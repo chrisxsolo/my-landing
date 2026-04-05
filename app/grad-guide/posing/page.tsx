@@ -1,5 +1,6 @@
 "use client";
 
+import { supabase } from '@/lib/supabase'
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -71,19 +72,22 @@ export default function PosingPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    async function fetchPoses() {
-      try {
-        // TODO: Replace with real Supabase call:
-        // const { data } = await supabase.from('grad_poses').select('*').order('order')
-        // if (data && data.length > 0) setPoses(data)
-        setLoading(false);
-      } catch (err) {
-        console.error(err);
-        setLoading(false);
-      }
+  async function fetchPoses() {
+    try {
+      const { data, error } = await supabase
+        .from('grad_poses')
+        .select('*')
+        .order('order', { ascending: true })
+      if (error) console.error(error)
+      if (data && data.length > 0) setPoses(data)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setLoading(false)
     }
-    fetchPoses();
-  }, []);
+  }
+  fetchPoses()
+}, [])
 
   return (
     <div className="min-h-screen bg-[#F8F9FF]">

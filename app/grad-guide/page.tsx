@@ -1,5 +1,5 @@
 "use client";
-
+import { supabase } from '@/lib/supabase'
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -51,19 +51,23 @@ export default function GradGuidePage() {
   // const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
   // const { data } = await supabase.from('grad_photos').select('*').order('created_at', { ascending: false })
   useEffect(() => {
-    async function fetchPhotos() {
-      try {
-        // TODO: Replace with real Supabase call once connected
-        // For now renders empty grid with placeholder message
-        setPhotos([]);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
+  async function fetchPhotos() {
+    try {
+      const { data, error } = await supabase
+        .from('grad_photos')
+        .select('*')
+        .order('created_at', { ascending: false })
+      
+      if (error) console.error(error)
+      if (data) setPhotos(data)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setLoading(false)
     }
-    fetchPhotos();
-  }, []);
+  }
+  fetchPhotos()
+}, [])
 
   return (
     <div className="min-h-screen bg-[#F8F9FF]">
