@@ -125,7 +125,7 @@ export default function Home() {
               🎓 Graduation Guide
             </Link>
             <a
-              href="https://www.instagram.com/"
+              href="https://www.instagram.com/soloxsnaps"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-white border border-slate-200 text-slate-700 font-semibold text-sm hover:border-slate-300 hover:-translate-y-0.5 transition-all duration-200 shadow-sm"
@@ -133,7 +133,7 @@ export default function Home() {
               📸 Instagram
             </a>
             <a
-              href="mailto:you@email.com"
+              href="https://www.soloxsnaps.com/contact/"
               className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-white border border-slate-200 text-slate-700 font-semibold text-sm hover:border-slate-300 hover:-translate-y-0.5 transition-all duration-200 shadow-sm"
             >
               ✉️ Book a shoot
