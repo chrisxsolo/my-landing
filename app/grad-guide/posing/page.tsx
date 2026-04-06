@@ -13,6 +13,7 @@ type Pose = {
   order: number;
 };
 
+
 // ── FALLBACK DRAFT CONTENT ─────────────────────────────────────────────
 // This shows while Supabase isn't connected yet.
 // Once connected, real data from the DB replaces this.
