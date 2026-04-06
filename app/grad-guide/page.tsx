@@ -9,9 +9,39 @@ export const dynamic = 'force-dynamic'
 type GradPhoto = { id: number; image_url: string; caption: string | null; };
 
 const sections = [
-  { href:"/grad-guide/posing",        number:"01", title:"Posing Guide",    desc:"Natural, flattering poses that actually look good on camera.", emoji:"📸", bg:"linear-gradient(135deg,#7c3aed,#db2777)" },
-  { href:"/grad-guide/what-to-wear",  number:"02", title:"What to Wear",    desc:"Colors and fits that photograph beautifully in any Bay Area location.", emoji:"👗", bg:"linear-gradient(135deg,#db2777,#f59e0b)" },
-  { href:"/grad-guide/how-to-prepare",number:"03", title:"How to Prepare",  desc:"Everything to do before your shoot so you show up confident and ready.", emoji:"✅", bg:"linear-gradient(135deg,#f59e0b,#7c3aed)" },
+  {
+    href: "/grad-guide/posing",
+    number: "01",
+    title: "Posing Guide",
+    desc: "Natural, flattering poses that actually look good on camera — no stiff yearbook vibes.",
+    emoji: "📸",
+    bg: "linear-gradient(135deg,#7c3aed,#db2777)",
+  },
+  {
+    href: "/grad-guide/what-to-wear",
+    number: "02",
+    title: "What to Wear",
+    desc: "Colors and fits that photograph beautifully in any Bay Area location.",
+    emoji: "👗",
+    bg: "linear-gradient(135deg,#db2777,#f59e0b)",
+  },
+  {
+    href: "/grad-guide/how-to-prepare",
+    number: "03",
+    title: "How to Prepare",
+    desc: "Everything to do before your shoot so you show up confident and ready.",
+    emoji: "✅",
+    bg: "linear-gradient(135deg,#f59e0b,#7c3aed)",
+  },
+  // ADD THIS:
+  {
+    href: "/location-guide",
+    number: "04",
+    title: "Location Guide",
+    desc: "Best spots at SJSU, Berkeley, SF State, and CSUEB — with timing and pro tips.",
+    emoji: "📍",
+    bg: "linear-gradient(135deg,#0f766e,#7c3aed)",
+  },
 ];
 
 const MARQUEE = ["Graduation Photos","Bay Area","Golden Hour","SJSU · Berkeley · Stanford","Natural Light","Real Moments","Graduation Photos","Bay Area","Golden Hour","SJSU · Berkeley · Stanford","Natural Light","Real Moments"];
@@ -113,7 +143,7 @@ export default function GradGuidePage() {
         <div className="max-w-3xl mx-auto">
           <p className="text-xs font-bold tracking-[0.15em] uppercase mb-2 text-violet-600">The Guide</p>
           <h2 className="text-3xl font-black text-slate-900 tracking-tight mb-8">Three things to know</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {sections.map((s) => (
               <Link key={s.href} href={s.href} className="card-lift group relative rounded-2xl p-6 cursor-pointer block overflow-hidden text-white" style={{background:s.bg}}>
                 <div className="absolute inset-0 pointer-events-none" style={{backgroundImage:`linear-gradient(rgba(255,255,255,0.06) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.06) 1px,transparent 1px)`,backgroundSize:"20px 20px"}}/>

@@ -1,149 +1,140 @@
 "use client";
+import { supabase } from '@/lib/supabase'
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { GUIDE_STYLES } from "@/lib/guidestyles";
 
 export const dynamic = 'force-dynamic'
 
-const MARQUEE = ["San Jose State","UC Berkeley","SF State","Cal State East Bay","Bay Area","Best Spots","Golden Hour","Campus Shoots","San Jose State","UC Berkeley","SF State","Cal State East Bay","Bay Area","Best Spots","Golden Hour","Campus Shoots"];
+type LocationSpot = {
+  id: number;
+  school_id: string;
+  school_name: string;
+  school_short: string;
+  name: string;
+  description: string;
+  tip: string;
+  icon: string;
+  image_url: string | null;
+  order: number;
+};
 
-const schools = [
-  {
-    id: "sjsu",
-    name: "San Jose State University",
-    short: "SJSU",
-    color: "#0055A2",
-    accent: "#E5A823",
-    gradient: "linear-gradient(135deg,#0055A2,#E5A823)",
-    gradientSoft: "linear-gradient(135deg,rgba(0,85,162,0.08),rgba(229,168,35,0.08))",
-    border: "rgba(0,85,162,0.2)",
+// ── SCHOOL METADATA (colors, branding) ──────────────────────────────────────
+// Spot content lives in Supabase. This just controls the visual theme per school.
+const SCHOOL_META: Record<string, {
+  emoji: string;
+  tagline: string;
+  gradient: string;
+  gradientSoft: string;
+  border: string;
+  color: string;
+  bar: string;
+}> = {
+  sjsu: {
     emoji: "🔵",
     tagline: "Downtown energy, iconic architecture",
-    spots: [
-      {
-        name: "The SJSU Sign Wall",
-        desc: "The big blue SJSU block letters on the side of the building on 7th St. Clean, bold, instantly recognizable. Best in the morning before it gets crowded.",
-        tip: "Arrive before 9am on weekdays for an empty wall.",
-        icon: "🏫",
-      },
-      {
-        name: "Tower Hall Steps",
-        desc: "The old red-brick Tower Hall is the most architectural building on campus. The front steps and archways give you a classic collegiate look that never goes out of style.",
-        tip: "Overcast days work great here — no harsh shadows on the brick.",
-        icon: "🏛️",
-      },
-    ],
+    gradient: "linear-gradient(135deg,#0055A2,#E5A823)",
+    gradientSoft: "rgba(0,85,162,0.07)",
+    border: "rgba(0,85,162,0.18)",
+    color: "#0055A2",
+    bar: "linear-gradient(180deg,#0055A2,#E5A823)",
   },
-  {
-    id: "berkeley",
-    name: "UC Berkeley",
-    short: "UC Berkeley",
-    color: "#003262",
-    accent: "#FDB515",
-    gradient: "linear-gradient(135deg,#003262,#FDB515)",
-    gradientSoft: "linear-gradient(135deg,rgba(0,50,98,0.08),rgba(253,181,21,0.08))",
-    border: "rgba(0,50,98,0.2)",
+  berkeley: {
     emoji: "🐻",
     tagline: "Iconic arches, Sather Gate, golden hillsides",
-    spots: [
-      {
-        name: "Sather Gate",
-        desc: "The most iconic spot on campus. The bronze gate with the campanile in the background is immediately recognizable as Berkeley. Go early morning for soft light and no crowds.",
-        tip: "7–9am on weekdays = nearly empty. Weekends get busy by 10am.",
-        icon: "🚪",
-      },
-      {
-        name: "Doe Memorial Library Steps",
-        desc: "Massive stone steps with classical columns. Gives you that timeless university photo that reads anywhere. Great for groups and solo shots in full gown.",
-        tip: "Shoot facing west in the late afternoon for beautiful front lighting.",
-        icon: "🏛️",
-      },
-      {
-        name: "The Campanile (Sather Tower)",
-        desc: "Shoot at the base looking up, or find a spot on the nearby path where you can frame the full tower behind you. One of the most striking backdrops on any campus.",
-        tip: "Golden hour from the west side of the tower is stunning.",
-        icon: "🗼",
-      },
-    ],
+    gradient: "linear-gradient(135deg,#003262,#FDB515)",
+    gradientSoft: "rgba(0,50,98,0.07)",
+    border: "rgba(0,50,98,0.18)",
+    color: "#003262",
+    bar: "linear-gradient(180deg,#003262,#FDB515)",
   },
-  {
-    id: "sfsu",
-    name: "San Francisco State University",
-    short: "SF State",
-    color: "#9B1C1F",
-    accent: "#F0A500",
-    gradient: "linear-gradient(135deg,#9B1C1F,#F0A500)",
-    gradientSoft: "linear-gradient(135deg,rgba(155,28,31,0.08),rgba(240,165,0,0.08))",
-    border: "rgba(155,28,31,0.2)",
+  sfsu: {
     emoji: "🌉",
     tagline: "Modern campus meets San Francisco backdrops",
-    spots: [
-      {
-        name: "SFSU Sign & Main Entrance",
-        desc: "The main campus entrance on 19th Ave has clean signage and a modern feel. Simple, direct, and immediately identifiable as SF State.",
-        tip: "Morning light from the east hits the sign perfectly on clear days.",
-        icon: "🏫",
-      },
-      {
-        name: "Cesar Chavez Student Center Steps",
-        desc: "The student center has wide concrete steps and an elevated plaza with great sight lines across campus. Modern architecture, good for full-length gown shots.",
-        tip: "The steps face south — great for midday light without squinting.",
-        icon: "🏢",
-      },
-      {
-        name: "Campus Green & Open Quad",
-        desc: "The central grassy area near the administration building gives you open sky and greenery. Clean, spacious, good for movement shots and cap throws.",
-        tip: "Afternoon light from the west gives you long golden shadows across the grass.",
-        icon: "🌿",
-      },
-    ],
+    gradient: "linear-gradient(135deg,#9B1C1F,#F0A500)",
+    gradientSoft: "rgba(155,28,31,0.07)",
+    border: "rgba(155,28,31,0.18)",
+    color: "#9B1C1F",
+    bar: "linear-gradient(180deg,#9B1C1F,#F0A500)",
   },
-  {
-    id: "csueb",
-    name: "Cal State East Bay",
-    short: "CSUEB",
-    color: "#003DA5",
-    accent: "#FFB81C",
-    gradient: "linear-gradient(135deg,#003DA5,#FFB81C)",
-    gradientSoft: "linear-gradient(135deg,rgba(0,61,165,0.08),rgba(255,184,28,0.08))",
-    border: "rgba(0,61,165,0.2)",
+  csueb: {
     emoji: "🦅",
     tagline: "Bay views, hillside campus, hidden gems",
-    spots: [
-      {
-        name: "CSUEB Sign at Main Entrance",
-        desc: "The main entrance sign off Carlos Bee Blvd gives you a clean, identifiable campus shot. Simple and works great for the classic 'I graduated here' photo.",
-        tip: "Morning light from the east is ideal before it gets harsh.",
-        icon: "🏫",
-      },
-      {
-        name: "Warren Hall Demolition Site / New Quad",
-        desc: "The open central area near the new construction gives you wide open sky and the Hayward Hills as a backdrop. Spacious and great for big group shots.",
-        tip: "Best in the late afternoon when the hills glow golden.",
-        icon: "🏔️",
-      },
-      {
-        name: "Library Terrace & Steps",
-        desc: "The library has a multi-level terrace with panoramic views of the Bay and the SF skyline on clear days. One of the best kept secrets for graduation photos in the East Bay.",
-        tip: "On clear days you can see SF in the background — check air quality first.",
-        icon: "📚",
-      },
-      {
-        name: "University Drive Pathway",
-        desc: "The main pedestrian pathway through campus lined with trees and light poles. Great for walking shots and candid-style portraits with depth in the background.",
-        tip: "Golden hour from the west end of the path is excellent.",
-        icon: "🌳",
-      },
-      {
-        name: "Meiklejohn Hall Archway",
-        desc: "One of the older buildings on campus with an archway entrance and red brick detail. Classic collegiate feel, good for portrait-style shots framed by the architecture.",
-        tip: "Overcast days work well here — consistent soft light through the archway.",
-        icon: "🏛️",
-      },
-    ],
+    gradient: "linear-gradient(135deg,#003DA5,#FFB81C)",
+    gradientSoft: "rgba(0,61,165,0.07)",
+    border: "rgba(0,61,165,0.18)",
+    color: "#003DA5",
+    bar: "linear-gradient(180deg,#003DA5,#FFB81C)",
   },
+};
+
+// Ordered list of school IDs for consistent display
+const SCHOOL_ORDER = ["sjsu","berkeley","sfsu","csueb"];
+
+// ── DRAFT CONTENT (shown until Supabase rows exist) ──────────────────────────
+const DRAFT_SPOTS: LocationSpot[] = [
+  // SJSU
+  {id:1,school_id:"sjsu",school_name:"San Jose State University",school_short:"SJSU",name:"The SJSU Sign Wall",description:"The big blue SJSU block letters on the side of the building on 7th St. Clean, bold, instantly recognizable. Best in the morning before it gets crowded.",tip:"Arrive before 9am on weekdays for an empty wall.",icon:"🏫",image_url:null,order:1},
+  {id:2,school_id:"sjsu",school_name:"San Jose State University",school_short:"SJSU",name:"Tower Hall Steps",description:"The old red-brick Tower Hall is the most architectural building on campus. The front steps and archways give you a classic collegiate look that never goes out of style.",tip:"Overcast days work great here — no harsh shadows on the brick.",icon:"🏛️",image_url:null,order:2},
+  {id:3,school_id:"sjsu",school_name:"San Jose State University",school_short:"SJSU",name:"Event Center Plaza",description:"Wide open concrete plaza with palm trees and clean sight lines. Great for walking shots, cap throws, and full-length gown photos. Lots of space to move.",tip:"The palm trees make great framing for backlit golden hour shots.",icon:"🌴",image_url:null,order:3},
+  {id:4,school_id:"sjsu",school_name:"San Jose State University",school_short:"SJSU",name:"MLK Library Steps",description:"The joint SJSU/San Jose Public Library has great steps and glass architecture out front. Modern aesthetic, clean lines, good for editorial-style portraits.",tip:"Late afternoon light hits the glass facade perfectly.",icon:"📚",image_url:null,order:4},
+  {id:5,school_id:"sjsu",school_name:"San Jose State University",school_short:"SJSU",name:"Campus Flower Beds & Gardens",description:"Scattered throughout campus near Clark Hall and the quad. Seasonal blooms add color and softness to photos — especially great if you're wearing darker outfits.",tip:"Spring semester has the best blooms — check before your shoot.",icon:"🌸",image_url:null,order:5},
+  // Berkeley
+  {id:6,school_id:"berkeley",school_name:"UC Berkeley",school_short:"UC Berkeley",name:"Sather Gate",description:"The most iconic spot on campus. The bronze gate with the campanile in the background is immediately recognizable as Berkeley. Go early morning for soft light and no crowds.",tip:"7–9am on weekdays = nearly empty. Weekends get busy by 10am.",icon:"🚪",image_url:null,order:1},
+  {id:7,school_id:"berkeley",school_name:"UC Berkeley",school_short:"UC Berkeley",name:"Doe Memorial Library Steps",description:"Massive stone steps with classical columns. Gives you that timeless university photo that reads anywhere. Great for groups and solo shots in full gown.",tip:"Shoot facing west in the late afternoon for beautiful front lighting.",icon:"🏛️",image_url:null,order:2},
+  {id:8,school_id:"berkeley",school_name:"UC Berkeley",school_short:"UC Berkeley",name:"Sproul Plaza",description:"The heart of campus. Open space, palm trees, and the Sather Tower in the background. Great for candid walking shots, cap throws, and wide environmental portraits.",tip:"The fountain area makes a great foreground element for wide shots.",icon:"🌳",image_url:null,order:3},
+  {id:9,school_id:"berkeley",school_name:"UC Berkeley",school_short:"UC Berkeley",name:"The Campanile (Sather Tower)",description:"Shoot at the base looking up, or find a spot where you can frame the full tower behind you. One of the most striking backdrops on any campus.",tip:"Golden hour from the west side of the tower is stunning.",icon:"🗼",image_url:null,order:4},
+  {id:10,school_id:"berkeley",school_name:"UC Berkeley",school_short:"UC Berkeley",name:"Faculty Glade",description:"A hidden gem — grassy open field surrounded by redwood trees and a small creek. Natural, serene, completely different vibe from the stone architecture nearby.",tip:"Great for a second look if you want something more natural and editorial.",icon:"🌿",image_url:null,order:5},
+  {id:11,school_id:"berkeley",school_name:"UC Berkeley",school_short:"UC Berkeley",name:"Strawberry Creek Path",description:"Wooded path running through campus with dappled light through the trees. Best for candid walking shots and profile portraits in natural shade.",tip:"Midday shade here is perfect when the sun is too harsh elsewhere.",icon:"🌊",image_url:null,order:6},
+  // SF State
+  {id:12,school_id:"sfsu",school_name:"San Francisco State University",school_short:"SF State",name:"SFSU Sign & Main Entrance",description:"The main campus entrance on 19th Ave has clean signage and a modern feel. Simple, direct, and immediately identifiable as SF State.",tip:"Morning light from the east hits the sign perfectly on clear days.",icon:"🏫",image_url:null,order:1},
+  {id:13,school_id:"sfsu",school_name:"San Francisco State University",school_short:"SF State",name:"Cesar Chavez Student Center Steps",description:"The student center has wide concrete steps and an elevated plaza with great sight lines across campus. Modern architecture, good for full-length gown shots.",tip:"The steps face south — great for midday light without squinting.",icon:"🏢",image_url:null,order:2},
+  {id:14,school_id:"sfsu",school_name:"San Francisco State University",school_short:"SF State",name:"Campus Green & Open Quad",description:"The central grassy area near the administration building gives you open sky and greenery. Clean, spacious, good for movement shots and cap throws.",tip:"Afternoon light from the west gives you long golden shadows across the grass.",icon:"🌿",image_url:null,order:3},
+  {id:15,school_id:"sfsu",school_name:"San Francisco State University",school_short:"SF State",name:"Lake Merced (5 min from campus)",description:"A short drive from campus and completely different energy. The lake trail with eucalyptus trees and open water makes for stunning editorial portraits with an SF feel.",tip:"Sunset here is unreal. Plan a second location shoot if you have time.",icon:"🌅",image_url:null,order:4},
+  {id:16,school_id:"sfsu",school_name:"San Francisco State University",school_short:"SF State",name:"Twin Peaks Overlook (nearby)",description:"A short drive for an iconic San Francisco skyline backdrop. Cap and gown with the whole city behind you — no other campus can offer this.",tip:"Go 30 min before golden hour. Fog can roll in fast so check the forecast.",icon:"🌁",image_url:null,order:5},
+  // CSUEB
+  {id:17,school_id:"csueb",school_name:"Cal State East Bay",school_short:"CSUEB",name:"CSUEB Sign at Main Entrance",description:"The main entrance sign off Carlos Bee Blvd gives you a clean, identifiable campus shot. Simple and works great for the classic 'I graduated here' photo.",tip:"Morning light from the east is ideal before it gets harsh.",icon:"🏫",image_url:null,order:1},
+  {id:18,school_id:"csueb",school_name:"Cal State East Bay",school_short:"CSUEB",name:"Central Quad & Open Areas",description:"The open central area gives you wide open sky and the Hayward Hills as a backdrop. Spacious and great for big group shots and cap throws.",tip:"Best in the late afternoon when the hills glow golden.",icon:"🏔️",image_url:null,order:2},
+  {id:19,school_id:"csueb",school_name:"Cal State East Bay",school_short:"CSUEB",name:"Library Terrace & Steps",description:"The library has a multi-level terrace with panoramic views of the Bay and the SF skyline on clear days. One of the best kept secrets for graduation photos in the East Bay.",tip:"On clear days you can see SF in the background — check air quality first.",icon:"📚",image_url:null,order:3},
+  {id:20,school_id:"csueb",school_name:"Cal State East Bay",school_short:"CSUEB",name:"University Drive Pathway",description:"The main pedestrian pathway through campus lined with trees and light poles. Great for walking shots and candid-style portraits with depth in the background.",tip:"Golden hour from the west end of the path is excellent.",icon:"🌳",image_url:null,order:4},
+  {id:21,school_id:"csueb",school_name:"Cal State East Bay",school_short:"CSUEB",name:"Meiklejohn Hall Archway",description:"One of the older buildings on campus with an archway entrance and red brick detail. Classic collegiate feel, good for portrait-style shots framed by the architecture.",tip:"Overcast days work well here — consistent soft light through the archway.",icon:"🏛️",image_url:null,order:5},
 ];
 
+const MARQUEE = ["San Jose State","UC Berkeley","SF State","Cal State East Bay","Bay Area","Best Spots","Golden Hour","Campus Shoots","San Jose State","UC Berkeley","SF State","Cal State East Bay","Bay Area","Best Spots","Golden Hour","Campus Shoots"];
+
 export default function LocationGuidePage() {
+  const [spots, setSpots] = useState<LocationSpot[]>(DRAFT_SPOTS);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchSpots() {
+      try {
+        const { data, error } = await supabase
+          .from('location_spots')
+          .select('*')
+          .order('school_id')
+          .order('order', { ascending: true })
+        if (error) console.error(error)
+        if (data && data.length > 0) setSpots(data)
+      } catch (err) { console.error(err) }
+      finally { setLoading(false) }
+    }
+    fetchSpots()
+  }, [])
+
+  // Group spots by school
+  const spotsBySchool = SCHOOL_ORDER.reduce((acc, schoolId) => {
+    acc[schoolId] = spots.filter(s => s.school_id === schoolId)
+    return acc
+  }, {} as Record<string, LocationSpot[]>)
+
+  // Get school display info from first spot or draft
+  const schoolInfo = SCHOOL_ORDER.reduce((acc, schoolId) => {
+    const first = spots.find(s => s.school_id === schoolId)
+    if (first) acc[schoolId] = { name: first.school_name, short: first.school_short }
+    return acc
+  }, {} as Record<string, { name: string; short: string }>)
+
   return (
     <div className="min-h-screen bg-white font-sans overflow-x-hidden">
       <style>{GUIDE_STYLES}</style>
@@ -158,26 +149,19 @@ export default function LocationGuidePage() {
 
       {/* HERO */}
       <section className="relative overflow-hidden px-6 pt-16 pb-14 border-b border-black/[0.06]">
-        {/* Grid */}
         <div className="absolute inset-0 pointer-events-none" style={{backgroundImage:`linear-gradient(rgba(124,58,237,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(124,58,237,0.04) 1px,transparent 1px)`,backgroundSize:"40px 40px"}}/>
         <div className="absolute inset-0 pointer-events-none" style={{background:"radial-gradient(ellipse at 50% 50%,transparent 30%,white 78%)"}}/>
-        {/* Corner brackets */}
         <div className="absolute top-5 left-5 w-5 h-5 pointer-events-none" style={{borderTop:"2px solid rgba(124,58,237,0.3)",borderLeft:"2px solid rgba(124,58,237,0.3)"}}/>
         <div className="absolute top-5 right-5 w-5 h-5 pointer-events-none" style={{borderTop:"2px solid rgba(219,39,119,0.3)",borderRight:"2px solid rgba(219,39,119,0.3)"}}/>
         <div className="absolute bottom-5 left-5 w-5 h-5 pointer-events-none" style={{borderBottom:"2px solid rgba(219,39,119,0.3)",borderLeft:"2px solid rgba(219,39,119,0.3)"}}/>
         <div className="absolute bottom-5 right-5 w-5 h-5 pointer-events-none" style={{borderBottom:"2px solid rgba(245,158,11,0.3)",borderRight:"2px solid rgba(245,158,11,0.3)"}}/>
-        {/* Pulse dots */}
         <div className="pdot absolute top-7 right-7 w-2 h-2 rounded-full pointer-events-none" style={{background:"linear-gradient(135deg,#7c3aed,#db2777)"}}/>
         <div className="pdot absolute bottom-8 left-8 w-1.5 h-1.5 rounded-full pointer-events-none" style={{background:"linear-gradient(135deg,#db2777,#f59e0b)",animationDelay:"1s"}}/>
-        {/* Blobs */}
         <div className="blob1 absolute rounded-full pointer-events-none" style={{width:520,height:520,top:-130,left:-110,background:"radial-gradient(circle,rgba(124,58,237,0.12),transparent 70%)"}}/>
         <div className="blob2 absolute rounded-full pointer-events-none" style={{width:400,height:400,top:-70,right:-90,background:"radial-gradient(circle,rgba(219,39,119,0.09),transparent 70%)"}}/>
-        {/* Squiggle */}
         <div className="absolute right-8 top-1/2 -translate-y-1/2 pointer-events-none hidden sm:block" style={{opacity:0.4,animation:"fadeIn 1s 0.6s ease both"}}>
           <svg width="110" height="220" viewBox="0 0 110 220" fill="none">
-            <defs>
-              <linearGradient id="lsg1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#7c3aed"/><stop offset="50%" stopColor="#db2777"/><stop offset="100%" stopColor="#f59e0b"/></linearGradient>
-            </defs>
+            <defs><linearGradient id="lsg1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#7c3aed"/><stop offset="50%" stopColor="#db2777"/><stop offset="100%" stopColor="#f59e0b"/></linearGradient></defs>
             <path className="sqp1" d="M55 6 C80 22,30 46,55 72 C80 98,30 120,55 148 C80 176,30 196,55 216" stroke="url(#lsg1)" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
             <path className="sqp2" d="M35 20 C60 36,10 60,35 86 C60 112,10 136,35 162 C60 188,10 206,35 218" stroke="#db2777" strokeWidth="0.8" fill="none" strokeLinecap="round" opacity="0.3"/>
             <circle cx="55" cy="6"   r="2.5" fill="#7c3aed" opacity="0.8"/>
@@ -186,7 +170,6 @@ export default function LocationGuidePage() {
             <circle cx="55" cy="216" r="2.5" fill="#7c3aed" opacity="0.8"/>
           </svg>
         </div>
-        {/* Spinning ring */}
         <div className="spin absolute -bottom-10 -left-10 pointer-events-none hidden sm:block" style={{opacity:0.08}}>
           <svg width="140" height="140" viewBox="0 0 140 140"><circle cx="70" cy="70" r="60" stroke="#7c3aed" strokeWidth="1" fill="none" strokeDasharray="8 6"/></svg>
         </div>
@@ -196,9 +179,7 @@ export default function LocationGuidePage() {
             <div className="pdot w-1.5 h-1.5 rounded-full" style={{background:"linear-gradient(135deg,#7c3aed,#db2777)"}}/>
             <p className="text-xs font-bold tracking-[0.12em] uppercase text-violet-700">Bay Area Campus Guide</p>
           </div>
-          <h1 className="afu2 text-5xl sm:text-6xl font-black tracking-tight leading-tight text-slate-900 mb-2">
-            Best spots to
-          </h1>
+          <h1 className="afu2 text-5xl sm:text-6xl font-black tracking-tight leading-tight text-slate-900 mb-2">Best spots to</h1>
           <p className="afu3 text-5xl sm:text-6xl font-light italic tracking-tight text-slate-900 mb-6">
             <span style={{background:"linear-gradient(135deg,#7c3aed,#db2777,#f59e0b)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>shoot at.</span>
             <span className="cblink inline-block w-[3px] h-[44px] sm:h-[52px] ml-1.5 rounded-sm align-middle" style={{background:"linear-gradient(135deg,#7c3aed,#db2777)"}}/>
@@ -206,14 +187,17 @@ export default function LocationGuidePage() {
           <p className="afu4 text-lg text-slate-600 font-light leading-relaxed max-w-lg mx-auto mb-8">
             Four Bay Area campuses, broken down spot by spot. Where to go, what to expect, and the best time to show up.
           </p>
-
-          {/* School jump links */}
+          {/* Jump links */}
           <div className="afu4 flex flex-wrap justify-center gap-2">
-            {schools.map((s) => (
-              <a key={s.id} href={`#${s.id}`} className="btn-lift px-4 py-2 rounded-full text-xs font-bold text-white" style={{background:s.gradient}}>
-                {s.short}
-              </a>
-            ))}
+            {SCHOOL_ORDER.map((id) => {
+              const meta = SCHOOL_META[id]
+              const info = schoolInfo[id]
+              return (
+                <a key={id} href={`#${id}`} className="btn-lift px-4 py-2 rounded-full text-xs font-bold text-white" style={{background:meta.gradient}}>
+                  {info?.short ?? id.toUpperCase()}
+                </a>
+              )
+            })}
           </div>
         </div>
       </section>
@@ -231,72 +215,124 @@ export default function LocationGuidePage() {
 
       {/* SCHOOLS */}
       <div className="px-6 py-14 space-y-24">
-        {schools.map((school, si) => (
-          <section key={school.id} id={school.id} className="max-w-3xl mx-auto scroll-mt-20">
-
-            {/* School header */}
-            <div className="relative rounded-2xl p-7 mb-8 overflow-hidden text-white" style={{background:school.gradient}}>
-              <div className="absolute inset-0 pointer-events-none" style={{backgroundImage:`linear-gradient(rgba(255,255,255,0.06) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.06) 1px,transparent 1px)`,backgroundSize:"20px 20px"}}/>
-              {/* Squiggle decoration on school header */}
-              <div className="absolute bottom-3 right-4 opacity-20 pointer-events-none">
-                <svg width="50" height="80" viewBox="0 0 50 80" fill="none"><path d="M25 4 C38 16,12 28,25 44 C38 60,12 70,25 78" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round"/><circle cx="25" cy="4" r="2" fill="white" opacity="0.8"/><circle cx="25" cy="44" r="2" fill="white" opacity="0.8"/><circle cx="25" cy="78" r="2" fill="white" opacity="0.8"/></svg>
-              </div>
-              <div className="relative z-10 flex items-start justify-between">
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-2xl">{school.emoji}</span>
-                    <span className="text-xs font-bold tracking-[0.15em] uppercase text-white/60">{String(si + 1).padStart(2,"0")} — {school.spots.length} spots</span>
-                  </div>
-                  <h2 className="text-2xl sm:text-3xl font-black leading-tight mb-1">{school.name}</h2>
-                  <p className="text-white/70 text-sm font-light">{school.tagline}</p>
-                </div>
-              </div>
+        {loading ? (
+          // Skeleton
+          [...Array(4)].map((_,i) => (
+            <div key={i} className="max-w-3xl mx-auto space-y-4">
+              <div className="rounded-2xl animate-pulse h-28" style={{background:"linear-gradient(135deg,#ede9fe,#fce7f3)"}}/>
+              {[...Array(3)].map((_,j) => <div key={j} className="rounded-2xl animate-pulse h-48" style={{background:"linear-gradient(135deg,#f5f3ff,#fdf2f8)"}}/>)}
             </div>
+          ))
+        ) : (
+          SCHOOL_ORDER.map((schoolId, si) => {
+            const meta = SCHOOL_META[schoolId]
+            const schoolSpots = spotsBySchool[schoolId] ?? []
+            const info = schoolInfo[schoolId]
+            if (!info) return null
 
-            {/* Spots */}
-            <div className="space-y-4">
-              {school.spots.map((spot, i) => (
-                <div key={i} className="tip-card rounded-2xl overflow-hidden relative" style={{background:"#fff",border:`1px solid ${school.border}`}}>
-                  {/* Colored left bar */}
-                  <div className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-2xl" style={{background:school.gradient}}/>
-                  {/* Top accent bar */}
-                  {i === 0 && <div className="h-[2px]" style={{background:school.gradient}}/>}
-                  <div className="p-5 pl-6">
-                    <div className="flex items-start gap-3">
-                      <span className="text-xl flex-shrink-0 mt-0.5">{spot.icon}</span>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 flex-wrap mb-1.5">
-                          <h3 className="text-base font-black text-slate-900 leading-tight">{spot.name}</h3>
-                          <span className="text-[10px] font-bold tracking-widest uppercase px-2 py-0.5 rounded-full" style={{color:school.color,background:school.gradientSoft}}>
-                            Spot {String(i + 1).padStart(2,"0")}
-                          </span>
-                        </div>
-                        <p className="text-slate-600 text-sm leading-relaxed mb-2">{spot.desc}</p>
-                        {/* Pro tip */}
-                        <div className="flex items-start gap-2 rounded-xl px-3 py-2" style={{background:school.gradientSoft,border:`1px solid ${school.border}`}}>
-                          <span className="text-xs font-black uppercase tracking-wider mt-0.5 flex-shrink-0" style={{color:school.color}}>Tip</span>
-                          <p className="text-xs leading-relaxed" style={{color:school.color}}>{spot.tip}</p>
-                        </div>
-                      </div>
+            return (
+              <section key={schoolId} id={schoolId} className="max-w-3xl mx-auto scroll-mt-20">
+
+                {/* School header card */}
+                <div className="relative rounded-2xl p-7 mb-8 overflow-hidden text-white" style={{background:meta.gradient}}>
+                  <div className="absolute inset-0 pointer-events-none" style={{backgroundImage:`linear-gradient(rgba(255,255,255,0.06) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.06) 1px,transparent 1px)`,backgroundSize:"20px 20px"}}/>
+                  <div className="absolute bottom-3 right-4 opacity-20 pointer-events-none">
+                    <svg width="50" height="80" viewBox="0 0 50 80" fill="none">
+                      <path d="M25 4 C38 16,12 28,25 44 C38 60,12 70,25 78" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+                      <circle cx="25" cy="4"  r="2" fill="white" opacity="0.8"/>
+                      <circle cx="25" cy="44" r="2" fill="white" opacity="0.8"/>
+                      <circle cx="25" cy="78" r="2" fill="white" opacity="0.8"/>
+                    </svg>
+                  </div>
+                  <div className="relative z-10">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-2xl">{meta.emoji}</span>
+                      <span className="text-xs font-bold tracking-[0.15em] uppercase text-white/60">
+                        {String(si + 1).padStart(2,"0")} — {schoolSpots.length} spots
+                      </span>
                     </div>
+                    <h2 className="text-2xl sm:text-3xl font-black leading-tight mb-1">{info.name}</h2>
+                    <p className="text-white/70 text-sm font-light">{meta.tagline}</p>
                   </div>
                 </div>
-              ))}
-            </div>
 
-            {/* Back to top link */}
-            <div className="mt-6 text-center">
-              <a href="#" className="text-xs font-bold tracking-widest uppercase text-slate-400 hover:text-slate-600 transition-colors">↑ Back to top</a>
-            </div>
-          </section>
-        ))}
+                {/* Spot cards — same layout as posing page */}
+                <div className="space-y-5">
+                  {schoolSpots.map((spot, i) => (
+                    <div key={spot.id} className="card-lift rounded-2xl overflow-hidden" style={{border:`1px solid ${meta.border}`,background:"#fff"}}>
+                      {/* Accent bar */}
+                      <div className="h-[3px]" style={{background:meta.gradient}}/>
+
+                      {spot.image_url ? (
+                        /* ── HAS IMAGE: stacked mobile, side-by-side desktop ── */
+                        <div className="flex flex-col sm:grid sm:grid-cols-2">
+                          <div className="w-full h-72 sm:h-auto overflow-hidden relative" style={{background:"#f1f5f9"}}>
+                            <img
+                              src={spot.image_url}
+                              alt={spot.name}
+                              className="w-full h-full object-cover"
+                            />
+                            {/* Spot number badge on image */}
+                            <div className="absolute top-3 left-3">
+                              <span className="text-xs font-black px-2.5 py-1 rounded-full text-white" style={{background:meta.gradient}}>
+                                SPOT {String(i + 1).padStart(2,"0")}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="p-6 flex flex-col justify-center">
+                            <h3 className="text-lg font-black text-slate-900 mb-2 leading-tight">{spot.name}</h3>
+                            <p className="text-slate-600 text-sm leading-relaxed mb-4">{spot.description}</p>
+                            <div className="flex items-start gap-2 rounded-xl px-3 py-2.5" style={{background:`${meta.gradientSoft}`,border:`1px solid ${meta.border}`}}>
+                              <span className="text-xs font-black uppercase tracking-wider mt-0.5 flex-shrink-0" style={{color:meta.color}}>Tip</span>
+                              <p className="text-xs leading-relaxed" style={{color:meta.color}}>{spot.tip}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        /* ── NO IMAGE: placeholder left col on desktop, full width on mobile ── */
+                        <div className="grid grid-cols-1 sm:grid-cols-2">
+                          <div className="hidden sm:flex items-center justify-center relative overflow-hidden" style={{minHeight:240,background:`linear-gradient(135deg,${meta.gradientSoft},transparent)`}}>
+                            <div className="absolute inset-0 pointer-events-none" style={{backgroundImage:`linear-gradient(rgba(0,0,0,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(0,0,0,0.04) 1px,transparent 1px)`,backgroundSize:"16px 16px"}}/>
+                            <div className="text-center relative z-10">
+                              <p className="text-4xl mb-2">{spot.icon}</p>
+                              <p className="text-xs font-semibold" style={{color:meta.color}}>Photo via Supabase</p>
+                            </div>
+                          </div>
+                          <div className="p-6 flex flex-col justify-center">
+                            <div className="mb-3">
+                              <span className="text-xs font-black tracking-widest px-2.5 py-1 rounded-full" style={{color:meta.color,background:meta.gradientSoft}}>
+                                SPOT {String(i + 1).padStart(2,"0")}
+                              </span>
+                            </div>
+                            <h3 className="text-lg font-black text-slate-900 mb-2 leading-tight">{spot.name}</h3>
+                            <p className="text-slate-600 text-sm leading-relaxed mb-4">{spot.description}</p>
+                            <div className="flex items-start gap-2 rounded-xl px-3 py-2.5" style={{background:meta.gradientSoft,border:`1px solid ${meta.border}`}}>
+                              <span className="text-xs font-black uppercase tracking-wider mt-0.5 flex-shrink-0" style={{color:meta.color}}>Tip</span>
+                              <p className="text-xs leading-relaxed" style={{color:meta.color}}>{spot.tip}</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-6 text-center">
+                  <a href="#" className="text-xs font-bold tracking-widest uppercase text-slate-400 hover:text-slate-600 transition-colors">↑ Back to top</a>
+                </div>
+              </section>
+            )
+          })
+        )}
       </div>
 
       {/* CTA */}
       <div className="px-6 pb-20">
         <div className="max-w-3xl mx-auto rounded-2xl p-10 text-center relative overflow-hidden" style={{background:"linear-gradient(135deg,#7c3aed,#db2777,#f59e0b)"}}>
           <div className="absolute inset-0 pointer-events-none" style={{backgroundImage:`linear-gradient(rgba(255,255,255,0.06) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.06) 1px,transparent 1px)`,backgroundSize:"28px 28px"}}/>
-          <div className="absolute top-4 right-6 opacity-15 pointer-events-none"><svg width="50" height="80" viewBox="0 0 50 80" fill="none"><path d="M25 4 C38 16,12 28,25 44 C38 60,12 70,25 78" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round"/></svg></div>
+          <div className="absolute top-4 right-6 opacity-15 pointer-events-none">
+            <svg width="50" height="80" viewBox="0 0 50 80" fill="none"><path d="M25 4 C38 16,12 28,25 44 C38 60,12 70,25 78" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round"/></svg>
+          </div>
           <h3 className="relative text-3xl font-black text-white mb-2 tracking-tight">Know your spots.<br/>Now book the shoot.</h3>
           <p className="relative text-white/75 mb-7 text-sm font-light">Tell me which locations you want and we'll plan the whole session around them.</p>
           <a href="https://www.soloxsnaps.com/contact/" className="btn-lift relative inline-block px-8 py-3 rounded-full bg-white font-bold text-sm" style={{color:"#7c3aed"}}>Book your shoot →</a>
