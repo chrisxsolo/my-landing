@@ -1,42 +1,23 @@
 "use client";
-
 import { supabase } from '@/lib/supabase'
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { GUIDE_STYLES } from "@/lib/guidestyles";
 
 export const dynamic = 'force-dynamic'
 
-type Pose = {
-  id: number;
-  title: string;
-  image_url: string;
-  instructions: string;
-  order: number;
-};
+type Pose = { id:number; title:string; image_url:string; instructions:string; order:number; };
 
 const DRAFT_POSES: Pose[] = [
-  { id:1, title:"Hand on Hip, Hand on Stool", image_url:"", instructions:"Place one hand on your hip and rest the other on a stool, ledge, or wall. This breaks up stiff posture and gives you something natural to do with your hands. Shift your weight to one leg slightly — it creates a relaxed S-curve that photographs beautifully. Keep your chin slightly forward and down to avoid looking stiff.", order:1 },
-  { id:2, title:"Cap in the Air", image_url:"", instructions:"Hold your graduation cap above your head with both hands, arms extended, and look up at it with a genuine smile. This is one of the most iconic grad shots. The key is to actually laugh or think of something funny — forced smiles read flat on camera. Toss it slightly and catch it mid-air for a more dynamic version.", order:2 },
-  { id:3, title:"Walking Toward Camera", image_url:"", instructions:"Walk naturally toward the camera with your cap and gown flowing. Look just slightly past the lens — not directly into it — and let your expression be relaxed. This shot works best in an open walkway, hallway, or path with leading lines. It creates movement and energy that static poses can't match.", order:3 },
-  { id:4, title:"Leaning Against a Wall", image_url:"", instructions:"Stand with your back or shoulder against a wall, one foot flat against it. Cross your arms loosely or hold your diploma in one hand. Tilt your chin down slightly and look into the camera. This pose reads as confident and cool — great for textured walls, brick, or architectural backgrounds.", order:4 },
-  { id:5, title:"Sitting on Steps", image_url:"", instructions:"Find a set of stairs and sit naturally — not perfectly upright, but slightly leaning forward with elbows on your knees. This is a relaxed, candid-feeling pose that works especially well for cap and gown shots. Spread your gown out around you for visual impact. Great for outdoor campus steps or urban staircases.", order:5 },
-  { id:6, title:"Looking Away, Candid Profile", image_url:"", instructions:"Look off into the distance at a 45-degree angle from the camera. Think about something that makes you genuinely happy — your photographer will capture a real expression. This works best in golden hour light where the sun hits the side of your face. It's one of the most editorial-looking grad shots you can get.", order:6 },
+  {id:1,title:"Hand on Hip, Hand on Stool",image_url:"",instructions:"Place one hand on your hip and rest the other on a stool, ledge, or wall. This breaks up stiff posture and gives you something natural to do with your hands. Shift your weight to one leg slightly — it creates a relaxed S-curve that photographs beautifully. Keep your chin slightly forward and down to avoid looking stiff.",order:1},
+  {id:2,title:"Cap in the Air",image_url:"",instructions:"Hold your graduation cap above your head with both hands, arms extended, and look up at it with a genuine smile. This is one of the most iconic grad shots. The key is to actually laugh or think of something funny — forced smiles read flat on camera. Toss it slightly and catch it mid-air for a more dynamic version.",order:2},
+  {id:3,title:"Walking Toward Camera",image_url:"",instructions:"Walk naturally toward the camera with your cap and gown flowing. Look just slightly past the lens — not directly into it — and let your expression be relaxed. This shot works best in an open walkway, hallway, or path with leading lines. It creates movement and energy that static poses can't match.",order:3},
+  {id:4,title:"Leaning Against a Wall",image_url:"",instructions:"Stand with your back or shoulder against a wall, one foot flat against it. Cross your arms loosely or hold your diploma in one hand. Tilt your chin down slightly and look into the camera. This pose reads as confident and cool — great for textured walls, brick, or architectural backgrounds.",order:4},
+  {id:5,title:"Sitting on Steps",image_url:"",instructions:"Find a set of stairs and sit naturally — not perfectly upright, but slightly leaning forward with elbows on your knees. This is a relaxed, candid-feeling pose that works especially well for cap and gown shots. Spread your gown out around you for visual impact. Great for outdoor campus steps or urban staircases.",order:5},
+  {id:6,title:"Looking Away, Candid Profile",image_url:"",instructions:"Look off into the distance at a 45-degree angle from the camera. Think about something that makes you genuinely happy — your photographer will capture a real expression. This works best in golden hour light where the sun hits the side of your face. It's one of the most editorial-looking grad shots you can get.",order:6},
 ];
 
-const STYLES = `
-  @keyframes fadeUp{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}
-  @keyframes blobFloat{0%,100%{transform:translate(0,0)scale(1);}33%{transform:translate(12px,-8px)scale(1.02);}66%{transform:translate(-8px,10px)scale(0.98);}}
-  @keyframes pulseRing{0%,100%{opacity:0.5;transform:scale(1);}50%{opacity:0.15;transform:scale(1.25);}}
-  .afu1{animation:fadeUp 0.5s 0.05s ease both;}
-  .afu2{animation:fadeUp 0.5s 0.12s ease both;}
-  .afu3{animation:fadeUp 0.5s 0.19s ease both;}
-  .blob1{animation:blobFloat 10s ease-in-out infinite;}
-  .pdot{animation:pulseRing 2.5s ease-in-out infinite;}
-  .card-lift{transition:transform 0.22s ease,box-shadow 0.22s ease;}
-  .card-lift:hover{transform:translateY(-4px);box-shadow:0 16px 40px rgba(124,58,237,0.1);}
-  .btn-lift{transition:transform 0.18s ease,box-shadow 0.18s ease;}
-  .btn-lift:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,0.12);}
-`;
+const MARQUEE = ["Pose Guide","Study Before Shoot","Natural Light","Real Moments","No Stiff Poses","Bay Area Grads","Pose Guide","Study Before Shoot","Natural Light","Real Moments","No Stiff Poses","Bay Area Grads"];
 
 export default function PosingPage() {
   const [poses, setPoses] = useState<Pose[]>(DRAFT_POSES);
@@ -45,109 +26,123 @@ export default function PosingPage() {
   useEffect(() => {
     async function fetchPoses() {
       try {
-        const { data, error } = await supabase.from('grad_poses').select('*').order('order', { ascending: true })
+        const {data,error} = await supabase.from('grad_poses').select('*').order('order',{ascending:true})
         if (error) console.error(error)
         if (data && data.length > 0) setPoses(data)
-      } catch (err) { console.error(err) }
+      } catch(err){console.error(err)}
     }
     fetchPoses()
   }, [])
 
   return (
     <div className="min-h-screen bg-white font-sans overflow-x-hidden">
-      <style>{STYLES}</style>
+      <style>{GUIDE_STYLES}</style>
 
       {/* NAVBAR */}
-      <nav className="sticky top-0 z-50 backdrop-blur-xl border-b border-black/[0.06]" style={{ background:"rgba(255,255,255,0.9)" }}>
+      <nav className="af sticky top-0 z-50 backdrop-blur-xl border-b border-black/[0.06]" style={{background:"rgba(255,255,255,0.9)"}}>
         <div className="max-w-3xl mx-auto px-6 h-14 flex items-center justify-between">
-          <Link href="/" className="font-black text-lg tracking-tight" style={{ background:"linear-gradient(135deg,#a78bfa,#f9a8d4,#fcd34d)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>
-            Chris.
-          </Link>
-          <Link href="/grad-guide" className="text-sm font-bold text-slate-700 hover:text-slate-400 transition-colors">
-            ← Grad Guide
-          </Link>
+          <Link href="/" className="font-black text-lg tracking-tight" style={{background:"linear-gradient(135deg,#a78bfa,#f9a8d4,#fcd34d)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>Chris.</Link>
+          <Link href="/grad-guide" className="text-sm font-bold text-slate-700 hover:text-slate-400 transition-colors">← Grad Guide</Link>
         </div>
       </nav>
 
       {/* HERO */}
-      <section className="relative overflow-hidden px-6 pt-14 pb-10 border-b border-black/[0.06]">
-        <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage:`linear-gradient(rgba(167,139,250,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(167,139,250,0.04) 1px,transparent 1px)`, backgroundSize:"40px 40px" }} />
-        <div className="absolute inset-0 pointer-events-none" style={{ background:"radial-gradient(ellipse at 40% 50%, transparent 30%, white 75%)" }} />
-        <div className="absolute top-5 left-5 w-4 h-4 pointer-events-none" style={{ borderTop:"1.5px solid rgba(124,58,237,0.3)", borderLeft:"1.5px solid rgba(124,58,237,0.3)" }} />
-        <div className="absolute bottom-5 right-5 w-4 h-4 pointer-events-none" style={{ borderBottom:"1.5px solid rgba(124,58,237,0.3)", borderRight:"1.5px solid rgba(124,58,237,0.3)" }} />
-        <div className="pdot absolute top-7 right-7 w-2 h-2 rounded-full pointer-events-none" style={{ background:"linear-gradient(135deg,#7c3aed,#db2777)" }} />
-        <div className="blob1 absolute rounded-full pointer-events-none" style={{ width:440, height:440, top:-120, left:-100, background:"radial-gradient(circle,rgba(124,58,237,0.12),transparent 70%)" }} />
+      <section className="relative overflow-hidden px-6 pt-14 pb-12 border-b border-black/[0.06]">
+        <div className="absolute inset-0 pointer-events-none" style={{backgroundImage:`linear-gradient(rgba(124,58,237,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(124,58,237,0.04) 1px,transparent 1px)`,backgroundSize:"40px 40px"}}/>
+        <div className="absolute inset-0 pointer-events-none" style={{background:"radial-gradient(ellipse at 40% 50%,transparent 28%,white 74%)"}}/>
+        <div className="absolute top-5 left-5 w-5 h-5 pointer-events-none" style={{borderTop:"2px solid rgba(124,58,237,0.3)",borderLeft:"2px solid rgba(124,58,237,0.3)"}}/>
+        <div className="absolute top-5 right-5 w-5 h-5 pointer-events-none" style={{borderTop:"2px solid rgba(219,39,119,0.25)",borderRight:"2px solid rgba(219,39,119,0.25)"}}/>
+        <div className="absolute bottom-5 left-5 w-5 h-5 pointer-events-none" style={{borderBottom:"2px solid rgba(219,39,119,0.25)",borderLeft:"2px solid rgba(219,39,119,0.25)"}}/>
+        <div className="absolute bottom-5 right-5 w-5 h-5 pointer-events-none" style={{borderBottom:"2px solid rgba(124,58,237,0.3)",borderRight:"2px solid rgba(124,58,237,0.3)"}}/>
+        <div className="pdot absolute top-7 right-7 w-2 h-2 rounded-full pointer-events-none" style={{background:"linear-gradient(135deg,#7c3aed,#db2777)"}}/>
+        <div className="pdot absolute bottom-7 left-7 w-1.5 h-1.5 rounded-full pointer-events-none" style={{background:"#db2777",animationDelay:"1s"}}/>
+        <div className="blob1 absolute rounded-full pointer-events-none" style={{width:460,height:460,top:-120,left:-100,background:"radial-gradient(circle,rgba(124,58,237,0.12),transparent 70%)"}}/>
+        <div className="blob2 absolute rounded-full pointer-events-none" style={{width:340,height:340,top:-60,right:-70,background:"radial-gradient(circle,rgba(219,39,119,0.09),transparent 70%)"}}/>
+
+        {/* Squiggle right */}
+        <div className="absolute right-8 top-1/2 -translate-y-1/2 pointer-events-none hidden sm:block" style={{opacity:0.45,animation:"fadeIn 1s 0.6s ease both"}}>
+          <svg width="100" height="200" viewBox="0 0 100 200" fill="none">
+            <defs><linearGradient id="psg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#7c3aed"/><stop offset="100%" stopColor="#db2777"/></linearGradient></defs>
+            <path className="sqp1" d="M50 6 C74 20,26 42,50 66 C74 90,26 112,50 136 C74 160,26 178,50 196" stroke="url(#psg)" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+            <path className="sqp2" d="M30 18 C54 32,6 54,30 78 C54 102,6 124,30 148 C54 172,6 188,30 198" stroke="#db2777" strokeWidth="0.8" fill="none" strokeLinecap="round" opacity="0.3"/>
+            <circle cx="50" cy="6"   r="2.5" fill="#7c3aed" opacity="0.8"/>
+            <circle cx="50" cy="66"  r="2.5" fill="#db2777" opacity="0.8"/>
+            <circle cx="50" cy="136" r="2.5" fill="#7c3aed" opacity="0.8"/>
+            <circle cx="50" cy="196" r="2.5" fill="#db2777" opacity="0.8"/>
+          </svg>
+        </div>
+        {/* Spinning ring */}
+        <div className="spin absolute -bottom-8 -left-8 pointer-events-none hidden sm:block" style={{opacity:0.08}}>
+          <svg width="120" height="120" viewBox="0 0 120 120"><circle cx="60" cy="60" r="52" stroke="#7c3aed" strokeWidth="1" fill="none" strokeDasharray="8 5"/></svg>
+        </div>
 
         <div className="relative z-10 max-w-3xl mx-auto">
-          <div className="afu1 inline-flex items-center gap-2 px-3 py-1.5 rounded-full mb-4" style={{ background:"rgba(124,58,237,0.08)", border:"1px solid rgba(124,58,237,0.18)" }}>
-            <div className="w-1.5 h-1.5 rounded-full bg-violet-600" />
+          <div className="afu1 inline-flex items-center gap-2 px-3 py-1.5 rounded-full mb-4" style={{background:"rgba(124,58,237,0.08)",border:"1px solid rgba(124,58,237,0.2)"}}>
+            <div className="pdot w-1.5 h-1.5 rounded-full bg-violet-600"/>
             <p className="text-xs font-bold tracking-[0.12em] uppercase text-violet-700">01 — Posing Guide</p>
           </div>
-          <h1 className="afu2 text-4xl sm:text-5xl font-black tracking-tight text-slate-900 mb-4 leading-tight">
-            Poses that actually{" "}
-            <span style={{ background:"linear-gradient(135deg,#7c3aed,#db2777)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>
-              look good.
-            </span>
+          <h1 className="afu2 text-4xl sm:text-5xl font-black tracking-tight text-slate-900 mb-2 leading-tight">
+            Poses that actually
           </h1>
-          <p className="afu3 text-base text-slate-600 font-light leading-relaxed max-w-xl">
+          <p className="afu3 text-4xl sm:text-5xl font-light italic tracking-tight text-slate-900 mb-5">
+            <span style={{background:"linear-gradient(135deg,#7c3aed,#db2777)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>look good.</span>
+            <span className="cblink inline-block w-[3px] h-[36px] sm:h-[44px] ml-1.5 rounded-sm align-middle" style={{background:"linear-gradient(135deg,#7c3aed,#db2777)"}}/>
+          </p>
+          <p className="afu4 text-base text-slate-600 font-light leading-relaxed max-w-xl">
             No stiff yearbook poses here. These are natural, flattering positions that work for real people — not just models. Study them before your shoot and we'll nail every single one.
           </p>
         </div>
       </section>
 
+      {/* MARQUEE */}
+      <div className="overflow-hidden border-b border-black/[0.06] py-3">
+        <div className="mtrack flex gap-12 whitespace-nowrap w-max">
+          {MARQUEE.map((item,i) => (
+            <span key={i} className="flex items-center gap-3 text-[11px] font-bold tracking-[0.14em] uppercase text-slate-300">
+              {item}<span className="w-[4px] h-[4px] rounded-full flex-shrink-0" style={{background:"linear-gradient(135deg,#7c3aed,#db2777)"}}/>
+            </span>
+          ))}
+        </div>
+      </div>
+
       {/* POSE CARDS */}
       <section className="px-6 py-14">
         <div className="max-w-3xl mx-auto space-y-5">
           {loading ? (
-            [...Array(4)].map((_, i) => (
-              <div key={i} className="rounded-2xl animate-pulse h-56" style={{ background:"linear-gradient(135deg,#ede9fe,#fce7f3)" }} />
-            ))
+            [...Array(4)].map((_,i) => <div key={i} className="rounded-2xl animate-pulse h-56" style={{background:"linear-gradient(135deg,#ede9fe,#fce7f3)"}}/>)
           ) : (
             poses.map((pose, index) => (
-              <div
-                key={pose.id}
-                className="card-lift rounded-2xl overflow-hidden"
-                style={{ border:"1px solid rgba(167,139,250,0.2)", background:"#fff" }}
-              >
-                {/* Accent bar */}
-                <div className="h-[3px]" style={{ background:"linear-gradient(90deg,#7c3aed,#db2777,#f59e0b)" }} />
-
+              <div key={pose.id} className="card-lift rounded-2xl overflow-hidden" style={{border:"1px solid rgba(167,139,250,0.2)",background:"#fff"}}>
+                <div className="h-[3px]" style={{background:"linear-gradient(90deg,#7c3aed,#db2777,#f59e0b)"}}/>
                 {pose.image_url ? (
-                  /* ── HAS IMAGE: stacked on mobile, side-by-side on sm+ ── */
                   <div className="flex flex-col sm:grid sm:grid-cols-2">
-                    {/* Image — full width on mobile with fixed height, fills column on desktop */}
-                    <div className="w-full h-72 sm:h-auto overflow-hidden bg-slate-100">
-                      <img
-                        src={pose.image_url}
-                        alt={pose.title}
-                        className="w-full h-full object-cover"
-                      />
+                    <div className="w-full h-72 sm:h-auto overflow-hidden bg-slate-100 relative">
+                      <img src={pose.image_url} alt={pose.title} className="w-full h-full object-cover"/>
+                      {/* Tiny squiggle overlay on image */}
+                      <div className="absolute bottom-3 left-3 opacity-40 pointer-events-none">
+                        <svg width="30" height="44" viewBox="0 0 30 44" fill="none"><path d="M15 3 C22 10,8 18,15 26 C22 34,8 38,15 42" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round"/></svg>
+                      </div>
                     </div>
-                    {/* Text */}
                     <div className="p-7 flex flex-col justify-center">
                       <div className="mb-3">
-                        <span className="text-xs font-bold tracking-widest px-2.5 py-1 rounded-full" style={{ color:"#7c3aed", background:"rgba(124,58,237,0.08)" }}>
-                          POSE {String(index + 1).padStart(2, "0")}
-                        </span>
+                        <span className="text-xs font-bold tracking-widest px-2.5 py-1 rounded-full" style={{color:"#7c3aed",background:"rgba(124,58,237,0.08)"}}>POSE {String(index+1).padStart(2,"0")}</span>
                       </div>
                       <h2 className="text-xl font-black text-slate-900 mb-3 leading-tight">{pose.title}</h2>
                       <p className="text-slate-600 text-sm leading-relaxed">{pose.instructions}</p>
                     </div>
                   </div>
                 ) : (
-                  /* ── NO IMAGE: single column, no placeholder on mobile ── */
                   <div className="grid grid-cols-1 sm:grid-cols-2">
-                    <div className="hidden sm:flex items-center justify-center" style={{ minHeight:240, background:"linear-gradient(135deg,#ede9fe,#fce7f3)" }}>
-                      <div className="text-center">
+                    <div className="hidden sm:flex items-center justify-center relative overflow-hidden" style={{minHeight:240,background:"linear-gradient(135deg,#ede9fe,#fce7f3)"}}>
+                      <div className="absolute inset-0 pointer-events-none" style={{backgroundImage:`linear-gradient(rgba(124,58,237,0.06) 1px,transparent 1px),linear-gradient(90deg,rgba(124,58,237,0.06) 1px,transparent 1px)`,backgroundSize:"16px 16px"}}/>
+                      <div className="text-center relative z-10">
                         <p className="text-4xl mb-2">📷</p>
                         <p className="text-xs font-semibold text-violet-400">Photo via Supabase</p>
                       </div>
                     </div>
                     <div className="p-7 flex flex-col justify-center">
                       <div className="mb-3">
-                        <span className="text-xs font-bold tracking-widest px-2.5 py-1 rounded-full" style={{ color:"#7c3aed", background:"rgba(124,58,237,0.08)" }}>
-                          POSE {String(index + 1).padStart(2, "0")}
-                        </span>
+                        <span className="text-xs font-bold tracking-widest px-2.5 py-1 rounded-full" style={{color:"#7c3aed",background:"rgba(124,58,237,0.08)"}}>POSE {String(index+1).padStart(2,"0")}</span>
                       </div>
                       <h2 className="text-xl font-black text-slate-900 mb-3 leading-tight">{pose.title}</h2>
                       <p className="text-slate-600 text-sm leading-relaxed">{pose.instructions}</p>
@@ -162,27 +157,21 @@ export default function PosingPage() {
 
       {/* CTA */}
       <section className="px-6 pb-20">
-        <div className="max-w-3xl mx-auto rounded-2xl p-8 text-white text-center relative overflow-hidden" style={{ background:"linear-gradient(135deg,#7c3aed,#db2777)" }}>
-          <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage:`linear-gradient(rgba(255,255,255,0.06) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.06) 1px,transparent 1px)`, backgroundSize:"24px 24px" }} />
+        <div className="max-w-3xl mx-auto rounded-2xl p-8 text-white text-center relative overflow-hidden" style={{background:"linear-gradient(135deg,#7c3aed,#db2777)"}}>
+          <div className="absolute inset-0 pointer-events-none" style={{backgroundImage:`linear-gradient(rgba(255,255,255,0.06) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.06) 1px,transparent 1px)`,backgroundSize:"24px 24px"}}/>
+          <div className="absolute top-4 right-5 opacity-15 pointer-events-none"><svg width="40" height="64" viewBox="0 0 40 64" fill="none"><path d="M20 4 C30 14,10 24,20 36 C30 48,10 56,20 62" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round"/></svg></div>
           <h3 className="relative text-2xl font-black mb-2">Ready to shoot?</h3>
           <p className="relative text-white/75 mb-6 text-sm">Save these poses on your phone so you can reference them day-of.</p>
           <div className="relative flex flex-wrap justify-center gap-3">
-            <Link href="/grad-guide/what-to-wear" className="btn-lift px-5 py-2.5 rounded-full bg-white font-bold text-sm" style={{ color:"#7c3aed" }}>
-              Next: What to Wear →
-            </Link>
-            <a href="https://www.soloxsnaps.com/contact/" className="btn-lift px-5 py-2.5 rounded-full font-bold text-sm border border-white/30 text-white hover:bg-white/10 transition-colors">
-              Book a shoot
-            </a>
+            <Link href="/grad-guide/what-to-wear" className="btn-lift px-5 py-2.5 rounded-full bg-white font-bold text-sm" style={{color:"#7c3aed"}}>Next: What to Wear →</Link>
+            <a href="https://www.soloxsnaps.com/contact/" className="btn-lift px-5 py-2.5 rounded-full font-bold text-sm border border-white/30 text-white hover:bg-white/10 transition-colors">Book a shoot</a>
           </div>
         </div>
       </section>
 
-      {/* FOOTER */}
       <footer className="border-t border-black/[0.06] bg-white py-8 px-6">
         <div className="max-w-3xl mx-auto flex items-center justify-between flex-wrap gap-4">
-          <span className="font-black text-lg" style={{ background:"linear-gradient(135deg,#a78bfa,#f9a8d4,#fcd34d)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>
-            Chris.
-          </span>
+          <span className="font-black text-lg" style={{background:"linear-gradient(135deg,#a78bfa,#f9a8d4,#fcd34d)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>Chris.</span>
           <span className="text-sm text-slate-400">© 2026 · Bay Area Grad Photography</span>
         </div>
       </footer>
