@@ -13,6 +13,14 @@ const photographyCards = [
     featured: true,
   },
   {
+  href: "/location-guide",
+  emoji: "📍",
+  tag: "Free Guide",
+  title: "Bay Area Location Guide",
+  desc: "Best spots at SJSU, Berkeley, SF State, and CSUEB — with timing and pro tips.",
+  featured: false,
+},
+  {
     href: "https://your-locations-site.vercel.app",
     emoji: "📍",
     tag: "Premium",
