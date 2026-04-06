@@ -60,8 +60,12 @@ export default function PosingPage() {
       {/* NAVBAR */}
       <nav className="sticky top-0 z-50 backdrop-blur-xl border-b border-black/[0.06]" style={{ background:"rgba(255,255,255,0.9)" }}>
         <div className="max-w-3xl mx-auto px-6 h-14 flex items-center justify-between">
-          <Link href="/" className="font-black text-lg tracking-tight" style={{ background:"linear-gradient(135deg,#a78bfa,#f9a8d4,#fcd34d)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>Chris.</Link>
-          <Link href="/grad-guide" className="text-sm font-bold text-slate-700 hover:text-slate-400 transition-colors">← Grad Guide</Link>
+          <Link href="/" className="font-black text-lg tracking-tight" style={{ background:"linear-gradient(135deg,#a78bfa,#f9a8d4,#fcd34d)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>
+            Chris.
+          </Link>
+          <Link href="/grad-guide" className="text-sm font-bold text-slate-700 hover:text-slate-400 transition-colors">
+            ← Grad Guide
+          </Link>
         </div>
       </nav>
 
@@ -69,19 +73,21 @@ export default function PosingPage() {
       <section className="relative overflow-hidden px-6 pt-14 pb-10 border-b border-black/[0.06]">
         <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage:`linear-gradient(rgba(167,139,250,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(167,139,250,0.04) 1px,transparent 1px)`, backgroundSize:"40px 40px" }} />
         <div className="absolute inset-0 pointer-events-none" style={{ background:"radial-gradient(ellipse at 40% 50%, transparent 30%, white 75%)" }} />
-        <div className="absolute top-5 left-5 w-4 h-4 pointer-events-none" style={{ borderTop:"1.5px solid rgba(124,58,237,0.3)",borderLeft:"1.5px solid rgba(124,58,237,0.3)" }} />
-        <div className="absolute bottom-5 right-5 w-4 h-4 pointer-events-none" style={{ borderBottom:"1.5px solid rgba(124,58,237,0.3)",borderRight:"1.5px solid rgba(124,58,237,0.3)" }} />
+        <div className="absolute top-5 left-5 w-4 h-4 pointer-events-none" style={{ borderTop:"1.5px solid rgba(124,58,237,0.3)", borderLeft:"1.5px solid rgba(124,58,237,0.3)" }} />
+        <div className="absolute bottom-5 right-5 w-4 h-4 pointer-events-none" style={{ borderBottom:"1.5px solid rgba(124,58,237,0.3)", borderRight:"1.5px solid rgba(124,58,237,0.3)" }} />
         <div className="pdot absolute top-7 right-7 w-2 h-2 rounded-full pointer-events-none" style={{ background:"linear-gradient(135deg,#7c3aed,#db2777)" }} />
-        <div className="blob1 absolute rounded-full pointer-events-none" style={{ width:440,height:440,top:-120,left:-100,background:"radial-gradient(circle,rgba(124,58,237,0.12),transparent 70%)" }} />
+        <div className="blob1 absolute rounded-full pointer-events-none" style={{ width:440, height:440, top:-120, left:-100, background:"radial-gradient(circle,rgba(124,58,237,0.12),transparent 70%)" }} />
 
         <div className="relative z-10 max-w-3xl mx-auto">
-          <div className="afu1 inline-flex items-center gap-2 px-3 py-1.5 rounded-full mb-4" style={{ background:"rgba(124,58,237,0.08)",border:"1px solid rgba(124,58,237,0.18)" }}>
+          <div className="afu1 inline-flex items-center gap-2 px-3 py-1.5 rounded-full mb-4" style={{ background:"rgba(124,58,237,0.08)", border:"1px solid rgba(124,58,237,0.18)" }}>
             <div className="w-1.5 h-1.5 rounded-full bg-violet-600" />
             <p className="text-xs font-bold tracking-[0.12em] uppercase text-violet-700">01 — Posing Guide</p>
           </div>
           <h1 className="afu2 text-4xl sm:text-5xl font-black tracking-tight text-slate-900 mb-4 leading-tight">
             Poses that actually{" "}
-            <span style={{ background:"linear-gradient(135deg,#7c3aed,#db2777)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>look good.</span>
+            <span style={{ background:"linear-gradient(135deg,#7c3aed,#db2777)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>
+              look good.
+            </span>
           </h1>
           <p className="afu3 text-base text-slate-600 font-light leading-relaxed max-w-xl">
             No stiff yearbook poses here. These are natural, flattering positions that work for real people — not just models. Study them before your shoot and we'll nail every single one.
@@ -93,35 +99,61 @@ export default function PosingPage() {
       <section className="px-6 py-14">
         <div className="max-w-3xl mx-auto space-y-5">
           {loading ? (
-            [...Array(4)].map((_, i) => <div key={i} className="rounded-2xl animate-pulse h-56" style={{ background:"linear-gradient(135deg,#ede9fe,#fce7f3)" }} />)
+            [...Array(4)].map((_, i) => (
+              <div key={i} className="rounded-2xl animate-pulse h-56" style={{ background:"linear-gradient(135deg,#ede9fe,#fce7f3)" }} />
+            ))
           ) : (
             poses.map((pose, index) => (
-              <div key={pose.id} className="card-lift rounded-2xl overflow-hidden" style={{ border:"1px solid rgba(167,139,250,0.2)", background:"#fff" }}>
+              <div
+                key={pose.id}
+                className="card-lift rounded-2xl overflow-hidden"
+                style={{ border:"1px solid rgba(167,139,250,0.2)", background:"#fff" }}
+              >
                 {/* Accent bar */}
                 <div className="h-[3px]" style={{ background:"linear-gradient(90deg,#7c3aed,#db2777,#f59e0b)" }} />
-                <div className={`grid ${pose.image_url ? "sm:grid-cols-2" : "grid-cols-1"}`}>
-                  {pose.image_url ? (
-                    <div className="aspect-square sm:aspect-auto bg-slate-100 overflow-hidden">
-                      <img src={pose.image_url} alt={pose.title} className="w-full h-full object-cover" />
+
+                {pose.image_url ? (
+                  /* ── HAS IMAGE: stacked on mobile, side-by-side on sm+ ── */
+                  <div className="flex flex-col sm:grid sm:grid-cols-2">
+                    {/* Image — full width on mobile with fixed height, fills column on desktop */}
+                    <div className="w-full h-72 sm:h-auto overflow-hidden bg-slate-100">
+                      <img
+                        src={pose.image_url}
+                        alt={pose.title}
+                        className="w-full h-full object-cover"
+                      />
                     </div>
-                  ) : (
-                    <div className="hidden sm:flex aspect-square sm:aspect-auto items-center justify-center" style={{ background:"linear-gradient(135deg,#ede9fe,#fce7f3)" }}>
+                    {/* Text */}
+                    <div className="p-7 flex flex-col justify-center">
+                      <div className="mb-3">
+                        <span className="text-xs font-bold tracking-widest px-2.5 py-1 rounded-full" style={{ color:"#7c3aed", background:"rgba(124,58,237,0.08)" }}>
+                          POSE {String(index + 1).padStart(2, "0")}
+                        </span>
+                      </div>
+                      <h2 className="text-xl font-black text-slate-900 mb-3 leading-tight">{pose.title}</h2>
+                      <p className="text-slate-600 text-sm leading-relaxed">{pose.instructions}</p>
+                    </div>
+                  </div>
+                ) : (
+                  /* ── NO IMAGE: single column, no placeholder on mobile ── */
+                  <div className="grid grid-cols-1 sm:grid-cols-2">
+                    <div className="hidden sm:flex items-center justify-center" style={{ minHeight:240, background:"linear-gradient(135deg,#ede9fe,#fce7f3)" }}>
                       <div className="text-center">
                         <p className="text-4xl mb-2">📷</p>
                         <p className="text-xs font-semibold text-violet-400">Photo via Supabase</p>
                       </div>
                     </div>
-                  )}
-                  <div className="p-7 flex flex-col justify-center">
-                    <div className="mb-3">
-                      <span className="text-xs font-bold tracking-widest px-2.5 py-1 rounded-full" style={{ color:"#7c3aed", background:"rgba(124,58,237,0.08)" }}>
-                        POSE {String(index + 1).padStart(2, "0")}
-                      </span>
+                    <div className="p-7 flex flex-col justify-center">
+                      <div className="mb-3">
+                        <span className="text-xs font-bold tracking-widest px-2.5 py-1 rounded-full" style={{ color:"#7c3aed", background:"rgba(124,58,237,0.08)" }}>
+                          POSE {String(index + 1).padStart(2, "0")}
+                        </span>
+                      </div>
+                      <h2 className="text-xl font-black text-slate-900 mb-3 leading-tight">{pose.title}</h2>
+                      <p className="text-slate-600 text-sm leading-relaxed">{pose.instructions}</p>
                     </div>
-                    <h2 className="text-xl font-black text-slate-900 mb-3 leading-tight">{pose.title}</h2>
-                    <p className="text-slate-600 text-sm leading-relaxed">{pose.instructions}</p>
                   </div>
-                </div>
+                )}
               </div>
             ))
           )}
@@ -148,7 +180,9 @@ export default function PosingPage() {
       {/* FOOTER */}
       <footer className="border-t border-black/[0.06] bg-white py-8 px-6">
         <div className="max-w-3xl mx-auto flex items-center justify-between flex-wrap gap-4">
-          <span className="font-black text-lg" style={{ background:"linear-gradient(135deg,#a78bfa,#f9a8d4,#fcd34d)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>Chris.</span>
+          <span className="font-black text-lg" style={{ background:"linear-gradient(135deg,#a78bfa,#f9a8d4,#fcd34d)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>
+            Chris.
+          </span>
           <span className="text-sm text-slate-400">© 2026 · Bay Area Grad Photography</span>
         </div>
       </footer>
