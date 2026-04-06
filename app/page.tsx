@@ -50,7 +50,7 @@ export default function Home() {
           <div className="flex items-center gap-6 text-sm font-medium text-slate-500">
             <a href="#photography" className="hover:text-slate-900 transition-colors">Photography</a>
             <a
-              href="https://www.instagram.com/"
+              href="https://www.instagram.com/soloxsnaps"
               target="_blank"
               rel="noopener noreferrer"
               className="hover:text-slate-900 transition-colors"

@@ -12,71 +12,122 @@ type PrepTip = {
   order: number;
 };
 
+// ── DRAFT CONTENT ─────────────────────────────────────────────────────
+// Organized into categories. Each card has an icon, title, and description.
+// Replace with Supabase data once you add rows to grad_prep_tips table.
 const DRAFT_PREP_TIPS: PrepTip[] = [
+  // PREPARATION
   {
     id: 1,
-    title: "Book at least 2 weeks out",
-    description:
-      "Good light and great locations fill up fast during grad season (May–June in the Bay). Booking early also gives you time to plan your outfit, location, and any family coordination without rushing. Last-minute shoots tend to be stressful — and stress shows in photos.",
-    icon: "📅",
+    title: "Get a good night's sleep",
+    description: "This sounds obvious but it matters more than people think. Tired eyes, dull skin, and low energy all show up on camera. Skip the late night before your shoot and get at least 7-8 hours. Drink water the morning of. You'll look and feel sharper.",
+    icon: "😴",
     order: 1,
   },
   {
     id: 2,
-    title: "Scout your location beforehand",
-    description:
-      "If you have a specific spot in mind — Lands End, the Palace of Fine Arts, your campus — visit it before your shoot. Check what time the light hits best (golden hour, 1-2 hours before sunset, is almost always the answer). Look for interesting backgrounds, walls, and architectural details you want to use.",
-    icon: "📍",
+    title: "Don't rush — give yourself extra time",
+    description: "Prep your outfit, stole, and cap the night before. Don't leave anything to the morning of. Factor in drive time, parking, and getting to the location — arriving stressed shows up in your first few shots. Get there 10-15 minutes early and give yourself a moment to breathe before we start.",
+    icon: "⏰",
     order: 2,
   },
   {
     id: 3,
-    title: "Get a full night's sleep",
-    description:
-      "Tired eyes and dull skin are the biggest killers of great photos. Your body shows up in your face — puffy eyes, uneven skin tone, low energy all come through on camera. Aim for 8 hours the night before. Skip the late celebration until after your shoot.",
-    icon: "😴",
+    title: "Eat something before we shoot",
+    description: "A hungry subject is a distracted subject. Eat a real meal 1-2 hours before your session — not right before, but enough ahead that you have real energy. Bring a small snack and water to the shoot too. We'll be moving around a lot.",
+    icon: "🥗",
     order: 3,
   },
+  // CLOTHING
   {
     id: 4,
-    title: "Eat before you shoot",
-    description:
-      "A hungry subject is a distracted, low-energy subject. Eat a proper meal 1-2 hours before your shoot — not right before (you don't want to feel bloated), but enough ahead that you have real energy. Avoid anything that makes you feel sluggish. Bring a snack and water to the shoot.",
-    icon: "🥗",
+    title: "Keep your outfit simple",
+    description: "You are the focus — not what you're wearing. Solid colors photograph far better than busy prints, stripes, or logos. Since your gown and stole tend to be rich and bold, lighter colors underneath create a nice contrast. Think ivory, cream, light neutrals, or soft pastels.",
+    icon: "👗",
     order: 4,
   },
   {
     id: 5,
-    title: "Steam or iron your gown",
-    description:
-      "Your gown ships folded and usually arrives with visible creases. A steamer (or a shower — hang it in the bathroom with hot water running for 15 minutes) gets rid of most wrinkles. Wrinkled gowns are one of the most common things people wish they'd fixed before their shoot.",
-    icon: "👗",
+    title: "Iron or steam everything the night before",
+    description: "Your gown comes folded and will have visible crease lines. Take it out of the package the night before — don't wait until the morning of. Hang it in the bathroom while you shower and the steam will smooth most of it out. Same goes for whatever you're wearing underneath.",
+    icon: "👔",
     order: 5,
   },
   {
     id: 6,
-    title: "Practice your poses",
-    description:
-      "Stand in front of a full-length mirror and practice the poses from the posing guide. Find your good side, your natural smile, and the angles that feel most comfortable. The more familiar a pose feels before the shoot, the more natural it looks in photos. 10 minutes of practice makes a real difference.",
-    icon: "🪞",
+    title: "Wear your stole with your outfit before the shoot",
+    description: "Try your full look together at least once before the day of — stole, gown, outfit, shoes. You want to make sure everything works together and nothing clashes. It also helps you spot anything you need to fix while you still have time.",
+    icon: "🎓",
     order: 6,
   },
+  // GIRLS
   {
     id: 7,
-    title: "Charge your phone",
-    description:
-      "You'll want to reference poses, check the location, and obviously share photos after. Bring a portable charger if you tend to run low. Also — silence it for the shoot. Notifications mid-shoot break your focus and your expression.",
-    icon: "🔋",
+    title: "Bring comfortable shoes for walking",
+    description: "If you're wearing heels, bring flip-flops or flats as a backup. We'll be walking across campus and standing for extended stretches. Heels that sink into grass or make you wince aren't going to give you relaxed, confident energy in your photos. Comfort translates on camera.",
+    icon: "👠",
     order: 7,
   },
   {
     id: 8,
-    title: "Communicate with your photographer",
-    description:
-      "Send your photographer your vision before the shoot — poses you love, locations you want to hit, any photos you've saved for inspiration. The more context they have going in, the more efficiently the shoot runs. Don't be shy about speaking up during the shoot either — if something doesn't feel right, say so.",
-    icon: "💬",
+    title: "Go slightly bolder with makeup than usual",
+    description: "Outdoor light and camera settings tend to flatten features. Your everyday makeup look will read as too subtle in photos. Add a bit more contour, define your brows slightly more, and opt for matte finishes over glossy. Test your look near a window in natural light a few days before to see how it photographs.",
+    icon: "💄",
     order: 8,
   },
+  {
+    id: 9,
+    title: "Stick with a hairstyle you know",
+    description: "Grad shoot day is not the time to try something new. Go with a style you've worn before and feel confident in — something you'd do for a wedding or a formal event. If you're booking a blowout, schedule it the morning of your shoot.",
+    icon: "💇",
+    order: 9,
+  },
+  // ACCESSORIES & PROPS
+  {
+    id: 10,
+    title: "Jewelry is great — lose the smartwatch",
+    description: "Earrings, necklaces, rings, and bracelets all add to the look. But leave the Apple Watch or Fitbit at home — it reads as out of place in grad photos and pulls attention away from your outfit.",
+    icon: "💍",
+    order: 10,
+  },
+  {
+    id: 11,
+    title: "Glasses will glare — plan ahead",
+    description: "If you wear glasses, the lenses will catch light and create glare in outdoor shots. If you can remove the lenses beforehand, that's the cleanest fix. Otherwise plan to take them off for most shots and put them back on between poses.",
+    icon: "👓",
+    order: 11,
+  },
+  {
+    id: 12,
+    title: "Props that actually work",
+    description: "Most people don't bring props and that's completely fine. But if you want to add something: bring all your stoles and honor cords, a bouquet of flowers (a full bouquet, not a single stem), champagne if you want that shot, or a calligraphy board with a message to someone who helped you get here. Skip smoke bombs, sparklers, balloons, and confetti — they create mess and aren't worth the cleanup.",
+    icon: "🌸",
+    order: 12,
+  },
+  // DAY OF
+  {
+    id: 13,
+    title: "Bring a small towel and stay hydrated",
+    description: "We're going to be moving around a lot, especially if we hit multiple locations. You will sweat. A small handkerchief or face towel goes a long way between shots. Keep water on you — hydration affects your skin, your energy, and your mood.",
+    icon: "💧",
+    order: 13,
+  },
+  {
+    id: 14,
+    title: "Communicate your vision before the shoot",
+    description: "Send me any poses, locations, or photos you love before we meet. The more I know going in, the more efficiently we can move through the session. And during the shoot — speak up. If something doesn't feel right or you want to try a different angle, say so. You know what you want better than anyone.",
+    icon: "💬",
+    order: 14,
+  },
+];
+
+// Group tips by category for display
+const categories = [
+  { label: "Preparation", ids: [1, 2, 3] },
+  { label: "Clothing", ids: [4, 5, 6] },
+  { label: "Hair & Makeup", ids: [7, 8, 9] },
+  { label: "Accessories & Props", ids: [10, 11, 12] },
+  { label: "Day Of", ids: [13, 14] },
 ];
 
 export default function HowToPreparePage() {
@@ -86,15 +137,19 @@ export default function HowToPreparePage() {
   useEffect(() => {
     async function fetchTips() {
       try {
-        // TODO: Replace with Supabase call:
-        // const { data } = await supabase.from('grad_prep_tips').select('*').order('order')
-        // if (data && data.length > 0) setTips(data)
-        setLoading(false);
+        const { data, error } = await supabase
+          .from('grad_prep_tips')
+          .select('*')
+          .order('order', { ascending: true })
+        if (error) console.error(error)
+        if (data && data.length > 0) setTips(data)
       } catch (err) {
-        console.error(err);
+        console.error(err)
+      } finally {
+        setLoading(false)
       }
     }
-    fetchTips();
+    fetchTips()
   }, []);
 
   return (
@@ -124,39 +179,61 @@ export default function HowToPreparePage() {
           <h1 className="text-4xl sm:text-5xl font-black tracking-tight text-slate-900 mb-4 leading-tight">
             Show up{" "}
             <span className="bg-gradient-to-r from-indigo-600 to-blue-600 bg-clip-text text-transparent">
-              confident.
+              ready.
             </span>
           </h1>
           <p className="text-base text-slate-500 font-light leading-relaxed max-w-xl">
-            The best grad photos come from people who show up relaxed and prepared. 
-            Here's everything to do before shoot day so you can focus on having fun 
-            and looking great.
+            The difference between a good session and a great one usually comes down to preparation. 
+            Here's everything you need to know before shoot day — broken down by category.
           </p>
         </div>
       </section>
 
-      {/* ── PREP TIPS ───────────────────────────────────────────── */}
+      {/* ── TIPS BY CATEGORY ────────────────────────────────────── */}
       <section className="px-6 pb-20">
-        <div className="max-w-3xl mx-auto grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="max-w-3xl mx-auto space-y-12">
           {loading ? (
-            [...Array(6)].map((_, i) => (
+            [...Array(4)].map((_, i) => (
               <div key={i} className="rounded-2xl bg-slate-200 animate-pulse h-48" />
             ))
           ) : (
-            tips.map((tip) => (
-              <div
-                key={tip.id}
-                className="bg-white rounded-2xl border border-slate-200 p-6 hover:border-indigo-200 hover:shadow-md transition-all duration-200"
-              >
-                <span className="text-3xl mb-4 block">{tip.icon}</span>
-                <h3 className="text-lg font-bold text-slate-900 mb-2 leading-tight">
-                  {tip.title}
-                </h3>
-                <p className="text-slate-500 text-sm leading-relaxed">
-                  {tip.description}
-                </p>
-              </div>
-            ))
+            categories.map((cat) => {
+              const catTips = tips.filter((t) => cat.ids.includes(t.id));
+              if (catTips.length === 0) return null;
+              return (
+                <div key={cat.label}>
+                  {/* Category header */}
+                  <div className="flex items-center gap-3 mb-4">
+                    <h2 className="text-xs font-bold tracking-[0.15em] uppercase text-indigo-600">
+                      {cat.label}
+                    </h2>
+                    <div className="flex-1 h-px bg-slate-200" />
+                  </div>
+
+                  {/* Tips in this category */}
+                  <div className="space-y-3">
+                    {catTips.map((tip) => (
+                      <div
+                        key={tip.id}
+                        className="bg-white rounded-2xl border border-slate-200 p-6 hover:border-indigo-200 hover:shadow-sm transition-all duration-200"
+                      >
+                        <div className="flex items-start gap-4">
+                          <span className="text-2xl flex-shrink-0">{tip.icon}</span>
+                          <div>
+                            <h3 className="text-base font-bold text-slate-900 mb-1.5 leading-tight">
+                              {tip.title}
+                            </h3>
+                            <p className="text-slate-500 text-sm leading-relaxed">
+                              {tip.description}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })
           )}
         </div>
       </section>
@@ -167,7 +244,7 @@ export default function HowToPreparePage() {
           <div className="bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600 rounded-2xl p-8 text-white text-center">
             <h3 className="text-2xl font-black mb-2">You're ready. Let's shoot.</h3>
             <p className="text-blue-100 mb-6 text-sm">
-              You've got the poses, the outfit, and the prep checklist. Time to book.
+              You've got the poses, the outfit, and the prep list. Time to book.
             </p>
             <div className="flex flex-wrap justify-center gap-3">
               <a
