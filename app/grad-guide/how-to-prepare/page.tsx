@@ -248,7 +248,7 @@ export default function HowToPreparePage() {
             </p>
             <div className="flex flex-wrap justify-center gap-3">
               <a
-                href="mailto:you@email.com"
+                href="https://www.soloxsnaps.com/contact/"
                 className="px-6 py-3 rounded-full bg-white text-indigo-600 font-semibold text-sm hover:bg-indigo-50 transition-colors shadow-lg"
               >
                 Book your shoot →
