@@ -2,12 +2,12 @@
 
 @layer base {
   ::selection {
-    background: rgba(99, 102, 241, 0.2);
-    color: #1e1b4b;
+    background: rgba(168, 85, 247, 0.15);
+    color: #4c1d95;
   }
 
   :focus-visible {
-    outline: 2px solid #6366f1;
+    outline: 2px solid #a855f7;
     outline-offset: 2px;
     border-radius: 4px;
   }
