@@ -1,8 +1,11 @@
 "use client";
 import { supabase } from '@/lib/supabase'
+import Link from "next/link";
 import { useEffect, useState } from "react";
+import { GUIDE_STYLES } from "@/lib/guidestyles"; // ← ADD THIS
 
-export const dynamic = 'force-dynamic'  // ← ADD THIS
+export const dynamic = 'force-dynamic'
+
 type AvailDate = {
   id: number;
   date: string; // "YYYY-MM-DD"
