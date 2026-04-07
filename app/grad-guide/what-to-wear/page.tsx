@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { GUIDE_STYLES } from "@/lib/guidestyles";
 import { C } from "@/lib/colors";
+import GuideNav from "@/app/components/GuideNav";
 
 export const dynamic = 'force-dynamic'
 
@@ -18,6 +19,7 @@ const DRAFT_OUTFITS: OutfitTip[] = [
   {id:6,title:"Bring comfortable shoes for walking",tip:"We'll cover a lot of ground during the session. If you're wearing heels, bring a pair of flip-flops or flats as backup. Heels that sink into grass affect your posture and energy.",icon:"👠",order:6},
   {id:7,title:"Exaggerate your makeup slightly for camera",tip:"Outdoor light and camera sensors flatten features more than you'd expect. Add more definition to your brows, a bit more contour, and go with matte over glossy finishes.",icon:"💄",order:7},
   {id:8,title:"Go with a hairstyle you already know",tip:"This isn't the day to experiment with something new. Pick a style you've worn before and feel confident in. If you're booking a blowout, schedule it for the morning of your session.",icon:"💇",order:8},
+  {id:9,title:"Match your undergarments to your outfit",tip:"If you're wearing light-colored clothing, make sure what's underneath matches in tone — otherwise it will be visible in photos.",icon:"👙",order:9},
   {id:10,title:"Get your haircut a few days before — not day of",tip:"A lot of guys don't love how they look immediately after a fresh cut. Get it done 2-3 days before your session so it has time to settle into its natural shape.",icon:"✂️",order:10},
   {id:11,title:"Groom your facial hair before the shoot",tip:"If your beard or mustache is part of your look, keep it — just make sure it's clean and shaped. Trim it up a few days before.",icon:"🪒",order:11},
   {id:12,title:"Jewelry works — smartwatches don't",tip:"Earrings, necklaces, rings, and bracelets all add to your look and photograph well. Leave the Apple Watch or Fitbit at home.",icon:"💍",order:12},
@@ -157,6 +159,7 @@ export default function WhatToWearPage() {
         </div>
       </section>
 
+      <GuideNav />
       <footer className="border-t border-black/[0.06] bg-white py-8 px-6">
         <div className="max-w-3xl mx-auto flex items-center justify-between flex-wrap gap-4">
           <span className="font-black text-lg" style={C.text}>Chris.</span>

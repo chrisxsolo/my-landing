@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { GUIDE_STYLES } from "@/lib/guidestyles";
 import { C } from "@/lib/colors";
+import GuideNav from "@/app/components/GuideNav";
 
 export const dynamic = 'force-dynamic'
 
@@ -160,6 +161,7 @@ export default function HowToPreparePage() {
         </div>
       </section>
 
+      <GuideNav />
       <footer className="border-t border-black/[0.06] bg-white py-8 px-6">
         <div className="max-w-3xl mx-auto flex items-center justify-between flex-wrap gap-4">
           <span className="font-black text-lg" style={C.text}>Chris.</span>
