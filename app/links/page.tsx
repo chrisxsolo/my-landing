@@ -206,7 +206,7 @@ export default function LinksPage() {
         )}
 
         {/* MARQUEE TICKER */}
-        <div className="w-full mt-14 overflow-hidden rounded-2xl py-3" style={{ background:`linear-gradient(135deg,${C.p1_06},${C.p2_04})`, border:`1px solid ${C.p1_12}` }}>
+        <div className="w-full mt-14 overflow-hidden rounded-2xl py-3" style={{ background:`linear-gradient(135deg,${C.p1_06},${C.p2_06})`, border:`1px solid ${C.p1_12}` }}>
           <div className="mtrack flex gap-8 whitespace-nowrap w-max">
             {["Bay Area Photographer","Grad Shoots","Portrait Sessions","Golden Hour","@soloxsnaps","Book Now","Bay Area Photographer","Grad Shoots","Portrait Sessions","Golden Hour","@soloxsnaps","Book Now"].map((item,i)=>(
               <span key={i} className="flex items-center gap-2 text-[10px] font-bold tracking-[0.12em] uppercase text-slate-400">
