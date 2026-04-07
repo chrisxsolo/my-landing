@@ -13,14 +13,6 @@ const photographyCards = [
     featured: true,
   },
   {
-  href: "/location-guide",
-  emoji: "📍",
-  tag: "Free Guide",
-  title: "Bay Area Grad Location Guide",
-  desc: "Best spots at SJSU, Berkeley, SF State, and CSUEB — with timing and pro tips.",
-  featured: false,
-},
-  {
     href: "https://your-locations-site.vercel.app",
     emoji: "📍",
     tag: "Premium",
@@ -35,6 +27,15 @@ const photographyCards = [
     tag: "Blog",
     title: "Shoot Stories",
     desc: "Behind-the-scenes from recent sessions — what worked and what didn't.",
+    featured: false,
+  },
+  // ADD THIS:
+  {
+    href: "/availability",
+    emoji: "📅",
+    tag: "Availability",
+    title: "Check My Schedule",
+    desc: "See what dates I have open for grad season and reach out to lock one in.",
     featured: false,
   },
 ];
