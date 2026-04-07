@@ -33,14 +33,22 @@ const sections = [
     emoji: "✅",
     bg: "linear-gradient(135deg,#f59e0b,#7c3aed)",
   },
-  // ADD THIS:
   {
     href: "/location-guide",
     number: "04",
     title: "Location Guide",
-    desc: "Best spots at SJSU, Berkeley, SF State, and CSUEB — with timing and pro tips.",
+    desc: "Best spots at SJSU, Berkeley, SF State, CSUEB, and USF.",
     emoji: "📍",
     bg: "linear-gradient(135deg,#0f766e,#7c3aed)",
+  },
+  // ADD THIS:
+  {
+    href: "/availability",
+    number: "05",
+    title: "My Availability",
+    desc: "Check what dates I have open and reach out to lock one in before it's gone.",
+    emoji: "📅",
+    bg: "linear-gradient(135deg,#db2777,#7c3aed)",
   },
 ];
 
@@ -143,7 +151,7 @@ export default function GradGuidePage() {
         <div className="max-w-3xl mx-auto">
           <p className="text-xs font-bold tracking-[0.15em] uppercase mb-2 text-violet-600">The Guide</p>
           <h2 className="text-3xl font-black text-slate-900 tracking-tight mb-8">Three things to know</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {sections.map((s) => (
               <Link key={s.href} href={s.href} className="card-lift group relative rounded-2xl p-6 cursor-pointer block overflow-hidden text-white" style={{background:s.bg}}>
                 <div className="absolute inset-0 pointer-events-none" style={{backgroundImage:`linear-gradient(rgba(255,255,255,0.06) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.06) 1px,transparent 1px)`,backgroundSize:"20px 20px"}}/>
