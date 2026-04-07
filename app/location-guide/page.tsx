@@ -66,10 +66,19 @@ const SCHOOL_META: Record<string, {
     color: "#003DA5",
     bar: "linear-gradient(180deg,#003DA5,#FFB81C)",
   },
+  usf: {
+    emoji: "🟢",
+    tagline: "Hilltop campus, Golden Gate Park nearby, city views",
+    gradient: "linear-gradient(135deg,#006636,#A8996E)",
+    gradientSoft: "rgba(0,102,54,0.07)",
+    border: "rgba(0,102,54,0.18)",
+    color: "#006636",
+    bar: "linear-gradient(180deg,#006636,#A8996E)",
+  },
 };
 
 // Ordered list of school IDs for consistent display
-const SCHOOL_ORDER = ["sjsu","berkeley","sfsu","csueb"];
+const SCHOOL_ORDER = ["sjsu","berkeley","sfsu","csueb","usf"];
 
 // ── DRAFT CONTENT (shown until Supabase rows exist) ──────────────────────────
 const DRAFT_SPOTS: LocationSpot[] = [
@@ -98,6 +107,12 @@ const DRAFT_SPOTS: LocationSpot[] = [
   {id:19,school_id:"csueb",school_name:"Cal State East Bay",school_short:"CSUEB",name:"Library Terrace & Steps",description:"The library has a multi-level terrace with panoramic views of the Bay and the SF skyline on clear days. One of the best kept secrets for graduation photos in the East Bay.",tip:"On clear days you can see SF in the background — check air quality first.",icon:"📚",image_url:null,order:3},
   {id:20,school_id:"csueb",school_name:"Cal State East Bay",school_short:"CSUEB",name:"University Drive Pathway",description:"The main pedestrian pathway through campus lined with trees and light poles. Great for walking shots and candid-style portraits with depth in the background.",tip:"Golden hour from the west end of the path is excellent.",icon:"🌳",image_url:null,order:4},
   {id:21,school_id:"csueb",school_name:"Cal State East Bay",school_short:"CSUEB",name:"Meiklejohn Hall Archway",description:"One of the older buildings on campus with an archway entrance and red brick detail. Classic collegiate feel, good for portrait-style shots framed by the architecture.",tip:"Overcast days work well here — consistent soft light through the archway.",icon:"🏛️",image_url:null,order:5},
+  // USF
+  {id:22,school_id:"usf",school_name:"University of San Francisco",school_short:"USF",name:"St. Ignatius Church Steps",description:"The massive twin-towered church is USF's most iconic landmark. The wide stone steps and grand facade give you an immediately recognizable backdrop that looks stunning with cap and gown.",tip:"Shoot facing east in the morning for clean front light on the steps. Afternoon puts the church in shadow.",icon:"⛪",image_url:null,order:1},
+  {id:23,school_id:"usf",school_name:"University of San Francisco",school_short:"USF",name:"Lone Mountain Summit",description:"The hilltop behind the Lone Mountain building has one of the best 360-degree views in San Francisco — the city skyline, the Bay, and the Golden Gate on clear days. Completely underused for grad photos.",tip:"Clear mornings in fall and spring are best. Fog usually burns off by 10am. Check the forecast the night before.",icon:"🌁",image_url:null,order:2},
+  {id:24,school_id:"usf",school_name:"University of San Francisco",school_short:"USF",name:"Kalmanovitz Hall Archway",description:"The main academic building has a beautiful arched entrance with red brick and ivy detail. Classic collegiate feel — similar energy to Berkeley's Doe Library but far less crowded.",tip:"This spot is shaded most of the day so it works well even at harsh midday sun.",icon:"🏛️",image_url:null,order:3},
+  {id:25,school_id:"usf",school_name:"University of San Francisco",school_short:"USF",name:"Golden Gate Park (5 min away)",description:"A short walk or rideshare from campus. The Panhandle entrance, the rose garden, and the Japanese Tea Garden area all make incredible backdrops. Completely different energy from campus and worth the extra stop.",tip:"The rose garden peaks in April–May. Japanese Tea Garden area is best on weekdays when it's less crowded.",icon:"🌿",image_url:null,order:4},
+  {id:26,school_id:"usf",school_name:"University of San Francisco",school_short:"USF",name:"The Main Quad & Lawn",description:"The central grassy quad surrounded by the main academic buildings gives you a clean, open shot with classic university architecture on all sides. Good for full-length gown photos and candid walking shots.",tip:"Golden hour from the west catches the brick buildings perfectly — plan for the last hour before sunset.",icon:"🌳",image_url:null,order:5},
 ];
 
 const MARQUEE = ["San Jose State","UC Berkeley","SF State","Cal State East Bay","Bay Area","Best Spots","Golden Hour","Campus Shoots","San Jose State","UC Berkeley","SF State","Cal State East Bay","Bay Area","Best Spots","Golden Hour","Campus Shoots"];
@@ -106,21 +121,28 @@ export default function LocationGuidePage() {
   const [spots, setSpots] = useState<LocationSpot[]>(DRAFT_SPOTS);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    async function fetchSpots() {
-      try {
-        const { data, error } = await supabase
-          .from('location_spots')
-          .select('*')
-          .order('school_id')
-          .order('order', { ascending: true })
-        if (error) console.error(error)
-        if (data && data.length > 0) setSpots(data)
-      } catch (err) { console.error(err) }
-      finally { setLoading(false) }
-    }
-    fetchSpots()
-  }, [])
+useEffect(() => {
+  async function fetchSpots() {
+    try {
+      const { data, error } = await supabase
+        .from('location_spots')
+        .select('*')
+        .order('school_id')
+        .order('order', { ascending: true })
+      if (error) console.error(error)
+      if (data && data.length > 0) {
+        // Find which school_ids have no Supabase rows and keep draft for those
+        const supabaseSchoolIds = new Set(data.map((s) => s.school_id))
+        const draftFallback = DRAFT_SPOTS.filter(
+          (s) => !supabaseSchoolIds.has(s.school_id)
+        )
+        setSpots([...data, ...draftFallback])
+      }
+    } catch (err) { console.error(err) }
+    finally { setLoading(false) }
+  }
+  fetchSpots()
+}, [])
 
   // Group spots by school
   const spotsBySchool = SCHOOL_ORDER.reduce((acc, schoolId) => {

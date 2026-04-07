@@ -16,7 +16,7 @@ const photographyCards = [
   href: "/location-guide",
   emoji: "📍",
   tag: "Free Guide",
-  title: "Bay Area Location Guide",
+  title: "Bay Area Grad Location Guide",
   desc: "Best spots at SJSU, Berkeley, SF State, and CSUEB — with timing and pro tips.",
   featured: false,
 },
