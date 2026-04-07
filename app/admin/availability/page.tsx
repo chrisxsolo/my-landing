@@ -1,6 +1,7 @@
 "use client";
 import { supabase } from '@/lib/supabase'
 import { useEffect, useRef, useState } from "react";
+export const dynamic = 'force-dynamic'  // ← ADD THIS
 
 const ADMIN_PASSWORD = "chris2026"; // ← change this
 
