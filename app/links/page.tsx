@@ -51,15 +51,13 @@ const STYLES = `
   @keyframes blobFloat{0%,100%{transform:translate(0,0)scale(1);}33%{transform:translate(12px,-8px)scale(1.02);}66%{transform:translate(-8px,10px)scale(0.98);}}
   @keyframes blobFloat2{0%,100%{transform:translate(0,0)scale(1);}33%{transform:translate(-10px,8px)scale(0.97);}66%{transform:translate(10px,-6px)scale(1.03);}}
   @keyframes pulseRing{0%,100%{opacity:0.5;transform:scale(1);}50%{opacity:0.15;transform:scale(1.3);}}
-  @keyframes drawLine{from{stroke-dashoffset:300;}to{stroke-dashoffset:0;}}
   @keyframes spinSlow{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
   @keyframes marquee{from{transform:translateX(0);}to{transform:translateX(-50%);}}
   .blob1{animation:blobFloat 10s ease-in-out infinite;}
   .blob2{animation:blobFloat2 12s ease-in-out infinite;}
   .pdot{animation:pulseRing 2.5s ease-in-out infinite;}
   .spin{animation:spinSlow 14s linear infinite;}
-  .sqp{stroke-dasharray:300;stroke-dashoffset:300;animation:drawLine 2s 0.5s ease forwards;}
-  .mtrack{animation:marquee 20s linear infinite;}
+  .mtrack{animation:marquee 28s linear infinite;}
   .link-card{
     transition:transform 0.2s ease,box-shadow 0.2s ease,border-color 0.2s ease;
     animation:fadeUp 0.5s ease both;
@@ -91,30 +89,17 @@ export default function LinksPage() {
   }, []);
 
   return (
-    <div className="min-h-screen font-sans overflow-x-hidden" style={{ background: "#faf9ff" }}>
+    <div className="min-h-screen font-sans overflow-x-hidden" style={{ background: "#ffffff" }}>
       <style>{STYLES}</style>
 
       {/* BG BLOBS */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden" style={{ zIndex: 0 }}>
-        <div className="blob1 absolute rounded-full" style={{ width:500,height:500,top:-150,left:-150,background:`radial-gradient(circle,${C.p1_10},transparent 70%)` }}/>
-        <div className="blob2 absolute rounded-full" style={{ width:400,height:400,top:-100,right:-120,background:`radial-gradient(circle,${C.p2_08},transparent 70%)` }}/>
-        <div className="blob1 absolute rounded-full" style={{ width:300,height:300,bottom:-80,left:"40%",background:`radial-gradient(circle,${C.p3_08},transparent 70%)` }}/>
-        {/* Grid */}
-        <div className="absolute inset-0" style={{ backgroundImage:`linear-gradient(rgba(157,111,232,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(157,111,232,0.03) 1px,transparent 1px)`, backgroundSize:"36px 36px" }}/>
+        <div className="blob1 absolute rounded-full" style={{ width:700,height:700,top:-250,left:-200,background:`radial-gradient(circle,${C.p1_08},transparent 60%)` }}/>
+        <div className="blob2 absolute rounded-full" style={{ width:600,height:600,top:-200,right:-200,background:`radial-gradient(circle,${C.p2_06},transparent 60%)` }}/>
+        <div className="blob1 absolute rounded-full" style={{ width:500,height:500,bottom:-150,left:"25%",background:`radial-gradient(circle,${C.p3_06},transparent 60%)` }}/>
         {/* Spin ring */}
-        <div className="spin absolute opacity-[0.06]" style={{ width:300,height:300,bottom:40,right:-60 }}>
+        <div className="spin absolute opacity-[0.06]" style={{ width:300,height:300,bottom:-60,right:-60 }}>
           <svg width="300" height="300" viewBox="0 0 300 300"><circle cx="150" cy="150" r="130" stroke={C.p1} strokeWidth="1" fill="none" strokeDasharray="8 6"/></svg>
-        </div>
-        {/* Squiggle */}
-        <div className="absolute left-4 top-1/3 opacity-30" style={{ animation:"fadeIn 1s 0.5s ease both" }}>
-          <svg width="60" height="180" viewBox="0 0 60 180" fill="none">
-            <defs><linearGradient id="lsq" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={C.p1}/><stop offset="100%" stopColor={C.p2}/></linearGradient></defs>
-            <path className="sqp" d="M30 4 C46 18,14 36,30 56 C46 76,14 94,30 114 C46 134,14 152,30 174" stroke="url(#lsq)" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
-            <circle cx="30" cy="4"   r="2.5" fill={C.p1} opacity="0.7"/>
-            <circle cx="30" cy="56"  r="2.5" fill={C.p2} opacity="0.7"/>
-            <circle cx="30" cy="114" r="2.5" fill={C.p3} opacity="0.7"/>
-            <circle cx="30" cy="174" r="2.5" fill={C.p1} opacity="0.7"/>
-          </svg>
         </div>
         {/* Pulse dots */}
         <div className="pdot absolute w-2 h-2 rounded-full" style={{ top:80,right:20,background:C.grad12 }}/>
@@ -167,7 +152,7 @@ export default function LinksPage() {
                 href={link.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="link-card block w-full rounded-2xl px-5 py-5 relative overflow-hidden"
+                className="link-card block w-full rounded-[28px] px-6 py-6 relative overflow-hidden"
                 style={{
                   animationDelay: `${0.1 + i * 0.07}s`,
                   background: CARD_GRADIENTS[i % CARD_GRADIENTS.length],
@@ -179,20 +164,18 @@ export default function LinksPage() {
                 onTouchEnd={() => setPressed(null)}
               >
                 {/* Subtle grid overlay */}
-                <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage:`linear-gradient(rgba(0,0,0,0.025) 1px,transparent 1px),linear-gradient(90deg,rgba(0,0,0,0.025) 1px,transparent 1px)`, backgroundSize:"16px 16px" }}/>
-
                 <div className="relative z-10 flex items-center gap-4">
                   {/* Emoji */}
                   {link.emoji && (
-                    <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0 bg-white/60 shadow-sm">
+                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0 bg-white shadow-sm flex-shrink-0" style={{minWidth:"56px",minHeight:"56px"}}>
                       {link.emoji}
                     </div>
                   )}
                   {/* Text */}
                   <div className="flex-1 min-w-0">
-                    <p className="font-black text-slate-900 text-base leading-tight">{link.label}</p>
+                    <p className="font-black text-slate-900 text-lg leading-tight">{link.label}</p>
                     {link.description && (
-                      <p className="text-xs text-slate-500 font-medium mt-0.5 leading-tight truncate">{link.description}</p>
+                      <p className="text-sm text-slate-500 font-medium mt-1 leading-tight truncate">{link.description}</p>
                     )}
                   </div>
                   {/* Arrow */}
@@ -206,11 +189,11 @@ export default function LinksPage() {
         )}
 
         {/* MARQUEE TICKER */}
-        <div className="w-full mt-14 overflow-hidden rounded-2xl py-3" style={{ background:`linear-gradient(135deg,${C.p1_06},${C.p2_06})`, border:`1px solid ${C.p1_12}` }}>
-          <div className="mtrack flex gap-8 whitespace-nowrap w-max">
+        <div className="w-full mt-14 overflow-hidden rounded-2xl py-3" style={{ background:`linear-gradient(135deg,${C.p1_06},${C.p2_04})`, border:`1px solid ${C.p1_12}` }}>
+          <div className="mtrack flex gap-16 whitespace-nowrap w-max">
             {["Bay Area Photographer","Grad Shoots","Portrait Sessions","Golden Hour","@soloxsnaps","Book Now","Bay Area Photographer","Grad Shoots","Portrait Sessions","Golden Hour","@soloxsnaps","Book Now"].map((item,i)=>(
               <span key={i} className="flex items-center gap-2 text-[10px] font-bold tracking-[0.12em] uppercase text-slate-400">
-                {item}<span className="w-[3px] h-[3px] rounded-full flex-shrink-0" style={{ background:C.grad12 }}/>
+                {item}<span className="w-[5px] h-[5px] rounded-full flex-shrink-0" style={{ background:C.grad12 }}/>
               </span>
             ))}
           </div>
