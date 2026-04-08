@@ -15,7 +15,8 @@ const sections = [
   { href:"/grad-guide/what-to-wear",   number:"02", title:"What to Wear",    desc:"Colors and fits that photograph beautifully in any Bay Area location.", emoji:"👗", bg:C.grad23 },
   { href:"/grad-guide/how-to-prepare", number:"03", title:"How to Prepare",  desc:"Everything to do before your shoot so you show up confident and ready.", emoji:"✅", bg:C.grad321 },
   { href:"/location-guide",            number:"04", title:"Location Guide",   desc:"Best spots at SJSU, Berkeley, SF State, CSUEB, and USF.", emoji:"📍", bg:`linear-gradient(135deg,#4f9e8a,${C.p1})` },
-  { href:"/availability",              number:"05", title:"My Availability",  desc:"Check what dates I have open and reach out to lock one in.", emoji:"📅", bg:C.grad },
+  { href:"/booking-process",           number:"05", title:"Booking Process",  desc:"From inquiry to delivery — see exactly what happens at each step.", emoji:"📋", bg:C.grad23 },
+  { href:"/availability",              number:"06", title:"My Availability",  desc:"Check what dates I have open and reach out to lock one in.", emoji:"📅", bg:C.grad },
 ];
 
 const MARQUEE = ["Graduation Photos","Bay Area","Golden Hour","SJSU · Berkeley · Stanford","Natural Light","Real Moments","Graduation Photos","Bay Area","Golden Hour","SJSU · Berkeley · Stanford","Natural Light","Real Moments"];

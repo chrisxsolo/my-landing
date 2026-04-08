@@ -47,6 +47,11 @@ const NAV_ITEMS: {
     emoji: "📍",
   },
   {
+    href:  "/booking-process",
+    label: "Process",
+    emoji: "📋",
+  },
+  {
     href:  "/availability",
     label: "Dates",
     emoji: "📅",

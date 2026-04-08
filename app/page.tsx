@@ -6,14 +6,16 @@ import { C } from "@/lib/colors";
 export const dynamic = 'force-dynamic'
 
 const photographyCards = [
-  { href:"/grad-guide",   emoji:"🎓", tag:"Free Guide", title:"Graduation Photo Guide",  desc:"Poses, outfits, timing — everything Bay Area grads need before their shoot.", featured:true },
-  { href:"/availability", emoji:"📅", tag:"Availability",title:"Check My Schedule",       desc:"See what dates I have open for grad season and reach out to lock one in.", featured:false },
-  { href:"/blog",         emoji:"✍️", tag:"Blog",        title:"Shoot Stories",            desc:"Behind-the-scenes from recent sessions — what worked and what didn't.", featured:false },
+  { href:"/grad-guide",      emoji:"🎓", tag:"Free Guide",  title:"Graduation Photo Guide",  desc:"Poses, outfits, timing — everything Bay Area grads need before their shoot.", featured:true },
+  { href:"/booking-process", emoji:"📋", tag:"Process",     title:"Booking Process",         desc:"From inquiry to delivery — see exactly what happens at each step.", featured:false },
+  { href:"/availability",    emoji:"📅", tag:"Availability",title:"Check My Schedule",       desc:"See what dates I have open for grad season and reach out to lock one in.", featured:false },
+  { href:"/blog",            emoji:"✍️", tag:"Blog",        title:"Shoot Stories",            desc:"Behind-the-scenes from recent sessions — what worked and what didn't.", featured:false },
 ];
 
 const cardStyles = [
   { bg:`linear-gradient(135deg,${C.p1_10},${C.p2_08})`, border:C.p1_25, tagColor:C.p1, tagBg:C.p1_10, accentBar:C.grad90_12, arrowColor:C.p1 },
   { bg:`linear-gradient(135deg,${C.p3_10},${C.p2_08})`, border:C.p2_25, tagColor:C.p2, tagBg:C.p2_10, accentBar:C.grad90_23, arrowColor:C.p2 },
+  { bg:`linear-gradient(135deg,${C.p2_10},${C.p3_08})`, border:C.p3_25, tagColor:C.p3, tagBg:C.p3_10, accentBar:C.grad90_23, arrowColor:C.p3 },
 ];
 
 const STYLES = `
