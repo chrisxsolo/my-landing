@@ -102,7 +102,7 @@ export default function LinksPage() {
       <div className="fixed inset-0 overflow-hidden pointer-events-none" style={{ zIndex: 0 }}>
         <div className="blob1 absolute rounded-full" style={{ width:700, height:700, top:-280, left:-200, background:`radial-gradient(circle, ${C.p1_08}, transparent 62%)` }}/>
         <div className="blob2 absolute rounded-full" style={{ width:600, height:600, top:-220, right:-200, background:`radial-gradient(circle, ${C.p2_06}, transparent 62%)` }}/>
-        <div className="blob1 absolute rounded-full" style={{ width:500, height:500, bottom:-180, left:"20%", background:`radial-gradient(circle, ${C.p3_06}, transparent 62%)` }}/>
+        <div className="blob1 absolute rounded-full" style={{ width:500, height:500, bottom:-180, left:"20%", background:`radial-gradient(circle, ${C.p3_08}, transparent 62%)` }}/>
         {/* Spinning ring - well below content */}
         <div className="spin absolute opacity-[0.07]" style={{ width:360, height:360, bottom:-120, right:-80 }}>
           <svg width="360" height="360" viewBox="0 0 360 360">
