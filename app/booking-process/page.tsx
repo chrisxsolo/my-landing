@@ -265,115 +265,66 @@ export default function BookingProcessPage() {
 
       {/* TIMELINE */}
       <section className="px-6 py-20 relative">
-        <div className="max-w-4xl mx-auto relative">
+        <div className="max-w-3xl mx-auto relative">
           {/* Vertical connecting line */}
-          <div className="timeline-line hidden md:block"/>
-
-          {/* Steps */}
-          <div className="space-y-16 md:space-y-24">
+          <div className="absolute left-8 top-0 bottom-0 w-[2px]" style={{background:`linear-gradient(180deg,${C.p1},${C.p2},${C.p3})`}}/>
+          
+          {/* Steps - simple vertical stack */}
+          <div className="space-y-8">
             {STEPS.map((step, index) => {
-              const isEven = index % 2 === 0;
               const isActive = activeStep === index;
               
               return (
                 <div
                   key={step.id}
                   ref={(el) => { observerRefs.current[index] = el; }}
-                  className="step-card relative"
+                  className="step-card relative pl-16"
                 >
-                  {/* Desktop layout: alternating left/right */}
-                  <div className="hidden md:grid md:grid-cols-2 gap-12 items-center">
-                    {/* Left side content (odd indices) */}
-                    {!isEven && <div/>}
-                    
-                    {/* Card */}
-                    <div className={`${isEven ? '' : 'md:col-start-2'}`}>
-                      <div className="rounded-2xl p-8 relative overflow-hidden" style={{
-                        background: `linear-gradient(135deg, ${step.color}0d, ${step.color}06)`,
-                        border: `1.5px solid ${step.color}30`
-                      }}>
-                        {/* Accent bar */}
-                        <div className="absolute top-0 left-0 right-0 h-[3px]" style={{background:step.gradient}}/>
-                        
-                        {/* Phase tag */}
-                        <div className="mb-4">
-                          <span className="text-xs font-black tracking-[0.15em] uppercase px-2.5 py-1 rounded-full inline-block" style={{
-                            background: `${step.color}15`,
-                            color: step.color
-                          }}>
-                            {step.phase} · {step.duration}
-                          </span>
-                        </div>
-
-                        {/* Content */}
-                        <div className="flex items-start gap-4 mb-5">
-                          <div className="step-emoji text-5xl flex-shrink-0">{step.emoji}</div>
-                          <div className="flex-1">
-                            <h3 className="text-2xl font-black text-slate-900 mb-2 leading-tight">{step.title}</h3>
-                            <p className="text-slate-600 text-sm leading-relaxed">{step.description}</p>
-                          </div>
-                        </div>
-
-                        {/* Details */}
-                        <div className="space-y-2 pl-[68px]">
-                          {step.details.map((detail, i) => (
-                            <div key={i} className="flex items-start gap-2">
-                              <div className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0" style={{background:step.color}}/>
-                              <p className="text-xs text-slate-500 leading-relaxed">{detail}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Right side content (even indices) */}
-                    {isEven && <div/>}
-                  </div>
-
-                  {/* Mobile layout: single column */}
-                  <div className="md:hidden">
-                    <div className="rounded-2xl p-6 relative overflow-hidden" style={{
-                      background: `linear-gradient(135deg, ${step.color}0d, ${step.color}06)`,
-                      border: `1.5px solid ${step.color}30`
-                    }}>
-                      <div className="absolute top-0 left-0 right-0 h-[3px]" style={{background:step.gradient}}/>
-                      
-                      <div className="mb-4">
-                        <span className="text-xs font-black tracking-[0.15em] uppercase px-2.5 py-1 rounded-full inline-block" style={{
-                          background: `${step.color}15`,
-                          color: step.color
-                        }}>
-                          {step.phase} · {step.duration}
-                        </span>
-                      </div>
-
-                      <div className="flex items-start gap-3 mb-4">
-                        <div className="step-emoji text-4xl flex-shrink-0">{step.emoji}</div>
-                        <div className="flex-1">
-                          <h3 className="text-xl font-black text-slate-900 mb-1.5 leading-tight">{step.title}</h3>
-                          <p className="text-slate-600 text-sm leading-relaxed">{step.description}</p>
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        {step.details.map((detail, i) => (
-                          <div key={i} className="flex items-start gap-2">
-                            <div className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0" style={{background:step.color}}/>
-                            <p className="text-xs text-slate-500 leading-relaxed">{detail}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Center timeline dot (desktop only) */}
-                  <div className="hidden md:block absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-                    <div className={`timeline-dot w-12 h-12 rounded-full flex items-center justify-center ${isActive ? 'active' : ''}`} style={{
+                  {/* Timeline dot */}
+                  <div className="absolute left-[13px] top-8">
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{
                       background: step.gradient,
                       border: "3px solid white",
-                      boxShadow: "0 4px 16px rgba(0,0,0,0.1)"
+                      boxShadow: "0 2px 12px rgba(0,0,0,0.1)"
                     }}>
-                      <span className="text-white font-black text-sm">{step.id}</span>
+                      <span className="text-white font-black text-xs">{step.id}</span>
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl p-8 relative overflow-hidden" style={{
+                    background: `linear-gradient(135deg, ${step.color}0d, ${step.color}06)`,
+                    border: `1.5px solid ${step.color}30`
+                  }}>
+                    {/* Accent bar */}
+                    <div className="absolute top-0 left-0 right-0 h-[3px]" style={{background:step.gradient}}/>
+                    
+                    {/* Phase tag */}
+                    <div className="mb-4">
+                      <span className="text-xs font-black tracking-[0.15em] uppercase px-2.5 py-1 rounded-full inline-block" style={{
+                        background: `${step.color}15`,
+                        color: step.color
+                      }}>
+                        {step.phase} · {step.duration}
+                      </span>
+                    </div>
+
+                    {/* Content */}
+                    <div className="flex items-start gap-4 mb-5">
+                      <div className="step-emoji text-5xl flex-shrink-0">{step.emoji}</div>
+                      <div className="flex-1">
+                        <h3 className="text-2xl font-black text-slate-900 mb-2 leading-tight">{step.title}</h3>
+                        <p className="text-slate-600 text-sm leading-relaxed">{step.description}</p>
+                      </div>
+                    </div>
+
+                    {/* Details */}
+                    <div className="space-y-2 pl-16">
+                      {step.details.map((detail, i) => (
+                        <div key={i} className="flex items-start gap-2">
+                          <div className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0" style={{background:step.color}}/>
+                          <p className="text-xs text-slate-500 leading-relaxed">{detail}</p>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
