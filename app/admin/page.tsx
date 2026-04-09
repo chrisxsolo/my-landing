@@ -6,10 +6,12 @@ import { ADMIN_PASSWORD, checkAuth, setAuth, logout } from "@/lib/adminAuth";
 
 export const dynamic = 'force-dynamic'
 
-type Tab = "poses"|"locations"|"blog";
+type Tab = "poses"|"locations"|"blog"|"analytics";
 type Pose = { id:number; title:string; image_url:string; instructions:string; order:number; };
 type Spot = { id:number; school_id:string; school_name:string; school_short:string; name:string; description:string; tip:string; icon:string; image_url:string|null; order:number; };
 type BlogPost = { id:number; title:string; body:string; published_at:string; slug:string; cover_image_url:string|null; extra_image_urls:string[]; };
+type LinkClick = { id:number; link_id:number; clicked_at:string; };
+type LinkStat = { id:number; label:string; emoji:string|null; url:string; clicks:number; };
 
 const SCHOOLS = [
   {id:"sjsu",    name:"San Jose State University",      short:"SJSU"},
@@ -72,18 +74,39 @@ export default function AdminDashboard() {
   const coverFileRef=useRef<HTMLInputElement>(null);
   const extraFileRef=useRef<HTMLInputElement>(null);
 
+  const [linkStats,setLinkStats]=useState<LinkStat[]>([]);
+  const [statsLoading,setStatsLoading]=useState(false);
+
   function showToast(msg:string,ok=true){setToast({msg,ok});setTimeout(()=>setToast(null),3000);}
 
   async function fetchPoses(){setPosesLoading(true);const{data}=await supabase.from('grad_poses').select('*').order('order',{ascending:true});if(data)setPoses(data);setPosesLoading(false);}
   async function fetchSpots(){setSpotsLoading(true);const{data}=await supabase.from('location_spots').select('*').order('school_id').order('order',{ascending:true});if(data)setSpots(data);setSpotsLoading(false);}
   async function fetchPosts(){setPostsLoading(true);const{data}=await supabase.from('blog_posts').select('*').order('published_at',{ascending:false});if(data)setPosts(data);setPostsLoading(false);}
-  useEffect(()=>{if(authed){fetchPoses();fetchSpots();fetchPosts();}},[authed]);
+  
+  async function fetchLinkStats(){
+    setStatsLoading(true);
+    const{data:links}=await supabase.from('links').select('id,label,emoji,url').eq('active',true).order('order',{ascending:true});
+    if(!links){setStatsLoading(false);return;}
+    const stats:LinkStat[]=[];
+    for(const link of links){
+      const{count}=await supabase.from('link_clicks').select('*',{count:'exact',head:true}).eq('link_id',link.id);
+      stats.push({...link,clicks:count||0});
+    }
+    setLinkStats(stats);
+    setStatsLoading(false);
+  }
+  
+  useEffect(()=>{if(authed){fetchPoses();fetchSpots();fetchPosts();if(tab==="analytics")fetchLinkStats();}},[authed,tab]);
 
   async function uploadImage(file:File,folder:string):Promise<string|null>{
     const ext=file.name.split('.').pop();
     const name=`${folder}/${Date.now()}.${ext}`;
     const{error}=await supabase.storage.from('grad-photos').upload(name,file,{upsert:true});
-    if(error){showToast("Image upload failed",false);return null;}
+    if(error){
+      console.error("Upload error:", error);
+      showToast(`Image upload failed: ${error.message}`,false);
+      return null;
+    }
     const{data}=supabase.storage.from('grad-photos').getPublicUrl(name);
     return data.publicUrl;
   }
@@ -209,11 +232,11 @@ export default function AdminDashboard() {
       <div className="max-w-3xl mx-auto px-6 py-8">
         {/* Tabs */}
         <div className="flex gap-2 mb-8 p-1 rounded-2xl bg-white border border-slate-100 w-fit">
-          {(["poses","locations","blog"] as Tab[]).map(t=>(
+          {(["poses","locations","blog","analytics"] as Tab[]).map(t=>(
             <button key={t} onClick={()=>{setTab(t);cancelEditPose();cancelEditSpot();cancelEditPost();}}
               className="px-5 py-2 rounded-xl text-sm font-bold transition-all"
               style={tab===t?{background:C.grad12,color:"#fff"}:{color:"#94a3b8"}}>
-              {t==="poses"?"📸 Grad Poses":t==="locations"?"📍 Locations":"✍️ Blog"}
+              {t==="poses"?"📸 Grad Poses":t==="locations"?"📍 Locations":t==="blog"?"✍️ Blog":"📊 Analytics"}
             </button>
           ))}
         </div>
@@ -497,6 +520,67 @@ export default function AdminDashboard() {
                   </div>
                 )
               )}
+            </div>
+          </div>
+        )}
+
+        {/* ── ANALYTICS ── */}
+        {tab==="analytics"&&(
+          <div className="space-y-6">
+            <div className={card}>
+              <div className="h-[3px]" style={{background:C.grad90_23}}/>
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-5">
+                  <h2 className="text-base font-black text-slate-900">Link Click Analytics</h2>
+                  <button onClick={fetchLinkStats} disabled={statsLoading} className="text-xs font-bold px-3 py-1.5 rounded-lg transition-all hover:opacity-80" style={{background:C.p2_08,color:C.p2}}>
+                    {statsLoading?"Loading...":"↻ Refresh"}
+                  </button>
+                </div>
+
+                {statsLoading?(
+                  <div className="text-center py-12 text-slate-400 text-sm">Loading analytics...</div>
+                ):(
+                  <div className="space-y-3">
+                    {linkStats.length===0?(
+                      <div className="text-center py-12">
+                        <p className="text-slate-400 text-sm mb-2">No links found</p>
+                        <p className="text-xs text-slate-300">Add links from the Links Admin page</p>
+                      </div>
+                    ):(
+                      linkStats.map(stat=>(
+                        <div key={stat.id} className="flex items-center justify-between p-4 rounded-xl border border-slate-100">
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <span className="text-2xl flex-shrink-0">{stat.emoji||"🔗"}</span>
+                            <div className="min-w-0 flex-1">
+                              <p className="font-black text-sm text-slate-900 truncate">{stat.label}</p>
+                              <p className="text-xs text-slate-400 truncate">{stat.url}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <div className="text-right">
+                              <p className="text-2xl font-black" style={{color:C.p1}}>{stat.clicks}</p>
+                              <p className="text-[10px] font-bold tracking-widest uppercase text-slate-300">clicks</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+
+                <div className="mt-6 pt-6 border-t border-slate-100">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-bold tracking-widest uppercase text-slate-400 mb-1">Total Clicks</p>
+                      <p className="text-3xl font-black" style={{color:C.p2}}>{linkStats.reduce((sum,s)=>sum+s.clicks,0)}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs font-bold tracking-widest uppercase text-slate-400 mb-1">Active Links</p>
+                      <p className="text-3xl font-black" style={{color:C.p3}}>{linkStats.length}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}
