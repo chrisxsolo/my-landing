@@ -155,6 +155,27 @@ export default function AdminDashboard() {
     setDailyStats(daily);
   }
   
+  async function clearAllAnalytics(){
+    const confirmed=window.confirm("⚠️ This will permanently delete ALL analytics data (views, clicks, history). Are you sure?");
+    if(!confirmed)return;
+    
+    setStatsLoading(true);
+    try{
+      // Delete all clicks
+      await supabase.from('link_clicks').delete().neq('id',0);
+      // Delete all views
+      await supabase.from('link_views').delete().neq('id',0);
+      
+      showToast("Analytics cleared successfully",true);
+      // Refresh the data
+      await fetchLinkStats();
+    }catch(err){
+      console.error(err);
+      showToast("Failed to clear analytics",false);
+      setStatsLoading(false);
+    }
+  }
+  
   useEffect(()=>{if(authed){fetchPoses();fetchSpots();fetchPosts();if(tab==="analytics")fetchLinkStats();}},[authed,tab]);
 
   async function uploadImage(file:File,folder:string):Promise<string|null>{
@@ -620,9 +641,14 @@ export default function AdminDashboard() {
                 <button onClick={()=>{setTimeRange(7);if(!statsLoading)fetchDailyStats(7);}} className="px-4 py-1.5 rounded-lg text-xs font-bold transition-all" style={timeRange===7?{background:C.p1_10,color:C.p1}:{color:"#94a3b8"}}>7 Days</button>
                 <button onClick={()=>{setTimeRange(30);if(!statsLoading)fetchDailyStats(30);}} className="px-4 py-1.5 rounded-lg text-xs font-bold transition-all" style={timeRange===30?{background:C.p1_10,color:C.p1}:{color:"#94a3b8"}}>30 Days</button>
               </div>
-              <button onClick={fetchLinkStats} disabled={statsLoading} className="text-xs font-bold px-4 py-2 rounded-lg transition-all hover:opacity-80" style={{background:C.p2_08,color:C.p2}}>
-                {statsLoading?"Loading...":"↻ Refresh"}
-              </button>
+              <div className="flex gap-2">
+                <button onClick={clearAllAnalytics} disabled={statsLoading} className="text-xs font-bold px-4 py-2 rounded-lg transition-all hover:opacity-80" style={{background:"rgba(239,68,68,0.08)",color:"#dc2626"}}>
+                  🗑️ Clear All
+                </button>
+                <button onClick={fetchLinkStats} disabled={statsLoading} className="text-xs font-bold px-4 py-2 rounded-lg transition-all hover:opacity-80" style={{background:C.p2_08,color:C.p2}}>
+                  {statsLoading?"Loading...":"↻ Refresh"}
+                </button>
+              </div>
             </div>
 
             {/* Chart */}
