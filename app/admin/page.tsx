@@ -628,35 +628,87 @@ export default function AdminDashboard() {
             <div className={card}>
               <div className="h-[3px]" style={{background:C.grad90}}/>
               <div className="p-6">
-                <h3 className="text-sm font-black text-slate-900 mb-4">Activity Over Time</h3>
+                <h3 className="text-sm font-black text-slate-900 mb-6">Activity Over Time</h3>
                 {statsLoading?(
-                  <div className="h-64 flex items-center justify-center text-slate-400 text-sm">Loading chart...</div>
+                  <div className="h-80 flex items-center justify-center text-slate-400 text-sm">Loading chart...</div>
                 ):(
-                  <div className="h-64 flex items-end justify-between gap-2">
-                    {dailyStats.map((stat,i)=>{
-                      const maxVal=Math.max(...dailyStats.map(s=>Math.max(s.clicks,s.views)),1);
-                      const clickHeight=(stat.clicks/maxVal)*100;
-                      const viewHeight=(stat.views/maxVal)*100;
-                      return(
-                        <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                          <div className="w-full flex gap-1 items-end" style={{height:240}}>
-                            <div className="flex-1 rounded-t" style={{height:`${viewHeight}%`,background:C.p1_20,minHeight:viewHeight>0?4:0}} title={`${stat.views} views`}/>
-                            <div className="flex-1 rounded-t" style={{height:`${clickHeight}%`,background:C.p2,minHeight:clickHeight>0?4:0}} title={`${stat.clicks} clicks`}/>
+                  <div className="relative">
+                    {/* Chart area */}
+                    <div className="h-80 flex items-end justify-between gap-3 px-4">
+                      {dailyStats.map((stat,i)=>{
+                        const maxVal=Math.max(...dailyStats.map(s=>Math.max(s.clicks,s.views)),1);
+                        const clickHeight=(stat.clicks/maxVal)*100;
+                        const viewHeight=(stat.views/maxVal)*100;
+                        const date=new Date(stat.date);
+                        const dayLabel=date.toLocaleDateString('en-US',{weekday:'short'});
+                        const dateLabel=date.getDate();
+                        
+                        return(
+                          <div key={i} className="group flex-1 flex flex-col items-center gap-2 cursor-pointer relative">
+                            {/* Hover tooltip */}
+                            <div className="absolute -top-20 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10">
+                              <div className="rounded-xl px-3 py-2 shadow-xl whitespace-nowrap" style={{background:"rgba(0,0,0,0.9)"}}>
+                                <p className="text-xs font-bold text-white mb-1">{dayLabel}, {dateLabel}</p>
+                                <p className="text-xs text-white/70">{stat.views} views</p>
+                                <p className="text-xs text-white/70">{stat.clicks} clicks</p>
+                              </div>
+                            </div>
+                            
+                            {/* Bars container */}
+                            <div className="w-full flex gap-1.5 items-end transition-all duration-300 group-hover:scale-105" style={{height:280}}>
+                              {/* Views bar */}
+                              <div className="flex-1 rounded-t-lg transition-all duration-500 ease-out relative overflow-hidden" 
+                                   style={{
+                                     height:`${viewHeight}%`,
+                                     background:`linear-gradient(180deg,${C.p1},${C.p1_35})`,
+                                     minHeight:viewHeight>0?8:0,
+                                     animationDelay:`${i*50}ms`,
+                                     boxShadow:`0 -4px 12px ${C.p1_15}`
+                                   }}>
+                                <div className="absolute inset-0" style={{background:`linear-gradient(180deg,transparent,rgba(255,255,255,0.2))`}}/>
+                              </div>
+                              
+                              {/* Clicks bar */}
+                              <div className="flex-1 rounded-t-lg transition-all duration-500 ease-out relative overflow-hidden" 
+                                   style={{
+                                     height:`${clickHeight}%`,
+                                     background:`linear-gradient(180deg,${C.p2},${C.p2_30})`,
+                                     minHeight:clickHeight>0?8:0,
+                                     animationDelay:`${i*50+25}ms`,
+                                     boxShadow:`0 -4px 12px ${C.p2_15}`
+                                   }}>
+                                <div className="absolute inset-0" style={{background:`linear-gradient(180deg,transparent,rgba(255,255,255,0.2))`}}/>
+                              </div>
+                            </div>
+                            
+                            {/* Date labels */}
+                            <div className="text-center">
+                              <p className="text-xs font-black text-slate-900 transition-colors group-hover:text-violet-600">{dateLabel}</p>
+                              <p className="text-[10px] font-bold text-slate-300 uppercase">{dayLabel}</p>
+                            </div>
                           </div>
-                          <p className="text-[9px] font-bold text-slate-300 text-center">{new Date(stat.date).getDate()}</p>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
+                    
+                    {/* Y-axis grid lines */}
+                    <div className="absolute inset-0 pointer-events-none flex flex-col justify-between px-4" style={{paddingBottom:56}}>
+                      {[...Array(5)].map((_,i)=>(
+                        <div key={i} className="w-full h-px" style={{background:"rgba(0,0,0,0.03)"}}/>
+                      ))}
+                    </div>
                   </div>
                 )}
-                <div className="flex items-center justify-center gap-6 mt-4 pt-4 border-t border-slate-100">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded" style={{background:C.p1_20}}/>
-                    <span className="text-xs font-bold text-slate-400">Views</span>
+                
+                {/* Legend */}
+                <div className="flex items-center justify-center gap-8 mt-6 pt-6 border-t" style={{borderColor:C.p1_08}}>
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-4 h-4 rounded-md shadow-sm" style={{background:`linear-gradient(135deg,${C.p1},${C.p1_35})`}}/>
+                    <span className="text-sm font-bold text-slate-600">Page Views</span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded" style={{background:C.p2}}/>
-                    <span className="text-xs font-bold text-slate-400">Clicks</span>
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-4 h-4 rounded-md shadow-sm" style={{background:`linear-gradient(135deg,${C.p2},${C.p2_30})`}}/>
+                    <span className="text-sm font-bold text-slate-600">Link Clicks</span>
                   </div>
                 </div>
               </div>
