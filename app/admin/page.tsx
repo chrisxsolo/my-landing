@@ -93,7 +93,8 @@ export default function AdminDashboard() {
     
     // Get total views
     const{count:viewCount}=await supabase.from('link_views').select('*',{count:'exact',head:true});
-    setTotalViews(viewCount||0);
+    const totalViewCount=viewCount||0;
+    setTotalViews(totalViewCount);
     
     // Get links with click counts
     const{data:links}=await supabase.from('links').select('id,label,emoji,url').eq('active',true).order('order',{ascending:true});
@@ -106,7 +107,7 @@ export default function AdminDashboard() {
       const{count}=await supabase.from('link_clicks').select('*',{count:'exact',head:true}).eq('link_id',link.id);
       const clicks=count||0;
       totalClickCount+=clicks;
-      const ctr=viewCount>0?(clicks/viewCount)*100:0;
+      const ctr=totalViewCount>0?(clicks/totalViewCount)*100:0;
       stats.push({...link,clicks,ctr});
     }
     
