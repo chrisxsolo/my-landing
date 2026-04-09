@@ -79,6 +79,8 @@ export default function AdminDashboard() {
   const [statsLoading,setStatsLoading]=useState(false);
   const [totalViews,setTotalViews]=useState(0);
   const [totalClicks,setTotalClicks]=useState(0);
+  const [uniqueVisitors,setUniqueVisitors]=useState(0);
+  const [uniqueClickers,setUniqueClickers]=useState(0);
   const [dailyStats,setDailyStats]=useState<DailyStat[]>([]);
   const [timeRange,setTimeRange]=useState<7|30>(7);
 
@@ -91,10 +93,19 @@ export default function AdminDashboard() {
   async function fetchLinkStats(){
     setStatsLoading(true);
     
-    // Get total views
+    // Get total views and unique visitors
     const{count:viewCount}=await supabase.from('link_views').select('*',{count:'exact',head:true});
+    const{data:uniqueViewsData}=await supabase.from('link_views').select('user_id');
+    const uniqueUserIds=new Set(uniqueViewsData?.map(v=>v.user_id).filter(Boolean));
+    
     const totalViewCount=viewCount||0;
     setTotalViews(totalViewCount);
+    setUniqueVisitors(uniqueUserIds.size);
+    
+    // Get total clicks and unique clickers
+    const{data:allClicksData}=await supabase.from('link_clicks').select('user_id');
+    const uniqueClickerIds=new Set(allClicksData?.map(c=>c.user_id).filter(Boolean));
+    setUniqueClickers(uniqueClickerIds.size);
     
     // Get links with click counts
     const{data:links}=await supabase.from('links').select('id,label,emoji,url').eq('active',true).order('order',{ascending:true});
@@ -608,13 +619,21 @@ export default function AdminDashboard() {
         {tab==="analytics"&&(
           <div className="space-y-6">
             {/* Overview Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className={card}>
                 <div className="h-[3px]" style={{background:C.grad12}}/>
                 <div className="p-6">
                   <p className="text-xs font-bold tracking-widest uppercase text-slate-400 mb-2">Total Views</p>
                   <p className="text-4xl font-black mb-1" style={{color:C.p1}}>{totalViews}</p>
                   <p className="text-xs text-slate-400">Page visits</p>
+                </div>
+              </div>
+              <div className={card}>
+                <div className="h-[3px]" style={{background:C.grad321}}/>
+                <div className="p-6">
+                  <p className="text-xs font-bold tracking-widest uppercase text-slate-400 mb-2">Unique Visitors</p>
+                  <p className="text-4xl font-black mb-1" style={{color:C.p3}}>{uniqueVisitors}</p>
+                  <p className="text-xs text-slate-400">Distinct users</p>
                 </div>
               </div>
               <div className={card}>
@@ -626,11 +645,11 @@ export default function AdminDashboard() {
                 </div>
               </div>
               <div className={card}>
-                <div className="h-[3px]" style={{background:C.grad321}}/>
+                <div className="h-[3px]" style={{background:C.grad90}}/>
                 <div className="p-6">
-                  <p className="text-xs font-bold tracking-widest uppercase text-slate-400 mb-2">Click Rate</p>
-                  <p className="text-4xl font-black mb-1" style={{color:C.p3}}>{totalViews>0?((totalClicks/totalViews)*100).toFixed(1):0}%</p>
-                  <p className="text-xs text-slate-400">CTR</p>
+                  <p className="text-xs font-bold tracking-widest uppercase text-slate-400 mb-2">Unique Clickers</p>
+                  <p className="text-4xl font-black mb-1" style={{color:C.p1}}>{uniqueClickers}</p>
+                  <p className="text-xs text-slate-400">Users who clicked</p>
                 </div>
               </div>
             </div>

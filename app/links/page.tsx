@@ -6,6 +6,19 @@ import { C } from "@/lib/colors";
 export const dynamic = 'force-dynamic'
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Generate or retrieve unique user ID for analytics tracking
+// ─────────────────────────────────────────────────────────────────────────────
+function getUserId(): string {
+  const key = 'chris_hub_user_id';
+  let userId = localStorage.getItem(key);
+  if (!userId) {
+    userId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    localStorage.setItem(key, userId);
+  }
+  return userId;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // PROFILE CONFIG — edit these values to update your profile
 // ─────────────────────────────────────────────────────────────────────────────
 const PROFILE = {
@@ -77,7 +90,8 @@ export default function LinksPage() {
 
   async function trackPageView() {
     try {
-      await supabase.from('link_views').insert({});
+      const userId = getUserId();
+      await supabase.from('link_views').insert({ user_id: userId });
     } catch (err) {
       console.error('Failed to track page view:', err);
     }
@@ -86,7 +100,8 @@ export default function LinksPage() {
   async function trackClick(linkId: number, url: string, e: React.MouseEvent<HTMLAnchorElement>) {
     e.preventDefault();
     try {
-      await supabase.from('link_clicks').insert({ link_id: linkId });
+      const userId = getUserId();
+      await supabase.from('link_clicks').insert({ link_id: linkId, user_id: userId });
     } catch (err) {
       console.error('Failed to track click:', err);
     }
@@ -221,7 +236,7 @@ export default function LinksPage() {
         {/* MARQUEE - 240px spacing */}
         <div
           className="w-full overflow-hidden rounded-2xl py-3"
-          style={{ marginTop: "12px", background:"white", border:`1px solid ${C.p1_12}`, boxShadow:`0 2px 16px ${C.p1_08}` }}
+          style={{ marginTop: "240px", background:"white", border:`1px solid ${C.p1_12}`, boxShadow:`0 2px 16px ${C.p1_08}` }}
         >
           <div className="mtrack flex whitespace-nowrap w-max" style={{ gap:"48px" }}>
             {MARQUEE_ITEMS.map((item, i) => (
