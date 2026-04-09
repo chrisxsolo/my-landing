@@ -5,10 +5,8 @@ import { C } from "@/lib/colors";
 
 const navLinks = [
   { label: "Home", href: "/" },
-  { label: "Links", href: "/links" },
-  { label: "Grad Guide", href: "/grad-guide" },
-  { label: "Location Guide", href: "/location-guide" },
-  { label: "Booking Process", href: "/booking-process" },
+  { label: "About Me", href: "/about" },
+  { label: "Graduation Guide", href: "/grad-guide" },
   { label: "Availability", href: "/availability" },
   { label: "Blog", href: "/blog" },
 ];
@@ -53,25 +51,13 @@ export default function Nav() {
                 href={link.href}
                 className="shrink-0 rounded-full px-3 py-2 text-sm font-bold text-slate-600 transition-opacity hover:opacity-70"
                 style={{
-                  background: `linear-gradient(135deg, ${C.p1_06}, ${C.p2_04})`,
+                  background: `linear-gradient(135deg, ${C.p1_06}, ${C.p2_06})`,
                 }}
               >
                 {link.label}
               </Link>
             ))}
 
-            <a
-              href="https://www.instagram.com/soloxsnaps"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="shrink-0 rounded-full px-3 py-2 text-sm font-bold transition-opacity hover:opacity-70"
-              style={{
-                color: C.p2,
-                background: `linear-gradient(135deg, ${C.p2_06}, ${C.p3_08})`,
-              }}
-            >
-              Instagram
-            </a>
           </div>
         </div>
       </nav>
