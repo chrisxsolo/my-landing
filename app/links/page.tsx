@@ -70,14 +70,27 @@ export default function LinksPage() {
       finally { setLoading(false); }
     }
     fetchLinks();
+    
+    // Track page view
+    trackPageView();
   }, []);
 
-  async function trackClick(linkId: number) {
+  async function trackPageView() {
+    try {
+      await supabase.from('link_views').insert({});
+    } catch (err) {
+      console.error('Failed to track page view:', err);
+    }
+  }
+
+  async function trackClick(linkId: number, url: string, e: React.MouseEvent<HTMLAnchorElement>) {
+    e.preventDefault();
     try {
       await supabase.from('link_clicks').insert({ link_id: linkId });
     } catch (err) {
       console.error('Failed to track click:', err);
     }
+    window.open(url, '_blank');
   }
 
   return (
@@ -169,7 +182,7 @@ export default function LinksPage() {
                     key={link.id}
                     href={link.url}
                     target="_blank" rel="noopener noreferrer"
-                    onClick={() => trackClick(link.id)}
+                    onClick={(e) => trackClick(link.id, link.url, e)}
                     className="link-card flex items-center gap-4 w-full rounded-2xl px-5 py-5"
                     style={{ animationDelay:`${0.1 + i * 0.06}s`, background:style.bg, border:`1.5px solid ${style.border}` }}
                   >
@@ -207,7 +220,7 @@ export default function LinksPage() {
         {/* MARQUEE - 240px spacing */}
         <div
           className="w-full overflow-hidden rounded-2xl py-3"
-          style={{ marginTop: "240px", background:"white", border:`1px solid ${C.p1_12}`, boxShadow:`0 2px 16px ${C.p1_08}` }}
+          style={{ marginTop: "12px", background:"white", border:`1px solid ${C.p1_12}`, boxShadow:`0 2px 16px ${C.p1_08}` }}
         >
           <div className="mtrack flex whitespace-nowrap w-max" style={{ gap:"48px" }}>
             {MARQUEE_ITEMS.map((item, i) => (

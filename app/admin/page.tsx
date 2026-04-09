@@ -11,7 +11,8 @@ type Pose = { id:number; title:string; image_url:string; instructions:string; or
 type Spot = { id:number; school_id:string; school_name:string; school_short:string; name:string; description:string; tip:string; icon:string; image_url:string|null; order:number; };
 type BlogPost = { id:number; title:string; body:string; published_at:string; slug:string; cover_image_url:string|null; extra_image_urls:string[]; };
 type LinkClick = { id:number; link_id:number; clicked_at:string; };
-type LinkStat = { id:number; label:string; emoji:string|null; url:string; clicks:number; };
+type LinkStat = { id:number; label:string; emoji:string|null; url:string; clicks:number; ctr:number; };
+type DailyStat = { date:string; clicks:number; views:number; };
 
 const SCHOOLS = [
   {id:"sjsu",    name:"San Jose State University",      short:"SJSU"},
@@ -76,6 +77,10 @@ export default function AdminDashboard() {
 
   const [linkStats,setLinkStats]=useState<LinkStat[]>([]);
   const [statsLoading,setStatsLoading]=useState(false);
+  const [totalViews,setTotalViews]=useState(0);
+  const [totalClicks,setTotalClicks]=useState(0);
+  const [dailyStats,setDailyStats]=useState<DailyStat[]>([]);
+  const [timeRange,setTimeRange]=useState<7|30>(7);
 
   function showToast(msg:string,ok=true){setToast({msg,ok});setTimeout(()=>setToast(null),3000);}
 
@@ -85,15 +90,68 @@ export default function AdminDashboard() {
   
   async function fetchLinkStats(){
     setStatsLoading(true);
+    
+    // Get total views
+    const{count:viewCount}=await supabase.from('link_views').select('*',{count:'exact',head:true});
+    setTotalViews(viewCount||0);
+    
+    // Get links with click counts
     const{data:links}=await supabase.from('links').select('id,label,emoji,url').eq('active',true).order('order',{ascending:true});
     if(!links){setStatsLoading(false);return;}
+    
     const stats:LinkStat[]=[];
+    let totalClickCount=0;
+    
     for(const link of links){
       const{count}=await supabase.from('link_clicks').select('*',{count:'exact',head:true}).eq('link_id',link.id);
-      stats.push({...link,clicks:count||0});
+      const clicks=count||0;
+      totalClickCount+=clicks;
+      const ctr=viewCount>0?(clicks/viewCount)*100:0;
+      stats.push({...link,clicks,ctr});
     }
+    
+    // Sort by clicks descending
+    stats.sort((a,b)=>b.clicks-a.clicks);
     setLinkStats(stats);
+    setTotalClicks(totalClickCount);
+    
+    // Get daily breakdown for last N days
+    await fetchDailyStats(timeRange);
+    
     setStatsLoading(false);
+  }
+  
+  async function fetchDailyStats(days:7|30){
+    const startDate=new Date();
+    startDate.setDate(startDate.getDate()-days);
+    
+    const{data:clicks}=await supabase.from('link_clicks').select('clicked_at').gte('clicked_at',startDate.toISOString());
+    const{data:views}=await supabase.from('link_views').select('viewed_at').gte('viewed_at',startDate.toISOString());
+    
+    const dailyMap:Record<string,{clicks:number;views:number}>={};
+    
+    // Initialize all days
+    for(let i=0;i<days;i++){
+      const d=new Date();
+      d.setDate(d.getDate()-i);
+      const key=d.toISOString().split('T')[0];
+      dailyMap[key]={clicks:0,views:0};
+    }
+    
+    // Count clicks per day
+    clicks?.forEach(c=>{
+      const key=c.clicked_at.split('T')[0];
+      if(dailyMap[key])dailyMap[key].clicks++;
+    });
+    
+    // Count views per day
+    views?.forEach(v=>{
+      const key=v.viewed_at.split('T')[0];
+      if(dailyMap[key])dailyMap[key].views++;
+    });
+    
+    const daily=Object.entries(dailyMap).map(([date,stats])=>({date,...stats})).sort((a,b)=>a.date.localeCompare(b.date));
+    setDailyStats(daily);
   }
   
   useEffect(()=>{if(authed){fetchPoses();fetchSpots();fetchPosts();if(tab==="analytics")fetchLinkStats();}},[authed,tab]);
@@ -527,16 +585,88 @@ export default function AdminDashboard() {
         {/* ── ANALYTICS ── */}
         {tab==="analytics"&&(
           <div className="space-y-6">
+            {/* Overview Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className={card}>
+                <div className="h-[3px]" style={{background:C.grad12}}/>
+                <div className="p-6">
+                  <p className="text-xs font-bold tracking-widest uppercase text-slate-400 mb-2">Total Views</p>
+                  <p className="text-4xl font-black mb-1" style={{color:C.p1}}>{totalViews}</p>
+                  <p className="text-xs text-slate-400">Page visits</p>
+                </div>
+              </div>
+              <div className={card}>
+                <div className="h-[3px]" style={{background:C.grad23}}/>
+                <div className="p-6">
+                  <p className="text-xs font-bold tracking-widest uppercase text-slate-400 mb-2">Total Clicks</p>
+                  <p className="text-4xl font-black mb-1" style={{color:C.p2}}>{totalClicks}</p>
+                  <p className="text-xs text-slate-400">Link clicks</p>
+                </div>
+              </div>
+              <div className={card}>
+                <div className="h-[3px]" style={{background:C.grad321}}/>
+                <div className="p-6">
+                  <p className="text-xs font-bold tracking-widest uppercase text-slate-400 mb-2">Click Rate</p>
+                  <p className="text-4xl font-black mb-1" style={{color:C.p3}}>{totalViews>0?((totalClicks/totalViews)*100).toFixed(1):0}%</p>
+                  <p className="text-xs text-slate-400">CTR</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Time Range Toggle + Refresh */}
+            <div className="flex items-center justify-between">
+              <div className="flex gap-2 p-1 rounded-xl bg-white border border-slate-100 w-fit">
+                <button onClick={()=>{setTimeRange(7);if(!statsLoading)fetchDailyStats(7);}} className="px-4 py-1.5 rounded-lg text-xs font-bold transition-all" style={timeRange===7?{background:C.p1_10,color:C.p1}:{color:"#94a3b8"}}>7 Days</button>
+                <button onClick={()=>{setTimeRange(30);if(!statsLoading)fetchDailyStats(30);}} className="px-4 py-1.5 rounded-lg text-xs font-bold transition-all" style={timeRange===30?{background:C.p1_10,color:C.p1}:{color:"#94a3b8"}}>30 Days</button>
+              </div>
+              <button onClick={fetchLinkStats} disabled={statsLoading} className="text-xs font-bold px-4 py-2 rounded-lg transition-all hover:opacity-80" style={{background:C.p2_08,color:C.p2}}>
+                {statsLoading?"Loading...":"↻ Refresh"}
+              </button>
+            </div>
+
+            {/* Chart */}
+            <div className={card}>
+              <div className="h-[3px]" style={{background:C.grad90}}/>
+              <div className="p-6">
+                <h3 className="text-sm font-black text-slate-900 mb-4">Activity Over Time</h3>
+                {statsLoading?(
+                  <div className="h-64 flex items-center justify-center text-slate-400 text-sm">Loading chart...</div>
+                ):(
+                  <div className="h-64 flex items-end justify-between gap-2">
+                    {dailyStats.map((stat,i)=>{
+                      const maxVal=Math.max(...dailyStats.map(s=>Math.max(s.clicks,s.views)),1);
+                      const clickHeight=(stat.clicks/maxVal)*100;
+                      const viewHeight=(stat.views/maxVal)*100;
+                      return(
+                        <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                          <div className="w-full flex gap-1 items-end" style={{height:240}}>
+                            <div className="flex-1 rounded-t" style={{height:`${viewHeight}%`,background:C.p1_20,minHeight:viewHeight>0?4:0}} title={`${stat.views} views`}/>
+                            <div className="flex-1 rounded-t" style={{height:`${clickHeight}%`,background:C.p2,minHeight:clickHeight>0?4:0}} title={`${stat.clicks} clicks`}/>
+                          </div>
+                          <p className="text-[9px] font-bold text-slate-300 text-center">{new Date(stat.date).getDate()}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                <div className="flex items-center justify-center gap-6 mt-4 pt-4 border-t border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded" style={{background:C.p1_20}}/>
+                    <span className="text-xs font-bold text-slate-400">Views</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded" style={{background:C.p2}}/>
+                    <span className="text-xs font-bold text-slate-400">Clicks</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Top Links */}
             <div className={card}>
               <div className="h-[3px]" style={{background:C.grad90_23}}/>
               <div className="p-6">
-                <div className="flex items-center justify-between mb-5">
-                  <h2 className="text-base font-black text-slate-900">Link Click Analytics</h2>
-                  <button onClick={fetchLinkStats} disabled={statsLoading} className="text-xs font-bold px-3 py-1.5 rounded-lg transition-all hover:opacity-80" style={{background:C.p2_08,color:C.p2}}>
-                    {statsLoading?"Loading...":"↻ Refresh"}
-                  </button>
-                </div>
-
+                <h2 className="text-base font-black text-slate-900 mb-5">Top Performing Links</h2>
                 {statsLoading?(
                   <div className="text-center py-12 text-slate-400 text-sm">Loading analytics...</div>
                 ):(
@@ -547,39 +677,38 @@ export default function AdminDashboard() {
                         <p className="text-xs text-slate-300">Add links from the Links Admin page</p>
                       </div>
                     ):(
-                      linkStats.map(stat=>(
-                        <div key={stat.id} className="flex items-center justify-between p-4 rounded-xl border border-slate-100">
-                          <div className="flex items-center gap-3 flex-1 min-w-0">
-                            <span className="text-2xl flex-shrink-0">{stat.emoji||"🔗"}</span>
-                            <div className="min-w-0 flex-1">
-                              <p className="font-black text-sm text-slate-900 truncate">{stat.label}</p>
-                              <p className="text-xs text-slate-400 truncate">{stat.url}</p>
+                      linkStats.map((stat,idx)=>{
+                        const maxClicks=linkStats[0]?.clicks||1;
+                        const barWidth=(stat.clicks/maxClicks)*100;
+                        return(
+                          <div key={stat.id} className="p-4 rounded-xl border border-slate-100 relative overflow-hidden">
+                            <div className="absolute inset-0 rounded-xl" style={{background:`linear-gradient(90deg,${C.p1_06} ${barWidth}%,transparent ${barWidth}%)`}}/>
+                            <div className="relative flex items-center justify-between gap-3">
+                              <div className="flex items-center gap-3 flex-1 min-w-0">
+                                <div className="flex items-center justify-center w-6 h-6 rounded-full text-xs font-black" style={{background:idx===0?C.p1_15:idx===1?C.p2_10:idx===2?C.p3_10:C.p1_06,color:idx<3?C.p1:"#94a3b8"}}>#{idx+1}</div>
+                                <span className="text-xl flex-shrink-0">{stat.emoji||"🔗"}</span>
+                                <div className="min-w-0 flex-1">
+                                  <p className="font-black text-sm text-slate-900 truncate">{stat.label}</p>
+                                  <p className="text-xs text-slate-400 truncate">{stat.url}</p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-4 flex-shrink-0">
+                                <div className="text-right">
+                                  <p className="text-xl font-black" style={{color:C.p1}}>{stat.clicks}</p>
+                                  <p className="text-[9px] font-bold tracking-widest uppercase text-slate-300">clicks</p>
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-xl font-black" style={{color:C.p2}}>{stat.ctr.toFixed(1)}%</p>
+                                  <p className="text-[9px] font-bold tracking-widest uppercase text-slate-300">CTR</p>
+                                </div>
+                              </div>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            <div className="text-right">
-                              <p className="text-2xl font-black" style={{color:C.p1}}>{stat.clicks}</p>
-                              <p className="text-[10px] font-bold tracking-widest uppercase text-slate-300">clicks</p>
-                            </div>
-                          </div>
-                        </div>
-                      ))
+                        );
+                      })
                     )}
                   </div>
                 )}
-
-                <div className="mt-6 pt-6 border-t border-slate-100">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs font-bold tracking-widest uppercase text-slate-400 mb-1">Total Clicks</p>
-                      <p className="text-3xl font-black" style={{color:C.p2}}>{linkStats.reduce((sum,s)=>sum+s.clicks,0)}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xs font-bold tracking-widest uppercase text-slate-400 mb-1">Active Links</p>
-                      <p className="text-3xl font-black" style={{color:C.p3}}>{linkStats.length}</p>
-                    </div>
-                  </div>
-                </div>
               </div>
             </div>
           </div>
