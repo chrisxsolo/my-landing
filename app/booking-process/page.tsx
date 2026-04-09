@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useEffect, useState, useRef } from "react";
 import { C } from "@/lib/colors";
 import GuideNav from "@/app/components/GuideNav";
+import Nav from "@/app/components/Nav";
 
 export const dynamic = 'force-dynamic'
 
@@ -213,13 +214,7 @@ export default function BookingProcessPage() {
         }
       `}</style>
 
-      {/* NAVBAR */}
-      <nav className="sticky top-0 z-50 backdrop-blur-xl border-b border-black/[0.06]" style={{background:"rgba(255,255,255,0.9)"}}>
-        <div className="max-w-4xl mx-auto px-6 h-14 flex items-center justify-between">
-          <Link href="/" className="font-black text-lg tracking-tight" style={C.text}>Chris.</Link>
-          <Link href="/" className="text-sm font-bold text-slate-700 hover:text-slate-400 transition-colors">← Back to hub</Link>
-        </div>
-      </nav>
+      <Nav />
 
       {/* HERO */}
       <section className="relative overflow-hidden px-6 pt-16 pb-14 border-b border-black/[0.06]">

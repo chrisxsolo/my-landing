@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { C } from "@/lib/colors";
+import Nav from "@/app/components/Nav";
 
 export const dynamic = 'force-dynamic'
 
@@ -56,16 +57,7 @@ export default function Home() {
     <div className="min-h-screen bg-white font-sans overflow-x-hidden">
       <style>{STYLES}</style>
 
-      {/* NAVBAR */}
-      <nav className="af sticky top-0 z-50 backdrop-blur-xl border-b border-black/[0.06]" style={{background:"rgba(255,255,255,0.9)"}}>
-        <div className="max-w-3xl mx-auto px-6 h-14 flex items-center justify-between">
-          <span className="font-black text-lg tracking-tight" style={C.text}>Chris.</span>
-          <div className="flex items-center gap-6 text-sm font-bold text-slate-800">
-            <a href="#photography" className="hover:text-slate-500 transition-colors">Photography</a>
-            <a href="https://www.instagram.com/soloxsnaps" target="_blank" rel="noopener noreferrer" className="hover:text-slate-500 transition-colors">Instagram</a>
-          </div>
-        </div>
-      </nav>
+      <Nav />
 
       {/* HERO */}
       <section className="relative overflow-hidden pt-20 pb-24 px-6 border-b border-black/[0.06]">

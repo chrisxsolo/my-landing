@@ -2,6 +2,7 @@
 import { supabase } from '@/lib/supabase'
 import { useEffect, useState } from "react";
 import { C } from "@/lib/colors";
+import Nav from "@/app/components/Nav";
 
 export const dynamic = 'force-dynamic'
 
@@ -111,6 +112,7 @@ export default function LinksPage() {
 
   return (
     <div className="min-h-screen font-sans" style={{ background: "#f7f6ff" }}>
+      <Nav />
       <style>{`
         @keyframes blobFloat  { 0%,100%{transform:translate(0,0)scale(1);}   40%{transform:translate(16px,-12px)scale(1.03);}   70%{transform:translate(-10px,10px)scale(0.97);} }
         @keyframes blobFloat2 { 0%,100%{transform:translate(0,0)scale(1);}   35%{transform:translate(-14px,10px)scale(0.96);}   65%{transform:translate(12px,-8px)scale(1.04);} }
