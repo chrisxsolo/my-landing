@@ -32,7 +32,7 @@ const PROCESS = [
 
 export default function AboutPage() {
   return (
-    <div className="min-h-screen relative overflow-hidden" style={{background:C.bg}}>
+    <div className="min-h-screen relative overflow-hidden bg-white">
       <style>{`
         @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
         @keyframes fadeIn{from{opacity:0}to{opacity:1}}
@@ -335,18 +335,32 @@ export default function AboutPage() {
                 Let's capture your graduation, portrait session, or creative project — in a way that actually feels like you.
               </p>
 
-              <div className="flex flex-wrap gap-4 justify-center">
+              <div className="mx-auto flex max-w-full flex-wrap items-center justify-center gap-4">
                 <a
                   href="https://soloxsnaps.com/contact"
-                  className="px-10 py-4 rounded-full font-bold text-white transition-all hover:scale-105 hover:opacity-90 whitespace-nowrap"
-                  style={{background:C.grad12,boxShadow:`0 8px 28px ${C.p1_25}`,fontSize:"1rem"}}
+                  className="inline-flex items-center justify-center rounded-full font-bold text-white transition-all hover:scale-[1.02] hover:opacity-90"
+                  style={{
+                    minHeight: 50,
+                    padding: "0 28px",
+                    fontSize: "0.95rem",
+                    lineHeight: 1,
+                    background: C.grad12,
+                    boxShadow: `0 8px 28px ${C.p1_25}`,
+                  }}
                 >
                   Get in Touch →
                 </a>
                 <Link
                   href="/availability"
-                  className="px-10 py-4 rounded-full font-bold text-slate-800 bg-white transition-all hover:scale-105 whitespace-nowrap"
-                  style={{border:`2px solid ${C.p1_20}`,boxShadow:`0 4px 16px ${C.p1_08}`,fontSize:"1rem"}}
+                  className="inline-flex items-center justify-center rounded-full bg-white font-bold text-slate-800 transition-all hover:scale-[1.02] whitespace-nowrap"
+                  style={{
+                    minHeight: 50,
+                    padding: "0 28px",
+                    fontSize: "0.95rem",
+                    lineHeight: 1,
+                    border: `2px solid ${C.p1_20}`,
+                    boxShadow: `0 4px 16px ${C.p1_08}`,
+                  }}
                 >
                   Check Availability
                 </Link>
