@@ -90,7 +90,8 @@ export default function LinksPage() {
     } catch (err) {
       console.error('Failed to track click:', err);
     }
-    window.open(url, '_blank');
+    // Use location.href for better mobile browser compatibility (Instagram, Facebook, etc.)
+    window.location.href = url;
   }
 
   return (
@@ -220,7 +221,7 @@ export default function LinksPage() {
         {/* MARQUEE - 240px spacing */}
         <div
           className="w-full overflow-hidden rounded-2xl py-3"
-          style={{ marginTop: "12px", background:"white", border:`1px solid ${C.p1_12}`, boxShadow:`0 2px 16px ${C.p1_08}` }}
+          style={{ marginTop: "240px", background:"white", border:`1px solid ${C.p1_12}`, boxShadow:`0 2px 16px ${C.p1_08}` }}
         >
           <div className="mtrack flex whitespace-nowrap w-max" style={{ gap:"48px" }}>
             {MARQUEE_ITEMS.map((item, i) => (
