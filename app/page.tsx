@@ -15,7 +15,7 @@ const photographyCards = [
 const cardStyles = [
   { bg:`linear-gradient(135deg,${C.p1_10},${C.p2_08})`, border:C.p1_25, tagColor:C.p1, tagBg:C.p1_10, accentBar:C.grad90_12, arrowColor:C.p1 },
   { bg:`linear-gradient(135deg,${C.p3_10},${C.p2_08})`, border:C.p2_25, tagColor:C.p2, tagBg:C.p2_10, accentBar:C.grad90_23, arrowColor:C.p2 },
-  { bg:`linear-gradient(135deg,${C.p2_10},${C.p3_08})`, border:C.p3_25, tagColor:C.p3, tagBg:C.p3_10, accentBar:C.grad90_23, arrowColor:C.p3 },
+  { bg:`linear-gradient(135deg,${C.p2_10},${C.p3_08})`, border:C.p3_30, tagColor:C.p3, tagBg:C.p3_10, accentBar:C.grad90_23, arrowColor:C.p3 },
 ];
 
 const STYLES = `

@@ -396,7 +396,7 @@ export default function BookingProcessPage() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="rounded-2xl p-6 relative overflow-hidden" style={{background:`linear-gradient(135deg,${C.p3_08},${C.p2_06})`,border:`1.5px solid ${C.p3_20}`}}>
+            <div className="rounded-2xl p-6 relative overflow-hidden" style={{background:`linear-gradient(135deg,${C.p3_08},${C.p2_06})`,border:`1.5px solid ${C.p3_18}`}}>
               <div className="absolute top-0 left-0 right-0 h-[3px]" style={{background:C.grad321}}/>
               <div className="flex items-start gap-3 mb-3">
                 <span className="text-3xl">⚡</span>
@@ -447,6 +447,7 @@ export default function BookingProcessPage() {
           </div>
         </div>
       </div>
+
       <footer className="border-t border-black/[0.06] bg-white py-8 px-6">
         <div className="max-w-4xl mx-auto flex items-center justify-between flex-wrap gap-4">
           <span className="font-black text-lg" style={C.text}>Chris.</span>
