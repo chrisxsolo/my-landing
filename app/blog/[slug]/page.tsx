@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { GUIDE_STYLES } from "@/lib/guidestyles";
 import { C } from "@/lib/colors";
+import Head from 'next/head';
 
 export const dynamic = 'force-dynamic'
 
@@ -15,6 +16,9 @@ type BlogPost = {
   slug: string;
   cover_image_url: string | null;
   extra_image_urls: string[];
+  meta_description: string | null;
+  meta_keywords: string | null;
+  og_image_url: string | null;
 };
 
 function formatDate(iso: string) {
@@ -24,6 +28,103 @@ function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
 }
 
+// SEO Component - generates meta tags and structured data
+function BlogSEO({ post }: { post: BlogPost }) {
+  const baseUrl = "www.chrissolo.dev"; // Update when you add your domain
+  const postUrl = `${baseUrl}/blog/${post.slug}`;
+  const ogImage = post.og_image_url || post.cover_image_url || `${baseUrl}/og-default.jpg`;
+  const description = post.meta_description || post.body.substring(0, 160) + "...";
+  
+  // Structured data for Google rich snippets
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    "headline": post.title,
+    "description": description,
+    "image": ogImage,
+    "datePublished": post.published_at,
+    "dateModified": post.published_at,
+    "author": {
+      "@type": "Person",
+      "name": "Chris Solorzano",
+      "url": baseUrl
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "Chris Solo Photography",
+      "logo": {
+        "@type": "ImageObject",
+        "url": `${baseUrl}/logo.png`
+      }
+    },
+    "mainEntityOfPage": {
+      "@type": "WebPage",
+      "@id": postUrl
+    }
+  };
+
+  useEffect(() => {
+    // Update document title
+    document.title = `${post.title} | Chris Solo Photography`;
+    
+    // Update meta tags
+    const updateMetaTag = (name: string, content: string, isProperty = false) => {
+      const attr = isProperty ? 'property' : 'name';
+      let meta = document.querySelector(`meta[${attr}="${name}"]`);
+      if (!meta) {
+        meta = document.createElement('meta');
+        meta.setAttribute(attr, name);
+        document.head.appendChild(meta);
+      }
+      meta.setAttribute('content', content);
+    };
+
+    // Basic meta tags
+    updateMetaTag('description', description);
+    if (post.meta_keywords) {
+      updateMetaTag('keywords', post.meta_keywords);
+    }
+
+    // Open Graph tags (Facebook, LinkedIn)
+    updateMetaTag('og:title', post.title, true);
+    updateMetaTag('og:description', description, true);
+    updateMetaTag('og:image', ogImage, true);
+    updateMetaTag('og:url', postUrl, true);
+    updateMetaTag('og:type', 'article', true);
+    updateMetaTag('og:site_name', 'Chris Solo Photography', true);
+    updateMetaTag('article:published_time', post.published_at, true);
+    updateMetaTag('article:author', 'Chris Solorzano', true);
+
+    // Twitter Card tags
+    updateMetaTag('twitter:card', 'summary_large_image');
+    updateMetaTag('twitter:title', post.title);
+    updateMetaTag('twitter:description', description);
+    updateMetaTag('twitter:image', ogImage);
+    updateMetaTag('twitter:creator', '@soloxsnaps');
+
+    // Canonical URL
+    let canonical = document.querySelector('link[rel="canonical"]') as HTMLLinkElement;
+    if (!canonical) {
+      canonical = document.createElement('link');
+      canonical.rel = 'canonical';
+      document.head.appendChild(canonical);
+    }
+    canonical.href = postUrl;
+
+    // Add structured data
+    let script = document.querySelector('script[type="application/ld+json"]');
+    if (!script) {
+      script = document.createElement('script');
+      script.type = 'application/ld+json';
+      document.head.appendChild(script);
+    }
+    script.textContent = JSON.stringify(structuredData);
+
+  }, [post]);
+
+  return null; // This component only updates the head, doesn't render anything
+}
+
 export default function BlogPostPage({ params }: { params: Promise<{ slug: string }> }) {
   const [slug, setSlug]       = useState<string | null>(null);
   const [post, setPost]       = useState<BlogPost | null>(null);
@@ -31,7 +132,6 @@ export default function BlogPostPage({ params }: { params: Promise<{ slug: strin
   const [notFound, setNotFound] = useState(false);
   const [lightbox, setLightbox] = useState<string | null>(null);
 
-  // Unwrap params promise (Next.js 16)
   useEffect(() => {
     params.then(p => setSlug(p.slug));
   }, [params]);
@@ -57,256 +157,149 @@ export default function BlogPostPage({ params }: { params: Promise<{ slug: strin
     fetchPost();
   }, [slug]);
 
-  // Close lightbox on Escape
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") setLightbox(null); };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, []);
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{background:C.bg}}>
+        <div className="text-center">
+          <div className="inline-block w-12 h-12 border-4 border-t-transparent rounded-full animate-spin mb-3" style={{borderColor:C.p1,borderTopColor:"transparent"}}/>
+          <p className="text-sm font-bold text-slate-400">Loading post...</p>
+        </div>
+      </div>
+    );
+  }
 
-  const allImages = post
-    ? [post.cover_image_url, ...(post.extra_image_urls ?? [])].filter(Boolean) as string[]
-    : [];
+  if (notFound || !post) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center px-6" style={{background:C.bg}}>
+        <h1 className="text-6xl font-black mb-4" style={{color:C.p1}}>404</h1>
+        <p className="text-xl font-bold text-slate-900 mb-6">Post not found</p>
+        <Link href="/blog" className="px-6 py-3 rounded-full font-bold text-sm text-white transition-all hover:opacity-90" style={{background:C.grad12}}>
+          ← Back to blog
+        </Link>
+      </div>
+    );
+  }
 
-  const STYLES = `
-    @keyframes fadeUp{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}
-    @keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
-    @keyframes blobFloat{0%,100%{transform:translate(0,0)scale(1);}33%{transform:translate(12px,-8px)scale(1.02);}66%{transform:translate(-8px,10px)scale(0.98);}}
-    @keyframes pulseRing{0%,100%{opacity:0.5;transform:scale(1);}50%{opacity:0.15;transform:scale(1.25);}}
-    @keyframes spinSlow{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
-    .afu1{animation:fadeUp 0.5s 0.05s ease both;}
-    .afu2{animation:fadeUp 0.5s 0.12s ease both;}
-    .blob1{animation:blobFloat 10s ease-in-out infinite;}
-    .pdot{animation:pulseRing 2.5s ease-in-out infinite;}
-    .spin{animation:spinSlow 12s linear infinite;}
-    .img-card{transition:transform 0.22s ease,box-shadow 0.22s ease;cursor:zoom-in;}
-    .img-card:hover{transform:translateY(-3px);box-shadow:0 16px 40px ${C.p1_13};}
-    .btn-lift{transition:transform 0.18s ease,box-shadow 0.18s ease;}
-    .btn-lift:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,0.12);}
-    .lightbox-bg{position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:999;display:flex;align-items:center;justify-content:center;padding:20px;}
-    .lightbox-img{max-width:100%;max-height:90vh;object-fit:contain;border-radius:12px;}
-  `;
+  const paragraphs = post.body.split('\n\n').filter(Boolean);
 
   return (
-    <div className="min-h-screen bg-white font-sans overflow-x-hidden">
-      <style>{STYLES}</style>
+    <div className="min-h-screen relative overflow-hidden" style={{background:C.bg}}>
+      {/* SEO Component - adds meta tags and structured data */}
+      <BlogSEO post={post} />
 
-      {/* LIGHTBOX */}
-      {lightbox && (
-        <div className="lightbox-bg" onClick={() => setLightbox(null)}>
-          <img src={lightbox} className="lightbox-img" alt="Full size" onClick={e => e.stopPropagation()} />
-          <button
-            onClick={() => setLightbox(null)}
-            className="absolute top-5 right-5 w-10 h-10 rounded-full bg-white/10 text-white font-bold text-lg flex items-center justify-center hover:bg-white/20 transition-colors"
-          >✕</button>
-        </div>
-      )}
+      {/* Background decorations */}
+      <div className="fixed inset-0 pointer-events-none opacity-30">
+        <div className="absolute inset-0" style={{background:`radial-gradient(circle at 20% 30%, ${C.p1_08}, transparent 40%)`}}/>
+        <div className="absolute inset-0" style={{background:`radial-gradient(circle at 80% 70%, ${C.p2_08}, transparent 40%)`}}/>
+        <div className="absolute inset-0" style={{background:`radial-gradient(circle at 50% 50%, ${C.p3_08}, transparent 50%)`}}/>
+      </div>
 
-      {/* NAVBAR */}
-      <nav
-        className="sticky top-0 z-50 backdrop-blur-xl border-b border-black/[0.06]"
-        style={{ background: "rgba(255,255,255,0.9)" }}
-      >
-        <div className="max-w-3xl mx-auto px-6 h-14 flex items-center justify-between">
-          <Link href="/" className="font-black text-lg tracking-tight" style={C.text}>Chris.</Link>
-          <Link href="/blog" className="text-sm font-bold text-slate-700 hover:text-slate-400 transition-colors">← All posts</Link>
-        </div>
-      </nav>
+      <div className="relative z-10 max-w-3xl mx-auto px-6 py-12">
+        {/* Back button */}
+        <Link href="/blog" className="inline-flex items-center gap-2 text-sm font-bold mb-8 transition-colors hover:opacity-70" style={{color:C.p1}}>
+          ← Back to blog
+        </Link>
 
-      {/* LOADING */}
-      {loading && (
-        <div className="max-w-3xl mx-auto px-6 py-20 space-y-4">
-          <div className="rounded-2xl animate-pulse h-10 w-2/3" style={{ background: `linear-gradient(135deg,${C.p1_08},${C.p2_06})` }} />
-          <div className="rounded-2xl animate-pulse h-72 w-full" style={{ background: `linear-gradient(135deg,${C.p1_06},${C.p2_06})` }} />
-          <div className="space-y-2 pt-4">
-            {[...Array(6)].map((_, i) => (
-              <div key={i} className="rounded-lg animate-pulse h-4" style={{ background: C.p1_06, width: i % 3 === 2 ? "70%" : "100%" }} />
+        {/* Cover image */}
+        {post.cover_image_url && (
+          <div className="w-full aspect-[2/1] rounded-2xl overflow-hidden mb-8 shadow-xl">
+            <img src={post.cover_image_url} alt={post.title} className="w-full h-full object-cover"/>
+          </div>
+        )}
+
+        {/* Post header */}
+        <header className="mb-8">
+          <h1 className="text-4xl md:text-5xl font-black mb-4 leading-tight" style={{color:C.text}}>{post.title}</h1>
+          <div className="flex items-center gap-3 text-sm text-slate-400">
+            <time dateTime={post.published_at}>
+              {formatDate(post.published_at)} at {formatTime(post.published_at)}
+            </time>
+            <span>·</span>
+            <span>By Chris Solorzano</span>
+          </div>
+        </header>
+
+        {/* Post body */}
+        <article className="prose prose-lg max-w-none mb-12">
+          {paragraphs.map((p, i) => (
+            <p key={i} className="text-slate-700 leading-relaxed mb-6" style={{fontSize:"1.0625rem"}}>
+              {p}
+            </p>
+          ))}
+        </article>
+
+        {/* Extra images grid */}
+        {post.extra_image_urls && post.extra_image_urls.length > 0 && (
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-12">
+            {post.extra_image_urls.map((url, i) => (
+              <button
+                key={i}
+                onClick={() => setLightbox(url)}
+                className="aspect-square rounded-xl overflow-hidden hover:scale-105 transition-transform cursor-pointer shadow-md"
+              >
+                <img src={url} alt={`${post.title} ${i + 1}`} className="w-full h-full object-cover"/>
+              </button>
             ))}
           </div>
+        )}
+
+        {/* Share section */}
+        <div className="border-t border-slate-200 pt-8 mb-12">
+          <p className="text-sm font-bold text-slate-400 mb-4">SHARE THIS POST</p>
+          <div className="flex gap-3">
+            <a 
+              href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(post.title)}&url=${encodeURIComponent(window.location.href)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-4 py-2 rounded-lg text-xs font-bold transition-all hover:opacity-80"
+              style={{background:C.p1_10,color:C.p1}}
+            >
+              Twitter
+            </a>
+            <a 
+              href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(window.location.href)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-4 py-2 rounded-lg text-xs font-bold transition-all hover:opacity-80"
+              style={{background:C.p2_10,color:C.p2}}
+            >
+              Facebook
+            </a>
+            <a 
+              href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(window.location.href)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-4 py-2 rounded-lg text-xs font-bold transition-all hover:opacity-80"
+              style={{background:C.p3_10,color:C.p3}}
+            >
+              LinkedIn
+            </a>
+          </div>
+        </div>
+
+        {/* CTA */}
+        <div className="rounded-2xl p-8 text-center shadow-xl" style={{background:`linear-gradient(135deg,${C.p1_10},${C.p2_08})`}}>
+          <h3 className="text-2xl font-black mb-3" style={{color:C.p1}}>Ready to book your shoot?</h3>
+          <p className="text-slate-600 mb-6">Let's capture your graduation moments</p>
+          <a href="https://soloxsnaps.com/contact" className="inline-block px-8 py-3 rounded-full font-bold text-sm text-white transition-all hover:opacity-90" style={{background:C.grad12}}>
+            Book Now →
+          </a>
+        </div>
+      </div>
+
+      {/* Lightbox */}
+      {lightbox && (
+        <div 
+          onClick={() => setLightbox(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center p-6 backdrop-blur-md"
+          style={{background:"rgba(0,0,0,0.9)"}}
+        >
+          <button onClick={() => setLightbox(null)} className="absolute top-6 right-6 w-12 h-12 rounded-full bg-white/10 text-white text-2xl flex items-center justify-center hover:bg-white/20 transition-colors">
+            ✕
+          </button>
+          <img src={lightbox} alt="Full size" className="max-w-full max-h-full rounded-xl shadow-2xl"/>
         </div>
       )}
-
-      {/* NOT FOUND */}
-      {!loading && notFound && (
-        <div className="max-w-3xl mx-auto px-6 py-32 text-center">
-          <p className="text-6xl mb-4">📷</p>
-          <h1 className="text-2xl font-black text-slate-900 mb-2">Post not found</h1>
-          <p className="text-slate-500 mb-6 text-sm">This shoot story doesn't exist or may have moved.</p>
-          <Link href="/blog" className="btn-lift inline-block px-6 py-3 rounded-full font-bold text-sm text-white" style={{ background: C.grad12 }}>← Back to all posts</Link>
-        </div>
-      )}
-
-      {/* POST */}
-      {!loading && post && (
-        <>
-          {/* ── COVER ────────────────────────────────────────────── */}
-          {post.cover_image_url ? (
-            <section className="relative w-full overflow-hidden border-b border-black/[0.06]">
-              {/* Full-bleed image */}
-              <div
-                className="relative w-full cursor-zoom-in"
-                style={{ height: "clamp(280px, 55vh, 600px)" }}
-                onClick={() => setLightbox(post.cover_image_url!)}
-              >
-                <img
-                  src={post.cover_image_url}
-                  alt={post.title}
-                  className="w-full h-full object-cover"
-                />
-                {/* Gradient scrim */}
-                <div
-                  className="absolute inset-0"
-                  style={{ background: "linear-gradient(to top, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.1) 50%, transparent 100%)" }}
-                />
-                {/* Title over image */}
-                <div className="absolute bottom-0 left-0 right-0 px-6 pb-8 pt-16">
-                  <div className="max-w-3xl mx-auto">
-                    <div className="flex items-center gap-2 mb-3 flex-wrap">
-                      <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-white/20 text-white backdrop-blur-sm">
-                        {formatDate(post.published_at)}
-                      </span>
-                      <span className="text-xs text-white/70 font-medium">{formatTime(post.published_at)}</span>
-                    </div>
-                    <h1 className="afu1 text-3xl sm:text-4xl md:text-5xl font-black text-white leading-tight tracking-tight">
-                      {post.title}
-                    </h1>
-                  </div>
-                </div>
-                {/* Zoom hint */}
-                <div className="absolute top-4 right-4 px-2.5 py-1 rounded-full text-xs font-bold text-white bg-black/30 backdrop-blur-sm">
-                  Click to enlarge
-                </div>
-              </div>
-            </section>
-          ) : (
-            /* No cover — hero with gradient */
-            <section className="relative overflow-hidden px-6 pt-16 pb-12 border-b border-black/[0.06]">
-              <div className="absolute inset-0 pointer-events-none" style={C.gridBg(0.04)} />
-              <div className="absolute inset-0 pointer-events-none" style={C.vignette} />
-              <div className="absolute top-5 left-5 w-5 h-5 pointer-events-none" style={{ borderTop: `2px solid ${C.p1_30}`, borderLeft: `2px solid ${C.p1_30}` }} />
-              <div className="absolute top-5 right-5 w-5 h-5 pointer-events-none" style={{ borderTop: `2px solid ${C.p2_18}`, borderRight: `2px solid ${C.p2_18}` }} />
-              <div className="pdot absolute top-7 right-7 w-2 h-2 rounded-full pointer-events-none" style={{ background: C.grad12 }} />
-              <div className="blob1 absolute rounded-full pointer-events-none" style={{ width: 400, height: 400, top: -100, left: -80, background: C.blob1 }} />
-              <div className="relative z-10 max-w-3xl mx-auto">
-                <div className="flex items-center gap-2 mb-5 flex-wrap">
-                  <span className="text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: C.p1_08, color: C.p1 }}>
-                    {formatDate(post.published_at)}
-                  </span>
-                  <span className="text-xs text-slate-400 font-medium">{formatTime(post.published_at)}</span>
-                </div>
-                <h1 className="afu1 text-4xl sm:text-5xl font-black tracking-tight leading-tight text-slate-900">
-                  {post.title}
-                </h1>
-              </div>
-            </section>
-          )}
-
-          {/* ── BODY ─────────────────────────────────────────────── */}
-          <article className="px-6 py-12">
-            <div className="max-w-3xl mx-auto">
-
-              {/* Byline (only shown when cover exists — otherwise date is in hero) */}
-              {post.cover_image_url && (
-                <div className="mb-10 pb-8 border-b border-black/[0.06]">
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <div
-                      className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-black flex-shrink-0"
-                      style={{ background: C.grad12 }}
-                    >CS</div>
-                    <span className="text-sm font-bold text-slate-700">Chris Solorzano</span>
-                    <span className="text-slate-300">·</span>
-                    <span className="text-sm text-slate-500">{formatDate(post.published_at)}</span>
-                    <span className="text-slate-300">·</span>
-                    <span className="text-sm text-slate-500">{formatTime(post.published_at)}</span>
-                    {(post.extra_image_urls?.length ?? 0) > 0 && (
-                      <>
-                        <span className="text-slate-300">·</span>
-                        <span className="text-xs font-bold px-2 py-1 rounded-full" style={{ background: C.p2_08, color: C.p2 }}>
-                          {(post.extra_image_urls?.length ?? 0) + 1} photos
-                        </span>
-                      </>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Body — split by blank lines into paragraphs */}
-              <div className="space-y-5">
-                {post.body.split(/\n\n+/).filter(p => p.trim()).map((para, i) => (
-                  <p key={i} className="text-slate-700 leading-relaxed" style={{ fontSize: "1.05rem" }}>
-                    {para.trim()}
-                  </p>
-                ))}
-              </div>
-
-              {/* ── EXTRA PHOTOS ─────────────────────────────────── */}
-              {post.extra_image_urls && post.extra_image_urls.length > 0 && (
-                <div className="mt-14">
-                  {/* Section divider */}
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="h-[2px] w-8 rounded" style={{ background: C.grad12 }} />
-                    <p className="text-xs font-black uppercase tracking-widest" style={{ color: C.p1 }}>
-                      Photos from this session
-                    </p>
-                    <div className="flex-1 h-px bg-black/[0.06]" />
-                  </div>
-
-                  {/* Grid — adapts to photo count */}
-                  <div className={`grid gap-3 ${
-                    post.extra_image_urls.length === 1
-                      ? "grid-cols-1"
-                      : post.extra_image_urls.length === 2
-                      ? "grid-cols-2"
-                      : "grid-cols-2 sm:grid-cols-3"
-                  }`}>
-                    {post.extra_image_urls.map((url, i) => {
-                      const isFirst = i === 0 && post.extra_image_urls.length > 3;
-                      return (
-                        <div
-                          key={i}
-                          className={`img-card rounded-2xl overflow-hidden ${
-                            post.extra_image_urls.length === 1
-                              ? "aspect-video"
-                              : isFirst
-                              ? "col-span-2 sm:col-span-1 aspect-square"
-                              : "aspect-square"
-                          }`}
-                          style={{ border: `1px solid ${C.p1_12}` }}
-                          onClick={() => setLightbox(url)}
-                        >
-                          <img src={url} alt={`Photo ${i + 1}`} className="w-full h-full object-cover" />
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <p className="text-xs text-slate-400 font-medium text-center mt-3">Tap any photo to enlarge</p>
-                </div>
-              )}
-
-              {/* ── BOTTOM NAV ───────────────────────────────────── */}
-              <div className="mt-14 pt-8 border-t border-black/[0.06] flex items-center justify-between flex-wrap gap-4">
-                <Link href="/blog" className="btn-lift flex items-center gap-2 text-sm font-bold" style={{ color: C.p1 }}>
-                  ← All posts
-                </Link>
-                <a
-                  href="https://www.soloxsnaps.com/contact/"
-                  className="btn-lift px-5 py-2.5 rounded-full font-bold text-sm text-white"
-                  style={{ background: C.grad12 }}
-                >
-                  Book your shoot →
-                </a>
-              </div>
-            </div>
-          </article>
-        </>
-      )}
-
-      <footer className="border-t border-black/[0.06] bg-white py-8 px-6">
-        <div className="max-w-3xl mx-auto flex items-center justify-between flex-wrap gap-4">
-          <span className="font-black text-lg" style={C.text}>Chris.</span>
-          <span className="text-sm text-slate-400">© 2026 · Bay Area Grad Photography</span>
-        </div>
-      </footer>
     </div>
   );
 }
