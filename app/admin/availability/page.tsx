@@ -2,10 +2,10 @@
 import { supabase } from '@/lib/supabase'
 import { useEffect, useState } from "react";
 import { C } from "@/lib/colors";
+import { checkAuth, logout } from "@/lib/adminAuth";
+import { useRouter } from "next/navigation";
 
 export const dynamic = 'force-dynamic'
-
-const ADMIN_PASSWORD = "chris2026"; // ← change this
 
 type AvailDate = { id?:number; date:string; status:"available"|"booked"|"hold"; note:string|null; };
 
@@ -21,16 +21,24 @@ const STATUS_CYCLE:Record<string,"available"|"booked"|"hold"|"none"> = {
 };
 
 export default function AdminAvailabilityPage() {
+  const router = useRouter();
   const today = new Date();
   const [authed,setAuthed]=useState(false);
-  const [pw,setPw]=useState("");
-  const [pwErr,setPwErr]=useState(false);
   const [month,setMonth]=useState(today.getMonth());
   const [year,setYear]=useState(today.getFullYear());
   const [dates,setDates]=useState<AvailDate[]>([]);
   const [loading,setLoading]=useState(false);
   const [saving,setSaving]=useState<string|null>(null);
   const [toast,setToast]=useState<string|null>(null);
+
+  // Check auth on mount, redirect if not authed
+  useEffect(() => {
+    if (!checkAuth()) {
+      router.push('/admin');
+    } else {
+      setAuthed(true);
+    }
+  }, [router]);
 
   function showToast(msg:string){setToast(msg);setTimeout(()=>setToast(null),2500);}
 
@@ -73,27 +81,11 @@ export default function AdminAvailabilityPage() {
 
   const inp="w-full px-3 py-2.5 rounded-xl text-sm font-medium text-slate-800 outline-none border border-slate-200 bg-white transition-colors";
 
+  // Show loading while checking auth
   if(!authed){
     return(
       <div className="min-h-screen bg-white flex items-center justify-center px-6 font-sans">
-        <div className="w-full max-w-sm">
-          <div className="text-center mb-8">
-            <span className="font-black text-2xl" style={C.text}>Chris.</span>
-            <p className="text-slate-400 text-sm mt-1 font-medium">Availability Admin</p>
-          </div>
-          <div className="rounded-2xl p-8 shadow-xl" style={{border:`1px solid ${C.p1_15}`}}>
-            <div className="h-[3px] rounded-full mb-6" style={{background:C.grad90}}/>
-            <label className="block text-xs font-bold tracking-widest uppercase text-slate-400 mb-2">Password</label>
-            <input type="password" value={pw} onChange={e=>{setPw(e.target.value);setPwErr(false);}}
-              onKeyDown={e=>{if(e.key==="Enter"){if(pw===ADMIN_PASSWORD)setAuthed(true);else setPwErr(true);}}}
-              placeholder="Enter password" className={inp+" mb-4"} style={pwErr?{borderColor:C.p2}:{}}/>
-            {pwErr&&<p className="text-xs font-semibold mb-3" style={{color:C.p2}}>Incorrect password</p>}
-            <button onClick={()=>{if(pw===ADMIN_PASSWORD)setAuthed(true);else setPwErr(true);}}
-              className="w-full py-2.5 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90" style={{background:C.grad12}}>
-              Enter →
-            </button>
-          </div>
-        </div>
+        <div className="text-slate-400">Loading...</div>
       </div>
     );
   }

@@ -2,10 +2,9 @@
 import { supabase } from '@/lib/supabase'
 import { useEffect, useRef, useState } from "react";
 import { C } from "@/lib/colors";
+import { ADMIN_PASSWORD, checkAuth, setAuth, logout } from "@/lib/adminAuth";
 
 export const dynamic = 'force-dynamic'
-
-const ADMIN_PASSWORD = "chris2026"; // ← change this
 
 type Tab = "poses"|"locations"|"blog";
 type Pose = { id:number; title:string; image_url:string; instructions:string; order:number; };
@@ -30,6 +29,13 @@ export default function AdminDashboard() {
   const [pwErr,setPwErr]=useState(false);
   const [tab,setTab]=useState<Tab>("poses");
   const [toast,setToast]=useState<{msg:string;ok:boolean}|null>(null);
+
+  // Check localStorage on mount
+  useEffect(() => {
+    if (checkAuth()) {
+      setAuthed(true);
+    }
+  }, []);
 
   const [poses,setPoses]=useState<Pose[]>([]);
   const [posesLoading,setPosesLoading]=useState(false);
@@ -175,10 +181,10 @@ export default function AdminDashboard() {
             <div className="h-[3px] rounded-full mb-6" style={{background:C.grad90}}/>
             <label className="block text-xs font-bold tracking-widest uppercase text-slate-400 mb-2">Password</label>
             <input type="password" value={pw} onChange={e=>{setPw(e.target.value);setPwErr(false);}}
-              onKeyDown={e=>{if(e.key==="Enter"){if(pw===ADMIN_PASSWORD)setAuthed(true);else setPwErr(true);}}}
+              onKeyDown={e=>{if(e.key==="Enter"){if(pw===ADMIN_PASSWORD){setAuth(true);setAuthed(true);}else setPwErr(true);}}}
               placeholder="Enter password" className={inp+" mb-4"} style={pwErr?{borderColor:C.p2}:{}}/>
             {pwErr&&<p className="text-xs font-semibold mb-3" style={{color:C.p2}}>Incorrect password</p>}
-            <button onClick={()=>{if(pw===ADMIN_PASSWORD)setAuthed(true);else setPwErr(true);}}
+            <button onClick={()=>{if(pw===ADMIN_PASSWORD){setAuth(true);setAuthed(true);}else setPwErr(true);}}
               className="w-full py-2.5 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90" style={{background:C.grad12}}>
               Enter →
             </button>
