@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useDeferredValue, useState } from "react";
+import ExpandableText from "@/app/components/ExpandableText";
 import { C } from "@/lib/colors";
 import {
   BAY_AREA_FILTER_CHIPS,
@@ -386,7 +387,11 @@ export default function LocationsExplorer({
                         </div>
                       </div>
 
-                      <p className="text-sm leading-relaxed text-slate-600">{location.description}</p>
+                      <ExpandableText
+                        text={location.description}
+                        className="text-sm leading-relaxed text-slate-600"
+                        buttonColor={region.text}
+                      />
 
                       <div className="mt-5 grid gap-3 sm:grid-cols-2">
                         <div className="rounded-2xl px-4 py-3" style={{ background: C.surfaceWarmAlt }}>

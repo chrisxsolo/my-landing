@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { useEffect, useState } from "react";
 import { GUIDE_STYLES } from "@/lib/guidestyles";
 import { C } from "@/lib/colors";
+import ExpandableText from "@/app/components/ExpandableText";
 import GuideNav from "@/app/components/GuideNav";
 import Nav from "@/app/components/Nav";
 
@@ -178,7 +179,13 @@ export default function LocationGuidePage() {
                           </div>
                           <div className="p-6 flex flex-col justify-center">
                             <h3 className="text-lg font-black text-slate-900 mb-2 leading-tight">{spot.name}</h3>
-                            <p className="text-slate-600 text-sm leading-relaxed mb-4">{spot.description}</p>
+                            <div className="mb-4">
+                              <ExpandableText
+                                text={spot.description}
+                                className="text-slate-600 text-sm leading-relaxed"
+                                buttonColor={meta.color}
+                              />
+                            </div>
                             <div className="flex items-start gap-2 rounded-xl px-3 py-2.5" style={{background:meta.gradientSoft,border:`1px solid ${meta.border}`}}>
                               <span className="text-xs font-black uppercase tracking-wider mt-0.5 flex-shrink-0" style={{color:meta.color}}>Tip</span>
                               <p className="text-xs leading-relaxed" style={{color:meta.color}}>{spot.tip}</p>
@@ -194,7 +201,13 @@ export default function LocationGuidePage() {
                           <div className="p-6 flex flex-col justify-center">
                             <div className="mb-3"><span className="text-xs font-black tracking-widest px-2.5 py-1 rounded-full" style={{color:meta.color,background:meta.gradientSoft}}>SPOT {String(i+1).padStart(2,"0")}</span></div>
                             <h3 className="text-lg font-black text-slate-900 mb-2 leading-tight">{spot.name}</h3>
-                            <p className="text-slate-600 text-sm leading-relaxed mb-4">{spot.description}</p>
+                            <div className="mb-4">
+                              <ExpandableText
+                                text={spot.description}
+                                className="text-slate-600 text-sm leading-relaxed"
+                                buttonColor={meta.color}
+                              />
+                            </div>
                             <div className="flex items-start gap-2 rounded-xl px-3 py-2.5" style={{background:meta.gradientSoft,border:`1px solid ${meta.border}`}}>
                               <span className="text-xs font-black uppercase tracking-wider mt-0.5 flex-shrink-0" style={{color:meta.color}}>Tip</span>
                               <p className="text-xs leading-relaxed" style={{color:meta.color}}>{spot.tip}</p>
