@@ -268,7 +268,11 @@ export default function BlogPostPage({ params }: { params: Promise<{ slug: strin
                           style={{ border: `1px solid ${C.p1_12}` }}
                           onClick={() => setLightbox(url)}
                         >
-                          <img src={url} alt={`Photo ${i + 1}`} className="w-full h-full object-cover" />
+                          <img
+                            src={url}
+                            alt={`Photo ${i + 1}`}
+                            className="w-full h-full object-cover"
+                          />
                         </div>
                       );
                     })}

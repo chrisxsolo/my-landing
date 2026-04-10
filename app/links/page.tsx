@@ -1,23 +1,10 @@
-"use client";
-import { supabase } from '@/lib/supabase'
-import { useEffect, useState } from "react";
 import { C } from "@/lib/colors";
 import Nav from "@/app/components/Nav";
+import TrackedLink from "@/app/links/TrackedLink";
+import LinksAnalytics from "@/app/links/LinksAnalytics";
+import { createSupabaseServerClient } from "@/lib/supabaseServer";
 
 export const dynamic = 'force-dynamic'
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Generate or retrieve unique user ID for analytics tracking
-// ─────────────────────────────────────────────────────────────────────────────
-function getUserId(): string {
-  const key = 'chris_hub_user_id';
-  let userId = localStorage.getItem(key);
-  if (!userId) {
-    userId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    localStorage.setItem(key, userId);
-  }
-  return userId;
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PROFILE CONFIG — edit these values to update your profile
@@ -67,52 +54,32 @@ const MARQUEE_ITEMS = [
   "Grad Shoots","Portrait Sessions","Golden Hour","@soloxsnaps","Book Now",
 ];
 
-export default function LinksPage() {
-  const [links, setLinks]   = useState<Link[]>(DRAFT_LINKS);
-  const [loading, setLoading] = useState(true);
+async function getLinks() {
+  try {
+    const supabase = createSupabaseServerClient();
+    const { data } = await supabase
+      .from("links")
+      .select("*")
+      .eq("active", true)
+      .order("order", { ascending: true });
 
-  useEffect(() => {
-    async function fetchLinks() {
-      try {
-        const { data } = await supabase
-          .from('links')
-          .select('*')
-          .eq('active', true)
-          .order('order', { ascending: true });
-        if (data && data.length > 0) setLinks(data);
-      } catch (err) { console.error(err); }
-      finally { setLoading(false); }
+    if (data && data.length > 0) {
+      return data as Link[];
     }
-    fetchLinks();
-    
-    // Track page view
-    trackPageView();
-  }, []);
-
-  async function trackPageView() {
-    try {
-      const userId = getUserId();
-      await supabase.from('link_views').insert({ user_id: userId });
-    } catch (err) {
-      console.error('Failed to track page view:', err);
-    }
+  } catch (error) {
+    console.error("Failed to fetch links page data", error);
   }
 
-  async function trackClick(linkId: number, url: string, e: React.MouseEvent<HTMLAnchorElement>) {
-    e.preventDefault();
-    try {
-      const userId = getUserId();
-      await supabase.from('link_clicks').insert({ link_id: linkId, user_id: userId });
-    } catch (err) {
-      console.error('Failed to track click:', err);
-    }
-    // Use location.href for better mobile browser compatibility (Instagram, Facebook, etc.)
-    window.location.href = url;
-  }
+  return DRAFT_LINKS;
+}
+
+export default async function LinksPage() {
+  const links = await getLinks();
 
   return (
     <div className="min-h-screen font-sans" style={{ background: "#f7f6ff" }}>
       <Nav />
+      <LinksAnalytics />
       <style>{`
         @keyframes blobFloat  { 0%,100%{transform:translate(0,0)scale(1);}   40%{transform:translate(16px,-12px)scale(1.03);}   70%{transform:translate(-10px,10px)scale(0.97);} }
         @keyframes blobFloat2 { 0%,100%{transform:translate(0,0)scale(1);}   35%{transform:translate(-14px,10px)scale(0.96);}   65%{transform:translate(12px,-8px)scale(1.04);} }
@@ -189,50 +156,23 @@ export default function LinksPage() {
 
         {/* LINKS */}
         <div className="w-full space-y-4">
-          {loading
-            ? [...Array(5)].map((_,i) => (
-                <div key={i} className="w-full rounded-2xl animate-pulse" style={{ height:76, background:`linear-gradient(135deg,${C.p1_08},${C.p2_06})` }}/>
-              ))
-            : links.map((link, i) => {
-                const style = CARD_BG[i % CARD_BG.length];
-                return (
-                  <a
-                    key={link.id}
-                    href={link.url}
-                    target="_blank" rel="noopener noreferrer"
-                    onClick={(e) => trackClick(link.id, link.url, e)}
-                    className="link-card flex items-center gap-4 w-full rounded-2xl px-5 py-5"
-                    style={{ animationDelay:`${0.1 + i * 0.06}s`, background:style.bg, border:`1.5px solid ${style.border}` }}
-                  >
-                    {/* Emoji icon */}
-                    <div
-                      className="rounded-xl flex items-center justify-center text-2xl flex-shrink-0"
-                      style={{ width:52, height:52, minWidth:52, minHeight:52 }}
-                    >
-                      {link.emoji ?? "🔗"}
-                    </div>
+          {links.map((link, i) => {
+            const style = CARD_BG[i % CARD_BG.length];
 
-                    {/* Text */}
-                    <div className="flex-1 min-w-0">
-                      <p className="font-black text-slate-900 text-base leading-tight">{link.label}</p>
-                      {link.description && (
-                        <p className="text-sm text-slate-500 font-medium mt-0.5 leading-tight truncate">{link.description}</p>
-                      )}
-                    </div>
-
-                    {/* Arrow */}
-                    <div
-                      className="rounded-full flex items-center justify-center flex-shrink-0"
-                      style={{ width:34, height:34, minWidth:34, background:"white", boxShadow:`0 2px 8px ${style.border}`, color:C.p1 }}
-                    >
-                      <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-                        <path d="M2.5 6.5h8M6.5 2.5l4 4-4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                    </div>
-                  </a>
-                );
-              })
-          }
+            return (
+              <TrackedLink
+                key={link.id}
+                id={link.id}
+                label={link.label}
+                url={link.url}
+                emoji={link.emoji}
+                description={link.description}
+                animationDelay={`${0.1 + i * 0.06}s`}
+                background={style.bg}
+                borderColor={style.border}
+              />
+            );
+          })}
         </div>
 
         {/* MARQUEE - 240px spacing */}
