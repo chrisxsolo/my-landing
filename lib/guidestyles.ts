@@ -28,9 +28,9 @@ export const GUIDE_STYLES = `
   .spin{animation:spinSlow 12s linear infinite;}
   .floaty{animation:floatY 4s ease-in-out infinite;}
   .card-lift{transition:transform 0.22s ease,box-shadow 0.22s ease;}
-  .card-lift:hover{transform:translateY(-5px);box-shadow:0 20px 48px rgba(124,58,237,0.13);}
+  .card-lift:hover{transform:translateY(-5px);box-shadow:0 20px 48px rgba(157,118,86,0.11);}
   .tip-card{transition:transform 0.2s ease,box-shadow 0.2s ease;}
-  .tip-card:hover{transform:translateY(-2px);box-shadow:0 10px 28px rgba(124,58,237,0.08);}
+  .tip-card:hover{transform:translateY(-2px);box-shadow:0 10px 28px rgba(157,118,86,0.08);}
   .btn-lift{transition:transform 0.18s ease,box-shadow 0.18s ease;}
-  .btn-lift:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,0.14);}
+  .btn-lift:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(157,118,86,0.12);}
 `

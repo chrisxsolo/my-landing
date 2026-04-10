@@ -67,11 +67,11 @@ export default function Nav() {
       <nav
         className="fixed top-0 left-0 right-0 z-50 border-b px-4 py-3 sm:px-6"
         style={{
-          background: "rgba(255,255,255,0.94)",
+          background: C.surfaceStrong,
           backdropFilter: "blur(20px)",
           WebkitBackdropFilter: "blur(20px)",
-          borderColor: "rgba(0,0,0,0.06)",
-          boxShadow: "0 4px 24px rgba(0,0,0,0.04)",
+          borderColor: C.borderSubtle,
+          boxShadow: C.shadowWarmSm,
         }}
       >
         <div className="mx-auto flex max-w-7xl items-center gap-4">
@@ -92,12 +92,15 @@ export default function Nav() {
                 style={{
                   background: isActivePath(pathname, link.href)
                       ? C.grad12
-                      : `linear-gradient(135deg, ${C.p1_06}, ${C.p2_06})`,
+                      : C.surfaceWarm,
                   color: isActivePath(pathname, link.href) ? "#fff" : undefined,
                   boxShadow:
                     isActivePath(pathname, link.href)
-                      ? `0 10px 24px ${C.p1_20}`
+                      ? C.shadowWarmSm
                       : "none",
+                  border: isActivePath(pathname, link.href)
+                    ? "none"
+                    : `1px solid ${C.borderSubtle}`,
                 }}
               >
                 {link.label}
@@ -112,11 +115,11 @@ export default function Nav() {
             onClick={() => setMobileOpen((open) => !open)}
             className="ml-auto inline-flex h-11 w-11 items-center justify-center rounded-2xl border md:hidden"
             style={{
-              borderColor: C.p1_12,
+              borderColor: C.borderSubtle,
               background: mobileOpen
                 ? C.grad12
-                : `linear-gradient(135deg, ${C.p1_04}, ${C.p2_06})`,
-              boxShadow: mobileOpen ? `0 10px 24px ${C.p1_20}` : "none",
+                : C.surfaceWarmAlt,
+              boxShadow: mobileOpen ? C.shadowWarmSm : "none",
             }}
           >
             <span className="relative h-4 w-5">
@@ -154,7 +157,14 @@ export default function Nav() {
             className="absolute inset-0 bg-slate-950/20 backdrop-blur-sm"
             onClick={() => setMobileOpen(false)}
           />
-          <div className="absolute left-4 right-4 top-[76px] rounded-[28px] border bg-white p-4 shadow-2xl">
+          <div
+            className="absolute left-4 right-4 top-[76px] rounded-[28px] border p-4 shadow-2xl"
+            style={{
+              background: C.surfaceStrong,
+              borderColor: C.borderSubtle,
+              boxShadow: C.shadowWarmLg,
+            }}
+          >
             <div className="flex flex-col gap-2">
               {navLinks.map((link) => (
                 <Link
@@ -164,12 +174,15 @@ export default function Nav() {
                   style={{
                     background: isActivePath(pathname, link.href)
                         ? C.grad12
-                        : `linear-gradient(135deg, ${C.p1_04}, ${C.p2_06})`,
+                        : C.surfaceWarm,
                     color: isActivePath(pathname, link.href) ? "#fff" : undefined,
                     boxShadow:
                       isActivePath(pathname, link.href)
-                        ? `0 10px 24px ${C.p1_20}`
+                        ? C.shadowWarmSm
                         : "none",
+                    border: isActivePath(pathname, link.href)
+                      ? "none"
+                      : `1px solid ${C.borderSubtle}`,
                   }}
                 >
                   {link.label}

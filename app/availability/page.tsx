@@ -58,12 +58,12 @@ export default function AvailabilityPage() {
   `;
 
   return (
-    <div className="min-h-screen bg-white font-sans overflow-x-hidden">
+    <div className="min-h-screen font-sans overflow-x-hidden" style={{ background: C.page }}>
       <style>{GUIDE_STYLES}{CAL_STYLES}</style>
 
       <Nav />
 
-      <section className="relative overflow-hidden px-6 pt-16 pb-14 border-b border-black/[0.06]">
+      <section className="relative overflow-hidden px-6 pt-16 pb-14 border-b" style={{ borderColor: C.borderSubtle }}>
         <div className="absolute inset-0 pointer-events-none" style={C.gridBg(0.04)}/>
         <div className="absolute inset-0 pointer-events-none" style={C.vignette}/>
         <div className="absolute top-5 left-5 w-5 h-5 pointer-events-none" style={{borderTop:`2px solid ${C.p1_30}`,borderLeft:`2px solid ${C.p1_30}`}}/>
@@ -103,7 +103,7 @@ export default function AvailabilityPage() {
         </div>
       </section>
 
-      <div className="overflow-hidden border-b border-black/[0.06] py-3">
+      <div className="overflow-hidden border-b py-3" style={{ borderColor: C.borderSubtle, background: C.surfaceStrong }}>
         <div className="mtrack flex gap-12 whitespace-nowrap w-max">
           {MARQUEE.map((item,i)=>(
             <span key={i} className="flex items-center gap-3 text-[11px] font-bold tracking-[0.14em] uppercase text-slate-300">
@@ -115,7 +115,7 @@ export default function AvailabilityPage() {
 
       <section className="px-6 py-14">
         <div className="max-w-2xl mx-auto">
-          <div className="rounded-2xl overflow-hidden" style={{border:`1px solid ${C.p1_15}`,boxShadow:`0 20px 60px ${C.p1_08}`}}>
+          <div className="rounded-2xl overflow-hidden" style={{background:C.surfaceStrong,border:`1px solid ${C.borderWarm}`,boxShadow:C.shadowWarmLg}}>
             {/* Calendar header */}
             <div className="relative p-6 pb-5" style={{background:C.grad12}}>
               <div className="absolute inset-0 pointer-events-none" style={C.ctaGrid}/>
@@ -141,7 +141,7 @@ export default function AvailabilityPage() {
               {DAYS.map(d=><div key={d} className="py-2.5 text-center text-[10px] font-black tracking-widest uppercase text-slate-400">{d}</div>)}
             </div>
             {/* Grid */}
-            <div className="p-4 bg-white">
+            <div className="p-4" style={{ background: C.surfaceSoft }}>
               {loading ? (
                 <div className="grid grid-cols-7 gap-1.5">{[...Array(35)].map((_,i)=><div key={i} className="aspect-square rounded-xl animate-pulse" style={{background:`linear-gradient(135deg,${C.p1_08},${C.p2_06})`}}/>)}</div>
               ) : (
@@ -212,7 +212,7 @@ export default function AvailabilityPage() {
         </div>
       </section>
 
-      <footer className="border-t border-black/[0.06] bg-white py-8 px-6">
+      <footer className="border-t py-8 px-6" style={{ borderColor: C.borderSubtle, background: C.surfaceStrong }}>
         <div className="max-w-3xl mx-auto flex items-center justify-between flex-wrap gap-4">
           <span className="font-black text-lg" style={C.text}>Chris.</span>
           <span className="text-sm text-slate-400">© 2026 · Bay Area Grad Photography</span>

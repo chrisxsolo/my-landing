@@ -79,11 +79,11 @@ export default function GuideNav() {
       <div
         className="fixed bottom-0 left-0 right-0 z-50"
         style={{
-          background: "rgba(255,255,255,0.93)",
+          background: C.surfaceStrong,
           backdropFilter: "blur(20px)",
           WebkitBackdropFilter: "blur(20px)",
-          borderTop: "1px solid rgba(0,0,0,0.07)",
-          boxShadow: "0 -4px 24px rgba(0,0,0,0.06)",
+          borderTop: `1px solid ${C.borderSubtle}`,
+          boxShadow: "0 -8px 28px rgba(157,118,86,0.10)",
         }}
       >
         <div
@@ -100,17 +100,16 @@ export default function GuideNav() {
                   className="flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-xl flex-1 transition-all duration-200"
                   style={{
                     background: active
-                      ? `linear-gradient(135deg,${C.p1_12},${C.p2_08})`
+                      ? C.surfaceWarmAlt
                       : "transparent",
-                    border: active
-                      ? `1px solid ${C.p1_20}`
-                      : "1px solid transparent",
+                    border: `1px solid ${active ? C.borderWarm : "transparent"}`,
+                    boxShadow: active ? C.shadowWarmSm : "none",
                   }}
                 >
                   <span className="text-lg leading-none">{item.emoji}</span>
                   <span
                     className="text-[10px] font-bold tracking-wide leading-none"
-                    style={{ color: active ? C.p1 : "#94a3b8" }}
+                    style={{ color: active ? C.p2 : "#94a3b8" }}
                   >
                     {item.label}
                   </span>

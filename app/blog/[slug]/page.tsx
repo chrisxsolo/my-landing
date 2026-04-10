@@ -92,7 +92,7 @@ export default function BlogPostPage({ params }: { params: Promise<{ slug: strin
   `;
 
   return (
-    <div className="min-h-screen bg-white font-sans overflow-x-hidden">
+    <div className="min-h-screen font-sans overflow-x-hidden" style={{ background: C.page }}>
       <style>{STYLES}</style>
       <Nav />
 
@@ -174,7 +174,7 @@ export default function BlogPostPage({ params }: { params: Promise<{ slug: strin
             </section>
           ) : (
             /* No cover — hero with gradient */
-            <section className="relative overflow-hidden px-6 pt-16 pb-12 border-b border-black/[0.06]">
+            <section className="relative overflow-hidden px-6 pt-16 pb-12 border-b" style={{ borderColor: C.borderSubtle }}>
               <div className="absolute inset-0 pointer-events-none" style={C.gridBg(0.04)} />
               <div className="absolute inset-0 pointer-events-none" style={C.vignette} />
               <div className="absolute top-5 left-5 w-5 h-5 pointer-events-none" style={{ borderTop: `2px solid ${C.p1_30}`, borderLeft: `2px solid ${C.p1_30}` }} />
@@ -265,7 +265,7 @@ export default function BlogPostPage({ params }: { params: Promise<{ slug: strin
                               ? "col-span-2 sm:col-span-1 aspect-square"
                               : "aspect-square"
                           }`}
-                          style={{ border: `1px solid ${C.p1_12}` }}
+                          style={{ border: `1px solid ${C.borderWarm}`, boxShadow: C.shadowWarmSm }}
                           onClick={() => setLightbox(url)}
                         >
                           <img
@@ -282,7 +282,7 @@ export default function BlogPostPage({ params }: { params: Promise<{ slug: strin
               )}
 
               {/* ── BOTTOM NAV ───────────────────────────────────── */}
-              <div className="mt-14 pt-8 border-t border-black/[0.06] flex items-center justify-between flex-wrap gap-4">
+              <div className="mt-14 pt-8 border-t flex items-center justify-between flex-wrap gap-4" style={{ borderColor: C.borderSubtle }}>
                 <Link href="/blog" className="btn-lift flex items-center gap-2 text-sm font-bold" style={{ color: C.p1 }}>
                   ← All posts
                 </Link>
@@ -299,7 +299,7 @@ export default function BlogPostPage({ params }: { params: Promise<{ slug: strin
         </>
       )}
 
-      <footer className="border-t border-black/[0.06] bg-white py-8 px-6">
+      <footer className="border-t py-8 px-6" style={{ borderColor: C.borderSubtle, background: C.surfaceStrong }}>
         <div className="max-w-3xl mx-auto flex items-center justify-between flex-wrap gap-4">
           <span className="font-black text-lg" style={C.text}>Chris.</span>
           <span className="text-sm text-slate-400">© 2026 · Bay Area Grad Photography</span>

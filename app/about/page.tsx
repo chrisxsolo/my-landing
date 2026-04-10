@@ -32,7 +32,7 @@ const PROCESS = [
 
 export default function AboutPage() {
   return (
-    <div className="min-h-screen relative overflow-hidden bg-white">
+    <div className="min-h-screen relative overflow-hidden" style={{ background: C.page }}>
       <style>{`
         @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
         @keyframes fadeIn{from{opacity:0}to{opacity:1}}
@@ -56,21 +56,21 @@ export default function AboutPage() {
         .sqp2{stroke-dasharray:300;stroke-dashoffset:300;animation:drawLine 2.4s 1.1s ease forwards}
         .pdot{animation:pulseRing 2.5s ease-in-out infinite}
         .card-hover{transition:all .3s ease}
-        .card-hover:hover{transform:translateY(-4px);box-shadow:0 20px 40px ${C.p1_15}}
+        .card-hover:hover{transform:translateY(-4px);box-shadow:${C.shadowWarmLg}}
       `}</style>
 
       <Nav />
 
       {/* Background Effects */}
       <div className="fixed inset-0 pointer-events-none opacity-30">
-        <div className="absolute inset-0" style={{background:`radial-gradient(circle at 20% 20%, ${C.p1_08}, transparent 50%)`}}/>
-        <div className="absolute inset-0" style={{background:`radial-gradient(circle at 80% 60%, ${C.p2_08}, transparent 50%)`}}/>
-        <div className="absolute inset-0" style={{background:`radial-gradient(circle at 50% 90%, ${C.p3_08}, transparent 40%)`}}/>
+        <div className="absolute inset-0" style={{background:`radial-gradient(circle at 20% 20%, rgba(255,221,212,0.36), transparent 50%)`}}/>
+        <div className="absolute inset-0" style={{background:`radial-gradient(circle at 80% 60%, rgba(245,208,227,0.28), transparent 50%)`}}/>
+        <div className="absolute inset-0" style={{background:`radial-gradient(circle at 50% 90%, rgba(255,233,188,0.22), transparent 40%)`}}/>
       </div>
 
       <div className="relative z-10">
         {/* Hero Section */}
-        <section className="relative overflow-hidden pt-20 pb-24 px-6 border-b" style={{borderColor:C.p1_10}}>
+        <section className="relative overflow-hidden pt-20 pb-24 px-6 border-b" style={{borderColor:C.borderSubtle}}>
           {/* Grid + vignette */}
           <div className="absolute inset-0 pointer-events-none" style={C.gridBg(0.045)}/>
           <div className="absolute inset-0 pointer-events-none" style={C.vignette}/>
@@ -106,7 +106,7 @@ export default function AboutPage() {
             {/* Left - Text */}
             <div>
               {/* Identity pill */}
-              <div className="afu1 inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-white border border-black/[0.08] shadow-sm mb-8">
+              <div className="afu1 inline-flex items-center gap-2.5 px-4 py-2 rounded-full mb-8" style={{background:C.surfaceStrong,border:`1px solid ${C.borderSubtle}`,boxShadow:C.shadowWarmSm}}>
                 <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0" style={{background:C.grad12}}>CS</div>
                 <span className="text-sm font-semibold text-slate-700">Chris Solorzano</span>
                 <span className="text-slate-300">·</span>
@@ -145,7 +145,7 @@ export default function AboutPage() {
                 <Link
                   href="/blog"
                   className="inline-flex items-center gap-2 px-6 py-3 rounded-full font-bold text-sm text-slate-900 bg-white border-2 transition-all hover:scale-105"
-                  style={{borderColor:"#111827"}}
+                  style={{background:C.surfaceStrong,borderColor:C.borderWarm}}
                 >
                   ✍️ Read Blog
                 </Link>
@@ -161,9 +161,9 @@ export default function AboutPage() {
                   className="relative card-hover rounded-3xl overflow-hidden"
                   style={{
                     width:"280px",
-                    background:"white",
-                    border:`2px solid ${C.p1_20}`,
-                    boxShadow:`0 16px 48px ${C.p1_15}`
+                    background:C.surfaceStrong,
+                    border:`2px solid ${C.borderWarm}`,
+                    boxShadow:C.shadowWarmLg
                   }}
                 >
                   <div className="relative overflow-hidden" style={{height:"320px",background:`linear-gradient(135deg,${C.p1_10},${C.p2_08})`}}>
@@ -198,7 +198,7 @@ export default function AboutPage() {
         </section>
 
         {/* Marquee */}
-        <div className="border-y py-4 overflow-hidden" style={{borderColor:C.p1_10,background:`linear-gradient(90deg,${C.p1_04},${C.p2_06},${C.p1_04})`}}>
+        <div className="border-y py-4 overflow-hidden" style={{borderColor:C.borderSubtle,background:C.surfaceStrong}}>
           <div className="mtrack flex gap-12 whitespace-nowrap">
             {["Portrait Photography","Bay Area","Creative Direction","Natural Light","Clean Edits","Graduation Shoots","Portrait Photography","Bay Area","Creative Direction","Natural Light","Clean Edits","Graduation Shoots"].map((item,i)=>(
               <span key={i} className="text-xs font-bold tracking-wider uppercase" style={{color:C.p1}}>
@@ -256,8 +256,8 @@ export default function AboutPage() {
                 key={item.title}
                 className="card-hover p-7 rounded-2xl relative overflow-hidden"
                 style={{
-                  background:"white",
-                  border:`1px solid ${C.p1_10}`,
+                  background:C.surfaceStrong,
+                  border:`1px solid ${C.borderSubtle}`,
                   animationDelay:`${i*0.1}s`
                 }}
               >
@@ -274,7 +274,7 @@ export default function AboutPage() {
 
         {/* Process Timeline */}
         <section className="max-w-6xl mx-auto px-6 py-16">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full mb-10" style={{background:C.p1_08,border:`1px solid ${C.p1_20}`}}>
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full mb-10" style={{background:C.surfaceStrong,border:`1px solid ${C.borderSubtle}`,boxShadow:C.shadowWarmSm}}>
             <span className="text-xs font-bold uppercase tracking-wider" style={{color:C.p1}}>How It Works</span>
           </div>
           <div className="grid md:grid-cols-4 gap-4">
@@ -282,7 +282,7 @@ export default function AboutPage() {
               <div
                 key={item.step}
                 className="card-hover relative rounded-2xl p-6 overflow-hidden"
-                style={{background:"white",border:`1px solid ${C.p1_10}`}}
+                style={{background:C.surfaceStrong,border:`1px solid ${C.borderSubtle}`,boxShadow:C.shadowWarmSm}}
               >
                 {/* Accent top bar */}
                 <div className="absolute top-0 left-0 right-0 h-1 rounded-t-2xl" style={{background:C.grad12}}/>
@@ -312,8 +312,8 @@ export default function AboutPage() {
           <div
             className="rounded-3xl relative overflow-hidden"
             style={{
-              background:`linear-gradient(135deg,${C.p1_10},${C.p2_08},${C.p3_08})`,
-              border:`1px solid ${C.p1_20}`
+              background:`linear-gradient(135deg, rgba(255,252,248,0.96), ${C.p1_10}, ${C.p2_08}, ${C.p3_08})`,
+              border:`1px solid ${C.borderWarm}`
             }}
           >
             {/* Grid overlay */}
@@ -323,7 +323,7 @@ export default function AboutPage() {
             <div className="absolute -bottom-12 -right-12 w-48 h-48 rounded-full opacity-30" style={{background:`radial-gradient(circle, ${C.p2_25}, transparent 70%)`}}/>
 
             <div className="relative z-10 px-12 py-16 text-center">
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-6" style={{background:"white",border:`1px solid ${C.p1_15}`,boxShadow:`0 2px 12px ${C.p1_10}`}}>
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-6" style={{background:C.surfaceStrong,border:`1px solid ${C.borderSubtle}`,boxShadow:C.shadowWarmSm}}>
                 <div className="w-2 h-2 rounded-full" style={{background:C.p1}}/>
                 <span className="text-xs font-bold tracking-wider uppercase" style={{color:C.p1}}>Let's Connect</span>
               </div>
@@ -352,14 +352,15 @@ export default function AboutPage() {
                 </a>
                 <Link
                   href="/availability"
-                  className="inline-flex items-center justify-center rounded-full bg-white font-bold text-slate-800 transition-all hover:scale-[1.02] whitespace-nowrap"
+                  className="inline-flex items-center justify-center rounded-full font-bold text-slate-800 transition-all hover:scale-[1.02] whitespace-nowrap"
                   style={{
                     minHeight: 50,
                     padding: "0 28px",
                     fontSize: "0.95rem",
                     lineHeight: 1,
-                    border: `2px solid ${C.p1_20}`,
-                    boxShadow: `0 4px 16px ${C.p1_08}`,
+                    background: C.surfaceStrong,
+                    border: `1.5px solid ${C.borderWarm}`,
+                    boxShadow: C.shadowWarmSm,
                   }}
                 >
                   Check Availability
@@ -370,7 +371,7 @@ export default function AboutPage() {
         </section>
 
         {/* Footer */}
-        <footer className="border-t py-8 px-6" style={{borderColor:C.p1_10}}>
+        <footer className="border-t py-8 px-6" style={{borderColor:C.borderSubtle, background:C.surfaceStrong}}>
           <div className="max-w-6xl mx-auto flex items-center justify-between flex-wrap gap-4">
             <span className="font-black text-lg" style={C.text}>Chris.</span>
             <span className="text-sm text-slate-400">© 2026 · Bay Area Photography</span>

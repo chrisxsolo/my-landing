@@ -14,9 +14,9 @@ const photographyCards = [
 ];
 
 const cardStyles = [
-  { bg:`linear-gradient(135deg,${C.p1_10},${C.p2_08})`, border:C.p1_25, tagColor:C.p1, tagBg:C.p1_10, accentBar:C.grad90_12, arrowColor:C.p1 },
-  { bg:`linear-gradient(135deg,${C.p3_10},${C.p2_08})`, border:C.p2_25, tagColor:C.p2, tagBg:C.p2_10, accentBar:C.grad90_23, arrowColor:C.p2 },
-  { bg:`linear-gradient(135deg,${C.p2_10},${C.p3_08})`, border:C.p3_30, tagColor:C.p3, tagBg:C.p3_10, accentBar:C.grad90_23, arrowColor:C.p3 },
+  { bg:`linear-gradient(135deg, rgba(255,249,243,0.98), ${C.p1_10}, ${C.p2_08})`, border:C.borderWarm, tagColor:C.p1, tagBg:C.p1_10, accentBar:C.grad90_12, arrowColor:C.p1 },
+  { bg:`linear-gradient(135deg, rgba(255,249,241,0.98), ${C.p3_10}, ${C.p2_08})`, border:C.borderWarm, tagColor:C.p2, tagBg:C.p2_10, accentBar:C.grad90_23, arrowColor:C.p2 },
+  { bg:`linear-gradient(135deg, rgba(255,250,244,0.98), ${C.p2_10}, ${C.p3_08})`, border:C.borderWarmStrong, tagColor:C.p3, tagBg:C.p3_10, accentBar:C.grad90_23, arrowColor:C.p3 },
 ];
 
 const STYLES = `
@@ -42,7 +42,7 @@ const STYLES = `
   .cblink{animation:cursorBlink 1.1s step-end infinite;}
   .pdot{animation:pulseRing 2.5s ease-in-out infinite;}
   .card-lift{transition:transform 0.22s ease,box-shadow 0.22s ease;}
-  .card-lift:hover{transform:translateY(-5px);box-shadow:0 20px 48px ${C.p1_13};}
+  .card-lift:hover{transform:translateY(-5px);box-shadow:${C.shadowWarmLg};}
   .arr{transition:transform 0.2s ease,color 0.2s ease;}
   .card-lift:hover .arr{transform:translate(3px,-3px);}
   .btn-lift{transition:transform 0.18s ease,box-shadow 0.18s ease;}
@@ -54,13 +54,13 @@ export default function Home() {
   useEffect(() => { const id = setInterval(()=>setTick(t=>t+1),4000); return()=>clearInterval(id); }, []);
 
   return (
-    <div className="min-h-screen bg-white font-sans overflow-x-hidden">
+    <div className="min-h-screen font-sans overflow-x-hidden" style={{ background: C.page }}>
       <style>{STYLES}</style>
 
       <Nav />
 
       {/* HERO */}
-      <section className="relative overflow-hidden pt-20 pb-24 px-6 border-b border-black/[0.06]">
+      <section className="relative overflow-hidden pt-20 pb-24 px-6 border-b" style={{ borderColor: C.borderSubtle }}>
         <div className="absolute inset-0 pointer-events-none" style={C.gridBg(0.045)}/>
         <div className="absolute inset-0 pointer-events-none" style={C.vignette}/>
         {/* Corner brackets */}
@@ -92,7 +92,7 @@ export default function Home() {
         </div>
 
         <div className="relative z-10 max-w-3xl mx-auto">
-          <div className="afu1 inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-white border border-black/[0.08] shadow-sm mb-8">
+          <div className="afu1 inline-flex items-center gap-2.5 px-4 py-2 rounded-full mb-8" style={{ background: C.surfaceStrong, border: `1px solid ${C.borderSubtle}`, boxShadow: C.shadowWarmSm }}>
             <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0" style={{background:C.grad12}}>CS</div>
             <span className="text-sm font-semibold text-slate-700">Chris Solorzano</span>
             <span className="text-slate-300">·</span>
@@ -109,13 +109,13 @@ export default function Home() {
           <div className="afu5 flex flex-wrap gap-3">
             <Link href="/grad-guide" className="btn-lift inline-flex items-center gap-2 px-6 py-3 rounded-full font-bold text-sm text-white shadow-md" style={{background:C.grad12}}>🎓 Graduation Guide</Link>
             <a href="https://www.instagram.com/soloxsnaps" target="_blank" rel="noopener noreferrer" className="btn-lift inline-flex items-center gap-2 px-6 py-3 rounded-full font-bold text-sm text-white" style={{background:"#111827"}}>📸 Instagram</a>
-            <a href="https://www.soloxsnaps.com/contact/" className="btn-lift inline-flex items-center gap-2 px-6 py-3 rounded-full font-bold text-sm" style={{background:"#fff",color:"#111827",border:"2px solid #111827"}}>✉️ Book a shoot</a>
+            <a href="https://www.soloxsnaps.com/contact/" className="btn-lift inline-flex items-center gap-2 px-6 py-3 rounded-full font-bold text-sm" style={{background:C.surfaceStrong,color:"#111827",border:`1.5px solid ${C.borderWarm}`}}>✉️ Book a shoot</a>
           </div>
         </div>
       </section>
 
       {/* MARQUEE */}
-      <div className="overflow-hidden border-b border-black/[0.06] py-3">
+      <div className="overflow-hidden border-b py-3" style={{ borderColor: C.borderSubtle, background: C.surfaceStrong }}>
         <div className="mtrack flex gap-12 whitespace-nowrap w-max">
           {["Graduation Photos","Bay Area","Golden Hour","SJSU · Berkeley · Stanford","Natural Light","Real Moments","Graduation Photos","Bay Area","Golden Hour","SJSU · Berkeley · Stanford","Natural Light","Real Moments"].map((item,i)=>(
             <span key={i} className="flex items-center gap-3 text-[11px] font-bold tracking-[0.14em] uppercase text-slate-300">
@@ -157,7 +157,7 @@ export default function Home() {
           {/* Stats */}
           <div className="grid grid-cols-3 gap-3 mt-6">
             {[{n:"200+",l:"Grads shot"},{n:"12+",l:"Bay Area spots"},{n:"48hr",l:"Turnaround"}].map(s=>(
-              <div key={s.l} className="rounded-2xl p-5 text-center" style={{background:`linear-gradient(135deg,${C.p1_08},${C.p2_06})`,border:`1px solid ${C.p1_12}`}}>
+              <div key={s.l} className="rounded-2xl p-5 text-center" style={{background:C.surfaceWarm,border:`1px solid ${C.borderSubtle}`, boxShadow: C.shadowWarmSm}}>
                 <span className="block text-2xl font-black tracking-tight mb-0.5" style={C.text12}>{s.n}</span>
                 <span className="block text-xs font-semibold text-slate-500">{s.l}</span>
               </div>
@@ -177,7 +177,7 @@ export default function Home() {
         </div>
       </div>
 
-      <footer className="py-10 px-6 border-t border-black/[0.06] bg-white">
+      <footer className="py-10 px-6 border-t" style={{ borderColor: C.borderSubtle, background: C.surfaceStrong }}>
         <div className="max-w-3xl mx-auto flex items-center justify-between flex-wrap gap-4">
           <span className="font-black text-lg" style={C.text}>Chris.</span>
           <span className="text-sm text-slate-400">© {new Date().getFullYear()} · San Francisco, CA</span>

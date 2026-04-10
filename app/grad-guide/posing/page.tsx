@@ -38,14 +38,14 @@ export default function PosingPage() {
   },[])
 
   return (
-    <div className="min-h-screen bg-white font-sans overflow-x-hidden">
+    <div className="min-h-screen font-sans overflow-x-hidden" style={{ background: C.page }}>
       <style>{GUIDE_STYLES}</style>
 
       <Nav />
 
-      <section className="relative overflow-hidden px-6 pt-14 pb-12 border-b border-black/[0.06]">
+      <section className="relative overflow-hidden px-6 pt-14 pb-12 border-b" style={{ borderColor: C.borderSubtle }}>
         <div className="absolute inset-0 pointer-events-none" style={C.gridBg(0.04)}/>
-        <div className="absolute inset-0 pointer-events-none" style={{background:`radial-gradient(ellipse at 40% 50%,transparent 28%,white 74%)`}}/>
+        <div className="absolute inset-0 pointer-events-none" style={{background:`radial-gradient(ellipse at 40% 50%,transparent 28%,${C.page} 74%)`}}/>
         <div className="absolute top-5 left-5 w-5 h-5 pointer-events-none" style={{borderTop:`2px solid ${C.p1_30}`,borderLeft:`2px solid ${C.p1_30}`}}/>
         <div className="absolute top-5 right-5 w-5 h-5 pointer-events-none" style={{borderTop:`2px solid ${C.p2_18}`,borderRight:`2px solid ${C.p2_18}`}}/>
         <div className="absolute bottom-5 left-5 w-5 h-5 pointer-events-none" style={{borderBottom:`2px solid ${C.p2_18}`,borderLeft:`2px solid ${C.p2_18}`}}/>
@@ -83,7 +83,7 @@ export default function PosingPage() {
         </div>
       </section>
 
-      <div className="overflow-hidden border-b border-black/[0.06] py-3">
+      <div className="overflow-hidden border-b py-3" style={{ borderColor: C.borderSubtle, background: C.surfaceStrong }}>
         <div className="mtrack flex gap-12 whitespace-nowrap w-max">
           {MARQUEE.map((item,i)=>(
             <span key={i} className="flex items-center gap-3 text-[11px] font-bold tracking-[0.14em] uppercase text-slate-300">
@@ -99,7 +99,7 @@ export default function PosingPage() {
             [...Array(4)].map((_,i)=><div key={i} className="rounded-2xl animate-pulse h-56" style={{background:`linear-gradient(135deg,${C.p1_08},${C.p2_06})`}}/>)
           ) : (
             poses.map((pose,index)=>(
-              <div key={pose.id} className="card-lift rounded-2xl overflow-hidden" style={{border:`1px solid ${C.p1_20}`,background:"#fff"}}>
+              <div key={pose.id} className="card-lift rounded-2xl overflow-hidden" style={{border:`1px solid ${C.borderWarm}`,background:C.surfaceStrong, boxShadow:C.shadowWarmSm}}>
                 <div className="h-[3px]" style={{background:C.grad90}}/>
                 {pose.image_url ? (
                   <div className="flex flex-col sm:grid sm:grid-cols-2">
@@ -146,7 +146,7 @@ export default function PosingPage() {
       </section>
 
       <GuideNav />
-      <footer className="border-t border-black/[0.06] bg-white py-8 px-6">
+      <footer className="border-t py-8 px-6" style={{ borderColor: C.borderSubtle, background: C.surfaceStrong }}>
         <div className="max-w-3xl mx-auto flex items-center justify-between flex-wrap gap-4">
           <span className="font-black text-lg" style={C.text}>Chris.</span>
           <span className="text-sm text-slate-400">© 2026 · Bay Area Grad Photography</span>

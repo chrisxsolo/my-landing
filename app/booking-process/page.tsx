@@ -159,7 +159,7 @@ export default function BookingProcessPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-white font-sans overflow-x-hidden">
+    <div className="min-h-screen font-sans overflow-x-hidden" style={{ background: C.page }}>
       <style>{`
         @keyframes fadeUp{from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:translateY(0);}}
         @keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
@@ -217,14 +217,12 @@ export default function BookingProcessPage() {
       <Nav />
 
       {/* HERO */}
-      <section className="relative overflow-hidden px-6 pt-16 pb-14 border-b border-black/[0.06]">
+      <section className="relative overflow-hidden px-6 pt-16 pb-14 border-b" style={{ borderColor: C.borderSubtle }}>
         <div className="absolute inset-0 pointer-events-none" style={{
-          backgroundImage: `linear-gradient(rgba(0,0,0,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.02) 1px, transparent 1px)`,
+          ...C.gridBg(0.04),
           backgroundSize: "30px 30px"
         }}/>
-        <div className="absolute inset-0 pointer-events-none" style={{
-          background: "radial-gradient(ellipse at 50% 50%, transparent 40%, white 85%)"
-        }}/>
+        <div className="absolute inset-0 pointer-events-none" style={C.vignette}/>
         <div className="absolute top-5 left-5 w-5 h-5 pointer-events-none" style={{borderTop:`2px solid ${C.p1_30}`,borderLeft:`2px solid ${C.p1_30}`}}/>
         <div className="absolute top-5 right-5 w-5 h-5 pointer-events-none" style={{borderTop:`2px solid ${C.p2_18}`,borderRight:`2px solid ${C.p2_18}`}}/>
         <div className="pdot absolute top-7 right-7 w-2 h-2 rounded-full pointer-events-none" style={{background:C.grad12}}/>
@@ -249,7 +247,7 @@ export default function BookingProcessPage() {
       </section>
 
       {/* MARQUEE */}
-      <div className="overflow-hidden border-b border-black/[0.06] py-3">
+      <div className="overflow-hidden border-b py-3" style={{ borderColor: C.borderSubtle, background: C.surfaceStrong }}>
         <div className="mtrack flex gap-12 whitespace-nowrap w-max">
           {MARQUEE.map((item,i)=>(
             <span key={i} className="flex items-center gap-3 text-[11px] font-bold tracking-[0.14em] uppercase text-slate-300">
@@ -447,7 +445,7 @@ export default function BookingProcessPage() {
       {/* Bottom Navigation */}
       <GuideNav />
 
-      <footer className="border-t border-black/[0.06] bg-white py-8 px-6">
+      <footer className="border-t py-8 px-6" style={{ borderColor: C.borderSubtle, background: C.surfaceStrong }}>
         <div className="max-w-4xl mx-auto flex items-center justify-between flex-wrap gap-4">
           <span className="font-black text-lg" style={C.text}>Chris.</span>
           <span className="text-sm text-slate-400">© 2026 · Bay Area Grad Photography</span>

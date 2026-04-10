@@ -39,12 +39,12 @@ export default function GradGuidePage() {
   },[])
 
   return (
-    <div className="min-h-screen bg-white font-sans overflow-x-hidden">
+    <div className="min-h-screen font-sans overflow-x-hidden" style={{ background: C.page }}>
       <style>{GUIDE_STYLES}</style>
 
       <Nav />
 
-      <section className="relative overflow-hidden px-6 pt-16 pb-14 border-b border-black/[0.06]">
+      <section className="relative overflow-hidden px-6 pt-16 pb-14 border-b" style={{ borderColor: C.borderSubtle }}>
         <div className="absolute inset-0 pointer-events-none" style={C.gridBg(0.045)}/>
         <div className="absolute inset-0 pointer-events-none" style={C.vignette}/>
         <div className="absolute top-5 left-5 w-5 h-5 pointer-events-none" style={{borderTop:`2px solid ${C.p1_30}`,borderLeft:`2px solid ${C.p1_30}`}}/>
@@ -87,7 +87,7 @@ export default function GradGuidePage() {
         </div>
       </section>
 
-      <div className="overflow-hidden border-b border-black/[0.06] py-3">
+      <div className="overflow-hidden border-b py-3" style={{ borderColor: C.borderSubtle, background: C.surfaceStrong }}>
         <div className="mtrack flex gap-12 whitespace-nowrap w-max">
           {MARQUEE.map((item,i)=>(
             <span key={i} className="flex items-center gap-3 text-[11px] font-bold tracking-[0.14em] uppercase text-slate-300">
@@ -119,7 +119,7 @@ export default function GradGuidePage() {
         </div>
       </section>
 
-      <section className="px-6 pb-20 border-t border-black/[0.06]">
+      <section className="px-6 pb-20 border-t" style={{ borderColor: C.borderSubtle }}>
         <div className="max-w-3xl mx-auto pt-14">
           <div className="mb-10 text-center">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full mb-3" style={{background:C.p1_08,border:`1px solid ${C.p1_18}`}}>
@@ -161,7 +161,7 @@ export default function GradGuidePage() {
       </div>
 
       <GuideNav />
-      <footer className="border-t border-black/[0.06] bg-white py-8 px-6">
+      <footer className="border-t py-8 px-6" style={{ borderColor: C.borderSubtle, background: C.surfaceStrong }}>
         <div className="max-w-3xl mx-auto flex items-center justify-between flex-wrap gap-4">
           <span className="font-black text-lg" style={C.text}>Chris.</span>
           <span className="text-sm text-slate-400">© 2026 · Bay Area Grad Photography</span>

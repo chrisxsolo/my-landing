@@ -8,6 +8,10 @@
 const p1 = "#9d6fe8"   // ← violet  — EDIT THIS
 const p2 = "#e879a0"   // ← pink    — EDIT THIS
 const p3 = "#fbbf24"   // ← amber   — EDIT THIS
+const page = "#fffaf5"
+const pageAlt = "#fff5ed"
+const warmEdge = "#eadbcb"
+const warmShadow = "rgba(157,118,86,0.10)"
 
 // Derived rgba helpers
 const r1 = "157,111,232"
@@ -17,6 +21,10 @@ const r3 = "251,191,36"
 export const C = {
   // Raw hex stops
   p1, p2, p3,
+  page,
+  pageAlt,
+  warmEdge,
+  warmShadow,
 
   // Main gradients
   grad:    `linear-gradient(135deg, ${p1}, ${p2}, ${p3})`,
@@ -38,6 +46,19 @@ export const C = {
   blob1: `radial-gradient(circle, rgba(${r1},0.13), transparent 70%)`,
   blob2: `radial-gradient(circle, rgba(${r2},0.10), transparent 70%)`,
   blob3: `radial-gradient(circle, rgba(${r3},0.08), transparent 70%)`,
+
+  // Warm neutral surfaces
+  surface: "rgba(255,255,255,0.84)",
+  surfaceStrong: "rgba(255,255,255,0.93)",
+  surfaceSoft: "rgba(255,251,247,0.96)",
+  surfaceWarm: `linear-gradient(135deg, rgba(255,251,247,0.98), rgba(${r2},0.08), rgba(${r3},0.08))`,
+  surfaceWarmAlt: `linear-gradient(135deg, rgba(255,248,241,0.98), rgba(${r1},0.07), rgba(${r2},0.08))`,
+  borderSubtle: `rgba(${r1},0.10)`,
+  borderWarm: `rgba(${r2},0.14)`,
+  borderWarmStrong: `rgba(${r3},0.18)`,
+  shadowWarmSm: `0 8px 24px ${warmShadow}`,
+  shadowWarm: `0 18px 42px ${warmShadow}`,
+  shadowWarmLg: `0 26px 68px rgba(157,118,86,0.12)`,
 
   // Soft fills (backgrounds, borders)
   p1_04:  `rgba(${r1},0.04)`,
@@ -87,7 +108,7 @@ export const C = {
 
   // Vignette overlay (fades grid at edges)
   vignette: {
-    background: "radial-gradient(ellipse at 50% 50%,transparent 30%,white 78%)",
+    background: `radial-gradient(ellipse at 50% 50%,transparent 30%,${page} 78%)`,
   },
 
   // Text gradient (logo, headings)
