@@ -9,6 +9,7 @@ const navLinks = [
   { label: "Home", href: "/" },
   { label: "About Me", href: "/about" },
   { label: "Graduation Guide", href: "/grad-guide" },
+  { label: "Locations", href: "/bay-area-locations" },
   { label: "Availability", href: "/availability" },
   { label: "Blog", href: "/blog" },
 ];

@@ -4,10 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import { C } from "@/lib/colors";
 import { ADMIN_PASSWORD, checkAuth, setAuth, logout } from "@/lib/adminAuth";
 import Nav from "@/app/components/Nav";
+import BayAreaLocationsManager from "@/app/admin/BayAreaLocationsManager";
 
 export const dynamic = 'force-dynamic'
 
-type Tab = "poses"|"locations"|"blog"|"analytics";
+type Tab = "poses"|"locations"|"bayGuide"|"blog"|"analytics";
 type Pose = { id:number; title:string; image_url:string; instructions:string; order:number; };
 type Spot = { id:number; school_id:string; school_name:string; school_short:string; name:string; description:string; tip:string; icon:string; image_url:string|null; order:number; };
 type BlogPost = { id:number; title:string; body:string; published_at:string; slug:string; cover_image_url:string|null; extra_image_urls:string[]; };
@@ -320,6 +321,7 @@ export default function AdminDashboard() {
       <div className="sticky top-[72px] z-40 border-b border-black/[0.06] px-6 h-14 flex items-center justify-between" style={{background:"rgba(255,255,255,0.95)",backdropFilter:"blur(20px)"}}>
         <span className="font-black text-lg" style={C.text}>Chris. Admin</span>
         <div className="flex items-center gap-4">
+          <a href="/bay-area-locations" className="text-xs font-bold text-slate-400 hover:text-slate-700 transition-colors">🗺️ Bay Guide</a>
           <a href="/admin/availability" className="text-xs font-bold text-slate-400 hover:text-slate-700 transition-colors">📅 Availability</a>
           <a href="/" className="text-xs font-bold text-slate-400 hover:text-slate-700 transition-colors">← Site</a>
         </div>
@@ -327,12 +329,12 @@ export default function AdminDashboard() {
 
       <div className="max-w-3xl mx-auto px-6 py-8">
         {/* Tabs */}
-        <div className="flex gap-2 mb-8 p-1 rounded-2xl bg-white border border-slate-100 w-fit">
-          {(["poses","locations","blog","analytics"] as Tab[]).map(t=>(
+        <div className="flex gap-2 mb-8 p-1 rounded-2xl bg-white border border-slate-100 w-fit flex-wrap">
+          {(["poses","locations","bayGuide","blog","analytics"] as Tab[]).map(t=>(
             <button key={t} onClick={()=>{setTab(t);cancelEditPose();cancelEditSpot();cancelEditPost();}}
               className="px-5 py-2 rounded-xl text-sm font-bold transition-all"
               style={tab===t?{background:C.grad12,color:"#fff"}:{color:"#94a3b8"}}>
-              {t==="poses"?"📸 Grad Poses":t==="locations"?"📍 Locations":t==="blog"?"✍️ Blog":"📊 Analytics"}
+              {t==="poses"?"📸 Grad Poses":t==="locations"?"📍 Campus Spots":t==="bayGuide"?"🗺️ Bay Guide":t==="blog"?"✍️ Blog":"📊 Analytics"}
             </button>
           ))}
         </div>
@@ -512,6 +514,9 @@ export default function AdminDashboard() {
             )}
           </div>
         )}
+
+        {tab==="bayGuide"&&<BayAreaLocationsManager />}
+
         {/* ── BLOG ── */}
         {tab==="blog"&&(
           <div className="space-y-6">

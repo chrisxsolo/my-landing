@@ -10,6 +10,7 @@ const photographyCards = [
   { href:"/grad-guide",      emoji:"🎓", tag:"Free Guide",  title:"Graduation Photo Guide",  desc:"Poses, outfits, timing — everything Bay Area grads need before their shoot.", featured:true },
   { href:"/booking-process", emoji:"📋", tag:"Process",     title:"Booking Process",         desc:"From inquiry to delivery — see exactly what happens at each step.", featured:false },
   { href:"/availability",    emoji:"📅", tag:"Availability",title:"Check My Schedule",       desc:"See what dates I have open for grad season and reach out to lock one in.", featured:false },
+  { href:"/bay-area-locations", emoji:"🗺️", tag:"Locations", title:"Bay Area Location Guide", desc:"My favorite portrait spots across SF, the South Bay, the Peninsula, beaches, and more.", featured:false },
   { href:"/blog",            emoji:"✍️", tag:"Blog",        title:"Shoot Stories",            desc:"Behind-the-scenes from recent sessions — what worked and what didn't.", featured:false },
 ];
 
@@ -17,6 +18,7 @@ const cardStyles = [
   { bg:`linear-gradient(135deg, rgba(255,249,243,0.98), ${C.p1_10}, ${C.p2_08})`, border:C.borderWarm, tagColor:C.p1, tagBg:C.p1_10, accentBar:C.grad90_12, arrowColor:C.p1 },
   { bg:`linear-gradient(135deg, rgba(255,249,241,0.98), ${C.p3_10}, ${C.p2_08})`, border:C.borderWarm, tagColor:C.p2, tagBg:C.p2_10, accentBar:C.grad90_23, arrowColor:C.p2 },
   { bg:`linear-gradient(135deg, rgba(255,250,244,0.98), ${C.p2_10}, ${C.p3_08})`, border:C.borderWarmStrong, tagColor:C.p3, tagBg:C.p3_10, accentBar:C.grad90_23, arrowColor:C.p3 },
+  { bg:`linear-gradient(135deg, rgba(255,250,245,0.98), ${C.p1_08}, ${C.p3_10})`, border:C.borderWarmStrong, tagColor:C.p1, tagBg:C.p1_08, accentBar:C.grad13, arrowColor:C.p1 },
 ];
 
 const STYLES = `
@@ -135,7 +137,9 @@ export default function Home() {
               const isExternal = "external" in card && card.external;
               const Wrapper = isExternal ? "a" : Link;
               const wrapperProps = isExternal ? {href:card.href,target:"_blank",rel:"noopener noreferrer"} : {href:card.href};
-              const cs = cardStyles[i-1] ?? cardStyles[0];
+              const cs = card.featured
+                ? cardStyles[0]
+                : cardStyles[(i - 1) % cardStyles.length];
               return (
                 // @ts-ignore
                 <Wrapper key={card.title} {...wrapperProps}
