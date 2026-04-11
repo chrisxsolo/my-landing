@@ -2,9 +2,8 @@
 import { supabase } from '@/lib/supabase'
 import { useEffect, useRef, useState } from "react";
 import { C } from "@/lib/colors";
-import { checkAuth, logout } from "@/lib/adminAuth";
+import { checkAuth } from "@/lib/adminAuth";
 import { useRouter } from "next/navigation";
-import Nav from "@/app/components/Nav";
 
 export const dynamic = 'force-dynamic'
 
@@ -118,18 +117,14 @@ export default function AdminLinksPage() {
   // Show loading while checking auth
   if (!authed) {
     return (
-      <>
-        <Nav />
-        <div className="min-h-[calc(100vh-72px)] bg-white flex items-center justify-center px-6 font-sans">
-          <div className="text-slate-400">Loading...</div>
-        </div>
-      </>
+      <div className="min-h-screen bg-white flex items-center justify-center px-6 font-sans">
+        <div className="text-slate-400">Loading...</div>
+      </div>
     );
   }
 
   return (
     <div className="min-h-screen font-sans" style={{ background:"#f8f7ff" }}>
-      <Nav />
       {/* Toast */}
       {toast && (
         <div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 rounded-full text-white text-sm font-bold shadow-xl"
@@ -137,7 +132,7 @@ export default function AdminLinksPage() {
       )}
 
       {/* Top bar */}
-      <div className="sticky top-[72px] z-40 border-b border-black/[0.06] px-6 h-14 flex items-center justify-between"
+      <div className="sticky top-0 z-40 border-b border-black/[0.06] px-6 h-14 flex items-center justify-between"
         style={{ background:"rgba(255,255,255,0.95)", backdropFilter:"blur(20px)" }}>
         <span className="font-black text-lg" style={C.text}>Links Admin</span>
         <div className="flex items-center gap-4">

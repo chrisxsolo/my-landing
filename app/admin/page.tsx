@@ -3,7 +3,6 @@ import { supabase } from '@/lib/supabase'
 import { useEffect, useRef, useState } from "react";
 import { C } from "@/lib/colors";
 import { ADMIN_PASSWORD, checkAuth, setAuth } from "@/lib/adminAuth";
-import Nav from "@/app/components/Nav";
 import BayAreaLocationsManager from "@/app/admin/BayAreaLocationsManager";
 
 export const dynamic = 'force-dynamic'
@@ -314,38 +313,34 @@ export default function AdminDashboard() {
 
   if(!authed){
     return(
-      <>
-        <Nav />
-        <div className="min-h-[calc(100vh-72px)] bg-white flex items-center justify-center px-6 font-sans">
-          <div className="w-full max-w-sm">
-            <div className="text-center mb-8">
-              <span className="font-black text-2xl" style={C.text}>Chris.</span>
-              <p className="text-slate-400 text-sm mt-1 font-medium">Admin Dashboard</p>
-            </div>
-            <div className="rounded-2xl p-8 shadow-xl" style={{border:`1px solid ${C.p1_15}`}}>
-              <div className="h-[3px] rounded-full mb-6" style={{background:C.grad90}}/>
-              <label className="block text-xs font-bold tracking-widest uppercase text-slate-400 mb-2">Password</label>
-              <input type="password" value={pw} onChange={e=>{setPw(e.target.value);setPwErr(false);}}
-                onKeyDown={e=>{if(e.key==="Enter"){if(pw===ADMIN_PASSWORD){setAuth(true);setAuthed(true);}else setPwErr(true);}}}
-                placeholder="Enter password" className={inp+" mb-4"} style={pwErr?{borderColor:C.p2}:{}}/>
-              {pwErr&&<p className="text-xs font-semibold mb-3" style={{color:C.p2}}>Incorrect password</p>}
-              <button onClick={()=>{if(pw===ADMIN_PASSWORD){setAuth(true);setAuthed(true);}else setPwErr(true);}}
-                className="w-full py-2.5 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90" style={{background:C.grad12}}>
-                Enter →
-              </button>
-            </div>
+      <div className="min-h-screen bg-white flex items-center justify-center px-6 font-sans">
+        <div className="w-full max-w-sm">
+          <div className="text-center mb-8">
+            <span className="font-black text-2xl" style={C.text}>Chris.</span>
+            <p className="text-slate-400 text-sm mt-1 font-medium">Admin Dashboard</p>
+          </div>
+          <div className="rounded-2xl p-8 shadow-xl" style={{border:`1px solid ${C.p1_15}`}}>
+            <div className="h-[3px] rounded-full mb-6" style={{background:C.grad90}}/>
+            <label className="block text-xs font-bold tracking-widest uppercase text-slate-400 mb-2">Password</label>
+            <input type="password" value={pw} onChange={e=>{setPw(e.target.value);setPwErr(false);}}
+              onKeyDown={e=>{if(e.key==="Enter"){if(pw===ADMIN_PASSWORD){setAuth(true);setAuthed(true);}else setPwErr(true);}}}
+              placeholder="Enter password" className={inp+" mb-4"} style={pwErr?{borderColor:C.p2}:{}}/>
+            {pwErr&&<p className="text-xs font-semibold mb-3" style={{color:C.p2}}>Incorrect password</p>}
+            <button onClick={()=>{if(pw===ADMIN_PASSWORD){setAuth(true);setAuthed(true);}else setPwErr(true);}}
+              className="w-full py-2.5 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90" style={{background:C.grad12}}>
+              Enter →
+            </button>
           </div>
         </div>
-      </>
+      </div>
     );
   }
 
   return(
     <div className="min-h-screen font-sans" style={{background:"#f8f7ff"}}>
-      <Nav />
       {toast&&<div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 rounded-full text-white text-sm font-bold shadow-xl" style={{background:toast.ok?C.grad12:"#be123c"}}>{toast.msg}</div>}
 
-      <div className="sticky top-[72px] z-40 border-b border-black/[0.06] px-6 h-14 flex items-center justify-between" style={{background:"rgba(255,255,255,0.95)",backdropFilter:"blur(20px)"}}>
+      <div className="sticky top-0 z-40 border-b border-black/[0.06] px-6 h-14 flex items-center justify-between" style={{background:"rgba(255,255,255,0.95)",backdropFilter:"blur(20px)"}}>
         <span className="font-black text-lg" style={C.text}>Chris. Admin</span>
         <div className="flex items-center gap-4">
           <a href="/bay-area-locations" className="text-xs font-bold text-slate-400 hover:text-slate-700 transition-colors">🗺️ Bay Guide</a>
