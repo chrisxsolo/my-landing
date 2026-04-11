@@ -2,7 +2,7 @@
 import { supabase } from '@/lib/supabase'
 import { useEffect, useRef, useState } from "react";
 import { C } from "@/lib/colors";
-import { ADMIN_PASSWORD, checkAuth, setAuth, logout } from "@/lib/adminAuth";
+import { ADMIN_PASSWORD, checkAuth, setAuth } from "@/lib/adminAuth";
 import Nav from "@/app/components/Nav";
 import BayAreaLocationsManager from "@/app/admin/BayAreaLocationsManager";
 
@@ -12,9 +12,10 @@ type Tab = "poses"|"locations"|"bayGuide"|"blog"|"analytics";
 type Pose = { id:number; title:string; image_url:string; instructions:string; order:number; };
 type Spot = { id:number; school_id:string; school_name:string; school_short:string; name:string; description:string; tip:string; icon:string; image_url:string|null; order:number; };
 type BlogPost = { id:number; title:string; body:string; published_at:string; slug:string; cover_image_url:string|null; extra_image_urls:string[]; };
-type LinkClick = { id:number; link_id:number; clicked_at:string; };
-type LinkStat = { id:number; label:string; emoji:string|null; url:string; clicks:number; ctr:number; };
-type DailyStat = { date:string; clicks:number; views:number; };
+type LinkClickEvent = { link_id:number|null; user_id:string|null; clicked_at:string; };
+type LinkViewEvent = { user_id:string|null; viewed_at:string; };
+type LinkStat = { id:number; label:string; emoji:string|null; url:string; clicks:number; uniqueClickers:number; ctr:number; clickShare:number; };
+type DailyStat = { date:string; clicks:number; views:number; ctr:number; };
 
 const SCHOOLS = [
   {id:"sjsu",    name:"San Jose State University",      short:"SJSU"},
@@ -27,6 +28,32 @@ const SCHOOLS = [
 const ICONS = ["🏫","🏛️","🌴","📚","🌸","🚪","🌳","🗼","🌿","🌊","🏢","🌅","🌁","🏔️","⛪","🌉","🦅","🔵","🐻"];
 const EMPTY_POSE = {title:"",instructions:"",order:""};
 const EMPTY_SPOT = {school_id:"sjsu",name:"",description:"",tip:"",icon:"🏫",order:""};
+
+const numberFmt=new Intl.NumberFormat("en-US");
+function fmtNum(value:number){return numberFmt.format(value);}
+function fmtPercent(value:number){return `${value.toFixed(1)}%`;}
+function fmtRatio(value:number){return value.toFixed(value>=10?1:2);}
+function dateFromKey(dateKey:string){const[y,m,d]=dateKey.split("-").map(Number);return new Date(y,m-1,d);}
+function buildDailyStats(days:7|30,clicks:Pick<LinkClickEvent,"clicked_at">[],views:Pick<LinkViewEvent,"viewed_at">[]):DailyStat[]{
+  const dailyMap:Record<string,{clicks:number;views:number}>={};
+  for(let i=0;i<days;i++){
+    const d=new Date();
+    d.setDate(d.getDate()-i);
+    const key=d.toISOString().split('T')[0];
+    dailyMap[key]={clicks:0,views:0};
+  }
+  clicks.forEach(c=>{
+    const key=c.clicked_at?.split('T')[0];
+    if(key&&dailyMap[key])dailyMap[key].clicks++;
+  });
+  views.forEach(v=>{
+    const key=v.viewed_at?.split('T')[0];
+    if(key&&dailyMap[key])dailyMap[key].views++;
+  });
+  return Object.entries(dailyMap)
+    .map(([date,stats])=>({date,...stats,ctr:stats.views>0?(stats.clicks/stats.views)*100:0}))
+    .sort((a,b)=>a.date.localeCompare(b.date));
+}
 
 export default function AdminDashboard() {
   const [authed,setAuthed]=useState(false);
@@ -94,78 +121,70 @@ export default function AdminDashboard() {
   
   async function fetchLinkStats(){
     setStatsLoading(true);
-    
-    // Get total views and unique visitors
-    const{count:viewCount}=await supabase.from('link_views').select('*',{count:'exact',head:true});
-    const{data:uniqueViewsData}=await supabase.from('link_views').select('user_id');
-    const uniqueUserIds=new Set(uniqueViewsData?.map(v=>v.user_id).filter(Boolean));
-    
-    const totalViewCount=viewCount||0;
-    setTotalViews(totalViewCount);
-    setUniqueVisitors(uniqueUserIds.size);
-    
-    // Get total clicks and unique clickers
-    const{data:allClicksData}=await supabase.from('link_clicks').select('user_id');
-    const uniqueClickerIds=new Set(allClicksData?.map(c=>c.user_id).filter(Boolean));
-    setUniqueClickers(uniqueClickerIds.size);
-    
-    // Get links with click counts
-    const{data:links}=await supabase.from('links').select('id,label,emoji,url').eq('active',true).order('order',{ascending:true});
-    if(!links){setStatsLoading(false);return;}
-    
-    const stats:LinkStat[]=[];
-    let totalClickCount=0;
-    
-    for(const link of links){
-      const{count}=await supabase.from('link_clicks').select('*',{count:'exact',head:true}).eq('link_id',link.id);
-      const clicks=count||0;
-      totalClickCount+=clicks;
-      const ctr=totalViewCount>0?(clicks/totalViewCount)*100:0;
-      stats.push({...link,clicks,ctr});
+    try{
+      const[
+        {data:views,error:viewsError},
+        {data:clicks,error:clicksError},
+        {data:links,error:linksError},
+      ]=await Promise.all([
+        supabase.from('link_views').select('user_id,viewed_at'),
+        supabase.from('link_clicks').select('link_id,user_id,clicked_at'),
+        supabase.from('links').select('id,label,emoji,url').eq('active',true).order('order',{ascending:true}),
+      ]);
+      if(viewsError||clicksError||linksError)throw viewsError||clicksError||linksError;
+
+      const viewEvents=(views??[]) as LinkViewEvent[];
+      const clickEvents=(clicks??[]) as LinkClickEvent[];
+      const totalViewCount=viewEvents.length;
+      const totalClickCount=clickEvents.length;
+      const uniqueUserIds=new Set(viewEvents.map(v=>v.user_id).filter(Boolean));
+      const uniqueClickerIds=new Set(clickEvents.map(c=>c.user_id).filter(Boolean));
+      const clicksByLink=new Map<number,LinkClickEvent[]>();
+
+      clickEvents.forEach(click=>{
+        if(!click.link_id)return;
+        const existing=clicksByLink.get(click.link_id)??[];
+        existing.push(click);
+        clicksByLink.set(click.link_id,existing);
+      });
+
+      const stats=((links??[]) as {id:number;label:string;emoji:string|null;url:string}[]).map(link=>{
+        const linkClicks=clicksByLink.get(link.id)??[];
+        const clickCount=linkClicks.length;
+        const linkUniqueClickers=new Set(linkClicks.map(click=>click.user_id).filter(Boolean)).size;
+        return {
+          ...link,
+          clicks:clickCount,
+          uniqueClickers:linkUniqueClickers,
+          ctr:totalViewCount>0?(clickCount/totalViewCount)*100:0,
+          clickShare:totalClickCount>0?(clickCount/totalClickCount)*100:0,
+        };
+      }).sort((a,b)=>b.clicks-a.clicks);
+
+      setTotalViews(totalViewCount);
+      setUniqueVisitors(uniqueUserIds.size);
+      setTotalClicks(totalClickCount);
+      setUniqueClickers(uniqueClickerIds.size);
+      setLinkStats(stats);
+      setDailyStats(buildDailyStats(timeRange,clickEvents,viewEvents));
+    }catch(err){
+      console.error("Failed to load link analytics",err);
+      showToast("Failed to load analytics",false);
+    }finally{
+      setStatsLoading(false);
     }
-    
-    // Sort by clicks descending
-    stats.sort((a,b)=>b.clicks-a.clicks);
-    setLinkStats(stats);
-    setTotalClicks(totalClickCount);
-    
-    // Get daily breakdown for last N days
-    await fetchDailyStats(timeRange);
-    
-    setStatsLoading(false);
   }
   
   async function fetchDailyStats(days:7|30){
     const startDate=new Date();
     startDate.setDate(startDate.getDate()-days);
-    
-    const{data:clicks}=await supabase.from('link_clicks').select('clicked_at').gte('clicked_at',startDate.toISOString());
-    const{data:views}=await supabase.from('link_views').select('viewed_at').gte('viewed_at',startDate.toISOString());
-    
-    const dailyMap:Record<string,{clicks:number;views:number}>={};
-    
-    // Initialize all days
-    for(let i=0;i<days;i++){
-      const d=new Date();
-      d.setDate(d.getDate()-i);
-      const key=d.toISOString().split('T')[0];
-      dailyMap[key]={clicks:0,views:0};
-    }
-    
-    // Count clicks per day
-    clicks?.forEach(c=>{
-      const key=c.clicked_at.split('T')[0];
-      if(dailyMap[key])dailyMap[key].clicks++;
-    });
-    
-    // Count views per day
-    views?.forEach(v=>{
-      const key=v.viewed_at.split('T')[0];
-      if(dailyMap[key])dailyMap[key].views++;
-    });
-    
-    const daily=Object.entries(dailyMap).map(([date,stats])=>({date,...stats})).sort((a,b)=>a.date.localeCompare(b.date));
-    setDailyStats(daily);
+
+    const[{data:clicks},{data:views}]=await Promise.all([
+      supabase.from('link_clicks').select('clicked_at').gte('clicked_at',startDate.toISOString()),
+      supabase.from('link_views').select('viewed_at').gte('viewed_at',startDate.toISOString()),
+    ]);
+
+    setDailyStats(buildDailyStats(days,(clicks??[]) as Pick<LinkClickEvent,"clicked_at">[],(views??[]) as Pick<LinkViewEvent,"viewed_at">[]));
   }
   
   async function clearAllAnalytics(){
@@ -284,6 +303,14 @@ export default function AdminDashboard() {
   const inp="w-full px-3 py-2.5 rounded-xl text-sm font-medium text-slate-800 outline-none border border-slate-200 focus:border-violet-300 bg-white transition-colors";
   const ta=`${inp} resize-none`;
   const card="bg-white rounded-2xl border border-slate-100 overflow-hidden";
+  const overallCtr=totalViews>0?(totalClicks/totalViews)*100:0;
+  const visitorClickRate=uniqueVisitors>0?(uniqueClickers/uniqueVisitors)*100:0;
+  const clicksPerVisitor=uniqueVisitors>0?totalClicks/uniqueVisitors:0;
+  const repeatClicks=Math.max(totalClicks-uniqueClickers,0);
+  const topLink=linkStats[0];
+  const rangeTotals=dailyStats.reduce((acc,stat)=>({views:acc.views+stat.views,clicks:acc.clicks+stat.clicks}),{views:0,clicks:0});
+  const rangeCtr=rangeTotals.views>0?(rangeTotals.clicks/rangeTotals.views)*100:0;
+  const busiestDay=dailyStats.reduce<DailyStat|null>((best,stat)=>!best||stat.clicks+stat.views>best.clicks+best.views?stat:best,null);
 
   if(!authed){
     return(
@@ -628,54 +655,141 @@ export default function AdminDashboard() {
         {/* ── ANALYTICS ── */}
         {tab==="analytics"&&(
           <div className="space-y-6">
+            <div className={card}>
+              <div className="h-[3px]" style={{background:C.grad90}}/>
+              <div className="p-6">
+                <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-widest mb-2" style={{color:C.p1}}>Linktree analytics</p>
+                    <h2 className="text-2xl font-black leading-tight text-slate-900">A cleaner read on views, clicks, and who actually clicked.</h2>
+                    <p className="mt-2 text-sm font-medium leading-relaxed text-slate-500">
+                      Stats are based on the link page tracker and a browser-level user id saved locally on each visitor&apos;s device.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2 md:justify-end">
+                    <div className="flex gap-2 p-1 rounded-xl bg-slate-50 border border-slate-100 w-fit">
+                      <button onClick={()=>{setTimeRange(7);if(!statsLoading)fetchDailyStats(7);}} className="px-4 py-1.5 rounded-lg text-xs font-bold transition-all" style={timeRange===7?{background:C.p1_10,color:C.p1}:{color:"#94a3b8"}}>7 Days</button>
+                      <button onClick={()=>{setTimeRange(30);if(!statsLoading)fetchDailyStats(30);}} className="px-4 py-1.5 rounded-lg text-xs font-bold transition-all" style={timeRange===30?{background:C.p1_10,color:C.p1}:{color:"#94a3b8"}}>30 Days</button>
+                    </div>
+                    <button onClick={fetchLinkStats} disabled={statsLoading} className="text-xs font-bold px-4 py-2 rounded-lg transition-all hover:opacity-80" style={{background:C.p2_08,color:C.p2}}>
+                      {statsLoading?"Loading...":"Refresh"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Overview Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className={card}>
                 <div className="h-[3px]" style={{background:C.grad12}}/>
                 <div className="p-6">
                   <p className="text-xs font-bold tracking-widest uppercase text-slate-400 mb-2">Total Views</p>
-                  <p className="text-4xl font-black mb-1" style={{color:C.p1}}>{totalViews}</p>
-                  <p className="text-xs text-slate-400">Page visits</p>
+                  <p className="text-4xl font-black mb-1" style={{color:C.p1}}>{fmtNum(totalViews)}</p>
+                  <p className="text-xs leading-relaxed text-slate-400">All link page loads.</p>
                 </div>
               </div>
               <div className={card}>
                 <div className="h-[3px]" style={{background:C.grad321}}/>
                 <div className="p-6">
                   <p className="text-xs font-bold tracking-widest uppercase text-slate-400 mb-2">Unique Visitors</p>
-                  <p className="text-4xl font-black mb-1" style={{color:C.p3}}>{uniqueVisitors}</p>
-                  <p className="text-xs text-slate-400">Distinct users</p>
+                  <p className="text-4xl font-black mb-1" style={{color:C.p3}}>{fmtNum(uniqueVisitors)}</p>
+                  <p className="text-xs leading-relaxed text-slate-400">Distinct users who opened the links page.</p>
                 </div>
               </div>
               <div className={card}>
                 <div className="h-[3px]" style={{background:C.grad23}}/>
                 <div className="p-6">
                   <p className="text-xs font-bold tracking-widest uppercase text-slate-400 mb-2">Total Clicks</p>
-                  <p className="text-4xl font-black mb-1" style={{color:C.p2}}>{totalClicks}</p>
-                  <p className="text-xs text-slate-400">Link clicks</p>
+                  <p className="text-4xl font-black mb-1" style={{color:C.p2}}>{fmtNum(totalClicks)}</p>
+                  <p className="text-xs leading-relaxed text-slate-400">Every tracked link click, including repeats.</p>
                 </div>
               </div>
               <div className={card}>
                 <div className="h-[3px]" style={{background:C.grad90}}/>
                 <div className="p-6">
                   <p className="text-xs font-bold tracking-widest uppercase text-slate-400 mb-2">Unique Clickers</p>
-                  <p className="text-4xl font-black mb-1" style={{color:C.p1}}>{uniqueClickers}</p>
-                  <p className="text-xs text-slate-400">Users who clicked</p>
+                  <p className="text-4xl font-black mb-1" style={{color:C.p1}}>{fmtNum(uniqueClickers)}</p>
+                  <p className="text-xs leading-relaxed text-slate-400">Distinct users who clicked at least one link.</p>
                 </div>
               </div>
             </div>
 
-            {/* Time Range Toggle + Refresh */}
-            <div className="flex items-center justify-between">
-              <div className="flex gap-2 p-1 rounded-xl bg-white border border-slate-100 w-fit">
-                <button onClick={()=>{setTimeRange(7);if(!statsLoading)fetchDailyStats(7);}} className="px-4 py-1.5 rounded-lg text-xs font-bold transition-all" style={timeRange===7?{background:C.p1_10,color:C.p1}:{color:"#94a3b8"}}>7 Days</button>
-                <button onClick={()=>{setTimeRange(30);if(!statsLoading)fetchDailyStats(30);}} className="px-4 py-1.5 rounded-lg text-xs font-bold transition-all" style={timeRange===30?{background:C.p1_10,color:C.p1}:{color:"#94a3b8"}}>30 Days</button>
+            {/* Engagement Snapshot */}
+            <div className={card}>
+              <div className="h-[3px]" style={{background:C.grad321}}/>
+              <div className="p-6">
+                <div className="flex flex-col gap-2 mb-5 md:flex-row md:items-end md:justify-between">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-widest mb-1" style={{color:C.p2}}>Engagement snapshot</p>
+                    <h3 className="text-base font-black text-slate-900">The numbers that explain the funnel.</h3>
+                  </div>
+                  <p className="text-xs font-bold text-slate-400">
+                    {timeRange}-day range: {fmtNum(rangeTotals.views)} views · {fmtNum(rangeTotals.clicks)} clicks · {fmtPercent(rangeCtr)} CTR
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                  <div className="rounded-xl border border-slate-100 p-4" style={{background:C.p1_04}}>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Click-through rate</p>
+                    <p className="text-2xl font-black" style={{color:C.p1}}>{fmtPercent(overallCtr)}</p>
+                    <p className="text-xs leading-relaxed text-slate-400">total clicks divided by total views</p>
+                  </div>
+                  <div className="rounded-xl border border-slate-100 p-4" style={{background:C.p2_06}}>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Visitor to clicker</p>
+                    <p className="text-2xl font-black" style={{color:C.p2}}>{fmtPercent(visitorClickRate)}</p>
+                    <p className="text-xs leading-relaxed text-slate-400">unique clickers divided by unique visitors</p>
+                  </div>
+                  <div className="rounded-xl border border-slate-100 p-4" style={{background:C.p3_08}}>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Clicks per visitor</p>
+                    <p className="text-2xl font-black" style={{color:"#d97706"}}>{fmtRatio(clicksPerVisitor)}</p>
+                    <p className="text-xs leading-relaxed text-slate-400">average clicks per unique visitor</p>
+                  </div>
+                  <div className="rounded-xl border border-slate-100 p-4" style={{background:C.p1_06}}>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Repeat clicks</p>
+                    <p className="text-2xl font-black" style={{color:C.p1}}>{fmtNum(repeatClicks)}</p>
+                    <p className="text-xs leading-relaxed text-slate-400">clicks beyond the first clicker click</p>
+                  </div>
+                  <div className="rounded-xl border border-slate-100 p-4" style={{background:C.p2_08}}>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Top link share</p>
+                    <p className="text-2xl font-black" style={{color:C.p2}}>{topLink?fmtPercent(topLink.clickShare):"0.0%"}</p>
+                    <p className="text-xs leading-relaxed text-slate-400">{topLink?topLink.label:"no clicks yet"}</p>
+                  </div>
+                </div>
+                <div className="mt-5 rounded-xl border border-slate-100 p-4" style={{background:"rgba(248,250,252,0.82)"}}>
+                  <p className="text-sm font-bold leading-relaxed text-slate-600">
+                    {totalViews>0?(
+                      <>
+                        {fmtNum(uniqueClickers)} of {fmtNum(uniqueVisitors)} distinct visitors clicked at least once. {topLink?`${topLink.label} is leading with ${fmtNum(topLink.clicks)} clicks (${fmtPercent(topLink.clickShare)} of all clicks).`:"No link has clicks yet."}
+                      </>
+                    ):(
+                      <>No link page traffic has been recorded yet.</>
+                    )}
+                  </p>
+                </div>
               </div>
-              <div className="flex gap-2">
-                <button onClick={clearAllAnalytics} disabled={statsLoading} className="text-xs font-bold px-4 py-2 rounded-lg transition-all hover:opacity-80" style={{background:"rgba(239,68,68,0.08)",color:"#dc2626"}}>
-                  🗑️ Clear All
-                </button>
-                <button onClick={fetchLinkStats} disabled={statsLoading} className="text-xs font-bold px-4 py-2 rounded-lg transition-all hover:opacity-80" style={{background:C.p2_08,color:C.p2}}>
-                  {statsLoading?"Loading...":"↻ Refresh"}
+            </div>
+
+            {/* Definitions */}
+            <div className={card}>
+              <div className="h-[3px]" style={{background:C.grad90_23}}/>
+              <div className="p-6">
+                <h3 className="text-base font-black text-slate-900 mb-4">What each stat means</h3>
+                <dl className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {[
+                    ["Distinct users","Approximate people/devices, based on the local browser id saved on the link page. A new browser or cleared storage can count as a new distinct user."],
+                    ["Unique visitors","Distinct users who loaded the links page at least once."],
+                    ["Unique clickers","Distinct users who clicked at least one link."],
+                    ["Click-through rate","Total clicks divided by total views, shown as a percentage."],
+                    ["Total clicks","Every recorded link click, including repeat clicks from the same user."],
+                  ].map(([term,definition])=>(
+                    <div key={term} className="rounded-xl border border-slate-100 p-4">
+                      <dt className="text-xs font-black uppercase tracking-widest mb-1" style={{color:C.p1}}>{term}</dt>
+                      <dd className="text-sm font-medium leading-relaxed text-slate-500">{definition}</dd>
+                    </div>
+                  ))}
+                </dl>
+                <button onClick={clearAllAnalytics} disabled={statsLoading} className="mt-5 text-xs font-bold px-4 py-2 rounded-lg transition-all hover:opacity-80" style={{background:"rgba(239,68,68,0.08)",color:"#dc2626"}}>
+                  Clear all analytics
                 </button>
               </div>
             </div>
@@ -684,18 +798,29 @@ export default function AdminDashboard() {
             <div className={card}>
               <div className="h-[3px]" style={{background:C.grad90}}/>
               <div className="p-6">
-                <h3 className="text-sm font-black text-slate-900 mb-6">Activity Over Time</h3>
+                <div className="flex flex-col gap-1 mb-6 md:flex-row md:items-end md:justify-between">
+                  <div>
+                    <h3 className="text-base font-black text-slate-900">Activity Over Time</h3>
+                    <p className="text-xs font-medium text-slate-400">Views and clicks by day for the selected range.</p>
+                  </div>
+                  {busiestDay&&busiestDay.views+busiestDay.clicks>0&&(
+                    <p className="text-xs font-bold text-slate-400">
+                      Busiest day: {dateFromKey(busiestDay.date).toLocaleDateString('en-US',{month:'short',day:'numeric'})} · {fmtNum(busiestDay.views+busiestDay.clicks)} events
+                    </p>
+                  )}
+                </div>
                 {statsLoading?(
                   <div className="h-80 flex items-center justify-center text-slate-400 text-sm">Loading chart...</div>
                 ):(
-                  <div className="relative">
+                  <div className="overflow-x-auto pb-2">
+                    <div className="relative min-w-[620px]">
                     {/* Chart area */}
-                    <div className="h-80 flex items-end justify-between gap-3 px-4">
+                    <div className="h-80 flex items-end justify-between gap-2 px-4">
                       {dailyStats.map((stat,i)=>{
                         const maxVal=Math.max(...dailyStats.map(s=>Math.max(s.clicks,s.views)),1);
                         const clickHeight=(stat.clicks/maxVal)*100;
                         const viewHeight=(stat.views/maxVal)*100;
-                        const date=new Date(stat.date);
+                        const date=dateFromKey(stat.date);
                         const dayLabel=date.toLocaleDateString('en-US',{weekday:'short'});
                         const dateLabel=date.getDate();
                         
@@ -707,6 +832,7 @@ export default function AdminDashboard() {
                                 <p className="text-xs font-bold text-white mb-1">{dayLabel}, {dateLabel}</p>
                                 <p className="text-xs text-white/70">{stat.views} views</p>
                                 <p className="text-xs text-white/70">{stat.clicks} clicks</p>
+                                <p className="text-xs text-white/70">{fmtPercent(stat.ctr)} CTR</p>
                               </div>
                             </div>
                             
@@ -753,6 +879,7 @@ export default function AdminDashboard() {
                         <div key={i} className="w-full h-px" style={{background:"rgba(0,0,0,0.03)"}}/>
                       ))}
                     </div>
+                    </div>
                   </div>
                 )}
                 
@@ -774,7 +901,13 @@ export default function AdminDashboard() {
             <div className={card}>
               <div className="h-[3px]" style={{background:C.grad90_23}}/>
               <div className="p-6">
-                <h2 className="text-base font-black text-slate-900 mb-5">Top Performing Links</h2>
+                <div className="flex flex-col gap-1 mb-5 md:flex-row md:items-end md:justify-between">
+                  <div>
+                    <h2 className="text-base font-black text-slate-900">Top Performing Links</h2>
+                    <p className="text-xs font-medium text-slate-400">Ranked by total clicks. CTR is link clicks divided by all page views.</p>
+                  </div>
+                  <a href="/admin/links" className="text-xs font-bold transition-colors hover:text-slate-700" style={{color:C.p2}}>Manage links</a>
+                </div>
                 {statsLoading?(
                   <div className="text-center py-12 text-slate-400 text-sm">Loading analytics...</div>
                 ):(
@@ -791,7 +924,7 @@ export default function AdminDashboard() {
                         return(
                           <div key={stat.id} className="p-4 rounded-xl border border-slate-100 relative overflow-hidden">
                             <div className="absolute inset-0 rounded-xl" style={{background:`linear-gradient(90deg,${C.p1_06} ${barWidth}%,transparent ${barWidth}%)`}}/>
-                            <div className="relative flex items-center justify-between gap-3">
+                            <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                               <div className="flex items-center gap-3 flex-1 min-w-0">
                                 <div className="flex items-center justify-center w-6 h-6 rounded-full text-xs font-black" style={{background:idx===0?C.p1_15:idx===1?C.p2_10:idx===2?C.p3_10:C.p1_06,color:idx<3?C.p1:"#94a3b8"}}>#{idx+1}</div>
                                 <span className="text-xl flex-shrink-0">{stat.emoji||"🔗"}</span>
@@ -800,14 +933,22 @@ export default function AdminDashboard() {
                                   <p className="text-xs text-slate-400 truncate">{stat.url}</p>
                                 </div>
                               </div>
-                              <div className="flex items-center gap-4 flex-shrink-0">
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 flex-shrink-0">
                                 <div className="text-right">
-                                  <p className="text-xl font-black" style={{color:C.p1}}>{stat.clicks}</p>
+                                  <p className="text-xl font-black" style={{color:C.p1}}>{fmtNum(stat.clicks)}</p>
                                   <p className="text-[9px] font-bold tracking-widest uppercase text-slate-300">clicks</p>
                                 </div>
                                 <div className="text-right">
-                                  <p className="text-xl font-black" style={{color:C.p2}}>{stat.ctr.toFixed(1)}%</p>
+                                  <p className="text-xl font-black" style={{color:C.p3}}>{fmtNum(stat.uniqueClickers)}</p>
+                                  <p className="text-[9px] font-bold tracking-widest uppercase text-slate-300">clickers</p>
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-xl font-black" style={{color:C.p2}}>{fmtPercent(stat.ctr)}</p>
                                   <p className="text-[9px] font-bold tracking-widest uppercase text-slate-300">CTR</p>
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-xl font-black" style={{color:C.p1}}>{fmtPercent(stat.clickShare)}</p>
+                                  <p className="text-[9px] font-bold tracking-widest uppercase text-slate-300">share</p>
                                 </div>
                               </div>
                             </div>
