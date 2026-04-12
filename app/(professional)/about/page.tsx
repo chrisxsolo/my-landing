@@ -112,8 +112,8 @@ export default function ProfessionalAboutPage() {
               and creative sessions. The common thread is simple: strong light, clean
               composition, and images that still feel like the moment.
             </p>
-            <a
-              href="https://www.soloxsnaps.com/contact/"
+            <Link
+              href="/contact"
               style={{
                 fontFamily: "Georgia, 'Times New Roman', serif",
                 fontSize: "0.78rem",
@@ -127,7 +127,7 @@ export default function ProfessionalAboutPage() {
               }}
             >
               Work with me
-            </a>
+            </Link>
           </div>
         </div>
       </section>
@@ -292,7 +292,7 @@ export default function ProfessionalAboutPage() {
           }}>
             View investment
           </Link>
-          <a href="https://www.soloxsnaps.com/contact/" style={{
+          <Link href="/contact" style={{
             fontFamily: "Georgia, 'Times New Roman', serif",
             fontSize: "0.75rem",
             letterSpacing: "0.18em",
@@ -303,7 +303,7 @@ export default function ProfessionalAboutPage() {
             textDecoration: "none",
           }}>
             Get in touch
-          </a>
+          </Link>
         </div>
       </section>
     </main>

@@ -20,6 +20,32 @@ function toStr(y: number, m: number, d: number) {
   return `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 }
 
+async function loadAvailabilityDates() {
+  const professional = await supabase
+    .from("professional_availability")
+    .select("*")
+    .order("date", { ascending: true });
+
+  if (professional.error) {
+    console.error("Failed to load professional availability:", professional.error);
+  }
+
+  if (professional.data && professional.data.length > 0) {
+    return professional.data as AvailDate[];
+  }
+
+  const legacy = await supabase
+    .from("availability")
+    .select("*")
+    .order("date", { ascending: true });
+
+  if (legacy.error) {
+    console.error("Failed to load availability fallback:", legacy.error);
+  }
+
+  return (legacy.data ?? []) as AvailDate[];
+}
+
 const CSS = `
   .av-day {
     cursor: default;
@@ -68,8 +94,7 @@ export default function AvailabilityPage() {
   useEffect(() => {
     async function fetch() {
       try {
-        const { data } = await supabase.from("professional_availability").select("*");
-        if (data) setDates(data);
+        setDates(await loadAvailabilityDates());
       } catch (e) { console.error(e); }
       finally { setLoading(false); }
     }

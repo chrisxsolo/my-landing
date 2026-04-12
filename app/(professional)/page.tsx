@@ -79,7 +79,6 @@ export default async function ProfessionalHomePage() {
 
   const carouselImages = images.filter(img => img.hero_carousel).slice(0, 5);
   const heroImages = carouselImages.length > 0 ? carouselImages : images.slice(0, 5);
-  const previewImages = images.slice(0, 3);
   const instagramImages = images.slice(0, 8);
 
   const jsonLd = {
@@ -201,58 +200,7 @@ export default async function ProfessionalHomePage() {
         </div>
       </section>
 
-      {/* ── 4. FROM THE PORTFOLIO ── */}
-      {previewImages.length > 0 && (
-        <section style={{ padding: "0 0 120px", background: "#fff" }}>
-          <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 60px" }}>
-            <div style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 24,
-              marginBottom: 48,
-            }}>
-              <div style={{ flex: 1, height: 1, background: "rgba(0,0,0,0.08)" }} />
-              <p style={{
-                fontFamily: "Georgia, 'Times New Roman', serif",
-                fontSize: "0.75rem",
-                letterSpacing: "0.28em",
-                textTransform: "uppercase",
-                color: "#999",
-                margin: 0,
-                flexShrink: 0,
-              }}>
-                From the Portfolio
-              </p>
-              <div style={{ flex: 1, height: 1, background: "rgba(0,0,0,0.08)" }} />
-            </div>
-
-            <div className="port-grid" style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1.3fr 1fr",
-              gap: 12,
-              alignItems: "end",
-            }}>
-              {previewImages.map((image, i) => (
-                <Link
-                  key={image.id}
-                  href={`/portfolio?category=${image.category_slug}`}
-                  className="pro-img-wrap pro-card-link"
-                  style={{ overflow: "hidden", aspectRatio: i === 1 ? "2/3" : "3/4" }}
-                >
-                  <img
-                    src={image.image_url}
-                    alt={image.alt}
-                    className="pro-img"
-                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                  />
-                </Link>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* ── 5. CATEGORY CARDS ── */}
+      {/* ── 4. CATEGORY CARDS ── */}
       <section style={{ borderTop: "1px solid rgba(0,0,0,0.07)", borderBottom: "1px solid rgba(0,0,0,0.07)", marginBottom: 120 }}>
         <div className="cats-grid" style={{
           display: "grid",

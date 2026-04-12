@@ -232,7 +232,7 @@ export default async function ProfessionalBlogPostPage({ params }: Props) {
         }}>
           Want to create something like this?
         </p>
-        <a href="https://www.soloxsnaps.com/contact/" style={{
+        <Link href="/contact" style={{
           fontFamily: "Georgia, 'Times New Roman', serif",
           fontSize: "0.75rem",
           letterSpacing: "0.18em",
@@ -244,7 +244,7 @@ export default async function ProfessionalBlogPostPage({ params }: Props) {
           display: "inline-block",
         }}>
           Inquire now
-        </a>
+        </Link>
       </section>
     </main>
   );

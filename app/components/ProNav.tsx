@@ -6,12 +6,15 @@ import { useState, useEffect, useRef } from "react";
 
 const links = [
   { label: "Home",         href: "/" },
-  { label: "Grads",        href: "/portfolio?category=grads" },
-  { label: "Families",     href: "/portfolio?category=families" },
   { label: "About",        href: "/about" },
   { label: "Availability", href: "/availability" },
   { label: "Contact",      href: "/contact" },
   { label: "Blog",         href: "/blog" },
+];
+
+const portfolioLinks = [
+  { label: "Grads",    href: "/portfolio?category=grads" },
+  { label: "Families", href: "/portfolio?category=families" },
 ];
 
 const pricingLinks = [
@@ -27,7 +30,9 @@ function isActive(pathname: string, href: string) {
 export default function ProNav() {
   const pathname = usePathname();
   const [atTop, setAtTop] = useState(true);
+  const [portfolioOpen, setPortfolioOpen] = useState(false);
   const [pricingOpen, setPricingOpen] = useState(false);
+  const portfolioRef = useRef<HTMLDivElement>(null);
   const pricingRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -38,6 +43,9 @@ export default function ProNav() {
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
+      if (portfolioRef.current && !portfolioRef.current.contains(e.target as Node)) {
+        setPortfolioOpen(false);
+      }
       if (pricingRef.current && !pricingRef.current.contains(e.target as Node)) {
         setPricingOpen(false);
       }
@@ -46,12 +54,13 @@ export default function ProNav() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
-  // Close dropdown on route change
-  useEffect(() => { setPricingOpen(false); }, [pathname]);
+  // Close dropdowns on route change
+  useEffect(() => { setPortfolioOpen(false); setPricingOpen(false); }, [pathname]);
 
   const isHeroPage = pathname === "/";
   const overlaid = isHeroPage && atTop;
   const linkColor = (active: boolean) => overlaid ? "rgba(255,255,255,0.85)" : (active ? "#111" : "#666");
+  const isPortfolioActive = portfolioLinks.some(l => isActive(pathname, l.href));
   const isPricingActive = pricingLinks.some(l => isActive(pathname, l.href));
 
   return (
@@ -111,7 +120,46 @@ export default function ProNav() {
         borderBottom: overlaid ? "none" : "1px solid rgba(0,0,0,0.06)",
         transition: "background 0.4s ease, border-color 0.4s ease",
       }}>
-        {links.map((link) => {
+        {links.slice(0, 1).map((link) => {
+          const active = isActive(pathname, link.href);
+          return (
+            <Link key={link.href} href={link.href} className="pro-nav-link" style={{ color: linkColor(active) }}>
+              {link.label}
+            </Link>
+          );
+        })}
+
+        {/* Portfolio dropdown */}
+        <div ref={portfolioRef} style={{ position: "relative" }}>
+          <button
+            className="pro-nav-link"
+            onClick={() => setPortfolioOpen(o => !o)}
+            style={{
+              color: linkColor(isPortfolioActive),
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              padding: 0,
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+            }}
+          >
+            Portfolio
+            <span style={{ fontSize: 7, opacity: 0.6, marginTop: 1 }}>{portfolioOpen ? "▲" : "▼"}</span>
+          </button>
+          {portfolioOpen && (
+            <div className="pro-pricing-dropdown">
+              {portfolioLinks.map(l => (
+                <Link key={l.href} href={l.href} style={{ color: isActive(pathname, l.href) ? "#111" : "#666" }}>
+                  {l.label}
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {links.slice(1).map((link) => {
           const active = isActive(pathname, link.href);
           return (
             <Link key={link.href} href={link.href} className="pro-nav-link" style={{ color: linkColor(active) }}>

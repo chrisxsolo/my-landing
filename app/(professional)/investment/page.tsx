@@ -212,7 +212,7 @@ export default function InvestmentPage() {
             I&rsquo;ll reply with availability, package fit, and a clear next step.
           </p>
         </div>
-        <a href="https://www.soloxsnaps.com/contact/" style={{
+        <Link href="/contact" style={{
           fontFamily: "Georgia, 'Times New Roman', serif",
           fontSize: "0.75rem",
           letterSpacing: "0.18em",
@@ -224,7 +224,7 @@ export default function InvestmentPage() {
           whiteSpace: "nowrap",
         }}>
           Start an inquiry
-        </a>
+        </Link>
       </section>
     </main>
   );

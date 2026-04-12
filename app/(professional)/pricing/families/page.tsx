@@ -1,96 +1,47 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { getPortfolioData } from "@/lib/professionalData";
 
 export const metadata: Metadata = {
   title: "Family Pricing | soloxsnaps",
-  description: "Family photography pricing and packages by Chris Solorzano — Bay Area family portraits.",
+  description: "Family photography pricing by Chris Solorzano — Bay Area family portraits.",
   alternates: { canonical: "/pricing/families" },
 };
 
 const CSS = `
-  .pkg-card { transition: transform 0.2s ease, box-shadow 0.2s ease; }
-  .pkg-card:hover { transform: translateY(-2px); box-shadow: 0 8px 40px rgba(0,0,0,0.07); }
   @media (max-width: 760px) {
-    .pkg-grid { grid-template-columns: 1fr !important; }
+    .split-layout { flex-direction: column !important; }
+    .split-img { flex: unset !important; height: 300px !important; width: 100% !important; }
+    .pricing-section { padding-left: 24px !important; padding-right: 24px !important; }
   }
 `;
 
-type Package = {
-  name: string;
-  price: string;
-  duration: string;
-  includes: string[];
-  note?: string;
-  popular?: boolean;
-};
-
-const packages: Package[] = [
-  {
-    name: "Mini",
-    price: "$225",
-    duration: "30 min",
-    includes: [
-      "30-minute session",
-      "1 outdoor location",
-      "20+ edited digital images",
-      "Private online gallery",
-      "Download rights",
-      "Up to 4 people",
-    ],
-  },
-  {
-    name: "Standard",
-    price: "$350",
-    duration: "60 min",
-    includes: [
-      "60-minute session",
-      "1–2 outdoor locations",
-      "40+ edited digital images",
-      "Private online gallery",
-      "Download rights",
-      "Up to 6 people",
-      "1 outfit change",
-    ],
-    popular: true,
-  },
-  {
-    name: "Extended",
-    price: "$475",
-    duration: "90 min",
-    includes: [
-      "90-minute session",
-      "2–3 outdoor locations",
-      "60+ edited digital images",
-      "Private online gallery",
-      "Download rights",
-      "Up to 8 people",
-      "2 outfit changes",
-      "Priority booking window",
-    ],
-  },
-];
-
 const addOns = [
-  { label: "Additional family members (per person, 5+)", price: "$30" },
-  { label: "Rush delivery (48 hrs)", price: "$50" },
-  { label: "Extra location", price: "$40" },
-  { label: "Print package (5×7, 8×10, 11×14)", price: "$75" },
-  { label: "Holiday card design (digital)", price: "$35" },
+  { label: "Additional nearby location", price: "$25" },
+  { label: "72-hour expedited delivery", price: "$75" },
+  { label: "Extended family members (beyond immediate family)", price: "$50–$75" },
+  { label: "Additional time (if needed mid-session)", price: "$100 / 30 min" },
 ];
 
-export default function FamilyPricingPage() {
+export default async function FamilyPricingPage() {
+  const { images } = await getPortfolioData();
+  const familyImages = images.filter((img) => img.category_slug === "families");
+  const bannerImage = familyImages[0]?.image_url ?? null;
+  const sessionImage = familyImages[1]?.image_url ?? familyImages[0]?.image_url ?? null;
+  const extendedImage = familyImages[2]?.image_url ?? familyImages[0]?.image_url ?? null;
+
   return (
     <main style={{ background: "#fff", color: "#1a1a1a", paddingTop: 80 }}>
       <style>{CSS}</style>
 
       {/* ── HEADER ── */}
-      <section style={{ padding: "80px 60px 64px", textAlign: "center" }}>
+      <section style={{ padding: "64px 60px 32px", textAlign: "center" }}>
         <p style={{
           fontFamily: "Georgia, 'Times New Roman', serif",
           fontSize: "0.7rem", letterSpacing: "0.28em",
           textTransform: "uppercase", color: "#bbb", marginBottom: 20,
         }}>
-          Pricing
+          Investment
         </p>
         <h1 style={{
           fontFamily: "Georgia, 'Times New Roman', serif",
@@ -105,7 +56,8 @@ export default function FamilyPricingPage() {
           fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
           fontSize: "1rem", color: "#aaa", maxWidth: 480, margin: "0 auto", lineHeight: 1.7,
         }}>
-          Warm, candid family sessions across the Bay Area. All packages include full-resolution digital downloads.
+          Warm, candid family sessions across the Bay Area.
+          Ideal for families who want updated photos without a long session or overstimulation.
         </p>
 
         {/* Nav toggle */}
@@ -130,157 +82,313 @@ export default function FamilyPricingPage() {
         </div>
       </section>
 
-      {/* ── PACKAGES ── */}
-      <section style={{ padding: "0 60px 80px", maxWidth: 1100, margin: "0 auto" }}>
-        <div className="pkg-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 24, alignItems: "stretch" }}>
-          {packages.map((pkg) => (
-            <div
-              key={pkg.name}
-              className="pkg-card"
-              style={{
-                border: pkg.popular ? "1.5px solid #1a1a1a" : "1px solid rgba(0,0,0,0.08)",
-                padding: "40px 36px",
-                background: pkg.popular ? "#1a1a1a" : "#fff",
-                display: "flex", flexDirection: "column",
-              }}
-            >
-              {pkg.popular && (
-                <p style={{
-                  fontFamily: "Georgia, 'Times New Roman', serif",
-                  fontSize: "0.6rem", letterSpacing: "0.26em",
-                  textTransform: "uppercase", color: "rgba(255,255,255,0.55)",
-                  marginBottom: 20,
-                }}>
-                  Most popular
-                </p>
-              )}
+      {/* ── BANNER IMAGE ── */}
+      {bannerImage && (
+        <div style={{ width: "100%", height: 300, overflow: "hidden", marginTop: 24 }}>
+          <img
+            src={bannerImage}
+            alt="Family portrait"
+            style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 40%", display: "block" }}
+          />
+        </div>
+      )}
+
+      {/* ── IMPORTANT INFO ── */}
+      <section className="pricing-section" style={{ padding: "72px 60px 64px", maxWidth: 960, margin: "0 auto" }}>
+        <p style={{
+          fontFamily: "Georgia, 'Times New Roman', serif",
+          fontSize: "0.65rem", letterSpacing: "0.28em",
+          textTransform: "uppercase", color: "#bbb", marginBottom: 40, textAlign: "center",
+        }}>
+          Important info
+        </p>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 40 }}>
+          {[
+            {
+              heading: "Booking & Payment",
+              items: [
+                "A 50% deposit is required for each photo shoot to book",
+                "The remaining balance is paid after the photoshoot",
+                "A contract must be signed prior to the photo session",
+              ],
+            },
+            {
+              heading: "Session Details",
+              items: [
+                "All rates are hourly",
+                "Some locations will have travel fees",
+              ],
+            },
+            {
+              heading: "Travel",
+              items: [
+                "Locations greater than a 20-mile radius of San Francisco will include a travel fee ranging from $20–$50",
+              ],
+            },
+          ].map(({ heading, items }) => (
+            <div key={heading}>
               <p style={{
                 fontFamily: "Georgia, 'Times New Roman', serif",
-                fontSize: "0.65rem", letterSpacing: "0.24em",
-                textTransform: "uppercase",
-                color: pkg.popular ? "rgba(255,255,255,0.55)" : "#bbb",
-                marginBottom: 8,
+                fontSize: "0.58rem", letterSpacing: "0.24em",
+                textTransform: "uppercase", color: "#bbb", marginBottom: 14,
               }}>
-                {pkg.duration}
+                {heading}
               </p>
+              {items.map((item) => (
+                <p key={item} style={{
+                  fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
+                  fontSize: "0.88rem", color: "#777", lineHeight: 1.8,
+                  marginBottom: 8, paddingLeft: 16, position: "relative",
+                }}>
+                  <span style={{ position: "absolute", left: 0, fontStyle: "normal", color: "#ccc" }}>—</span>
+                  {item}
+                </p>
+              ))}
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── FAMILY SESSION ── */}
+      <section className="pricing-section" style={{ padding: "0 60px 80px", maxWidth: 1100, margin: "0 auto" }}>
+        <div style={{ borderTop: "1px solid rgba(0,0,0,0.07)", paddingTop: 72 }}>
+          <div className="split-layout" style={{ display: "flex", gap: 64, alignItems: "flex-start" }}>
+
+            {/* Text */}
+            <div style={{ flex: "1 1 0", minWidth: 0 }}>
               <h2 style={{
                 fontFamily: "Georgia, 'Times New Roman', serif",
-                fontSize: "1.5rem", fontWeight: 400,
-                letterSpacing: "0.08em",
-                color: pkg.popular ? "#fff" : "#111",
-                margin: "0 0 4px",
+                fontSize: "clamp(1.6rem, 3vw, 2.6rem)", fontWeight: 300,
+                letterSpacing: "0.05em", color: "#111",
+                margin: "0 0 20px", lineHeight: 1.15,
               }}>
-                {pkg.name}
+                Family Session
               </h2>
               <p style={{
-                fontFamily: "Georgia, 'Times New Roman', serif",
-                fontSize: "2.4rem", fontWeight: 300,
-                color: pkg.popular ? "#fff" : "#111",
-                margin: "12px 0 28px", letterSpacing: "0.04em",
+                fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
+                fontSize: "0.92rem", color: "#888", lineHeight: 1.85, marginBottom: 32,
               }}>
-                {pkg.price}
+                Ideal for families who want updated photos without a long session or overstimulation.
               </p>
-              <div style={{ width: 24, height: 1, background: pkg.popular ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.1)", marginBottom: 28 }} />
-              <ul style={{ listStyle: "none", padding: 0, margin: "0 0 32px", flex: 1 }}>
-                {pkg.includes.map((item) => (
+
+              <ul style={{ listStyle: "none", padding: 0, margin: "0 0 40px" }}>
+                {[
+                  "Up to 30 minutes",
+                  "One location",
+                  "Guided, relaxed session",
+                  "Minimum 10 professionally edited images",
+                  "Private online gallery",
+                  "Standard turnaround",
+                ].map((item) => (
                   <li key={item} style={{
                     fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
-                    fontSize: "0.9rem", color: pkg.popular ? "rgba(255,255,255,0.8)" : "#666",
-                    lineHeight: 1.7, marginBottom: 8,
-                    paddingLeft: 16, position: "relative",
+                    fontSize: "0.9rem", color: "#666", lineHeight: 1.7,
+                    marginBottom: 10, paddingLeft: 18, position: "relative",
                   }}>
-                    <span style={{
-                      position: "absolute", left: 0,
-                      color: pkg.popular ? "rgba(255,255,255,0.4)" : "#bbb",
-                      fontStyle: "normal",
-                    }}>—</span>
+                    <span style={{ position: "absolute", left: 0, fontStyle: "normal", color: "#bbb" }}>—</span>
                     {item}
                   </li>
                 ))}
               </ul>
-              {pkg.note && (
-                <p style={{
-                  fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
-                  fontSize: "0.78rem", color: pkg.popular ? "rgba(255,255,255,0.45)" : "#ccc",
-                  marginBottom: 24,
-                }}>
-                  {pkg.note}
-                </p>
-              )}
-              <Link href="/contact" style={{
-                fontFamily: "Georgia, 'Times New Roman', serif",
-                fontSize: "0.72rem", letterSpacing: "0.18em",
-                textTransform: "uppercase",
-                color: pkg.popular ? "#1a1a1a" : "#fff",
-                background: pkg.popular ? "#fff" : "#1a1a1a",
-                padding: "13px 0",
-                textDecoration: "none", display: "block", textAlign: "center",
-              }}>
-                Book this package →
-              </Link>
-            </div>
-          ))}
-        </div>
-      </section>
 
-      {/* ── ADD-ONS ── */}
-      <section style={{ padding: "0 60px 80px", maxWidth: 1100, margin: "0 auto" }}>
-        <div style={{ borderTop: "1px solid rgba(0,0,0,0.07)", paddingTop: 60 }}>
-          <p style={{
-            fontFamily: "Georgia, 'Times New Roman', serif",
-            fontSize: "0.7rem", letterSpacing: "0.28em",
-            textTransform: "uppercase", color: "#bbb", marginBottom: 36, textAlign: "center",
-          }}>
-            Add-ons
-          </p>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 1, border: "1px solid rgba(0,0,0,0.07)" }}>
-            {addOns.map((item) => (
-              <div key={item.label} style={{ padding: "24px 28px", borderRight: "1px solid rgba(0,0,0,0.07)" }}>
-                <p style={{
-                  fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
-                  fontSize: "0.9rem", color: "#555", marginBottom: 8, lineHeight: 1.5,
+              {/* Add-ons */}
+              <p style={{
+                fontFamily: "Georgia, 'Times New Roman', serif",
+                fontSize: "0.58rem", letterSpacing: "0.24em",
+                textTransform: "uppercase", color: "#bbb", marginBottom: 16,
+              }}>
+                Add-ons
+              </p>
+              {addOns.map((item) => (
+                <div key={item.label} style={{
+                  display: "flex", justifyContent: "space-between",
+                  borderBottom: "1px solid rgba(0,0,0,0.05)", padding: "10px 0", maxWidth: 440,
                 }}>
-                  {item.label}
+                  <p style={{
+                    fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
+                    fontSize: "0.85rem", color: "#777",
+                  }}>
+                    {item.label}
+                  </p>
+                  <p style={{
+                    fontFamily: "Georgia, 'Times New Roman', serif",
+                    fontSize: "0.85rem", color: "#333",
+                    whiteSpace: "nowrap", marginLeft: 20,
+                  }}>
+                    {item.price}
+                  </p>
+                </div>
+              ))}
+
+              {/* Price */}
+              <div style={{ marginTop: 44, paddingTop: 36, borderTop: "1px solid rgba(0,0,0,0.07)" }}>
+                <p style={{
+                  fontFamily: "Georgia, 'Times New Roman', serif",
+                  fontSize: "0.58rem", letterSpacing: "0.24em",
+                  textTransform: "uppercase", color: "#bbb", marginBottom: 6,
+                }}>
+                  Investment
                 </p>
                 <p style={{
                   fontFamily: "Georgia, 'Times New Roman', serif",
-                  fontSize: "1.1rem", fontWeight: 300, color: "#111",
+                  fontSize: "0.78rem", fontStyle: "italic", color: "#aaa", marginBottom: 8,
                 }}>
-                  {item.price}
+                  Starting from
+                </p>
+                <p style={{
+                  fontFamily: "Georgia, 'Times New Roman', serif",
+                  fontSize: "3rem", fontWeight: 300, color: "#111",
+                  margin: "0", letterSpacing: "0.02em",
+                }}>
+                  $350
                 </p>
               </div>
-            ))}
+
+              <Link href="/contact" style={{
+                display: "inline-block", marginTop: 32,
+                fontFamily: "Georgia, 'Times New Roman', serif",
+                fontSize: "0.72rem", letterSpacing: "0.18em",
+                textTransform: "uppercase", color: "#fff",
+                background: "#1a1a1a", padding: "13px 32px",
+                textDecoration: "none",
+              }}>
+                Book this session →
+              </Link>
+            </div>
+
+            {/* Image */}
+            {sessionImage && (
+              <div className="split-img" style={{ flex: "0 0 400px", height: 540, overflow: "hidden" }}>
+                <img
+                  src={sessionImage}
+                  alt="Family portrait"
+                  style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center", display: "block" }}
+                />
+              </div>
+            )}
           </div>
         </div>
       </section>
 
-      {/* ── FAQ ── */}
-      <section style={{ padding: "0 60px 80px", maxWidth: 800, margin: "0 auto" }}>
-        <div style={{ borderTop: "1px solid rgba(0,0,0,0.07)", paddingTop: 60 }}>
-          <p style={{
-            fontFamily: "Georgia, 'Times New Roman', serif",
-            fontSize: "0.7rem", letterSpacing: "0.28em",
-            textTransform: "uppercase", color: "#bbb", marginBottom: 36, textAlign: "center",
-          }}>
-            Good to know
-          </p>
-          {[
-            ["Where do we shoot?", "Anywhere in the Bay Area — parks, beaches, urban settings, or a meaningful spot to your family. I'm happy to suggest locations."],
-            ["When is the best time for photos?", "Golden hour (1 hour before sunset) is ideal for the warmest, softest light. I can accommodate morning sessions too."],
-            ["How many people can we include?", "The Standard and Extended packages include up to 6 and 8 people respectively. Additional members are available as an add-on."],
-            ["How do I receive my photos?", "Via a private online gallery with full-resolution downloads, delivered within the promised window."],
-          ].map(([q, a]) => (
-            <div key={q} style={{ marginBottom: 36, paddingBottom: 36, borderBottom: "1px solid rgba(0,0,0,0.06)" }}>
-              <p style={{
+      {/* ── EXTENDED FAMILY SESSION ── */}
+      <section className="pricing-section" style={{ padding: "0 60px 80px", maxWidth: 1100, margin: "0 auto" }}>
+        <div style={{ borderTop: "1px solid rgba(0,0,0,0.07)", paddingTop: 72 }}>
+          <div className="split-layout" style={{ display: "flex", gap: 64, alignItems: "flex-start" }}>
+
+            {/* Image first */}
+            {extendedImage && (
+              <div className="split-img" style={{ flex: "0 0 400px", height: 540, overflow: "hidden" }}>
+                <img
+                  src={extendedImage}
+                  alt="Extended family portrait"
+                  style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center", display: "block" }}
+                />
+              </div>
+            )}
+
+            {/* Text */}
+            <div style={{ flex: "1 1 0", minWidth: 0 }}>
+              <h2 style={{
                 fontFamily: "Georgia, 'Times New Roman', serif",
-                fontSize: "1rem", fontWeight: 400, color: "#111", marginBottom: 10,
-              }}>{q}</p>
+                fontSize: "clamp(1.6rem, 3vw, 2.6rem)", fontWeight: 300,
+                letterSpacing: "0.05em", color: "#111",
+                margin: "0 0 20px", lineHeight: 1.15,
+              }}>
+                Extended Family Session
+              </h2>
               <p style={{
                 fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
-                fontSize: "0.95rem", color: "#888", lineHeight: 1.75,
-              }}>{a}</p>
+                fontSize: "0.92rem", color: "#888", lineHeight: 1.85, marginBottom: 32,
+              }}>
+                Best for larger families, younger kids, or anyone who wants more variety and flexibility.
+              </p>
+
+              <ul style={{ listStyle: "none", padding: 0, margin: "0 0 40px" }}>
+                {[
+                  "Up to 60 minutes",
+                  "One location",
+                  "More time for kids to warm up",
+                  "Greater variety of groupings and moments",
+                  "Minimum 30 professionally edited images",
+                  "Private online gallery",
+                  "Standard turnaround",
+                ].map((item) => (
+                  <li key={item} style={{
+                    fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
+                    fontSize: "0.9rem", color: "#666", lineHeight: 1.7,
+                    marginBottom: 10, paddingLeft: 18, position: "relative",
+                  }}>
+                    <span style={{ position: "absolute", left: 0, fontStyle: "normal", color: "#bbb" }}>—</span>
+                    {item}
+                  </li>
+                ))}
+              </ul>
+
+              {/* Add-ons */}
+              <p style={{
+                fontFamily: "Georgia, 'Times New Roman', serif",
+                fontSize: "0.58rem", letterSpacing: "0.24em",
+                textTransform: "uppercase", color: "#bbb", marginBottom: 16,
+              }}>
+                Add-ons
+              </p>
+              {addOns.map((item) => (
+                <div key={item.label} style={{
+                  display: "flex", justifyContent: "space-between",
+                  borderBottom: "1px solid rgba(0,0,0,0.05)", padding: "10px 0", maxWidth: 440,
+                }}>
+                  <p style={{
+                    fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
+                    fontSize: "0.85rem", color: "#777",
+                  }}>
+                    {item.label}
+                  </p>
+                  <p style={{
+                    fontFamily: "Georgia, 'Times New Roman', serif",
+                    fontSize: "0.85rem", color: "#333",
+                    whiteSpace: "nowrap", marginLeft: 20,
+                  }}>
+                    {item.price}
+                  </p>
+                </div>
+              ))}
+
+              {/* Price */}
+              <div style={{ marginTop: 44, paddingTop: 36, borderTop: "1px solid rgba(0,0,0,0.07)" }}>
+                <p style={{
+                  fontFamily: "Georgia, 'Times New Roman', serif",
+                  fontSize: "0.58rem", letterSpacing: "0.24em",
+                  textTransform: "uppercase", color: "#bbb", marginBottom: 6,
+                }}>
+                  Investment
+                </p>
+                <p style={{
+                  fontFamily: "Georgia, 'Times New Roman', serif",
+                  fontSize: "0.78rem", fontStyle: "italic", color: "#aaa", marginBottom: 8,
+                }}>
+                  Starting from
+                </p>
+                <p style={{
+                  fontFamily: "Georgia, 'Times New Roman', serif",
+                  fontSize: "3rem", fontWeight: 300, color: "#111",
+                  margin: "0", letterSpacing: "0.02em",
+                }}>
+                  $500
+                </p>
+              </div>
+
+              <Link href="/contact" style={{
+                display: "inline-block", marginTop: 32,
+                fontFamily: "Georgia, 'Times New Roman', serif",
+                fontSize: "0.72rem", letterSpacing: "0.18em",
+                textTransform: "uppercase", color: "#fff",
+                background: "#1a1a1a", padding: "13px 32px",
+                textDecoration: "none",
+              }}>
+                Book this session →
+              </Link>
             </div>
-          ))}
+          </div>
         </div>
       </section>
 

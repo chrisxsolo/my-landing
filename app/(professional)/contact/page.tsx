@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 const sessionTypes = [
   "Graduation Portrait",
   "Family Session",
+  "Couples Session",
   "Individual Portrait",
   "Event Coverage",
   "Other",
@@ -90,10 +92,11 @@ const CSS = `
 `;
 
 export default function ContactPage() {
+  const router = useRouter();
   const [form, setForm] = useState({
     name: "", email: "", phone: "", sessionType: "", date: "", message: "",
   });
-  const [status, setStatus] = useState<"idle" | "sending" | "success" | "error">("idle");
+  const [status, setStatus] = useState<"idle" | "sending" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) {
@@ -112,8 +115,8 @@ export default function ContactPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to send.");
-      setStatus("success");
-      setForm({ name: "", email: "", phone: "", sessionType: "", date: "", message: "" });
+      sessionStorage.setItem("inquiry_submitted", JSON.stringify(form));
+      router.push("/contact/thanks");
     } catch (err: unknown) {
       setStatus("error");
       setErrorMsg(err instanceof Error ? err.message : "Something went wrong.");
@@ -173,57 +176,7 @@ export default function ContactPage() {
 
           {/* ── FORM ── */}
           <div>
-            {status === "success" ? (
-              <div style={{
-                padding: "60px 40px",
-                textAlign: "center",
-                border: "1px solid rgba(0,0,0,0.07)",
-              }}>
-                <p style={{
-                  fontFamily: "Georgia, 'Times New Roman', serif",
-                  fontSize: "0.7rem",
-                  letterSpacing: "0.24em",
-                  textTransform: "uppercase",
-                  color: "#bbb",
-                  marginBottom: 16,
-                }}>
-                  Message sent
-                </p>
-                <h2 style={{
-                  fontFamily: "Georgia, 'Times New Roman', serif",
-                  fontSize: "2rem",
-                  fontWeight: 300,
-                  color: "#111",
-                  margin: "0 0 16px",
-                }}>
-                  Thank you.
-                </h2>
-                <p style={{
-                  fontFamily: "Georgia, 'Times New Roman', serif",
-                  fontStyle: "italic",
-                  fontSize: "1rem",
-                  color: "#aaa",
-                  lineHeight: 1.7,
-                  marginBottom: 32,
-                }}>
-                  I&rsquo;ll be in touch within 24–48 hours. Check your availability on the calendar in the meantime.
-                </p>
-                <Link href="/availability" style={{
-                  fontFamily: "Georgia, 'Times New Roman', serif",
-                  fontSize: "0.72rem",
-                  letterSpacing: "0.18em",
-                  textTransform: "uppercase",
-                  color: "#fff",
-                  background: "#1a1a1a",
-                  padding: "12px 28px",
-                  textDecoration: "none",
-                  display: "inline-block",
-                }}>
-                  View availability →
-                </Link>
-              </div>
-            ) : (
-              <form onSubmit={handleSubmit} noValidate>
+            <form onSubmit={handleSubmit} noValidate>
                 {/* Row 1: Name + Email */}
                 <div className="form-row" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "32px", marginBottom: 36 }}>
                   <div>
@@ -314,7 +267,6 @@ export default function ContactPage() {
                   {status === "sending" ? "Sending…" : "Send inquiry"}
                 </button>
               </form>
-            )}
           </div>
 
           {/* ── SIDEBAR INFO ── */}

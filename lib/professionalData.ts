@@ -54,6 +54,7 @@ const VISIBLE_PORTFOLIO_SLUGS = ["grads", "families"];
 const CATEGORY_SLUG_ALIASES: Record<string, string> = {
   graduation: "grads",
   portraits: "families",
+  family: "families",
 };
 
 export const FALLBACK_CATEGORIES: PortfolioCategory[] = [

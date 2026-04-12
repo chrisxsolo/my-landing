@@ -1,97 +1,56 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { getPortfolioData } from "@/lib/professionalData";
 
 export const metadata: Metadata = {
   title: "Grad Pricing | soloxsnaps",
-  description: "Graduation photography pricing and packages by Chris Solorzano — Bay Area grad portraits.",
+  description: "Graduation photography pricing by Chris Solorzano — Bay Area grad portraits.",
   alternates: { canonical: "/pricing/grads" },
 };
 
 const CSS = `
-  .pkg-card { transition: transform 0.2s ease, box-shadow 0.2s ease; }
-  .pkg-card:hover { transform: translateY(-2px); box-shadow: 0 8px 40px rgba(0,0,0,0.07); }
-  .pkg-popular { position: relative; }
   @media (max-width: 760px) {
-    .pkg-grid { grid-template-columns: 1fr !important; }
+    .split-layout { flex-direction: column !important; }
+    .split-img { flex: unset !important; height: 300px !important; width: 100% !important; }
+    .pricing-section { padding-left: 24px !important; padding-right: 24px !important; }
+    .group-grid { grid-template-columns: 1fr !important; }
   }
 `;
 
-type Package = {
-  name: string;
-  price: string;
-  duration: string;
-  highlights: string[];
-  includes: string[];
-  note?: string;
-  popular?: boolean;
-};
-
-const packages: Package[] = [
-  {
-    name: "Mini",
-    price: "$175",
-    duration: "20 min",
-    highlights: ["1 location", "Online gallery"],
-    includes: [
-      "20-minute session",
-      "1 outdoor location",
-      "15+ edited digital images",
-      "Private online gallery",
-      "Download rights",
-    ],
-  },
-  {
-    name: "Classic",
-    price: "$275",
-    duration: "45 min",
-    highlights: ["1–2 locations", "Online gallery"],
-    includes: [
-      "45-minute session",
-      "1–2 outdoor locations",
-      "30+ edited digital images",
-      "Private online gallery",
-      "Download rights",
-      "1 outfit change",
-    ],
-    popular: true,
-  },
-  {
-    name: "Full",
-    price: "$375",
-    duration: "75 min",
-    highlights: ["2–3 locations", "Online gallery", "Priority booking"],
-    includes: [
-      "75-minute session",
-      "2–3 outdoor locations",
-      "50+ edited digital images",
-      "Private online gallery",
-      "Download rights",
-      "2 outfit changes",
-      "Priority booking window",
-    ],
-  },
-];
-
 const addOns = [
-  { label: "Additional family members (per person)", price: "$25" },
-  { label: "Rush delivery (48 hrs)", price: "$50" },
-  { label: "Extra location", price: "$40" },
-  { label: "Print package (5×7, 8×10, 11×14)", price: "$75" },
+  { label: "Additional outfit", price: "$75" },
+  { label: "Second nearby off-campus location", price: "$25" },
+  { label: "72-hour expedited delivery", price: "$75" },
+  { label: "Celebratory elements (champagne or confetti)", price: "On request" },
+  { label: "Extended time", price: "$50 / 30 min" },
 ];
 
-export default function GradPricingPage() {
+const groupPricing = [
+  { people: "2 People", price: "$300", unit: "per person" },
+  { people: "3 People", price: "$275", unit: "per person" },
+  { people: "4 People", price: "$250", unit: "per person" },
+  { people: "5 People", price: "$225", unit: "per person" },
+  { people: "6–8 People", price: "$200", unit: "per person" },
+];
+
+export default async function GradPricingPage() {
+  const { images } = await getPortfolioData();
+  const gradImages = images.filter((img) => img.category_slug === "grads");
+  const bannerImage = gradImages[0]?.image_url ?? null;
+  const packageImage = gradImages[1]?.image_url ?? gradImages[0]?.image_url ?? null;
+
   return (
     <main style={{ background: "#fff", color: "#1a1a1a", paddingTop: 80 }}>
       <style>{CSS}</style>
 
       {/* ── HEADER ── */}
-      <section style={{ padding: "80px 60px 64px", textAlign: "center" }}>
+      <section style={{ padding: "64px 60px 32px", textAlign: "center" }}>
         <p style={{
           fontFamily: "Georgia, 'Times New Roman', serif",
           fontSize: "0.7rem", letterSpacing: "0.28em",
           textTransform: "uppercase", color: "#bbb", marginBottom: 20,
         }}>
-          Pricing
+          Investment
         </p>
         <h1 style={{
           fontFamily: "Georgia, 'Times New Roman', serif",
@@ -99,14 +58,15 @@ export default function GradPricingPage() {
           letterSpacing: "0.06em", color: "#111",
           lineHeight: 1.1, margin: "0 auto 28px", maxWidth: 700,
         }}>
-          Grad sessions.
+          Graduation.
         </h1>
         <div style={{ width: 36, height: 1, background: "rgba(0,0,0,0.12)", margin: "0 auto 28px" }} />
         <p style={{
           fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
-          fontSize: "1rem", color: "#aaa", maxWidth: 480, margin: "0 auto", lineHeight: 1.7,
+          fontSize: "1rem", color: "#aaa", maxWidth: 500, margin: "0 auto", lineHeight: 1.7,
         }}>
-          Clean Bay Area graduation portraits with a soft editorial feel. All packages include full-resolution digital downloads.
+          Your graduation session is more than just photos — it&apos;s a curated experience designed to capture
+          this milestone with confidence, clarity, and intention.
         </p>
 
         {/* Nav toggle */}
@@ -131,157 +91,335 @@ export default function GradPricingPage() {
         </div>
       </section>
 
-      {/* ── PACKAGES ── */}
-      <section style={{ padding: "0 60px 80px", maxWidth: 1100, margin: "0 auto" }}>
-        <div className="pkg-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 24, alignItems: "stretch" }}>
-          {packages.map((pkg) => (
-            <div
-              key={pkg.name}
-              className={`pkg-card${pkg.popular ? " pkg-popular" : ""}`}
-              style={{
-                border: pkg.popular ? "1.5px solid #1a1a1a" : "1px solid rgba(0,0,0,0.08)",
-                padding: "40px 36px",
-                background: pkg.popular ? "#1a1a1a" : "#fff",
-                display: "flex", flexDirection: "column",
-              }}
-            >
-              {pkg.popular && (
-                <p style={{
-                  fontFamily: "Georgia, 'Times New Roman', serif",
-                  fontSize: "0.6rem", letterSpacing: "0.26em",
-                  textTransform: "uppercase", color: "rgba(255,255,255,0.55)",
-                  marginBottom: 20,
-                }}>
-                  Most popular
-                </p>
-              )}
+      {/* ── BANNER IMAGE ── */}
+      {bannerImage && (
+        <div style={{ width: "100%", height: 300, overflow: "hidden", marginTop: 24 }}>
+          <img
+            src={bannerImage}
+            alt="Graduation portrait"
+            style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 30%", display: "block" }}
+          />
+        </div>
+      )}
+
+      {/* ── BOOKING DETAILS ── */}
+      <section className="pricing-section" style={{ padding: "72px 60px 64px", maxWidth: 960, margin: "0 auto" }}>
+        <p style={{
+          fontFamily: "Georgia, 'Times New Roman', serif",
+          fontSize: "0.65rem", letterSpacing: "0.28em",
+          textTransform: "uppercase", color: "#bbb", marginBottom: 40, textAlign: "center",
+        }}>
+          Booking details
+        </p>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 40 }}>
+          {[
+            {
+              heading: "Booking & Payment",
+              items: [
+                "A 50% deposit is required to secure your session",
+                "The remaining balance is due on the day of the photoshoot",
+                "A signed contract is required prior to the session",
+              ],
+            },
+            {
+              heading: "Session Details",
+              items: [
+                "All rates are hourly",
+                "Session length scales based on group size",
+              ],
+            },
+            {
+              heading: "Travel",
+              items: [
+                "Locations outside a 20-mile radius of San Francisco may include a travel fee ranging from $20–$75",
+              ],
+            },
+          ].map(({ heading, items }) => (
+            <div key={heading}>
               <p style={{
                 fontFamily: "Georgia, 'Times New Roman', serif",
-                fontSize: "0.65rem", letterSpacing: "0.24em",
-                textTransform: "uppercase",
-                color: pkg.popular ? "rgba(255,255,255,0.55)" : "#bbb",
-                marginBottom: 8,
+                fontSize: "0.58rem", letterSpacing: "0.24em",
+                textTransform: "uppercase", color: "#bbb", marginBottom: 14,
               }}>
-                {pkg.duration}
+                {heading}
+              </p>
+              {items.map((item) => (
+                <p key={item} style={{
+                  fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
+                  fontSize: "0.88rem", color: "#777", lineHeight: 1.8,
+                  marginBottom: 8, paddingLeft: 16, position: "relative",
+                }}>
+                  <span style={{ position: "absolute", left: 0, fontStyle: "normal", color: "#ccc" }}>—</span>
+                  {item}
+                </p>
+              ))}
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── STANDARD PACKAGE ── */}
+      <section className="pricing-section" style={{ padding: "0 60px 80px", maxWidth: 1100, margin: "0 auto" }}>
+        <div style={{ borderTop: "1px solid rgba(0,0,0,0.07)", paddingTop: 72 }}>
+          <div className="split-layout" style={{ display: "flex", gap: 64, alignItems: "flex-start" }}>
+
+            {/* Text */}
+            <div style={{ flex: "1 1 0", minWidth: 0 }}>
+              <p style={{
+                fontFamily: "Georgia, 'Times New Roman', serif",
+                fontSize: "0.65rem", letterSpacing: "0.28em",
+                textTransform: "uppercase", color: "#bbb", marginBottom: 16,
+              }}>
+                Standard
               </p>
               <h2 style={{
                 fontFamily: "Georgia, 'Times New Roman', serif",
-                fontSize: "1.5rem", fontWeight: 400,
-                letterSpacing: "0.08em",
-                color: pkg.popular ? "#fff" : "#111",
-                margin: "0 0 4px",
+                fontSize: "clamp(1.6rem, 3vw, 2.6rem)", fontWeight: 300,
+                letterSpacing: "0.05em", color: "#111",
+                margin: "0 0 24px", lineHeight: 1.15,
               }}>
-                {pkg.name}
+                Graduation Package
               </h2>
               <p style={{
-                fontFamily: "Georgia, 'Times New Roman', serif",
-                fontSize: "2.4rem", fontWeight: 300,
-                color: pkg.popular ? "#fff" : "#111",
-                margin: "12px 0 28px", letterSpacing: "0.04em",
+                fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
+                fontSize: "0.92rem", color: "#888", lineHeight: 1.85, marginBottom: 32,
               }}>
-                {pkg.price}
+                Ideal for graduates who want a cohesive, elevated gallery without feeling rushed or over-posed.
               </p>
-              <div style={{ width: 24, height: 1, background: pkg.popular ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.1)", marginBottom: 28 }} />
-              <ul style={{ listStyle: "none", padding: 0, margin: "0 0 32px", flex: 1 }}>
-                {pkg.includes.map((item) => (
+
+              <ul style={{ listStyle: "none", padding: 0, margin: "0 0 40px" }}>
+                {[
+                  "Approximately 1 hour on campus",
+                  "Professionally guided session with posing and direction throughout",
+                  "One curated outfit look",
+                  "Multiple on-campus location selection",
+                  "Private online gallery",
+                  "50+ professionally edited images",
+                  "Standard two-week turnaround",
+                ].map((item) => (
                   <li key={item} style={{
                     fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
-                    fontSize: "0.9rem", color: pkg.popular ? "rgba(255,255,255,0.8)" : "#666",
-                    lineHeight: 1.7, marginBottom: 8,
-                    paddingLeft: 16, position: "relative",
+                    fontSize: "0.9rem", color: "#666", lineHeight: 1.7,
+                    marginBottom: 10, paddingLeft: 18, position: "relative",
                   }}>
-                    <span style={{
-                      position: "absolute", left: 0,
-                      color: pkg.popular ? "rgba(255,255,255,0.4)" : "#bbb",
-                      fontStyle: "normal",
-                    }}>—</span>
+                    <span style={{ position: "absolute", left: 0, fontStyle: "normal", color: "#bbb" }}>—</span>
                     {item}
                   </li>
                 ))}
               </ul>
-              {pkg.note && (
-                <p style={{
-                  fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
-                  fontSize: "0.78rem", color: pkg.popular ? "rgba(255,255,255,0.45)" : "#ccc",
-                  marginBottom: 24,
-                }}>
-                  {pkg.note}
-                </p>
-              )}
-              <Link href="/contact" style={{
-                fontFamily: "Georgia, 'Times New Roman', serif",
-                fontSize: "0.72rem", letterSpacing: "0.18em",
-                textTransform: "uppercase",
-                color: pkg.popular ? "#1a1a1a" : "#fff",
-                background: pkg.popular ? "#fff" : "#1a1a1a",
-                padding: "13px 0",
-                textDecoration: "none", display: "block", textAlign: "center",
-              }}>
-                Book this package →
-              </Link>
-            </div>
-          ))}
-        </div>
-      </section>
 
-      {/* ── ADD-ONS ── */}
-      <section style={{ padding: "0 60px 80px", maxWidth: 1100, margin: "0 auto" }}>
-        <div style={{ borderTop: "1px solid rgba(0,0,0,0.07)", paddingTop: 60 }}>
-          <p style={{
-            fontFamily: "Georgia, 'Times New Roman', serif",
-            fontSize: "0.7rem", letterSpacing: "0.28em",
-            textTransform: "uppercase", color: "#bbb", marginBottom: 36, textAlign: "center",
-          }}>
-            Add-ons
-          </p>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 1, border: "1px solid rgba(0,0,0,0.07)" }}>
-            {addOns.map((item) => (
-              <div key={item.label} style={{ padding: "24px 28px", borderRight: "1px solid rgba(0,0,0,0.07)" }}>
-                <p style={{
-                  fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
-                  fontSize: "0.9rem", color: "#555", marginBottom: 8, lineHeight: 1.5,
+              {/* Add-ons */}
+              <p style={{
+                fontFamily: "Georgia, 'Times New Roman', serif",
+                fontSize: "0.58rem", letterSpacing: "0.24em",
+                textTransform: "uppercase", color: "#bbb", marginBottom: 6,
+              }}>
+                Add-ons
+              </p>
+              <p style={{
+                fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
+                fontSize: "0.78rem", color: "#bbb", marginBottom: 16,
+              }}>
+                Available upon request and subject to scheduling
+              </p>
+              {addOns.map((item) => (
+                <div key={item.label} style={{
+                  display: "flex", justifyContent: "space-between",
+                  borderBottom: "1px solid rgba(0,0,0,0.05)", padding: "10px 0", maxWidth: 440,
                 }}>
-                  {item.label}
+                  <p style={{
+                    fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
+                    fontSize: "0.85rem", color: "#777",
+                  }}>
+                    {item.label}
+                  </p>
+                  <p style={{
+                    fontFamily: "Georgia, 'Times New Roman', serif",
+                    fontSize: "0.85rem", color: "#333",
+                    whiteSpace: "nowrap", marginLeft: 20,
+                  }}>
+                    {item.price}
+                  </p>
+                </div>
+              ))}
+
+              {/* Price */}
+              <div style={{ marginTop: 44, paddingTop: 36, borderTop: "1px solid rgba(0,0,0,0.07)" }}>
+                <p style={{
+                  fontFamily: "Georgia, 'Times New Roman', serif",
+                  fontSize: "0.58rem", letterSpacing: "0.24em",
+                  textTransform: "uppercase", color: "#bbb", marginBottom: 10,
+                }}>
+                  Investment
                 </p>
                 <p style={{
                   fontFamily: "Georgia, 'Times New Roman', serif",
-                  fontSize: "1.1rem", fontWeight: 300, color: "#111",
+                  fontSize: "3rem", fontWeight: 300, color: "#111",
+                  margin: "0 0 4px", letterSpacing: "0.02em",
                 }}>
-                  {item.price}
+                  $350
+                </p>
+                <p style={{
+                  fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
+                  fontSize: "0.85rem", color: "#aaa",
+                }}>
+                  per hour
                 </p>
               </div>
-            ))}
+
+              <Link href="/contact" style={{
+                display: "inline-block", marginTop: 32,
+                fontFamily: "Georgia, 'Times New Roman', serif",
+                fontSize: "0.72rem", letterSpacing: "0.18em",
+                textTransform: "uppercase", color: "#fff",
+                background: "#1a1a1a", padding: "13px 32px",
+                textDecoration: "none",
+              }}>
+                Book this session →
+              </Link>
+            </div>
+
+            {/* Image */}
+            {packageImage && (
+              <div className="split-img" style={{ flex: "0 0 400px", height: 580, overflow: "hidden" }}>
+                <img
+                  src={packageImage}
+                  alt="Graduation portrait"
+                  style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center top", display: "block" }}
+                />
+              </div>
+            )}
           </div>
         </div>
       </section>
 
-      {/* ── FAQ ROW ── */}
-      <section style={{ padding: "0 60px 80px", maxWidth: 800, margin: "0 auto" }}>
-        <div style={{ borderTop: "1px solid rgba(0,0,0,0.07)", paddingTop: 60 }}>
+      {/* ── GROUP PACKAGE ── */}
+      <section className="pricing-section" style={{ padding: "0 60px 80px", maxWidth: 1100, margin: "0 auto" }}>
+        <div style={{ borderTop: "1px solid rgba(0,0,0,0.07)", paddingTop: 72 }}>
           <p style={{
             fontFamily: "Georgia, 'Times New Roman', serif",
-            fontSize: "0.7rem", letterSpacing: "0.28em",
-            textTransform: "uppercase", color: "#bbb", marginBottom: 36, textAlign: "center",
+            fontSize: "0.65rem", letterSpacing: "0.28em",
+            textTransform: "uppercase", color: "#bbb", marginBottom: 16,
           }}>
-            Good to know
+            Group sessions
           </p>
-          {[
-            ["When should I book?", "As early as possible — especially May through June, which books out weeks in advance. I recommend reaching out at least 3–4 weeks before your date."],
-            ["Where do we shoot?", "Anywhere in the Bay Area — SF, Berkeley, Stanford, SJSU, Peninsula, South Bay. I'm happy to suggest spots based on your look and school."],
-            ["How do I receive my photos?", "Via a private online gallery. You'll get a link to download all your full-resolution images within the delivery window."],
-            ["Can I bring friends or family?", "Yes — add-on pricing applies per additional person."],
-          ].map(([q, a]) => (
-            <div key={q} style={{ marginBottom: 36, paddingBottom: 36, borderBottom: "1px solid rgba(0,0,0,0.06)" }}>
+          <h2 style={{
+            fontFamily: "Georgia, 'Times New Roman', serif",
+            fontSize: "clamp(1.6rem, 3vw, 2.6rem)", fontWeight: 300,
+            letterSpacing: "0.05em", color: "#111",
+            margin: "0 0 24px", lineHeight: 1.15,
+          }}>
+            Group Grad Package
+          </h2>
+          <p style={{
+            fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
+            fontSize: "0.92rem", color: "#888", lineHeight: 1.85,
+            marginBottom: 10, maxWidth: 620,
+          }}>
+            Perfect for friends who want individual portraits and celebratory group photos all in one experience.
+            Each graduate receives dedicated posing, direction, and time in front of the camera.
+          </p>
+          <p style={{
+            fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
+            fontSize: "0.88rem", color: "#aaa", lineHeight: 1.75,
+            marginBottom: 52, maxWidth: 520,
+          }}>
+            Sessions are designed to feel organized, efficient, and elevated — not rushed.
+          </p>
+
+          <div className="group-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 60 }}>
+            {/* Services */}
+            <div>
               <p style={{
                 fontFamily: "Georgia, 'Times New Roman', serif",
-                fontSize: "1rem", fontWeight: 400, color: "#111", marginBottom: 10,
-              }}>{q}</p>
+                fontSize: "0.58rem", letterSpacing: "0.24em",
+                textTransform: "uppercase", color: "#bbb", marginBottom: 16,
+              }}>
+                What&apos;s included
+              </p>
+              <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+                {[
+                  "Individual portraits for each graduate",
+                  "Multiple group photo combinations",
+                  "Professionally guided posing and direction",
+                  "Strategic on-campus location planning",
+                  "Private online gallery delivery",
+                  "Professionally edited images per person",
+                ].map((item) => (
+                  <li key={item} style={{
+                    fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
+                    fontSize: "0.9rem", color: "#666", lineHeight: 1.7,
+                    marginBottom: 10, paddingLeft: 18, position: "relative",
+                  }}>
+                    <span style={{ position: "absolute", left: 0, fontStyle: "normal", color: "#bbb" }}>—</span>
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Pricing */}
+            <div>
+              <p style={{
+                fontFamily: "Georgia, 'Times New Roman', serif",
+                fontSize: "0.58rem", letterSpacing: "0.24em",
+                textTransform: "uppercase", color: "#bbb", marginBottom: 16,
+              }}>
+                Pricing
+              </p>
+              {groupPricing.map((row) => (
+                <div key={row.people} style={{
+                  display: "flex", alignItems: "baseline",
+                  justifyContent: "space-between",
+                  borderBottom: "1px solid rgba(0,0,0,0.06)", padding: "13px 0",
+                }}>
+                  <p style={{
+                    fontFamily: "Georgia, 'Times New Roman', serif",
+                    fontSize: "0.92rem", color: "#555",
+                  }}>
+                    {row.people}
+                  </p>
+                  <div style={{ textAlign: "right" }}>
+                    <span style={{
+                      fontFamily: "Georgia, 'Times New Roman', serif",
+                      fontSize: "1.15rem", fontWeight: 300, color: "#111",
+                    }}>
+                      {row.price}
+                    </span>
+                    <span style={{
+                      fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
+                      fontSize: "0.78rem", color: "#aaa", marginLeft: 6,
+                    }}>
+                      {row.unit}
+                    </span>
+                  </div>
+                </div>
+              ))}
               <p style={{
                 fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
-                fontSize: "0.95rem", color: "#888", lineHeight: 1.75,
-              }}>{a}</p>
+                fontSize: "0.82rem", color: "#aaa", lineHeight: 1.7, marginTop: 20,
+              }}>
+                Sessions with 3 or more graduates require at least 90 minutes to maintain quality and flow.
+              </p>
+              <p style={{
+                fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
+                fontSize: "0.82rem", color: "#aaa", lineHeight: 1.7, marginTop: 8,
+              }}>
+                Add-ons available upon request including additional outfits, extended time, and expedited delivery.
+              </p>
             </div>
-          ))}
+          </div>
+
+          <Link href="/contact" style={{
+            display: "inline-block", marginTop: 44,
+            fontFamily: "Georgia, 'Times New Roman', serif",
+            fontSize: "0.72rem", letterSpacing: "0.18em",
+            textTransform: "uppercase", color: "#fff",
+            background: "#1a1a1a", padding: "13px 32px",
+            textDecoration: "none",
+          }}>
+            Inquire about group session →
+          </Link>
         </div>
       </section>
 

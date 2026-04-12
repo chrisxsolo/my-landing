@@ -7,7 +7,8 @@ import BayAreaLocationsManager from "@/app/admin/BayAreaLocationsManager";
 
 export const dynamic = 'force-dynamic'
 
-type Tab = "poses"|"locations"|"bayGuide"|"portfolio"|"categories"|"blog"|"analytics";
+type Tab = "poses"|"locations"|"bayGuide"|"portfolio"|"categories"|"blog"|"analytics"|"inquiries";
+type Inquiry = { id:number; name:string; email:string; phone:string|null; session_type:string|null; date_in_mind:string|null; message:string; status:string; created_at:string; };
 type BlogCategory = "journal"|"professional";
 type Pose = { id:number; title:string; image_url:string; instructions:string; order:number; };
 type Spot = { id:number; school_id:string; school_name:string; school_short:string; name:string; description:string; tip:string; icon:string; image_url:string|null; order:number; };
@@ -143,6 +144,12 @@ export default function AdminDashboard() {
   const coverFileRef=useRef<HTMLInputElement>(null);
   const extraFileRef=useRef<HTMLInputElement>(null);
 
+  // ── Inquiries ─────────────────────────────────────────────────────────
+  const [inquiries,setInquiries]=useState<Inquiry[]>([]);
+  const [inquiriesLoading,setInquiriesLoading]=useState(false);
+  const [inquiryDeleteConfirm,setInquiryDeleteConfirm]=useState<number|null>(null);
+  const [editingInquiry,setEditingInquiry]=useState<Inquiry|null>(null);
+
   const [linkStats,setLinkStats]=useState<LinkStat[]>([]);
   const [statsLoading,setStatsLoading]=useState(false);
   const [totalViews,setTotalViews]=useState(0);
@@ -153,6 +160,11 @@ export default function AdminDashboard() {
   const [timeRange,setTimeRange]=useState<7|30>(7);
 
   function showToast(msg:string,ok=true){setToast({msg,ok});setTimeout(()=>setToast(null),3000);}
+
+  async function fetchInquiries(){setInquiriesLoading(true);const{data}=await supabase.from('inquiries').select('*').order('created_at',{ascending:false});setInquiries(data??[]);setInquiriesLoading(false);}
+  async function deleteInquiry(id:number){const{error}=await supabase.from('inquiries').delete().eq('id',id);if(error){showToast("Delete failed",false);}else{setInquiries(p=>p.filter(x=>x.id!==id));setInquiryDeleteConfirm(null);showToast("Inquiry deleted");}}
+  async function updateInquiryStatus(id:number,status:string){const{error}=await supabase.from('inquiries').update({status}).eq('id',id);if(error){showToast("Update failed",false);}else{setInquiries(p=>p.map(x=>x.id===id?{...x,status}:x));showToast("Status updated");}}
+
   function isSetupMissing(error:{code?:string;message?:string}|null){const message=error?.message?.toLowerCase()??"";return error?.code==="42P01"||error?.code==="42703"||message.includes("does not exist")||message.includes("schema cache");}
 
   async function fetchSiteSettings(){
@@ -332,7 +344,7 @@ export default function AdminDashboard() {
     }
   }
   
-  useEffect(()=>{if(authed){fetchPoses();fetchSpots();fetchCategories();fetchPortfolioImages();fetchPosts();fetchSiteSettings();if(tab==="analytics")fetchLinkStats();}},[authed,tab,blogCategory]);
+  useEffect(()=>{if(authed){fetchPoses();fetchSpots();fetchCategories();fetchPortfolioImages();fetchPosts();fetchSiteSettings();if(tab==="analytics")fetchLinkStats();if(tab==="inquiries")fetchInquiries();}},[authed,tab,blogCategory]);
 
   async function compressImage(file:File, maxPx=2400, quality=0.82):Promise<Blob>{
     return new Promise(resolve=>{
@@ -548,11 +560,11 @@ export default function AdminDashboard() {
       <div className="max-w-3xl mx-auto px-6 py-8">
         {/* Tabs */}
         <div className="flex gap-2 mb-8 p-1 rounded-2xl bg-white border border-slate-100 w-fit flex-wrap">
-          {(["poses","locations","bayGuide","portfolio","categories","blog","analytics"] as Tab[]).map(t=>(
-            <button key={t} onClick={()=>{setTab(t);cancelEditPose();cancelEditSpot();cancelEditPortfolioImage();cancelEditCategory();cancelEditPost();}}
+          {(["poses","locations","bayGuide","portfolio","categories","blog","analytics","inquiries"] as Tab[]).map(t=>(
+            <button key={t} onClick={()=>{setTab(t);cancelEditPose();cancelEditSpot();cancelEditPortfolioImage();cancelEditCategory();cancelEditPost();setEditingInquiry(null);setInquiryDeleteConfirm(null);}}
               className="px-5 py-2 rounded-xl text-sm font-bold transition-all"
               style={tab===t?{background:C.grad12,color:"#fff"}:{color:"#94a3b8"}}>
-              {t==="poses"?"📸 Grad Poses":t==="locations"?"📍 Campus Spots":t==="bayGuide"?"🗺️ Bay Guide":t==="portfolio"?"🖼️ Portfolio":t==="categories"?"🏷️ Categories":t==="blog"?"✍️ Blog":"📊 Analytics"}
+              {t==="poses"?"📸 Grad Poses":t==="locations"?"📍 Campus Spots":t==="bayGuide"?"🗺️ Bay Guide":t==="portfolio"?"🖼️ Portfolio":t==="categories"?"🏷️ Categories":t==="blog"?"✍️ Blog":t==="analytics"?"📊 Analytics":"📬 Inquiries"}
             </button>
           ))}
         </div>
@@ -1463,6 +1475,93 @@ export default function AdminDashboard() {
                         );
                       })
                     )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── INQUIRIES ── */}
+        {tab==="inquiries"&&(
+          <div className="space-y-6">
+            <div className={card}>
+              <div className="h-[3px]" style={{background:C.grad90_12}}/>
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-5">
+                  <div>
+                    <h2 className="text-base font-black text-slate-900">Contact Inquiries</h2>
+                    <p className="text-xs font-medium text-slate-400">{inquiries.length} total · newest first</p>
+                  </div>
+                  <button onClick={fetchInquiries} disabled={inquiriesLoading} className="text-xs font-bold px-3 py-1.5 rounded-lg transition-all hover:opacity-80" style={{background:C.grad12,color:"#fff"}}>
+                    {inquiriesLoading?"Loading…":"Refresh"}
+                  </button>
+                </div>
+                {inquiriesLoading?(
+                  <div className="text-center py-12 text-slate-400 text-sm">Loading inquiries…</div>
+                ):inquiries.length===0?(
+                  <div className="text-center py-12 text-slate-400 text-sm">No inquiries yet.</div>
+                ):(
+                  <div className="space-y-3">
+                    {inquiries.map(inq=>(
+                      <div key={inq.id} className="rounded-xl border border-slate-100 overflow-hidden">
+                        {/* Header row */}
+                        <div className="flex items-start justify-between gap-3 p-4 bg-slate-50">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="text-sm font-black text-slate-900">{inq.name}</p>
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${inq.status==="new"?"bg-emerald-100 text-emerald-700":inq.status==="responded"?"bg-blue-100 text-blue-700":"bg-slate-200 text-slate-500"}`}>
+                                {inq.status}
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-400 mt-0.5">{new Date(inq.created_at).toLocaleString("en-US",{month:"short",day:"numeric",year:"numeric",hour:"numeric",minute:"2-digit"})}</p>
+                          </div>
+                          <div className="flex gap-2 flex-shrink-0">
+                            <select value={inq.status} onChange={e=>updateInquiryStatus(inq.id,e.target.value)}
+                              className="text-xs font-bold px-2 py-1 rounded-lg border border-slate-200 bg-white text-slate-600 outline-none">
+                              <option value="new">new</option>
+                              <option value="responded">responded</option>
+                              <option value="archived">archived</option>
+                            </select>
+                            <button onClick={()=>setEditingInquiry(editingInquiry?.id===inq.id?null:inq)}
+                              className="text-xs font-bold px-3 py-1 rounded-lg transition-all hover:opacity-80 bg-slate-200 text-slate-700">
+                              {editingInquiry?.id===inq.id?"Close":"View"}
+                            </button>
+                            {inquiryDeleteConfirm===inq.id?(
+                              <div className="flex gap-1">
+                                <button onClick={()=>deleteInquiry(inq.id)} className="text-xs font-bold px-2 py-1 rounded-lg bg-red-500 text-white">Yes</button>
+                                <button onClick={()=>setInquiryDeleteConfirm(null)} className="text-xs font-bold px-2 py-1 rounded-lg bg-slate-200 text-slate-600">No</button>
+                              </div>
+                            ):(
+                              <button onClick={()=>setInquiryDeleteConfirm(inq.id)} className="text-xs font-bold px-2 py-1 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition-all">Delete</button>
+                            )}
+                          </div>
+                        </div>
+                        {/* Detail panel */}
+                        {editingInquiry?.id===inq.id&&(
+                          <div className="p-4 border-t border-slate-100 space-y-3">
+                            {[
+                              {label:"Email",value:<a href={`mailto:${inq.email}`} className="text-blue-600 hover:underline">{inq.email}</a>},
+                              inq.phone&&{label:"Phone",value:inq.phone},
+                              inq.session_type&&{label:"Session",value:inq.session_type},
+                              inq.date_in_mind&&{label:"Date in mind",value:inq.date_in_mind},
+                            ].filter(Boolean).map((row,i)=>{
+                              const r=row as {label:string;value:React.ReactNode};
+                              return(
+                                <div key={i} className="flex gap-4">
+                                  <span className="text-[10px] font-bold uppercase tracking-widest text-slate-300 min-w-[90px] pt-0.5">{r.label}</span>
+                                  <span className="text-sm text-slate-700">{r.value}</span>
+                                </div>
+                              );
+                            })}
+                            <div className="flex gap-4 pt-1">
+                              <span className="text-[10px] font-bold uppercase tracking-widest text-slate-300 min-w-[90px] pt-0.5">Message</span>
+                              <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{inq.message}</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>

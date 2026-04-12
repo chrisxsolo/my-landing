@@ -6,7 +6,7 @@ const footerLinks = [
   { label: "Families", href: "/portfolio?category=families" },
   { label: "About",    href: "/about" },
   { label: "Blog",     href: "/blog" },
-  { label: "Contact",  href: "https://www.soloxsnaps.com/contact/" },
+  { label: "Contact",  href: "/contact" },
 ];
 
 export default function ProfessionalLayout({ children }: Readonly<{ children: React.ReactNode }>) {
