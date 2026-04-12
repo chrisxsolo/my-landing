@@ -6,12 +6,12 @@ import { usePathname } from "next/navigation";
 import { C } from "@/lib/colors";
 
 const navLinks = [
-  { label: "Home", href: "/" },
-  { label: "About Me", href: "/about" },
+  { label: "Home", href: "/home" },
+  { label: "Me", href: "/me" },
   { label: "Graduation Guide", href: "/grad-guide" },
   { label: "Locations", href: "/bay-area-locations" },
   { label: "Availability", href: "/availability" },
-  { label: "Blog", href: "/blog" },
+  { label: "Journal", href: "/journal" },
 ];
 
 function isActivePath(pathname: string, href: string) {
@@ -77,7 +77,7 @@ export default function Nav() {
       >
         <div className="mx-auto flex max-w-7xl items-center gap-4">
           <Link
-            href="/"
+            href="/home"
             className="shrink-0 text-xl font-black tracking-tight"
             style={{ color: C.p1 }}
           >

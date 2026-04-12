@@ -7,10 +7,13 @@ import BayAreaLocationsManager from "@/app/admin/BayAreaLocationsManager";
 
 export const dynamic = 'force-dynamic'
 
-type Tab = "poses"|"locations"|"bayGuide"|"blog"|"analytics";
+type Tab = "poses"|"locations"|"bayGuide"|"portfolio"|"categories"|"blog"|"analytics";
+type BlogCategory = "journal"|"professional";
 type Pose = { id:number; title:string; image_url:string; instructions:string; order:number; };
 type Spot = { id:number; school_id:string; school_name:string; school_short:string; name:string; description:string; tip:string; icon:string; image_url:string|null; order:number; };
-type BlogPost = { id:number; title:string; body:string; published_at:string; slug:string; cover_image_url:string|null; extra_image_urls:string[]; };
+type BlogPost = { id:number; title:string; body:string; published_at:string; slug:string; cover_image_url:string|null; extra_image_urls:string[]; category?:BlogCategory|string|null; };
+type PortfolioCategory = { id:number; name:string; slug:string; description:string|null; sort_order:number; active:boolean; };
+type PortfolioImage = { id:number; title:string; alt:string|null; image_url:string; category_id:number|null; category_slug:string; featured:boolean; sort_order:number; created_at:string|null; };
 type LinkClickEvent = { link_id:number|null; user_id:string|null; clicked_at:string; };
 type LinkViewEvent = { user_id:string|null; viewed_at:string; };
 type LinkStat = { id:number; label:string; emoji:string|null; url:string; clicks:number; uniqueClickers:number; ctr:number; clickShare:number; };
@@ -27,6 +30,12 @@ const SCHOOLS = [
 const ICONS = ["🏫","🏛️","🌴","📚","🌸","🚪","🌳","🗼","🌿","🌊","🏢","🌅","🌁","🏔️","⛪","🌉","🦅","🔵","🐻"];
 const EMPTY_POSE = {title:"",instructions:"",order:""};
 const EMPTY_SPOT = {school_id:"sjsu",name:"",description:"",tip:"",icon:"🏫",order:""};
+const EMPTY_CATEGORY = {name:"",slug:"",description:"",sort_order:"1",active:true};
+const EMPTY_PORTFOLIO = {title:"",alt:"",category_slug:"graduation",featured:false,sort_order:""};
+const BLOG_CATEGORIES:{value:BlogCategory;label:string;helper:string}[]=[
+  {value:"journal",label:"Journal",helper:"Fun shoot stories at /journal"},
+  {value:"professional",label:"Professional",helper:"Case studies at /blog"},
+];
 
 const numberFmt=new Intl.NumberFormat("en-US");
 function fmtNum(value:number){return numberFmt.format(value);}
@@ -88,10 +97,29 @@ export default function AdminDashboard() {
   const [spotDeleteConfirm,setSpotDeleteConfirm]=useState<number|null>(null);
   const spotFileRef=useRef<HTMLInputElement>(null);
 
+  // ── Professional portfolio ───────────────────────────────────────────
+  const [portfolioImages,setPortfolioImages]=useState<PortfolioImage[]>([]);
+  const [portfolioLoading,setPortfolioLoading]=useState(false);
+  const [portfolioForm,setPortfolioForm]=useState(EMPTY_PORTFOLIO);
+  const [portfolioFile,setPortfolioFile]=useState<File|null>(null);
+  const [portfolioPreview,setPortfolioPreview]=useState<string|null>(null);
+  const [portfolioSaving,setPortfolioSaving]=useState(false);
+  const [editingPortfolioImage,setEditingPortfolioImage]=useState<PortfolioImage|null>(null);
+  const [portfolioDeleteConfirm,setPortfolioDeleteConfirm]=useState<number|null>(null);
+  const portfolioFileRef=useRef<HTMLInputElement>(null);
+
+  const [categories,setCategories]=useState<PortfolioCategory[]>([]);
+  const [categoriesLoading,setCategoriesLoading]=useState(false);
+  const [categoryForm,setCategoryForm]=useState(EMPTY_CATEGORY);
+  const [categorySaving,setCategorySaving]=useState(false);
+  const [editingCategory,setEditingCategory]=useState<PortfolioCategory|null>(null);
+  const [categoryDeleteConfirm,setCategoryDeleteConfirm]=useState<number|null>(null);
+
   // ── Blog ──────────────────────────────────────────────────────────────
   const [posts,setPosts]=useState<BlogPost[]>([]);
   const [postsLoading,setPostsLoading]=useState(false);
-  const EMPTY_POST={title:"",body:"",slug:"",published_at:new Date().toISOString().slice(0,16)};
+  const [blogCategory,setBlogCategory]=useState<BlogCategory>("journal");
+  const EMPTY_POST={title:"",body:"",slug:"",category:"journal" as BlogCategory,published_at:new Date().toISOString().slice(0,16)};
   const [postForm,setPostForm]=useState(EMPTY_POST);
   const [coverImg,setCoverImg]=useState<File|null>(null);
   const [coverImgPreview,setCoverImgPreview]=useState<string|null>(null);
@@ -113,10 +141,36 @@ export default function AdminDashboard() {
   const [timeRange,setTimeRange]=useState<7|30>(7);
 
   function showToast(msg:string,ok=true){setToast({msg,ok});setTimeout(()=>setToast(null),3000);}
+  function isSetupMissing(error:{code?:string;message?:string}|null){const message=error?.message?.toLowerCase()??"";return error?.code==="42P01"||error?.code==="42703"||message.includes("does not exist")||message.includes("schema cache");}
 
   async function fetchPoses(){setPosesLoading(true);const{data}=await supabase.from('grad_poses').select('*').order('order',{ascending:true});if(data)setPoses(data);setPosesLoading(false);}
   async function fetchSpots(){setSpotsLoading(true);const{data}=await supabase.from('location_spots').select('*').order('school_id').order('order',{ascending:true});if(data)setSpots(data);setSpotsLoading(false);}
-  async function fetchPosts(){setPostsLoading(true);const{data}=await supabase.from('blog_posts').select('*').order('published_at',{ascending:false});if(data)setPosts(data);setPostsLoading(false);}
+  async function fetchCategories(){
+    setCategoriesLoading(true);
+    const{data,error}=await supabase.from('portfolio_categories').select('*').order('sort_order',{ascending:true});
+    if(error&&!isSetupMissing(error))console.error(error);
+    if(data)setCategories(data);
+    setCategoriesLoading(false);
+  }
+  async function fetchPortfolioImages(){
+    setPortfolioLoading(true);
+    const{data,error}=await supabase.from('portfolio_images').select('*').order('featured',{ascending:false}).order('sort_order',{ascending:true});
+    if(error&&!isSetupMissing(error))console.error(error);
+    if(data)setPortfolioImages(data);
+    setPortfolioLoading(false);
+  }
+  async function fetchPosts(){
+    setPostsLoading(true);
+    let{data,error}=await supabase.from('blog_posts').select('*').eq('category',blogCategory).order('published_at',{ascending:false});
+    if(error&&error.message?.toLowerCase().includes("category")){
+      const fallback=await supabase.from('blog_posts').select('*').order('published_at',{ascending:false});
+      data=fallback.data;
+      error=fallback.error;
+    }
+    if(error&&!isSetupMissing(error))console.error(error);
+    if(data)setPosts(data);
+    setPostsLoading(false);
+  }
   
   async function fetchLinkStats(){
     setStatsLoading(true);
@@ -207,7 +261,7 @@ export default function AdminDashboard() {
     }
   }
   
-  useEffect(()=>{if(authed){fetchPoses();fetchSpots();fetchPosts();if(tab==="analytics")fetchLinkStats();}},[authed,tab]);
+  useEffect(()=>{if(authed){fetchPoses();fetchSpots();fetchCategories();fetchPortfolioImages();fetchPosts();if(tab==="analytics")fetchLinkStats();}},[authed,tab,blogCategory]);
 
   async function uploadImage(file:File,folder:string):Promise<string|null>{
     const ext=file.name.split('.').pop();
@@ -265,10 +319,51 @@ export default function AdminDashboard() {
 
   async function deleteSpot(id:number){await supabase.from('location_spots').delete().eq('id',id);setSpots(p=>p.filter(x=>x.id!==id));setSpotDeleteConfirm(null);if(editingSpot?.id===id)cancelEditSpot();showToast("Spot deleted");}
 
+  // ── Professional portfolio handlers ──────────────────────────────────
+  function categoryName(slug:string){return categories.find(c=>c.slug===slug)?.name??slug;}
+  function startEditCategory(category:PortfolioCategory){setEditingCategory(category);setCategoryForm({name:category.name,slug:category.slug,description:category.description??"",sort_order:String(category.sort_order),active:category.active});window.scrollTo({top:0,behavior:"smooth"});}
+  function cancelEditCategory(){setEditingCategory(null);setCategoryForm(EMPTY_CATEGORY);}
+  async function saveCategory(){
+    if(!categoryForm.name||!categoryForm.slug){showToast("Category name and slug required",false);return;}
+    setCategorySaving(true);
+    const payload={name:categoryForm.name,slug:slugify(categoryForm.slug),description:categoryForm.description||null,sort_order:parseInt(categoryForm.sort_order)||categories.length+1,active:categoryForm.active};
+    if(editingCategory){
+      const{error}=await supabase.from('portfolio_categories').update(payload).eq('id',editingCategory.id);
+      if(error)showToast("Category update failed — "+error.message,false);else{showToast("Category updated!");cancelEditCategory();fetchCategories();}
+    }else{
+      const{error}=await supabase.from('portfolio_categories').insert(payload);
+      if(error)showToast("Category save failed — "+error.message,false);else{showToast("Category added!");setCategoryForm(EMPTY_CATEGORY);fetchCategories();}
+    }
+    setCategorySaving(false);
+  }
+  async function deleteCategory(id:number){await supabase.from('portfolio_categories').delete().eq('id',id);setCategories(p=>p.filter(x=>x.id!==id));setCategoryDeleteConfirm(null);if(editingCategory?.id===id)cancelEditCategory();showToast("Category deleted");}
+
+  function startEditPortfolioImage(image:PortfolioImage){setEditingPortfolioImage(image);setPortfolioForm({title:image.title,alt:image.alt??"",category_slug:image.category_slug,featured:image.featured,sort_order:String(image.sort_order)});setPortfolioFile(null);setPortfolioPreview(image.image_url);window.scrollTo({top:0,behavior:"smooth"});}
+  function cancelEditPortfolioImage(){setEditingPortfolioImage(null);setPortfolioForm(EMPTY_PORTFOLIO);setPortfolioFile(null);setPortfolioPreview(null);if(portfolioFileRef.current)portfolioFileRef.current.value="";}
+  function onPortfolioFile(e:React.ChangeEvent<HTMLInputElement>){const f=e.target.files?.[0];if(!f)return;setPortfolioFile(f);setPortfolioPreview(URL.createObjectURL(f));}
+  async function savePortfolioImage(){
+    if(!portfolioForm.title){showToast("Portfolio title required",false);return;}
+    if(!portfolioFile&&!editingPortfolioImage){showToast("Upload a portfolio image",false);return;}
+    setPortfolioSaving(true);
+    let image_url=editingPortfolioImage?.image_url??"";
+    if(portfolioFile){const url=await uploadImage(portfolioFile,"portfolio");if(!url){setPortfolioSaving(false);return;}image_url=url;}
+    const category=categories.find(c=>c.slug===portfolioForm.category_slug);
+    const payload={title:portfolioForm.title,alt:portfolioForm.alt||portfolioForm.title,image_url,category_id:category?.id??null,category_slug:portfolioForm.category_slug,featured:portfolioForm.featured,sort_order:parseInt(portfolioForm.sort_order)||editingPortfolioImage?.sort_order||portfolioImages.length+1};
+    if(editingPortfolioImage){
+      const{error}=await supabase.from('portfolio_images').update(payload).eq('id',editingPortfolioImage.id);
+      if(error)showToast("Portfolio update failed — "+error.message,false);else{showToast("Portfolio image updated!");cancelEditPortfolioImage();fetchPortfolioImages();}
+    }else{
+      const{error}=await supabase.from('portfolio_images').insert(payload);
+      if(error)showToast("Portfolio save failed — "+error.message,false);else{showToast("Portfolio image added!");cancelEditPortfolioImage();fetchPortfolioImages();}
+    }
+    setPortfolioSaving(false);
+  }
+  async function deletePortfolioImage(id:number){await supabase.from('portfolio_images').delete().eq('id',id);setPortfolioImages(p=>p.filter(x=>x.id!==id));setPortfolioDeleteConfirm(null);if(editingPortfolioImage?.id===id)cancelEditPortfolioImage();showToast("Portfolio image deleted");}
+
   // ── Blog handlers ──────────────────────────────────────────────────────
   function slugify(s:string){return s.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");}
-  function startEditPost(post:BlogPost){setEditingPost(post);setPostForm({title:post.title,body:post.body,slug:post.slug,published_at:post.published_at.slice(0,16)});setCoverImg(null);setCoverImgPreview(post.cover_image_url||null);setExtraImgs([]);setExtraPreviews(post.extra_image_urls??[]);window.scrollTo({top:0,behavior:"smooth"});}
-  function cancelEditPost(){setEditingPost(null);setPostForm(EMPTY_POST);setCoverImg(null);setCoverImgPreview(null);setExtraImgs([]);setExtraPreviews([]);if(coverFileRef.current)coverFileRef.current.value="";if(extraFileRef.current)extraFileRef.current.value="";}
+  function startEditPost(post:BlogPost){const category=post.category==="professional"?"professional":"journal";setEditingPost(post);setPostForm({title:post.title,body:post.body,slug:post.slug,category,published_at:post.published_at.slice(0,16)});setBlogCategory(category);setCoverImg(null);setCoverImgPreview(post.cover_image_url||null);setExtraImgs([]);setExtraPreviews(post.extra_image_urls??[]);window.scrollTo({top:0,behavior:"smooth"});}
+  function cancelEditPost(){setEditingPost(null);setPostForm({...EMPTY_POST,category:blogCategory});setCoverImg(null);setCoverImgPreview(null);setExtraImgs([]);setExtraPreviews([]);if(coverFileRef.current)coverFileRef.current.value="";if(extraFileRef.current)extraFileRef.current.value="";}
   function onCoverImg(e:React.ChangeEvent<HTMLInputElement>){const f=e.target.files?.[0];if(!f)return;setCoverImg(f);setCoverImgPreview(URL.createObjectURL(f));}
   function onExtraImgs(e:React.ChangeEvent<HTMLInputElement>){const files=Array.from(e.target.files??[]);if(!files.length)return;setExtraImgs(prev=>[...prev,...files]);setExtraPreviews(prev=>[...prev,...files.map(f=>URL.createObjectURL(f))]);}
   function removeExtraPreview(i:number){setExtraPreviews(p=>p.filter((_,j)=>j!==i));setExtraImgs(p=>p.filter((_,j)=>j!==i));}
@@ -286,7 +381,7 @@ export default function AdminDashboard() {
     // extra_image_urls = existing that still show in previews + newly uploaded
     const existingKept=existingExtras.filter(url=>extraPreviews.includes(url));
     const extra_image_urls=[...existingKept,...newExtraUrls];
-    const payload={title:postForm.title,body:postForm.body,slug,cover_image_url,extra_image_urls,published_at:new Date(postForm.published_at).toISOString()};
+    const payload={title:postForm.title,body:postForm.body,slug,category:postForm.category,cover_image_url,extra_image_urls,published_at:new Date(postForm.published_at).toISOString()};
     if(editingPost){
       const{error}=await supabase.from('blog_posts').update(payload).eq('id',editingPost.id);
       if(error)showToast("Update failed",false);else{showToast("Post updated!");cancelEditPost();fetchPosts();}
@@ -352,11 +447,11 @@ export default function AdminDashboard() {
       <div className="max-w-3xl mx-auto px-6 py-8">
         {/* Tabs */}
         <div className="flex gap-2 mb-8 p-1 rounded-2xl bg-white border border-slate-100 w-fit flex-wrap">
-          {(["poses","locations","bayGuide","blog","analytics"] as Tab[]).map(t=>(
-            <button key={t} onClick={()=>{setTab(t);cancelEditPose();cancelEditSpot();cancelEditPost();}}
+          {(["poses","locations","bayGuide","portfolio","categories","blog","analytics"] as Tab[]).map(t=>(
+            <button key={t} onClick={()=>{setTab(t);cancelEditPose();cancelEditSpot();cancelEditPortfolioImage();cancelEditCategory();cancelEditPost();}}
               className="px-5 py-2 rounded-xl text-sm font-bold transition-all"
               style={tab===t?{background:C.grad12,color:"#fff"}:{color:"#94a3b8"}}>
-              {t==="poses"?"📸 Grad Poses":t==="locations"?"📍 Campus Spots":t==="bayGuide"?"🗺️ Bay Guide":t==="blog"?"✍️ Blog":"📊 Analytics"}
+              {t==="poses"?"📸 Grad Poses":t==="locations"?"📍 Campus Spots":t==="bayGuide"?"🗺️ Bay Guide":t==="portfolio"?"🖼️ Portfolio":t==="categories"?"🏷️ Categories":t==="blog"?"✍️ Blog":"📊 Analytics"}
             </button>
           ))}
         </div>
@@ -539,6 +634,153 @@ export default function AdminDashboard() {
 
         {tab==="bayGuide"&&<BayAreaLocationsManager />}
 
+        {/* ── PORTFOLIO ── */}
+        {tab==="portfolio"&&(
+          <div className="space-y-6">
+            <div className={card}>
+              <div className="h-[3px]" style={{background:"#111827"}}/>
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-5">
+                  <h2 className="text-base font-black text-slate-900">{editingPortfolioImage?`Editing: ${editingPortfolioImage.title}`:"New Portfolio Image"}</h2>
+                  {editingPortfolioImage&&<button onClick={cancelEditPortfolioImage} className="text-xs font-bold text-slate-400 px-3 py-1.5 rounded-lg bg-slate-100">Cancel edit</button>}
+                </div>
+                {editingPortfolioImage&&<div className="mb-4 px-3 py-2 rounded-xl text-xs font-bold" style={{background:C.p1_08,color:C.p1,border:`1px solid ${C.p1_20}`}}>✏️ Editing professional portfolio image.</div>}
+
+                <div className="mb-4">
+                  <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Photo</label>
+                  {portfolioPreview?(
+                    <div className="relative w-full h-64 rounded-xl overflow-hidden mb-2 bg-slate-100">
+                      <img src={portfolioPreview} className="w-full h-full object-cover"/>
+                      <button onClick={()=>{setPortfolioFile(null);setPortfolioPreview(editingPortfolioImage?.image_url||null);if(portfolioFileRef.current)portfolioFileRef.current.value="";}} className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/50 text-white text-sm font-bold flex items-center justify-center">✕</button>
+                      <button onClick={()=>portfolioFileRef.current?.click()} className="absolute bottom-2 right-2 text-xs font-bold text-white px-3 py-1.5 rounded-full bg-black/70">Change</button>
+                    </div>
+                  ):(
+                    <button onClick={()=>portfolioFileRef.current?.click()} className="w-full h-44 rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-2" style={{borderColor:"rgba(15,23,42,0.16)",background:"#f8fafc"}}>
+                      <span className="text-3xl">🖼️</span>
+                      <span className="text-xs font-bold text-slate-800">Tap to upload portfolio photo</span>
+                      <span className="text-xs text-slate-400">Saved in grad-photos/portfolio</span>
+                    </button>
+                  )}
+                  <input ref={portfolioFileRef} type="file" accept="image/*" className="hidden" onChange={onPortfolioFile}/>
+                </div>
+
+                <div className="space-y-3">
+                  <div><label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1.5">Title</label><input className={inp} placeholder="e.g. Golden hour grad portrait" value={portfolioForm.title} onChange={e=>setPortfolioForm(f=>({...f,title:e.target.value}))}/></div>
+                  <div><label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1.5">Alt Text</label><input className={inp} placeholder="Describe the image for SEO and accessibility" value={portfolioForm.alt} onChange={e=>setPortfolioForm(f=>({...f,alt:e.target.value}))}/></div>
+                  <div><label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1.5">Category</label><select className={inp} value={portfolioForm.category_slug} onChange={e=>setPortfolioForm(f=>({...f,category_slug:e.target.value}))}>{categories.length>0?categories.map(category=><option key={category.slug} value={category.slug}>{category.name}</option>):<option value="portfolio">Portfolio</option>}</select></div>
+                  <div><label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1.5">Order #</label><input className={inp} type="number" placeholder="e.g. 1" value={portfolioForm.sort_order} onChange={e=>setPortfolioForm(f=>({...f,sort_order:e.target.value}))}/></div>
+                  <label className="flex items-center gap-2 text-sm font-bold text-slate-700"><input type="checkbox" checked={portfolioForm.featured} onChange={e=>setPortfolioForm(f=>({...f,featured:e.target.checked}))}/> Featured on homepage</label>
+                  <button onClick={savePortfolioImage} disabled={portfolioSaving} className="w-full py-3 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90 active:scale-95 mt-2" style={{background:"#111827",opacity:portfolioSaving?0.7:1}}>
+                    {portfolioSaving?"Saving…":editingPortfolioImage?"Update Portfolio Image ✓":"Save Portfolio Image →"}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <p className="text-xs font-black uppercase tracking-widest text-slate-900">Portfolio Images</p>
+                <span className="text-xs font-bold text-slate-400">({portfolioImages.length})</span>
+              </div>
+              {portfolioLoading?[...Array(3)].map((_,i)=><div key={i} className="rounded-2xl animate-pulse h-20 mb-3 bg-slate-100"/>):(
+                portfolioImages.length===0?<p className="text-sm text-slate-400 font-medium">No portfolio images yet — upload the first one above.</p>:(
+                  <div className="space-y-3">
+                    {portfolioImages.map(image=>(
+                      <div key={image.id} className={card} style={editingPortfolioImage?.id===image.id?{outline:"2px solid #111827"}:{}}>
+                        <div className="flex">
+                          <div className="w-24 h-24 flex-shrink-0 overflow-hidden bg-slate-100"><img src={image.image_url} className="w-full h-full object-cover"/></div>
+                          <div className="flex-1 p-4 min-w-0">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2 mb-0.5">
+                                  {image.featured&&<span className="text-[10px] font-black px-1.5 py-0.5 rounded-md bg-slate-900 text-white">FEATURED</span>}
+                                  <p className="text-sm font-black text-slate-900 truncate">{image.title}</p>
+                                </div>
+                                <p className="text-xs text-slate-400">{categoryName(image.category_slug)} · #{image.sort_order}</p>
+                              </div>
+                              <div className="flex gap-2 flex-shrink-0">
+                                {editingPortfolioImage?.id!==image.id&&<button onClick={()=>startEditPortfolioImage(image)} className="text-xs font-bold px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700">Edit</button>}
+                                {portfolioDeleteConfirm===image.id?(
+                                  <div className="flex gap-1.5">
+                                    <button onClick={()=>deletePortfolioImage(image.id)} className="text-xs font-bold text-white px-2.5 py-1.5 rounded-lg" style={{background:"#be123c"}}>Delete</button>
+                                    <button onClick={()=>setPortfolioDeleteConfirm(null)} className="text-xs font-bold text-slate-500 px-2.5 py-1.5 rounded-lg bg-slate-100">✕</button>
+                                  </div>
+                                ):<button onClick={()=>setPortfolioDeleteConfirm(image.id)} className="text-xs font-bold text-slate-300 hover:text-red-400 transition-colors px-1">🗑</button>}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── CATEGORIES ── */}
+        {tab==="categories"&&(
+          <div className="space-y-6">
+            <div className={card}>
+              <div className="h-[3px]" style={{background:"#111827"}}/>
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-5">
+                  <h2 className="text-base font-black text-slate-900">{editingCategory?`Editing: ${editingCategory.name}`:"New Portfolio Category"}</h2>
+                  {editingCategory&&<button onClick={cancelEditCategory} className="text-xs font-bold text-slate-400 px-3 py-1.5 rounded-lg bg-slate-100">Cancel edit</button>}
+                </div>
+                <div className="space-y-3">
+                  <div><label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1.5">Name</label><input className={inp} placeholder="e.g. Weddings" value={categoryForm.name} onChange={e=>setCategoryForm(f=>({...f,name:e.target.value,slug:editingCategory?f.slug:slugify(e.target.value)}))}/></div>
+                  <div><label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1.5">Slug</label><input className={inp} placeholder="e.g. weddings" value={categoryForm.slug} onChange={e=>setCategoryForm(f=>({...f,slug:slugify(e.target.value)}))}/></div>
+                  <div><label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1.5">Description</label><textarea className={ta} rows={3} placeholder="Short category description..." value={categoryForm.description} onChange={e=>setCategoryForm(f=>({...f,description:e.target.value}))}/></div>
+                  <div><label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1.5">Order #</label><input className={inp} type="number" value={categoryForm.sort_order} onChange={e=>setCategoryForm(f=>({...f,sort_order:e.target.value}))}/></div>
+                  <label className="flex items-center gap-2 text-sm font-bold text-slate-700"><input type="checkbox" checked={categoryForm.active} onChange={e=>setCategoryForm(f=>({...f,active:e.target.checked}))}/> Active</label>
+                  <button onClick={saveCategory} disabled={categorySaving} className="w-full py-3 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90 active:scale-95 mt-2" style={{background:"#111827",opacity:categorySaving?0.7:1}}>
+                    {categorySaving?"Saving…":editingCategory?"Update Category ✓":"Save Category →"}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <p className="text-xs font-black uppercase tracking-widest text-slate-900">Portfolio Categories</p>
+                <span className="text-xs font-bold text-slate-400">({categories.length})</span>
+              </div>
+              {categoriesLoading?[...Array(3)].map((_,i)=><div key={i} className="rounded-2xl animate-pulse h-20 mb-3 bg-slate-100"/>):(
+                categories.length===0?<p className="text-sm text-slate-400 font-medium">No categories yet — add Graduation, Portraits, or Events to start.</p>:(
+                  <div className="space-y-3">
+                    {categories.map(category=>(
+                      <div key={category.id} className={card} style={editingCategory?.id===category.id?{outline:"2px solid #111827"}:{}}>
+                        <div className="p-4 flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-black px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-500">#{category.sort_order}</span>
+                              <p className="text-sm font-black text-slate-900 truncate">{category.name}</p>
+                              {!category.active&&<span className="text-[10px] font-black px-1.5 py-0.5 rounded-md bg-red-50 text-red-500">INACTIVE</span>}
+                            </div>
+                            <p className="text-xs text-slate-400 mt-1">/{category.slug}</p>
+                            {category.description&&<p className="text-xs text-slate-500 mt-2 leading-relaxed">{category.description}</p>}
+                          </div>
+                          <div className="flex gap-2 flex-shrink-0">
+                            {editingCategory?.id!==category.id&&<button onClick={()=>startEditCategory(category)} className="text-xs font-bold px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700">Edit</button>}
+                            {categoryDeleteConfirm===category.id?(
+                              <div className="flex gap-1.5">
+                                <button onClick={()=>deleteCategory(category.id)} className="text-xs font-bold text-white px-2.5 py-1.5 rounded-lg" style={{background:"#be123c"}}>Delete</button>
+                                <button onClick={()=>setCategoryDeleteConfirm(null)} className="text-xs font-bold text-slate-500 px-2.5 py-1.5 rounded-lg bg-slate-100">✕</button>
+                              </div>
+                            ):<button onClick={()=>setCategoryDeleteConfirm(category.id)} className="text-xs font-bold text-slate-300 hover:text-red-400 transition-colors px-1">🗑</button>}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )
+              )}
+            </div>
+          </div>
+        )}
+
         {/* ── BLOG ── */}
         {tab==="blog"&&(
           <div className="space-y-6">
@@ -550,6 +792,23 @@ export default function AdminDashboard() {
                   {editingPost&&<button onClick={cancelEditPost} className="text-xs font-bold text-slate-400 px-3 py-1.5 rounded-lg bg-slate-100">Cancel edit</button>}
                 </div>
                 {editingPost&&<div className="mb-4 px-3 py-2 rounded-xl text-xs font-bold" style={{background:C.p1_08,color:C.p1,border:`1px solid ${C.p1_20}`}}>✏️ Editing existing post.</div>}
+
+                <div className="mb-5">
+                  <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Post Category</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {BLOG_CATEGORIES.map(category=>(
+                      <button
+                        key={category.value}
+                        onClick={()=>{setBlogCategory(category.value);setPostForm(f=>({...f,category:category.value}));}}
+                        className="rounded-xl border px-4 py-3 text-left transition-all"
+                        style={postForm.category===category.value?{borderColor:C.p1,background:C.p1_08}:{borderColor:"#e2e8f0",background:"#fff"}}
+                      >
+                        <span className="block text-sm font-black text-slate-900">{category.label}</span>
+                        <span className="block text-xs font-medium text-slate-400 mt-0.5">{category.helper}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
                 {/* Cover image */}
                 <div className="mb-4">
@@ -608,9 +867,18 @@ export default function AdminDashboard() {
 
             {/* Existing posts */}
             <div>
-              <div className="flex items-center gap-2 mb-3">
-                <p className="text-xs font-black uppercase tracking-widest" style={{color:C.p1}}>Published Posts</p>
+              <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+                <div className="flex items-center gap-2">
+                <p className="text-xs font-black uppercase tracking-widest" style={{color:C.p1}}>{blogCategory==="professional"?"Professional Case Studies":"Journal Posts"}</p>
                 <span className="text-xs font-bold text-slate-400">({posts.length})</span>
+                </div>
+                <div className="flex gap-2 p-1 rounded-xl bg-white border border-slate-100">
+                  {BLOG_CATEGORIES.map(category=>(
+                    <button key={category.value} onClick={()=>{setBlogCategory(category.value);setPostForm(f=>({...f,category:category.value}));}} className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all" style={blogCategory===category.value?{background:C.p1_10,color:C.p1}:{color:"#94a3b8"}}>
+                      {category.label}
+                    </button>
+                  ))}
+                </div>
               </div>
               {postsLoading?[...Array(2)].map((_,i)=><div key={i} className="rounded-2xl animate-pulse h-20 mb-3" style={{background:`linear-gradient(135deg,${C.p1_08},${C.p2_06})`}}/>):(
                 posts.length===0?<p className="text-sm text-slate-400 font-medium">No posts yet — write your first one above.</p>:(
@@ -623,10 +891,10 @@ export default function AdminDashboard() {
                             <div className="flex items-start justify-between gap-2">
                               <div className="min-w-0">
                                 <p className="text-sm font-black text-slate-900 truncate mb-0.5">{post.title}</p>
-                                <p className="text-xs text-slate-400">{new Date(post.published_at).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})} · {(post.extra_image_urls?.length??0)+1} photo{(post.extra_image_urls?.length??0)>0?"s":""}</p>
+                                <p className="text-xs text-slate-400">{post.category==="professional"?"Professional":"Journal"} · {new Date(post.published_at).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})} · {(post.extra_image_urls?.length??0)+1} photo{(post.extra_image_urls?.length??0)>0?"s":""}</p>
                               </div>
                               <div className="flex gap-2 flex-shrink-0">
-                                <a href={`/blog/${post.slug}`} target="_blank" className="text-xs font-bold px-3 py-1.5 rounded-lg" style={{background:C.p1_08,color:C.p1}}>View</a>
+                                <a href={`${post.category==="professional"?"/blog":"/journal"}/${post.slug}`} target="_blank" className="text-xs font-bold px-3 py-1.5 rounded-lg" style={{background:C.p1_08,color:C.p1}}>View</a>
                                 {editingPost?.id!==post.id&&<button onClick={()=>startEditPost(post)} className="text-xs font-bold px-3 py-1.5 rounded-lg" style={{background:C.p2_08,color:C.p2}}>Edit</button>}
                                 {postDeleteConfirm===post.id?(
                                   <div className="flex gap-1.5">
