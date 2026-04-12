@@ -5,153 +5,247 @@ import { getBlogPostBySlug } from "@/lib/professionalData";
 
 export const dynamic = "force-dynamic";
 
-type Props = {
-  params: Promise<{ slug: string }>;
-};
+type Props = { params: Promise<{ slug: string }> };
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
+    month: "long", day: "numeric", year: "numeric",
   });
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const post = await getBlogPostBySlug("professional", slug);
-
-  if (!post) {
-    return {
-      title: "Case Study Not Found | soloxsnaps",
-    };
-  }
-
-  const description =
-    post.meta_description ||
-    (post.body.length > 155 ? `${post.body.slice(0, 155).trim()}...` : post.body);
-
+  if (!post) return { title: "Not Found | soloxsnaps" };
+  const description = post.meta_description || (post.body.length > 155 ? `${post.body.slice(0, 155).trim()}…` : post.body);
   return {
     title: `${post.title} | soloxsnaps`,
     description,
-    alternates: {
-      canonical: `/blog/${post.slug}`,
-    },
+    alternates: { canonical: `/blog/${post.slug}` },
     keywords: post.meta_keywords ?? undefined,
     openGraph: {
-      title: post.title,
-      description,
-      type: "article",
+      title: post.title, description, type: "article",
       publishedTime: post.published_at,
-      images: post.og_image_url || post.cover_image_url ? [post.og_image_url || post.cover_image_url || ""] : undefined,
+      images: post.og_image_url || post.cover_image_url
+        ? [post.og_image_url || post.cover_image_url || ""] : undefined,
     },
   };
 }
 
+const CSS = `
+  .slug-extra { overflow: hidden; }
+  .slug-extra-img { transition: transform 0.7s ease; display: block; }
+  .slug-extra:hover .slug-extra-img { transform: scale(1.03); }
+  @media (max-width: 720px) {
+    .slug-body-grid { grid-template-columns: 1fr !important; }
+    .slug-aside { display: none !important; }
+    .slug-extra-grid { columns: 1 !important; }
+  }
+  @media (min-width: 640px) { .slug-extra-grid { columns: 2; } }
+  @media (min-width: 1024px) { .slug-extra-grid { columns: 3; } }
+`;
+
 export default async function ProfessionalBlogPostPage({ params }: Props) {
   const { slug } = await params;
   const post = await getBlogPostBySlug("professional", slug);
+  if (!post) notFound();
 
-  if (!post) {
-    notFound();
-  }
-
-  const images = [post.cover_image_url, ...(post.extra_image_urls ?? [])].filter(Boolean) as string[];
+  const extraImages = post.extra_image_urls ?? [];
 
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "BlogPosting",
     headline: post.title,
     datePublished: post.published_at,
-    image: images,
-    author: {
-      "@type": "Person",
-      name: "Chris Solorzano",
-    },
-    publisher: {
-      "@type": "Organization",
-      name: "soloxsnaps",
-    },
+    image: [post.cover_image_url, ...extraImages].filter(Boolean),
+    author: { "@type": "Person", name: "Chris Solorzano" },
+    publisher: { "@type": "Organization", name: "soloxsnaps" },
   };
 
   return (
-    <main className="bg-[#fbfbfa] text-[#202020]">
+    <main style={{ background: "#fff", color: "#1a1a1a", paddingTop: 80 }}>
+      <style>{CSS}</style>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c"),
-        }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
       />
 
-      <article>
-        <header className="mx-auto max-w-7xl px-5 py-16 text-center sm:px-8 sm:py-20">
-          <Link href="/blog" className="text-sm text-black/55 underline underline-offset-4 hover:text-black">
-            Back to case studies
-          </Link>
-          <p className="mt-10 text-xs uppercase text-black/38">{formatDate(post.published_at)}</p>
-          <h1 className="mx-auto mt-4 max-w-5xl font-serif text-5xl font-normal leading-none text-[#202020] sm:text-7xl lg:text-8xl">
-            {post.title}
-          </h1>
-        </header>
+      {/* ── HEADER ── */}
+      <header style={{ padding: "60px 60px 48px", textAlign: "center", maxWidth: 900, margin: "0 auto" }}>
+        <Link href="/blog" style={{
+          fontFamily: "Georgia, 'Times New Roman', serif",
+          fontSize: "0.7rem",
+          letterSpacing: "0.2em",
+          textTransform: "uppercase",
+          color: "#bbb",
+          textDecoration: "none",
+          borderBottom: "1px solid rgba(0,0,0,0.12)",
+          paddingBottom: 1,
+        }}>
+          ← Back to blog
+        </Link>
+        <p style={{
+          fontFamily: "Georgia, 'Times New Roman', serif",
+          fontSize: "0.68rem",
+          letterSpacing: "0.22em",
+          textTransform: "uppercase",
+          color: "#ccc",
+          margin: "32px 0 16px",
+        }}>
+          {formatDate(post.published_at)}
+        </p>
+        <h1 style={{
+          fontFamily: "Georgia, 'Times New Roman', serif",
+          fontSize: "clamp(1.8rem, 5vw, 4.5rem)",
+          fontWeight: 300,
+          letterSpacing: "0.05em",
+          color: "#111",
+          lineHeight: 1.12,
+          margin: "0 auto 32px",
+        }}>
+          {post.title}
+        </h1>
+        <div style={{ width: 36, height: 1, background: "rgba(0,0,0,0.12)", margin: "0 auto" }} />
+      </header>
 
-        {post.cover_image_url ? (
-          <div className="mx-auto max-w-[1600px] px-3 sm:px-5 lg:px-8">
-            <div className="max-h-[820px] overflow-hidden bg-black/5">
-              <img
-                src={post.cover_image_url}
-                alt={post.title}
-                className="h-full w-full object-cover"
-              />
-            </div>
-          </div>
-        ) : null}
-
-        <div className="mx-auto grid max-w-7xl gap-10 px-5 py-14 sm:px-8 lg:grid-cols-[0.55fr_1fr]">
-          <aside className="text-sm leading-6 text-black/45">
-            <p className="font-medium uppercase text-black/38">Details</p>
-            <p className="mt-4">San Francisco and Bay Area photography by Chris Solorzano.</p>
-          </aside>
-          <div className="space-y-6 text-lg leading-8 text-black/68">
-            {post.body
-              .split(/\n\n+/)
-              .filter((paragraph) => paragraph.trim())
-              .map((paragraph, index) => (
-                <p key={index}>{paragraph.trim()}</p>
-              ))}
+      {/* ── COVER IMAGE ── */}
+      {post.cover_image_url && (
+        <div style={{ padding: "0 20px 80px", maxWidth: 1400, margin: "0 auto" }}>
+          <div style={{ overflow: "hidden", maxHeight: 780 }}>
+            <img
+              src={post.cover_image_url}
+              alt={post.title}
+              style={{ width: "100%", maxHeight: 780, objectFit: "cover", display: "block" }}
+            />
           </div>
         </div>
+      )}
 
-        {post.extra_image_urls?.length > 0 ? (
-          <section className="border-t border-black/10 px-3 py-14 sm:px-5 lg:px-8">
-            <div className="mx-auto max-w-[1600px]">
-              <div className="mb-8 flex flex-col gap-4 px-2 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                  <p className="text-sm uppercase text-black/42">Gallery</p>
-                  <h2 className="mt-3 font-serif text-5xl font-normal leading-none text-[#202020] sm:text-7xl">
-                    More from this story
-                  </h2>
-                </div>
-                <a href="https://www.soloxsnaps.com/contact/" className="text-sm text-black/52 underline underline-offset-4 hover:text-black">
-                  Inquire now
-                </a>
-              </div>
-              <div className="columns-1 gap-3 sm:columns-2 lg:columns-3">
-                {post.extra_image_urls.map((url, index) => (
-                  <div key={url} className="mb-3 break-inside-avoid overflow-hidden bg-black/5">
-                    <div style={{ aspectRatio: index % 2 === 0 ? "4 / 5" : "5 / 4" }}>
-                      <img
-                        src={url}
-                        alt={`${post.title} image ${index + 1}`}
-                        className="h-full w-full object-cover"
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
+      {/* ── BODY ── */}
+      <div className="slug-body-grid" style={{
+        display: "grid",
+        gridTemplateColumns: "220px 1fr",
+        gap: "60px",
+        maxWidth: 1100,
+        margin: "0 auto",
+        padding: "0 60px 100px",
+      }}>
+        <aside className="slug-aside">
+          <p style={{
+            fontFamily: "Georgia, 'Times New Roman', serif",
+            fontSize: "0.68rem",
+            letterSpacing: "0.22em",
+            textTransform: "uppercase",
+            color: "#ccc",
+            marginBottom: 16,
+          }}>
+            Details
+          </p>
+          <p style={{
+            fontFamily: "Georgia, 'Times New Roman', serif",
+            fontStyle: "italic",
+            fontSize: "0.88rem",
+            lineHeight: 1.7,
+            color: "#aaa",
+          }}>
+            Bay Area photography by Chris Solorzano.
+          </p>
+        </aside>
+        <div>
+          {post.body
+            .split(/\n\n+/)
+            .filter((p) => p.trim())
+            .map((paragraph, i) => (
+              <p key={i} style={{
+                fontFamily: "Georgia, 'Times New Roman', serif",
+                fontSize: "1.05rem",
+                lineHeight: 1.9,
+                color: "#555",
+                marginBottom: 24,
+              }}>
+                {paragraph.trim()}
+              </p>
+            ))}
+        </div>
+      </div>
+
+      {/* ── EXTRA IMAGES ── */}
+      {extraImages.length > 0 && (
+        <section style={{
+          borderTop: "1px solid rgba(0,0,0,0.07)",
+          padding: "80px 20px 100px",
+        }}>
+          <div style={{ maxWidth: 1400, margin: "0 auto" }}>
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 24,
+              marginBottom: 48,
+              padding: "0 40px",
+            }}>
+              <div style={{ flex: 1, height: 1, background: "rgba(0,0,0,0.07)" }} />
+              <p style={{
+                fontFamily: "Georgia, 'Times New Roman', serif",
+                fontSize: "0.7rem",
+                letterSpacing: "0.26em",
+                textTransform: "uppercase",
+                color: "#ccc",
+                margin: 0,
+                flexShrink: 0,
+              }}>
+                More from this story
+              </p>
+              <div style={{ flex: 1, height: 1, background: "rgba(0,0,0,0.07)" }} />
             </div>
-          </section>
-        ) : null}
-      </article>
+            <div className="slug-extra-grid" style={{ columnGap: 8 }}>
+              {extraImages.map((url, i) => (
+                <div key={url} className="slug-extra" style={{
+                  marginBottom: 8,
+                  breakInside: "avoid",
+                  aspectRatio: i % 2 === 0 ? "4/5" : "5/4",
+                }}>
+                  <img
+                    src={url}
+                    alt={`${post.title} — image ${i + 1}`}
+                    className="slug-extra-img"
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ── CTA ── */}
+      <section style={{
+        borderTop: "1px solid rgba(0,0,0,0.07)",
+        padding: "80px 60px",
+        textAlign: "center",
+      }}>
+        <p style={{
+          fontFamily: "Georgia, 'Times New Roman', serif",
+          fontStyle: "italic",
+          fontSize: "clamp(1rem, 2vw, 1.3rem)",
+          color: "#aaa",
+          marginBottom: 32,
+        }}>
+          Want to create something like this?
+        </p>
+        <a href="https://www.soloxsnaps.com/contact/" style={{
+          fontFamily: "Georgia, 'Times New Roman', serif",
+          fontSize: "0.75rem",
+          letterSpacing: "0.18em",
+          textTransform: "uppercase",
+          color: "#fff",
+          background: "#1a1a1a",
+          padding: "14px 36px",
+          textDecoration: "none",
+          display: "inline-block",
+        }}>
+          Inquire now
+        </a>
+      </section>
     </main>
   );
 }

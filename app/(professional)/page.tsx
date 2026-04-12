@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getPortfolioData, type PortfolioCategory, type PortfolioImage } from "@/lib/professionalData";
+import HeroCarousel from "@/app/components/HeroCarousel";
 
 export const dynamic = "force-dynamic";
 
 const title = "soloxsnaps | Bay Area Graduation and Family Photographer";
 const description =
-  "Bay Area graduation and family photography by Chris Solorzano, focused on honest portraits, warm milestones, and clean editorial imagery.";
+  "Bay Area graduation and family photography by Chris Solorzano — honest portraits, warm milestones, and quietly cinematic imagery.";
 const profileImage =
   "https://dmtslzwglpezympptqls.supabase.co/storage/v1/object/public/grad-photos/DSC02593_(2).jpg";
 const visiblePortfolioSlugs = ["grads", "families"];
@@ -14,53 +15,61 @@ const visiblePortfolioSlugs = ["grads", "families"];
 export const metadata: Metadata = {
   title,
   description,
-  alternates: {
-    canonical: "/",
-  },
+  alternates: { canonical: "/" },
   keywords: [
     "Bay Area graduation photographer",
     "San Francisco graduation photographer",
     "Bay Area family photographer",
-    "family photographer",
     "soloxsnaps",
     "Chris Solorzano photography",
   ],
-  openGraph: {
-    title,
-    description,
-    type: "website",
-    siteName: "soloxsnaps",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title,
-    description,
-  },
+  openGraph: { title, description, type: "website", siteName: "soloxsnaps" },
+  twitter: { card: "summary_large_image", title, description },
 };
 
 function getCoverForCategory(
   category: PortfolioCategory,
   images: PortfolioImage[],
-  fallbackImage: PortfolioImage | undefined,
+  fallback: PortfolioImage | undefined,
   index: number
 ) {
-  return images.find((image) => image.category_slug === category.slug) ?? images[index] ?? fallbackImage;
+  return images.find((img) => img.category_slug === category.slug) ?? images[index] ?? fallback;
 }
+
+const CSS = `
+  .pro-img { transition: transform 0.7s ease; display: block; }
+  .pro-img-wrap:hover .pro-img { transform: scale(1.04); }
+  .pro-card-link { text-decoration: none; display: block; }
+  .pro-card-link:hover .pro-card-label { opacity: 0.5; }
+  .pro-card-label { transition: opacity 0.2s ease; }
+  .pro-insta { transition: opacity 0.25s ease; }
+  .pro-insta:hover { opacity: 0.75; }
+  @media (max-width: 720px) {
+    .about-grid   { grid-template-columns: 1fr !important; }
+    .port-grid    { grid-template-columns: 1fr !important; }
+    .cats-grid    { grid-template-columns: 1fr !important; }
+    .cats-grid > * { border-right: none !important; border-bottom: 1px solid rgba(0,0,0,0.08) !important; }
+    .footer-grid  { grid-template-columns: 1fr !important; }
+  }
+`;
 
 export default async function ProfessionalHomePage() {
   const { categories, images } = await getPortfolioData();
   const heroImage = images[0];
   const heroImageUrl = heroImage?.image_url ?? profileImage;
-  const heroImageAlt = heroImage?.alt ?? "Bay Area portrait by Chris Solorzano";
+
   const visibleCategories = visiblePortfolioSlugs
-    .map((slug) => categories.find((category) => category.slug === slug))
+    .map((slug) => categories.find((c) => c.slug === slug))
     .filter(Boolean) as PortfolioCategory[];
+
   const portfolioSections = visibleCategories.map((category, index) => ({
     category,
     cover: getCoverForCategory(category, images, heroImage, index),
     subline: category.slug === "grads" ? "the milestone" : "the people",
   }));
-  const portfolioPreviewImages = images.slice(0, 3);
+
+  const previewImages = images.slice(0, 3);
+  const instagramImages = images.slice(0, 8);
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -68,165 +77,326 @@ export default async function ProfessionalHomePage() {
     name: "soloxsnaps",
     url: "https://soloxsnaps.com",
     image: heroImageUrl,
-    founder: {
-      "@type": "Person",
-      name: "Chris Solorzano",
-    },
+    founder: { "@type": "Person", name: "Chris Solorzano" },
     areaServed: ["San Francisco", "Bay Area", "San Jose", "Oakland", "Berkeley"],
     serviceType: ["Graduation photography", "Family photography"],
   };
 
   return (
-    <main className="bg-[#fbfbfa] text-[#242424]">
+    <main style={{ background: "#ffffff", color: "#1a1a1a" }}>
+      <style>{CSS}</style>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c"),
-        }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
       />
 
-      <section className="px-6 pb-20 pt-10 sm:px-10">
-        <div className="mx-auto max-w-[1460px]">
-          <h1 className="text-center font-serif text-6xl font-normal lowercase leading-none text-[#171717] sm:text-8xl lg:text-9xl">
-            soloxsnaps
-          </h1>
+      {/* ── 1. HERO — full viewport, image cycles, name overlaid ── */}
+      <HeroCarousel images={images} />
 
-          <div className="relative mx-auto mt-10 max-w-[1280px]">
-            <div className="hidden lg:block">
-              <p className="absolute -left-16 top-1/2 -translate-y-1/2 rotate-90 font-serif text-sm italic text-black/45">
-                scroll
-              </p>
-              <div className="absolute -left-10 top-[56%] h-16 w-px bg-black/25" />
-            </div>
-            <Link href="/portfolio?category=grads" className="group block overflow-hidden bg-black/5">
-              <img
-                src={heroImageUrl}
-                alt={heroImageAlt}
-                className="h-[420px] w-full object-cover transition duration-700 group-hover:scale-[1.02] sm:h-[620px] lg:h-[760px]"
-              />
-            </Link>
-            <div className="mt-5 flex justify-center gap-3" aria-hidden="true">
-              {Array.from({ length: 8 }).map((_, index) => (
-                <span key={index} className="h-3 w-3 bg-black/10" />
-              ))}
-            </div>
-          </div>
-
-          <div className="mx-auto mt-20 max-w-4xl text-center">
-            <p className="font-serif text-2xl uppercase leading-loose text-[#242424] sm:text-4xl">
-              Photographing the honest,
-              <br />
-              for grads and families who feel deeply.
-            </p>
-            <div className="mx-auto mt-10 h-px w-20 bg-black/20" />
-            <p className="mt-7 font-serif text-xl italic leading-relaxed text-[#333333] sm:text-2xl">
-              Bay Area graduation and family photographer
-            </p>
-          </div>
-        </div>
+      {/* ── 2. INTRO STATEMENT ── */}
+      <section style={{ padding: "100px 40px", textAlign: "center", background: "#fff" }}>
+        <p style={{
+          fontFamily: "Georgia, 'Times New Roman', serif",
+          fontSize: "clamp(1.05rem, 2.6vw, 1.55rem)",
+          fontWeight: 400,
+          letterSpacing: "0.09em",
+          textTransform: "uppercase",
+          lineHeight: 1.9,
+          color: "#1a1a1a",
+          maxWidth: 660,
+          margin: "0 auto 36px",
+        }}>
+          Photographing the honest,<br />
+          for grads and families who feel deeply.
+        </p>
+        <div style={{ width: 40, height: 1, background: "rgba(0,0,0,0.2)", margin: "0 auto 32px" }} />
+        <p style={{
+          fontFamily: "Georgia, 'Times New Roman', serif",
+          fontStyle: "italic",
+          fontSize: "clamp(0.95rem, 1.8vw, 1.15rem)",
+          color: "#888",
+        }}>
+          Bay Area Graduation &amp; Family Photographer
+        </p>
       </section>
 
-      <section className="px-6 py-20 sm:px-10">
-        <div className="mx-auto grid max-w-6xl gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
-          <div className="text-center">
-            <p className="font-serif text-xl italic text-[#242424]">artistry &amp; ease</p>
-            <h2 className="mt-6 font-serif text-3xl font-normal uppercase leading-none text-[#242424]">
+      {/* ── 3. ABOUT ── */}
+      <section style={{ padding: "0 60px 120px", maxWidth: 1200, margin: "0 auto" }}>
+        <div className="about-grid" style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: "80px",
+          alignItems: "center",
+        }}>
+          {/* Photo */}
+          <div className="pro-img-wrap" style={{ overflow: "hidden", aspectRatio: "3/4" }}>
+            <img
+              src={profileImage}
+              alt="Chris Solorzano"
+              className="pro-img"
+              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            />
+          </div>
+
+          {/* Text */}
+          <div>
+            <p style={{
+              fontFamily: "Georgia, 'Times New Roman', serif",
+              fontStyle: "italic",
+              fontSize: "1rem",
+              color: "#bbb",
+              marginBottom: 14,
+              letterSpacing: "0.04em",
+            }}>
+              artistry &amp; adventure
+            </p>
+            <h2 style={{
+              fontFamily: "Georgia, 'Times New Roman', serif",
+              fontSize: "clamp(1.3rem, 2.5vw, 2rem)",
+              fontWeight: 400,
+              letterSpacing: "0.18em",
+              textTransform: "uppercase",
+              color: "#111",
+              margin: "0 0 24px",
+            }}>
               Chris Solorzano
             </h2>
-            <div className="mx-auto mt-8 h-px w-16 bg-black/20" />
-            <p className="mx-auto mt-10 max-w-md font-serif text-xl leading-relaxed text-[#333333]">
-              I photograph the real stuff with a calm eye: proud grads, growing families, and the little pauses that make a session feel like you.
+            <div style={{ width: 36, height: 1, background: "rgba(0,0,0,0.15)", marginBottom: 28 }} />
+            <p style={{
+              fontFamily: "Georgia, 'Times New Roman', serif",
+              fontSize: "1.05rem",
+              lineHeight: 1.9,
+              color: "#555",
+              marginBottom: 32,
+              maxWidth: 380,
+            }}>
+              My name is Chris Solorzano — a hopeless romantic, a lover of real light and
+              honest stories. I specialize in Bay Area graduation portraits and family sessions,
+              always in pursuit of the quiet, ephemeral moments that matter most.
             </p>
-            <Link href="/about" className="mt-10 inline-block font-serif text-lg italic text-[#242424] hover:opacity-60">
-              learn more about me and my photographs here
+            <Link href="/about" style={{
+              fontFamily: "Georgia, 'Times New Roman', serif",
+              fontStyle: "italic",
+              fontSize: "0.95rem",
+              color: "#111",
+              textDecoration: "none",
+              borderBottom: "1px solid rgba(0,0,0,0.25)",
+              paddingBottom: 2,
+              letterSpacing: "0.02em",
+            }}>
+              learn more about me →
             </Link>
-            <div className="mx-auto mt-8 h-px w-20 bg-black/30" />
-          </div>
-
-          <div className="overflow-hidden bg-black/5">
-            <img src={profileImage} alt="Chris Solorzano" className="h-full max-h-[760px] w-full object-cover" />
           </div>
         </div>
       </section>
 
-      {portfolioPreviewImages.length > 0 ? (
-        <section className="px-6 py-20 sm:px-10">
-          <div className="mx-auto max-w-6xl">
-            <h2 className="text-center font-serif text-3xl font-normal uppercase text-[#242424]">
-              From the portfolio
-            </h2>
-            <div className="mt-14 grid gap-8 md:grid-cols-3">
-              {portfolioPreviewImages.map((image) => (
-                <Link key={image.id} href={`/portfolio?category=${image.category_slug}`} className="group block overflow-hidden bg-black/5">
+      {/* ── 4. FROM THE PORTFOLIO ── */}
+      {previewImages.length > 0 && (
+        <section style={{ padding: "0 0 120px", background: "#fff" }}>
+          <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 60px" }}>
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 24,
+              marginBottom: 48,
+            }}>
+              <div style={{ flex: 1, height: 1, background: "rgba(0,0,0,0.08)" }} />
+              <p style={{
+                fontFamily: "Georgia, 'Times New Roman', serif",
+                fontSize: "0.75rem",
+                letterSpacing: "0.28em",
+                textTransform: "uppercase",
+                color: "#999",
+                margin: 0,
+                flexShrink: 0,
+              }}>
+                From the Portfolio
+              </p>
+              <div style={{ flex: 1, height: 1, background: "rgba(0,0,0,0.08)" }} />
+            </div>
+
+            <div className="port-grid" style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1.3fr 1fr",
+              gap: 12,
+              alignItems: "end",
+            }}>
+              {previewImages.map((image, i) => (
+                <Link
+                  key={image.id}
+                  href={`/portfolio?category=${image.category_slug}`}
+                  className="pro-img-wrap pro-card-link"
+                  style={{ overflow: "hidden", aspectRatio: i === 1 ? "2/3" : "3/4" }}
+                >
                   <img
                     src={image.image_url}
                     alt={image.alt}
-                    className="h-[360px] w-full object-cover transition duration-700 group-hover:scale-[1.02]"
+                    className="pro-img"
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
                   />
                 </Link>
               ))}
             </div>
           </div>
         </section>
-      ) : null}
+      )}
 
-      <section className="px-6 py-20 sm:px-10">
-        <div className="mx-auto grid max-w-7xl border-y border-black/20 md:grid-cols-2">
+      {/* ── 5. CATEGORY CARDS ── */}
+      <section style={{ borderTop: "1px solid rgba(0,0,0,0.07)", borderBottom: "1px solid rgba(0,0,0,0.07)", marginBottom: 120 }}>
+        <div className="cats-grid" style={{
+          display: "grid",
+          gridTemplateColumns: `repeat(${portfolioSections.length + 1}, 1fr)`,
+          maxWidth: "100%",
+        }}>
           {portfolioSections.map(({ category, cover, subline }, index) => (
             <Link
               key={category.slug}
               href={`/portfolio?category=${category.slug}`}
-              className={`group flex min-h-[560px] flex-col items-center justify-center px-8 py-14 text-center ${
-                index === 0 ? "md:border-r md:border-black/20" : ""
-              }`}
+              className="pro-card-link"
+              style={{
+                borderRight: index < portfolioSections.length ? "1px solid rgba(0,0,0,0.07)" : "none",
+                padding: "60px 40px",
+                textAlign: "center",
+              }}
             >
-              <h2 className="font-serif text-4xl font-normal uppercase text-[#242424]">{category.name}</h2>
-              <p className="mt-4 font-serif text-2xl italic text-[#242424]">{subline}</p>
-              <div className="mx-auto mt-8 h-px w-16 bg-black/20" />
-              {cover ? (
-                <div className="mt-10 w-full max-w-[360px] overflow-hidden bg-black/5">
+              {cover && (
+                <div className="pro-img-wrap" style={{ overflow: "hidden", marginBottom: 28 }}>
                   <img
                     src={cover.image_url}
                     alt={cover.alt}
-                    className="h-[300px] w-full object-cover transition duration-700 group-hover:scale-[1.02]"
+                    className="pro-img"
+                    style={{ width: "100%", height: 260, objectFit: "cover" }}
                   />
                 </div>
-              ) : null}
+              )}
+              <h2 className="pro-card-label" style={{
+                fontFamily: "Georgia, 'Times New Roman', serif",
+                fontSize: "clamp(0.9rem, 1.8vw, 1.3rem)",
+                fontWeight: 400,
+                letterSpacing: "0.22em",
+                textTransform: "uppercase",
+                color: "#1a1a1a",
+                margin: "0 0 8px",
+              }}>
+                {category.name}
+              </h2>
+              <p style={{
+                fontFamily: "Georgia, 'Times New Roman', serif",
+                fontStyle: "italic",
+                fontSize: "0.95rem",
+                color: "#aaa",
+                margin: "0 0 20px",
+              }}>
+                {subline}
+              </p>
+              <div style={{ width: 24, height: 1, background: "rgba(0,0,0,0.15)", margin: "0 auto" }} />
             </Link>
           ))}
-        </div>
-      </section>
 
-      <section className="px-6 py-20 text-center sm:px-10">
-        <div className="mx-auto max-w-5xl">
-          <p className="font-serif text-3xl italic leading-relaxed text-[#333333] sm:text-4xl">
-            The best photos feel like a memory you can still step into: familiar, easy, and full of the people who matter.
-          </p>
-          <p className="mt-10 font-serif text-lg uppercase text-[#242424]">soloxsnaps</p>
-        </div>
-      </section>
-
-      <section className="px-6 py-20 sm:px-10">
-        <div className="mx-auto grid max-w-7xl gap-12 lg:grid-cols-[1fr_1fr] lg:items-end">
-          <div>
-            <p className="font-serif text-xl italic text-black/65">you love the work and you're</p>
-            <h2 className="mt-5 font-serif text-5xl font-normal leading-none text-[#202020] sm:text-7xl">
-              Ready to work together?
+          {/* Contact card */}
+          <a
+            href="https://www.soloxsnaps.com/contact/"
+            className="pro-card-link"
+            style={{ padding: "60px 40px", textAlign: "center" }}
+          >
+            {heroImage && (
+              <div className="pro-img-wrap" style={{ overflow: "hidden", marginBottom: 28 }}>
+                <img
+                  src={heroImage.image_url}
+                  alt="Book a session"
+                  className="pro-img"
+                  style={{ width: "100%", height: 260, objectFit: "cover" }}
+                />
+              </div>
+            )}
+            <h2 className="pro-card-label" style={{
+              fontFamily: "Georgia, 'Times New Roman', serif",
+              fontSize: "clamp(0.9rem, 1.8vw, 1.3rem)",
+              fontWeight: 400,
+              letterSpacing: "0.22em",
+              textTransform: "uppercase",
+              color: "#1a1a1a",
+              margin: "0 0 8px",
+            }}>
+              Contact
             </h2>
-            <a
-              href="https://www.soloxsnaps.com/contact/"
-              className="mt-10 inline-flex border border-black px-8 py-4 text-sm uppercase text-[#202020] transition-colors hover:bg-black hover:text-white"
-            >
-              Inquire now
-            </a>
-          </div>
-          {heroImage ? (
-            <div className="overflow-hidden bg-black/5">
-              <img src={heroImage.image_url} alt={heroImage.alt} className="h-full max-h-[720px] w-full object-cover" />
-            </div>
-          ) : null}
+            <p style={{
+              fontFamily: "Georgia, 'Times New Roman', serif",
+              fontStyle: "italic",
+              fontSize: "0.95rem",
+              color: "#aaa",
+              margin: "0 0 20px",
+            }}>
+              get in touch
+            </p>
+            <div style={{ width: 24, height: 1, background: "rgba(0,0,0,0.15)", margin: "0 auto" }} />
+          </a>
         </div>
       </section>
+
+      {/* ── 6. TESTIMONIAL ── */}
+      <section style={{ padding: "0 60px 120px", textAlign: "center" }}>
+        <div style={{ maxWidth: 720, margin: "0 auto" }}>
+          <p style={{
+            fontFamily: "Georgia, 'Times New Roman', serif",
+            fontStyle: "italic",
+            fontSize: "clamp(1.1rem, 2.2vw, 1.45rem)",
+            lineHeight: 1.85,
+            color: "#444",
+            marginBottom: 28,
+          }}>
+            &ldquo;His superpower is that he&rsquo;s able to capture the indescribable — the
+            in-between moments, so packed with emotion they couldn&rsquo;t possibly be
+            contained. Chris is an artist, a storyteller, and you can tell he loves
+            what he does.&rdquo;
+          </p>
+          <p style={{
+            fontFamily: "Georgia, 'Times New Roman', serif",
+            fontSize: "0.72rem",
+            letterSpacing: "0.24em",
+            textTransform: "uppercase",
+            color: "#ccc",
+          }}>
+            Samantha &amp; Family &nbsp;·&nbsp; Berkeley, CA
+          </p>
+        </div>
+      </section>
+
+      {/* ── 7. INSTAGRAM STRIP ── */}
+      {instagramImages.length > 0 && (
+        <section style={{ padding: "0 0 0", background: "#fff" }}>
+          <p style={{
+            textAlign: "center",
+            fontFamily: "Georgia, 'Times New Roman', serif",
+            fontSize: "0.68rem",
+            letterSpacing: "0.24em",
+            textTransform: "uppercase",
+            color: "#ccc",
+            marginBottom: 20,
+            paddingTop: 0,
+          }}>
+            @soloxsnaps
+          </p>
+          <div style={{ display: "flex", gap: 3, overflowX: "auto" }}>
+            {instagramImages.map((image) => (
+              <a
+                key={image.id}
+                href="https://www.instagram.com/soloxsnaps"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="pro-insta"
+                style={{ flexShrink: 0, display: "block", overflow: "hidden" }}
+              >
+                <img
+                  src={image.image_url}
+                  alt={image.alt}
+                  style={{ width: 150, height: 150, objectFit: "cover", display: "block" }}
+                />
+              </a>
+            ))}
+          </div>
+        </section>
+      )}
     </main>
   );
 }

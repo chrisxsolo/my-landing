@@ -2,15 +2,16 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 
 const links = [
-  { label: "Home", href: "/" },
-  { label: "Grads", href: "/portfolio?category=grads" },
-  { label: "Families", href: "/portfolio?category=families" },
-  { label: "About", href: "/about" },
-  { label: "Contact", href: "https://www.soloxsnaps.com/contact/" },
-  { label: "Blog", href: "/blog" },
+  { label: "Home",         href: "/" },
+  { label: "Grads",        href: "/portfolio?category=grads" },
+  { label: "Families",     href: "/portfolio?category=families" },
+  { label: "About",        href: "/about" },
+  { label: "Availability", href: "/availability" },
+  { label: "Contact",      href: "/contact" },
+  { label: "Blog",         href: "/blog" },
 ];
 
 function isActive(pathname: string, href: string) {
@@ -18,100 +19,75 @@ function isActive(pathname: string, href: string) {
   return path === "/" ? pathname === path : pathname === path || pathname.startsWith(`${path}/`);
 }
 
-function NavLink({
-  href,
-  label,
-  pathname,
-}: {
-  href: string;
-  label: string;
-  pathname: string;
-}) {
-  const active = href.startsWith("http") ? false : isActive(pathname, href);
-  const className = `font-serif text-sm uppercase text-[#242424] transition-opacity hover:opacity-55 ${
-    active ? "opacity-100" : "opacity-80"
-  }`;
-
-  if (href.startsWith("http")) {
-    return (
-      <a href={href} className={className}>
-        {label}
-      </a>
-    );
-  }
-
-  return (
-    <Link href={href} className={className}>
-      {label}
-    </Link>
-  );
-}
-
 export default function ProNav() {
   const pathname = usePathname();
-  const [open, setOpen] = useState(false);
+  const [atTop, setAtTop] = useState(true);
 
   useEffect(() => {
-    setOpen(false);
-  }, [pathname]);
+    const onScroll = () => setAtTop(window.scrollY < 60);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  // On hero pages (root "/"), nav is overlaid on image when at top
+  const isHeroPage = pathname === "/";
+  const overlaid = isHeroPage && atTop;
 
   return (
-    <header className="relative z-50 bg-[#fbfbfa] text-[#242424]">
-      <nav className="mx-auto flex max-w-[1460px] items-center justify-between px-6 py-7 sm:px-10 lg:justify-center lg:gap-20">
-        <Link href="/" className="font-serif text-xl lowercase text-[#242424] lg:hidden">
-          soloxsnaps
-        </Link>
+    <>
+      <style>{`
+        .pro-nav-link {
+          font-size: 10px;
+          letter-spacing: 0.18em;
+          text-transform: uppercase;
+          text-decoration: none;
+          transition: opacity 0.2s ease;
+          font-family: var(--font-dm-sans), sans-serif;
+          font-weight: 500;
+        }
+        .pro-nav-link:hover { opacity: 0.45; }
+      `}</style>
 
-        <div className="hidden w-full max-w-6xl items-center justify-between lg:flex">
-          {links.map((link) => (
-            <NavLink key={link.href} {...link} pathname={pathname} />
-          ))}
-        </div>
-
-        <button
-          type="button"
-          aria-label={open ? "Close navigation menu" : "Open navigation menu"}
-          aria-expanded={open}
-          onClick={() => setOpen((current) => !current)}
-          className="inline-flex h-10 w-10 items-center justify-center border border-black/20 lg:hidden"
-        >
-          <span className="relative h-4 w-5">
-            <span
-              className="absolute left-0 top-0 h-px w-5 bg-black transition-transform"
-              style={{ transform: open ? "translateY(7px) rotate(45deg)" : "none" }}
-            />
-            <span
-              className="absolute left-0 top-[7px] h-px w-5 bg-black transition-opacity"
-              style={{ opacity: open ? 0 : 1 }}
-            />
-            <span
-              className="absolute left-0 top-[14px] h-px w-5 bg-black transition-transform"
-              style={{ transform: open ? "translateY(-7px) rotate(-45deg)" : "none" }}
-            />
-          </span>
-        </button>
-      </nav>
-
-      {open ? (
-        <div className="border-t border-black/10 px-6 py-6 lg:hidden">
-          <div className="grid gap-5">
-            {links.map((link) =>
-              link.href.startsWith("http") ? (
-                <a key={link.href} href={link.href} className="font-serif text-base uppercase text-[#242424]">
-                  {link.label}
-                </a>
-              ) : (
-                <Link key={link.href} href={link.href} className="font-serif text-base uppercase text-[#242424]">
-                  {link.label}
-                </Link>
-              )
-            )}
-            <Link href="/home" className="pt-3 text-sm text-black/55">
-              Fun site
+      <header style={{
+        position: "fixed",
+        top: 0, left: 0, right: 0,
+        zIndex: 100,
+        padding: "20px 40px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        background: overlaid ? "transparent" : "rgba(250,250,248,0.96)",
+        backdropFilter: overlaid ? "none" : "blur(12px)",
+        WebkitBackdropFilter: overlaid ? "none" : "blur(12px)",
+        borderBottom: overlaid ? "none" : "1px solid rgba(0,0,0,0.06)",
+        transition: "background 0.4s ease, border-color 0.4s ease, backdrop-filter 0.4s ease",
+      }}>
+        {links.map((link) => {
+          const active = link.href.startsWith("http") ? false : isActive(pathname, link.href);
+          const color = overlaid ? "rgba(255,255,255,0.85)" : (active ? "#111" : "#666");
+          return link.href.startsWith("http") ? (
+            <a
+              key={link.href}
+              href={link.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="pro-nav-link"
+              style={{ color }}
+            >
+              {link.label}
+            </a>
+          ) : (
+            <Link
+              key={link.href}
+              href={link.href}
+              className="pro-nav-link"
+              style={{ color }}
+            >
+              {link.label}
             </Link>
-          </div>
-        </div>
-      ) : null}
-    </header>
+          );
+        })}
+      </header>
+    </>
   );
 }

@@ -6,21 +6,37 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Portfolio | soloxsnaps",
-  description:
-    "Portfolio of Bay Area graduation and family photography by Chris Solorzano.",
-  alternates: {
-    canonical: "/portfolio",
-  },
+  description: "Portfolio of Bay Area graduation and family photography by Chris Solorzano.",
+  alternates: { canonical: "/portfolio" },
   openGraph: {
     title: "Portfolio | soloxsnaps",
-    description:
-      "Bay Area graduation and family photography by Chris Solorzano.",
+    description: "Bay Area graduation and family photography by Chris Solorzano.",
     type: "website",
   },
 };
 
+const CSS = `
+  .port-figure { overflow: hidden; }
+  .port-img { transition: transform 0.7s ease; display: block; }
+  .port-figure:hover .port-img { transform: scale(1.04); }
+  .port-caption {
+    position: absolute; inset: 0;
+    display: flex; align-items: flex-end; justify-content: space-between;
+    gap: 8px; padding: 16px;
+    background: rgba(0,0,0,0);
+    opacity: 0;
+    transition: background 0.35s ease, opacity 0.35s ease;
+  }
+  .port-figure:hover .port-caption {
+    background: rgba(0,0,0,0.38);
+    opacity: 1;
+  }
+  .port-filter-link { transition: color 0.2s ease, border-color 0.2s ease; text-decoration: none; }
+  .port-filter-link:hover { color: #111 !important; }
+`;
+
 function imageRatio(index: number) {
-  return ["4 / 5", "1 / 1", "3 / 4", "5 / 4", "2 / 3", "4 / 3"][index % 6];
+  return ["4/5", "1/1", "3/4", "5/4", "2/3", "4/3"][index % 6];
 }
 
 export default async function PortfolioPage({
@@ -30,65 +46,179 @@ export default async function PortfolioPage({
 }) {
   const { categories, images } = await getPortfolioData();
   const selectedCategory = (await searchParams).category;
-  const selected = categories.find((category) => category.slug === selectedCategory);
+  const selected = categories.find((c) => c.slug === selectedCategory);
   const filteredImages = selectedCategory
-    ? images.filter((image) => image.category_slug === selectedCategory)
+    ? images.filter((img) => img.category_slug === selectedCategory)
     : images;
 
   return (
-    <main className="bg-[#fbfbfa] text-[#202020]">
-      <section className="mx-auto max-w-7xl px-5 py-16 text-center sm:px-8 sm:py-20">
-        <p className="text-sm uppercase text-black/42">Portfolio</p>
-        <h1 className="mx-auto mt-4 max-w-5xl font-serif text-5xl font-normal leading-none text-[#202020] sm:text-7xl lg:text-8xl">
-          Selected work from recent sessions.
+    <main style={{ background: "#fff", color: "#1a1a1a", paddingTop: 80 }}>
+      <style>{CSS}</style>
+
+      {/* ── HEADER ── */}
+      <section style={{ padding: "80px 60px 60px", textAlign: "center" }}>
+        <p style={{
+          fontFamily: "Georgia, 'Times New Roman', serif",
+          fontSize: "0.7rem",
+          letterSpacing: "0.28em",
+          textTransform: "uppercase",
+          color: "#bbb",
+          marginBottom: 20,
+        }}>
+          Portfolio
+        </p>
+        <h1 style={{
+          fontFamily: "Georgia, 'Times New Roman', serif",
+          fontSize: "clamp(2rem, 5.5vw, 5rem)",
+          fontWeight: 300,
+          letterSpacing: "0.06em",
+          color: "#111",
+          lineHeight: 1.1,
+          margin: "0 auto 28px",
+          maxWidth: 800,
+        }}>
+          {selected?.name ?? "Selected work"}
         </h1>
-        <p className="mx-auto mt-7 max-w-2xl text-base leading-7 text-black/60">
-          {selected?.description ||
-            "Graduation and family sessions across the Bay Area."}
+        <div style={{ width: 36, height: 1, background: "rgba(0,0,0,0.12)", margin: "0 auto 28px" }} />
+        <p style={{
+          fontFamily: "Georgia, 'Times New Roman', serif",
+          fontStyle: "italic",
+          fontSize: "1rem",
+          color: "#aaa",
+          marginBottom: 40,
+        }}>
+          {selected?.description ?? "Graduation and family sessions across the Bay Area."}
         </p>
 
-        <div className="mt-10 flex flex-wrap items-center justify-center gap-x-4 gap-y-3 text-sm text-black/52">
-          <Link href="/portfolio" className={!selectedCategory ? "text-[#202020] underline underline-offset-4" : "hover:text-black"}>
-            / All
+        {/* Category filters */}
+        <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "8px 24px" }}>
+          <Link
+            href="/portfolio"
+            className="port-filter-link"
+            style={{
+              fontFamily: "Georgia, 'Times New Roman', serif",
+              fontSize: "0.72rem",
+              letterSpacing: "0.2em",
+              textTransform: "uppercase",
+              color: !selectedCategory ? "#111" : "#bbb",
+              borderBottom: !selectedCategory ? "1px solid #111" : "1px solid transparent",
+              paddingBottom: 2,
+            }}
+          >
+            All
           </Link>
-          {categories.map((category) => (
+          {categories.map((cat) => (
             <Link
-              key={category.slug}
-              href={`/portfolio?category=${category.slug}`}
-              className={selectedCategory === category.slug ? "text-[#202020] underline underline-offset-4" : "hover:text-black"}
+              key={cat.slug}
+              href={`/portfolio?category=${cat.slug}`}
+              className="port-filter-link"
+              style={{
+                fontFamily: "Georgia, 'Times New Roman', serif",
+                fontSize: "0.72rem",
+                letterSpacing: "0.2em",
+                textTransform: "uppercase",
+                color: selectedCategory === cat.slug ? "#111" : "#bbb",
+                borderBottom: selectedCategory === cat.slug ? "1px solid #111" : "1px solid transparent",
+                paddingBottom: 2,
+              }}
             >
-              / {category.name}
+              {cat.name}
             </Link>
           ))}
         </div>
       </section>
 
-      <section className="px-3 pb-16 sm:px-5 lg:px-8">
-        <div className="mx-auto max-w-[1600px]">
+      {/* ── GRID ── */}
+      <section style={{ padding: "0 20px 100px" }}>
+        <div style={{ maxWidth: 1400, margin: "0 auto" }}>
           {filteredImages.length > 0 ? (
-            <div className="columns-1 gap-3 sm:columns-2 lg:columns-3">
+            <div style={{ columns: "1", columnGap: 8 }} className="port-masonry">
+              <style>{`
+                @media (min-width: 640px)  { .port-masonry { columns: 2 !important; } }
+                @media (min-width: 1024px) { .port-masonry { columns: 3 !important; } }
+              `}</style>
               {filteredImages.map((image, index) => (
-                <figure key={image.id} className="group relative mb-3 break-inside-avoid overflow-hidden bg-black/5">
-                  <div style={{ aspectRatio: imageRatio(index) }}>
-                    <img
-                      src={image.image_url}
-                      alt={image.alt}
-                      className="h-full w-full object-cover transition duration-700 group-hover:scale-[1.02]"
-                    />
-                  </div>
-                  <figcaption className="absolute inset-0 flex items-end justify-between gap-4 bg-black/0 p-4 opacity-0 transition duration-300 group-hover:bg-black/45 group-hover:opacity-100">
-                    <span className="text-sm font-medium text-white">{image.title}</span>
-                    <span className="text-xs uppercase text-white/70">{image.category_name}</span>
+                <figure
+                  key={image.id}
+                  className="port-figure"
+                  style={{
+                    position: "relative",
+                    marginBottom: 8,
+                    breakInside: "avoid",
+                    aspectRatio: imageRatio(index),
+                  }}
+                >
+                  <img
+                    src={image.image_url}
+                    alt={image.alt}
+                    className="port-img"
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  />
+                  <figcaption className="port-caption">
+                    <span style={{
+                      fontFamily: "Georgia, 'Times New Roman', serif",
+                      fontSize: "0.8rem",
+                      color: "#fff",
+                      fontStyle: "italic",
+                    }}>
+                      {image.title}
+                    </span>
+                    <span style={{
+                      fontFamily: "Georgia, 'Times New Roman', serif",
+                      fontSize: "0.65rem",
+                      letterSpacing: "0.18em",
+                      textTransform: "uppercase",
+                      color: "rgba(255,255,255,0.65)",
+                    }}>
+                      {image.category_name}
+                    </span>
                   </figcaption>
                 </figure>
               ))}
             </div>
           ) : (
-            <div className="mx-auto max-w-7xl border border-black/10 p-10 text-black/55">
+            <div style={{
+              border: "1px solid rgba(0,0,0,0.07)",
+              padding: "60px 40px",
+              textAlign: "center",
+              fontFamily: "Georgia, 'Times New Roman', serif",
+              fontStyle: "italic",
+              color: "#bbb",
+            }}>
               No portfolio images yet.
             </div>
           )}
         </div>
+      </section>
+
+      {/* ── CTA ── */}
+      <section style={{
+        borderTop: "1px solid rgba(0,0,0,0.07)",
+        padding: "80px 60px",
+        textAlign: "center",
+      }}>
+        <p style={{
+          fontFamily: "Georgia, 'Times New Roman', serif",
+          fontStyle: "italic",
+          fontSize: "clamp(1rem, 2.2vw, 1.3rem)",
+          color: "#888",
+          marginBottom: 32,
+        }}>
+          Like what you see?
+        </p>
+        <a href="https://www.soloxsnaps.com/contact/" style={{
+          fontFamily: "Georgia, 'Times New Roman', serif",
+          fontSize: "0.75rem",
+          letterSpacing: "0.18em",
+          textTransform: "uppercase",
+          color: "#fff",
+          background: "#1a1a1a",
+          padding: "14px 36px",
+          textDecoration: "none",
+          display: "inline-block",
+        }}>
+          Inquire now
+        </a>
       </section>
     </main>
   );

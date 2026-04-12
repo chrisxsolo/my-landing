@@ -1,16 +1,13 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "Investment | soloxsnaps",
-  description:
-    "Photography investment and package starting points for soloxsnaps in San Francisco and the Bay Area.",
-  alternates: {
-    canonical: "/investment",
-  },
+  description: "Photography investment and package starting points for soloxsnaps in San Francisco and the Bay Area.",
+  alternates: { canonical: "/investment" },
   openGraph: {
     title: "Investment | soloxsnaps",
-    description:
-      "Photography investment and package starting points for soloxsnaps in San Francisco and the Bay Area.",
+    description: "Photography investment and package starting points for soloxsnaps.",
     type: "website",
   },
 };
@@ -20,13 +17,13 @@ const packages = [
     name: "Portrait",
     price: "Starting at $250",
     details: "Individual portraits, personal branding, or a clean creative refresh.",
-    includes: ["45-60 minute session", "One Bay Area location", "Edited online gallery"],
+    includes: ["45–60 minute session", "One Bay Area location", "Edited online gallery"],
   },
   {
     name: "Graduation",
     price: "Starting at $300",
     details: "A polished gallery for grads who want a sharper, more editorial set.",
-    includes: ["60-90 minute session", "Campus or city location", "Cap, gown, and detail shots"],
+    includes: ["60–90 minute session", "Campus or city location", "Cap, gown, and detail shots"],
   },
   {
     name: "Events",
@@ -36,61 +33,198 @@ const packages = [
   },
 ];
 
+const CSS = `
+  .inv-row:not(:last-child) { border-bottom: 1px solid rgba(0,0,0,0.07); }
+  @media (max-width: 720px) {
+    .inv-row-inner { grid-template-columns: 1fr !important; }
+    .inv-includes { grid-template-columns: 1fr !important; }
+  }
+`;
+
 export default function InvestmentPage() {
   return (
-    <main className="bg-[#fbfbfa] text-[#202020]">
-      <section className="mx-auto max-w-7xl px-5 py-16 text-center sm:px-8 sm:py-20">
-        <p className="text-sm uppercase text-black/42">Investment</p>
-        <h1 className="mx-auto mt-4 max-w-5xl font-serif text-5xl font-normal leading-none text-[#202020] sm:text-7xl lg:text-8xl">
+    <main style={{ background: "#fff", color: "#1a1a1a", paddingTop: 80 }}>
+      <style>{CSS}</style>
+
+      {/* ── HEADER ── */}
+      <section style={{ padding: "80px 60px 80px", textAlign: "center" }}>
+        <p style={{
+          fontFamily: "Georgia, 'Times New Roman', serif",
+          fontSize: "0.7rem",
+          letterSpacing: "0.28em",
+          textTransform: "uppercase",
+          color: "#bbb",
+          marginBottom: 20,
+        }}>
+          Investment
+        </p>
+        <h1 style={{
+          fontFamily: "Georgia, 'Times New Roman', serif",
+          fontSize: "clamp(2rem, 5.5vw, 5rem)",
+          fontWeight: 300,
+          letterSpacing: "0.06em",
+          color: "#111",
+          lineHeight: 1.1,
+          margin: "0 auto 28px",
+          maxWidth: 700,
+        }}>
           What I can offer for you.
         </h1>
-        <p className="mx-auto mt-7 max-w-2xl text-base leading-7 text-black/60">
+        <div style={{ width: 36, height: 1, background: "rgba(0,0,0,0.12)", margin: "0 auto 28px" }} />
+        <p style={{
+          fontFamily: "Georgia, 'Times New Roman', serif",
+          fontStyle: "italic",
+          fontSize: "1rem",
+          color: "#aaa",
+          maxWidth: 520,
+          margin: "0 auto",
+          lineHeight: 1.7,
+        }}>
           Every session starts with the same baseline: thoughtful planning, calm direction, clean edits, and a private gallery built for easy sharing.
         </p>
       </section>
 
-      <section className="px-5 pb-16 sm:px-8">
-        <div className="mx-auto max-w-7xl border-t border-black/14">
+      {/* ── PACKAGES ── */}
+      <section style={{ padding: "0 60px 100px", maxWidth: 1100, margin: "0 auto" }}>
+        <div style={{ borderTop: "1px solid rgba(0,0,0,0.07)" }}>
           {packages.map((item, index) => (
-            <article key={item.name} className="grid gap-6 border-b border-black/14 py-9 lg:grid-cols-[140px_0.7fr_1fr]">
-              <p className="font-serif text-3xl leading-none text-black/50">
-                {String(index + 1).padStart(2, "0")}
-              </p>
-              <div>
-                <p className="text-sm uppercase text-black/42">{item.name}</p>
-                <h2 className="mt-3 text-3xl font-medium leading-tight text-[#202020]">{item.price}</h2>
-                <p className="mt-4 max-w-md text-sm leading-6 text-black/58">{item.details}</p>
+            <article key={item.name} className="inv-row" style={{ padding: "60px 0" }}>
+              <div className="inv-row-inner" style={{
+                display: "grid",
+                gridTemplateColumns: "80px 1fr 1fr",
+                gap: "40px",
+                alignItems: "start",
+              }}>
+                {/* Number */}
+                <p style={{
+                  fontFamily: "Georgia, 'Times New Roman', serif",
+                  fontSize: "2.5rem",
+                  fontWeight: 300,
+                  color: "#e0e0e0",
+                  margin: 0,
+                  lineHeight: 1,
+                }}>
+                  {String(index + 1).padStart(2, "0")}
+                </p>
+
+                {/* Name + price + description */}
+                <div>
+                  <p style={{
+                    fontFamily: "Georgia, 'Times New Roman', serif",
+                    fontSize: "0.68rem",
+                    letterSpacing: "0.24em",
+                    textTransform: "uppercase",
+                    color: "#bbb",
+                    marginBottom: 12,
+                  }}>
+                    {item.name}
+                  </p>
+                  <h2 style={{
+                    fontFamily: "Georgia, 'Times New Roman', serif",
+                    fontSize: "clamp(1.3rem, 2.5vw, 2rem)",
+                    fontWeight: 300,
+                    letterSpacing: "0.04em",
+                    color: "#111",
+                    margin: "0 0 16px",
+                    lineHeight: 1.2,
+                  }}>
+                    {item.price}
+                  </h2>
+                  <p style={{
+                    fontFamily: "Georgia, 'Times New Roman', serif",
+                    fontSize: "0.95rem",
+                    lineHeight: 1.75,
+                    color: "#888",
+                    margin: 0,
+                  }}>
+                    {item.details}
+                  </p>
+                </div>
+
+                {/* Includes */}
+                <ul className="inv-includes" style={{
+                  listStyle: "none",
+                  padding: 0,
+                  margin: 0,
+                  display: "grid",
+                  gap: 0,
+                }}>
+                  {item.includes.map((detail) => (
+                    <li key={detail} style={{
+                      fontFamily: "Georgia, 'Times New Roman', serif",
+                      fontSize: "0.88rem",
+                      color: "#888",
+                      padding: "12px 0",
+                      borderTop: "1px solid rgba(0,0,0,0.07)",
+                      lineHeight: 1.5,
+                    }}>
+                      {detail}
+                    </li>
+                  ))}
+                </ul>
               </div>
-              <ul className="grid gap-3 text-sm text-black/62 sm:grid-cols-3 lg:grid-cols-1">
-                {item.includes.map((detail) => (
-                  <li key={detail} className="border-t border-black/10 pt-3">
-                    {detail}
-                  </li>
-                ))}
-              </ul>
             </article>
           ))}
         </div>
       </section>
 
-      <section className="border-t border-black/10 px-5 py-16 sm:px-8">
-        <div className="mx-auto grid max-w-7xl gap-8 md:grid-cols-[1fr_0.6fr] md:items-end">
-          <div>
-            <p className="text-sm uppercase text-black/42">Availability</p>
-            <h2 className="mt-4 max-w-4xl font-serif text-4xl font-normal leading-tight text-[#202020] sm:text-6xl">
-              Tell me the date, location, and what this is for.
-            </h2>
-            <p className="mt-5 max-w-2xl text-base leading-7 text-black/58">
-              I will reply with availability, package fit, and a clear next step.
-            </p>
-          </div>
-          <a
-            href="https://www.soloxsnaps.com/contact/"
-            className="w-fit border border-black px-5 py-3 text-sm font-medium text-[#202020] transition-colors hover:bg-black hover:text-white"
-          >
-            Start an inquiry
-          </a>
+      {/* ── CTA ── */}
+      <section style={{
+        borderTop: "1px solid rgba(0,0,0,0.07)",
+        padding: "100px 60px",
+        maxWidth: 1100,
+        margin: "0 auto",
+        display: "grid",
+        gap: "40px",
+        alignItems: "end",
+        gridTemplateColumns: "1fr auto",
+      }}>
+        <div>
+          <p style={{
+            fontFamily: "Georgia, 'Times New Roman', serif",
+            fontSize: "0.7rem",
+            letterSpacing: "0.28em",
+            textTransform: "uppercase",
+            color: "#bbb",
+            marginBottom: 20,
+          }}>
+            Availability
+          </p>
+          <h2 style={{
+            fontFamily: "Georgia, 'Times New Roman', serif",
+            fontSize: "clamp(1.6rem, 3.5vw, 3.2rem)",
+            fontWeight: 300,
+            letterSpacing: "0.04em",
+            color: "#111",
+            lineHeight: 1.2,
+            margin: "0 0 16px",
+            maxWidth: 560,
+          }}>
+            Tell me the date, location, and what this is for.
+          </h2>
+          <p style={{
+            fontFamily: "Georgia, 'Times New Roman', serif",
+            fontStyle: "italic",
+            fontSize: "0.95rem",
+            color: "#aaa",
+            margin: 0,
+          }}>
+            I&rsquo;ll reply with availability, package fit, and a clear next step.
+          </p>
         </div>
+        <a href="https://www.soloxsnaps.com/contact/" style={{
+          fontFamily: "Georgia, 'Times New Roman', serif",
+          fontSize: "0.75rem",
+          letterSpacing: "0.18em",
+          textTransform: "uppercase",
+          color: "#fff",
+          background: "#1a1a1a",
+          padding: "14px 32px",
+          textDecoration: "none",
+          whiteSpace: "nowrap",
+        }}>
+          Start an inquiry
+        </a>
       </section>
     </main>
   );
