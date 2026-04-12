@@ -180,6 +180,17 @@ export default function ProNav() {
           .pro-header {
             padding: 16px 22px;
             gap: 16px;
+            background: rgba(250,250,248,0.96) !important;
+            border-bottom: 1px solid rgba(0,0,0,0.06) !important;
+            backdrop-filter: blur(12px) !important;
+            -webkit-backdrop-filter: blur(12px) !important;
+          }
+          .pro-header > .pro-nav-link,
+          .pro-header > .pro-mobile-button {
+            color: #111 !important;
+          }
+          .pro-header > .pro-mobile-button span {
+            color: #4a4a4a !important;
           }
           .pro-desktop-nav { display: none; }
           .pro-mobile-button { display: inline-flex; }
