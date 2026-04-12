@@ -280,18 +280,6 @@ export default function ProfessionalAboutPage() {
           Ready to see what this could look like for you?
         </p>
         <div style={{ display: "flex", gap: 16, justifyContent: "center", flexWrap: "wrap" }}>
-          <Link href="/investment" style={{
-            fontFamily: "Georgia, 'Times New Roman', serif",
-            fontSize: "0.75rem",
-            letterSpacing: "0.18em",
-            textTransform: "uppercase",
-            color: "#fff",
-            background: "#1a1a1a",
-            padding: "14px 32px",
-            textDecoration: "none",
-          }}>
-            View investment
-          </Link>
           <Link href="/contact" style={{
             fontFamily: "Georgia, 'Times New Roman', serif",
             fontSize: "0.75rem",

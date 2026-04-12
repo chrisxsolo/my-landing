@@ -14,6 +14,7 @@ const CSS = `
     .split-img { flex: unset !important; height: 300px !important; width: 100% !important; }
     .pricing-section { padding-left: 24px !important; padding-right: 24px !important; }
     .group-grid { grid-template-columns: 1fr !important; }
+    .group-image { height: 260px !important; margin-bottom: 42px !important; }
   }
 `;
 
@@ -33,10 +34,18 @@ const groupPricing = [
   { people: "6–8 People", price: "$200", unit: "per person" },
 ];
 
+const GROUP_GRAD_IMAGE_URL =
+  "https://dmtslzwglpezympptqls.supabase.co/storage/v1/object/public/grad-photos/portfolio/1775960037598.jpeg";
+
 export default async function GradPricingPage() {
   const { images } = await getPortfolioData();
   const gradImages = images.filter((img) => img.category_slug === "grads");
   const packageImage = gradImages[1]?.image_url ?? gradImages[0]?.image_url ?? null;
+  const groupImage =
+    gradImages.find((img) => img.image_url === GROUP_GRAD_IMAGE_URL)?.image_url ??
+    gradImages.find((img) => `${img.title} ${img.alt}`.toLowerCase().includes("group"))?.image_url ??
+    gradImages[6]?.image_url ??
+    packageImage;
 
   return (
     <main style={{ background: "#fff", color: "#1a1a1a", paddingTop: 80 }}>
@@ -266,6 +275,16 @@ export default async function GradPricingPage() {
           }}>
             Sessions are designed to feel organized, efficient, and elevated — not rushed.
           </p>
+
+          {groupImage && (
+            <div className="group-image" style={{ height: 420, margin: "0 0 56px", overflow: "hidden" }}>
+              <img
+                src={groupImage}
+                alt="Group graduation portraits"
+                style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 62%", display: "block" }}
+              />
+            </div>
+          )}
 
           <div className="group-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 60 }}>
             {/* Services */}

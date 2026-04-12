@@ -49,26 +49,35 @@ async function loadAvailabilityDates() {
 const CSS = `
   .av-day {
     cursor: default;
-    border: 1px solid rgba(0,0,0,0.06);
+    border: 1px solid #d8d8d8;
+    background: #fff;
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
     aspect-ratio: 1;
-    transition: transform 0.15s ease;
+    transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
     font-family: Georgia, 'Times New Roman', serif;
-    font-size: 0.85rem;
-    color: #555;
+    font-size: 0.9rem;
+    color: #333;
     position: relative;
   }
   .av-day-available {
     cursor: pointer;
-    border-color: rgba(0,0,0,0.12);
-    color: #1a1a1a;
+    background: #eaf7ef;
+    border-color: #2f8f5b;
+    color: #145332;
+    font-weight: 600;
   }
-  .av-day-available:hover { transform: scale(1.06); border-color: #1a1a1a; }
-  .av-day-booked { background: rgba(0,0,0,0.02); color: #555; }
-  .av-day-hold   { cursor: pointer; border-color: rgba(0,0,0,0.1); color: #555; }
-  .av-day-hold:hover { transform: scale(1.04); }
-  .av-day-today  { border-color: #1a1a1a !important; }
+  .av-day-available:hover { transform: scale(1.06); border-color: #145332; }
+  .av-day-booked { background: #ececec; border-color: #c8c8c8; color: #555; }
+  .av-day-hold {
+    cursor: pointer;
+    background: #fff1bf;
+    border-color: #9a6b16;
+    color: #5b3d0a;
+    font-weight: 600;
+  }
+  .av-day-hold:hover { transform: scale(1.04); border-color: #5b3d0a; }
+  .av-day-today  { box-shadow: inset 0 0 0 2px #1a1a1a; }
   .av-day-selected { background: #1a1a1a !important; color: #fff !important; }
   .av-nav {
     border: none; background: none; cursor: pointer;
@@ -78,8 +87,8 @@ const CSS = `
   }
   .av-nav:hover { color: #111; }
   .av-dot {
-    width: 4px; height: 4px; border-radius: 50%;
-    position: absolute; bottom: 5px;
+    width: 6px; height: 6px; border-radius: 50%;
+    position: absolute; bottom: 6px;
   }
 `;
 
@@ -230,10 +239,10 @@ export default function AvailabilityPage() {
                       >
                         <span style={{ fontSize: "0.8rem" }}>{day}</span>
                         {!isPast && entry?.status === "available" && !isSel && (
-                          <span className="av-dot" style={{ background: "#1a1a1a" }} />
+                          <span className="av-dot" style={{ background: "#2f8f5b" }} />
                         )}
                         {!isPast && entry?.status === "hold" && !isSel && (
-                          <span className="av-dot" style={{ background: "#555" }} />
+                          <span className="av-dot" style={{ background: "#9a6b16" }} />
                         )}
                       </div>
                     );
@@ -249,12 +258,12 @@ export default function AvailabilityPage() {
               display: "flex", gap: 24, justifyContent: "center", flexWrap: "wrap",
             }}>
               {[
-                { label: "Available", dot: "#1a1a1a" },
-                { label: "On hold",   dot: "#555" },
-                { label: "Booked",    dot: "rgba(0,0,0,0.08)" },
+                { label: "Available", dot: "#2f8f5b" },
+                { label: "On hold",   dot: "#9a6b16" },
+                { label: "Booked",    dot: "#b8b8b8" },
               ].map(({ label, dot }) => (
                 <div key={label} style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                  <span style={{ width: 7, height: 7, borderRadius: "50%", background: dot, flexShrink: 0, border: "1px solid rgba(0,0,0,0.1)" }} />
+                  <span style={{ width: 9, height: 9, borderRadius: "50%", background: dot, flexShrink: 0, border: "1px solid rgba(0,0,0,0.15)" }} />
                   <span style={{
                     fontFamily: "var(--font-dm-sans), sans-serif",
                     fontSize: "0.65rem", letterSpacing: "0.16em",
