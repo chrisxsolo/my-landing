@@ -9,12 +9,47 @@ export const metadata: Metadata = {
 };
 
 const CSS = `
+  .split-img {
+    flex: 0 0 400px;
+    height: 580px;
+    overflow: hidden;
+  }
+  .pricing-photo {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center top;
+    display: block;
+  }
+  .group-image {
+    width: min(100%, 680px);
+    aspect-ratio: 2 / 3;
+    margin: 0 auto 64px;
+    overflow: hidden;
+  }
+  .group-photo {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center center;
+    display: block;
+  }
   @media (max-width: 760px) {
     .split-layout { flex-direction: column !important; }
-    .split-img { flex: unset !important; height: 300px !important; width: 100% !important; }
+    .split-img {
+      flex: unset !important;
+      width: 100% !important;
+      height: auto !important;
+      aspect-ratio: 2 / 3;
+      margin-top: 28px;
+    }
+    .pricing-photo { object-position: center center; }
     .pricing-section { padding-left: 24px !important; padding-right: 24px !important; }
     .group-grid { grid-template-columns: 1fr !important; }
-    .group-image { height: 260px !important; margin-bottom: 42px !important; }
+    .group-image {
+      width: 100%;
+      margin-bottom: 42px !important;
+    }
   }
 `;
 
@@ -230,11 +265,12 @@ export default async function GradPricingPage() {
 
             {/* Image */}
             {packageImage && (
-              <div className="split-img" style={{ flex: "0 0 400px", height: 580, overflow: "hidden" }}>
+              <div className="split-img">
                 <img
                   src={packageImage}
                   alt="Graduation portrait"
-                  style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center top", display: "block" }}
+                  className="pricing-photo"
+                  decoding="async"
                 />
               </div>
             )}
@@ -277,12 +313,13 @@ export default async function GradPricingPage() {
           </p>
 
           {groupImage && (
-            <div className="group-image" style={{ height: 420, margin: "0 0 56px", overflow: "hidden" }}>
-              <img
-                src={groupImage}
-                alt="Group graduation portraits"
-                style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 62%", display: "block" }}
-              />
+            <div className="group-image">
+                <img
+                  src={groupImage}
+                  alt="Group graduation portraits"
+                  className="group-photo"
+                  decoding="async"
+                />
             </div>
           )}
 

@@ -68,6 +68,25 @@ export default function HeroCarousel({ images }: { images: CarouselImage[] }) {
           transition: all 0.35s ease;
         }
         .hero-dot-btn:hover { opacity: 0.7; }
+        .hero-wordmark {
+          font-family: Georgia, 'Times New Roman', serif;
+          font-size: 5.5rem;
+          font-weight: 300;
+          letter-spacing: 0px;
+          text-transform: uppercase;
+          color: #ffffff;
+          margin: 0;
+          text-align: center;
+          text-shadow: 0 1px 24px rgba(0,0,0,0.2);
+          white-space: nowrap;
+          max-width: calc(100vw - 32px);
+        }
+        @media (max-width: 760px) {
+          .hero-wordmark { font-size: 2.9rem; }
+        }
+        @media (max-width: 360px) {
+          .hero-wordmark { font-size: 2.45rem; }
+        }
       `}</style>
 
       {/* Full-viewport image stack */}
@@ -101,17 +120,7 @@ export default function HeroCarousel({ images }: { images: CarouselImage[] }) {
           display: "flex", alignItems: "center", justifyContent: "center",
           pointerEvents: "none",
         }}>
-          <h1 style={{
-            fontFamily: "Georgia, 'Times New Roman', serif",
-            fontSize: "clamp(2rem, 6vw, 5.5rem)",
-            fontWeight: 300,
-            letterSpacing: "0.22em",
-            textTransform: "uppercase",
-            color: "#ffffff",
-            margin: 0,
-            textAlign: "center",
-            textShadow: "0 1px 24px rgba(0,0,0,0.2)",
-          }}>
+          <h1 className="hero-wordmark">
             soloxsnaps
           </h1>
         </div>
