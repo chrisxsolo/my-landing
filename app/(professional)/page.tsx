@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getPortfolioData, type PortfolioCategory, type PortfolioImage } from "@/lib/professionalData";
+import { getPortfolioData, getSiteSettings, type PortfolioCategory, type PortfolioImage } from "@/lib/professionalData";
 import HeroCarousel from "@/app/components/HeroCarousel";
 
 export const dynamic = "force-dynamic";
@@ -54,9 +54,18 @@ const CSS = `
 `;
 
 export default async function ProfessionalHomePage() {
-  const { categories, images } = await getPortfolioData();
+  const [{ categories, images }, settings] = await Promise.all([
+    getPortfolioData(),
+    getSiteSettings(),
+  ]);
   const heroImage = images[0];
   const heroImageUrl = heroImage?.image_url ?? profileImage;
+
+  function resolveSettingsCover(key: string, fallback: PortfolioImage | undefined) {
+    const url = settings[key];
+    if (url) return { image_url: url, alt: key.replace("home_cover_", "") } as PortfolioImage;
+    return fallback;
+  }
 
   const visibleCategories = visiblePortfolioSlugs
     .map((slug) => categories.find((c) => c.slug === slug))
@@ -64,10 +73,12 @@ export default async function ProfessionalHomePage() {
 
   const portfolioSections = visibleCategories.map((category, index) => ({
     category,
-    cover: getCoverForCategory(category, images, heroImage, index),
+    cover: resolveSettingsCover(`home_cover_${category.slug}`, getCoverForCategory(category, images, heroImage, index)),
     subline: category.slug === "grads" ? "the milestone" : "the people",
   }));
 
+  const carouselImages = images.filter(img => img.hero_carousel).slice(0, 5);
+  const heroImages = carouselImages.length > 0 ? carouselImages : images.slice(0, 5);
   const previewImages = images.slice(0, 3);
   const instagramImages = images.slice(0, 8);
 
@@ -91,7 +102,7 @@ export default async function ProfessionalHomePage() {
       />
 
       {/* ── 1. HERO — full viewport, image cycles, name overlaid ── */}
-      <HeroCarousel images={images} />
+      <HeroCarousel images={heroImages} />
 
       {/* ── 2. INTRO STATEMENT ── */}
       <section style={{ padding: "100px 40px", textAlign: "center", background: "#fff" }}>
@@ -294,15 +305,15 @@ export default async function ProfessionalHomePage() {
           ))}
 
           {/* Contact card */}
-          <a
-            href="https://www.soloxsnaps.com/contact/"
+          <Link
+            href="/contact"
             className="pro-card-link"
             style={{ padding: "60px 40px", textAlign: "center" }}
           >
-            {heroImage && (
+            {(settings["home_cover_contact"] ?? heroImage?.image_url) && (
               <div className="pro-img-wrap" style={{ overflow: "hidden", marginBottom: 28 }}>
                 <img
-                  src={heroImage.image_url}
+                  src={settings["home_cover_contact"] ?? heroImage!.image_url}
                   alt="Book a session"
                   className="pro-img"
                   style={{ width: "100%", height: 260, objectFit: "cover" }}
@@ -330,7 +341,7 @@ export default async function ProfessionalHomePage() {
               get in touch
             </p>
             <div style={{ width: 24, height: 1, background: "rgba(0,0,0,0.15)", margin: "0 auto" }} />
-          </a>
+          </Link>
         </div>
       </section>
 

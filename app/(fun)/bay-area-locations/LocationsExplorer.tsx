@@ -180,7 +180,7 @@ export default function LocationsExplorer({
                 Book a shoot -&gt;
               </a>
               <Link
-                href="/availability"
+                href="/booking"
                 className="btn-lift rounded-full px-6 py-3 text-sm font-bold text-slate-900"
                 style={{ background: C.surfaceStrong, border: `1px solid ${C.borderSubtle}`, boxShadow: C.shadowWarmSm }}
               >

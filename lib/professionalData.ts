@@ -18,6 +18,7 @@ export type PortfolioImage = {
   category_slug: string;
   category_name: string;
   featured: boolean;
+  hero_carousel: boolean;
   sort_order: number;
   created_at: string | null;
 };
@@ -92,6 +93,7 @@ const FALLBACK_IMAGES: PortfolioImage[] = [
     category_slug: "families",
     category_name: "Families",
     featured: true,
+    hero_carousel: true,
     sort_order: 1,
     created_at: null,
   },
@@ -133,6 +135,7 @@ function normalizeImage(
     category_slug: categorySlug,
     category_name: category?.name ?? categorySlug,
     featured: raw.featured ?? index < 6,
+    hero_carousel: raw.hero_carousel ?? false,
     sort_order: Number(raw.sort_order ?? raw.order ?? index + 1),
     created_at: raw.created_at ?? null,
   };
@@ -231,6 +234,17 @@ export async function getPortfolioData() {
   const images = await getPortfolioImages(categories);
 
   return { categories, images };
+}
+
+export async function getSiteSettings(): Promise<Record<string, string | null>> {
+  try {
+    const supabase = createSupabaseServerClient();
+    const { data } = await supabase.from("site_settings").select("key,value");
+    if (!data) return {};
+    return data.reduce((acc, row) => { acc[row.key] = row.value; return acc; }, {} as Record<string, string | null>);
+  } catch {
+    return {};
+  }
 }
 
 export async function getBlogPostsByCategory(category: "professional" | "journal") {

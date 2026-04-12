@@ -17,20 +17,7 @@ export const metadata: Metadata = {
 
 const CSS = `
   .port-figure { overflow: hidden; }
-  .port-img { transition: transform 0.7s ease; display: block; }
-  .port-figure:hover .port-img { transform: scale(1.04); }
-  .port-caption {
-    position: absolute; inset: 0;
-    display: flex; align-items: flex-end; justify-content: space-between;
-    gap: 8px; padding: 16px;
-    background: rgba(0,0,0,0);
-    opacity: 0;
-    transition: background 0.35s ease, opacity 0.35s ease;
-  }
-  .port-figure:hover .port-caption {
-    background: rgba(0,0,0,0.38);
-    opacity: 1;
-  }
+  .port-img { display: block; }
   .port-filter-link { transition: color 0.2s ease, border-color 0.2s ease; text-decoration: none; }
   .port-filter-link:hover { color: #111 !important; }
 `;
@@ -154,25 +141,6 @@ export default async function PortfolioPage({
                     className="port-img"
                     style={{ width: "100%", height: "100%", objectFit: "cover" }}
                   />
-                  <figcaption className="port-caption">
-                    <span style={{
-                      fontFamily: "Georgia, 'Times New Roman', serif",
-                      fontSize: "0.8rem",
-                      color: "#fff",
-                      fontStyle: "italic",
-                    }}>
-                      {image.title}
-                    </span>
-                    <span style={{
-                      fontFamily: "Georgia, 'Times New Roman', serif",
-                      fontSize: "0.65rem",
-                      letterSpacing: "0.18em",
-                      textTransform: "uppercase",
-                      color: "rgba(255,255,255,0.65)",
-                    }}>
-                      {image.category_name}
-                    </span>
-                  </figcaption>
                 </figure>
               ))}
             </div>
@@ -206,7 +174,7 @@ export default async function PortfolioPage({
         }}>
           Like what you see?
         </p>
-        <a href="https://www.soloxsnaps.com/contact/" style={{
+        <Link href="/contact" style={{
           fontFamily: "Georgia, 'Times New Roman', serif",
           fontSize: "0.75rem",
           letterSpacing: "0.18em",
@@ -218,7 +186,7 @@ export default async function PortfolioPage({
           display: "inline-block",
         }}>
           Inquire now
-        </a>
+        </Link>
       </section>
     </main>
   );

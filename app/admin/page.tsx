@@ -13,7 +13,7 @@ type Pose = { id:number; title:string; image_url:string; instructions:string; or
 type Spot = { id:number; school_id:string; school_name:string; school_short:string; name:string; description:string; tip:string; icon:string; image_url:string|null; order:number; };
 type BlogPost = { id:number; title:string; body:string; published_at:string; slug:string; cover_image_url:string|null; extra_image_urls:string[]; category?:BlogCategory|string|null; };
 type PortfolioCategory = { id:number; name:string; slug:string; description:string|null; sort_order:number; active:boolean; };
-type PortfolioImage = { id:number; title:string; alt:string|null; image_url:string; category_id:number|null; category_slug:string; featured:boolean; sort_order:number; created_at:string|null; };
+type PortfolioImage = { id:number; title:string; alt:string|null; image_url:string; category_id:number|null; category_slug:string; featured:boolean; hero_carousel:boolean; sort_order:number; created_at:string|null; };
 type LinkClickEvent = { link_id:number|null; user_id:string|null; clicked_at:string; };
 type LinkViewEvent = { user_id:string|null; viewed_at:string; };
 type LinkStat = { id:number; label:string; emoji:string|null; url:string; clicks:number; uniqueClickers:number; ctr:number; clickShare:number; };
@@ -115,6 +115,18 @@ export default function AdminDashboard() {
   const [editingCategory,setEditingCategory]=useState<PortfolioCategory|null>(null);
   const [categoryDeleteConfirm,setCategoryDeleteConfirm]=useState<number|null>(null);
 
+  // ── Batch upload ─────────────────────────────────────────────────────
+  type BatchItem = { file: File; preview: string; category_slug: string; title: string; };
+  const [batchItems, setBatchItems] = useState<BatchItem[]>([]);
+  const [batchSaving, setBatchSaving] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const batchFileRef = useRef<HTMLInputElement>(null);
+
+  // ── Site settings (home cover photos) ────────────────────────────────
+  const [siteSettings, setSiteSettings] = useState<Record<string,string|null>>({});
+  const [settingsSaving, setSettingsSaving] = useState<string|null>(null);
+  const [coverPickerKey, setCoverPickerKey] = useState<string|null>(null);
+
   // ── Blog ──────────────────────────────────────────────────────────────
   const [posts,setPosts]=useState<BlogPost[]>([]);
   const [postsLoading,setPostsLoading]=useState(false);
@@ -142,6 +154,65 @@ export default function AdminDashboard() {
 
   function showToast(msg:string,ok=true){setToast({msg,ok});setTimeout(()=>setToast(null),3000);}
   function isSetupMissing(error:{code?:string;message?:string}|null){const message=error?.message?.toLowerCase()??"";return error?.code==="42P01"||error?.code==="42703"||message.includes("does not exist")||message.includes("schema cache");}
+
+  async function fetchSiteSettings(){
+    const{data}=await supabase.from('site_settings').select('key,value');
+    if(data)setSiteSettings(data.reduce((acc:{[k:string]:string|null},r)=>{acc[r.key]=r.value;return acc;},{}));
+  }
+
+  function onBatchFiles(e:React.ChangeEvent<HTMLInputElement>){
+    const files=Array.from(e.target.files??[]);
+    if(!files.length)return;
+    const defaultCat=categories[0]?.slug??"grads";
+    setBatchItems(prev=>[...prev,...files.map(f=>({file:f,preview:URL.createObjectURL(f),category_slug:defaultCat,title:f.name.replace(/\.[^.]+$/,"").replace(/[-_]/g," ")}))]);
+    if(batchFileRef.current)batchFileRef.current.value="";
+  }
+
+  async function saveBatchImages(){
+    if(!batchItems.length){showToast("No images queued",false);return;}
+    setBatchSaving(true);
+    let saved=0;
+    for(const item of batchItems){
+      const url=await uploadImage(item.file,"portfolio");
+      if(!url)continue;
+      const cat=categories.find(c=>c.slug===item.category_slug);
+      const{error}=await supabase.from('portfolio_images').insert({title:item.title||"Portfolio image",alt:item.title||"Portfolio image",image_url:url,category_id:cat?.id??null,category_slug:item.category_slug,featured:false,sort_order:portfolioImages.length+saved+1});
+      if(!error)saved++;
+    }
+    setBatchSaving(false);
+    setBatchItems([]);
+    showToast(`${saved} image${saved!==1?"s":""} uploaded`);
+    fetchPortfolioImages();
+  }
+
+  async function importGradPhotos(){
+    setImporting(true);
+    const{data:gradPhotos}=await supabase.from('grad_photos').select('id,image_url,caption,created_at').order('created_at',{ascending:false});
+    if(!gradPhotos||gradPhotos.length===0){showToast("No grad photos found",false);setImporting(false);return;}
+    const{data:existing}=await supabase.from('portfolio_images').select('image_url');
+    const existingUrls=new Set((existing??[]).map(r=>r.image_url));
+    const toImport=gradPhotos.filter(p=>p.image_url&&!existingUrls.has(p.image_url));
+    if(!toImport.length){showToast("All grad photos already imported",true);setImporting(false);return;}
+    const gradCat=categories.find(c=>c.slug==="grads");
+    let count=0;
+    for(let i=0;i<toImport.length;i++){
+      const p=toImport[i];
+      const{error}=await supabase.from('portfolio_images').insert({title:p.caption||"Graduation portrait",alt:p.caption||"Bay Area graduation portrait by Chris Solorzano",image_url:p.image_url,category_id:gradCat?.id??null,category_slug:"grads",featured:i<6,sort_order:portfolioImages.length+count+1});
+      if(!error)count++;
+    }
+    setImporting(false);
+    showToast(`${count} grad photo${count!==1?"s":""} imported`);
+    fetchPortfolioImages();
+  }
+
+  async function updateSiteSetting(key:string,value:string|null){
+    setSettingsSaving(key);
+    await supabase.from('site_settings').upsert({key,value,updated_at:new Date().toISOString()},{onConflict:'key'});
+    setSiteSettings(prev=>({...prev,[key]:value}));
+    setSettingsSaving(null);
+    setCoverPickerKey(null);
+    showToast("Cover photo updated");
+  }
 
   async function fetchPoses(){setPosesLoading(true);const{data}=await supabase.from('grad_poses').select('*').order('order',{ascending:true});if(data)setPoses(data);setPosesLoading(false);}
   async function fetchSpots(){setSpotsLoading(true);const{data}=await supabase.from('location_spots').select('*').order('school_id').order('order',{ascending:true});if(data)setSpots(data);setSpotsLoading(false);}
@@ -261,12 +332,34 @@ export default function AdminDashboard() {
     }
   }
   
-  useEffect(()=>{if(authed){fetchPoses();fetchSpots();fetchCategories();fetchPortfolioImages();fetchPosts();if(tab==="analytics")fetchLinkStats();}},[authed,tab,blogCategory]);
+  useEffect(()=>{if(authed){fetchPoses();fetchSpots();fetchCategories();fetchPortfolioImages();fetchPosts();fetchSiteSettings();if(tab==="analytics")fetchLinkStats();}},[authed,tab,blogCategory]);
+
+  async function compressImage(file:File, maxPx=2400, quality=0.82):Promise<Blob>{
+    return new Promise(resolve=>{
+      const img=new Image();
+      const url=URL.createObjectURL(file);
+      img.onload=()=>{
+        URL.revokeObjectURL(url);
+        let {width,height}=img;
+        if(width>maxPx||height>maxPx){
+          if(width>height){height=Math.round(height*(maxPx/width));width=maxPx;}
+          else{width=Math.round(width*(maxPx/height));height=maxPx;}
+        }
+        const canvas=document.createElement('canvas');
+        canvas.width=width; canvas.height=height;
+        const ctx=canvas.getContext('2d')!;
+        ctx.drawImage(img,0,0,width,height);
+        canvas.toBlob(blob=>resolve(blob??file),'image/jpeg',quality);
+      };
+      img.onerror=()=>{URL.revokeObjectURL(url);resolve(file);};
+      img.src=url;
+    });
+  }
 
   async function uploadImage(file:File,folder:string):Promise<string|null>{
-    const ext=file.name.split('.').pop();
-    const name=`${folder}/${Date.now()}.${ext}`;
-    const{error}=await supabase.storage.from('grad-photos').upload(name,file,{upsert:true});
+    const compressed = await compressImage(file);
+    const name=`${folder}/${Date.now()}.jpg`;
+    const{error}=await supabase.storage.from('grad-photos').upload(name,compressed,{upsert:true,contentType:'image/jpeg'});
     if(error){
       console.error("Upload error:", error);
       showToast(`Image upload failed: ${error.message}`,false);
@@ -359,6 +452,14 @@ export default function AdminDashboard() {
     setPortfolioSaving(false);
   }
   async function deletePortfolioImage(id:number){await supabase.from('portfolio_images').delete().eq('id',id);setPortfolioImages(p=>p.filter(x=>x.id!==id));setPortfolioDeleteConfirm(null);if(editingPortfolioImage?.id===id)cancelEditPortfolioImage();showToast("Portfolio image deleted");}
+
+  async function toggleCarousel(id:number, current:boolean){
+    const carouselCount = portfolioImages.filter(i=>i.hero_carousel).length;
+    if(!current && carouselCount>=5){showToast("Max 5 carousel images — remove one first",false);return;}
+    await supabase.from('portfolio_images').update({hero_carousel:!current}).eq('id',id);
+    setPortfolioImages(p=>p.map(x=>x.id===id?{...x,hero_carousel:!current}:x));
+    showToast(!current?"Added to carousel":"Removed from carousel");
+  }
 
   // ── Blog handlers ──────────────────────────────────────────────────────
   function slugify(s:string){return s.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");}
@@ -637,15 +738,16 @@ export default function AdminDashboard() {
         {/* ── PORTFOLIO ── */}
         {tab==="portfolio"&&(
           <div className="space-y-6">
+
+            {/* ── Single image upload/edit ── */}
             <div className={card}>
               <div className="h-[3px]" style={{background:"#111827"}}/>
               <div className="p-6">
                 <div className="flex items-center justify-between mb-5">
-                  <h2 className="text-base font-black text-slate-900">{editingPortfolioImage?`Editing: ${editingPortfolioImage.title}`:"New Portfolio Image"}</h2>
+                  <h2 className="text-base font-black text-slate-900">{editingPortfolioImage?`Editing: ${editingPortfolioImage.title}`:"Add Single Image"}</h2>
                   {editingPortfolioImage&&<button onClick={cancelEditPortfolioImage} className="text-xs font-bold text-slate-400 px-3 py-1.5 rounded-lg bg-slate-100">Cancel edit</button>}
                 </div>
                 {editingPortfolioImage&&<div className="mb-4 px-3 py-2 rounded-xl text-xs font-bold" style={{background:C.p1_08,color:C.p1,border:`1px solid ${C.p1_20}`}}>✏️ Editing professional portfolio image.</div>}
-
                 <div className="mb-4">
                   <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Photo</label>
                   {portfolioPreview?(
@@ -663,11 +765,10 @@ export default function AdminDashboard() {
                   )}
                   <input ref={portfolioFileRef} type="file" accept="image/*" className="hidden" onChange={onPortfolioFile}/>
                 </div>
-
                 <div className="space-y-3">
                   <div><label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1.5">Title</label><input className={inp} placeholder="e.g. Golden hour grad portrait" value={portfolioForm.title} onChange={e=>setPortfolioForm(f=>({...f,title:e.target.value}))}/></div>
                   <div><label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1.5">Alt Text</label><input className={inp} placeholder="Describe the image for SEO and accessibility" value={portfolioForm.alt} onChange={e=>setPortfolioForm(f=>({...f,alt:e.target.value}))}/></div>
-                  <div><label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1.5">Category</label><select className={inp} value={portfolioForm.category_slug} onChange={e=>setPortfolioForm(f=>({...f,category_slug:e.target.value}))}>{categories.length>0?categories.map(category=><option key={category.slug} value={category.slug}>{category.name}</option>):<option value="portfolio">Portfolio</option>}</select></div>
+                  <div><label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1.5">Category</label><select className={inp} value={portfolioForm.category_slug} onChange={e=>setPortfolioForm(f=>({...f,category_slug:e.target.value}))}>{categories.length>0?categories.map(c=><option key={c.slug} value={c.slug}>{c.name}</option>):<option value="grads">Grads</option>}</select></div>
                   <div><label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1.5">Order #</label><input className={inp} type="number" placeholder="e.g. 1" value={portfolioForm.sort_order} onChange={e=>setPortfolioForm(f=>({...f,sort_order:e.target.value}))}/></div>
                   <label className="flex items-center gap-2 text-sm font-bold text-slate-700"><input type="checkbox" checked={portfolioForm.featured} onChange={e=>setPortfolioForm(f=>({...f,featured:e.target.checked}))}/> Featured on homepage</label>
                   <button onClick={savePortfolioImage} disabled={portfolioSaving} className="w-full py-3 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90 active:scale-95 mt-2" style={{background:"#111827",opacity:portfolioSaving?0.7:1}}>
@@ -677,6 +778,142 @@ export default function AdminDashboard() {
               </div>
             </div>
 
+            {/* ── Batch upload ── */}
+            <div className={card}>
+              <div className="h-[3px]" style={{background:C.grad12}}/>
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-2">
+                  <h2 className="text-base font-black text-slate-900">Batch Upload</h2>
+                  <button onClick={()=>batchFileRef.current?.click()} className="text-xs font-bold px-4 py-2 rounded-xl text-white" style={{background:C.grad12}}>+ Add photos</button>
+                </div>
+                <p className="text-xs text-slate-400 mb-4">Select multiple photos at once. Set a category for each before saving.</p>
+                <input ref={batchFileRef} type="file" accept="image/*" multiple className="hidden" onChange={onBatchFiles}/>
+
+                {batchItems.length>0?(
+                  <>
+                    <div className="space-y-2 mb-4">
+                      {batchItems.map((item,i)=>(
+                        <div key={i} className="flex items-center gap-3 p-2 rounded-xl bg-slate-50 border border-slate-100">
+                          <div className="w-14 h-14 flex-shrink-0 rounded-lg overflow-hidden bg-slate-200">
+                            <img src={item.preview} className="w-full h-full object-cover"/>
+                          </div>
+                          <div className="flex-1 min-w-0 space-y-1.5">
+                            <input className="w-full px-2 py-1 rounded-lg text-xs font-medium text-slate-800 outline-none border border-slate-200 bg-white" placeholder="Title" value={item.title} onChange={e=>setBatchItems(prev=>prev.map((x,j)=>j===i?{...x,title:e.target.value}:x))}/>
+                            <select className="w-full px-2 py-1 rounded-lg text-xs font-medium text-slate-800 outline-none border border-slate-200 bg-white" value={item.category_slug} onChange={e=>setBatchItems(prev=>prev.map((x,j)=>j===i?{...x,category_slug:e.target.value}:x))}>
+                              {categories.map(c=><option key={c.slug} value={c.slug}>{c.name}</option>)}
+                            </select>
+                          </div>
+                          <button onClick={()=>setBatchItems(prev=>prev.filter((_,j)=>j!==i))} className="w-7 h-7 rounded-full bg-slate-200 text-slate-500 text-xs font-bold flex-shrink-0 flex items-center justify-center hover:bg-red-100 hover:text-red-500 transition-colors">✕</button>
+                        </div>
+                      ))}
+                    </div>
+                    <button onClick={saveBatchImages} disabled={batchSaving} className="w-full py-3 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90" style={{background:C.grad12,opacity:batchSaving?0.7:1}}>
+                      {batchSaving?`Uploading…`:`Upload ${batchItems.length} image${batchItems.length!==1?"s":""} →`}
+                    </button>
+                  </>
+                ):(
+                  <button onClick={()=>batchFileRef.current?.click()} className="w-full h-32 rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-2" style={{borderColor:C.p1_20,background:C.p1_04}}>
+                    <span className="text-2xl">📁</span>
+                    <span className="text-xs font-bold" style={{color:C.p1}}>Tap to select multiple photos</span>
+                    <span className="text-xs text-slate-400">Tag each as Grads or Families before uploading</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* ── Import from grad_photos ── */}
+            <div className={card}>
+              <div className="h-[3px]" style={{background:C.grad90_23}}/>
+              <div className="p-6 flex items-center justify-between gap-4 flex-wrap">
+                <div>
+                  <h2 className="text-base font-black text-slate-900 mb-1">Import from Grad Photos</h2>
+                  <p className="text-xs text-slate-400">Copies any grad_photos not yet in the portfolio (tagged as Grads).</p>
+                </div>
+                <button onClick={importGradPhotos} disabled={importing} className="flex-shrink-0 px-5 py-2.5 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90" style={{background:C.grad90_23,opacity:importing?0.7:1}}>
+                  {importing?"Importing…":"Import Grad Photos →"}
+                </button>
+              </div>
+            </div>
+
+            {/* ── Home Cover Photos ── */}
+            <div className={card}>
+              <div className="h-[3px]" style={{background:"#111827"}}/>
+              <div className="p-6">
+                <h2 className="text-base font-black text-slate-900 mb-1">Home Page Cover Photos</h2>
+                <p className="text-xs text-slate-400 mb-5">Pick which portfolio image appears on the home page for each section card. Click a slot to open the picker.</p>
+                <div className="space-y-4">
+                  {([["home_cover_grads","Grads card"],["home_cover_families","Families card"],["home_cover_contact","Contact card"]] as [string,string][]).map(([key,label])=>(
+                    <div key={key}>
+                      <p className="text-xs font-black uppercase tracking-widest text-slate-500 mb-2">{label}</p>
+                      {coverPickerKey===key?(
+                        <div>
+                          <div className="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto mb-2">
+                            {portfolioImages.map(img=>(
+                              <button key={img.id} onClick={()=>updateSiteSetting(key,img.image_url)} disabled={settingsSaving===key}
+                                className="relative aspect-square rounded-xl overflow-hidden border-2 transition-all hover:scale-105"
+                                style={{borderColor:siteSettings[key]===img.image_url?"#111827":"transparent"}}>
+                                <img src={img.image_url} className="w-full h-full object-cover"/>
+                                {siteSettings[key]===img.image_url&&<div className="absolute inset-0 bg-black/40 flex items-center justify-center"><span className="text-white text-lg font-black">✓</span></div>}
+                              </button>
+                            ))}
+                          </div>
+                          <div className="flex gap-2">
+                            <button onClick={()=>setCoverPickerKey(null)} className="text-xs font-bold px-3 py-1.5 rounded-lg bg-slate-100 text-slate-500">Cancel</button>
+                            {siteSettings[key]&&<button onClick={()=>updateSiteSetting(key,null)} className="text-xs font-bold px-3 py-1.5 rounded-lg text-red-500 bg-red-50">Remove cover</button>}
+                          </div>
+                        </div>
+                      ):(
+                        <button onClick={()=>setCoverPickerKey(key)} className="flex items-center gap-3 w-full p-2 rounded-xl border border-slate-100 bg-slate-50 hover:bg-slate-100 transition-colors text-left">
+                          {siteSettings[key]?(
+                            <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-slate-200">
+                              <img src={siteSettings[key]!} className="w-full h-full object-cover"/>
+                            </div>
+                          ):(
+                            <div className="w-16 h-16 rounded-lg flex-shrink-0 bg-slate-200 flex items-center justify-center text-slate-400 text-xl">🖼️</div>
+                          )}
+                          <div>
+                            <p className="text-xs font-black text-slate-800">{siteSettings[key]?"Change cover photo":"Set cover photo"}</p>
+                            <p className="text-xs text-slate-400">{siteSettings[key]?"Click to pick a different image":"Uses first portfolio image as fallback"}</p>
+                          </div>
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* ── Hero Carousel Manager ── */}
+            <div className={card}>
+              <div className="h-[3px]" style={{background:"#111827"}}/>
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-1">
+                  <h2 className="text-base font-black text-slate-900">Hero Carousel</h2>
+                  <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-500">{portfolioImages.filter(i=>i.hero_carousel).length} / 5</span>
+                </div>
+                <p className="text-xs text-slate-400 mb-4">These photos rotate in the full-screen hero on the home page. Pick up to 5.</p>
+                {portfolioImages.filter(i=>i.hero_carousel).length===0?(
+                  <p className="text-sm text-slate-400 italic">No carousel images set — toggle images below.</p>
+                ):(
+                  <div className="grid grid-cols-5 gap-2">
+                    {portfolioImages.filter(i=>i.hero_carousel).map(img=>(
+                      <div key={img.id} className="relative aspect-square rounded-xl overflow-hidden group">
+                        <img src={img.image_url} className="w-full h-full object-cover"/>
+                        <button onClick={()=>toggleCarousel(img.id,true)}
+                          className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
+                          <span className="text-white text-xs font-black bg-red-500/80 px-2 py-1 rounded-lg">Remove</span>
+                        </button>
+                      </div>
+                    ))}
+                    {portfolioImages.filter(i=>i.hero_carousel).length<5&&(
+                      <div className="aspect-square rounded-xl border-2 border-dashed flex items-center justify-center text-slate-300 text-2xl" style={{borderColor:"rgba(0,0,0,0.1)"}}>+</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* ── Image list ── */}
             <div>
               <div className="flex items-center gap-2 mb-3">
                 <p className="text-xs font-black uppercase tracking-widest text-slate-900">Portfolio Images</p>
@@ -698,7 +935,14 @@ export default function AdminDashboard() {
                                 </div>
                                 <p className="text-xs text-slate-400">{categoryName(image.category_slug)} · #{image.sort_order}</p>
                               </div>
-                              <div className="flex gap-2 flex-shrink-0">
+                              <div className="flex gap-2 flex-shrink-0 items-center">
+                                <button
+                                  onClick={()=>toggleCarousel(image.id, image.hero_carousel)}
+                                  title={image.hero_carousel?"Remove from carousel":"Add to carousel"}
+                                  className="text-xs font-black px-2.5 py-1.5 rounded-lg transition-colors"
+                                  style={image.hero_carousel?{background:"#111827",color:"#fff"}:{background:"#f1f5f9",color:"#64748b"}}>
+                                  {image.hero_carousel?"★":"☆"}
+                                </button>
                                 {editingPortfolioImage?.id!==image.id&&<button onClick={()=>startEditPortfolioImage(image)} className="text-xs font-bold px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700">Edit</button>}
                                 {portfolioDeleteConfirm===image.id?(
                                   <div className="flex gap-1.5">

@@ -68,7 +68,7 @@ export default function AvailabilityPage() {
   useEffect(() => {
     async function fetch() {
       try {
-        const { data } = await supabase.from("availability").select("*");
+        const { data } = await supabase.from("professional_availability").select("*");
         if (data) setDates(data);
       } catch (e) { console.error(e); }
       finally { setLoading(false); }
