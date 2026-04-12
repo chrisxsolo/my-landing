@@ -52,7 +52,7 @@ export default async function ProfessionalBlogPage() {
           fontSize: "0.7rem",
           letterSpacing: "0.28em",
           textTransform: "uppercase",
-          color: "#bbb",
+          color: "#555",
           marginBottom: 20,
         }}>
           Blog
@@ -74,7 +74,7 @@ export default async function ProfessionalBlogPage() {
           fontFamily: "Georgia, 'Times New Roman', serif",
           fontStyle: "italic",
           fontSize: "1rem",
-          color: "#aaa",
+          color: "#555",
           maxWidth: 480,
           margin: "0 auto",
           lineHeight: 1.7,
@@ -101,7 +101,7 @@ export default async function ProfessionalBlogPage() {
                     fontFamily: "Georgia, 'Times New Roman', serif",
                     fontSize: "2rem",
                     fontWeight: 300,
-                    color: "#e8e8e8",
+                    color: "#555",
                     margin: 0,
                     lineHeight: 1,
                   }}>
@@ -129,7 +129,7 @@ export default async function ProfessionalBlogPage() {
                       fontSize: "0.68rem",
                       letterSpacing: "0.2em",
                       textTransform: "uppercase",
-                      color: "#ccc",
+                      color: "#555",
                       marginBottom: 16,
                     }}>
                       {formatDate(post.published_at)}
@@ -149,7 +149,7 @@ export default async function ProfessionalBlogPage() {
                       fontFamily: "Georgia, 'Times New Roman', serif",
                       fontSize: "0.9rem",
                       lineHeight: 1.75,
-                      color: "#999",
+                      color: "#555",
                       marginBottom: 20,
                     }}>
                       {excerpt(post.meta_description || post.body)}
@@ -158,7 +158,7 @@ export default async function ProfessionalBlogPage() {
                       fontFamily: "Georgia, 'Times New Roman', serif",
                       fontStyle: "italic",
                       fontSize: "0.88rem",
-                      color: "#bbb",
+                      color: "#555",
                       borderBottom: "1px solid rgba(0,0,0,0.15)",
                       paddingBottom: 1,
                     }}>
@@ -174,7 +174,7 @@ export default async function ProfessionalBlogPage() {
               textAlign: "center",
               fontFamily: "Georgia, 'Times New Roman', serif",
               fontStyle: "italic",
-              color: "#ccc",
+              color: "#555",
               fontSize: "1.05rem",
             }}>
               No case studies yet.

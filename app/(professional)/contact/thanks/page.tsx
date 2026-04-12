@@ -34,7 +34,7 @@ const CSS = `
     font-size: 0.6rem;
     letter-spacing: 0.22em;
     text-transform: uppercase;
-    color: #bbb;
+    color: #555;
     min-width: 110px;
     padding-top: 3px;
     flex-shrink: 0;
@@ -50,6 +50,8 @@ const CSS = `
   @media (max-width: 640px) {
     .thanks-grid { grid-template-columns: 1fr !important; gap: 40px !important; }
     .thanks-main { padding: 60px 24px !important; }
+    .detail-row { flex-direction: column; gap: 6px; }
+    .detail-label { min-width: 0; }
   }
 `;
 
@@ -103,7 +105,7 @@ export default function ThanksPage() {
           <p style={{
             fontFamily: "Georgia, 'Times New Roman', serif",
             fontSize: "0.68rem", letterSpacing: "0.28em",
-            textTransform: "uppercase", color: "#bbb", marginBottom: 20,
+            textTransform: "uppercase", color: "#555", marginBottom: 20,
           }}>
             Inquiry received
           </p>
@@ -118,7 +120,7 @@ export default function ThanksPage() {
           <div style={{ width: 36, height: 1, background: "rgba(0,0,0,0.12)", marginBottom: 24 }} />
           <p style={{
             fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
-            fontSize: "1.05rem", color: "#888", lineHeight: 1.8, maxWidth: 480,
+            fontSize: "1.05rem", color: "#555", lineHeight: 1.8, maxWidth: 480,
           }}>
             Your inquiry is in. I&rsquo;ll be in touch within 24–48 hours to confirm availability
             and talk through next steps.
@@ -135,13 +137,13 @@ export default function ThanksPage() {
             <p style={{
               fontFamily: "var(--font-dm-sans), sans-serif",
               fontSize: "0.6rem", letterSpacing: "0.24em",
-              textTransform: "uppercase", color: "#bbb", marginBottom: 4,
+              textTransform: "uppercase", color: "#555", marginBottom: 4,
             }}>
               What you submitted
             </p>
             <p style={{
               fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
-              fontSize: "0.82rem", color: "#ccc", marginBottom: 24,
+              fontSize: "0.82rem", color: "#555", marginBottom: 24,
             }}>
               Keep this for your records.
             </p>
@@ -159,11 +161,11 @@ export default function ThanksPage() {
           <p style={{
             fontFamily: "var(--font-dm-sans), sans-serif",
             fontSize: "0.6rem", letterSpacing: "0.24em",
-            textTransform: "uppercase", color: "#bbb", marginBottom: 20,
+            textTransform: "uppercase", color: "#555", marginBottom: 20,
           }}>
             What happens next
           </p>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20 }}>
+          <div className="thanks-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20 }}>
             {[
               { step: "01", title: "I review", body: "Your inquiry lands directly in my inbox and I review every detail." },
               { step: "02", title: "I reply", body: "Expect a response within 24–48 hours — usually sooner." },
@@ -172,7 +174,7 @@ export default function ThanksPage() {
               <div key={step} style={{ padding: "24px 0", borderTop: "1px solid rgba(0,0,0,0.07)" }}>
                 <p style={{
                   fontFamily: "Georgia, 'Times New Roman', serif",
-                  fontSize: "1.6rem", fontWeight: 300, color: "#e0e0e0",
+                  fontSize: "1.6rem", fontWeight: 300, color: "#555",
                   margin: "0 0 10px",
                 }}>
                   {step}
@@ -186,7 +188,7 @@ export default function ThanksPage() {
                 </p>
                 <p style={{
                   fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
-                  fontSize: "0.85rem", color: "#888", lineHeight: 1.7,
+                  fontSize: "0.85rem", color: "#555", lineHeight: 1.7,
                 }}>
                   {body}
                 </p>
@@ -209,7 +211,7 @@ export default function ThanksPage() {
           <Link href="/" style={{
             fontFamily: "Georgia, 'Times New Roman', serif",
             fontSize: "0.72rem", letterSpacing: "0.18em",
-            textTransform: "uppercase", color: "#666",
+            textTransform: "uppercase", color: "#555",
             border: "1px solid rgba(0,0,0,0.15)", padding: "13px 28px",
             textDecoration: "none", display: "inline-block",
           }}>

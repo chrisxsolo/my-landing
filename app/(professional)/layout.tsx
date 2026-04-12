@@ -11,17 +11,63 @@ const footerLinks = [
 
 export default function ProfessionalLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <div style={{ minHeight: "100vh", background: "#ffffff", color: "#1a1a1a" }}>
+    <div className="professional-shell" style={{ minHeight: "100vh", background: "#ffffff", color: "#1a1a1a" }}>
+      <style>{`
+        @media (max-width: 760px) {
+          .professional-shell {
+            overflow-x: hidden;
+          }
+          .professional-shell main {
+            padding-top: 72px !important;
+          }
+          .professional-shell section {
+            padding-left: 24px !important;
+            padding-right: 24px !important;
+          }
+          .professional-shell header:not(.pro-header) {
+            padding-left: 24px !important;
+            padding-right: 24px !important;
+          }
+          .professional-shell h1 {
+            font-size: clamp(2.2rem, 13vw, 4rem) !important;
+            line-height: 1.05 !important;
+            overflow-wrap: anywhere;
+          }
+          .professional-shell h2 {
+            overflow-wrap: anywhere;
+          }
+          .professional-shell img {
+            max-width: 100%;
+          }
+          .professional-shell section[style*="grid-template-columns"],
+          .professional-shell section > div[style*="grid-template-columns"],
+          .professional-shell article > div[style*="grid-template-columns"] {
+            grid-template-columns: 1fr !important;
+          }
+          .professional-footer {
+            padding: 56px 24px 36px !important;
+          }
+          .professional-footer-grid {
+            grid-template-columns: 1fr !important;
+            gap: 34px !important;
+            margin-bottom: 42px !important;
+          }
+          .professional-footer-bottom {
+            align-items: flex-start !important;
+            flex-direction: column !important;
+          }
+        }
+      `}</style>
       <ProNav />
       {children}
 
       {/* ── FOOTER ── */}
-      <footer style={{
+      <footer className="professional-footer" style={{
         borderTop: "1px solid rgba(0,0,0,0.07)",
         padding: "72px 60px 48px",
         background: "#ffffff",
       }}>
-        <div style={{
+        <div className="professional-footer-grid" style={{
           maxWidth: 1200,
           margin: "0 auto",
           display: "grid",
@@ -46,12 +92,12 @@ export default function ProfessionalLayout({ children }: Readonly<{ children: Re
               fontFamily: "Georgia, 'Times New Roman', serif",
               fontStyle: "italic",
               fontSize: "0.9rem",
-              color: "#666",
+              color: "#555",
               marginBottom: 16,
             }}>
               graduation &amp; family photography
             </p>
-            <p style={{ fontSize: "0.82rem", lineHeight: 1.75, color: "#666", maxWidth: 280 }}>
+            <p style={{ fontSize: "0.82rem", lineHeight: 1.75, color: "#555", maxWidth: 280 }}>
               Chris Solorzano — Bay Area photographer specializing in honest graduation portraits and family sessions.
             </p>
           </div>
@@ -63,7 +109,7 @@ export default function ProfessionalLayout({ children }: Readonly<{ children: Re
               fontWeight: 600,
               letterSpacing: "0.22em",
               textTransform: "uppercase",
-              color: "#888",
+              color: "#555",
               marginBottom: 20,
             }}>
               Navigate
@@ -105,7 +151,7 @@ export default function ProfessionalLayout({ children }: Readonly<{ children: Re
               fontWeight: 600,
               letterSpacing: "0.22em",
               textTransform: "uppercase",
-              color: "#888",
+              color: "#555",
               marginBottom: 20,
             }}>
               Connect
@@ -126,7 +172,7 @@ export default function ProfessionalLayout({ children }: Readonly<{ children: Re
         </div>
 
         {/* Bottom bar */}
-        <div style={{
+        <div className="professional-footer-bottom" style={{
           borderTop: "1px solid rgba(0,0,0,0.06)",
           paddingTop: 28,
           display: "flex",
@@ -137,10 +183,10 @@ export default function ProfessionalLayout({ children }: Readonly<{ children: Re
           flexWrap: "wrap",
           gap: 12,
         }}>
-          <p style={{ fontSize: "0.72rem", letterSpacing: "0.1em", color: "#888", textTransform: "uppercase" }}>
+          <p style={{ fontSize: "0.72rem", letterSpacing: "0.1em", color: "#555", textTransform: "uppercase" }}>
             © {new Date().getFullYear()} soloxsnaps
           </p>
-          <p style={{ fontSize: "0.72rem", letterSpacing: "0.1em", color: "#888", textTransform: "uppercase" }}>
+          <p style={{ fontSize: "0.72rem", letterSpacing: "0.1em", color: "#555", textTransform: "uppercase" }}>
             San Francisco, CA
           </p>
         </div>

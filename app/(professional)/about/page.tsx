@@ -44,7 +44,7 @@ export default function ProfessionalAboutPage() {
           fontSize: "0.7rem",
           letterSpacing: "0.28em",
           textTransform: "uppercase",
-          color: "#bbb",
+          color: "#555",
           marginBottom: 20,
         }}>
           All about Chris
@@ -85,7 +85,7 @@ export default function ProfessionalAboutPage() {
               fontFamily: "Georgia, 'Times New Roman', serif",
               fontStyle: "italic",
               fontSize: "1rem",
-              color: "#bbb",
+              color: "#555",
               marginBottom: 16,
             }}>
               photographer, bay area
@@ -151,7 +151,7 @@ export default function ProfessionalAboutPage() {
               fontSize: "0.7rem",
               letterSpacing: "0.28em",
               textTransform: "uppercase",
-              color: "#bbb",
+              color: "#555",
               marginBottom: 20,
             }}>
               Approach
@@ -206,7 +206,7 @@ export default function ProfessionalAboutPage() {
               fontSize: "0.7rem",
               letterSpacing: "0.28em",
               textTransform: "uppercase",
-              color: "#bbb",
+              color: "#555",
               marginBottom: 20,
             }}>
               How it works
@@ -231,7 +231,7 @@ export default function ProfessionalAboutPage() {
                     fontFamily: "Georgia, 'Times New Roman', serif",
                     fontSize: "2rem",
                     fontWeight: 300,
-                    color: "#ddd",
+                    color: "#555",
                     margin: 0,
                     lineHeight: 1,
                   }}>
@@ -249,7 +249,7 @@ export default function ProfessionalAboutPage() {
                     }}>
                       {name}
                     </h3>
-                    <p style={{ fontSize: "0.9rem", lineHeight: 1.75, color: "#888", margin: 0 }}>
+                    <p style={{ fontSize: "0.9rem", lineHeight: 1.75, color: "#555", margin: 0 }}>
                       {body}
                     </p>
                   </div>
@@ -271,7 +271,7 @@ export default function ProfessionalAboutPage() {
           fontFamily: "Georgia, 'Times New Roman', serif",
           fontStyle: "italic",
           fontSize: "clamp(1.1rem, 2.5vw, 1.5rem)",
-          color: "#888",
+          color: "#555",
           marginBottom: 36,
           maxWidth: 560,
           margin: "0 auto 36px",

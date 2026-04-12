@@ -28,7 +28,7 @@ const CSS = `
     box-sizing: border-box;
   }
   .contact-input:focus { border-bottom-color: #1a1a1a; }
-  .contact-input::placeholder { color: #ccc; font-style: italic; }
+  .contact-input::placeholder { color: #555; font-style: italic; }
   .contact-select {
     width: 100%;
     padding: 14px 0;
@@ -60,13 +60,13 @@ const CSS = `
     min-height: 120px;
   }
   .contact-textarea:focus { border-bottom-color: #1a1a1a; }
-  .contact-textarea::placeholder { color: #ccc; font-style: italic; }
+  .contact-textarea::placeholder { color: #555; font-style: italic; }
   .contact-label {
     font-family: var(--font-dm-sans), sans-serif;
     font-size: 0.65rem;
     letter-spacing: 0.22em;
     text-transform: uppercase;
-    color: #bbb;
+    color: #555;
     display: block;
     margin-bottom: 2px;
   }
@@ -134,7 +134,7 @@ export default function ContactPage() {
           fontSize: "0.7rem",
           letterSpacing: "0.28em",
           textTransform: "uppercase",
-          color: "#bbb",
+          color: "#555",
           marginBottom: 20,
         }}>
           Contact
@@ -156,7 +156,7 @@ export default function ContactPage() {
           fontFamily: "Georgia, 'Times New Roman', serif",
           fontStyle: "italic",
           fontSize: "1rem",
-          color: "#aaa",
+          color: "#555",
           maxWidth: 480,
           margin: "0 auto",
           lineHeight: 1.7,
@@ -224,7 +224,7 @@ export default function ContactPage() {
                     </select>
                     <span style={{
                       position: "absolute", right: 0, bottom: 16,
-                      color: "#ccc", pointerEvents: "none", fontSize: "0.8rem",
+                      color: "#555", pointerEvents: "none", fontSize: "0.8rem",
                     }}>↓</span>
                   </div>
                 </div>
@@ -277,7 +277,7 @@ export default function ContactPage() {
                 fontSize: "0.65rem",
                 letterSpacing: "0.24em",
                 textTransform: "uppercase",
-                color: "#ccc",
+                color: "#555",
                 marginBottom: 16,
               }}>
                 Response time
@@ -287,7 +287,7 @@ export default function ContactPage() {
                 fontStyle: "italic",
                 fontSize: "1rem",
                 lineHeight: 1.75,
-                color: "#888",
+                color: "#555",
               }}>
                 I reply within 24–48 hours and will confirm availability for your preferred date.
               </p>
@@ -299,7 +299,7 @@ export default function ContactPage() {
                 fontSize: "0.65rem",
                 letterSpacing: "0.24em",
                 textTransform: "uppercase",
-                color: "#ccc",
+                color: "#555",
                 marginBottom: 16,
               }}>
                 Location
@@ -309,7 +309,7 @@ export default function ContactPage() {
                 fontStyle: "italic",
                 fontSize: "1rem",
                 lineHeight: 1.75,
-                color: "#888",
+                color: "#555",
               }}>
                 Based in San Francisco. Available throughout the Bay Area — SF, Berkeley, Stanford, SJSU, Peninsula, South Bay, and beyond.
               </p>
@@ -321,7 +321,7 @@ export default function ContactPage() {
                 fontSize: "0.65rem",
                 letterSpacing: "0.24em",
                 textTransform: "uppercase",
-                color: "#ccc",
+                color: "#555",
                 marginBottom: 16,
               }}>
                 Elsewhere
@@ -330,7 +330,7 @@ export default function ContactPage() {
                 fontFamily: "Georgia, 'Times New Roman', serif",
                 fontStyle: "italic",
                 fontSize: "0.95rem",
-                color: "#888",
+                color: "#555",
                 textDecoration: "none",
                 borderBottom: "1px solid rgba(0,0,0,0.1)",
                 paddingBottom: 1,
@@ -347,7 +347,7 @@ export default function ContactPage() {
                 fontSize: "0.65rem",
                 letterSpacing: "0.24em",
                 textTransform: "uppercase",
-                color: "#ccc",
+                color: "#555",
                 marginBottom: 16,
               }}>
                 Check dates
@@ -356,7 +356,7 @@ export default function ContactPage() {
                 fontFamily: "Georgia, 'Times New Roman', serif",
                 fontStyle: "italic",
                 fontSize: "0.95rem",
-                color: "#888",
+                color: "#555",
                 textDecoration: "none",
                 borderBottom: "1px solid rgba(0,0,0,0.1)",
                 paddingBottom: 1,

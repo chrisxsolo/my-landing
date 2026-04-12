@@ -190,6 +190,9 @@ export default function ProNav() {
             top: 100%;
             left: 0;
             right: 0;
+            max-height: calc(100vh - 64px);
+            overflow-y: auto;
+            overscroll-behavior: contain;
             padding: 18px 22px 24px;
             background: rgba(250,250,248,0.98);
             border-top: 1px solid rgba(0,0,0,0.06);
@@ -201,6 +204,7 @@ export default function ProNav() {
           .pro-mobile-panel .pro-nav-link {
             color: #343434 !important;
             justify-content: space-between;
+            min-height: 36px;
             width: 100%;
           }
         }

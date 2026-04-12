@@ -62,7 +62,7 @@ export default function InvestmentPage() {
                   fontFamily: "Georgia, 'Times New Roman', serif",
                   fontSize: "2.5rem",
                   fontWeight: 300,
-                  color: "#e0e0e0",
+                  color: "#555",
                   margin: 0,
                   lineHeight: 1,
                 }}>
@@ -76,7 +76,7 @@ export default function InvestmentPage() {
                     fontSize: "0.68rem",
                     letterSpacing: "0.24em",
                     textTransform: "uppercase",
-                    color: "#666",
+                    color: "#555",
                     marginBottom: 12,
                   }}>
                     {item.name}
@@ -147,7 +147,7 @@ export default function InvestmentPage() {
             fontSize: "0.7rem",
             letterSpacing: "0.28em",
             textTransform: "uppercase",
-            color: "#666",
+            color: "#555",
             marginBottom: 20,
           }}>
             Availability
@@ -168,7 +168,7 @@ export default function InvestmentPage() {
             fontFamily: "Georgia, 'Times New Roman', serif",
             fontStyle: "italic",
             fontSize: "0.95rem",
-            color: "#666",
+            color: "#555",
             margin: 0,
           }}>
             I&rsquo;ll reply with availability, package fit, and a clear next step.

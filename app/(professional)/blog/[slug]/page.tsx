@@ -77,7 +77,7 @@ export default async function ProfessionalBlogPostPage({ params }: Props) {
           fontSize: "0.7rem",
           letterSpacing: "0.2em",
           textTransform: "uppercase",
-          color: "#bbb",
+          color: "#555",
           textDecoration: "none",
           borderBottom: "1px solid rgba(0,0,0,0.12)",
           paddingBottom: 1,
@@ -89,7 +89,7 @@ export default async function ProfessionalBlogPostPage({ params }: Props) {
           fontSize: "0.68rem",
           letterSpacing: "0.22em",
           textTransform: "uppercase",
-          color: "#ccc",
+          color: "#555",
           margin: "32px 0 16px",
         }}>
           {formatDate(post.published_at)}
@@ -136,7 +136,7 @@ export default async function ProfessionalBlogPostPage({ params }: Props) {
             fontSize: "0.68rem",
             letterSpacing: "0.22em",
             textTransform: "uppercase",
-            color: "#ccc",
+            color: "#555",
             marginBottom: 16,
           }}>
             Details
@@ -146,7 +146,7 @@ export default async function ProfessionalBlogPostPage({ params }: Props) {
             fontStyle: "italic",
             fontSize: "0.88rem",
             lineHeight: 1.7,
-            color: "#aaa",
+            color: "#555",
           }}>
             Bay Area photography by Chris Solorzano.
           </p>
@@ -189,7 +189,7 @@ export default async function ProfessionalBlogPostPage({ params }: Props) {
                 fontSize: "0.7rem",
                 letterSpacing: "0.26em",
                 textTransform: "uppercase",
-                color: "#ccc",
+                color: "#555",
                 margin: 0,
                 flexShrink: 0,
               }}>
@@ -227,7 +227,7 @@ export default async function ProfessionalBlogPostPage({ params }: Props) {
           fontFamily: "Georgia, 'Times New Roman', serif",
           fontStyle: "italic",
           fontSize: "clamp(1rem, 2vw, 1.3rem)",
-          color: "#aaa",
+          color: "#555",
           marginBottom: 32,
         }}>
           Want to create something like this?

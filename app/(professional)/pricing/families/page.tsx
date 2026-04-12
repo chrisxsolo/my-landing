@@ -26,7 +26,6 @@ const addOns = [
 export default async function FamilyPricingPage() {
   const { images } = await getPortfolioData();
   const familyImages = images.filter((img) => img.category_slug === "families");
-  const bannerImage = familyImages[0]?.image_url ?? null;
   const sessionImage = familyImages[1]?.image_url ?? familyImages[0]?.image_url ?? null;
   const extendedImage = familyImages[2]?.image_url ?? familyImages[0]?.image_url ?? null;
 
@@ -34,23 +33,12 @@ export default async function FamilyPricingPage() {
     <main style={{ background: "#fff", color: "#1a1a1a", paddingTop: 80 }}>
       <style>{CSS}</style>
 
-      {/* ── BANNER IMAGE ── */}
-      {bannerImage && (
-        <div style={{ width: "100%", height: 300, overflow: "hidden" }}>
-          <img
-            src={bannerImage}
-            alt="Family portrait"
-            style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 40%", display: "block" }}
-          />
-        </div>
-      )}
-
       {/* ── IMPORTANT INFO ── */}
       <section className="pricing-section" style={{ padding: "72px 60px 64px", maxWidth: 960, margin: "0 auto" }}>
         <p style={{
           fontFamily: "Georgia, 'Times New Roman', serif",
           fontSize: "0.65rem", letterSpacing: "0.28em",
-          textTransform: "uppercase", color: "#666", marginBottom: 40, textAlign: "center",
+          textTransform: "uppercase", color: "#555", marginBottom: 40, textAlign: "center",
         }}>
           Important info
         </p>
@@ -82,7 +70,7 @@ export default async function FamilyPricingPage() {
               <p style={{
                 fontFamily: "Georgia, 'Times New Roman', serif",
                 fontSize: "0.58rem", letterSpacing: "0.24em",
-                textTransform: "uppercase", color: "#666", marginBottom: 14,
+                textTransform: "uppercase", color: "#555", marginBottom: 14,
               }}>
                 {heading}
               </p>
@@ -92,7 +80,7 @@ export default async function FamilyPricingPage() {
                   fontSize: "0.88rem", color: "#555", lineHeight: 1.8,
                   marginBottom: 8, paddingLeft: 16, position: "relative",
                 }}>
-                  <span style={{ position: "absolute", left: 0, fontStyle: "normal", color: "#888" }}>—</span>
+                  <span style={{ position: "absolute", left: 0, fontStyle: "normal", color: "#555" }}>—</span>
                   {item}
                 </p>
               ))}
@@ -134,10 +122,10 @@ export default async function FamilyPricingPage() {
                 ].map((item) => (
                   <li key={item} style={{
                     fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
-                    fontSize: "0.9rem", color: "#666", lineHeight: 1.7,
+                    fontSize: "0.9rem", color: "#555", lineHeight: 1.7,
                     marginBottom: 10, paddingLeft: 18, position: "relative",
                   }}>
-                    <span style={{ position: "absolute", left: 0, fontStyle: "normal", color: "#666" }}>—</span>
+                    <span style={{ position: "absolute", left: 0, fontStyle: "normal", color: "#555" }}>—</span>
                     {item}
                   </li>
                 ))}
@@ -147,7 +135,7 @@ export default async function FamilyPricingPage() {
               <p style={{
                 fontFamily: "Georgia, 'Times New Roman', serif",
                 fontSize: "0.58rem", letterSpacing: "0.24em",
-                textTransform: "uppercase", color: "#666", marginBottom: 16,
+                textTransform: "uppercase", color: "#555", marginBottom: 16,
               }}>
                 Add-ons
               </p>
@@ -177,13 +165,13 @@ export default async function FamilyPricingPage() {
                 <p style={{
                   fontFamily: "Georgia, 'Times New Roman', serif",
                   fontSize: "0.58rem", letterSpacing: "0.24em",
-                  textTransform: "uppercase", color: "#666", marginBottom: 6,
+                  textTransform: "uppercase", color: "#555", marginBottom: 6,
                 }}>
                   Investment
                 </p>
                 <p style={{
                   fontFamily: "Georgia, 'Times New Roman', serif",
-                  fontSize: "0.78rem", fontStyle: "italic", color: "#666", marginBottom: 8,
+                  fontSize: "0.78rem", fontStyle: "italic", color: "#555", marginBottom: 8,
                 }}>
                   Starting from
                 </p>
@@ -267,10 +255,10 @@ export default async function FamilyPricingPage() {
                 ].map((item) => (
                   <li key={item} style={{
                     fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
-                    fontSize: "0.9rem", color: "#666", lineHeight: 1.7,
+                    fontSize: "0.9rem", color: "#555", lineHeight: 1.7,
                     marginBottom: 10, paddingLeft: 18, position: "relative",
                   }}>
-                    <span style={{ position: "absolute", left: 0, fontStyle: "normal", color: "#666" }}>—</span>
+                    <span style={{ position: "absolute", left: 0, fontStyle: "normal", color: "#555" }}>—</span>
                     {item}
                   </li>
                 ))}
@@ -280,7 +268,7 @@ export default async function FamilyPricingPage() {
               <p style={{
                 fontFamily: "Georgia, 'Times New Roman', serif",
                 fontSize: "0.58rem", letterSpacing: "0.24em",
-                textTransform: "uppercase", color: "#666", marginBottom: 16,
+                textTransform: "uppercase", color: "#555", marginBottom: 16,
               }}>
                 Add-ons
               </p>
@@ -310,13 +298,13 @@ export default async function FamilyPricingPage() {
                 <p style={{
                   fontFamily: "Georgia, 'Times New Roman', serif",
                   fontSize: "0.58rem", letterSpacing: "0.24em",
-                  textTransform: "uppercase", color: "#666", marginBottom: 6,
+                  textTransform: "uppercase", color: "#555", marginBottom: 6,
                 }}>
                   Investment
                 </p>
                 <p style={{
                   fontFamily: "Georgia, 'Times New Roman', serif",
-                  fontSize: "0.78rem", fontStyle: "italic", color: "#666", marginBottom: 8,
+                  fontSize: "0.78rem", fontStyle: "italic", color: "#555", marginBottom: 8,
                 }}>
                   Starting from
                 </p>
@@ -348,7 +336,7 @@ export default async function FamilyPricingPage() {
       <section style={{ borderTop: "1px solid rgba(0,0,0,0.07)", padding: "80px 60px", textAlign: "center" }}>
         <p style={{
           fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
-          fontSize: "clamp(1rem, 2vw, 1.3rem)", color: "#666", marginBottom: 32,
+          fontSize: "clamp(1rem, 2vw, 1.3rem)", color: "#555", marginBottom: 32,
         }}>
           Ready to book a family session?
         </p>

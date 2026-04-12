@@ -124,7 +124,7 @@ export default async function ProfessionalHomePage() {
           fontFamily: "Georgia, 'Times New Roman', serif",
           fontStyle: "italic",
           fontSize: "clamp(0.95rem, 1.8vw, 1.15rem)",
-          color: "#888",
+          color: "#555",
         }}>
           Bay Area Graduation &amp; Family Photographer
         </p>
@@ -154,7 +154,7 @@ export default async function ProfessionalHomePage() {
               fontFamily: "Georgia, 'Times New Roman', serif",
               fontStyle: "italic",
               fontSize: "1rem",
-              color: "#bbb",
+              color: "#555",
               marginBottom: 14,
               letterSpacing: "0.04em",
             }}>
@@ -243,7 +243,7 @@ export default async function ProfessionalHomePage() {
                 fontFamily: "Georgia, 'Times New Roman', serif",
                 fontStyle: "italic",
                 fontSize: "0.95rem",
-                color: "#aaa",
+                color: "#555",
                 margin: "0 0 20px",
               }}>
                 {subline}
@@ -283,7 +283,7 @@ export default async function ProfessionalHomePage() {
               fontFamily: "Georgia, 'Times New Roman', serif",
               fontStyle: "italic",
               fontSize: "0.95rem",
-              color: "#aaa",
+              color: "#555",
               margin: "0 0 20px",
             }}>
               get in touch
@@ -314,7 +314,7 @@ export default async function ProfessionalHomePage() {
             fontSize: "0.72rem",
             letterSpacing: "0.24em",
             textTransform: "uppercase",
-            color: "#ccc",
+            color: "#555",
           }}>
             Samantha &amp; Family &nbsp;·&nbsp; Berkeley, CA
           </p>
@@ -330,7 +330,7 @@ export default async function ProfessionalHomePage() {
             fontSize: "0.68rem",
             letterSpacing: "0.24em",
             textTransform: "uppercase",
-            color: "#ccc",
+            color: "#555",
             marginBottom: 20,
             paddingTop: 0,
           }}>

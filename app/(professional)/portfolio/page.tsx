@@ -49,7 +49,7 @@ export default async function PortfolioPage({
           fontSize: "0.7rem",
           letterSpacing: "0.28em",
           textTransform: "uppercase",
-          color: "#bbb",
+          color: "#555",
           marginBottom: 20,
         }}>
           Portfolio
@@ -71,7 +71,7 @@ export default async function PortfolioPage({
           fontFamily: "Georgia, 'Times New Roman', serif",
           fontStyle: "italic",
           fontSize: "1rem",
-          color: "#aaa",
+          color: "#555",
           marginBottom: 40,
         }}>
           {selected?.description ?? "Graduation and family sessions across the Bay Area."}
@@ -87,7 +87,7 @@ export default async function PortfolioPage({
               fontSize: "0.72rem",
               letterSpacing: "0.2em",
               textTransform: "uppercase",
-              color: !selectedCategory ? "#111" : "#bbb",
+              color: !selectedCategory ? "#111" : "#555",
               borderBottom: !selectedCategory ? "1px solid #111" : "1px solid transparent",
               paddingBottom: 2,
             }}
@@ -104,7 +104,7 @@ export default async function PortfolioPage({
                 fontSize: "0.72rem",
                 letterSpacing: "0.2em",
                 textTransform: "uppercase",
-                color: selectedCategory === cat.slug ? "#111" : "#bbb",
+                color: selectedCategory === cat.slug ? "#111" : "#555",
                 borderBottom: selectedCategory === cat.slug ? "1px solid #111" : "1px solid transparent",
                 paddingBottom: 2,
               }}
@@ -151,7 +151,7 @@ export default async function PortfolioPage({
               textAlign: "center",
               fontFamily: "Georgia, 'Times New Roman', serif",
               fontStyle: "italic",
-              color: "#bbb",
+              color: "#555",
             }}>
               No portfolio images yet.
             </div>
@@ -169,7 +169,7 @@ export default async function PortfolioPage({
           fontFamily: "Georgia, 'Times New Roman', serif",
           fontStyle: "italic",
           fontSize: "clamp(1rem, 2.2vw, 1.3rem)",
-          color: "#888",
+          color: "#555",
           marginBottom: 32,
         }}>
           Like what you see?

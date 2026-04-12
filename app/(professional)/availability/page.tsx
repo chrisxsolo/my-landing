@@ -56,7 +56,7 @@ const CSS = `
     transition: transform 0.15s ease;
     font-family: Georgia, 'Times New Roman', serif;
     font-size: 0.85rem;
-    color: #bbb;
+    color: #555;
     position: relative;
   }
   .av-day-available {
@@ -65,15 +65,15 @@ const CSS = `
     color: #1a1a1a;
   }
   .av-day-available:hover { transform: scale(1.06); border-color: #1a1a1a; }
-  .av-day-booked { background: rgba(0,0,0,0.02); color: #ddd; }
-  .av-day-hold   { cursor: pointer; border-color: rgba(0,0,0,0.1); color: #888; }
+  .av-day-booked { background: rgba(0,0,0,0.02); color: #555; }
+  .av-day-hold   { cursor: pointer; border-color: rgba(0,0,0,0.1); color: #555; }
   .av-day-hold:hover { transform: scale(1.04); }
   .av-day-today  { border-color: #1a1a1a !important; }
   .av-day-selected { background: #1a1a1a !important; color: #fff !important; }
   .av-nav {
     border: none; background: none; cursor: pointer;
     font-family: Georgia, 'Times New Roman', serif;
-    font-size: 1.2rem; color: #bbb; padding: 4px 10px;
+    font-size: 1.2rem; color: #555; padding: 4px 10px;
     transition: color 0.2s ease;
   }
   .av-nav:hover { color: #111; }
@@ -122,7 +122,7 @@ export default function AvailabilityPage() {
         <p style={{
           fontFamily: "Georgia, 'Times New Roman', serif",
           fontSize: "0.7rem", letterSpacing: "0.28em",
-          textTransform: "uppercase", color: "#bbb", marginBottom: 20,
+          textTransform: "uppercase", color: "#555", marginBottom: 20,
         }}>
           Availability
         </p>
@@ -137,7 +137,7 @@ export default function AvailabilityPage() {
         <div style={{ width: 36, height: 1, background: "rgba(0,0,0,0.12)", margin: "0 auto 28px" }} />
         <p style={{
           fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
-          fontSize: "1rem", color: "#aaa", maxWidth: 440, margin: "0 auto", lineHeight: 1.7,
+          fontSize: "1rem", color: "#555", maxWidth: 440, margin: "0 auto", lineHeight: 1.7,
         }}>
           Grad season books up fast. Check my open dates and reach out to lock one in.
         </p>
@@ -167,7 +167,7 @@ export default function AvailabilityPage() {
                 <p style={{
                   fontFamily: "Georgia, 'Times New Roman', serif",
                   fontSize: "0.72rem", letterSpacing: "0.16em",
-                  textTransform: "uppercase", color: "#bbb", margin: 0,
+                  textTransform: "uppercase", color: "#555", margin: 0,
                 }}>
                   {year} {availCount > 0 && `· ${availCount} open`}
                 </p>
@@ -182,7 +182,7 @@ export default function AvailabilityPage() {
                   padding: "10px 0", textAlign: "center",
                   fontFamily: "var(--font-dm-sans), sans-serif",
                   fontSize: "0.6rem", letterSpacing: "0.18em",
-                  textTransform: "uppercase", color: "#ccc",
+                  textTransform: "uppercase", color: "#555",
                 }}>
                   {d}
                 </div>
@@ -233,7 +233,7 @@ export default function AvailabilityPage() {
                           <span className="av-dot" style={{ background: "#1a1a1a" }} />
                         )}
                         {!isPast && entry?.status === "hold" && !isSel && (
-                          <span className="av-dot" style={{ background: "#bbb" }} />
+                          <span className="av-dot" style={{ background: "#555" }} />
                         )}
                       </div>
                     );
@@ -250,7 +250,7 @@ export default function AvailabilityPage() {
             }}>
               {[
                 { label: "Available", dot: "#1a1a1a" },
-                { label: "On hold",   dot: "#bbb" },
+                { label: "On hold",   dot: "#555" },
                 { label: "Booked",    dot: "rgba(0,0,0,0.08)" },
               ].map(({ label, dot }) => (
                 <div key={label} style={{ display: "flex", alignItems: "center", gap: 7 }}>
@@ -258,7 +258,7 @@ export default function AvailabilityPage() {
                   <span style={{
                     fontFamily: "var(--font-dm-sans), sans-serif",
                     fontSize: "0.65rem", letterSpacing: "0.16em",
-                    textTransform: "uppercase", color: "#bbb",
+                    textTransform: "uppercase", color: "#555",
                   }}>
                     {label}
                   </span>
@@ -275,7 +275,7 @@ export default function AvailabilityPage() {
                 <p style={{
                   fontFamily: "Georgia, 'Times New Roman', serif",
                   fontSize: "0.65rem", letterSpacing: "0.22em",
-                  textTransform: "uppercase", color: "#ccc", marginBottom: 12,
+                  textTransform: "uppercase", color: "#555", marginBottom: 12,
                 }}>
                   {selected.status === "available" ? "Open" : "On hold"}
                 </p>
@@ -291,7 +291,7 @@ export default function AvailabilityPage() {
                   <p style={{
                     fontFamily: "Georgia, 'Times New Roman', serif",
                     fontStyle: "italic", fontSize: "0.88rem",
-                    color: "#aaa", lineHeight: 1.6, marginBottom: 0,
+                    color: "#555", lineHeight: 1.6, marginBottom: 0,
                   }}>
                     {selected.note}
                   </p>
@@ -302,7 +302,7 @@ export default function AvailabilityPage() {
                 <p style={{
                   fontFamily: "Georgia, 'Times New Roman', serif",
                   fontStyle: "italic", fontSize: "0.9rem",
-                  color: "#ccc", lineHeight: 1.7,
+                  color: "#555", lineHeight: 1.7,
                 }}>
                   Tap any date on the calendar to see its status.
                 </p>
@@ -313,14 +313,14 @@ export default function AvailabilityPage() {
               <p style={{
                 fontFamily: "Georgia, 'Times New Roman', serif",
                 fontSize: "0.65rem", letterSpacing: "0.22em",
-                textTransform: "uppercase", color: "#ccc", marginBottom: 14,
+                textTransform: "uppercase", color: "#555", marginBottom: 14,
               }}>
                 Locations
               </p>
               <p style={{
                 fontFamily: "Georgia, 'Times New Roman', serif",
                 fontStyle: "italic", fontSize: "0.95rem",
-                color: "#888", lineHeight: 1.75,
+                color: "#555", lineHeight: 1.75,
               }}>
                 SF · Berkeley · Stanford · SJSU · Peninsula · South Bay · Beaches
               </p>
@@ -330,7 +330,7 @@ export default function AvailabilityPage() {
               <p style={{
                 fontFamily: "Georgia, 'Times New Roman', serif",
                 fontStyle: "italic", fontSize: "0.95rem",
-                color: "#888", lineHeight: 1.75, marginBottom: 24,
+                color: "#555", lineHeight: 1.75, marginBottom: 24,
               }}>
                 See a date that works? Reach out and we&rsquo;ll lock it in before someone else does.
               </p>
