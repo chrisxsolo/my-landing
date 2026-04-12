@@ -46,46 +46,8 @@ export default function InvestmentPage() {
     <main style={{ background: "#fff", color: "#1a1a1a", paddingTop: 80 }}>
       <style>{CSS}</style>
 
-      {/* ── HEADER ── */}
-      <section style={{ padding: "80px 60px 80px", textAlign: "center" }}>
-        <p style={{
-          fontFamily: "Georgia, 'Times New Roman', serif",
-          fontSize: "0.7rem",
-          letterSpacing: "0.28em",
-          textTransform: "uppercase",
-          color: "#bbb",
-          marginBottom: 20,
-        }}>
-          Investment
-        </p>
-        <h1 style={{
-          fontFamily: "Georgia, 'Times New Roman', serif",
-          fontSize: "clamp(2rem, 5.5vw, 5rem)",
-          fontWeight: 300,
-          letterSpacing: "0.06em",
-          color: "#111",
-          lineHeight: 1.1,
-          margin: "0 auto 28px",
-          maxWidth: 700,
-        }}>
-          What I can offer for you.
-        </h1>
-        <div style={{ width: 36, height: 1, background: "rgba(0,0,0,0.12)", margin: "0 auto 28px" }} />
-        <p style={{
-          fontFamily: "Georgia, 'Times New Roman', serif",
-          fontStyle: "italic",
-          fontSize: "1rem",
-          color: "#aaa",
-          maxWidth: 520,
-          margin: "0 auto",
-          lineHeight: 1.7,
-        }}>
-          Every session starts with the same baseline: thoughtful planning, calm direction, clean edits, and a private gallery built for easy sharing.
-        </p>
-      </section>
-
       {/* ── PACKAGES ── */}
-      <section style={{ padding: "0 60px 100px", maxWidth: 1100, margin: "0 auto" }}>
+      <section style={{ padding: "64px 60px 100px", maxWidth: 1100, margin: "0 auto" }}>
         <div style={{ borderTop: "1px solid rgba(0,0,0,0.07)" }}>
           {packages.map((item, index) => (
             <article key={item.name} className="inv-row" style={{ padding: "60px 0" }}>
@@ -114,7 +76,7 @@ export default function InvestmentPage() {
                     fontSize: "0.68rem",
                     letterSpacing: "0.24em",
                     textTransform: "uppercase",
-                    color: "#bbb",
+                    color: "#666",
                     marginBottom: 12,
                   }}>
                     {item.name}
@@ -134,7 +96,7 @@ export default function InvestmentPage() {
                     fontFamily: "Georgia, 'Times New Roman', serif",
                     fontSize: "0.95rem",
                     lineHeight: 1.75,
-                    color: "#888",
+                    color: "#555",
                     margin: 0,
                   }}>
                     {item.details}
@@ -153,7 +115,7 @@ export default function InvestmentPage() {
                     <li key={detail} style={{
                       fontFamily: "Georgia, 'Times New Roman', serif",
                       fontSize: "0.88rem",
-                      color: "#888",
+                      color: "#555",
                       padding: "12px 0",
                       borderTop: "1px solid rgba(0,0,0,0.07)",
                       lineHeight: 1.5,
@@ -185,7 +147,7 @@ export default function InvestmentPage() {
             fontSize: "0.7rem",
             letterSpacing: "0.28em",
             textTransform: "uppercase",
-            color: "#bbb",
+            color: "#666",
             marginBottom: 20,
           }}>
             Availability
@@ -206,7 +168,7 @@ export default function InvestmentPage() {
             fontFamily: "Georgia, 'Times New Roman', serif",
             fontStyle: "italic",
             fontSize: "0.95rem",
-            color: "#aaa",
+            color: "#666",
             margin: 0,
           }}>
             I&rsquo;ll reply with availability, package fit, and a clear next step.

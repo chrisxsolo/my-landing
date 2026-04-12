@@ -43,57 +43,9 @@ export default async function GradPricingPage() {
     <main style={{ background: "#fff", color: "#1a1a1a", paddingTop: 80 }}>
       <style>{CSS}</style>
 
-      {/* ── HEADER ── */}
-      <section style={{ padding: "64px 60px 32px", textAlign: "center" }}>
-        <p style={{
-          fontFamily: "Georgia, 'Times New Roman', serif",
-          fontSize: "0.7rem", letterSpacing: "0.28em",
-          textTransform: "uppercase", color: "#bbb", marginBottom: 20,
-        }}>
-          Investment
-        </p>
-        <h1 style={{
-          fontFamily: "Georgia, 'Times New Roman', serif",
-          fontSize: "clamp(2rem, 5.5vw, 5rem)", fontWeight: 300,
-          letterSpacing: "0.06em", color: "#111",
-          lineHeight: 1.1, margin: "0 auto 28px", maxWidth: 700,
-        }}>
-          Graduation.
-        </h1>
-        <div style={{ width: 36, height: 1, background: "rgba(0,0,0,0.12)", margin: "0 auto 28px" }} />
-        <p style={{
-          fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
-          fontSize: "1rem", color: "#aaa", maxWidth: 500, margin: "0 auto", lineHeight: 1.7,
-        }}>
-          Your graduation session is more than just photos — it&apos;s a curated experience designed to capture
-          this milestone with confidence, clarity, and intention.
-        </p>
-
-        {/* Nav toggle */}
-        <div style={{ display: "flex", justifyContent: "center", gap: 24, marginTop: 40 }}>
-          <span style={{
-            fontFamily: "Georgia, 'Times New Roman', serif",
-            fontSize: "0.72rem", letterSpacing: "0.18em",
-            textTransform: "uppercase", color: "#111",
-            borderBottom: "1px solid #111", paddingBottom: 2,
-          }}>
-            Grads
-          </span>
-          <Link href="/pricing/families" style={{
-            fontFamily: "Georgia, 'Times New Roman', serif",
-            fontSize: "0.72rem", letterSpacing: "0.18em",
-            textTransform: "uppercase", color: "#bbb",
-            borderBottom: "1px solid transparent", paddingBottom: 2,
-            textDecoration: "none",
-          }}>
-            Families
-          </Link>
-        </div>
-      </section>
-
       {/* ── BANNER IMAGE ── */}
       {bannerImage && (
-        <div style={{ width: "100%", height: 300, overflow: "hidden", marginTop: 24 }}>
+        <div style={{ width: "100%", height: 300, overflow: "hidden" }}>
           <img
             src={bannerImage}
             alt="Graduation portrait"
@@ -107,7 +59,7 @@ export default async function GradPricingPage() {
         <p style={{
           fontFamily: "Georgia, 'Times New Roman', serif",
           fontSize: "0.65rem", letterSpacing: "0.28em",
-          textTransform: "uppercase", color: "#bbb", marginBottom: 40, textAlign: "center",
+          textTransform: "uppercase", color: "#666", marginBottom: 40, textAlign: "center",
         }}>
           Booking details
         </p>
@@ -139,17 +91,17 @@ export default async function GradPricingPage() {
               <p style={{
                 fontFamily: "Georgia, 'Times New Roman', serif",
                 fontSize: "0.58rem", letterSpacing: "0.24em",
-                textTransform: "uppercase", color: "#bbb", marginBottom: 14,
+                textTransform: "uppercase", color: "#666", marginBottom: 14,
               }}>
                 {heading}
               </p>
               {items.map((item) => (
                 <p key={item} style={{
                   fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
-                  fontSize: "0.88rem", color: "#777", lineHeight: 1.8,
+                  fontSize: "0.88rem", color: "#555", lineHeight: 1.8,
                   marginBottom: 8, paddingLeft: 16, position: "relative",
                 }}>
-                  <span style={{ position: "absolute", left: 0, fontStyle: "normal", color: "#ccc" }}>—</span>
+                  <span style={{ position: "absolute", left: 0, fontStyle: "normal", color: "#888" }}>—</span>
                   {item}
                 </p>
               ))}
@@ -168,7 +120,7 @@ export default async function GradPricingPage() {
               <p style={{
                 fontFamily: "Georgia, 'Times New Roman', serif",
                 fontSize: "0.65rem", letterSpacing: "0.28em",
-                textTransform: "uppercase", color: "#bbb", marginBottom: 16,
+                textTransform: "uppercase", color: "#666", marginBottom: 16,
               }}>
                 Standard
               </p>
@@ -182,7 +134,7 @@ export default async function GradPricingPage() {
               </h2>
               <p style={{
                 fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
-                fontSize: "0.92rem", color: "#888", lineHeight: 1.85, marginBottom: 32,
+                fontSize: "0.92rem", color: "#555", lineHeight: 1.85, marginBottom: 32,
               }}>
                 Ideal for graduates who want a cohesive, elevated gallery without feeling rushed or over-posed.
               </p>
@@ -202,7 +154,7 @@ export default async function GradPricingPage() {
                     fontSize: "0.9rem", color: "#666", lineHeight: 1.7,
                     marginBottom: 10, paddingLeft: 18, position: "relative",
                   }}>
-                    <span style={{ position: "absolute", left: 0, fontStyle: "normal", color: "#bbb" }}>—</span>
+                    <span style={{ position: "absolute", left: 0, fontStyle: "normal", color: "#666" }}>—</span>
                     {item}
                   </li>
                 ))}
@@ -212,13 +164,13 @@ export default async function GradPricingPage() {
               <p style={{
                 fontFamily: "Georgia, 'Times New Roman', serif",
                 fontSize: "0.58rem", letterSpacing: "0.24em",
-                textTransform: "uppercase", color: "#bbb", marginBottom: 6,
+                textTransform: "uppercase", color: "#666", marginBottom: 6,
               }}>
                 Add-ons
               </p>
               <p style={{
                 fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
-                fontSize: "0.78rem", color: "#bbb", marginBottom: 16,
+                fontSize: "0.78rem", color: "#666", marginBottom: 16,
               }}>
                 Available upon request and subject to scheduling
               </p>
@@ -229,7 +181,7 @@ export default async function GradPricingPage() {
                 }}>
                   <p style={{
                     fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
-                    fontSize: "0.85rem", color: "#777",
+                    fontSize: "0.85rem", color: "#555",
                   }}>
                     {item.label}
                   </p>
@@ -248,7 +200,7 @@ export default async function GradPricingPage() {
                 <p style={{
                   fontFamily: "Georgia, 'Times New Roman', serif",
                   fontSize: "0.58rem", letterSpacing: "0.24em",
-                  textTransform: "uppercase", color: "#bbb", marginBottom: 10,
+                  textTransform: "uppercase", color: "#666", marginBottom: 10,
                 }}>
                   Investment
                 </p>
@@ -261,7 +213,7 @@ export default async function GradPricingPage() {
                 </p>
                 <p style={{
                   fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
-                  fontSize: "0.85rem", color: "#aaa",
+                  fontSize: "0.85rem", color: "#666",
                 }}>
                   per hour
                 </p>
@@ -299,7 +251,7 @@ export default async function GradPricingPage() {
           <p style={{
             fontFamily: "Georgia, 'Times New Roman', serif",
             fontSize: "0.65rem", letterSpacing: "0.28em",
-            textTransform: "uppercase", color: "#bbb", marginBottom: 16,
+            textTransform: "uppercase", color: "#666", marginBottom: 16,
           }}>
             Group sessions
           </p>
@@ -313,7 +265,7 @@ export default async function GradPricingPage() {
           </h2>
           <p style={{
             fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
-            fontSize: "0.92rem", color: "#888", lineHeight: 1.85,
+            fontSize: "0.92rem", color: "#555", lineHeight: 1.85,
             marginBottom: 10, maxWidth: 620,
           }}>
             Perfect for friends who want individual portraits and celebratory group photos all in one experience.
@@ -321,7 +273,7 @@ export default async function GradPricingPage() {
           </p>
           <p style={{
             fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
-            fontSize: "0.88rem", color: "#aaa", lineHeight: 1.75,
+            fontSize: "0.88rem", color: "#666", lineHeight: 1.75,
             marginBottom: 52, maxWidth: 520,
           }}>
             Sessions are designed to feel organized, efficient, and elevated — not rushed.
@@ -333,7 +285,7 @@ export default async function GradPricingPage() {
               <p style={{
                 fontFamily: "Georgia, 'Times New Roman', serif",
                 fontSize: "0.58rem", letterSpacing: "0.24em",
-                textTransform: "uppercase", color: "#bbb", marginBottom: 16,
+                textTransform: "uppercase", color: "#666", marginBottom: 16,
               }}>
                 What&apos;s included
               </p>
@@ -351,7 +303,7 @@ export default async function GradPricingPage() {
                     fontSize: "0.9rem", color: "#666", lineHeight: 1.7,
                     marginBottom: 10, paddingLeft: 18, position: "relative",
                   }}>
-                    <span style={{ position: "absolute", left: 0, fontStyle: "normal", color: "#bbb" }}>—</span>
+                    <span style={{ position: "absolute", left: 0, fontStyle: "normal", color: "#666" }}>—</span>
                     {item}
                   </li>
                 ))}
@@ -363,7 +315,7 @@ export default async function GradPricingPage() {
               <p style={{
                 fontFamily: "Georgia, 'Times New Roman', serif",
                 fontSize: "0.58rem", letterSpacing: "0.24em",
-                textTransform: "uppercase", color: "#bbb", marginBottom: 16,
+                textTransform: "uppercase", color: "#666", marginBottom: 16,
               }}>
                 Pricing
               </p>
@@ -388,7 +340,7 @@ export default async function GradPricingPage() {
                     </span>
                     <span style={{
                       fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
-                      fontSize: "0.78rem", color: "#aaa", marginLeft: 6,
+                      fontSize: "0.78rem", color: "#666", marginLeft: 6,
                     }}>
                       {row.unit}
                     </span>
@@ -397,13 +349,13 @@ export default async function GradPricingPage() {
               ))}
               <p style={{
                 fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
-                fontSize: "0.82rem", color: "#aaa", lineHeight: 1.7, marginTop: 20,
+                fontSize: "0.82rem", color: "#666", lineHeight: 1.7, marginTop: 20,
               }}>
                 Sessions with 3 or more graduates require at least 90 minutes to maintain quality and flow.
               </p>
               <p style={{
                 fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
-                fontSize: "0.82rem", color: "#aaa", lineHeight: 1.7, marginTop: 8,
+                fontSize: "0.82rem", color: "#666", lineHeight: 1.7, marginTop: 8,
               }}>
                 Add-ons available upon request including additional outfits, extended time, and expedited delivery.
               </p>
@@ -427,7 +379,7 @@ export default async function GradPricingPage() {
       <section style={{ borderTop: "1px solid rgba(0,0,0,0.07)", padding: "80px 60px", textAlign: "center" }}>
         <p style={{
           fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
-          fontSize: "clamp(1rem, 2vw, 1.3rem)", color: "#aaa", marginBottom: 32,
+          fontSize: "clamp(1rem, 2vw, 1.3rem)", color: "#666", marginBottom: 32,
         }}>
           Ready to book your grad session?
         </p>

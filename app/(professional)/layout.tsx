@@ -46,12 +46,12 @@ export default function ProfessionalLayout({ children }: Readonly<{ children: Re
               fontFamily: "Georgia, 'Times New Roman', serif",
               fontStyle: "italic",
               fontSize: "0.9rem",
-              color: "#aaa",
+              color: "#666",
               marginBottom: 16,
             }}>
               graduation &amp; family photography
             </p>
-            <p style={{ fontSize: "0.82rem", lineHeight: 1.75, color: "#bbb", maxWidth: 280 }}>
+            <p style={{ fontSize: "0.82rem", lineHeight: 1.75, color: "#666", maxWidth: 280 }}>
               Chris Solorzano — Bay Area photographer specializing in honest graduation portraits and family sessions.
             </p>
           </div>
@@ -63,7 +63,7 @@ export default function ProfessionalLayout({ children }: Readonly<{ children: Re
               fontWeight: 600,
               letterSpacing: "0.22em",
               textTransform: "uppercase",
-              color: "#ccc",
+              color: "#888",
               marginBottom: 20,
             }}>
               Navigate
@@ -75,7 +75,7 @@ export default function ProfessionalLayout({ children }: Readonly<{ children: Re
                   fontSize: "0.8rem",
                   letterSpacing: "0.1em",
                   textTransform: "uppercase",
-                  color: "#888",
+                  color: "#555",
                   textDecoration: "none",
                   marginBottom: 12,
                   transition: "color 0.2s ease",
@@ -88,7 +88,7 @@ export default function ProfessionalLayout({ children }: Readonly<{ children: Re
                   fontSize: "0.8rem",
                   letterSpacing: "0.1em",
                   textTransform: "uppercase",
-                  color: "#888",
+                  color: "#555",
                   textDecoration: "none",
                   marginBottom: 12,
                 }}>
@@ -105,20 +105,20 @@ export default function ProfessionalLayout({ children }: Readonly<{ children: Re
               fontWeight: 600,
               letterSpacing: "0.22em",
               textTransform: "uppercase",
-              color: "#ccc",
+              color: "#888",
               marginBottom: 20,
             }}>
               Connect
             </p>
             <a href="https://www.instagram.com/soloxsnaps" target="_blank" rel="noopener noreferrer" style={{
               display: "block", fontSize: "0.8rem", letterSpacing: "0.1em",
-              textTransform: "uppercase", color: "#888", textDecoration: "none", marginBottom: 12,
+              textTransform: "uppercase", color: "#555", textDecoration: "none", marginBottom: 12,
             }}>
               Instagram
             </a>
             <Link href="/home" style={{
               display: "block", fontSize: "0.8rem", letterSpacing: "0.1em",
-              textTransform: "uppercase", color: "#888", textDecoration: "none", marginBottom: 12,
+              textTransform: "uppercase", color: "#555", textDecoration: "none", marginBottom: 12,
             }}>
               Fun Site
             </Link>
@@ -137,10 +137,10 @@ export default function ProfessionalLayout({ children }: Readonly<{ children: Re
           flexWrap: "wrap",
           gap: 12,
         }}>
-          <p style={{ fontSize: "0.72rem", letterSpacing: "0.1em", color: "#ccc", textTransform: "uppercase" }}>
+          <p style={{ fontSize: "0.72rem", letterSpacing: "0.1em", color: "#888", textTransform: "uppercase" }}>
             © {new Date().getFullYear()} soloxsnaps
           </p>
-          <p style={{ fontSize: "0.72rem", letterSpacing: "0.1em", color: "#ccc", textTransform: "uppercase" }}>
+          <p style={{ fontSize: "0.72rem", letterSpacing: "0.1em", color: "#888", textTransform: "uppercase" }}>
             San Francisco, CA
           </p>
         </div>
