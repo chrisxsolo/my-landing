@@ -39,16 +39,80 @@ function getCoverForCategory(
 const CSS = `
   .pro-img { transition: transform 0.7s ease; display: block; }
   .pro-img-wrap:hover .pro-img { transform: scale(1.04); }
-  .pro-card-link { text-decoration: none; display: block; }
-  .pro-card-link:hover .pro-card-label { opacity: 0.5; }
+  .pro-card-link {
+    text-decoration: none;
+    display: grid;
+    gap: 18px;
+    align-content: start;
+    min-width: 0;
+    background: rgba(255,255,255,0.72);
+    border: 1px solid rgba(0,0,0,0.09);
+    border-radius: 8px;
+    padding: 18px;
+    transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
+  }
+  .pro-card-link:hover {
+    transform: translateY(-4px);
+    border-color: rgba(0,0,0,0.22);
+    background: #fff;
+    box-shadow: 0 18px 46px rgba(0,0,0,0.08);
+  }
+  .pro-card-media {
+    position: relative;
+    overflow: hidden;
+    border-radius: 8px;
+    aspect-ratio: 4 / 3;
+    background: #ecebe7;
+  }
+  .pro-card-media img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .pro-card-index {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    background: rgba(250,250,248,0.86);
+    color: #111;
+    font-family: var(--font-dm-sans), sans-serif;
+    font-size: 11px;
+    font-weight: 560;
+    letter-spacing: 0;
+  }
+  .pro-card-kicker {
+    color: #60605c;
+    font-family: var(--font-dm-sans), sans-serif;
+    font-size: 11px;
+    font-weight: 560;
+    letter-spacing: 0;
+    margin: 0 0 8px;
+    text-transform: uppercase;
+  }
   .pro-card-label { transition: opacity 0.2s ease; }
+  .pro-card-link:hover .pro-card-label { opacity: 0.72; }
+  .pro-card-arrow {
+    align-items: center;
+    border-top: 1px solid rgba(0,0,0,0.08);
+    color: #333;
+    display: flex;
+    font-family: var(--font-dm-sans), sans-serif;
+    font-size: 12px;
+    font-weight: 560;
+    justify-content: space-between;
+    letter-spacing: 0;
+    margin-top: 8px;
+    padding-top: 14px;
+    text-transform: uppercase;
+  }
   .pro-insta { transition: opacity 0.25s ease; }
   .pro-insta:hover { opacity: 0.75; }
   @media (max-width: 720px) {
     .about-grid   { grid-template-columns: 1fr !important; }
     .port-grid    { grid-template-columns: 1fr !important; }
     .cats-grid    { grid-template-columns: 1fr !important; }
-    .cats-grid > * { border-right: none !important; border-bottom: 1px solid rgba(0,0,0,0.08) !important; }
     .footer-grid  { grid-template-columns: 1fr !important; }
   }
 `;
@@ -74,7 +138,7 @@ export default async function ProfessionalHomePage() {
   const portfolioSections = visibleCategories.map((category, index) => ({
     category,
     cover: resolveSettingsCover(`home_cover_${category.slug}`, getCoverForCategory(category, images, heroImage, index)),
-    subline: category.slug === "grads" ? "the milestone" : "the people",
+    subline: category.slug === "grads" ? "Graduation sessions" : "Family sessions",
   }));
 
   const carouselImages = images.filter(img => img.hero_carousel).slice(0, 5);
@@ -201,54 +265,59 @@ export default async function ProfessionalHomePage() {
       </section>
 
       {/* ── 4. CATEGORY CARDS ── */}
-      <section style={{ borderTop: "1px solid rgba(0,0,0,0.07)", borderBottom: "1px solid rgba(0,0,0,0.07)", marginBottom: 120 }}>
+      <section style={{ borderTop: "1px solid rgba(0,0,0,0.07)", borderBottom: "1px solid rgba(0,0,0,0.07)", marginBottom: 120, padding: "64px 40px", background: "#f7f7f4" }}>
         <div className="cats-grid" style={{
           display: "grid",
           gridTemplateColumns: `repeat(${portfolioSections.length + 1}, 1fr)`,
-          maxWidth: "100%",
+          gap: 20,
+          maxWidth: 1240,
+          margin: "0 auto",
         }}>
           {portfolioSections.map(({ category, cover, subline }, index) => (
             <Link
               key={category.slug}
               href={`/portfolio?category=${category.slug}`}
               className="pro-card-link"
-              style={{
-                borderRight: index < portfolioSections.length ? "1px solid rgba(0,0,0,0.07)" : "none",
-                padding: "60px 40px",
-                textAlign: "center",
-              }}
             >
               {cover && (
-                <div className="pro-img-wrap" style={{ overflow: "hidden", marginBottom: 28 }}>
+                <div className="pro-img-wrap pro-card-media">
+                  <span className="pro-card-index">{String(index + 1).padStart(2, "0")}</span>
                   <img
                     src={cover.image_url}
                     alt={cover.alt}
                     className="pro-img"
-                    style={{ width: "100%", height: 260, objectFit: "cover" }}
                   />
                 </div>
               )}
-              <h2 className="pro-card-label" style={{
-                fontFamily: "Georgia, 'Times New Roman', serif",
-                fontSize: "clamp(0.9rem, 1.8vw, 1.3rem)",
-                fontWeight: 400,
-                letterSpacing: "0.22em",
-                textTransform: "uppercase",
-                color: "#1a1a1a",
-                margin: "0 0 8px",
-              }}>
-                {category.name}
-              </h2>
-              <p style={{
-                fontFamily: "Georgia, 'Times New Roman', serif",
-                fontStyle: "italic",
-                fontSize: "0.95rem",
-                color: "#555",
-                margin: "0 0 20px",
-              }}>
-                {subline}
-              </p>
-              <div style={{ width: 24, height: 1, background: "rgba(0,0,0,0.15)", margin: "0 auto" }} />
+              <div>
+                <p className="pro-card-kicker">{subline}</p>
+                <h2 className="pro-card-label" style={{
+                  fontFamily: "var(--font-dm-sans), sans-serif",
+                  fontSize: "24px",
+                  fontWeight: 560,
+                  letterSpacing: 0,
+                  textTransform: "uppercase",
+                  color: "#111",
+                  margin: "0 0 8px",
+                  lineHeight: 1,
+                }}>
+                  {category.name}
+                </h2>
+                <p style={{
+                  fontFamily: "Georgia, 'Times New Roman', serif",
+                  fontStyle: "italic",
+                  fontSize: "0.95rem",
+                  color: "#555",
+                  lineHeight: 1.6,
+                  margin: 0,
+                }}>
+                  {category.slug === "grads" ? "Clean, guided portraits for the milestone." : "Easy portraits for the people you keep close."}
+                </p>
+              </div>
+              <span className="pro-card-arrow">
+                View work
+                <span aria-hidden="true">→</span>
+              </span>
             </Link>
           ))}
 
@@ -256,39 +325,46 @@ export default async function ProfessionalHomePage() {
           <Link
             href="/contact"
             className="pro-card-link"
-            style={{ padding: "60px 40px", textAlign: "center" }}
           >
             {(settings["home_cover_contact"] ?? heroImage?.image_url) && (
-              <div className="pro-img-wrap" style={{ overflow: "hidden", marginBottom: 28 }}>
+              <div className="pro-img-wrap pro-card-media">
+                <span className="pro-card-index">03</span>
                 <img
                   src={settings["home_cover_contact"] ?? heroImage!.image_url}
                   alt="Book a session"
                   className="pro-img"
-                  style={{ width: "100%", height: 260, objectFit: "cover" }}
                 />
               </div>
             )}
-            <h2 className="pro-card-label" style={{
-              fontFamily: "Georgia, 'Times New Roman', serif",
-              fontSize: "clamp(0.9rem, 1.8vw, 1.3rem)",
-              fontWeight: 400,
-              letterSpacing: "0.22em",
-              textTransform: "uppercase",
-              color: "#1a1a1a",
-              margin: "0 0 8px",
-            }}>
-              Contact
-            </h2>
-            <p style={{
-              fontFamily: "Georgia, 'Times New Roman', serif",
-              fontStyle: "italic",
-              fontSize: "0.95rem",
-              color: "#555",
-              margin: "0 0 20px",
-            }}>
-              get in touch
-            </p>
-            <div style={{ width: 24, height: 1, background: "rgba(0,0,0,0.15)", margin: "0 auto" }} />
+            <div>
+              <p className="pro-card-kicker">Booking notes</p>
+              <h2 className="pro-card-label" style={{
+                fontFamily: "var(--font-dm-sans), sans-serif",
+                fontSize: "24px",
+                fontWeight: 560,
+                letterSpacing: 0,
+                textTransform: "uppercase",
+                color: "#111",
+                margin: "0 0 8px",
+                lineHeight: 1,
+              }}>
+                Contact
+              </h2>
+              <p style={{
+                fontFamily: "Georgia, 'Times New Roman', serif",
+                fontStyle: "italic",
+                fontSize: "0.95rem",
+                color: "#555",
+                lineHeight: 1.6,
+                margin: 0,
+              }}>
+                Send the date, location, and what this is for.
+              </p>
+            </div>
+            <span className="pro-card-arrow">
+              Start inquiry
+              <span aria-hidden="true">→</span>
+            </span>
           </Link>
         </div>
       </section>

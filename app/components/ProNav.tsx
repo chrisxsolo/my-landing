@@ -7,19 +7,19 @@ import { useEffect, useRef, useState } from "react";
 const orderedLinks = [
   { label: "Home", href: "/" },
   { label: "About", href: "/about" },
-  { label: "Availability", href: "/availability" },
+  { label: "Dates", href: "/availability" },
   { label: "Contact", href: "/contact" },
-  { label: "Blog", href: "/blog" },
+  { label: "Journal", href: "/blog" },
 ];
 
 const portfolioLinks = [
-  { label: "Grads", href: "/portfolio?category=grads" },
-  { label: "Families", href: "/portfolio?category=families" },
+  { label: "Grad gallery", href: "/portfolio?category=grads" },
+  { label: "Family gallery", href: "/portfolio?category=families" },
 ];
 
 const pricingLinks = [
-  { label: "Grad Pricing", href: "/pricing/grads" },
-  { label: "Family Pricing", href: "/pricing/families" },
+  { label: "Grad rates", href: "/pricing/grads" },
+  { label: "Family rates", href: "/pricing/families" },
 ];
 
 function isActive(pathname: string, href: string) {
@@ -81,7 +81,12 @@ export default function ProNav() {
   const mutedLinkColor = overlaid ? "rgba(255,255,255,0.78)" : "#4a4a4a";
 
   const renderDropdownLink = (link: { label: string; href: string }) => (
-    <Link key={link.href} href={link.href} style={{ color: isActive(pathname, link.href) ? "#111" : "#343434" }}>
+    <Link
+      key={link.href}
+      href={link.href}
+      className="pro-dropdown-link"
+      style={{ color: isActive(pathname, link.href) ? "#111" : "#343434" }}
+    >
       {link.label}
     </Link>
   );
@@ -103,56 +108,80 @@ export default function ProNav() {
           transition: background 0.4s ease, border-color 0.4s ease;
         }
         .pro-nav-link {
-          font-size: 10px;
-          letter-spacing: 0.18em;
+          font-size: 11px;
+          letter-spacing: 0;
           text-transform: uppercase;
           text-decoration: none;
-          transition: color 0.2s ease, opacity 0.2s ease;
+          transition: color 0.2s ease, opacity 0.2s ease, background 0.2s ease, border-color 0.2s ease;
           font-family: var(--font-dm-sans), sans-serif;
-          font-weight: 650;
+          font-weight: 560;
           background: none;
-          border: none;
+          border: 1px solid transparent;
+          border-radius: 8px;
           cursor: pointer;
-          padding: 0;
+          padding: 8px 10px;
           display: inline-flex;
           align-items: center;
-          gap: 5px;
+          gap: 6px;
         }
-        .pro-nav-link:hover { opacity: 0.58; }
+        .pro-nav-link:hover {
+          opacity: 1;
+          background: rgba(0,0,0,0.045);
+          border-color: rgba(0,0,0,0.08);
+        }
         .pro-desktop-nav {
           margin-left: auto;
           display: flex;
           align-items: center;
-          gap: clamp(18px, 3vw, 42px);
+          gap: 14px;
         }
         .pro-dropdown-wrap { position: relative; }
         .pro-dropdown {
           position: absolute;
-          top: calc(100% + 14px);
+          top: calc(100% + 10px);
           left: 50%;
           transform: translateX(-50%);
           background: rgba(250,250,248,0.98);
           backdrop-filter: blur(16px);
           -webkit-backdrop-filter: blur(16px);
-          border: 1px solid rgba(0,0,0,0.08);
-          padding: 8px 0;
-          min-width: 178px;
-          box-shadow: 0 8px 32px rgba(0,0,0,0.08);
+          border: 1px solid rgba(0,0,0,0.12);
+          border-radius: 8px;
+          padding: 6px;
+          min-width: 176px;
+          box-shadow: 0 18px 46px rgba(0,0,0,0.11);
           z-index: 200;
         }
-        .pro-dropdown a {
-          display: block;
-          padding: 11px 20px;
+        .pro-dropdown-link {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          min-height: 36px;
+          padding: 0 12px;
           font-family: var(--font-dm-sans), sans-serif;
-          font-size: 10px;
-          font-weight: 650;
-          letter-spacing: 0.18em;
+          font-size: 11px;
+          font-weight: 560;
+          letter-spacing: 0;
           text-transform: uppercase;
           text-decoration: none;
           transition: color 0.15s ease, background 0.15s ease;
           white-space: nowrap;
+          border-radius: 6px;
         }
-        .pro-dropdown a:hover { color: #111 !important; background: rgba(0,0,0,0.035); }
+        .pro-dropdown-link::after {
+          content: "→";
+          font-size: 11px;
+          opacity: 0;
+          transform: translateX(-4px);
+          transition: opacity 0.15s ease, transform 0.15s ease;
+        }
+        .pro-dropdown-link:hover {
+          color: #111 !important;
+          background: rgba(0,0,0,0.055);
+        }
+        .pro-dropdown-link:hover::after {
+          opacity: 0.55;
+          transform: translateX(0);
+        }
         .pro-mobile-button {
           display: none;
           margin-left: auto;
@@ -164,17 +193,21 @@ export default function ProNav() {
         }
         .pro-mobile-submenu {
           display: grid;
-          gap: 12px;
-          padding: 4px 0 0 18px;
+          gap: 6px;
+          padding: 8px 0 0 14px;
         }
         .pro-mobile-submenu a {
           color: #343434;
           font-family: var(--font-dm-sans), sans-serif;
-          font-size: 10px;
-          font-weight: 650;
-          letter-spacing: 0.18em;
+          font-size: 11px;
+          font-weight: 560;
+          letter-spacing: 0;
           text-transform: uppercase;
           text-decoration: none;
+        }
+        .pro-mobile-submenu .pro-dropdown-link {
+          min-height: 34px;
+          padding: 0 12px;
         }
         @media (max-width: 760px) {
           .pro-header {
@@ -205,7 +238,7 @@ export default function ProNav() {
             overflow-y: auto;
             overscroll-behavior: contain;
             padding: 18px 22px 24px;
-            background: rgba(250,250,248,0.98);
+            background: #fafaf8;
             border-top: 1px solid rgba(0,0,0,0.06);
             border-bottom: 1px solid rgba(0,0,0,0.08);
             box-shadow: 0 18px 34px rgba(0,0,0,0.08);
@@ -251,7 +284,7 @@ export default function ProNav() {
               }}
               style={{ color: linkColor(isPricingActive) }}
             >
-              Pricing
+              Rates
               <span aria-hidden="true" style={{ color: mutedLinkColor, fontSize: 8 }}>{pricingOpen ? "▲" : "▼"}</span>
             </button>
             {pricingOpen && <div className="pro-dropdown">{pricingLinks.map(renderDropdownLink)}</div>}
@@ -268,7 +301,7 @@ export default function ProNav() {
               }}
               style={{ color: linkColor(isPortfolioActive) }}
             >
-              Portfolio
+              Work
               <span aria-hidden="true" style={{ color: mutedLinkColor, fontSize: 8 }}>{portfolioOpen ? "▲" : "▼"}</span>
             </button>
             {portfolioOpen && <div className="pro-dropdown">{portfolioLinks.map(renderDropdownLink)}</div>}
@@ -308,7 +341,7 @@ export default function ProNav() {
                   setPortfolioOpen(false);
                 }}
               >
-                Pricing
+                Rates
                 <span aria-hidden="true">{pricingOpen ? "▲" : "▼"}</span>
               </button>
               {pricingOpen && <div className="pro-mobile-submenu">{pricingLinks.map(renderDropdownLink)}</div>}
@@ -324,7 +357,7 @@ export default function ProNav() {
                   setPricingOpen(false);
                 }}
               >
-                Portfolio
+                Work
                 <span aria-hidden="true">{portfolioOpen ? "▲" : "▼"}</span>
               </button>
               {portfolioOpen && <div className="pro-mobile-submenu">{portfolioLinks.map(renderDropdownLink)}</div>}
