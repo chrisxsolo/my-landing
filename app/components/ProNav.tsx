@@ -108,18 +108,19 @@ export default function ProNav() {
           transition: background 0.4s ease, border-color 0.4s ease;
         }
         .pro-nav-link {
-          font-size: 11px;
+          font-size: 13px;
+          line-height: 1;
           letter-spacing: 0;
-          text-transform: uppercase;
+          text-transform: none;
           text-decoration: none;
           transition: color 0.2s ease, opacity 0.2s ease, background 0.2s ease, border-color 0.2s ease;
-          font-family: var(--font-dm-sans), sans-serif;
-          font-weight: 560;
+          font-family: "Avenir Next", "SF Pro Rounded", var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
+          font-weight: 650;
           background: none;
           border: 1px solid transparent;
           border-radius: 8px;
           cursor: pointer;
-          padding: 8px 10px;
+          padding: 9px 11px;
           display: inline-flex;
           align-items: center;
           gap: 6px;
@@ -133,7 +134,7 @@ export default function ProNav() {
           margin-left: auto;
           display: flex;
           align-items: center;
-          gap: 14px;
+          gap: 10px;
         }
         .pro-dropdown-wrap { position: relative; }
         .pro-dropdown {
@@ -155,13 +156,13 @@ export default function ProNav() {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          min-height: 36px;
-          padding: 0 12px;
-          font-family: var(--font-dm-sans), sans-serif;
-          font-size: 11px;
-          font-weight: 560;
+          min-height: 38px;
+          padding: 0 13px;
+          font-family: "Avenir Next", "SF Pro Rounded", var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
+          font-size: 13px;
+          font-weight: 650;
           letter-spacing: 0;
-          text-transform: uppercase;
+          text-transform: none;
           text-decoration: none;
           transition: color 0.15s ease, background 0.15s ease;
           white-space: nowrap;
@@ -169,7 +170,7 @@ export default function ProNav() {
         }
         .pro-dropdown-link::after {
           content: "→";
-          font-size: 11px;
+          font-size: 12px;
           opacity: 0;
           transform: translateX(-4px);
           transition: opacity 0.15s ease, transform 0.15s ease;
@@ -198,15 +199,15 @@ export default function ProNav() {
         }
         .pro-mobile-submenu a {
           color: #343434;
-          font-family: var(--font-dm-sans), sans-serif;
-          font-size: 11px;
-          font-weight: 560;
+          font-family: "Avenir Next", "SF Pro Rounded", var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
+          font-size: 13px;
+          font-weight: 650;
           letter-spacing: 0;
-          text-transform: uppercase;
+          text-transform: none;
           text-decoration: none;
         }
         .pro-mobile-submenu .pro-dropdown-link {
-          min-height: 34px;
+          min-height: 38px;
           padding: 0 12px;
         }
         @media (max-width: 760px) {
@@ -248,7 +249,7 @@ export default function ProNav() {
           .pro-mobile-panel .pro-nav-link {
             color: #343434 !important;
             justify-content: space-between;
-            min-height: 36px;
+            min-height: 40px;
             width: 100%;
           }
         }

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getPortfolioData } from "@/lib/professionalData";
+import { getPortfolioData, getSiteSettings } from "@/lib/professionalData";
 
 export const metadata: Metadata = {
   title: "Family Pricing | soloxsnaps",
@@ -9,10 +9,116 @@ export const metadata: Metadata = {
 };
 
 const CSS = `
+  .pricing-page {
+    --pricing-ink: #111513;
+    --pricing-copy: #303635;
+    --pricing-muted: #596260;
+    --pricing-surface: #f7f8f5;
+    --pricing-line: rgba(17, 21, 19, 0.1);
+    background: #fff;
+    color: var(--pricing-ink);
+    font-family: var(--font-dm-sans), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  .pricing-page h2,
+  .pricing-page p,
+  .pricing-page li,
+  .pricing-page span,
+  .pricing-page a {
+    font-family: var(--font-dm-sans), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+    letter-spacing: 0 !important;
+  }
+  .pricing-page h2 {
+    color: var(--pricing-ink) !important;
+    font-weight: 720 !important;
+    line-height: 1.05 !important;
+  }
+  .pricing-page p,
+  .pricing-page li,
+  .pricing-page span {
+    color: var(--pricing-copy) !important;
+  }
+  .pricing-page p,
+  .pricing-page li {
+    font-style: normal !important;
+  }
+  .pricing-page li {
+    font-size: 1rem !important;
+    line-height: 1.75 !important;
+    margin-bottom: 12px !important;
+  }
+  .pricing-page p[style*="text-transform"] {
+    color: var(--pricing-muted) !important;
+    font-size: 0.76rem !important;
+    font-weight: 720 !important;
+  }
+  .pricing-page [style*="font-size: 3rem"] {
+    color: var(--pricing-ink) !important;
+    font-size: clamp(3.1rem, 7vw, 4.8rem) !important;
+    font-weight: 720 !important;
+    line-height: 0.95 !important;
+  }
+  .pricing-page a {
+    border-radius: 8px !important;
+    background: #141716 !important;
+    color: #fff !important;
+    font-weight: 720 !important;
+  }
+  .booking-details-section {
+    max-width: 1160px !important;
+    padding-top: 92px !important;
+    padding-bottom: 76px !important;
+  }
+  .pricing-page .booking-details-section > p {
+    color: var(--pricing-ink) !important;
+    font-size: 1rem !important;
+    font-weight: 800 !important;
+    margin-bottom: 34px !important;
+  }
+  .booking-details-section > div {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 18px !important;
+  }
+  .booking-details-section > div > div {
+    min-height: 100%;
+    padding: 24px;
+    border: 1px solid var(--pricing-line);
+    border-radius: 8px;
+    background: var(--pricing-surface);
+  }
+  .pricing-page .booking-details-section > div > div > p:first-child {
+    color: var(--pricing-ink) !important;
+    font-size: 0.86rem !important;
+    font-weight: 800 !important;
+    margin-bottom: 16px !important;
+  }
+  .booking-details-section > div > div > p:not(:first-child) {
+    color: var(--pricing-copy) !important;
+    font-size: 1.04rem !important;
+    line-height: 1.65 !important;
+    margin-bottom: 14px !important;
+    padding-left: 22px !important;
+  }
+  .booking-details-section span {
+    color: #6e7673 !important;
+  }
   @media (max-width: 760px) {
     .split-layout { flex-direction: column !important; }
     .split-img { flex: unset !important; height: 300px !important; width: 100% !important; }
     .pricing-section { padding-left: 24px !important; padding-right: 24px !important; }
+    .booking-details-section {
+      padding-top: 64px !important;
+      padding-bottom: 58px !important;
+    }
+    .booking-details-section > div {
+      grid-template-columns: 1fr !important;
+      gap: 12px !important;
+    }
+    .booking-details-section > div > div {
+      padding: 20px;
+    }
+    .booking-details-section > div > div > p:not(:first-child) {
+      font-size: 1rem !important;
+    }
   }
 `;
 
@@ -24,17 +130,17 @@ const addOns = [
 ];
 
 export default async function FamilyPricingPage() {
-  const { images } = await getPortfolioData();
+  const [{ images }, siteSettings] = await Promise.all([getPortfolioData(), getSiteSettings()]);
   const familyImages = images.filter((img) => img.category_slug === "families");
-  const sessionImage = familyImages[1]?.image_url ?? familyImages[0]?.image_url ?? null;
-  const extendedImage = familyImages[2]?.image_url ?? familyImages[0]?.image_url ?? null;
+  const sessionImage = siteSettings.pricing_family_session_image || familyImages[1]?.image_url || familyImages[0]?.image_url || null;
+  const extendedImage = siteSettings.pricing_family_extended_image || familyImages[2]?.image_url || familyImages[0]?.image_url || null;
 
   return (
-    <main style={{ background: "#fff", color: "#1a1a1a", paddingTop: 80 }}>
+    <main className="pricing-page" style={{ background: "#fff", color: "#1a1a1a", paddingTop: 80 }}>
       <style>{CSS}</style>
 
       {/* ── IMPORTANT INFO ── */}
-      <section className="pricing-section" style={{ padding: "72px 60px 64px", maxWidth: 960, margin: "0 auto" }}>
+      <section className="pricing-section booking-details-section" style={{ padding: "72px 60px 64px", maxWidth: 960, margin: "0 auto" }}>
         <p style={{
           fontFamily: "Georgia, 'Times New Roman', serif",
           fontSize: "0.65rem", letterSpacing: "0.28em",

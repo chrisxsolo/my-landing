@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getPortfolioData } from "@/lib/professionalData";
+import { getPortfolioData, getSiteSettings } from "@/lib/professionalData";
 
 export const metadata: Metadata = {
   title: "Grad Pricing | soloxsnaps",
@@ -9,6 +9,98 @@ export const metadata: Metadata = {
 };
 
 const CSS = `
+  .pricing-page {
+    --pricing-ink: #111513;
+    --pricing-copy: #303635;
+    --pricing-muted: #596260;
+    --pricing-surface: #f7f8f5;
+    --pricing-line: rgba(17, 21, 19, 0.1);
+    background: #fff;
+    color: var(--pricing-ink);
+    font-family: var(--font-dm-sans), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  .pricing-page h2,
+  .pricing-page p,
+  .pricing-page li,
+  .pricing-page span,
+  .pricing-page a {
+    font-family: var(--font-dm-sans), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+    letter-spacing: 0 !important;
+  }
+  .pricing-page h2 {
+    color: var(--pricing-ink) !important;
+    font-weight: 720 !important;
+    line-height: 1.05 !important;
+  }
+  .pricing-page p,
+  .pricing-page li,
+  .pricing-page span {
+    color: var(--pricing-copy) !important;
+  }
+  .pricing-page p,
+  .pricing-page li {
+    font-style: normal !important;
+  }
+  .pricing-page li {
+    font-size: 1rem !important;
+    line-height: 1.75 !important;
+    margin-bottom: 12px !important;
+  }
+  .pricing-page p[style*="text-transform"] {
+    color: var(--pricing-muted) !important;
+    font-size: 0.76rem !important;
+    font-weight: 720 !important;
+  }
+  .pricing-page [style*="font-size: 3rem"] {
+    color: var(--pricing-ink) !important;
+    font-size: clamp(3.1rem, 7vw, 4.8rem) !important;
+    font-weight: 720 !important;
+    line-height: 0.95 !important;
+  }
+  .pricing-page a {
+    border-radius: 8px !important;
+    background: #141716 !important;
+    color: #fff !important;
+    font-weight: 720 !important;
+  }
+  .booking-details-section {
+    max-width: 1160px !important;
+    padding-top: 92px !important;
+    padding-bottom: 76px !important;
+  }
+  .pricing-page .booking-details-section > p {
+    color: var(--pricing-ink) !important;
+    font-size: 1rem !important;
+    font-weight: 800 !important;
+    margin-bottom: 34px !important;
+  }
+  .booking-details-section > div {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 18px !important;
+  }
+  .booking-details-section > div > div {
+    min-height: 100%;
+    padding: 24px;
+    border: 1px solid var(--pricing-line);
+    border-radius: 8px;
+    background: var(--pricing-surface);
+  }
+  .pricing-page .booking-details-section > div > div > p:first-child {
+    color: var(--pricing-ink) !important;
+    font-size: 0.86rem !important;
+    font-weight: 800 !important;
+    margin-bottom: 16px !important;
+  }
+  .booking-details-section > div > div > p:not(:first-child) {
+    color: var(--pricing-copy) !important;
+    font-size: 1.04rem !important;
+    line-height: 1.65 !important;
+    margin-bottom: 14px !important;
+    padding-left: 22px !important;
+  }
+  .booking-details-section span {
+    color: #6e7673 !important;
+  }
   .split-img {
     flex: 0 0 400px;
     height: 580px;
@@ -45,6 +137,20 @@ const CSS = `
     }
     .pricing-photo { object-position: center center; }
     .pricing-section { padding-left: 24px !important; padding-right: 24px !important; }
+    .booking-details-section {
+      padding-top: 64px !important;
+      padding-bottom: 58px !important;
+    }
+    .booking-details-section > div {
+      grid-template-columns: 1fr !important;
+      gap: 12px !important;
+    }
+    .booking-details-section > div > div {
+      padding: 20px;
+    }
+    .booking-details-section > div > div > p:not(:first-child) {
+      font-size: 1rem !important;
+    }
     .group-grid { grid-template-columns: 1fr !important; }
     .group-image {
       width: 100%;
@@ -73,21 +179,22 @@ const GROUP_GRAD_IMAGE_URL =
   "https://dmtslzwglpezympptqls.supabase.co/storage/v1/object/public/grad-photos/portfolio/1775960037598.jpeg";
 
 export default async function GradPricingPage() {
-  const { images } = await getPortfolioData();
+  const [{ images }, siteSettings] = await Promise.all([getPortfolioData(), getSiteSettings()]);
   const gradImages = images.filter((img) => img.category_slug === "grads");
-  const packageImage = gradImages[1]?.image_url ?? gradImages[0]?.image_url ?? null;
+  const packageImage = siteSettings.pricing_grad_standard_image || gradImages[1]?.image_url || gradImages[0]?.image_url || null;
   const groupImage =
-    gradImages.find((img) => img.image_url === GROUP_GRAD_IMAGE_URL)?.image_url ??
-    gradImages.find((img) => `${img.title} ${img.alt}`.toLowerCase().includes("group"))?.image_url ??
-    gradImages[6]?.image_url ??
+    siteSettings.pricing_grad_group_image ||
+    gradImages.find((img) => img.image_url === GROUP_GRAD_IMAGE_URL)?.image_url ||
+    gradImages.find((img) => `${img.title} ${img.alt}`.toLowerCase().includes("group"))?.image_url ||
+    gradImages[6]?.image_url ||
     packageImage;
 
   return (
-    <main style={{ background: "#fff", color: "#1a1a1a", paddingTop: 80 }}>
+    <main className="pricing-page" style={{ background: "#fff", color: "#1a1a1a", paddingTop: 80 }}>
       <style>{CSS}</style>
 
       {/* ── BOOKING DETAILS ── */}
-      <section className="pricing-section" style={{ padding: "72px 60px 64px", maxWidth: 960, margin: "0 auto" }}>
+      <section className="pricing-section booking-details-section" style={{ padding: "72px 60px 64px", maxWidth: 960, margin: "0 auto" }}>
         <p style={{
           fontFamily: "Georgia, 'Times New Roman', serif",
           fontSize: "0.65rem", letterSpacing: "0.28em",

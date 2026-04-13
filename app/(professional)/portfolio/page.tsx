@@ -16,15 +16,205 @@ export const metadata: Metadata = {
 };
 
 const CSS = `
-  .port-figure { overflow: hidden; }
-  .port-img { display: block; }
-  .port-filter-link { transition: color 0.2s ease, border-color 0.2s ease; text-decoration: none; }
-  .port-filter-link:hover { color: #111 !important; }
+  .portfolio-page {
+    background: #fff;
+    color: #111;
+    padding-top: 78px;
+  }
+  .port-intro {
+    min-height: clamp(260px, 38vw, 480px);
+    display: grid;
+    place-items: end center;
+    padding: 112px 28px 72px;
+    text-align: center;
+  }
+  .port-intro-inner {
+    width: min(760px, 100%);
+  }
+  .port-eyebrow,
+  .port-filter-link,
+  .port-empty,
+  .port-cta-link {
+    font-family: var(--font-dm-sans), sans-serif;
+    letter-spacing: 0;
+    text-transform: uppercase;
+  }
+  .port-eyebrow {
+    margin: 0 0 18px;
+    color: #555;
+    font-size: 0.68rem;
+    font-weight: 620;
+  }
+  .port-title {
+    max-width: 760px;
+    margin: 0 auto 28px;
+    color: #111;
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: clamp(2.2rem, 6vw, 5.8rem);
+    font-weight: 300;
+    letter-spacing: 0.04em;
+    line-height: 0.98;
+  }
+  .port-description {
+    max-width: 520px;
+    margin: 0 auto 34px;
+    color: #4e4e4e;
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: clamp(1rem, 1.9vw, 1.22rem);
+    font-style: italic;
+    line-height: 1.75;
+  }
+  .port-filter-row {
+    display: inline-flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    padding: 6px;
+    border: 1px solid rgba(0,0,0,0.09);
+    border-radius: 8px;
+    background: #fbfbf9;
+  }
+  .port-filter-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 34px;
+    padding: 0 13px;
+    color: #444;
+    border-radius: 6px;
+    font-size: 0.68rem;
+    font-weight: 620;
+    text-decoration: none;
+    transition: color 0.18s ease, background 0.18s ease;
+  }
+  .port-filter-link[aria-current="page"],
+  .port-filter-link:hover {
+    color: #111;
+    background: rgba(0,0,0,0.06);
+  }
+  .portfolio-gallery-section {
+    padding: 0 24px 116px;
+  }
+  .port-image-wall {
+    width: min(1500px, 100%);
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .port-figure {
+    position: relative;
+    aspect-ratio: 4 / 5;
+    margin: 0;
+    overflow: hidden;
+    background: #ecece8;
+    isolation: isolate;
+  }
+  .port-figure::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,0.035);
+  }
+  .port-img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center center;
+    transform: scale(1.01);
+    transition: transform 0.7s ease, filter 0.7s ease;
+  }
+  .port-figure:hover .port-img {
+    transform: scale(1.055);
+    filter: saturate(1.04) contrast(1.02);
+  }
+  .port-empty {
+    width: min(720px, 100%);
+    margin: 0 auto;
+    padding: 72px 28px;
+    border: 1px solid rgba(0,0,0,0.08);
+    border-radius: 8px;
+    color: #4e4e4e;
+    font-size: 0.78rem;
+    font-weight: 620;
+    text-align: center;
+  }
+  .port-cta {
+    border-top: 1px solid rgba(0,0,0,0.07);
+    padding: 82px 28px;
+    text-align: center;
+  }
+  .port-cta-copy {
+    margin: 0 0 30px;
+    color: #4e4e4e;
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: clamp(1rem, 2.2vw, 1.3rem);
+    font-style: italic;
+  }
+  .port-cta-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 48px;
+    padding: 0 28px;
+    border-radius: 8px;
+    background: #161616;
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 620;
+    text-decoration: none;
+  }
+  @media (max-width: 980px) {
+    .port-image-wall {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px;
+    }
+  }
+  @media (max-width: 760px) {
+    .portfolio-page {
+      padding-top: 72px !important;
+    }
+    .professional-shell .port-intro {
+      min-height: 330px;
+      padding: 122px 20px 48px !important;
+    }
+    .port-title {
+      font-size: clamp(2.25rem, 14vw, 4.2rem) !important;
+      letter-spacing: 0.03em;
+    }
+    .port-description {
+      font-size: 0.98rem;
+      line-height: 1.65;
+      margin-bottom: 24px;
+    }
+    .port-filter-row {
+      width: 100%;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 4px;
+    }
+    .port-filter-link {
+      justify-content: center;
+      padding: 0 8px;
+      font-size: 0.66rem;
+    }
+    .professional-shell .portfolio-gallery-section {
+      padding: 0 0 82px !important;
+    }
+    .port-image-wall {
+      width: 100%;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 4px;
+    }
+    .port-cta {
+      padding: 64px 24px;
+    }
+    .port-cta-link {
+      width: 100%;
+      justify-content: center;
+    }
+  }
 `;
-
-function imageRatio(index: number) {
-  return ["4/5", "1/1", "3/4", "5/4", "2/3", "4/3"][index % 6];
-}
 
 export default async function PortfolioPage({
   searchParams,
@@ -39,58 +229,24 @@ export default async function PortfolioPage({
     : images;
 
   return (
-    <main style={{ background: "#fff", color: "#1a1a1a", paddingTop: 80 }}>
+    <main className="portfolio-page">
       <style>{CSS}</style>
 
-      {/* ── HEADER ── */}
-      <section style={{ padding: "80px 60px 60px", textAlign: "center" }}>
-        <p style={{
-          fontFamily: "Georgia, 'Times New Roman', serif",
-          fontSize: "0.7rem",
-          letterSpacing: "0.28em",
-          textTransform: "uppercase",
-          color: "#555",
-          marginBottom: 20,
-        }}>
-          Portfolio
-        </p>
-        <h1 style={{
-          fontFamily: "Georgia, 'Times New Roman', serif",
-          fontSize: "clamp(2rem, 5.5vw, 5rem)",
-          fontWeight: 300,
-          letterSpacing: "0.06em",
-          color: "#111",
-          lineHeight: 1.1,
-          margin: "0 auto 28px",
-          maxWidth: 800,
-        }}>
-          {selected?.name ?? "Selected work"}
-        </h1>
-        <div style={{ width: 36, height: 1, background: "rgba(0,0,0,0.12)", margin: "0 auto 28px" }} />
-        <p style={{
-          fontFamily: "Georgia, 'Times New Roman', serif",
-          fontStyle: "italic",
-          fontSize: "1rem",
-          color: "#555",
-          marginBottom: 40,
-        }}>
-          {selected?.description ?? "Graduation and family sessions across the Bay Area."}
-        </p>
+      <section className="port-intro" aria-labelledby="portfolio-title">
+        <div className="port-intro-inner">
+          <p className="port-eyebrow">Portfolio</p>
+          <h1 id="portfolio-title" className="port-title">
+            {selected?.name ?? "Selected work"}
+          </h1>
+          <p className="port-description">
+            {selected?.description ?? "Graduation and family sessions across the Bay Area."}
+          </p>
 
-        {/* Category filters */}
-        <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "8px 24px" }}>
+          <div className="port-filter-row" aria-label="Portfolio filters">
           <Link
             href="/portfolio"
             className="port-filter-link"
-            style={{
-              fontFamily: "Georgia, 'Times New Roman', serif",
-              fontSize: "0.72rem",
-              letterSpacing: "0.2em",
-              textTransform: "uppercase",
-              color: !selectedCategory ? "#111" : "#555",
-              borderBottom: !selectedCategory ? "1px solid #111" : "1px solid transparent",
-              paddingBottom: 2,
-            }}
+            aria-current={!selectedCategory ? "page" : undefined}
           >
             All
           </Link>
@@ -99,92 +255,43 @@ export default async function PortfolioPage({
               key={cat.slug}
               href={`/portfolio?category=${cat.slug}`}
               className="port-filter-link"
-              style={{
-                fontFamily: "Georgia, 'Times New Roman', serif",
-                fontSize: "0.72rem",
-                letterSpacing: "0.2em",
-                textTransform: "uppercase",
-                color: selectedCategory === cat.slug ? "#111" : "#555",
-                borderBottom: selectedCategory === cat.slug ? "1px solid #111" : "1px solid transparent",
-                paddingBottom: 2,
-              }}
+              aria-current={selectedCategory === cat.slug ? "page" : undefined}
             >
               {cat.name}
             </Link>
           ))}
+          </div>
         </div>
       </section>
 
-      {/* ── GRID ── */}
-      <section style={{ padding: "0 20px 100px" }}>
-        <div style={{ maxWidth: 1400, margin: "0 auto" }}>
+      <section className="portfolio-gallery-section" aria-label={`${selected?.name ?? "Selected work"} photos`}>
           {filteredImages.length > 0 ? (
-            <div style={{ columns: "1", columnGap: 8 }} className="port-masonry">
-              <style>{`
-                @media (min-width: 640px)  { .port-masonry { columns: 2 !important; } }
-                @media (min-width: 1024px) { .port-masonry { columns: 3 !important; } }
-              `}</style>
-              {filteredImages.map((image, index) => (
+            <div className="port-image-wall">
+              {filteredImages.map((image) => (
                 <figure
                   key={image.id}
                   className="port-figure"
-                  style={{
-                    position: "relative",
-                    marginBottom: 8,
-                    breakInside: "avoid",
-                    aspectRatio: imageRatio(index),
-                  }}
                 >
                   <img
                     src={image.image_url}
                     alt={image.alt}
                     className="port-img"
-                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
                   />
                 </figure>
               ))}
             </div>
           ) : (
-            <div style={{
-              border: "1px solid rgba(0,0,0,0.07)",
-              padding: "60px 40px",
-              textAlign: "center",
-              fontFamily: "Georgia, 'Times New Roman', serif",
-              fontStyle: "italic",
-              color: "#555",
-            }}>
+            <div className="port-empty">
               No portfolio images yet.
             </div>
           )}
-        </div>
       </section>
 
-      {/* ── CTA ── */}
-      <section style={{
-        borderTop: "1px solid rgba(0,0,0,0.07)",
-        padding: "80px 60px",
-        textAlign: "center",
-      }}>
-        <p style={{
-          fontFamily: "Georgia, 'Times New Roman', serif",
-          fontStyle: "italic",
-          fontSize: "clamp(1rem, 2.2vw, 1.3rem)",
-          color: "#555",
-          marginBottom: 32,
-        }}>
+      <section className="port-cta">
+        <p className="port-cta-copy">
           Like what you see?
         </p>
-        <Link href="/contact" style={{
-          fontFamily: "Georgia, 'Times New Roman', serif",
-          fontSize: "0.75rem",
-          letterSpacing: "0.18em",
-          textTransform: "uppercase",
-          color: "#fff",
-          background: "#1a1a1a",
-          padding: "14px 36px",
-          textDecoration: "none",
-          display: "inline-block",
-        }}>
+        <Link href="/contact" className="port-cta-link">
           Inquire now
         </Link>
       </section>

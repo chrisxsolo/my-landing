@@ -43,6 +43,11 @@ function fmtNum(value:number){return numberFmt.format(value);}
 function fmtPercent(value:number){return `${value.toFixed(1)}%`;}
 function fmtRatio(value:number){return value.toFixed(value>=10?1:2);}
 function dateFromKey(dateKey:string){const[y,m,d]=dateKey.split("-").map(Number);return new Date(y,m-1,d);}
+function matchesPortfolioGroup(image:PortfolioImage,group:"grads"|"families"){
+  const slug=image.category_slug;
+  if(group==="grads")return slug==="grads"||slug==="graduation";
+  return slug==="families"||slug==="family"||slug==="portraits";
+}
 function buildDailyStats(days:7|30,clicks:Pick<LinkClickEvent,"clicked_at">[],views:Pick<LinkViewEvent,"viewed_at">[]):DailyStat[]{
   const dailyMap:Record<string,{clicks:number;views:number}>={};
   for(let i=0;i<days;i++){
@@ -123,7 +128,7 @@ export default function AdminDashboard() {
   const [importing, setImporting] = useState(false);
   const batchFileRef = useRef<HTMLInputElement>(null);
 
-  // ── Site settings (home cover photos) ────────────────────────────────
+  // ── Site settings (site image selections) ────────────────────────────
   const [siteSettings, setSiteSettings] = useState<Record<string,string|null>>({});
   const [settingsSaving, setSettingsSaving] = useState<string|null>(null);
   const [coverPickerKey, setCoverPickerKey] = useState<string|null>(null);
@@ -223,7 +228,7 @@ export default function AdminDashboard() {
     setSiteSettings(prev=>({...prev,[key]:value}));
     setSettingsSaving(null);
     setCoverPickerKey(null);
-    showToast("Cover photo updated");
+    showToast("Photo selection updated");
   }
 
   async function fetchPoses(){setPosesLoading(true);const{data}=await supabase.from('grad_poses').select('*').order('order',{ascending:true});if(data)setPoses(data);setPosesLoading(false);}
@@ -891,6 +896,69 @@ export default function AdminDashboard() {
                       )}
                     </div>
                   ))}
+                </div>
+              </div>
+            </div>
+
+            {/* ── Pricing Page Photos ── */}
+            <div className={card}>
+              <div className="h-[3px]" style={{background:"#111827"}}/>
+              <div className="p-6">
+                <h2 className="text-base font-black text-slate-900 mb-1">Pricing Page Photos</h2>
+                <p className="text-xs text-slate-400 mb-5">Pick which portfolio images appear on the grad and family pricing pages.</p>
+                <div className="space-y-4">
+                  {([
+                    {key:"pricing_grad_standard_image",label:"Grad package photo",helper:"Shown beside the standard graduation package.",category:"grads"},
+                    {key:"pricing_grad_group_image",label:"Group grad photo",helper:"Shown in the group grad package section.",category:"grads"},
+                    {key:"pricing_family_session_image",label:"Family session photo",helper:"Shown beside the family session package.",category:"families"},
+                    {key:"pricing_family_extended_image",label:"Extended family photo",helper:"Shown beside the extended family package.",category:"families"},
+                  ] as {key:string;label:string;helper:string;category:"grads"|"families"}[]).map(({key,label,helper,category})=>{
+                    const categoryImages=portfolioImages.filter(img=>matchesPortfolioGroup(img,category));
+                    const pickerImages=categoryImages.length>0?categoryImages:portfolioImages;
+
+                    return(
+                      <div key={key}>
+                        <p className="text-xs font-black uppercase tracking-widest text-slate-500 mb-1">{label}</p>
+                        <p className="text-xs text-slate-400 mb-2">{helper}</p>
+                        {coverPickerKey===key?(
+                          <div>
+                            {pickerImages.length>0?(
+                              <div className="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto mb-2">
+                                {pickerImages.map(img=>(
+                                  <button key={img.id} onClick={()=>updateSiteSetting(key,img.image_url)} disabled={settingsSaving===key}
+                                    className="relative aspect-square rounded-xl overflow-hidden border-2 transition-all hover:scale-105"
+                                    style={{borderColor:siteSettings[key]===img.image_url?"#111827":"transparent"}}>
+                                    <img src={img.image_url} className="w-full h-full object-cover"/>
+                                    {siteSettings[key]===img.image_url&&<div className="absolute inset-0 bg-black/40 flex items-center justify-center"><span className="text-white text-lg font-black">✓</span></div>}
+                                  </button>
+                                ))}
+                              </div>
+                            ):(
+                              <p className="text-xs text-slate-400 mb-2 rounded-xl bg-slate-50 border border-slate-100 p-3">Upload portfolio images first, then come back here to choose pricing photos.</p>
+                            )}
+                            <div className="flex gap-2">
+                              <button onClick={()=>setCoverPickerKey(null)} className="text-xs font-bold px-3 py-1.5 rounded-lg bg-slate-100 text-slate-500">Cancel</button>
+                              {siteSettings[key]&&<button onClick={()=>updateSiteSetting(key,null)} className="text-xs font-bold px-3 py-1.5 rounded-lg text-red-500 bg-red-50">Remove photo</button>}
+                            </div>
+                          </div>
+                        ):(
+                          <button onClick={()=>setCoverPickerKey(key)} className="flex items-center gap-3 w-full p-2 rounded-xl border border-slate-100 bg-slate-50 hover:bg-slate-100 transition-colors text-left">
+                            {siteSettings[key]?(
+                              <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-slate-200">
+                                <img src={siteSettings[key]!} className="w-full h-full object-cover"/>
+                              </div>
+                            ):(
+                              <div className="w-16 h-16 rounded-lg flex-shrink-0 bg-slate-200 flex items-center justify-center text-slate-400 text-xl">🖼️</div>
+                            )}
+                            <div>
+                              <p className="text-xs font-black text-slate-800">{siteSettings[key]?"Change pricing photo":"Set pricing photo"}</p>
+                              <p className="text-xs text-slate-400">{siteSettings[key]?"Click to pick a different image":"Uses the current automatic fallback"}</p>
+                            </div>
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
