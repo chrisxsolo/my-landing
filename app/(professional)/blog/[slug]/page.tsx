@@ -235,13 +235,16 @@ export default async function ProfessionalBlogPostPage({ params }: Props) {
         <Link href="/contact" style={{
           fontFamily: "Georgia, 'Times New Roman', serif",
           fontSize: "0.75rem",
-          letterSpacing: "0.18em",
-          textTransform: "uppercase",
-          color: "#fff",
-          background: "#1a1a1a",
+          letterSpacing: 0,
+          color: "#005f5f",
+          background: "rgba(230, 251, 248, 0.95)",
+          border: "1px solid rgba(0, 166, 166, 0.3)",
+          borderRadius: 8,
+          boxShadow: "0 10px 24px rgba(0, 166, 166, 0.08)",
           padding: "14px 36px",
           textDecoration: "none",
           display: "inline-block",
+          fontWeight: 820,
         }}>
           Inquire now
         </Link>

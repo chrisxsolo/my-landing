@@ -13,45 +13,178 @@ type Submission = {
 };
 
 const CSS = `
-  @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(20px); }
-    to   { opacity: 1; transform: translateY(0); }
+  @keyframes thanksFadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
   }
-  .fade-up { animation: fadeUp 0.6s ease forwards; }
-  .fade-up-2 { animation: fadeUp 0.6s ease 0.15s forwards; opacity: 0; }
-  .fade-up-3 { animation: fadeUp 0.6s ease 0.3s forwards; opacity: 0; }
-  .fade-up-4 { animation: fadeUp 0.6s ease 0.45s forwards; opacity: 0; }
-
-  .detail-row {
+  .thanks-page {
+    min-height: 100vh;
+    padding-top: 98px;
+    background: transparent;
+    color: #101412;
+  }
+  .thanks-shell {
+    width: min(980px, calc(100% - 48px));
+    margin: 0 auto;
+    padding: 70px 0 110px;
+  }
+  .thanks-panel {
+    padding: 12px;
+    border: 1px solid rgba(18, 24, 22, 0.1);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.78);
+    box-shadow: 0 14px 34px rgba(18, 24, 22, 0.07);
+    animation: thanksFadeUp 0.5s ease both;
+  }
+  .thanks-inner {
+    padding: 38px;
+  }
+  .thanks-kicker,
+  .thanks-link,
+  .detail-label {
+    font-family: var(--font-dm-sans), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    letter-spacing: 0;
+  }
+  .thanks-kicker {
+    margin: 0 0 14px;
+    color: #008b8b;
+    font-size: 13px;
+    font-weight: 820;
+  }
+  .thanks-title {
+    max-width: 720px;
+    margin: 0;
+    color: #101412;
+    font-size: 58px;
+    font-weight: 880;
+    letter-spacing: 0;
+    line-height: 0.98;
+    text-wrap: balance;
+  }
+  .thanks-copy {
+    max-width: 620px;
+    margin: 22px 0 0;
+    color: #4b5a55;
+    font-size: 17px;
+    line-height: 1.72;
+    text-wrap: pretty;
+  }
+  .thanks-actions {
     display: flex;
-    align-items: flex-start;
-    gap: 20px;
-    padding: 16px 0;
-    border-bottom: 1px solid rgba(0,0,0,0.06);
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 28px;
+  }
+  .thanks-link {
+    min-height: 46px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 18px;
+    border: 1px solid rgba(0, 166, 166, 0.3);
+    border-radius: 8px;
+    background: rgba(230, 251, 248, 0.95);
+    color: #005f5f;
+    box-shadow: 0 10px 24px rgba(0, 166, 166, 0.08);
+    font-size: 14px;
+    font-weight: 820;
+    text-decoration: none;
+    transition: background 0.18s ease, transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+  }
+  .thanks-link[data-variant="ghost"] {
+    border-color: rgba(18, 24, 22, 0.11);
+    background: rgba(247, 250, 248, 0.88);
+    color: #101412;
+    box-shadow: none;
+  }
+  .thanks-link:hover {
+    transform: translateY(-1px);
+    border-color: rgba(0, 166, 166, 0.46);
+    background: rgba(214, 247, 244, 0.98);
+    box-shadow: 0 14px 28px rgba(0, 166, 166, 0.12);
+  }
+  .thanks-link[data-variant="ghost"]:hover {
+    background: #ffffff;
+    box-shadow: 0 10px 22px rgba(18, 24, 22, 0.06);
+  }
+  .thanks-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 28px;
+  }
+  .thanks-card {
+    padding: 18px;
+    border: 1px solid rgba(18, 24, 22, 0.1);
+    border-radius: 8px;
+    background: rgba(247, 250, 248, 0.82);
+  }
+  .thanks-card h2 {
+    margin: 0 0 10px;
+    color: #101412;
+    font-size: 21px;
+    font-weight: 860;
+    letter-spacing: 0;
+    line-height: 1.12;
+  }
+  .thanks-card p {
+    margin: 0;
+    color: #55635e;
+    font-size: 15px;
+    line-height: 1.62;
+  }
+  .detail-list {
+    display: grid;
+    gap: 0;
+    margin-top: 18px;
+  }
+  .detail-row {
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    gap: 16px;
+    padding: 14px 0;
+    border-bottom: 1px solid rgba(18, 24, 22, 0.09);
   }
   .detail-label {
-    font-family: var(--font-dm-sans), sans-serif;
-    font-size: 0.6rem;
-    letter-spacing: 0.22em;
-    text-transform: uppercase;
-    color: #555;
-    min-width: 110px;
-    padding-top: 3px;
-    flex-shrink: 0;
+    color: #008b8b;
+    font-size: 12px;
+    font-weight: 820;
   }
   .detail-value {
-    font-family: Georgia, 'Times New Roman', serif;
-    font-size: 0.95rem;
-    color: #444;
-    line-height: 1.65;
+    color: #33403b;
+    font-size: 15px;
+    line-height: 1.62;
     word-break: break-word;
   }
-
-  @media (max-width: 640px) {
-    .thanks-grid { grid-template-columns: 1fr !important; gap: 40px !important; }
-    .thanks-main { padding: 60px 24px !important; }
-    .detail-row { flex-direction: column; gap: 6px; }
-    .detail-label { min-width: 0; }
+  @media (max-width: 760px) {
+    .thanks-page {
+      padding-top: 78px;
+    }
+    .thanks-shell {
+      width: min(980px, calc(100% - 36px));
+      padding: 48px 0 78px;
+    }
+    .thanks-inner {
+      padding: 20px 8px 8px;
+    }
+    .thanks-title {
+      font-size: 40px;
+      line-height: 1;
+    }
+    .thanks-copy {
+      font-size: 16px;
+    }
+    .thanks-grid {
+      grid-template-columns: 1fr;
+    }
+    .detail-row {
+      grid-template-columns: 1fr;
+      gap: 6px;
+    }
+    .thanks-actions {
+      display: grid;
+      grid-template-columns: 1fr;
+    }
   }
 `;
 
@@ -67,158 +200,80 @@ export default function ThanksPage() {
         sessionStorage.removeItem("inquiry_submitted");
       }
     } catch {
-      // ignore
+      // Ignore missing or malformed session data.
     }
     setLoaded(true);
   }, []);
 
-  const fields = data ? [
-    data.name        && { label: "Name",         value: data.name },
-    data.email       && { label: "Email",         value: data.email },
-    data.phone       && { label: "Phone",         value: data.phone },
-    data.sessionType && { label: "Session type",  value: data.sessionType },
-    data.date        && { label: "Date in mind",  value: data.date },
-    data.message     && { label: "Message",       value: data.message },
-  ].filter(Boolean) as { label: string; value: string }[] : [];
+  const fields = data
+    ? [
+        data.name && { label: "Name", value: data.name },
+        data.email && { label: "Email", value: data.email },
+        data.phone && { label: "Phone", value: data.phone },
+        data.sessionType && { label: "Session type", value: data.sessionType },
+        data.date && { label: "Date in mind", value: data.date },
+        data.message && { label: "Message", value: data.message },
+      ].filter(Boolean) as { label: string; value: string }[]
+    : [];
 
   if (!loaded) return null;
 
   return (
-    <main style={{ background: "#fff", color: "#1a1a1a", minHeight: "100vh", paddingTop: 80 }}>
+    <main className="thanks-page">
       <style>{CSS}</style>
 
-      <div className="thanks-main" style={{ maxWidth: 800, margin: "0 auto", padding: "80px 60px 120px" }}>
-
-        {/* Check mark */}
-        <div className="fade-up" style={{ marginBottom: 40 }}>
-          <div style={{
-            width: 56, height: 56,
-            border: "1.5px solid rgba(0,0,0,0.12)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            marginBottom: 36,
-          }}>
-            <svg width="22" height="16" viewBox="0 0 22 16" fill="none">
-              <path d="M1 8L8 15L21 1" stroke="#1a1a1a" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </div>
-
-          <p style={{
-            fontFamily: "Georgia, 'Times New Roman', serif",
-            fontSize: "0.68rem", letterSpacing: "0.28em",
-            textTransform: "uppercase", color: "#555", marginBottom: 20,
-          }}>
-            Inquiry received
-          </p>
-          <h1 style={{
-            fontFamily: "Georgia, 'Times New Roman', serif",
-            fontSize: "clamp(2.2rem, 6vw, 4.5rem)", fontWeight: 300,
-            letterSpacing: "0.04em", color: "#111",
-            lineHeight: 1.1, margin: "0 0 24px",
-          }}>
-            {data?.name ? `Thank you, ${data.name.split(" ")[0]}.` : "Thank you."}
-          </h1>
-          <div style={{ width: 36, height: 1, background: "rgba(0,0,0,0.12)", marginBottom: 24 }} />
-          <p style={{
-            fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
-            fontSize: "1.05rem", color: "#555", lineHeight: 1.8, maxWidth: 480,
-          }}>
-            Your inquiry is in. I&rsquo;ll be in touch within 24–48 hours to confirm availability
-            and talk through next steps.
-          </p>
-        </div>
-
-        {/* Submitted info */}
-        {fields.length > 0 && (
-          <div className="fade-up-2" style={{
-            marginTop: 56,
-            border: "1px solid rgba(0,0,0,0.08)",
-            padding: "32px 36px",
-          }}>
-            <p style={{
-              fontFamily: "var(--font-dm-sans), sans-serif",
-              fontSize: "0.6rem", letterSpacing: "0.24em",
-              textTransform: "uppercase", color: "#555", marginBottom: 4,
-            }}>
-              What you submitted
+      <section className="thanks-shell">
+        <div className="thanks-panel">
+          <div className="thanks-inner">
+            <p className="thanks-kicker">Inquiry received</p>
+            <h1 className="thanks-title">
+              {data?.name ? `Thank you, ${data.name.split(" ")[0]}.` : "Thank you."}
+            </h1>
+            <p className="thanks-copy">
+              Your note is in. I will reply within 24 to 48 hours, and a copy of your responses is on the way to your inbox.
             </p>
-            <p style={{
-              fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
-              fontSize: "0.82rem", color: "#555", marginBottom: 24,
-            }}>
-              Keep this for your records.
-            </p>
-            {fields.map((field) => (
-              <div key={field.label} className="detail-row">
-                <span className="detail-label">{field.label}</span>
-                <span className="detail-value">{field.value}</span>
-              </div>
-            ))}
-          </div>
-        )}
 
-        {/* What happens next */}
-        <div className="fade-up-3" style={{ marginTop: 48 }}>
-          <p style={{
-            fontFamily: "var(--font-dm-sans), sans-serif",
-            fontSize: "0.6rem", letterSpacing: "0.24em",
-            textTransform: "uppercase", color: "#555", marginBottom: 20,
-          }}>
-            What happens next
-          </p>
-          <div className="thanks-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20 }}>
-            {[
-              { step: "01", title: "I review", body: "Your inquiry lands directly in my inbox and I review every detail." },
-              { step: "02", title: "I reply", body: "Expect a response within 24–48 hours — usually sooner." },
-              { step: "03", title: "We book", body: "Once we confirm fit and availability, I send a contract and deposit link." },
-            ].map(({ step, title, body }) => (
-              <div key={step} style={{ padding: "24px 0", borderTop: "1px solid rgba(0,0,0,0.07)" }}>
-                <p style={{
-                  fontFamily: "Georgia, 'Times New Roman', serif",
-                  fontSize: "1.6rem", fontWeight: 300, color: "#555",
-                  margin: "0 0 10px",
-                }}>
-                  {step}
-                </p>
-                <p style={{
-                  fontFamily: "Georgia, 'Times New Roman', serif",
-                  fontSize: "0.9rem", letterSpacing: "0.08em",
-                  textTransform: "uppercase", color: "#333", marginBottom: 8,
-                }}>
-                  {title}
-                </p>
-                <p style={{
-                  fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
-                  fontSize: "0.85rem", color: "#555", lineHeight: 1.7,
-                }}>
-                  {body}
-                </p>
+            <div className="thanks-actions">
+              <Link href="/grad-guide" className="thanks-link">
+                Open the graduation guide
+              </Link>
+              <Link href="/availability" className="thanks-link" data-variant="ghost">
+                Check dates
+              </Link>
+              <Link href="/" className="thanks-link" data-variant="ghost">
+                Back to home
+              </Link>
+            </div>
+
+            <div className="thanks-grid">
+              <div className="thanks-card">
+                <p className="thanks-kicker">Next</p>
+                <h2>I review the details.</h2>
+                <p>I will check the date, session type, location notes, and reply with the clean next step.</p>
               </div>
-            ))}
+              <div className="thanks-card">
+                <p className="thanks-kicker">Then</p>
+                <h2>We lock the session.</h2>
+                <p>Once the date works, I send the contract, deposit step, and any prep notes you need.</p>
+              </div>
+            </div>
+
+            {fields.length > 0 && (
+              <div className="thanks-card" style={{ marginTop: 12 }}>
+                <p className="thanks-kicker">What you submitted</p>
+                <div className="detail-list">
+                  {fields.map((field) => (
+                    <div key={field.label} className="detail-row">
+                      <span className="detail-label">{field.label}</span>
+                      <span className="detail-value">{field.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
-
-        {/* CTAs */}
-        <div className="fade-up-4" style={{ display: "flex", gap: 16, marginTop: 52, flexWrap: "wrap" }}>
-          <Link href="/availability" style={{
-            fontFamily: "Georgia, 'Times New Roman', serif",
-            fontSize: "0.72rem", letterSpacing: "0.18em",
-            textTransform: "uppercase", color: "#fff",
-            background: "#1a1a1a", padding: "13px 28px",
-            textDecoration: "none", display: "inline-block",
-          }}>
-            Check availability →
-          </Link>
-          <Link href="/" style={{
-            fontFamily: "Georgia, 'Times New Roman', serif",
-            fontSize: "0.72rem", letterSpacing: "0.18em",
-            textTransform: "uppercase", color: "#555",
-            border: "1px solid rgba(0,0,0,0.15)", padding: "13px 28px",
-            textDecoration: "none", display: "inline-block",
-          }}>
-            Back to home
-          </Link>
-        </div>
-      </div>
+      </section>
     </main>
   );
 }

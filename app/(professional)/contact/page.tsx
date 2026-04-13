@@ -13,94 +13,282 @@ const sessionTypes = [
   "Other",
 ];
 
+const contactImage =
+  "https://dmtslzwglpezympptqls.supabase.co/storage/v1/object/public/grad-photos/champagne-popping.jpg";
+
 const CSS = `
-  .contact-input {
-    width: 100%;
-    padding: 14px 0;
-    border: none;
-    border-bottom: 1px solid rgba(0,0,0,0.12);
+  .contact-page {
+    padding-top: 98px;
     background: transparent;
-    font-family: Georgia, 'Times New Roman', serif;
-    font-size: 1rem;
-    color: #1a1a1a;
-    outline: none;
-    transition: border-color 0.2s ease;
-    box-sizing: border-box;
+    color: #101412;
   }
-  .contact-input:focus { border-bottom-color: #1a1a1a; }
-  .contact-input::placeholder { color: #555; font-style: italic; }
-  .contact-select {
+  .contact-shell {
+    width: min(1180px, calc(100% - 48px));
+    margin: 0 auto;
+  }
+  .contact-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) 360px;
+    gap: 28px;
+    align-items: end;
+    padding: 70px 0 34px;
+  }
+  .contact-kicker,
+  .contact-label,
+  .contact-input,
+  .contact-select,
+  .contact-textarea,
+  .submit-btn,
+  .contact-link,
+  .contact-chip {
+    font-family: var(--font-dm-sans), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    letter-spacing: 0;
+  }
+  .contact-kicker {
+    margin: 0 0 14px;
+    color: #008b8b;
+    font-size: 13px;
+    font-weight: 820;
+  }
+  .contact-title {
+    max-width: 760px;
+    margin: 0;
+    color: #101412;
+    font-size: 58px;
+    font-weight: 880;
+    letter-spacing: 0;
+    line-height: 0.98;
+    text-wrap: balance;
+  }
+  .contact-copy {
+    max-width: 620px;
+    margin: 22px 0 0;
+    color: #4b5a55;
+    font-size: 17px;
+    line-height: 1.72;
+    text-wrap: pretty;
+  }
+  .contact-hero-media {
+    min-height: 360px;
+    overflow: hidden;
+    border: 1px solid rgba(18, 24, 22, 0.1);
+    border-radius: 8px;
+    background: #dfe8e4;
+    box-shadow: 0 24px 70px rgba(18, 24, 22, 0.12);
+  }
+  .contact-hero-media img {
     width: 100%;
-    padding: 14px 0;
-    border: none;
-    border-bottom: 1px solid rgba(0,0,0,0.12);
-    background: transparent;
-    font-family: Georgia, 'Times New Roman', serif;
-    font-size: 1rem;
-    color: #1a1a1a;
-    outline: none;
-    transition: border-color 0.2s ease;
-    appearance: none;
-    cursor: pointer;
+    height: 100%;
+    display: block;
+    object-fit: cover;
   }
-  .contact-select:focus { border-bottom-color: #1a1a1a; }
+  .contact-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 330px;
+    gap: 18px;
+    align-items: start;
+    padding: 24px 0 110px;
+  }
+  .contact-form-panel,
+  .contact-side-panel {
+    border: 1px solid rgba(18, 24, 22, 0.1);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.78);
+    box-shadow: 0 14px 34px rgba(18, 24, 22, 0.07);
+  }
+  .contact-form-panel {
+    padding: 28px;
+  }
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  .contact-field {
+    display: grid;
+    gap: 8px;
+    margin-bottom: 18px;
+  }
+  .contact-label {
+    color: #008b8b;
+    font-size: 12px;
+    font-weight: 820;
+  }
+  .contact-input,
+  .contact-select,
   .contact-textarea {
     width: 100%;
-    padding: 14px 0;
-    border: none;
-    border-bottom: 1px solid rgba(0,0,0,0.12);
-    background: transparent;
-    font-family: Georgia, 'Times New Roman', serif;
-    font-size: 1rem;
-    color: #1a1a1a;
+    border: 1px solid rgba(18, 24, 22, 0.12);
+    border-radius: 8px;
+    background: rgba(247, 250, 248, 0.82);
+    color: #101412;
+    font-size: 16px;
+    font-weight: 680;
     outline: none;
-    resize: none;
-    transition: border-color 0.2s ease;
-    box-sizing: border-box;
-    min-height: 120px;
+    transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
   }
-  .contact-textarea:focus { border-bottom-color: #1a1a1a; }
-  .contact-textarea::placeholder { color: #555; font-style: italic; }
-  .contact-label {
-    font-family: var(--font-dm-sans), sans-serif;
-    font-size: 0.65rem;
-    letter-spacing: 0.22em;
-    text-transform: uppercase;
-    color: #555;
-    display: block;
-    margin-bottom: 2px;
+  .contact-input,
+  .contact-select {
+    min-height: 50px;
+    padding: 0 14px;
+  }
+  .contact-textarea {
+    min-height: 150px;
+    padding: 14px;
+    resize: vertical;
+  }
+  .contact-input:focus,
+  .contact-select:focus,
+  .contact-textarea:focus {
+    border-color: rgba(0, 166, 166, 0.62);
+    background: #ffffff;
+    box-shadow: 0 0 0 4px rgba(0, 166, 166, 0.1);
+  }
+  .contact-input::placeholder,
+  .contact-textarea::placeholder {
+    color: #7b8984;
+  }
+  .submit-btn,
+  .contact-link {
+    min-height: 48px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(0, 166, 166, 0.3);
+    border-radius: 8px;
+    background: rgba(230, 251, 248, 0.95);
+    color: #005f5f;
+    box-shadow: 0 10px 24px rgba(0, 166, 166, 0.08);
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 820;
+    text-decoration: none;
+    transition: background 0.18s ease, transform 0.18s ease, opacity 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
   }
   .submit-btn {
-    font-family: Georgia, 'Times New Roman', serif;
-    font-size: 0.75rem;
-    letter-spacing: 0.2em;
-    text-transform: uppercase;
-    color: #fff;
-    background: #1a1a1a;
-    border: none;
-    padding: 16px 48px;
-    cursor: pointer;
-    transition: opacity 0.2s ease;
-    display: inline-block;
+    width: 100%;
   }
-  .submit-btn:hover:not(:disabled) { opacity: 0.75; }
-  .submit-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .submit-btn:hover:not(:disabled),
+  .contact-link:hover {
+    transform: translateY(-1px);
+    border-color: rgba(0, 166, 166, 0.46);
+    background: rgba(214, 247, 244, 0.98);
+    box-shadow: 0 14px 28px rgba(0, 166, 166, 0.12);
+  }
+  .submit-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+  .contact-error {
+    margin: 0 0 18px;
+    color: #b3263a;
+    font-size: 14px;
+    font-weight: 760;
+    line-height: 1.5;
+  }
+  .contact-sidebar {
+    display: grid;
+    gap: 14px;
+  }
+  .contact-side-panel {
+    padding: 18px;
+  }
+  .contact-side-panel h2 {
+    margin: 0 0 10px;
+    color: #101412;
+    font-size: 23px;
+    font-weight: 860;
+    letter-spacing: 0;
+    line-height: 1.1;
+  }
+  .contact-side-panel p,
+  .contact-side-panel a {
+    margin: 0;
+    color: #56635e;
+    font-size: 15px;
+    line-height: 1.65;
+  }
+  .contact-side-panel a {
+    color: #101412;
+    font-weight: 780;
+    text-decoration: none;
+  }
+  .contact-chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 18px;
+  }
+  .contact-chip {
+    min-height: 34px;
+    display: inline-flex;
+    align-items: center;
+    padding: 0 11px;
+    border: 1px solid rgba(18, 24, 22, 0.1);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.72);
+    color: #26312d;
+    font-size: 13px;
+    font-weight: 760;
+  }
+  @media (max-width: 920px) {
+    .contact-hero,
+    .contact-layout {
+      grid-template-columns: 1fr;
+    }
+    .contact-hero-media {
+      min-height: 420px;
+      order: -1;
+    }
+  }
   @media (max-width: 760px) {
-    .contact-grid { grid-template-columns: 1fr !important; gap: 60px !important; }
-    .form-row { grid-template-columns: 1fr !important; }
+    .contact-page {
+      padding-top: 78px;
+    }
+    .contact-shell {
+      width: min(1180px, calc(100% - 36px));
+    }
+    .contact-hero {
+      padding-top: 48px;
+    }
+    .contact-title {
+      font-size: 40px;
+      line-height: 1;
+    }
+    .contact-copy {
+      font-size: 16px;
+    }
+    .contact-hero-media {
+      min-height: 340px;
+    }
+    .contact-layout {
+      padding-bottom: 78px;
+    }
+    .contact-form-panel {
+      padding: 18px;
+    }
+    .form-row {
+      grid-template-columns: 1fr;
+      gap: 0;
+    }
   }
 `;
 
 export default function ContactPage() {
   const router = useRouter();
   const [form, setForm] = useState({
-    name: "", email: "", phone: "", sessionType: "", date: "", message: "",
+    name: "",
+    email: "",
+    phone: "",
+    sessionType: "",
+    date: "",
+    message: "",
   });
   const [status, setStatus] = useState<"idle" | "sending" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) {
-    setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
+    setForm((value) => ({ ...value, [e.target.name]: e.target.value }));
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -124,249 +312,146 @@ export default function ContactPage() {
   }
 
   return (
-    <main style={{ background: "#fff", color: "#1a1a1a", paddingTop: 80 }}>
+    <main className="contact-page">
       <style>{CSS}</style>
 
-      {/* ── HEADER ── */}
-      <section style={{ padding: "80px 60px 80px", textAlign: "center" }}>
-        <p style={{
-          fontFamily: "Georgia, 'Times New Roman', serif",
-          fontSize: "0.7rem",
-          letterSpacing: "0.28em",
-          textTransform: "uppercase",
-          color: "#555",
-          marginBottom: 20,
-        }}>
-          Contact
-        </p>
-        <h1 style={{
-          fontFamily: "Georgia, 'Times New Roman', serif",
-          fontSize: "clamp(2rem, 5.5vw, 5rem)",
-          fontWeight: 300,
-          letterSpacing: "0.06em",
-          color: "#111",
-          lineHeight: 1.1,
-          margin: "0 auto 28px",
-          maxWidth: 640,
-        }}>
-          Let&rsquo;s work together.
-        </h1>
-        <div style={{ width: 36, height: 1, background: "rgba(0,0,0,0.12)", margin: "0 auto 28px" }} />
-        <p style={{
-          fontFamily: "Georgia, 'Times New Roman', serif",
-          fontStyle: "italic",
-          fontSize: "1rem",
-          color: "#555",
-          maxWidth: 480,
-          margin: "0 auto",
-          lineHeight: 1.7,
-        }}>
-          Grad season books up fast. Reach out early and we&rsquo;ll make it happen.
-        </p>
-      </section>
-
-      {/* ── BODY — form left, info right ── */}
-      <section style={{ padding: "0 60px 120px", maxWidth: 1100, margin: "0 auto" }}>
-        <div className="contact-grid" style={{
-          display: "grid",
-          gridTemplateColumns: "1.4fr 0.6fr",
-          gap: "100px",
-          alignItems: "start",
-        }}>
-
-          {/* ── FORM ── */}
-          <div>
-            <form onSubmit={handleSubmit} noValidate>
-                {/* Row 1: Name + Email */}
-                <div className="form-row" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "32px", marginBottom: 36 }}>
-                  <div>
-                    <label htmlFor="name" className="contact-label">Name *</label>
-                    <input
-                      id="name" name="name" type="text" required
-                      placeholder="Your name"
-                      className="contact-input"
-                      value={form.name} onChange={handleChange}
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="email" className="contact-label">Email *</label>
-                    <input
-                      id="email" name="email" type="email" required
-                      placeholder="your@email.com"
-                      className="contact-input"
-                      value={form.email} onChange={handleChange}
-                    />
-                  </div>
-                </div>
-
-                {/* Row 2: Phone + Session type */}
-                <div className="form-row" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "32px", marginBottom: 36 }}>
-                  <div>
-                    <label htmlFor="phone" className="contact-label">Phone (optional)</label>
-                    <input
-                      id="phone" name="phone" type="tel"
-                      placeholder="(415) 000-0000"
-                      className="contact-input"
-                      value={form.phone} onChange={handleChange}
-                    />
-                  </div>
-                  <div style={{ position: "relative" }}>
-                    <label htmlFor="sessionType" className="contact-label">Session type</label>
-                    <select
-                      id="sessionType" name="sessionType"
-                      className="contact-select"
-                      value={form.sessionType} onChange={handleChange}
-                    >
-                      <option value="">Select one…</option>
-                      {sessionTypes.map((t) => (
-                        <option key={t} value={t}>{t}</option>
-                      ))}
-                    </select>
-                    <span style={{
-                      position: "absolute", right: 0, bottom: 16,
-                      color: "#555", pointerEvents: "none", fontSize: "0.8rem",
-                    }}>↓</span>
-                  </div>
-                </div>
-
-                {/* Row 3: Date */}
-                <div style={{ marginBottom: 36 }}>
-                  <label htmlFor="date" className="contact-label">Date in mind</label>
-                  <input
-                    id="date" name="date" type="text"
-                    placeholder="e.g. May 15, or flexible"
-                    className="contact-input"
-                    value={form.date} onChange={handleChange}
-                  />
-                </div>
-
-                {/* Row 4: Message */}
-                <div style={{ marginBottom: 48 }}>
-                  <label htmlFor="message" className="contact-label">Message *</label>
-                  <textarea
-                    id="message" name="message" required
-                    placeholder="Tell me about your session — location ideas, vibe, what matters most to you…"
-                    className="contact-textarea"
-                    value={form.message} onChange={handleChange}
-                  />
-                </div>
-
-                {errorMsg && (
-                  <p style={{
-                    fontFamily: "Georgia, 'Times New Roman', serif",
-                    fontStyle: "italic",
-                    fontSize: "0.88rem",
-                    color: "#c0392b",
-                    marginBottom: 20,
-                  }}>
-                    {errorMsg}
-                  </p>
-                )}
-
-                <button type="submit" disabled={status === "sending"} className="submit-btn">
-                  {status === "sending" ? "Sending…" : "Send inquiry"}
-                </button>
-              </form>
-          </div>
-
-          {/* ── SIDEBAR INFO ── */}
-          <div style={{ paddingTop: 8 }}>
-            <div style={{ marginBottom: 48 }}>
-              <p style={{
-                fontFamily: "Georgia, 'Times New Roman', serif",
-                fontSize: "0.65rem",
-                letterSpacing: "0.24em",
-                textTransform: "uppercase",
-                color: "#555",
-                marginBottom: 16,
-              }}>
-                Response time
-              </p>
-              <p style={{
-                fontFamily: "Georgia, 'Times New Roman', serif",
-                fontStyle: "italic",
-                fontSize: "1rem",
-                lineHeight: 1.75,
-                color: "#555",
-              }}>
-                I reply within 24–48 hours and will confirm availability for your preferred date.
-              </p>
-            </div>
-
-            <div style={{ borderTop: "1px solid rgba(0,0,0,0.07)", paddingTop: 36, marginBottom: 48 }}>
-              <p style={{
-                fontFamily: "Georgia, 'Times New Roman', serif",
-                fontSize: "0.65rem",
-                letterSpacing: "0.24em",
-                textTransform: "uppercase",
-                color: "#555",
-                marginBottom: 16,
-              }}>
-                Location
-              </p>
-              <p style={{
-                fontFamily: "Georgia, 'Times New Roman', serif",
-                fontStyle: "italic",
-                fontSize: "1rem",
-                lineHeight: 1.75,
-                color: "#555",
-              }}>
-                Based in San Francisco. Available throughout the Bay Area — SF, Berkeley, Stanford, SJSU, Peninsula, South Bay, and beyond.
-              </p>
-            </div>
-
-            <div style={{ borderTop: "1px solid rgba(0,0,0,0.07)", paddingTop: 36, marginBottom: 48 }}>
-              <p style={{
-                fontFamily: "Georgia, 'Times New Roman', serif",
-                fontSize: "0.65rem",
-                letterSpacing: "0.24em",
-                textTransform: "uppercase",
-                color: "#555",
-                marginBottom: 16,
-              }}>
-                Elsewhere
-              </p>
-              <a href="https://www.instagram.com/soloxsnaps" target="_blank" rel="noopener noreferrer" style={{
-                fontFamily: "Georgia, 'Times New Roman', serif",
-                fontStyle: "italic",
-                fontSize: "0.95rem",
-                color: "#555",
-                textDecoration: "none",
-                borderBottom: "1px solid rgba(0,0,0,0.1)",
-                paddingBottom: 1,
-                display: "inline-block",
-                marginBottom: 10,
-              }}>
-                @soloxsnaps on Instagram
-              </a>
-            </div>
-
-            <div style={{ borderTop: "1px solid rgba(0,0,0,0.07)", paddingTop: 36 }}>
-              <p style={{
-                fontFamily: "Georgia, 'Times New Roman', serif",
-                fontSize: "0.65rem",
-                letterSpacing: "0.24em",
-                textTransform: "uppercase",
-                color: "#555",
-                marginBottom: 16,
-              }}>
-                Check dates
-              </p>
-              <Link href="/availability" style={{
-                fontFamily: "Georgia, 'Times New Roman', serif",
-                fontStyle: "italic",
-                fontSize: "0.95rem",
-                color: "#555",
-                textDecoration: "none",
-                borderBottom: "1px solid rgba(0,0,0,0.1)",
-                paddingBottom: 1,
-                display: "inline-block",
-              }}>
-                View availability calendar →
-              </Link>
-            </div>
+      <section className="contact-shell contact-hero">
+        <div>
+          <p className="contact-kicker">Start the booking note</p>
+          <h1 className="contact-title">Tell me the date, location, and what this is for.</h1>
+          <p className="contact-copy">
+            Send the basics and I will reply within 24 to 48 hours with availability, next steps, and anything useful for your session.
+          </p>
+          <div className="contact-chip-row">
+            <span className="contact-chip">Graduation</span>
+            <span className="contact-chip">Family</span>
+            <span className="contact-chip">Bay Area</span>
           </div>
         </div>
+        <div className="contact-hero-media">
+          <img src={contactImage} alt="Chris Solorzano photography portrait" decoding="async" />
+        </div>
+      </section>
+
+      <section className="contact-shell contact-layout">
+        <div className="contact-form-panel">
+          <form onSubmit={handleSubmit} noValidate>
+            <div className="form-row">
+              <div className="contact-field">
+                <label htmlFor="name" className="contact-label">Name *</label>
+                <input
+                  id="name"
+                  name="name"
+                  type="text"
+                  required
+                  placeholder="Your name"
+                  className="contact-input"
+                  value={form.name}
+                  onChange={handleChange}
+                />
+              </div>
+              <div className="contact-field">
+                <label htmlFor="email" className="contact-label">Email *</label>
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  required
+                  placeholder="you@email.com"
+                  className="contact-input"
+                  value={form.email}
+                  onChange={handleChange}
+                />
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="contact-field">
+                <label htmlFor="phone" className="contact-label">Phone</label>
+                <input
+                  id="phone"
+                  name="phone"
+                  type="tel"
+                  placeholder="Optional"
+                  className="contact-input"
+                  value={form.phone}
+                  onChange={handleChange}
+                />
+              </div>
+              <div className="contact-field">
+                <label htmlFor="sessionType" className="contact-label">Session type</label>
+                <select
+                  id="sessionType"
+                  name="sessionType"
+                  className="contact-select"
+                  value={form.sessionType}
+                  onChange={handleChange}
+                >
+                  <option value="">Select one</option>
+                  {sessionTypes.map((type) => (
+                    <option key={type} value={type}>{type}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="contact-field">
+              <label htmlFor="date" className="contact-label">Date in mind</label>
+              <input
+                id="date"
+                name="date"
+                type="text"
+                placeholder="May 15, flexible, or a few options"
+                className="contact-input"
+                value={form.date}
+                onChange={handleChange}
+              />
+            </div>
+
+            <div className="contact-field">
+              <label htmlFor="message" className="contact-label">Message *</label>
+              <textarea
+                id="message"
+                name="message"
+                required
+                placeholder="Tell me the campus or location, how many people, and the vibe you want."
+                className="contact-textarea"
+                value={form.message}
+                onChange={handleChange}
+              />
+            </div>
+
+            {errorMsg && <p className="contact-error">{errorMsg}</p>}
+
+            <button type="submit" disabled={status === "sending"} className="submit-btn">
+              {status === "sending" ? "Sending..." : "Send inquiry"}
+            </button>
+          </form>
+        </div>
+
+        <aside className="contact-sidebar" aria-label="Booking details">
+          <div className="contact-side-panel">
+            <p className="contact-kicker">Response time</p>
+            <h2>24 to 48 hours.</h2>
+            <p>You will also get a copy of your responses and the graduation guide after submitting.</p>
+          </div>
+
+          <div className="contact-side-panel">
+            <p className="contact-kicker">Check dates</p>
+            <h2>Already have a window?</h2>
+            <p>
+              <Link href="/availability">View availability</Link> before sending your inquiry.
+            </p>
+          </div>
+
+          <div className="contact-side-panel">
+            <p className="contact-kicker">Instagram</p>
+            <h2>@soloxsnaps</h2>
+            <p>
+              <a href="https://www.instagram.com/soloxsnaps" target="_blank" rel="noopener noreferrer">See recent work</a>
+            </p>
+          </div>
+        </aside>
       </section>
     </main>
   );

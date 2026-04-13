@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 type CarouselImage = {
@@ -11,155 +12,214 @@ type CarouselImage = {
 
 export default function HeroCarousel({ images }: { images: CarouselImage[] }) {
   const [current, setCurrent] = useState(0);
-  const [prev, setPrev] = useState<number | null>(null);
-  const [transitioning, setTransitioning] = useState(false);
-
-  function goTo(i: number) {
-    if (i === current || transitioning) return;
-    setTransitioning(true);
-    setPrev(current);
-    setCurrent(i);
-    setTimeout(() => {
-      setPrev(null);
-      setTransitioning(false);
-    }, 800);
-  }
 
   useEffect(() => {
     if (images.length <= 1) return;
-    const id = setInterval(() => {
-      const next = (current + 1) % images.length;
-      goTo(next);
-    }, 5000);
-    return () => clearInterval(id);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [current, images.length, transitioning]);
+    const id = window.setInterval(() => {
+      setCurrent((index) => (index + 1) % images.length);
+    }, 5200);
+    return () => window.clearInterval(id);
+  }, [images.length]);
 
   if (!images.length) return null;
 
   return (
     <>
       <style>{`
-        .hero-slide {
+        .home-hero {
+          position: relative;
+          height: 88svh;
+          overflow: hidden;
+          isolation: isolate;
+          background: #101412;
+        }
+        .home-hero-slide {
           position: absolute;
           inset: 0;
           background-size: cover;
           background-position: center;
         }
-        .hero-slide-enter {
-          animation: heroFadeIn 0.8s ease forwards;
+        .home-hero::after {
+          content: "";
+          position: absolute;
+          inset: 0;
+          z-index: 1;
+          background:
+            linear-gradient(90deg, rgba(10, 14, 13, 0.72) 0%, rgba(10, 14, 13, 0.28) 46%, rgba(10, 14, 13, 0.1) 100%),
+            linear-gradient(180deg, rgba(10, 14, 13, 0.34) 0%, rgba(10, 14, 13, 0.04) 42%, rgba(10, 14, 13, 0.42) 100%);
+          pointer-events: none;
         }
-        .hero-slide-exit {
-          animation: heroFadeOut 0.8s ease forwards;
+        .home-hero-inner {
+          position: relative;
+          z-index: 2;
+          width: min(1180px, calc(100% - 48px));
+          height: 100%;
+          margin: 0 auto;
+          display: grid;
+          align-content: end;
+          padding: 140px 0 62px;
         }
-        @keyframes heroFadeIn {
-          from { opacity: 0; }
-          to   { opacity: 1; }
+        .home-hero-kicker {
+          width: fit-content;
+          margin: 0 0 18px;
+          padding: 8px 10px;
+          border: 1px solid rgba(255, 255, 255, 0.22);
+          border-radius: 8px;
+          background: rgba(255, 255, 255, 0.12);
+          color: rgba(255, 255, 255, 0.88);
+          font-size: 13px;
+          font-weight: 760;
+          letter-spacing: 0;
         }
-        @keyframes heroFadeOut {
-          from { opacity: 1; }
-          to   { opacity: 0; }
-        }
-        .hero-dot-btn {
-          border: none;
-          padding: 0;
-          cursor: pointer;
-          background: none;
-          transition: all 0.35s ease;
-        }
-        .hero-dot-btn:hover { opacity: 0.7; }
-        .hero-wordmark {
-          font-family: Georgia, 'Times New Roman', serif;
-          font-size: 5.5rem;
-          font-weight: 300;
-          letter-spacing: 0px;
-          text-transform: uppercase;
-          color: #ffffff;
+        .home-hero-title {
+          max-width: 760px;
           margin: 0;
-          text-align: center;
-          text-shadow: 0 1px 24px rgba(0,0,0,0.2);
-          white-space: nowrap;
-          max-width: calc(100vw - 32px);
+          color: #ffffff;
+          font-size: 74px;
+          font-weight: 860;
+          letter-spacing: 0;
+          line-height: 0.95;
+          text-wrap: balance;
+          text-shadow: 0 18px 54px rgba(0, 0, 0, 0.34);
+        }
+        .home-hero-copy {
+          max-width: 600px;
+          margin: 22px 0 0;
+          color: rgba(255, 255, 255, 0.82);
+          font-size: 18px;
+          line-height: 1.7;
+          text-wrap: pretty;
+        }
+        .home-hero-actions {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 10px;
+          margin-top: 30px;
+        }
+        .home-hero-action {
+          min-height: 46px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0 18px;
+          border: 1px solid rgba(255, 255, 255, 0.22);
+          border-radius: 8px;
+          background: rgba(255, 255, 255, 0.16);
+          color: #ffffff;
+          font-size: 14px;
+          font-weight: 800;
+          letter-spacing: 0;
+          text-decoration: none;
+          transition: background 0.18s ease, transform 0.18s ease;
+        }
+        .home-hero-action[data-primary="true"] {
+          border-color: #ffffff;
+          background: #ffffff;
+          color: #0f1714;
+        }
+        .home-hero-action:hover {
+          transform: translateY(-1px);
+          background: rgba(255, 255, 255, 0.24);
+        }
+        .home-hero-action[data-primary="true"]:hover {
+          background: #f7faf8;
+        }
+        .home-hero-dots {
+          position: absolute;
+          z-index: 3;
+          right: 24px;
+          bottom: 22px;
+          display: flex;
+          gap: 7px;
+        }
+        .home-hero-dot {
+          width: 8px;
+          height: 8px;
+          padding: 0;
+          border: 0;
+          border-radius: 8px;
+          background: rgba(255, 255, 255, 0.44);
+          cursor: pointer;
+          transition: width 0.2s ease, background 0.2s ease;
+        }
+        .home-hero-dot[data-active="true"] {
+          width: 30px;
+          background: #ffffff;
         }
         @media (max-width: 760px) {
-          .hero-wordmark { font-size: 2.9rem; }
+          .home-hero {
+            height: 84svh;
+          }
+          .home-hero-inner {
+            width: min(1180px, calc(100% - 36px));
+            padding: 116px 0 44px;
+          }
+          .home-hero-title {
+            font-size: 46px;
+            line-height: 1;
+          }
+          .home-hero-copy {
+            font-size: 16px;
+            line-height: 1.62;
+          }
+          .home-hero-actions {
+            display: grid;
+            grid-template-columns: 1fr;
+            margin-top: 24px;
+          }
+          .home-hero-dots {
+            left: 18px;
+            right: auto;
+            bottom: 18px;
+          }
         }
-        @media (max-width: 360px) {
-          .hero-wordmark { font-size: 2.45rem; }
+        @media (max-width: 380px) {
+          .home-hero-title {
+            font-size: 39px;
+          }
         }
       `}</style>
 
-      {/* Full-viewport image stack */}
-      <div style={{ position: "relative", width: "100%", height: "100vh", overflow: "hidden", background: "#e8e4df" }}>
-        {/* Previous image (fading out) */}
-        {prev !== null && images[prev] && (
-          <div
-            className="hero-slide hero-slide-exit"
-            style={{ backgroundImage: `url(${images[prev].image_url})` }}
-          />
-        )}
+      <section className="home-hero" aria-label="Bay Area photography hero">
+        <div
+          className="home-hero-slide"
+          role="img"
+          aria-label={images[current].alt}
+          style={{ backgroundImage: `url(${images[current].image_url})` }}
+        />
 
-        {/* Current image (fading in) */}
-        {images[current] && (
-          <div
-            className={`hero-slide ${transitioning ? "hero-slide-enter" : ""}`}
-            style={{ backgroundImage: `url(${images[current].image_url})` }}
-          />
-        )}
-
-        {/* Overlay — very subtle darkening at top and bottom for text legibility */}
-        <div style={{
-          position: "absolute", inset: 0,
-          background: "linear-gradient(to bottom, rgba(0,0,0,0.18) 0%, transparent 35%, transparent 65%, rgba(0,0,0,0.22) 100%)",
-          pointerEvents: "none",
-        }} />
-
-        {/* Centered studio name overlaid on image */}
-        <div style={{
-          position: "absolute", inset: 0,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          pointerEvents: "none",
-        }}>
-          <h1 className="hero-wordmark">
-            soloxsnaps
+        <div className="home-hero-inner">
+          <p className="home-hero-kicker">Bay Area graduation and family photography</p>
+          <h1 className="home-hero-title">
+            Portraits with polish, warmth, and a real pulse.
           </h1>
+          <p className="home-hero-copy">
+            Directed enough to feel effortless. Natural enough to still feel like you.
+          </p>
+          <div className="home-hero-actions">
+            <Link href="/contact" className="home-hero-action" data-primary="true">
+              Book a shoot
+            </Link>
+            <Link href="/portfolio" className="home-hero-action">
+              View the work
+            </Link>
+          </div>
         </div>
 
-        {/* Dots — bottom center */}
-        <div style={{
-          position: "absolute", bottom: 28, left: 0, right: 0,
-          display: "flex", justifyContent: "center", gap: 8,
-        }}>
-          {images.map((_, i) => (
-            <button
-              key={i}
-              className="hero-dot-btn"
-              aria-label={`Go to slide ${i + 1}`}
-              onClick={() => goTo(i)}
-              style={{
-                width: i === current ? 24 : 8,
-                height: 8,
-                borderRadius: 4,
-                background: i === current ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.4)",
-              }}
-            />
-          ))}
-        </div>
-
-        {/* Scroll hint */}
-        <div style={{
-          position: "absolute", bottom: 28, right: 32,
-          fontFamily: "Georgia, 'Times New Roman', serif",
-          fontStyle: "italic",
-          fontSize: "0.72rem",
-          letterSpacing: "0.12em",
-          color: "rgba(255,255,255,0.6)",
-          writingMode: "vertical-rl",
-          transform: "rotate(180deg)",
-        }}>
-          scroll
-        </div>
-      </div>
+        {images.length > 1 && (
+          <div className="home-hero-dots" aria-label="Hero slides">
+            {images.map((image, index) => (
+              <button
+                key={image.id}
+                className="home-hero-dot"
+                data-active={index === current}
+                aria-label={`Show slide ${index + 1}`}
+                onClick={() => setCurrent(index)}
+              />
+            ))}
+          </div>
+        )}
+      </section>
     </>
   );
 }

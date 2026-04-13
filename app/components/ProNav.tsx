@@ -4,11 +4,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
-const orderedLinks = [
+const primaryLinks = [
   { label: "Home", href: "/" },
-  { label: "About", href: "/about" },
   { label: "Dates", href: "/availability" },
-  { label: "Contact", href: "/contact" },
+  { label: "About", href: "/about" },
   { label: "Journal", href: "/blog" },
 ];
 
@@ -29,30 +28,25 @@ function isActive(pathname: string, href: string) {
 
 export default function ProNav() {
   const pathname = usePathname();
-  const [atTop, setAtTop] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const [portfolioOpen, setPortfolioOpen] = useState(false);
   const [pricingOpen, setPricingOpen] = useState(false);
   const navRef = useRef<HTMLElement>(null);
 
-  useEffect(() => {
-    const onScroll = () => setAtTop(window.scrollY < 60);
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
+  const isPortfolioActive = portfolioLinks.some((link) => isActive(pathname, link.href));
+  const isPricingActive = pricingLinks.some((link) => isActive(pathname, link.href));
 
   useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (navRef.current && !navRef.current.contains(e.target as Node)) {
+    function handleClick(event: MouseEvent) {
+      if (navRef.current && !navRef.current.contains(event.target as Node)) {
         setMenuOpen(false);
         setPortfolioOpen(false);
         setPricingOpen(false);
       }
     }
 
-    function handleKeydown(e: KeyboardEvent) {
-      if (e.key === "Escape") {
+    function handleKeydown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
         setMenuOpen(false);
         setPortfolioOpen(false);
         setPricingOpen(false);
@@ -73,19 +67,12 @@ export default function ProNav() {
     setPricingOpen(false);
   }, [pathname]);
 
-  const isHeroPage = pathname === "/";
-  const overlaid = isHeroPage && atTop;
-  const isPortfolioActive = portfolioLinks.some((link) => isActive(pathname, link.href));
-  const isPricingActive = pricingLinks.some((link) => isActive(pathname, link.href));
-  const linkColor = (active: boolean) => overlaid ? "rgba(255,255,255,0.92)" : active ? "#111" : "#343434";
-  const mutedLinkColor = overlaid ? "rgba(255,255,255,0.78)" : "#4a4a4a";
-
   const renderDropdownLink = (link: { label: string; href: string }) => (
     <Link
       key={link.href}
       href={link.href}
-      className="pro-dropdown-link"
-      style={{ color: isActive(pathname, link.href) ? "#111" : "#343434" }}
+      className="pro-nav-dropdown-link"
+      aria-current={isActive(pathname, link.href) ? "page" : undefined}
     >
       {link.label}
     </Link>
@@ -100,257 +87,283 @@ export default function ProNav() {
           left: 0;
           right: 0;
           z-index: 100;
-          padding: 20px 40px;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 32px;
-          transition: background 0.4s ease, border-color 0.4s ease;
+          padding: 14px 24px;
+          pointer-events: none;
         }
-        .pro-nav-link {
-          font-size: 13px;
-          line-height: 1;
-          letter-spacing: 0;
-          text-transform: none;
-          text-decoration: none;
-          transition: color 0.2s ease, opacity 0.2s ease, background 0.2s ease, border-color 0.2s ease;
-          font-family: "Avenir Next", "SF Pro Rounded", var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
-          font-weight: 650;
-          background: none;
-          border: 1px solid transparent;
+        .pro-nav-shell {
+          width: min(1180px, 100%);
+          min-height: 58px;
+          margin: 0 auto;
+          padding: 7px;
+          display: grid;
+          grid-template-columns: auto 1fr auto;
+          align-items: center;
+          gap: 14px;
+          border: 1px solid rgba(18, 24, 22, 0.11);
           border-radius: 8px;
-          cursor: pointer;
-          padding: 9px 11px;
+          background: rgba(255, 255, 255, 0.94);
+          box-shadow: 0 12px 28px rgba(16, 24, 22, 0.1);
+          pointer-events: auto;
+        }
+        .pro-nav-brand,
+        .pro-nav-link,
+        .pro-nav-button,
+        .pro-nav-cta,
+        .pro-nav-dropdown-link {
+          font-family: var(--font-dm-sans), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+          letter-spacing: 0;
+          text-decoration: none;
+        }
+        .pro-nav-brand {
           display: inline-flex;
           align-items: center;
-          gap: 6px;
-        }
-        .pro-nav-link:hover {
-          opacity: 1;
-          background: rgba(0,0,0,0.045);
-          border-color: rgba(0,0,0,0.08);
+          min-height: 42px;
+          padding: 0 14px;
+          color: #0e1412;
+          font-size: 17px;
+          font-weight: 820;
+          line-height: 1;
         }
         .pro-desktop-nav {
-          margin-left: auto;
+          justify-self: center;
           display: flex;
           align-items: center;
-          gap: 10px;
+          gap: 4px;
+          padding: 4px;
+          border-radius: 8px;
+          background: rgba(245, 249, 247, 0.72);
         }
-        .pro-dropdown-wrap { position: relative; }
-        .pro-dropdown {
+        .pro-nav-link,
+        .pro-nav-button {
+          min-height: 36px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          padding: 0 12px;
+          border: 1px solid transparent;
+          border-radius: 8px;
+          background: transparent;
+          color: #2f3835;
+          cursor: pointer;
+          font-size: 13px;
+          font-weight: 740;
+          line-height: 1;
+          transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+        }
+        .pro-nav-link:hover,
+        .pro-nav-button:hover,
+        .pro-nav-link[aria-current="page"],
+        .pro-nav-button[aria-current="page"] {
+          background: rgba(255, 255, 255, 0.92);
+          border-color: rgba(18, 24, 22, 0.1);
+          color: #0e1412;
+        }
+        .pro-nav-caret {
+          color: #687571;
+          font-size: 10px;
+          line-height: 1;
+        }
+        .pro-nav-actions {
+          justify-self: end;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        .pro-nav-cta {
+          min-height: 42px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0 18px;
+          border: 1px solid rgba(0, 166, 166, 0.3);
+          border-radius: 8px;
+          background: rgba(230, 251, 248, 0.95);
+          color: #005f5f;
+          box-shadow: 0 8px 20px rgba(0, 166, 166, 0.08);
+          font-size: 13px;
+          font-weight: 820;
+          line-height: 1;
+          transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+        }
+        .pro-nav-cta:hover {
+          transform: translateY(-1px);
+          border-color: rgba(0, 166, 166, 0.46);
+          background: rgba(214, 247, 244, 0.98);
+          box-shadow: 0 12px 26px rgba(0, 166, 166, 0.12);
+        }
+        .pro-dropdown-wrap {
+          position: relative;
+        }
+        .pro-nav-dropdown {
           position: absolute;
           top: calc(100% + 10px);
           left: 50%;
-          transform: translateX(-50%);
-          background: rgba(250,250,248,0.98);
-          backdrop-filter: blur(16px);
-          -webkit-backdrop-filter: blur(16px);
-          border: 1px solid rgba(0,0,0,0.12);
+          min-width: 194px;
+          padding: 7px;
+          display: grid;
+          gap: 3px;
+          border: 1px solid rgba(18, 24, 22, 0.12);
           border-radius: 8px;
-          padding: 6px;
-          min-width: 176px;
-          box-shadow: 0 18px 46px rgba(0,0,0,0.11);
-          z-index: 200;
+          background: #ffffff;
+          box-shadow: 0 16px 34px rgba(16, 24, 22, 0.14);
+          transform: translateX(-50%);
         }
-        .pro-dropdown-link {
+        .pro-nav-dropdown-link {
+          min-height: 40px;
           display: flex;
           align-items: center;
-          justify-content: space-between;
-          min-height: 38px;
-          padding: 0 13px;
-          font-family: "Avenir Next", "SF Pro Rounded", var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
-          font-size: 13px;
-          font-weight: 650;
-          letter-spacing: 0;
-          text-transform: none;
-          text-decoration: none;
-          transition: color 0.15s ease, background 0.15s ease;
-          white-space: nowrap;
-          border-radius: 6px;
-        }
-        .pro-dropdown-link::after {
-          content: "→";
-          font-size: 12px;
-          opacity: 0;
-          transform: translateX(-4px);
-          transition: opacity 0.15s ease, transform 0.15s ease;
-        }
-        .pro-dropdown-link:hover {
-          color: #111 !important;
-          background: rgba(0,0,0,0.055);
-        }
-        .pro-dropdown-link:hover::after {
-          opacity: 0.55;
-          transform: translateX(0);
-        }
-        .pro-mobile-button {
-          display: none;
-          margin-left: auto;
-        }
-        .pro-mobile-panel { display: none; }
-        .pro-mobile-section {
-          border-top: 1px solid rgba(0,0,0,0.08);
-          padding-top: 14px;
-        }
-        .pro-mobile-submenu {
-          display: grid;
-          gap: 6px;
-          padding: 8px 0 0 14px;
-        }
-        .pro-mobile-submenu a {
-          color: #343434;
-          font-family: "Avenir Next", "SF Pro Rounded", var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
-          font-size: 13px;
-          font-weight: 650;
-          letter-spacing: 0;
-          text-transform: none;
-          text-decoration: none;
-        }
-        .pro-mobile-submenu .pro-dropdown-link {
-          min-height: 38px;
           padding: 0 12px;
+          border-radius: 8px;
+          color: #2f3835;
+          font-size: 13px;
+          font-weight: 720;
         }
-        @media (max-width: 760px) {
+        .pro-nav-dropdown-link:hover,
+        .pro-nav-dropdown-link[aria-current="page"] {
+          background: rgba(10, 166, 166, 0.11);
+          color: #0d1412;
+        }
+        .pro-mobile-button,
+        .pro-mobile-panel {
+          display: none;
+        }
+        @media (max-width: 880px) {
           .pro-header {
-            padding: 16px 22px;
-            gap: 16px;
-            background: rgba(250,250,248,0.96) !important;
-            border-bottom: 1px solid rgba(0,0,0,0.06) !important;
-            backdrop-filter: blur(12px) !important;
-            -webkit-backdrop-filter: blur(12px) !important;
+            padding: 10px 12px;
           }
-          .pro-header > .pro-nav-link,
-          .pro-header > .pro-mobile-button {
-            color: #111 !important;
+          .pro-nav-shell {
+            grid-template-columns: 1fr auto;
+            min-height: 56px;
           }
-          .pro-header > .pro-mobile-button span {
-            color: #4a4a4a !important;
+          .pro-desktop-nav,
+          .pro-nav-actions {
+            display: none;
           }
-          .pro-desktop-nav { display: none; }
-          .pro-mobile-button { display: inline-flex; }
+          .pro-mobile-button {
+            display: inline-flex;
+          }
           .pro-mobile-panel {
-            display: grid;
-            gap: 16px;
             position: absolute;
-            top: 100%;
+            top: calc(100% + 10px);
             left: 0;
             right: 0;
-            max-height: calc(100vh - 64px);
+            display: grid;
+            gap: 8px;
+            max-height: calc(100svh - 86px);
             overflow-y: auto;
-            overscroll-behavior: contain;
-            padding: 18px 22px 24px;
-            background: #fafaf8;
-            border-top: 1px solid rgba(0,0,0,0.06);
-            border-bottom: 1px solid rgba(0,0,0,0.08);
-            box-shadow: 0 18px 34px rgba(0,0,0,0.08);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
+            padding: 10px;
+            border: 1px solid rgba(18, 24, 22, 0.12);
+            border-radius: 8px;
+            background: #ffffff;
+            box-shadow: 0 16px 34px rgba(16, 24, 22, 0.14);
           }
-          .pro-mobile-panel .pro-nav-link {
-            color: #343434 !important;
-            justify-content: space-between;
-            min-height: 40px;
+          .pro-mobile-panel .pro-nav-link,
+          .pro-mobile-panel .pro-nav-button,
+          .pro-mobile-panel .pro-nav-cta {
             width: 100%;
+            min-height: 46px;
+            justify-content: space-between;
+            padding: 0 14px;
+          }
+          .pro-mobile-panel .pro-nav-cta {
+            justify-content: center;
+            margin-top: 6px;
+          }
+          .pro-mobile-submenu {
+            display: grid;
+            gap: 4px;
+            padding: 4px 0 8px 12px;
+          }
+          .pro-mobile-submenu .pro-nav-dropdown-link {
+            min-height: 40px;
+            background: rgba(245, 249, 247, 0.82);
           }
         }
       `}</style>
 
-      <header
-        ref={navRef}
-        className="pro-header"
-        style={{
-          background: overlaid ? "transparent" : "rgba(250,250,248,0.96)",
-          backdropFilter: overlaid ? "none" : "blur(12px)",
-          WebkitBackdropFilter: overlaid ? "none" : "blur(12px)",
-          borderBottom: overlaid ? "none" : "1px solid rgba(0,0,0,0.06)",
-        }}
-      >
-        <Link href="/" className="pro-nav-link" style={{ color: linkColor(pathname === "/") }}>
-          Home
-        </Link>
-
-        <nav className="pro-desktop-nav" aria-label="Primary navigation">
-          <Link href="/about" className="pro-nav-link" style={{ color: linkColor(isActive(pathname, "/about")) }}>
-            About
+      <header ref={navRef} className="pro-header">
+        <div className="pro-nav-shell">
+          <Link href="/" className="pro-nav-brand" aria-label="soloxsnaps home">
+            soloxsnaps
           </Link>
 
-          <div className="pro-dropdown-wrap">
-            <button
-              className="pro-nav-link"
-              type="button"
-              aria-expanded={pricingOpen}
-              onClick={() => {
-                setPricingOpen((open) => !open);
-                setPortfolioOpen(false);
-              }}
-              style={{ color: linkColor(isPricingActive) }}
-            >
-              Rates
-              <span aria-hidden="true" style={{ color: mutedLinkColor, fontSize: 8 }}>{pricingOpen ? "▲" : "▼"}</span>
-            </button>
-            {pricingOpen && <div className="pro-dropdown">{pricingLinks.map(renderDropdownLink)}</div>}
-          </div>
-
-          <div className="pro-dropdown-wrap">
-            <button
-              className="pro-nav-link"
-              type="button"
-              aria-expanded={portfolioOpen}
-              onClick={() => {
-                setPortfolioOpen((open) => !open);
-                setPricingOpen(false);
-              }}
-              style={{ color: linkColor(isPortfolioActive) }}
-            >
-              Work
-              <span aria-hidden="true" style={{ color: mutedLinkColor, fontSize: 8 }}>{portfolioOpen ? "▲" : "▼"}</span>
-            </button>
-            {portfolioOpen && <div className="pro-dropdown">{portfolioLinks.map(renderDropdownLink)}</div>}
-          </div>
-
-          {orderedLinks.slice(2).map((link) => (
-            <Link key={link.href} href={link.href} className="pro-nav-link" style={{ color: linkColor(isActive(pathname, link.href)) }}>
-              {link.label}
-            </Link>
-          ))}
-        </nav>
-
-        <button
-          className="pro-nav-link pro-mobile-button"
-          type="button"
-          aria-expanded={menuOpen}
-          aria-controls="pro-mobile-menu"
-          onClick={() => setMenuOpen((open) => !open)}
-          style={{ color: linkColor(false) }}
-        >
-          Menu
-          <span aria-hidden="true" style={{ color: mutedLinkColor, fontSize: 8 }}>{menuOpen ? "▲" : "▼"}</span>
-        </button>
-
-        {menuOpen && (
-          <nav id="pro-mobile-menu" className="pro-mobile-panel" aria-label="Mobile navigation">
-            <Link href="/" className="pro-nav-link">Home</Link>
-            <Link href="/about" className="pro-nav-link">About</Link>
-
-            <div className="pro-mobile-section">
-              <button
+          <nav className="pro-desktop-nav" aria-label="Primary navigation">
+            {primaryLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
                 className="pro-nav-link"
+                aria-current={isActive(pathname, link.href) ? "page" : undefined}
+              >
+                {link.label}
+              </Link>
+            ))}
+
+            <div className="pro-dropdown-wrap">
+              <button
+                className="pro-nav-button"
                 type="button"
+                aria-current={isPortfolioActive ? "page" : undefined}
+                aria-expanded={portfolioOpen}
+                onClick={() => {
+                  setPortfolioOpen((open) => !open);
+                  setPricingOpen(false);
+                }}
+              >
+                Work <span className="pro-nav-caret">{portfolioOpen ? "^" : "v"}</span>
+              </button>
+              {portfolioOpen && <div className="pro-nav-dropdown">{portfolioLinks.map(renderDropdownLink)}</div>}
+            </div>
+
+            <div className="pro-dropdown-wrap">
+              <button
+                className="pro-nav-button"
+                type="button"
+                aria-current={isPricingActive ? "page" : undefined}
                 aria-expanded={pricingOpen}
                 onClick={() => {
                   setPricingOpen((open) => !open);
                   setPortfolioOpen(false);
                 }}
               >
-                Rates
-                <span aria-hidden="true">{pricingOpen ? "▲" : "▼"}</span>
+                Rates <span className="pro-nav-caret">{pricingOpen ? "^" : "v"}</span>
               </button>
-              {pricingOpen && <div className="pro-mobile-submenu">{pricingLinks.map(renderDropdownLink)}</div>}
+              {pricingOpen && <div className="pro-nav-dropdown">{pricingLinks.map(renderDropdownLink)}</div>}
             </div>
+          </nav>
 
-            <div className="pro-mobile-section">
+          <div className="pro-nav-actions">
+            <Link href="/contact" className="pro-nav-cta">
+              Book a shoot
+            </Link>
+          </div>
+
+          <button
+            className="pro-nav-button pro-mobile-button"
+            type="button"
+            aria-expanded={menuOpen}
+            aria-controls="pro-mobile-menu"
+            onClick={() => setMenuOpen((open) => !open)}
+          >
+            Menu <span className="pro-nav-caret">{menuOpen ? "x" : "v"}</span>
+          </button>
+
+          {menuOpen && (
+            <nav id="pro-mobile-menu" className="pro-mobile-panel" aria-label="Mobile navigation">
+              {primaryLinks.map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className="pro-nav-link"
+                  aria-current={isActive(pathname, link.href) ? "page" : undefined}
+                >
+                  {link.label}
+                </Link>
+              ))}
+
               <button
-                className="pro-nav-link"
+                className="pro-nav-button"
                 type="button"
                 aria-expanded={portfolioOpen}
                 onClick={() => {
@@ -358,19 +371,29 @@ export default function ProNav() {
                   setPricingOpen(false);
                 }}
               >
-                Work
-                <span aria-hidden="true">{portfolioOpen ? "▲" : "▼"}</span>
+                Work <span className="pro-nav-caret">{portfolioOpen ? "^" : "v"}</span>
               </button>
               {portfolioOpen && <div className="pro-mobile-submenu">{portfolioLinks.map(renderDropdownLink)}</div>}
-            </div>
 
-            {orderedLinks.slice(2).map((link) => (
-              <Link key={link.href} href={link.href} className="pro-nav-link">
-                {link.label}
+              <button
+                className="pro-nav-button"
+                type="button"
+                aria-expanded={pricingOpen}
+                onClick={() => {
+                  setPricingOpen((open) => !open);
+                  setPortfolioOpen(false);
+                }}
+              >
+                Rates <span className="pro-nav-caret">{pricingOpen ? "^" : "v"}</span>
+              </button>
+              {pricingOpen && <div className="pro-mobile-submenu">{pricingLinks.map(renderDropdownLink)}</div>}
+
+              <Link href="/contact" className="pro-nav-cta">
+                Book a shoot
               </Link>
-            ))}
-          </nav>
-        )}
+            </nav>
+          )}
+        </div>
       </header>
     </>
   );

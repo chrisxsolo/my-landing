@@ -2,193 +2,169 @@ import Link from "next/link";
 import ProNav from "@/app/components/ProNav";
 
 const footerLinks = [
-  { label: "Grads",    href: "/portfolio?category=grads" },
-  { label: "Families", href: "/portfolio?category=families" },
-  { label: "About",    href: "/about" },
-  { label: "Blog",     href: "/blog" },
-  { label: "Contact",  href: "/contact" },
+  { label: "Grad gallery", href: "/portfolio?category=grads" },
+  { label: "Family gallery", href: "/portfolio?category=families" },
+  { label: "Grad rates", href: "/pricing/grads" },
+  { label: "Family rates", href: "/pricing/families" },
+  { label: "Dates", href: "/availability" },
+  { label: "Contact", href: "/contact" },
 ];
 
 export default function ProfessionalLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <div className="professional-shell" style={{ minHeight: "100vh", background: "#ffffff", color: "#1a1a1a" }}>
+    <div className="professional-shell">
       <style>{`
+        .professional-shell {
+          min-height: 100vh;
+          background: #f7faf8;
+          color: #101412;
+          font-family: var(--font-dm-sans), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+          overflow-x: hidden;
+        }
+        .professional-shell * {
+          box-sizing: border-box;
+        }
+        .professional-shell img {
+          max-width: 100%;
+        }
+        .professional-footer {
+          padding: 72px 24px 36px;
+          background: #f7faf8;
+        }
+        .professional-footer-inner {
+          width: min(1180px, 100%);
+          margin: 0 auto;
+          padding: 28px;
+          border: 1px solid rgba(18, 24, 22, 0.1);
+          border-radius: 8px;
+          background: rgba(255, 255, 255, 0.7);
+          box-shadow: 0 14px 34px rgba(18, 24, 22, 0.06);
+        }
+        .professional-footer-top {
+          display: grid;
+          grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+          gap: 40px;
+          align-items: end;
+          padding-bottom: 28px;
+          border-bottom: 1px solid rgba(18, 24, 22, 0.1);
+        }
+        .professional-footer-brand {
+          margin: 0 0 14px;
+          color: #0e1412;
+          font-size: 28px;
+          font-weight: 860;
+          letter-spacing: 0;
+          line-height: 1;
+        }
+        .professional-footer-copy {
+          max-width: 520px;
+          margin: 0;
+          color: #4d5a55;
+          font-size: 16px;
+          line-height: 1.75;
+        }
+        .professional-footer-links {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 10px;
+          justify-content: flex-end;
+        }
+        .professional-footer-link {
+          min-height: 38px;
+          display: inline-flex;
+          align-items: center;
+          padding: 0 13px;
+          border: 1px solid rgba(18, 24, 22, 0.1);
+          border-radius: 8px;
+          background: rgba(255, 255, 255, 0.72);
+          color: #26312d;
+          font-size: 13px;
+          font-weight: 760;
+          letter-spacing: 0;
+          text-decoration: none;
+          transition: background 0.18s ease, transform 0.18s ease;
+        }
+        .professional-footer-link:hover {
+          background: #ffffff;
+          transform: translateY(-1px);
+        }
+        .professional-footer-bottom {
+          display: flex;
+          justify-content: space-between;
+          gap: 16px;
+          padding-top: 24px;
+          color: #64716d;
+          font-size: 13px;
+          font-weight: 680;
+          letter-spacing: 0;
+        }
         @media (max-width: 760px) {
-          .professional-shell {
-            overflow-x: hidden;
-          }
           .professional-shell main {
-            padding-top: 72px !important;
+            padding-top: 76px !important;
           }
           .professional-shell section {
-            padding-left: 24px !important;
-            padding-right: 24px !important;
+            padding-left: 20px !important;
+            padding-right: 20px !important;
           }
-          .professional-shell header:not(.pro-header) {
-            padding-left: 24px !important;
-            padding-right: 24px !important;
-          }
-          .professional-shell h1 {
-            font-size: clamp(2.2rem, 13vw, 4rem) !important;
-            line-height: 1.05 !important;
-            overflow-wrap: anywhere;
-          }
+          .professional-shell h1,
           .professional-shell h2 {
             overflow-wrap: anywhere;
           }
-          .professional-shell img {
-            max-width: 100%;
-          }
-          .professional-shell section[style*="grid-template-columns"],
-          .professional-shell section > div[style*="grid-template-columns"],
-          .professional-shell article > div[style*="grid-template-columns"] {
-            grid-template-columns: 1fr !important;
-          }
           .professional-footer {
-            padding: 56px 24px 36px !important;
+            padding: 48px 14px 24px;
           }
-          .professional-footer-grid {
-            grid-template-columns: 1fr !important;
-            gap: 34px !important;
-            margin-bottom: 42px !important;
+          .professional-footer-inner {
+            padding: 20px;
+          }
+          .professional-footer-top {
+            grid-template-columns: 1fr;
+            gap: 28px;
+          }
+          .professional-footer-brand {
+            font-size: 24px;
+          }
+          .professional-footer-links {
+            justify-content: flex-start;
           }
           .professional-footer-bottom {
-            align-items: flex-start !important;
-            flex-direction: column !important;
+            flex-direction: column;
           }
         }
       `}</style>
       <ProNav />
       {children}
 
-      {/* ── FOOTER ── */}
-      <footer className="professional-footer" style={{
-        borderTop: "1px solid rgba(0,0,0,0.07)",
-        padding: "72px 60px 48px",
-        background: "#ffffff",
-      }}>
-        <div className="professional-footer-grid" style={{
-          maxWidth: 1200,
-          margin: "0 auto",
-          display: "grid",
-          gridTemplateColumns: "1.5fr 1fr 1fr",
-          gap: "48px",
-          marginBottom: 60,
-        }}>
-          {/* Brand */}
-          <div>
-            <p style={{
-              fontFamily: "Georgia, 'Times New Roman', serif",
-              fontSize: "1.1rem",
-              fontWeight: 400,
-              letterSpacing: "0.2em",
-              textTransform: "uppercase",
-              color: "#111",
-              marginBottom: 14,
-            }}>
-              soloxsnaps
-            </p>
-            <p style={{
-              fontFamily: "Georgia, 'Times New Roman', serif",
-              fontStyle: "italic",
-              fontSize: "0.9rem",
-              color: "#555",
-              marginBottom: 16,
-            }}>
-              graduation &amp; family photography
-            </p>
-            <p style={{ fontSize: "0.82rem", lineHeight: 1.75, color: "#555", maxWidth: 280 }}>
-              Chris Solorzano — Bay Area photographer specializing in honest graduation portraits and family sessions.
-            </p>
-          </div>
+      <footer className="professional-footer">
+        <div className="professional-footer-inner">
+          <div className="professional-footer-top">
+            <div>
+              <p className="professional-footer-brand">soloxsnaps</p>
+              <p className="professional-footer-copy">
+                Bay Area graduation and family photography with clean direction, real light, and galleries that feel ready to share.
+              </p>
+            </div>
 
-          {/* Nav */}
-          <div>
-            <p style={{
-              fontSize: "0.65rem",
-              fontWeight: 600,
-              letterSpacing: "0.22em",
-              textTransform: "uppercase",
-              color: "#555",
-              marginBottom: 20,
-            }}>
-              Navigate
-            </p>
-            {footerLinks.map((link) =>
-              link.href.startsWith("http") ? (
-                <a key={link.href} href={link.href} style={{
-                  display: "block",
-                  fontSize: "0.8rem",
-                  letterSpacing: "0.1em",
-                  textTransform: "uppercase",
-                  color: "#555",
-                  textDecoration: "none",
-                  marginBottom: 12,
-                  transition: "color 0.2s ease",
-                }}>
-                  {link.label}
-                </a>
-              ) : (
-                <Link key={link.href} href={link.href} style={{
-                  display: "block",
-                  fontSize: "0.8rem",
-                  letterSpacing: "0.1em",
-                  textTransform: "uppercase",
-                  color: "#555",
-                  textDecoration: "none",
-                  marginBottom: 12,
-                }}>
+            <nav className="professional-footer-links" aria-label="Footer navigation">
+              {footerLinks.map((link) => (
+                <Link key={link.href} href={link.href} className="professional-footer-link">
                   {link.label}
                 </Link>
-              )
-            )}
+              ))}
+              <a
+                href="https://www.instagram.com/soloxsnaps"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="professional-footer-link"
+              >
+                Instagram
+              </a>
+            </nav>
           </div>
 
-          {/* Connect */}
-          <div>
-            <p style={{
-              fontSize: "0.65rem",
-              fontWeight: 600,
-              letterSpacing: "0.22em",
-              textTransform: "uppercase",
-              color: "#555",
-              marginBottom: 20,
-            }}>
-              Connect
-            </p>
-            <a href="https://www.instagram.com/soloxsnaps" target="_blank" rel="noopener noreferrer" style={{
-              display: "block", fontSize: "0.8rem", letterSpacing: "0.1em",
-              textTransform: "uppercase", color: "#555", textDecoration: "none", marginBottom: 12,
-            }}>
-              Instagram
-            </a>
-            <Link href="/home" style={{
-              display: "block", fontSize: "0.8rem", letterSpacing: "0.1em",
-              textTransform: "uppercase", color: "#555", textDecoration: "none", marginBottom: 12,
-            }}>
-              Fun Site
-            </Link>
+          <div className="professional-footer-bottom">
+            <span>© {new Date().getFullYear()} soloxsnaps</span>
+            <span>San Francisco, California</span>
           </div>
-        </div>
-
-        {/* Bottom bar */}
-        <div className="professional-footer-bottom" style={{
-          borderTop: "1px solid rgba(0,0,0,0.06)",
-          paddingTop: 28,
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          maxWidth: 1200,
-          margin: "0 auto",
-          flexWrap: "wrap",
-          gap: 12,
-        }}>
-          <p style={{ fontSize: "0.72rem", letterSpacing: "0.1em", color: "#555", textTransform: "uppercase" }}>
-            © {new Date().getFullYear()} soloxsnaps
-          </p>
-          <p style={{ fontSize: "0.72rem", letterSpacing: "0.1em", color: "#555", textTransform: "uppercase" }}>
-            San Francisco, CA
-          </p>
         </div>
       </footer>
     </div>

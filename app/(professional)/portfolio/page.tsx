@@ -157,12 +157,21 @@ const CSS = `
     align-items: center;
     min-height: 48px;
     padding: 0 28px;
+    border: 1px solid rgba(0, 166, 166, 0.3);
     border-radius: 8px;
-    background: #161616;
-    color: #fff;
+    background: rgba(230, 251, 248, 0.95);
+    color: #005f5f;
+    box-shadow: 0 10px 24px rgba(0, 166, 166, 0.08);
     font-size: 0.75rem;
     font-weight: 620;
     text-decoration: none;
+    transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+  }
+  .port-cta-link:hover {
+    transform: translateY(-1px);
+    border-color: rgba(0, 166, 166, 0.46);
+    background: rgba(214, 247, 244, 0.98);
+    box-shadow: 0 14px 28px rgba(0, 166, 166, 0.12);
   }
   @media (max-width: 980px) {
     .port-image-wall {

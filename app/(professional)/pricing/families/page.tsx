@@ -8,126 +8,307 @@ export const metadata: Metadata = {
   alternates: { canonical: "/pricing/families" },
 };
 
-const CSS = `
-  .pricing-page {
-    --pricing-ink: #111513;
-    --pricing-copy: #303635;
-    --pricing-muted: #596260;
-    --pricing-surface: #f7f8f5;
-    --pricing-line: rgba(17, 21, 19, 0.1);
-    background: #fff;
-    color: var(--pricing-ink);
-    font-family: var(--font-dm-sans), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  }
-  .pricing-page h2,
-  .pricing-page p,
-  .pricing-page li,
-  .pricing-page span,
-  .pricing-page a {
-    font-family: var(--font-dm-sans), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
-    letter-spacing: 0 !important;
-  }
-  .pricing-page h2 {
-    color: var(--pricing-ink) !important;
-    font-weight: 720 !important;
-    line-height: 1.05 !important;
-  }
-  .pricing-page p,
-  .pricing-page li,
-  .pricing-page span {
-    color: var(--pricing-copy) !important;
-  }
-  .pricing-page p,
-  .pricing-page li {
-    font-style: normal !important;
-  }
-  .pricing-page li {
-    font-size: 1rem !important;
-    line-height: 1.75 !important;
-    margin-bottom: 12px !important;
-  }
-  .pricing-page p[style*="text-transform"] {
-    color: var(--pricing-muted) !important;
-    font-size: 0.76rem !important;
-    font-weight: 720 !important;
-  }
-  .pricing-page [style*="font-size: 3rem"] {
-    color: var(--pricing-ink) !important;
-    font-size: clamp(3.1rem, 7vw, 4.8rem) !important;
-    font-weight: 720 !important;
-    line-height: 0.95 !important;
-  }
-  .pricing-page a {
-    border-radius: 8px !important;
-    background: #141716 !important;
-    color: #fff !important;
-    font-weight: 720 !important;
-  }
-  .booking-details-section {
-    max-width: 1160px !important;
-    padding-top: 92px !important;
-    padding-bottom: 76px !important;
-  }
-  .pricing-page .booking-details-section > p {
-    color: var(--pricing-ink) !important;
-    font-size: 1rem !important;
-    font-weight: 800 !important;
-    margin-bottom: 34px !important;
-  }
-  .booking-details-section > div {
-    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-    gap: 18px !important;
-  }
-  .booking-details-section > div > div {
-    min-height: 100%;
-    padding: 24px;
-    border: 1px solid var(--pricing-line);
-    border-radius: 8px;
-    background: var(--pricing-surface);
-  }
-  .pricing-page .booking-details-section > div > div > p:first-child {
-    color: var(--pricing-ink) !important;
-    font-size: 0.86rem !important;
-    font-weight: 800 !important;
-    margin-bottom: 16px !important;
-  }
-  .booking-details-section > div > div > p:not(:first-child) {
-    color: var(--pricing-copy) !important;
-    font-size: 1.04rem !important;
-    line-height: 1.65 !important;
-    margin-bottom: 14px !important;
-    padding-left: 22px !important;
-  }
-  .booking-details-section span {
-    color: #6e7673 !important;
-  }
-  @media (max-width: 760px) {
-    .split-layout { flex-direction: column !important; }
-    .split-img { flex: unset !important; height: 300px !important; width: 100% !important; }
-    .pricing-section { padding-left: 24px !important; padding-right: 24px !important; }
-    .booking-details-section {
-      padding-top: 64px !important;
-      padding-bottom: 58px !important;
-    }
-    .booking-details-section > div {
-      grid-template-columns: 1fr !important;
-      gap: 12px !important;
-    }
-    .booking-details-section > div > div {
-      padding: 20px;
-    }
-    .booking-details-section > div > div > p:not(:first-child) {
-      font-size: 1rem !important;
-    }
-  }
-`;
-
 const addOns = [
   { label: "Additional nearby location", price: "$25" },
   { label: "72-hour expedited delivery", price: "$75" },
-  { label: "Extended family members (beyond immediate family)", price: "$50–$75" },
-  { label: "Additional time (if needed mid-session)", price: "$100 / 30 min" },
+  { label: "Extended family members", price: "$50-$75" },
+  { label: "Additional time", price: "$100 / 30 min" },
 ];
+
+const CSS = `
+  .pricing-modern {
+    padding-top: 98px;
+    background: transparent;
+    color: #101412;
+  }
+  .pricing-shell {
+    width: min(1180px, calc(100% - 48px));
+    margin: 0 auto;
+  }
+  .pricing-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.85fr);
+    gap: 28px;
+    align-items: end;
+    padding: 70px 0 34px;
+  }
+  .pricing-kicker,
+  .pricing-chip,
+  .pricing-link,
+  .pricing-meta,
+  .pricing-row {
+    font-family: var(--font-dm-sans), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    letter-spacing: 0;
+  }
+  .pricing-kicker {
+    margin: 0 0 14px;
+    color: #008b8b;
+    font-size: 13px;
+    font-weight: 820;
+  }
+  .pricing-title {
+    max-width: 760px;
+    margin: 0;
+    color: #101412;
+    font-size: 58px;
+    font-weight: 880;
+    letter-spacing: 0;
+    line-height: 0.98;
+    text-wrap: balance;
+  }
+  .pricing-copy {
+    max-width: 620px;
+    margin: 22px 0 0;
+    color: #4b5a55;
+    font-size: 17px;
+    line-height: 1.72;
+    text-wrap: pretty;
+  }
+  .pricing-hero-panel,
+  .pricing-info-card,
+  .pricing-package,
+  .pricing-cta-panel {
+    border: 1px solid rgba(18, 24, 22, 0.1);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.76);
+    box-shadow: 0 14px 34px rgba(18, 24, 22, 0.07);
+  }
+  .pricing-hero-panel {
+    padding: 16px;
+  }
+  .pricing-price {
+    margin: 0;
+    color: #101412;
+    font-size: 62px;
+    font-weight: 880;
+    letter-spacing: 0;
+    line-height: 0.92;
+  }
+  .pricing-meta {
+    margin: 10px 0 0;
+    color: #60706a;
+    font-size: 14px;
+    font-weight: 720;
+  }
+  .pricing-chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 18px;
+  }
+  .pricing-chip {
+    min-height: 34px;
+    display: inline-flex;
+    align-items: center;
+    padding: 0 11px;
+    border: 1px solid rgba(18, 24, 22, 0.1);
+    border-radius: 8px;
+    background: rgba(247, 250, 248, 0.82);
+    color: #26312d;
+    font-size: 13px;
+    font-weight: 760;
+  }
+  .pricing-info-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    padding: 24px 0 68px;
+  }
+  .pricing-info-card {
+    padding: 22px;
+  }
+  .pricing-info-card h2 {
+    margin: 0 0 14px;
+    color: #101412;
+    font-size: 19px;
+    font-weight: 860;
+    letter-spacing: 0;
+    line-height: 1.12;
+  }
+  .pricing-info-card p {
+    margin: 0 0 10px;
+    color: #55635e;
+    font-size: 15px;
+    line-height: 1.62;
+  }
+  .pricing-package {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 0.82fr);
+    gap: 12px;
+    padding: 12px;
+    margin-bottom: 18px;
+  }
+  .pricing-package[data-reverse="true"] {
+    grid-template-columns: minmax(320px, 0.82fr) minmax(0, 1fr);
+  }
+  .pricing-package-content {
+    padding: 34px;
+    align-self: center;
+  }
+  .pricing-package-media {
+    min-height: 560px;
+    overflow: hidden;
+    border-radius: 8px;
+    background: #dfe8e4;
+  }
+  .pricing-package-media img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: cover;
+    object-position: center;
+  }
+  .pricing-package h2 {
+    margin: 0;
+    color: #101412;
+    font-size: 42px;
+    font-weight: 880;
+    letter-spacing: 0;
+    line-height: 0.98;
+    text-wrap: balance;
+  }
+  .pricing-package ul {
+    display: grid;
+    gap: 10px;
+    margin: 28px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .pricing-package li {
+    position: relative;
+    padding-left: 20px;
+    color: #4d5a55;
+    font-size: 16px;
+    line-height: 1.62;
+  }
+  .pricing-package li::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0.72em;
+    width: 8px;
+    height: 8px;
+    border-radius: 99px;
+    background: #00a6a6;
+  }
+  .pricing-addons {
+    margin-top: 30px;
+    padding-top: 22px;
+    border-top: 1px solid rgba(18, 24, 22, 0.1);
+  }
+  .pricing-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 18px;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(18, 24, 22, 0.08);
+    color: #33403b;
+    font-size: 15px;
+    font-weight: 720;
+  }
+  .pricing-row span:last-child {
+    color: #101412;
+    white-space: nowrap;
+  }
+  .pricing-investment {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: 18px;
+    margin-top: 30px;
+  }
+  .pricing-link {
+    min-height: 46px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 18px;
+    border: 1px solid rgba(0, 166, 166, 0.3);
+    border-radius: 8px;
+    background: rgba(230, 251, 248, 0.95);
+    color: #005f5f;
+    box-shadow: 0 10px 24px rgba(0, 166, 166, 0.08);
+    font-size: 14px;
+    font-weight: 820;
+    text-decoration: none;
+    transition: background 0.18s ease, transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+  }
+  .pricing-link:hover {
+    transform: translateY(-1px);
+    border-color: rgba(0, 166, 166, 0.46);
+    background: rgba(214, 247, 244, 0.98);
+    box-shadow: 0 14px 28px rgba(0, 166, 166, 0.12);
+  }
+  .pricing-cta {
+    padding: 70px 0 110px;
+  }
+  .pricing-cta-panel {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 24px;
+    padding: 28px;
+  }
+  @media (max-width: 940px) {
+    .pricing-hero,
+    .pricing-info-grid,
+    .pricing-package,
+    .pricing-package[data-reverse="true"] {
+      grid-template-columns: 1fr;
+    }
+    .pricing-package[data-reverse="true"] .pricing-package-media {
+      order: -1;
+    }
+  }
+  @media (max-width: 760px) {
+    .pricing-modern {
+      padding-top: 78px;
+    }
+    .pricing-shell {
+      width: min(1180px, calc(100% - 36px));
+    }
+    .pricing-hero {
+      padding-top: 48px;
+    }
+    .pricing-title {
+      font-size: 40px;
+      line-height: 1;
+    }
+    .pricing-copy {
+      font-size: 16px;
+    }
+    .pricing-price {
+      font-size: 48px;
+    }
+    .pricing-info-grid {
+      padding-bottom: 52px;
+    }
+    .pricing-package-content {
+      padding: 20px 8px 12px;
+    }
+    .pricing-package h2 {
+      font-size: 32px;
+      line-height: 1.02;
+    }
+    .pricing-package-media {
+      min-height: 390px;
+      aspect-ratio: 4 / 5;
+    }
+    .pricing-row {
+      align-items: flex-start;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .pricing-cta {
+      padding-bottom: 78px;
+    }
+    .pricing-cta-panel {
+      align-items: flex-start;
+      flex-direction: column;
+      padding: 22px;
+    }
+  }
+`;
 
 export default async function FamilyPricingPage() {
   const [{ images }, siteSettings] = await Promise.all([getPortfolioData(), getSiteSettings()]);
@@ -136,325 +317,165 @@ export default async function FamilyPricingPage() {
   const extendedImage = siteSettings.pricing_family_extended_image || familyImages[2]?.image_url || familyImages[0]?.image_url || null;
 
   return (
-    <main className="pricing-page" style={{ background: "#fff", color: "#1a1a1a", paddingTop: 80 }}>
+    <main className="pricing-modern">
       <style>{CSS}</style>
 
-      {/* ── IMPORTANT INFO ── */}
-      <section className="pricing-section booking-details-section" style={{ padding: "72px 60px 64px", maxWidth: 960, margin: "0 auto" }}>
-        <p style={{
-          fontFamily: "Georgia, 'Times New Roman', serif",
-          fontSize: "0.65rem", letterSpacing: "0.28em",
-          textTransform: "uppercase", color: "#555", marginBottom: 40, textAlign: "center",
-        }}>
-          Important info
-        </p>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 40 }}>
-          {[
-            {
-              heading: "Booking & Payment",
-              items: [
-                "A 50% deposit is required for each photo shoot to book",
-                "The remaining balance is paid after the photoshoot",
-                "A contract must be signed prior to the photo session",
-              ],
-            },
-            {
-              heading: "Session Details",
-              items: [
-                "All rates are hourly",
-                "Some locations will have travel fees",
-              ],
-            },
-            {
-              heading: "Travel",
-              items: [
-                "Locations greater than a 20-mile radius of San Francisco will include a travel fee ranging from $20–$50",
-              ],
-            },
-          ].map(({ heading, items }) => (
-            <div key={heading}>
-              <p style={{
-                fontFamily: "Georgia, 'Times New Roman', serif",
-                fontSize: "0.58rem", letterSpacing: "0.24em",
-                textTransform: "uppercase", color: "#555", marginBottom: 14,
-              }}>
-                {heading}
-              </p>
-              {items.map((item) => (
-                <p key={item} style={{
-                  fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
-                  fontSize: "0.88rem", color: "#555", lineHeight: 1.8,
-                  marginBottom: 8, paddingLeft: 16, position: "relative",
-                }}>
-                  <span style={{ position: "absolute", left: 0, fontStyle: "normal", color: "#555" }}>—</span>
-                  {item}
-                </p>
-              ))}
-            </div>
-          ))}
+      <section className="pricing-shell pricing-hero">
+        <div>
+          <p className="pricing-kicker">Family pricing</p>
+          <h1 className="pricing-title">Clean family photos without turning the day into a production.</h1>
+          <p className="pricing-copy">
+            Relaxed sessions with enough structure for kids, grandparents, and everyone who says they feel awkward in photos.
+          </p>
         </div>
-      </section>
 
-      {/* ── FAMILY SESSION ── */}
-      <section className="pricing-section" style={{ padding: "0 60px 80px", maxWidth: 1100, margin: "0 auto" }}>
-        <div style={{ borderTop: "1px solid rgba(0,0,0,0.07)", paddingTop: 72 }}>
-          <div className="split-layout" style={{ display: "flex", gap: 64, alignItems: "flex-start" }}>
-
-            {/* Text */}
-            <div style={{ flex: "1 1 0", minWidth: 0 }}>
-              <h2 style={{
-                fontFamily: "Georgia, 'Times New Roman', serif",
-                fontSize: "clamp(1.6rem, 3vw, 2.6rem)", fontWeight: 300,
-                letterSpacing: "0.05em", color: "#111",
-                margin: "0 0 20px", lineHeight: 1.15,
-              }}>
-                Family Session
-              </h2>
-              <p style={{
-                fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
-                fontSize: "0.92rem", color: "#555", lineHeight: 1.85, marginBottom: 32,
-              }}>
-                Ideal for families who want updated photos without a long session or overstimulation.
-              </p>
-
-              <ul style={{ listStyle: "none", padding: 0, margin: "0 0 40px" }}>
-                {[
-                  "Up to 30 minutes",
-                  "One location",
-                  "Guided, relaxed session",
-                  "Minimum 10 professionally edited images",
-                  "Private online gallery",
-                  "Standard turnaround",
-                ].map((item) => (
-                  <li key={item} style={{
-                    fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
-                    fontSize: "0.9rem", color: "#555", lineHeight: 1.7,
-                    marginBottom: 10, paddingLeft: 18, position: "relative",
-                  }}>
-                    <span style={{ position: "absolute", left: 0, fontStyle: "normal", color: "#555" }}>—</span>
-                    {item}
-                  </li>
-                ))}
-              </ul>
-
-              {/* Add-ons */}
-              <p style={{
-                fontFamily: "Georgia, 'Times New Roman', serif",
-                fontSize: "0.58rem", letterSpacing: "0.24em",
-                textTransform: "uppercase", color: "#555", marginBottom: 16,
-              }}>
-                Add-ons
-              </p>
-              {addOns.map((item) => (
-                <div key={item.label} style={{
-                  display: "flex", justifyContent: "space-between",
-                  borderBottom: "1px solid rgba(0,0,0,0.05)", padding: "10px 0", maxWidth: 440,
-                }}>
-                  <p style={{
-                    fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
-                    fontSize: "0.85rem", color: "#555",
-                  }}>
-                    {item.label}
-                  </p>
-                  <p style={{
-                    fontFamily: "Georgia, 'Times New Roman', serif",
-                    fontSize: "0.85rem", color: "#333",
-                    whiteSpace: "nowrap", marginLeft: 20,
-                  }}>
-                    {item.price}
-                  </p>
-                </div>
-              ))}
-
-              {/* Price */}
-              <div style={{ marginTop: 44, paddingTop: 36, borderTop: "1px solid rgba(0,0,0,0.07)" }}>
-                <p style={{
-                  fontFamily: "Georgia, 'Times New Roman', serif",
-                  fontSize: "0.58rem", letterSpacing: "0.24em",
-                  textTransform: "uppercase", color: "#555", marginBottom: 6,
-                }}>
-                  Investment
-                </p>
-                <p style={{
-                  fontFamily: "Georgia, 'Times New Roman', serif",
-                  fontSize: "0.78rem", fontStyle: "italic", color: "#555", marginBottom: 8,
-                }}>
-                  Starting from
-                </p>
-                <p style={{
-                  fontFamily: "Georgia, 'Times New Roman', serif",
-                  fontSize: "3rem", fontWeight: 300, color: "#111",
-                  margin: "0", letterSpacing: "0.02em",
-                }}>
-                  $350
-                </p>
-              </div>
-
-              <Link href="/contact" style={{
-                display: "inline-block", marginTop: 32,
-                fontFamily: "Georgia, 'Times New Roman', serif",
-                fontSize: "0.72rem", letterSpacing: "0.18em",
-                textTransform: "uppercase", color: "#fff",
-                background: "#1a1a1a", padding: "13px 32px",
-                textDecoration: "none",
-              }}>
-                Book this session →
-              </Link>
-            </div>
-
-            {/* Image */}
-            {sessionImage && (
-              <div className="split-img" style={{ flex: "0 0 400px", height: 540, overflow: "hidden" }}>
-                <img
-                  src={sessionImage}
-                  alt="Family portrait"
-                  style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center", display: "block" }}
-                />
-              </div>
-            )}
+        <div className="pricing-hero-panel">
+          <p className="pricing-kicker">Starting from</p>
+          <p className="pricing-price">$350</p>
+          <p className="pricing-meta">private online gallery included</p>
+          <div className="pricing-chip-row">
+            <span className="pricing-chip">Guided session</span>
+            <span className="pricing-chip">Bay Area locations</span>
+            <span className="pricing-chip">Family-friendly pacing</span>
           </div>
         </div>
       </section>
 
-      {/* ── EXTENDED FAMILY SESSION ── */}
-      <section className="pricing-section" style={{ padding: "0 60px 80px", maxWidth: 1100, margin: "0 auto" }}>
-        <div style={{ borderTop: "1px solid rgba(0,0,0,0.07)", paddingTop: 72 }}>
-          <div className="split-layout" style={{ display: "flex", gap: 64, alignItems: "flex-start" }}>
+      <section className="pricing-shell pricing-info-grid" aria-label="Booking details">
+        {[
+          {
+            heading: "Booking",
+            items: ["50% deposit to reserve the date.", "Contract completed before the session.", "Remaining balance due after the shoot."],
+          },
+          {
+            heading: "Session flow",
+            items: ["Session length depends on the package.", "Kids get time to warm up.", "Location and timing are planned before shoot day."],
+          },
+          {
+            heading: "Travel",
+            items: ["Some locations include travel fees.", "Locations outside 20 miles from SF may include a $20-$50 travel fee."],
+          },
+        ].map(({ heading, items }) => (
+          <div key={heading} className="pricing-info-card">
+            <h2>{heading}</h2>
+            {items.map((item) => (
+              <p key={item}>{item}</p>
+            ))}
+          </div>
+        ))}
+      </section>
 
-            {/* Image first */}
-            {extendedImage && (
-              <div className="split-img" style={{ flex: "0 0 400px", height: 540, overflow: "hidden" }}>
-                <img
-                  src={extendedImage}
-                  alt="Extended family portrait"
-                  style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center", display: "block" }}
-                />
+      <section className="pricing-shell pricing-package">
+        <div className="pricing-package-content">
+          <p className="pricing-kicker">Quick and clean</p>
+          <h2>Family Session</h2>
+          <p className="pricing-copy">
+            Ideal for families who want updated photos without a long session or overstimulation.
+          </p>
+
+          <ul>
+            {[
+              "Up to 30 minutes",
+              "One location",
+              "Guided, relaxed session",
+              "Minimum 10 professionally edited images",
+              "Private online gallery",
+              "Standard turnaround",
+            ].map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+
+          <div className="pricing-addons">
+            <p className="pricing-kicker">Add-ons</p>
+            {addOns.map((item) => (
+              <div key={item.label} className="pricing-row">
+                <span>{item.label}</span>
+                <span>{item.price}</span>
               </div>
-            )}
+            ))}
+          </div>
 
-            {/* Text */}
-            <div style={{ flex: "1 1 0", minWidth: 0 }}>
-              <h2 style={{
-                fontFamily: "Georgia, 'Times New Roman', serif",
-                fontSize: "clamp(1.6rem, 3vw, 2.6rem)", fontWeight: 300,
-                letterSpacing: "0.05em", color: "#111",
-                margin: "0 0 20px", lineHeight: 1.15,
-              }}>
-                Extended Family Session
-              </h2>
-              <p style={{
-                fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
-                fontSize: "0.92rem", color: "#555", lineHeight: 1.85, marginBottom: 32,
-              }}>
-                Best for larger families, younger kids, or anyone who wants more variety and flexibility.
-              </p>
-
-              <ul style={{ listStyle: "none", padding: 0, margin: "0 0 40px" }}>
-                {[
-                  "Up to 60 minutes",
-                  "One location",
-                  "More time for kids to warm up",
-                  "Greater variety of groupings and moments",
-                  "Minimum 30 professionally edited images",
-                  "Private online gallery",
-                  "Standard turnaround",
-                ].map((item) => (
-                  <li key={item} style={{
-                    fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
-                    fontSize: "0.9rem", color: "#555", lineHeight: 1.7,
-                    marginBottom: 10, paddingLeft: 18, position: "relative",
-                  }}>
-                    <span style={{ position: "absolute", left: 0, fontStyle: "normal", color: "#555" }}>—</span>
-                    {item}
-                  </li>
-                ))}
-              </ul>
-
-              {/* Add-ons */}
-              <p style={{
-                fontFamily: "Georgia, 'Times New Roman', serif",
-                fontSize: "0.58rem", letterSpacing: "0.24em",
-                textTransform: "uppercase", color: "#555", marginBottom: 16,
-              }}>
-                Add-ons
-              </p>
-              {addOns.map((item) => (
-                <div key={item.label} style={{
-                  display: "flex", justifyContent: "space-between",
-                  borderBottom: "1px solid rgba(0,0,0,0.05)", padding: "10px 0", maxWidth: 440,
-                }}>
-                  <p style={{
-                    fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
-                    fontSize: "0.85rem", color: "#555",
-                  }}>
-                    {item.label}
-                  </p>
-                  <p style={{
-                    fontFamily: "Georgia, 'Times New Roman', serif",
-                    fontSize: "0.85rem", color: "#333",
-                    whiteSpace: "nowrap", marginLeft: 20,
-                  }}>
-                    {item.price}
-                  </p>
-                </div>
-              ))}
-
-              {/* Price */}
-              <div style={{ marginTop: 44, paddingTop: 36, borderTop: "1px solid rgba(0,0,0,0.07)" }}>
-                <p style={{
-                  fontFamily: "Georgia, 'Times New Roman', serif",
-                  fontSize: "0.58rem", letterSpacing: "0.24em",
-                  textTransform: "uppercase", color: "#555", marginBottom: 6,
-                }}>
-                  Investment
-                </p>
-                <p style={{
-                  fontFamily: "Georgia, 'Times New Roman', serif",
-                  fontSize: "0.78rem", fontStyle: "italic", color: "#555", marginBottom: 8,
-                }}>
-                  Starting from
-                </p>
-                <p style={{
-                  fontFamily: "Georgia, 'Times New Roman', serif",
-                  fontSize: "3rem", fontWeight: 300, color: "#111",
-                  margin: "0", letterSpacing: "0.02em",
-                }}>
-                  $500
-                </p>
-              </div>
-
-              <Link href="/contact" style={{
-                display: "inline-block", marginTop: 32,
-                fontFamily: "Georgia, 'Times New Roman', serif",
-                fontSize: "0.72rem", letterSpacing: "0.18em",
-                textTransform: "uppercase", color: "#fff",
-                background: "#1a1a1a", padding: "13px 32px",
-                textDecoration: "none",
-              }}>
-                Book this session →
-              </Link>
+          <div className="pricing-investment">
+            <div>
+              <p className="pricing-kicker">Investment</p>
+              <p className="pricing-price">$350</p>
+              <p className="pricing-meta">starting from</p>
             </div>
+            <Link href="/contact" className="pricing-link">
+              Book this session
+            </Link>
+          </div>
+        </div>
+
+        {sessionImage && (
+          <div className="pricing-package-media">
+            <img src={sessionImage} alt="Family portrait" decoding="async" />
+          </div>
+        )}
+      </section>
+
+      <section className="pricing-shell pricing-package" data-reverse="true">
+        {extendedImage && (
+          <div className="pricing-package-media">
+            <img src={extendedImage} alt="Extended family portrait" decoding="async" />
+          </div>
+        )}
+
+        <div className="pricing-package-content">
+          <p className="pricing-kicker">More breathing room</p>
+          <h2>Extended Family Session</h2>
+          <p className="pricing-copy">
+            Best for larger families, younger kids, or anyone who wants more variety and flexibility.
+          </p>
+
+          <ul>
+            {[
+              "Up to 60 minutes",
+              "One location",
+              "More time for kids to warm up",
+              "Greater variety of groupings and moments",
+              "Minimum 30 professionally edited images",
+              "Private online gallery",
+              "Standard turnaround",
+            ].map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+
+          <div className="pricing-addons">
+            <p className="pricing-kicker">Add-ons</p>
+            {addOns.map((item) => (
+              <div key={item.label} className="pricing-row">
+                <span>{item.label}</span>
+                <span>{item.price}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="pricing-investment">
+            <div>
+              <p className="pricing-kicker">Investment</p>
+              <p className="pricing-price">$500</p>
+              <p className="pricing-meta">starting from</p>
+            </div>
+            <Link href="/contact" className="pricing-link">
+              Book this session
+            </Link>
           </div>
         </div>
       </section>
 
-      {/* ── CTA ── */}
-      <section style={{ borderTop: "1px solid rgba(0,0,0,0.07)", padding: "80px 60px", textAlign: "center" }}>
-        <p style={{
-          fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
-          fontSize: "clamp(1rem, 2vw, 1.3rem)", color: "#555", marginBottom: 32,
-        }}>
-          Ready to book a family session?
-        </p>
-        <Link href="/contact" style={{
-          fontFamily: "Georgia, 'Times New Roman', serif",
-          fontSize: "0.75rem", letterSpacing: "0.18em",
-          textTransform: "uppercase", color: "#fff",
-          background: "#1a1a1a", padding: "14px 36px",
-          textDecoration: "none", display: "inline-block",
-        }}>
-          Inquire now →
-        </Link>
+      <section className="pricing-shell pricing-cta">
+        <div className="pricing-cta-panel">
+          <div>
+            <p className="pricing-kicker">Ready for family photos?</p>
+            <h2 className="pricing-title" style={{ fontSize: 38 }}>Send the people, date, and location.</h2>
+          </div>
+          <Link href="/contact" className="pricing-link">
+            Inquire now
+          </Link>
+        </div>
       </section>
     </main>
   );
