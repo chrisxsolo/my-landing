@@ -4,16 +4,19 @@ import { createSupabaseServerClient } from "@/lib/supabaseServer";
 
 const DEFAULT_CONTACT_EMAIL_TO = "chrisxsolo2@gmail.com";
 const DEFAULT_CONTACT_EMAIL_FROM = "soloxsnaps contact <onboarding@resend.dev>";
+const DEFAULT_SITE_URL = "https://soloxsnaps.com";
 
 function cleanText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
 function getContactRecipients() {
-  return (process.env.CONTACT_EMAIL_TO ?? DEFAULT_CONTACT_EMAIL_TO)
+  const recipients = (process.env.CONTACT_EMAIL_TO ?? DEFAULT_CONTACT_EMAIL_TO)
     .split(",")
     .map((email) => email.trim())
     .filter(Boolean);
+
+  return recipients.length ? recipients : [DEFAULT_CONTACT_EMAIL_TO];
 }
 
 function escapeHtml(value: string) {
@@ -23,6 +26,19 @@ function escapeHtml(value: string) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+function getSiteUrl() {
+  return (process.env.NEXT_PUBLIC_SITE_URL ?? DEFAULT_SITE_URL).replace(/\/+$/, "");
+}
+
+function renderInquiryRow(label: string, value: string) {
+  return `
+    <tr style="border-bottom: 1px solid rgba(17,21,19,0.09);">
+      <td style="padding: 13px 0; color: #6a716f; width: 140px; font-size: 12px; font-weight: 700; text-transform: uppercase;">${label}</td>
+      <td style="padding: 13px 0; color: #1b201f; font-size: 15px; line-height: 1.55;">${value}</td>
+    </tr>
+  `;
 }
 
 export async function POST(req: NextRequest) {
@@ -75,6 +91,11 @@ export async function POST(req: NextRequest) {
         const resend = new Resend(resendApiKey);
         const emailFrom = process.env.CONTACT_EMAIL_FROM ?? process.env.RESEND_FROM ?? DEFAULT_CONTACT_EMAIL_FROM;
         const emailTo = getContactRecipients();
+        const siteUrl = getSiteUrl();
+        const guideUrl = `${siteUrl}/grad-guide`;
+        const contactUrl = `${siteUrl}/contact`;
+        const safeGuideUrl = escapeHtml(guideUrl);
+        const safeContactUrl = escapeHtml(contactUrl);
         const safeName = escapeHtml(name);
         const safeEmail = escapeHtml(email);
         const safePhone = escapeHtml(phone);
@@ -83,6 +104,14 @@ export async function POST(req: NextRequest) {
         const safeMessage = escapeHtml(message).replace(/\n/g, "<br>");
         const safeInquiryId = inquiry?.id ? escapeHtml(String(inquiry.id)) : "";
         const subject = `New inquiry from ${name}${sessionType ? ` - ${sessionType}` : ""}`.replace(/[\r\n]+/g, " ");
+        const confirmationSubject = "Your soloxsnaps inquiry and next steps";
+        const responseRows = [
+          renderInquiryRow("Name", safeName),
+          renderInquiryRow("Email", `<a href="mailto:${safeEmail}" style="color: #111513;">${safeEmail}</a>`),
+          renderInquiryRow("Phone", safePhone || "Not provided"),
+          renderInquiryRow("Session", safeSessionType || "Not provided"),
+          renderInquiryRow("Date in mind", safeDate || "Not provided"),
+        ].join("");
 
         const { error: resendError } = await resend.emails.send({
           from: emailFrom,
@@ -135,9 +164,80 @@ export async function POST(req: NextRequest) {
         });
         if (resendError) {
           console.error("Resend contact email failed:", resendError);
-          throw new Error(resendError.message);
+        } else {
+          emailSent = true;
         }
-        emailSent = true;
+
+        const { error: confirmationError } = await resend.emails.send({
+          from: emailFrom,
+          to: email,
+          replyTo: emailTo[0] ?? DEFAULT_CONTACT_EMAIL_TO,
+          subject: confirmationSubject,
+          text: [
+            `Hi ${name},`,
+            "",
+            "Thanks for reaching out to soloxsnaps. I received your inquiry and I will get back to you within 24 to 48 hours.",
+            "",
+            "While you wait, you can check out my graduation guide to prepare for your shoot and learn more about how grad sessions work:",
+            guideUrl,
+            "",
+            "Your responses:",
+            `Name: ${name}`,
+            `Email: ${email}`,
+            `Phone: ${phone || "Not provided"}`,
+            `Session: ${sessionType || "Not provided"}`,
+            `Date in mind: ${date || "Not provided"}`,
+            "Message:",
+            message,
+            "",
+            `You can also revisit the contact page here: ${contactUrl}`,
+          ].join("\n"),
+          html: `
+          <div style="font-family: Arial, Helvetica, sans-serif; max-width: 640px; margin: 0 auto; padding: 40px 28px; background: #ffffff; color: #111513;">
+            <p style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: #6a716f; margin: 0 0 18px;">
+              soloxsnaps inquiry received
+            </p>
+            <h1 style="font-size: 32px; line-height: 1.08; color: #111513; margin: 0 0 18px; font-weight: 700;">
+              Thanks for reaching out, ${safeName}.
+            </h1>
+            <p style="font-size: 16px; line-height: 1.7; color: #303635; margin: 0 0 24px;">
+              I received your inquiry and will get back to you within <strong>24 to 48 hours</strong>. Your responses are copied below so you have everything in one place.
+            </p>
+
+            <div style="border: 1px solid rgba(17,21,19,0.1); border-radius: 8px; padding: 22px; background: #f7f8f5; margin: 0 0 26px;">
+              <p style="font-size: 13px; font-weight: 700; text-transform: uppercase; color: #111513; margin: 0 0 10px;">
+                Before your shoot
+              </p>
+              <p style="font-size: 15px; line-height: 1.65; color: #303635; margin: 0 0 18px;">
+                My graduation guide walks through posing, outfit ideas, timing, and how to feel prepared before shoot day.
+              </p>
+              <a href="${safeGuideUrl}" style="display: inline-block; background: #141716; color: #ffffff; text-decoration: none; border-radius: 8px; padding: 12px 18px; font-size: 13px; font-weight: 700;">
+                Open the graduation guide
+              </a>
+            </div>
+
+            <div style="margin: 0 0 28px;">
+              <p style="font-size: 13px; font-weight: 700; text-transform: uppercase; color: #111513; margin: 0 0 10px;">
+                Your inquiry
+              </p>
+              <table style="width: 100%; border-collapse: collapse;">
+                ${responseRows}
+              </table>
+              <div style="padding-top: 16px;">
+                <p style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: #6a716f; margin: 0 0 8px;">Message</p>
+                <p style="font-size: 15px; line-height: 1.7; color: #303635; margin: 0;">${safeMessage}</p>
+              </div>
+            </div>
+
+            <p style="font-size: 13px; line-height: 1.6; color: #6a716f; border-top: 1px solid rgba(17,21,19,0.1); padding-top: 18px; margin: 0;">
+              If you need to add anything, you can reply to this email or send another note through <a href="${safeContactUrl}" style="color: #111513;">the contact page</a>.
+            </p>
+          </div>
+        `,
+        });
+        if (confirmationError) {
+          console.error("Resend contact confirmation email failed:", confirmationError);
+        }
       } else {
         console.warn("Skipping contact email notification: RESEND_API_KEY is not configured.");
       }
