@@ -32,6 +32,26 @@ function getSiteUrl() {
   return (process.env.NEXT_PUBLIC_SITE_URL ?? DEFAULT_SITE_URL).replace(/\/+$/, "");
 }
 
+// Retry a Resend send up to `attempts` times with exponential back-off.
+// Resend occasionally drops sends with a transient 5xx — this catches that
+// without slowing down the happy path (first attempt is immediate).
+async function sendWithRetry(
+  fn: () => Promise<{ data: unknown; error: unknown }>,
+  attempts = 3,
+  baseDelayMs = 600,
+): Promise<{ error: unknown }> {
+  let lastError: unknown = null;
+  for (let i = 0; i < attempts; i++) {
+    const { error } = await fn();
+    if (!error) return { error: null };
+    lastError = error;
+    if (i < attempts - 1) {
+      await new Promise((r) => setTimeout(r, baseDelayMs * 2 ** i)); // 600ms, 1200ms
+    }
+  }
+  return { error: lastError };
+}
+
 function renderInquiryRow(label: string, value: string) {
   return `
     <tr style="border-bottom: 1px solid rgba(17,21,19,0.09);">
@@ -113,7 +133,7 @@ export async function POST(req: NextRequest) {
           renderInquiryRow("Date in mind", safeDate || "Not provided"),
         ].join("");
 
-        const { error: resendError } = await resend.emails.send({
+        const { error: resendError } = await sendWithRetry(() => resend.emails.send({
           from: emailFrom,
           to: emailTo,
           replyTo: email,
@@ -161,14 +181,14 @@ export async function POST(req: NextRequest) {
             </p>
           </div>
         `,
-        });
+        }));
         if (resendError) {
-          console.error("Resend contact email failed:", resendError);
+          console.error("Resend contact email failed after retries:", resendError);
         } else {
           emailSent = true;
         }
 
-        const { error: confirmationError } = await resend.emails.send({
+        const { error: confirmationError } = await sendWithRetry(() => resend.emails.send({
           from: emailFrom,
           to: email,
           replyTo: emailTo[0] ?? DEFAULT_CONTACT_EMAIL_TO,
@@ -234,9 +254,9 @@ export async function POST(req: NextRequest) {
             </p>
           </div>
         `,
-        });
+        }));
         if (confirmationError) {
-          console.error("Resend contact confirmation email failed:", confirmationError);
+          console.error("Resend contact confirmation email failed after retries:", confirmationError);
         }
       } else {
         console.warn("Skipping contact email notification: RESEND_API_KEY is not configured.");
