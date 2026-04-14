@@ -62,7 +62,10 @@ const CSS = `
      Light gradient, clean and airy. padding-top clears the fixed nav. */
   .journal-hero {
     padding: 120px 0 68px;
-    background: linear-gradient(to bottom, #eaf0ec 0%, #f5f6f4 100%);
+    background:
+      radial-gradient(ellipse 65% 60% at 5% 10%, rgba(162, 210, 196, 0.16) 0%, transparent 60%),
+      radial-gradient(ellipse 50% 55% at 95% 90%, rgba(130, 185, 175, 0.12) 0%, transparent 55%),
+      linear-gradient(to bottom, #eaf0ec 0%, #f5f6f4 100%);
     border-bottom: 1px solid rgba(18, 24, 22, 0.07);
   }
   .journal-hero-kicker {
@@ -108,9 +111,7 @@ const CSS = `
     margin-bottom: 12px;
     border: 1px solid rgba(18, 24, 22, 0.08);
     border-radius: 14px;
-    background: rgba(255, 255, 255, 0.82);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    background: #ffffff;
     box-shadow: 0 4px 18px rgba(18, 24, 22, 0.05);
     text-decoration: none;
     color: inherit;
@@ -237,8 +238,8 @@ export default async function ProfessionalBlogPage() {
         <div className="journal-shell">
           {posts.length > 0 ? (
             posts.map((post, index) => (
-              <Link key={post.id} href={`/blog/${post.slug}`} className="journal-row"
-                style={{ animation: `fadeUp 0.5s ${index * 0.07}s cubic-bezier(0.22,1,0.36,1) both` }}>
+              <Link key={post.id} href={`/blog/${post.slug}`} className="journal-row glass-shimmer"
+                data-reveal data-delay={String(Math.min(index + 1, 5))}>
                 <span className="journal-num">{String(index + 1).padStart(2, "0")}</span>
                 <div className="journal-cover">
                   {post.cover_image_url ? (

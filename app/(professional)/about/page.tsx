@@ -69,7 +69,10 @@ const CSS = `
      padding-top: 120px clears the fixed nav bar + breathing room. */
   .about-hero {
     padding: 120px 0 72px;
-    background: linear-gradient(to bottom, #eaf0ec 0%, #f5f6f4 100%);
+    background:
+      radial-gradient(ellipse 65% 60% at 5% 15%, rgba(162, 210, 196, 0.16) 0%, transparent 60%),
+      radial-gradient(ellipse 55% 50% at 95% 85%, rgba(130, 185, 175, 0.12) 0%, transparent 55%),
+      linear-gradient(to bottom, #eaf0ec 0%, #f5f6f4 100%);
     border-bottom: 1px solid rgba(18, 24, 22, 0.07);
   }
   .about-kicker {
@@ -217,7 +220,7 @@ const CSS = `
   }
   .about-process-label { position: sticky; top: 110px; }
 
-  /* Each numbered step — glass card */
+  /* Each numbered step — glass card with shimmer */
   .about-step {
     display: grid;
     grid-template-columns: 80px 1fr;
@@ -226,13 +229,24 @@ const CSS = `
     margin-bottom: 12px;
     border: 1px solid rgba(18, 24, 22, 0.08);
     border-radius: 12px;
-    background: rgba(255, 255, 255, 0.82);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    background: #ffffff;
     box-shadow: 0 6px 20px rgba(18, 24, 22, 0.05);
+    position: relative;
+    overflow: hidden;
     transition: transform 0.2s ease, box-shadow 0.2s ease;
     align-items: start;
   }
+  .about-step::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(115deg, transparent 30%, rgba(255,255,255,0.38) 50%, transparent 70%);
+    transform: translateX(-100%);
+    transition: transform 0.65s cubic-bezier(0.22,1,0.36,1);
+    pointer-events: none;
+    z-index: 1;
+  }
+  .about-step:hover::before { transform: translateX(100%); }
   .about-step:hover {
     transform: translateY(-2px);
     box-shadow: 0 12px 32px rgba(18, 24, 22, 0.08);
@@ -267,15 +281,13 @@ const CSS = `
     border-top: 1px solid rgba(18, 24, 22, 0.07);
     text-align: center;
   }
-  /* Frosted glass CTA card */
+  /* Glass CTA card */
   .about-cta-card {
     display: inline-block;
     padding: 48px 56px;
     border: 1px solid rgba(18, 24, 22, 0.09);
     border-radius: 16px;
-    background: rgba(255, 255, 255, 0.82);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    background: #ffffff;
     box-shadow: 0 12px 40px rgba(18, 24, 22, 0.07);
     text-align: center;
     max-width: 580px;
@@ -347,11 +359,10 @@ export default function ProfessionalAboutPage() {
            Portrait URL: change the `portrait` constant at the top of this file. */}
       <section className="about-bio">
         <div className="about-shell about-bio-grid">
-          <div className="about-portrait-wrap"
-            style={{ animation: "scaleIn 0.8s 0.1s cubic-bezier(0.22,1,0.36,1) both" }}>
+          <div className="about-portrait-wrap" data-reveal="scale">
             <img src={portrait} alt="Chris Solorzano" loading="eager" decoding="async" />
           </div>
-          <div className="about-bio-text">
+          <div className="about-bio-text" data-reveal data-delay="2">
             <p className="about-section-kicker">Photographer, Bay Area</p>
             <h2 className="about-section-title">Clean direction. Real moments.</h2>
             {/* ── Edit bio text here ── */}
@@ -375,11 +386,11 @@ export default function ProfessionalAboutPage() {
            To change text: edit the <p> tags inside about-approach-body. */}
       <section className="about-approach">
         <div className="about-shell about-approach-grid">
-          <div className="about-approach-label">
+          <div className="about-approach-label" data-reveal="left">
             <p className="about-section-kicker">Approach</p>
             <h2 className="about-section-title">Direction without the stiffness.</h2>
           </div>
-          <div className="about-approach-body">
+          <div className="about-approach-body" data-reveal data-delay="2">
             {/* ── Edit approach paragraphs here ── */}
             <p>
               Sessions are built to feel clear and easy. I help with posing, pacing, location choices,
@@ -410,8 +421,7 @@ export default function ProfessionalAboutPage() {
           </div>
           <div>
             {process.map(([number, name, body], i) => (
-              <div key={name} className="about-step"
-                style={{ animation: `fadeUp 0.55s ${0.1 + i * 0.1}s cubic-bezier(0.22,1,0.36,1) both` }}>
+              <div key={name} className="about-step" data-reveal data-delay={String(i + 1)}>
                 <span className="about-step-num">{number}</span>
                 <div>
                   <h3 className="about-step-name">{name}</h3>
@@ -428,7 +438,7 @@ export default function ProfessionalAboutPage() {
       <section className="about-cta">
         <div className="about-shell">
           <div style={{ display: "flex", justifyContent: "center" }}>
-            <div className="about-cta-card">
+            <div className="about-cta-card glass-shimmer" data-reveal>
               <h2 className="about-cta-title">Ready to see what this could look like for you?</h2>
               <p className="about-cta-sub">Share your date and session idea. I&rsquo;ll handle the rest.</p>
               <div className="about-cta-buttons">

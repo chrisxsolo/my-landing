@@ -143,10 +143,13 @@ const CSS = `
   }
 
   /* ═══════════════════════════════════════════════════════════════════════════
-     SERVICES SECTION — frosted glass cards on light gray bg
+     SERVICES SECTION — frosted glass cards on gradient mesh bg
      ═══════════════════════════════════════════════════════════════════════════ */
   .home-services {
-    background: #f5f6f4;
+    background:
+      radial-gradient(ellipse 70% 60% at 10% 20%, rgba(162, 210, 196, 0.14) 0%, transparent 60%),
+      radial-gradient(ellipse 50% 55% at 90% 80%, rgba(130, 185, 175, 0.10) 0%, transparent 55%),
+      #f5f6f4;
     padding: 80px 0 88px;
   }
   .home-services-header {
@@ -173,9 +176,7 @@ const CSS = `
     padding: 12px;
     border: 1px solid rgba(18, 24, 22, 0.09);
     border-radius: 14px;
-    background: rgba(255, 255, 255, 0.82);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    background: #ffffff;
     color: #101412;
     text-decoration: none;
     box-shadow: 0 6px 24px rgba(18, 24, 22, 0.06);
@@ -258,10 +259,13 @@ const CSS = `
   }
 
   /* ═══════════════════════════════════════════════════════════════════════════
-     SESSION SYSTEM — light gray bg, frosted glass 4-item grid
+     SESSION SYSTEM — gradient mesh bg, frosted glass 4-item grid
      ═══════════════════════════════════════════════════════════════════════════ */
   .home-proof {
-    background: #f5f6f4;
+    background:
+      radial-gradient(ellipse 60% 70% at 80% 15%, rgba(130, 185, 175, 0.12) 0%, transparent 55%),
+      radial-gradient(ellipse 55% 50% at 15% 90%, rgba(162, 210, 196, 0.10) 0%, transparent 55%),
+      #f5f6f4;
     padding: 80px 0 88px;
     border-top: 1px solid rgba(18, 24, 22, 0.06);
   }
@@ -280,9 +284,7 @@ const CSS = `
   .home-proof-intro, .home-proof-item {
     min-height: 148px;
     padding: 22px;
-    background: rgba(255, 255, 255, 0.82);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    background: #ffffff;
   }
   .home-proof-intro {
     display: grid;
@@ -332,9 +334,7 @@ const CSS = `
     padding: 12px;
     border: 1px solid rgba(18, 24, 22, 0.09);
     border-radius: 16px;
-    background: rgba(255, 255, 255, 0.82);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    background: #ffffff;
     box-shadow: 0 12px 40px rgba(18, 24, 22, 0.07);
   }
   .home-cta-copy { padding: 32px 28px; }
@@ -492,8 +492,8 @@ export default async function ProfessionalHomePage() {
           </div>
 
           <div className="home-card-grid">
-            {portfolioSections.map(({ category, cover, subline, copy }) => (
-              <Link key={category.slug} href={`/portfolio?category=${category.slug}`} className="home-card">
+            {portfolioSections.map(({ category, cover, subline, copy }, i) => (
+              <Link key={category.slug} href={`/portfolio?category=${category.slug}`} className="home-card glass-shimmer" data-reveal data-delay={String(i + 1)}>
                 {cover && (
                   <div className="home-card-media">
                     <img src={cover.image_url} alt={cover.alt} loading="lazy" decoding="async" />
@@ -510,7 +510,7 @@ export default async function ProfessionalHomePage() {
               </Link>
             ))}
 
-            <Link href="/contact" className="home-card">
+            <Link href="/contact" className="home-card glass-shimmer" data-reveal data-delay="3">
               <div className="home-card-media">
                 <img src={settings.home_cover_contact ?? heroImageUrl} alt="Book a Bay Area photography session" loading="lazy" decoding="async" />
               </div>
@@ -534,7 +534,7 @@ export default async function ProfessionalHomePage() {
       <div className="home-editorial">
         <div className="home-shell">
           <div className="home-editorial-grid">
-            <div className="home-editorial-copy">
+            <div className="home-editorial-copy" data-reveal="left">
               <div>
                 {/* Section heading — edit text here */}
                 <p className="home-kicker">Portraits for the people you keep</p>
@@ -550,7 +550,7 @@ export default async function ProfessionalHomePage() {
                 <Link href="/pricing/grads"   className="home-link home-link--ghost">See grad rates</Link>
               </div>
             </div>
-            <div className="home-editorial-media" aria-label="Featured photography">
+            <div className="home-editorial-media" aria-label="Featured photography" data-reveal data-delay="2">
               <div className="home-stacked-photo" data-size="large">
                 <img src={firstPortfolioImage}  alt="Bay Area portrait session" loading="lazy" decoding="async" />
               </div>
@@ -581,8 +581,8 @@ export default async function ProfessionalHomePage() {
               ["02", "Locations",  "SF, Berkeley, Stanford, SJSU, South Bay."],
               ["03", "Gallery",    "Clean delivery for sharing and downloading."],
               ["04", "Timing",     "Peak campus dates move fast."],
-            ].map(([number, title, copy]) => (
-              <div key={title} className="home-proof-item">
+            ].map(([number, title, copy], i) => (
+              <div key={title} className="home-proof-item" data-reveal data-delay={String(i + 1)}>
                 <span className="home-proof-number">{number}</span>
                 <div>
                   <h3>{title}</h3>
@@ -599,7 +599,7 @@ export default async function ProfessionalHomePage() {
            To change heading: edit the h2 below. */}
       <section className="home-cta">
         <div className="home-shell">
-          <div className="home-cta-panel">
+          <div className="home-cta-panel glass-shimmer" data-reveal>
             <div className="home-cta-copy">
               {/* CTA heading — edit text here */}
               <p className="home-kicker">Grad season moves quickly</p>

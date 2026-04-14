@@ -1,5 +1,6 @@
 import Link from "next/link";
 import ProNav from "@/app/components/ProNav";
+import ScrollReveal from "@/app/components/ScrollReveal";
 
 const footerLinks = [
   { label: "Grad gallery", href: "/portfolio?category=grads" },
@@ -14,6 +15,96 @@ export default function ProfessionalLayout({ children }: Readonly<{ children: Re
   return (
     <div className="professional-shell">
       <style>{`
+        /* ── DESIGN TOKENS ───────────────────────────────────────────────────────
+           Global CSS custom properties used across all professional pages.
+           Edit values here to change the look of the whole site at once. */
+        :root {
+          --ink:           #101412;      /* primary text */
+          --ink-muted:     #4b5a55;      /* secondary text */
+          --ink-dim:       #667f79;      /* captions, kickers */
+          --bg:            #f5f6f4;      /* page background */
+          --bg-white:      #ffffff;      /* card/section white */
+          --accent:        #3d6b5e;      /* green CTA / link accent */
+          --accent-light:  #4f6d67;      /* lighter accent variant */
+          --glass:         rgba(255,255,255,0.82);   /* frosted glass card fill */
+          --glass-border:  rgba(18,24,22,0.08);      /* card border */
+          --glass-shadow:  0 4px 18px rgba(18,24,22,0.06); /* card resting shadow */
+          --glass-shadow-lg: 0 12px 36px rgba(18,24,22,0.09); /* card hover shadow */
+          --blur:          blur(16px);   /* standard backdrop blur */
+          --blur-strong:   blur(24px);   /* nav / prominent elements */
+          --radius-sm:     8px;
+          --radius-md:     14px;
+          --radius-lg:     20px;
+          --transition:    0.22s cubic-bezier(0.22,1,0.36,1);
+        }
+
+        /* ── SCROLL REVEAL ───────────────────────────────────────────────────────
+           Only active when JS has loaded (.js-scroll-reveal on <html>).
+           Elements remain fully visible if JS is disabled — no FOIC.
+
+           Usage:
+             <div data-reveal>…</div>              → fades up (default)
+             <div data-reveal="left">…</div>       → slides from left
+             <div data-reveal="scale">…</div>      → scales up
+             <div data-reveal data-delay="2">…</div> → staggered (1–5) */
+        .js-scroll-reveal [data-reveal] {
+          opacity: 0;
+          transform: translateY(20px);
+          /* will-change tells the browser to promote this to its own GPU layer
+             before the animation starts — eliminates jank during scroll */
+          will-change: transform, opacity;
+          transition: opacity 0.5s cubic-bezier(0.22,1,0.36,1),
+                      transform 0.5s cubic-bezier(0.22,1,0.36,1);
+        }
+        .js-scroll-reveal [data-reveal="left"] {
+          transform: translateX(-24px);
+        }
+        .js-scroll-reveal [data-reveal="scale"] {
+          transform: scale(0.95);
+        }
+
+        /* Visible state — GPU layer released after animation via will-change: auto */
+        .js-scroll-reveal [data-reveal][data-visible="true"] {
+          opacity: 1;
+          transform: none;
+          will-change: auto;
+        }
+
+        /* Stagger delays: data-delay="1" through data-delay="5" */
+        .js-scroll-reveal [data-delay="1"] { transition-delay: 0.06s; }
+        .js-scroll-reveal [data-delay="2"] { transition-delay: 0.12s; }
+        .js-scroll-reveal [data-delay="3"] { transition-delay: 0.18s; }
+        .js-scroll-reveal [data-delay="4"] { transition-delay: 0.24s; }
+        .js-scroll-reveal [data-delay="5"] { transition-delay: 0.30s; }
+
+        /* ── GLASS SHIMMER ───────────────────────────────────────────────────────
+           Add class="glass-shimmer" to any card element.
+           On hover, a diagonal light sweep crosses the card surface.
+           will-change on ::before ensures the sweep is GPU-composited. */
+        .glass-shimmer {
+          position: relative;
+          overflow: hidden;
+        }
+        .glass-shimmer::before {
+          content: "";
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(
+            115deg,
+            transparent 30%,
+            rgba(255,255,255,0.30) 50%,
+            transparent 70%
+          );
+          transform: translateX(-110%);
+          will-change: transform;
+          transition: transform 0.55s cubic-bezier(0.22,1,0.36,1);
+          pointer-events: none;
+          z-index: 1;
+        }
+        .glass-shimmer:hover::before {
+          transform: translateX(110%);
+        }
+
         .professional-shell {
           min-height: 100vh;
           background: #f7faf8;
@@ -131,6 +222,7 @@ export default function ProfessionalLayout({ children }: Readonly<{ children: Re
           }
         }
       `}</style>
+      <ScrollReveal />
       <ProNav />
       {children}
 

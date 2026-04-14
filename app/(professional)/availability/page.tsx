@@ -85,7 +85,10 @@ const CSS = `
      Light gradient header. padding-top clears the fixed nav bar. */
   .avail-hero {
     padding: 120px 0 64px;
-    background: linear-gradient(to bottom, #eaf0ec 0%, #f5f6f4 100%);
+    background:
+      radial-gradient(ellipse 65% 60% at 8% 10%, rgba(162, 210, 196, 0.16) 0%, transparent 60%),
+      radial-gradient(ellipse 50% 55% at 92% 90%, rgba(130, 185, 175, 0.12) 0%, transparent 55%),
+      linear-gradient(to bottom, #eaf0ec 0%, #f5f6f4 100%);
     border-bottom: 1px solid rgba(18, 24, 22, 0.07);
   }
   .avail-hero-kicker {
@@ -122,7 +125,7 @@ const CSS = `
     margin-top: 24px;
     animation: fadeUp 0.65s 0.24s cubic-bezier(0.22, 1, 0.36, 1) both;
   }
-  /* Frosted glass chips on light background */
+  /* Glass chips on light background */
   .avail-chip {
     min-height: 34px;
     display: inline-flex;
@@ -130,9 +133,7 @@ const CSS = `
     padding: 0 12px;
     border: 1px solid rgba(18, 24, 22, 0.1);
     border-radius: 8px;
-    background: rgba(255, 255, 255, 0.78);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+    background: rgba(255, 255, 255, 0.92);
     color: #26312d;
     font-size: 13px;
     font-weight: 760;
@@ -153,9 +154,7 @@ const CSS = `
   .avail-calendar, .avail-sidebar-panel {
     border: 1px solid rgba(18, 24, 22, 0.09);
     border-radius: 14px;
-    background: rgba(255, 255, 255, 0.82);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    background: #ffffff;
     box-shadow: 0 8px 32px rgba(18, 24, 22, 0.06);
   }
   .avail-calendar { overflow: hidden; }
@@ -398,7 +397,7 @@ export default function AvailabilityPage() {
       <div className="avail-body">
         <div className="avail-shell avail-layout">
           {/* ── CALENDAR ── */}
-          <div className="avail-calendar">
+          <div className="avail-calendar" data-reveal>
             <div className="avail-cal-head">
               <button className="avail-nav" onClick={prevMonth} aria-label="Previous month">{"<"}</button>
               <div>
@@ -461,7 +460,7 @@ export default function AvailabilityPage() {
 
           {/* ── SIDEBAR ── */}
           <aside className="avail-sidebar" aria-label="Availability details">
-            <div className="avail-sidebar-panel">
+            <div className="avail-sidebar-panel" data-reveal data-delay="2">
               <p className="avail-mini-label">{selectedLabel}</p>
               <h2>{selected ? formatDate(selected.date) : "Tap an open date"}</h2>
               <p>
@@ -472,7 +471,7 @@ export default function AvailabilityPage() {
               <Link href="/contact" className="avail-link">Start inquiry</Link>
             </div>
 
-            <div className="avail-sidebar-panel">
+            <div className="avail-sidebar-panel" data-reveal data-delay="3">
               <p className="avail-mini-label">Next windows</p>
               {upcomingDates.length > 0 ? (
                 <div className="avail-upcoming">
@@ -490,7 +489,7 @@ export default function AvailabilityPage() {
             </div>
 
             {/* ── Locations — edit the h3 text to change listed campuses ── */}
-            <div className="avail-sidebar-panel">
+            <div className="avail-sidebar-panel" data-reveal data-delay="4">
               <p className="avail-mini-label">Locations</p>
               <h3>SF, Berkeley, Stanford, SJSU, Peninsula, South Bay.</h3>
               <p>Sunset and campus windows are planned around light, walking distance, and how busy the location gets.</p>

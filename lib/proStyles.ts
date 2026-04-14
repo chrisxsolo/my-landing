@@ -198,11 +198,24 @@ export function pricingCSS({
 
   /* ── INFO CARD (each of the Booking/Session/Travel cards) ───────────────────
      transition makes the hover lift smooth.
-     hover: lifts card up 4px and deepens shadow. */
+     hover: lifts card up 4px, deepens shadow, and sweeps a shimmer across. */
   .pricing-info-card {
     padding: 22px;
+    position: relative;
+    overflow: hidden;
     transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.22s ease, border-color 0.22s ease;
   }
+  .pricing-info-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(115deg, transparent 30%, rgba(255,255,255,0.38) 50%, transparent 70%);
+    transform: translateX(-100%);
+    transition: transform 0.65s cubic-bezier(0.22,1,0.36,1);
+    pointer-events: none;
+    z-index: 1;
+  }
+  .pricing-info-card:hover::before { transform: translateX(100%); }
   .pricing-info-card:hover {
     transform: translateY(-4px);
     box-shadow: 0 20px 44px rgba(18, 24, 22, 0.1);
