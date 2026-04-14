@@ -7,14 +7,15 @@
 // Response shape:
 // {
 //   "as_of": "2026-04-14",
-//   "professional": {
-//     "available": [{ "date": "2026-05-03", "label": "Sun, May 3", "note": null }],
+//   "dates": {
+//     "available": [{ "date": "2026-05-03", "label": "Sun, May 3, 2026", "note": null }],
 //     "on_hold":   [...],
 //     "booked":    [...]
 //   },
-//   "fun": { ... same shape ... },
 //   "quick_read": "5 open dates in the next 90 days ..."   ← plain English for AI context
 // }
+//
+// Both /availability (professional) and /booking (fun) display these same dates.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextResponse } from "next/server";
@@ -76,28 +77,26 @@ export async function GET() {
     const today = new Date();
     const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
 
-    const [proResult, funResult] = await Promise.all([
-      supabase.from("professional_availability").select("date, status, note").order("date"),
-      supabase.from("availability").select("date, status, note").order("date"),
-    ]);
+    const { data, error } = await supabase
+      .from("availability")
+      .select("date, status, note")
+      .order("date");
 
-    const proRows  = (proResult.data  ?? []) as Row[];
-    const funRows  = (funResult.data  ?? []) as Row[];
+    if (error) throw error;
 
-    const professional = groupDates(proRows, todayStr);
-    const fun          = groupDates(funRows, todayStr);
+    const rows  = (data ?? []) as Row[];
+    const dates = groupDates(rows, todayStr);
 
-    const quickRead = [
-      buildQuickRead("Professional site (/availability)", professional),
-      buildQuickRead("Fun site (/booking)", fun),
-    ].join("\n");
+    const quickRead = buildQuickRead(
+      "Both sites (/availability and /booking)",
+      dates,
+    );
 
     return NextResponse.json(
       {
-        as_of:        todayStr,
-        professional,
-        fun,
-        quick_read:   quickRead,
+        as_of:      todayStr,
+        dates,
+        quick_read: quickRead,
       },
       {
         headers: {

@@ -8,8 +8,6 @@ import { useRouter } from "next/navigation";
 export const dynamic = 'force-dynamic'
 
 type AvailDate = { id?:number; date:string; status:"available"|"booked"|"hold"; note:string|null; };
-type SiteMode = "professional" | "fun";
-
 const DAYS   = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 
@@ -21,15 +19,12 @@ const STATUS_CYCLE:Record<string,"available"|"booked"|"hold"|"none"> = {
   "none":"available","available":"booked","booked":"hold","hold":"none",
 };
 
-function tableName(site: SiteMode) {
-  return site === "professional" ? "professional_availability" : "availability";
-}
+const TABLE = "availability";
 
 export default function AdminAvailabilityPage() {
   const router = useRouter();
   const today = new Date();
   const [authed,setAuthed]=useState(false);
-  const [site,setSite]=useState<SiteMode>("professional");
   const [month,setMonth]=useState(today.getMonth());
   const [year,setYear]=useState(today.getFullYear());
   const [dates,setDates]=useState<AvailDate[]>([]);
@@ -49,11 +44,11 @@ export default function AdminAvailabilityPage() {
 
   async function fetchDates(){
     setLoading(true);
-    try{const{data}=await supabase.from(tableName(site)).select('*');if(data)setDates(data);}
+    try{const{data}=await supabase.from(TABLE).select('*');if(data)setDates(data);}
     catch(err){console.error(err);}
     finally{setLoading(false);}
   }
-  useEffect(()=>{if(authed)fetchDates();},[authed, site])
+  useEffect(()=>{if(authed)fetchDates();},[authed])
 
   const dateMap=dates.reduce((acc,d)=>{acc[d.date]=d;return acc;},{} as Record<string,AvailDate>)
   const daysInMonth=getDaysInMonth(year,month);
@@ -65,14 +60,13 @@ export default function AdminAvailabilityPage() {
     const cur=existing?.status??"none";
     const next=STATUS_CYCLE[cur];
     setSaving(dateStr);
-    const table = tableName(site);
     if(next==="none"){
-      if(existing?.id){await supabase.from(table).delete().eq('id',existing.id);setDates(p=>p.filter(d=>d.date!==dateStr));showToast("Date cleared");}
+      if(existing?.id){await supabase.from(TABLE).delete().eq('id',existing.id);setDates(p=>p.filter(d=>d.date!==dateStr));showToast("Date cleared");}
     }else if(existing?.id){
-      await supabase.from(table).update({status:next}).eq('id',existing.id);
+      await supabase.from(TABLE).update({status:next}).eq('id',existing.id);
       setDates(p=>p.map(d=>d.date===dateStr?{...d,status:next}:d));showToast(`Marked as ${next}`);
     }else{
-      const{data}=await supabase.from(table).insert({date:dateStr,status:next,note:null}).select().single();
+      const{data}=await supabase.from(TABLE).insert({date:dateStr,status:next,note:null}).select().single();
       if(data)setDates(p=>[...p,data]);showToast(`Marked as ${next}`);
     }
     setSaving(null);
@@ -81,7 +75,7 @@ export default function AdminAvailabilityPage() {
   async function updateNote(dateStr:string,note:string){
     const existing=dateMap[dateStr];
     if(!existing?.id)return;
-    await supabase.from(tableName(site)).update({note}).eq('id',existing.id);
+    await supabase.from(TABLE).update({note}).eq('id',existing.id);
     setDates(p=>p.map(d=>d.date===dateStr?{...d,note}:d));showToast("Note saved");
   }
 
@@ -111,26 +105,17 @@ export default function AdminAvailabilityPage() {
         <span className="font-black text-lg" style={C.text}>Chris. Admin</span>
         <div className="flex items-center gap-4">
           <a href="/admin" className="text-xs font-bold text-slate-400 hover:text-slate-700 transition-colors">← Dashboard</a>
-          <a href={site==="professional"?"/availability":"/booking"} target="_blank" rel="noopener noreferrer" className="text-xs font-bold text-slate-400 hover:text-slate-700 transition-colors">Public page ↗</a>
+          <a href="/availability" target="_blank" rel="noopener noreferrer" className="text-xs font-bold text-slate-400 hover:text-slate-700 transition-colors">View /availability ↗</a>
+          <a href="/booking" target="_blank" rel="noopener noreferrer" className="text-xs font-bold text-slate-400 hover:text-slate-700 transition-colors">View /booking ↗</a>
         </div>
       </div>
 
       <div className="max-w-2xl mx-auto px-6 py-8">
 
-        {/* Site Switcher */}
-        <div className="flex gap-2 p-1 rounded-2xl bg-white border border-slate-100 w-fit mb-6">
-          {([["professional","🖼️ Professional site"],["fun","✨ Fun site"]] as [SiteMode,string][]).map(([s,label])=>(
-            <button key={s} onClick={()=>{setSite(s);setDates([]);}} className="px-5 py-2 rounded-xl text-sm font-bold transition-all"
-              style={site===s?{background:C.grad12,color:"#fff"}:{color:"#94a3b8"}}>
-              {label}
-            </button>
-          ))}
-        </div>
-
         {/* Instructions */}
         <div className="rounded-2xl p-4 mb-6 flex flex-wrap gap-3" style={{background:"white",border:`1px solid ${C.p1_12}`}}>
           <p className="text-xs font-bold text-slate-500 w-full mb-1">
-            Managing: <span style={{color:C.p1}}>{site==="professional"?"professional site (/availability)":"fun site (/booking)"}</span> · Click any date to cycle:
+            <span style={{color:C.p1}}>Shared calendar</span> — dates show on both <span className="text-slate-700">/availability</span> and <span className="text-slate-700">/booking</span> · Click any date to cycle:
           </p>
           {[
             {label:"Available",bg:C.p1_15,border:C.p1_35,color:C.p1},

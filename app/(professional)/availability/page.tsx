@@ -7,9 +7,11 @@
 //   3. Sidebar    — selected date details, upcoming dates, locations list
 //
 // HOW DATES WORK:
-//   Dates are managed in Supabase → Table: "professional_availability"
+//   Dates are managed in Supabase → Table: "availability"
+//   Both the professional site (/availability) and the fun site (/booking)
+//   read from this same table — they just display it differently.
 //   Each row has: date (YYYY-MM-DD), status ("available"/"booked"/"hold"), note
-//   To add available dates: insert rows in that table via Supabase dashboard.
+//   To add/edit dates: use the admin panel at /admin/availability.
 //
 // DATE STATUS COLORS (change in .avail-date-btn[data-status=...] below):
 //   available → green-tinted  (rgba 112, 139, 133)
@@ -52,19 +54,12 @@ function formatDate(date: string) {
 }
 
 async function loadAvailabilityDates() {
-  const professional = await supabase
-    .from("professional_availability")
-    .select("*")
-    .order("date", { ascending: true });
-  if (professional.error) console.error("Failed to load professional availability:", professional.error);
-  if (professional.data && professional.data.length > 0) return professional.data as AvailDate[];
-
-  const legacy = await supabase
+  const { data, error } = await supabase
     .from("availability")
     .select("*")
     .order("date", { ascending: true });
-  if (legacy.error) console.error("Failed to load availability fallback:", legacy.error);
-  return (legacy.data ?? []) as AvailDate[];
+  if (error) console.error("Failed to load availability:", error);
+  return (data ?? []) as AvailDate[];
 }
 
 const CSS = `
