@@ -154,6 +154,26 @@ export default function AdminDashboard() {
   const [inquiriesLoading,setInquiriesLoading]=useState(false);
   const [inquiryDeleteConfirm,setInquiryDeleteConfirm]=useState<number|null>(null);
   const [editingInquiry,setEditingInquiry]=useState<Inquiry|null>(null);
+  const [draftLoading,setDraftLoading]=useState<number|null>(null);
+  const [drafts,setDrafts]=useState<Record<number,string>>({});
+  const [draftCopied,setDraftCopied]=useState<number|null>(null);
+
+  async function generateDraft(inq:Inquiry){
+    setDraftLoading(inq.id);
+    try{
+      const res=await fetch("/api/draft-reply",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:inq.name,email:inq.email,phone:inq.phone,session_type:inq.session_type,date_in_mind:inq.date_in_mind,message:inq.message})});
+      const json=await res.json();
+      if(json.draft){setDrafts(p=>({...p,[inq.id]:json.draft}));}
+      else{showToast(json.error??"Draft failed",false);}
+    }catch(e){showToast("Draft request failed",false);console.error(e);}
+    finally{setDraftLoading(null);}
+  }
+
+  function copyDraft(id:number){
+    const text=drafts[id];
+    if(!text)return;
+    navigator.clipboard.writeText(text).then(()=>{setDraftCopied(id);setTimeout(()=>setDraftCopied(null),2000);});
+  }
 
   const [linkStats,setLinkStats]=useState<LinkStat[]>([]);
   const [statsLoading,setStatsLoading]=useState(false);
@@ -1651,6 +1671,46 @@ export default function AdminDashboard() {
                             <div className="flex gap-4 pt-1">
                               <span className="text-[10px] font-bold uppercase tracking-widest text-slate-300 min-w-[90px] pt-0.5">Message</span>
                               <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{inq.message}</p>
+                            </div>
+
+                            {/* ── AI Draft Reply ── */}
+                            <div className="pt-3 border-t border-slate-100">
+                              <div className="flex items-center justify-between gap-3 mb-2">
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-300">AI Draft Reply</span>
+                                <button
+                                  onClick={()=>generateDraft(inq)}
+                                  disabled={draftLoading===inq.id}
+                                  className="text-xs font-bold px-3 py-1.5 rounded-lg transition-all hover:opacity-80 disabled:opacity-50 flex items-center gap-1.5"
+                                  style={{background:C.grad12,color:"#fff"}}
+                                >
+                                  {draftLoading===inq.id?(
+                                    <><span className="animate-spin inline-block">◌</span> Writing…</>
+                                  ):(
+                                    <>{drafts[inq.id]?"Regenerate":"✦ Draft with AI"}</>
+                                  )}
+                                </button>
+                              </div>
+                              {drafts[inq.id]&&(
+                                <div className="relative">
+                                  <textarea
+                                    readOnly
+                                    value={drafts[inq.id]}
+                                    rows={10}
+                                    className="w-full text-sm text-slate-700 leading-relaxed rounded-xl p-3 resize-y outline-none"
+                                    style={{border:`1px solid ${C.p1_20}`,background:C.p1_04,fontFamily:"inherit"}}
+                                  />
+                                  <button
+                                    onClick={()=>copyDraft(inq.id)}
+                                    className="absolute top-2 right-2 text-xs font-bold px-2.5 py-1 rounded-lg transition-all"
+                                    style={draftCopied===inq.id?{background:"#10b981",color:"#fff"}:{background:"rgba(255,255,255,0.9)",color:C.p1,border:`1px solid ${C.p1_20}`}}
+                                  >
+                                    {draftCopied===inq.id?"Copied!":"Copy"}
+                                  </button>
+                                  <p className="text-[10px] text-slate-400 mt-1.5 font-medium">
+                                    Review before sending · paste into your email client and send from <strong>{inq.email}</strong>
+                                  </p>
+                                </div>
+                              )}
                             </div>
                           </div>
                         )}

@@ -1,0 +1,109 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/draft-reply
+//
+// Admin-only endpoint. Takes an inquiry and asks Claude to draft a reply email.
+// Pulls live availability data so Claude can suggest specific open dates.
+//
+// Request body:
+//   { name, email, phone?, session_type?, date_in_mind?, message }
+//
+// Response:
+//   { draft: "Hi Ryan, ..." }
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { NextRequest, NextResponse } from "next/server";
+import Anthropic from "@anthropic-ai/sdk";
+
+export const dynamic = "force-dynamic";
+
+async function fetchAvailability(): Promise<string> {
+  try {
+    // Use the internal API — works in both dev and prod
+    const base = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+    const res = await fetch(`${base}/api/availability`, { cache: "no-store" });
+    if (!res.ok) return "Availability data unavailable.";
+    const json = await res.json();
+    return json.quick_read ?? "Availability data unavailable.";
+  } catch {
+    return "Availability data unavailable — tell them to check soloxsnaps.com/availability for open dates.";
+  }
+}
+
+export async function POST(req: NextRequest) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    return NextResponse.json(
+      { error: "ANTHROPIC_API_KEY is not configured." },
+      { status: 503 }
+    );
+  }
+
+  let body: Record<string, string>;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+  }
+
+  const { name, email, session_type, date_in_mind, message, phone } = body;
+
+  if (!name || !email || !message) {
+    return NextResponse.json(
+      { error: "name, email, and message are required." },
+      { status: 400 }
+    );
+  }
+
+  const availability = await fetchAvailability();
+
+  const systemPrompt = `You are Chris Solorzano, a Bay Area graduation and family photographer. You run soloxsnaps.com.
+
+Your tone is warm, personal, and direct — not overly formal, not salesy. You sound like a real person who genuinely cares about making their shoot great. Keep replies concise (3–5 short paragraphs max).
+
+Your style:
+- Use the client's first name naturally
+- Acknowledge what they want specifically (session type, date, etc.)
+- Mention 2–3 specific open dates from the availability data when relevant (pick ones closest to their requested date if they gave one, otherwise the next soonest)
+- End with a clear next step: they should reply to confirm a date or ask questions
+- Sign as "Chris"
+- Do NOT include a subject line, do NOT include a greeting like "Dear" — start directly with "Hi [Name],"
+- Do NOT include markdown formatting (no bold, no asterisks, no bullet points) — plain text only
+- Do NOT mention pricing unless they asked about it`;
+
+  const userPrompt = `Draft a reply to this client inquiry:
+
+Name: ${name}
+Email: ${email}${phone ? `\nPhone: ${phone}` : ""}${session_type ? `\nSession type: ${session_type}` : ""}${date_in_mind ? `\nDate they have in mind: ${date_in_mind}` : ""}
+
+Their message:
+${message}
+
+Current availability:
+${availability}
+
+Write the reply now.`;
+
+  try {
+    const client = new Anthropic({ apiKey });
+    const response = await client.messages.create({
+      model: "claude-opus-4-5",
+      max_tokens: 600,
+      messages: [{ role: "user", content: userPrompt }],
+      system: systemPrompt,
+    });
+
+    const draft = response.content
+      .filter((b) => b.type === "text")
+      .map((b) => (b as { type: "text"; text: string }).text)
+      .join("")
+      .trim();
+
+    return NextResponse.json({ draft });
+  } catch (err) {
+    console.error("Claude draft-reply error:", err);
+    return NextResponse.json(
+      { error: "Failed to generate draft. Check ANTHROPIC_API_KEY." },
+      { status: 500 }
+    );
+  }
+}
