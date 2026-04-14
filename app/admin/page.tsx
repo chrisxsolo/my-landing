@@ -12,7 +12,7 @@ type Inquiry = { id:number; name:string; email:string; phone:string|null; sessio
 type BlogCategory = "journal"|"professional";
 type Pose = { id:number; title:string; image_url:string; instructions:string; order:number; };
 type Spot = { id:number; school_id:string; school_name:string; school_short:string; name:string; description:string; tip:string; icon:string; image_url:string|null; order:number; };
-type BlogPost = { id:number; title:string; body:string; published_at:string; slug:string; cover_image_url:string|null; extra_image_urls:string[]; category?:BlogCategory|string|null; };
+type BlogPost = { id:number; title:string; body:string; published_at:string; slug:string; cover_image_url:string|null; extra_image_urls:string[]; category?:BlogCategory|string|null; sites?:string[]|null; };
 type PortfolioCategory = { id:number; name:string; slug:string; description:string|null; sort_order:number; active:boolean; };
 type PortfolioImage = { id:number; title:string; alt:string|null; image_url:string; category_id:number|null; category_slug:string; featured:boolean; hero_carousel:boolean; sort_order:number; created_at:string|null; };
 type LinkClickEvent = { link_id:number|null; user_id:string|null; clicked_at:string; };
@@ -137,7 +137,7 @@ export default function AdminDashboard() {
   const [posts,setPosts]=useState<BlogPost[]>([]);
   const [postsLoading,setPostsLoading]=useState(false);
   const [blogCategory,setBlogCategory]=useState<BlogCategory>("journal");
-  const EMPTY_POST={title:"",body:"",slug:"",category:"journal" as BlogCategory,published_at:new Date().toISOString().slice(0,16)};
+  const EMPTY_POST={title:"",body:"",slug:"",category:"journal" as BlogCategory,sites:["journal"] as string[],published_at:new Date().toISOString().slice(0,16)};
   const [postForm,setPostForm]=useState(EMPTY_POST);
   const [coverImg,setCoverImg]=useState<File|null>(null);
   const [coverImgPreview,setCoverImgPreview]=useState<string|null>(null);
@@ -249,9 +249,10 @@ export default function AdminDashboard() {
   }
   async function fetchPosts(){
     setPostsLoading(true);
-    let{data,error}=await supabase.from('blog_posts').select('*').eq('category',blogCategory).order('published_at',{ascending:false});
-    if(error&&error.message?.toLowerCase().includes("category")){
-      const fallback=await supabase.from('blog_posts').select('*').order('published_at',{ascending:false});
+    let{data,error}=await supabase.from('blog_posts').select('*').contains('sites',[blogCategory]).order('published_at',{ascending:false});
+    if(error){
+      // Fall back to legacy category column
+      const fallback=await supabase.from('blog_posts').select('*').eq('category',blogCategory).order('published_at',{ascending:false});
       data=fallback.data;
       error=fallback.error;
     }
@@ -480,8 +481,13 @@ export default function AdminDashboard() {
 
   // ── Blog handlers ──────────────────────────────────────────────────────
   function slugify(s:string){return s.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");}
-  function startEditPost(post:BlogPost){const category=post.category==="professional"?"professional":"journal";setEditingPost(post);setPostForm({title:post.title,body:post.body,slug:post.slug,category,published_at:post.published_at.slice(0,16)});setBlogCategory(category);setCoverImg(null);setCoverImgPreview(post.cover_image_url||null);setExtraImgs([]);setExtraPreviews(post.extra_image_urls??[]);window.scrollTo({top:0,behavior:"smooth"});}
-  function cancelEditPost(){setEditingPost(null);setPostForm({...EMPTY_POST,category:blogCategory});setCoverImg(null);setCoverImgPreview(null);setExtraImgs([]);setExtraPreviews([]);if(coverFileRef.current)coverFileRef.current.value="";if(extraFileRef.current)extraFileRef.current.value="";}
+  function startEditPost(post:BlogPost){
+    const sites=post.sites&&post.sites.length>0?post.sites:[post.category==="professional"?"professional":"journal"];
+    const primaryCat=(sites.includes("professional")?"professional":"journal") as BlogCategory;
+    setEditingPost(post);setPostForm({title:post.title,body:post.body,slug:post.slug,category:primaryCat,sites,published_at:post.published_at.slice(0,16)});
+    setBlogCategory(primaryCat);setCoverImg(null);setCoverImgPreview(post.cover_image_url||null);setExtraImgs([]);setExtraPreviews(post.extra_image_urls??[]);window.scrollTo({top:0,behavior:"smooth"});
+  }
+  function cancelEditPost(){setEditingPost(null);setPostForm({...EMPTY_POST,category:blogCategory,sites:[blogCategory]});setCoverImg(null);setCoverImgPreview(null);setExtraImgs([]);setExtraPreviews([]);if(coverFileRef.current)coverFileRef.current.value="";if(extraFileRef.current)extraFileRef.current.value="";}
   function onCoverImg(e:React.ChangeEvent<HTMLInputElement>){const f=e.target.files?.[0];if(!f)return;setCoverImg(f);setCoverImgPreview(URL.createObjectURL(f));}
   function onExtraImgs(e:React.ChangeEvent<HTMLInputElement>){const files=Array.from(e.target.files??[]);if(!files.length)return;setExtraImgs(prev=>[...prev,...files]);setExtraPreviews(prev=>[...prev,...files.map(f=>URL.createObjectURL(f))]);}
   function removeExtraPreview(i:number){setExtraPreviews(p=>p.filter((_,j)=>j!==i));setExtraImgs(p=>p.filter((_,j)=>j!==i));}
@@ -499,7 +505,9 @@ export default function AdminDashboard() {
     // extra_image_urls = existing that still show in previews + newly uploaded
     const existingKept=existingExtras.filter(url=>extraPreviews.includes(url));
     const extra_image_urls=[...existingKept,...newExtraUrls];
-    const payload={title:postForm.title,body:postForm.body,slug,category:postForm.category,cover_image_url,extra_image_urls,published_at:new Date(postForm.published_at).toISOString()};
+    const sites=postForm.sites&&postForm.sites.length>0?postForm.sites:[postForm.category];
+    const primaryCategory=(sites.includes("professional")?"professional":"journal") as BlogCategory;
+    const payload={title:postForm.title,body:postForm.body,slug,category:primaryCategory,sites,cover_image_url,extra_image_urls,published_at:new Date(postForm.published_at).toISOString()};
     if(editingPost){
       const{error}=await supabase.from('blog_posts').update(payload).eq('id',editingPost.id);
       if(error)showToast("Update failed",false);else{showToast("Post updated!");cancelEditPost();fetchPosts();}
@@ -1118,20 +1126,36 @@ export default function AdminDashboard() {
                 {editingPost&&<div className="mb-4 px-3 py-2 rounded-xl text-xs font-bold" style={{background:C.p1_08,color:C.p1,border:`1px solid ${C.p1_20}`}}>✏️ Editing existing post.</div>}
 
                 <div className="mb-5">
-                  <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Post Category</label>
+                  <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Show On</label>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {BLOG_CATEGORIES.map(category=>(
-                      <button
-                        key={category.value}
-                        onClick={()=>{setBlogCategory(category.value);setPostForm(f=>({...f,category:category.value}));}}
-                        className="rounded-xl border px-4 py-3 text-left transition-all"
-                        style={postForm.category===category.value?{borderColor:C.p1,background:C.p1_08}:{borderColor:"#e2e8f0",background:"#fff"}}
+                    {BLOG_CATEGORIES.map(cat=>(
+                      <label
+                        key={cat.value}
+                        className="flex items-start gap-3 rounded-xl border px-4 py-3 cursor-pointer transition-all"
+                        style={(postForm.sites??[]).includes(cat.value)?{borderColor:C.p1,background:C.p1_08}:{borderColor:"#e2e8f0",background:"#fff"}}
                       >
-                        <span className="block text-sm font-black text-slate-900">{category.label}</span>
-                        <span className="block text-xs font-medium text-slate-400 mt-0.5">{category.helper}</span>
-                      </button>
+                        <input
+                          type="checkbox"
+                          className="mt-0.5 accent-violet-600"
+                          checked={(postForm.sites??[]).includes(cat.value)}
+                          onChange={e=>{
+                            const checked=e.target.checked;
+                            setPostForm(f=>{
+                              const cur=f.sites??[];
+                              const next=checked?[...cur,cat.value]:cur.filter(s=>s!==cat.value);
+                              const primary=(next.includes("professional")?"professional":"journal") as BlogCategory;
+                              return {...f,sites:next,category:primary};
+                            });
+                          }}
+                        />
+                        <div>
+                          <span className="block text-sm font-black text-slate-900">{cat.label}</span>
+                          <span className="block text-xs font-medium text-slate-400 mt-0.5">{cat.helper}</span>
+                        </div>
+                      </label>
                     ))}
                   </div>
+                  {(postForm.sites??[]).length===0&&<p className="text-xs font-bold mt-1.5" style={{color:"#be123c"}}>Select at least one site.</p>}
                 </div>
 
                 {/* Cover image */}
@@ -1215,10 +1239,12 @@ export default function AdminDashboard() {
                             <div className="flex items-start justify-between gap-2">
                               <div className="min-w-0">
                                 <p className="text-sm font-black text-slate-900 truncate mb-0.5">{post.title}</p>
-                                <p className="text-xs text-slate-400">{post.category==="professional"?"Professional":"Journal"} · {new Date(post.published_at).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})} · {(post.extra_image_urls?.length??0)+1} photo{(post.extra_image_urls?.length??0)>0?"s":""}</p>
+                                <p className="text-xs text-slate-400">{(post.sites&&post.sites.length>0?post.sites:[post.category==="professional"?"professional":"journal"]).map(s=>s==="professional"?"Professional":"Journal").join(" + ")} · {new Date(post.published_at).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})} · {(post.extra_image_urls?.length??0)+1} photo{(post.extra_image_urls?.length??0)>0?"s":""}</p>
                               </div>
-                              <div className="flex gap-2 flex-shrink-0">
-                                <a href={`${post.category==="professional"?"/blog":"/journal"}/${post.slug}`} target="_blank" className="text-xs font-bold px-3 py-1.5 rounded-lg" style={{background:C.p1_08,color:C.p1}}>View</a>
+                              <div className="flex gap-2 flex-shrink-0 flex-wrap">
+                                {(post.sites&&post.sites.length>0?post.sites:[post.category==="professional"?"professional":"journal"]).map(site=>(
+                                  <a key={site} href={`${site==="professional"?"/blog":"/journal"}/${post.slug}`} target="_blank" className="text-xs font-bold px-3 py-1.5 rounded-lg" style={{background:C.p1_08,color:C.p1}}>{site==="professional"?"Blog →":"Journal →"}</a>
+                                ))}
                                 {editingPost?.id!==post.id&&<button onClick={()=>startEditPost(post)} className="text-xs font-bold px-3 py-1.5 rounded-lg" style={{background:C.p2_08,color:C.p2}}>Edit</button>}
                                 {postDeleteConfirm===post.id?(
                                   <div className="flex gap-1.5">

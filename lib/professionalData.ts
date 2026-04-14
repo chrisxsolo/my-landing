@@ -32,6 +32,7 @@ export type BlogPost = {
   cover_image_url: string | null;
   extra_image_urls: string[];
   category?: "professional" | "journal" | string | null;
+  sites?: string[] | null;
   meta_description?: string | null;
   meta_keywords?: string | null;
   og_image_url?: string | null;
@@ -251,18 +252,27 @@ export async function getSiteSettings(): Promise<Record<string, string | null>> 
 export async function getBlogPostsByCategory(category: "professional" | "journal") {
   try {
     const supabase = createSupabaseServerClient();
+    // Try sites array column first (supports cross-posting)
     const { data, error } = await supabase
       .from("blog_posts")
       .select("*")
-      .eq("category", category)
+      .contains("sites", [category])
       .order("published_at", { ascending: false });
 
-    if (error || !data) {
-      if (error && !isMissingColumnError(error)) console.error(`Failed to load ${category} posts`, error);
-      return [];
+    if (error) {
+      // Fall back to legacy single-category column
+      const fallback = await supabase
+        .from("blog_posts")
+        .select("*")
+        .eq("category", category)
+        .order("published_at", { ascending: false });
+      if (fallback.error && !isMissingColumnError(fallback.error)) {
+        console.error(`Failed to load ${category} posts`, fallback.error);
+      }
+      return (fallback.data ?? []) as BlogPost[];
     }
 
-    return data as BlogPost[];
+    return (data ?? []) as BlogPost[];
   } catch (error) {
     console.error(`Failed to load ${category} posts`, error);
     return [];
@@ -272,16 +282,26 @@ export async function getBlogPostsByCategory(category: "professional" | "journal
 export async function getBlogPostBySlug(category: "professional" | "journal", slug: string) {
   try {
     const supabase = createSupabaseServerClient();
+    // Try sites array column first (supports cross-posting)
     const { data, error } = await supabase
       .from("blog_posts")
       .select("*")
       .eq("slug", slug)
-      .eq("category", category)
+      .contains("sites", [category])
       .single();
 
-    if (error || !data) {
-      if (error && !isMissingColumnError(error)) console.error(`Failed to load ${category} post ${slug}`, error);
-      return null;
+    if (error) {
+      // Fall back to legacy single-category column
+      const fallback = await supabase
+        .from("blog_posts")
+        .select("*")
+        .eq("slug", slug)
+        .eq("category", category)
+        .single();
+      if (fallback.error && !isMissingColumnError(fallback.error)) {
+        console.error(`Failed to load ${category} post ${slug}`, fallback.error);
+      }
+      return fallback.data ? (fallback.data as BlogPost) : null;
     }
 
     return data as BlogPost;

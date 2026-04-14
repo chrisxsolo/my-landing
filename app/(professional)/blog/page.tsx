@@ -1,15 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// JOURNAL / BLOG PAGE  →  soloxsnaps.com/blog
-// ─────────────────────────────────────────────────────────────────────────────
-// WHAT'S ON THIS PAGE (top to bottom):
-//   1. Light hero  — "Journal." heading on a soft gray gradient
-//   2. Post list   — glass card rows: cover photo + date, title, excerpt
-//   3. Empty state — shown when there are no posts yet
-//
-// QUICK EDITS:
-//   → Hero title:       find "Journal." in the hero JSX below
-//   → Hero subtitle:    find the <p> below the h1
-//   → Excerpt length:   change `max = 160` in the excerpt() function
+// PROFESSIONAL BLOG PAGE  →  soloxsnaps.com/blog
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { Metadata } from "next";
@@ -29,12 +19,10 @@ export const metadata: Metadata = {
   },
 };
 
-// excerpt: trims post body to `max` characters.
-function excerpt(body: string, max = 160) {
+function excerpt(body: string, max = 140) {
   return body.length > max ? `${body.slice(0, max).trim()}…` : body;
 }
 
-// formatDate: converts ISO date to "April 7, 2025" style.
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", {
     month: "long", day: "numeric", year: "numeric",
@@ -43,223 +31,548 @@ function formatDate(iso: string) {
 
 const CSS = `
   @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(20px); }
+    from { opacity: 0; transform: translateY(24px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes scaleIn {
+    from { transform: scaleX(0); opacity: 0; }
+    to   { transform: scaleX(1); opacity: 1; }
+  }
+  @keyframes pillFade {
+    from { opacity: 0; transform: translateY(10px); }
     to   { opacity: 1; transform: translateY(0); }
   }
 
   /* ── PAGE ─────────────────────────────────────────────────────────────────── */
-  .journal-page {
-    background: #f5f6f4;
-    color: #101412;
-    font-family: var(--font-dm-sans), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  .blog-page {
+    background: #f7faf8;
+    color: var(--ink);
+    font-family: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
+    padding-top: 90px;
   }
-  .journal-shell {
+  .blog-shell {
     width: min(1180px, calc(100% - 48px));
     margin: 0 auto;
   }
 
-  /* ── HERO ─────────────────────────────────────────────────────────────────────
-     Light gradient, clean and airy. padding-top clears the fixed nav. */
-  .journal-hero {
-    padding: 120px 0 68px;
+  /* ── HERO ─────────────────────────────────────────────────────────────────── */
+  .blog-hero {
+    padding: 88px 0 80px;
     background:
-      radial-gradient(ellipse 65% 60% at 5% 10%, rgba(162, 210, 196, 0.16) 0%, transparent 60%),
-      radial-gradient(ellipse 50% 55% at 95% 90%, rgba(130, 185, 175, 0.12) 0%, transparent 55%),
-      linear-gradient(to bottom, #eaf0ec 0%, #f5f6f4 100%);
+      radial-gradient(ellipse 65% 60% at 5% 10%, rgba(162, 210, 196, 0.17) 0%, transparent 60%),
+      radial-gradient(ellipse 55% 50% at 95% 90%, rgba(130, 185, 175, 0.13) 0%, transparent 55%),
+      radial-gradient(ellipse 40% 40% at 60% 0%,  rgba(200, 230, 220, 0.10) 0%, transparent 50%),
+      linear-gradient(to bottom, #e8efec 0%, #f7faf8 100%);
     border-bottom: 1px solid rgba(18, 24, 22, 0.07);
-  }
-  .journal-hero-kicker {
-    margin: 0 0 16px;
-    color: #667f79;
-    font-size: 13px;
-    font-weight: 820;
-    animation: fadeUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
-  }
-  .journal-hero-title {
-    margin: 0;
-    color: #101412;
-    font-size: clamp(3.2rem, 8.5vw, 7.5rem);
-    font-weight: 900;
-    letter-spacing: -0.035em;
-    line-height: 0.88;
-    animation: fadeUp 0.65s 0.08s cubic-bezier(0.22, 1, 0.36, 1) both;
-  }
-  .journal-hero-sub {
-    margin: 20px 0 0;
-    color: #4b5a55;
-    font-size: 17px;
-    line-height: 1.7;
-    max-width: 480px;
-    animation: fadeUp 0.65s 0.16s cubic-bezier(0.22, 1, 0.36, 1) both;
-  }
-
-  /* ── POST LIST ───────────────────────────────────────────────────────────────
-     Posts show as glass card rows.
-     To change card spacing: update margin-bottom in .journal-row. */
-  .journal-list {
-    background: #f5f6f4;
-    padding: 36px 0 100px;
-  }
-
-  /* Glass card row */
-  .journal-row {
-    display: grid;
-    grid-template-columns: 52px minmax(0, 0.95fr) minmax(0, 1.05fr);
-    gap: 36px;
-    align-items: center;
-    padding: 24px;
-    margin-bottom: 12px;
-    border: 1px solid rgba(18, 24, 22, 0.08);
-    border-radius: 14px;
-    background: #ffffff;
-    box-shadow: 0 4px 18px rgba(18, 24, 22, 0.05);
-    text-decoration: none;
-    color: inherit;
-    transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.2s ease, border-color 0.2s ease;
-  }
-  .journal-row:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 12px 36px rgba(18, 24, 22, 0.09);
-    border-color: rgba(18, 24, 22, 0.12);
-  }
-  .journal-row:last-child { margin-bottom: 0; }
-
-  /* Post number */
-  .journal-num {
-    color: rgba(18, 24, 22, 0.15);
-    font-size: 1.8rem;
-    font-weight: 900;
-    line-height: 1;
-    letter-spacing: -0.04em;
-    text-align: right;
-  }
-
-  /* Cover photo */
-  .journal-cover {
+    position: relative;
     overflow: hidden;
-    border-radius: 10px;
-    background: #dfe8e4;
-    aspect-ratio: 4 / 3;
-    box-shadow: 0 4px 16px rgba(18, 24, 22, 0.08);
   }
-  .journal-cover img {
-    width: 100%; height: 100%;
-    display: block; object-fit: cover;
-    transition: transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
-  }
-  .journal-row:hover .journal-cover img { transform: scale(1.04); }
 
-  /* Text */
-  .journal-date {
-    margin: 0 0 8px;
-    color: #667f79;
+  /* Decorative corner marks */
+  .blog-hero::before,
+  .blog-hero::after {
+    content: "";
+    position: absolute;
+    width: 18px; height: 18px;
+    opacity: 0.35;
+  }
+  .blog-hero::before {
+    top: 28px; left: 28px;
+    border-top: 1.5px solid #3d6b5e;
+    border-left: 1.5px solid #3d6b5e;
+  }
+  .blog-hero::after {
+    bottom: 28px; right: 28px;
+    border-bottom: 1.5px solid #3d6b5e;
+    border-right: 1.5px solid #3d6b5e;
+  }
+
+  .blog-hero-kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 22px;
+    padding: 7px 16px;
+    border: 1px solid rgba(61, 107, 94, 0.18);
+    border-radius: 100px;
+    background: rgba(255, 255, 255, 0.78);
+    backdrop-filter: var(--blur);
+    -webkit-backdrop-filter: var(--blur);
+    box-shadow: 0 2px 12px rgba(61, 107, 94, 0.08);
+    color: var(--ink-dim);
     font-size: 12px;
     font-weight: 820;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
+    animation: pillFade 0.5s cubic-bezier(0.22,1,0.36,1) both;
   }
-  .journal-post-title {
-    margin: 0 0 12px;
-    color: #101412;
-    font-size: clamp(1.15rem, 2vw, 1.55rem);
+  .blog-hero-kicker-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #3d6b5e;
+    flex-shrink: 0;
+    box-shadow: 0 0 0 3px rgba(61,107,94,0.15);
+  }
+  .blog-hero-heading {
+    margin: 0;
+    animation: fadeUp 0.6s 0.08s cubic-bezier(0.22,1,0.36,1) both;
+  }
+  .blog-hero-title {
+    display: block;
+    font-size: clamp(3.8rem, 9.5vw, 8.5rem);
+    font-weight: 900;
+    letter-spacing: -0.045em;
+    line-height: 0.87;
+    color: var(--ink);
+  }
+  .blog-hero-title-light {
+    display: block;
+    font-size: clamp(3.8rem, 9.5vw, 8.5rem);
+    font-weight: 280;
+    font-style: italic;
+    letter-spacing: -0.03em;
+    line-height: 0.96;
+    color: var(--ink-muted);
+    padding-bottom: 4px;
+  }
+  .blog-hero-sub {
+    margin: 24px 0 0;
+    max-width: 420px;
+    color: var(--ink-muted);
+    font-size: 16px;
+    line-height: 1.8;
+    animation: fadeUp 0.6s 0.16s cubic-bezier(0.22,1,0.36,1) both;
+  }
+  .blog-hero-rule {
+    display: block;
+    width: 32px;
+    height: 2px;
+    background: #3d6b5e;
+    margin: 28px 0 0;
+    transform-origin: left center;
+    animation: scaleIn 0.7s 0.3s cubic-bezier(0.22,1,0.36,1) both;
+  }
+
+  /* ── POST LIST SECTION ────────────────────────────────────────────────────── */
+  .blog-list {
+    padding: 72px 0 120px;
+  }
+
+  /* ── FEATURED CARD (first post, 2-col) ───────────────────────────────────── */
+  .blog-featured {
+    display: grid;
+    grid-template-columns: 1.1fr 0.9fr;
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-lg);
+    background: var(--bg-white);
+    overflow: hidden;
+    box-shadow: var(--glass-shadow);
+    text-decoration: none;
+    color: inherit;
+    margin-bottom: 16px;
+    transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition);
+  }
+  .blog-featured:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 20px 48px rgba(18, 24, 22, 0.1);
+    border-color: rgba(18, 24, 22, 0.13);
+  }
+
+  .blog-featured-media {
+    overflow: hidden;
+    background: #dfe8e4;
+    min-height: 440px;
+    max-height: 540px;
+  }
+  .blog-featured-media img {
+    width: 100%; height: 100%;
+    display: block; object-fit: cover;
+    transition: transform 0.8s cubic-bezier(0.22,1,0.36,1);
+  }
+  .blog-featured:hover .blog-featured-media img { transform: scale(1.04); }
+
+  .blog-featured-media-empty {
+    width: 100%; height: 100%; min-height: 440px;
+    background:
+      radial-gradient(ellipse 70% 70% at 50% 50%, rgba(162,210,196,0.2) 0%, transparent 70%),
+      #e8efec;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .blog-featured-body {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 52px 52px 52px 48px;
+    gap: 0;
+  }
+
+  .blog-featured-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 5px 13px;
+    border: 1px solid rgba(61,107,94,0.2);
+    border-radius: 100px;
+    background: rgba(61,107,94,0.07);
+    color: #3d6b5e;
+    font-size: 11px;
+    font-weight: 820;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    width: fit-content;
+    margin-bottom: 20px;
+  }
+  .blog-featured-label-dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: #3d6b5e;
+    flex-shrink: 0;
+  }
+
+  .blog-featured-title {
+    margin: 0 0 16px;
+    font-size: clamp(1.45rem, 2.2vw, 2.1rem);
     font-weight: 860;
-    letter-spacing: -0.015em;
-    line-height: 1.15;
+    letter-spacing: -0.025em;
+    line-height: 1.1;
+    color: var(--ink);
     text-wrap: balance;
   }
-  .journal-excerpt {
-    margin: 0 0 16px;
-    color: #4b5a55;
+  .blog-featured-excerpt {
+    margin: 0 0 28px;
+    color: var(--ink-muted);
     font-size: 15px;
-    line-height: 1.68;
+    line-height: 1.78;
   }
-  .journal-read-more {
+  .blog-featured-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--ink-dim);
+    font-size: 12.5px;
+    font-weight: 700;
+    margin-bottom: 28px;
+  }
+  .blog-featured-meta-dot {
+    width: 3px; height: 3px;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0.4;
+    flex-shrink: 0;
+  }
+  .blog-featured-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 42px;
+    padding: 0 20px;
+    border: 1px solid rgba(18,24,22,0.1);
+    border-radius: var(--radius-sm);
+    background: rgba(255,255,255,0.85);
+    color: var(--ink);
+    font-size: 13px;
+    font-weight: 820;
+    width: fit-content;
+    transition: background var(--transition), transform var(--transition), box-shadow var(--transition);
+  }
+  .blog-featured:hover .blog-featured-cta {
+    background: #ffffff;
+    transform: translateX(4px);
+    box-shadow: 0 6px 20px rgba(18,24,22,0.07);
+  }
+
+  /* ── SECONDARY GRID ───────────────────────────────────────────────────────── */
+  .blog-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 12px;
+  }
+
+  /* ── POST CARD ────────────────────────────────────────────────────────────── */
+  .blog-card {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-md);
+    background: var(--bg-white);
+    overflow: hidden;
+    box-shadow: var(--glass-shadow);
+    text-decoration: none;
+    color: inherit;
+    transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition);
+  }
+  .blog-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 16px 40px rgba(18, 24, 22, 0.09);
+    border-color: rgba(18, 24, 22, 0.12);
+  }
+
+  .blog-card-media {
+    overflow: hidden;
+    background: #dfe8e4;
+    aspect-ratio: 4 / 3;
+  }
+  .blog-card-media img {
+    width: 100%; height: 100%;
+    display: block; object-fit: cover;
+    transition: transform 0.7s cubic-bezier(0.22,1,0.36,1);
+  }
+  .blog-card:hover .blog-card-media img { transform: scale(1.05); }
+
+  .blog-card-media-empty {
+    width: 100%; height: 100%;
+    background:
+      radial-gradient(ellipse 80% 80% at 50% 50%, rgba(162,210,196,0.15) 0%, transparent 70%),
+      #e8efec;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .blog-card-body {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    padding: 22px 24px 26px;
+  }
+  .blog-card-date {
+    margin: 0 0 10px;
+    color: var(--ink-dim);
+    font-size: 11.5px;
+    font-weight: 820;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .blog-card-title {
+    margin: 0 0 12px;
+    font-size: clamp(1rem, 1.4vw, 1.13rem);
+    font-weight: 860;
+    letter-spacing: -0.015em;
+    line-height: 1.2;
+    color: var(--ink);
+    text-wrap: balance;
+    flex: 1;
+  }
+  .blog-card-excerpt {
+    margin: 0 0 18px;
+    color: var(--ink-muted);
+    font-size: 13.5px;
+    line-height: 1.7;
+  }
+  .blog-card-cta {
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    min-height: 34px;
-    padding: 0 12px;
-    border: 1px solid rgba(112, 139, 133, 0.22);
-    border-radius: 8px;
-    background: rgba(246, 250, 248, 0.94);
-    color: #4f6d67;
-    font-size: 13px;
+    color: #3d6b5e;
+    font-size: 12.5px;
     font-weight: 820;
+    margin-top: auto;
+    transition: gap var(--transition);
+  }
+  .blog-card:hover .blog-card-cta { gap: 9px; }
+
+  /* ── PHOTO COUNT CHIP ─────────────────────────────────────────────────────── */
+  .blog-photo-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 9px;
+    border-radius: 100px;
+    background: rgba(18,24,22,0.05);
+    color: var(--ink-dim);
+    font-size: 11px;
+    font-weight: 760;
+    margin-left: 4px;
   }
 
-  /* ── EMPTY STATE ─────────────────────────────────────────────────────────── */
-  .journal-empty {
-    padding: 72px 28px;
+  /* ── EMPTY STATE ──────────────────────────────────────────────────────────── */
+  .blog-empty {
+    padding: 100px 32px;
     text-align: center;
-    border: 1px solid rgba(18, 24, 22, 0.08);
-    border-radius: 14px;
-    background: rgba(255, 255, 255, 0.78);
-    color: #667f79;
-    font-size: 17px;
-    line-height: 1.7;
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-lg);
+    background: rgba(255, 255, 255, 0.72);
+    backdrop-filter: var(--blur);
+    -webkit-backdrop-filter: var(--blur);
+  }
+  .blog-empty-title {
+    margin: 16px 0 8px;
+    font-size: 1.2rem;
+    font-weight: 860;
+    color: var(--ink);
+  }
+  .blog-empty-copy {
+    margin: 0;
+    color: var(--ink-muted);
+    font-size: 15px;
   }
 
-  /* ── RESPONSIVE ──────────────────────────────────────────────────────────── */
-  @media (max-width: 760px) {
-    .journal-shell { width: min(1180px, calc(100% - 36px)); }
-    .journal-hero { padding: 100px 0 52px; }
-    .journal-hero-title { font-size: clamp(2.6rem, 12vw, 4rem); }
-    .journal-hero-sub { font-size: 15px; }
-    .journal-row { grid-template-columns: 1fr; gap: 16px; padding: 18px; }
-    .journal-num { display: none; }
-    .journal-post-title { font-size: 1.25rem; }
-    .journal-list { padding-top: 24px; }
+  /* ── RESPONSIVE ───────────────────────────────────────────────────────────── */
+  @media (max-width: 960px) {
+    .blog-featured { grid-template-columns: 1fr; }
+    .blog-featured-media { min-height: 300px; max-height: 360px; }
+    .blog-featured-body { padding: 30px 32px 36px; justify-content: flex-start; }
+    .blog-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 600px) {
+    .blog-page { padding-top: 80px; }
+    .blog-hero { padding: 60px 0 52px; }
+    .blog-hero-title, .blog-hero-title-light { font-size: clamp(3rem, 14vw, 4.5rem); }
+    .blog-list { padding: 48px 0 80px; }
+    .blog-grid { grid-template-columns: 1fr; }
+    .blog-featured-body { padding: 24px 22px 28px; }
   }
 `;
 
 export default async function ProfessionalBlogPage() {
   const posts = await getBlogPostsByCategory("professional");
+  const [featured, ...rest] = posts;
 
   return (
-    <main className="journal-page">
+    <main className="blog-page">
       <style>{CSS}</style>
 
-      {/* ── HERO ───────────────────────────────────────────────────────────────
-           Light gradient header. Edit h1 and p text directly below. */}
-      <section className="journal-hero">
-        <div className="journal-shell">
-          <p className="journal-hero-kicker">Journal</p>
-          <h1 className="journal-hero-title">Session notes &amp; stories.</h1>
-          <p className="journal-hero-sub">
+      {/* ── HERO ─────────────────────────────────────────────────────────── */}
+      <section className="blog-hero">
+        <div className="blog-shell">
+          <div className="blog-hero-kicker">
+            <span className="blog-hero-kicker-dot" />
+            Journal
+          </div>
+
+          <h1 className="blog-hero-heading">
+            <span className="blog-hero-title">Session notes</span>
+            <span className="blog-hero-title-light">&amp; stories.</span>
+          </h1>
+
+          <p className="blog-hero-sub">
             Recent work, notes from sessions, and the quieter details behind the frame.
           </p>
+
+          <span className="blog-hero-rule" />
         </div>
       </section>
 
-      {/* ── POST LIST ──────────────────────────────────────────────────────────
-           Posts fetched from Supabase (category: "professional").
-           Each row: number, cover photo, date + title + excerpt + read more. */}
-      <section className="journal-list">
-        <div className="journal-shell">
-          {posts.length > 0 ? (
-            posts.map((post, index) => (
-              <Link key={post.id} href={`/blog/${post.slug}`} className="journal-row glass-shimmer"
-                data-reveal data-delay={String(Math.min(index + 1, 5))}>
-                <span className="journal-num">{String(index + 1).padStart(2, "0")}</span>
-                <div className="journal-cover">
-                  {post.cover_image_url ? (
-                    <img src={post.cover_image_url} alt={post.title} loading="lazy" decoding="async" />
-                  ) : (
-                    <div style={{ width: "100%", height: "100%", background: "#dfe8e4" }} />
-                  )}
-                </div>
-                <div>
-                  <p className="journal-date">{formatDate(post.published_at)}</p>
-                  <h2 className="journal-post-title">{post.title}</h2>
-                  <p className="journal-excerpt">{excerpt(post.meta_description || post.body)}</p>
-                  <span className="journal-read-more">Read the story →</span>
-                </div>
-              </Link>
-            ))
-          ) : (
-            <div className="journal-empty">
-              <p>No case studies yet. Check back after grad season.</p>
+      {/* ── POSTS ────────────────────────────────────────────────────────── */}
+      <section className="blog-list">
+        <div className="blog-shell">
+          {posts.length === 0 ? (
+            <div className="blog-empty" data-reveal>
+              <svg width="44" height="44" viewBox="0 0 44 44" fill="none" style={{ margin: "0 auto" }}>
+                <rect x="5" y="10" width="34" height="26" rx="4" stroke="#3d6b5e" strokeWidth="1.5" fill="none" />
+                <path d="M14 21h16M14 27h10" stroke="#3d6b5e" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+              <p className="blog-empty-title">No case studies yet.</p>
+              <p className="blog-empty-copy">Check back after grad season.</p>
             </div>
+          ) : (
+            <>
+              {/* ── FEATURED (first post) ─────────────────────────────── */}
+              {featured && (
+                <Link
+                  href={`/blog/${featured.slug}`}
+                  className="blog-featured glass-shimmer"
+                  data-reveal
+                >
+                  <div className="blog-featured-media">
+                    {featured.cover_image_url ? (
+                      <img
+                        src={featured.cover_image_url}
+                        alt={featured.title}
+                        loading="eager"
+                        decoding="async"
+                      />
+                    ) : (
+                      <div className="blog-featured-media-empty">
+                        <svg width="52" height="52" viewBox="0 0 52 52" fill="none" opacity="0.25">
+                          <rect x="4" y="10" width="44" height="32" rx="4" stroke="#3d6b5e" strokeWidth="1.5" fill="none" />
+                          <circle cx="17" cy="22" r="5" stroke="#3d6b5e" strokeWidth="1.5" fill="none" />
+                          <path d="M4 36l12-9 10 7 9-6 13 10" stroke="#3d6b5e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="blog-featured-body">
+                    <span className="blog-featured-label">
+                      <span className="blog-featured-label-dot" />
+                      Latest story
+                    </span>
+
+                    <h2 className="blog-featured-title">{featured.title}</h2>
+
+                    <p className="blog-featured-excerpt">
+                      {excerpt(featured.meta_description || featured.body, 170)}
+                    </p>
+
+                    <div className="blog-featured-meta">
+                      <span>{formatDate(featured.published_at)}</span>
+                      {(featured.extra_image_urls?.length ?? 0) > 0 && (
+                        <>
+                          <span className="blog-featured-meta-dot" />
+                          <span>{(featured.extra_image_urls?.length ?? 0) + 1} photos</span>
+                        </>
+                      )}
+                    </div>
+
+                    <span className="blog-featured-cta">
+                      Read the story
+                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                        <path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </span>
+                  </div>
+                </Link>
+              )}
+
+              {/* ── SECONDARY GRID ───────────────────────────────────── */}
+              {rest.length > 0 && (
+                <div className="blog-grid">
+                  {rest.map((post, index) => (
+                    <Link
+                      key={post.id}
+                      href={`/blog/${post.slug}`}
+                      className="blog-card glass-shimmer"
+                      data-reveal
+                      data-delay={String(Math.min((index % 3) + 1, 5))}
+                    >
+                      <div className="blog-card-media">
+                        {post.cover_image_url ? (
+                          <img
+                            src={post.cover_image_url}
+                            alt={post.title}
+                            loading="lazy"
+                            decoding="async"
+                          />
+                        ) : (
+                          <div className="blog-card-media-empty">
+                            <svg width="34" height="34" viewBox="0 0 34 34" fill="none" opacity="0.25">
+                              <rect x="2" y="6" width="30" height="22" rx="3" stroke="#3d6b5e" strokeWidth="1.5" fill="none" />
+                              <circle cx="11" cy="14" r="3.5" stroke="#3d6b5e" strokeWidth="1.5" fill="none" />
+                              <path d="M2 24l8-6 7 5 6-4 9 7" stroke="#3d6b5e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="blog-card-body">
+                        <p className="blog-card-date">{formatDate(post.published_at)}</p>
+                        <h2 className="blog-card-title">{post.title}</h2>
+                        <p className="blog-card-excerpt">
+                          {excerpt(post.meta_description || post.body, 110)}
+                        </p>
+                        <span className="blog-card-cta">
+                          Read the story
+                          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                            <path d="M2 6.5h9M8 3l3.5 3.5L8 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        </span>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </div>
       </section>

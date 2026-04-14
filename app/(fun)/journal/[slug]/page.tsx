@@ -19,6 +19,7 @@ type BlogPost = {
   meta_keywords?: string | null;
   og_image_url?: string | null;
   category?: "professional" | "journal" | string | null;
+  sites?: string[] | null;
 };
 
 function formatDate(iso: string) {
@@ -48,14 +49,16 @@ export default function BlogPostPage({ params }: { params: Promise<{ slug: strin
           .from('blog_posts')
           .select('*')
           .eq('slug', slug)
-          .eq('category', 'journal')
+          .contains('sites', ['journal'])
           .single();
 
-        if (error && error.message?.toLowerCase().includes("category")) {
+        if (error) {
+          // Fall back to legacy category column
           const fallback = await supabase
             .from('blog_posts')
             .select('*')
             .eq('slug', slug)
+            .eq('category', 'journal')
             .single();
           data = fallback.data;
           error = fallback.error;
@@ -72,6 +75,23 @@ export default function BlogPostPage({ params }: { params: Promise<{ slug: strin
     }
     fetchPost();
   }, [slug]);
+
+  // If this post is also on the professional site, set canonical → /blog/[slug] for SEO
+  useEffect(() => {
+    if (!post) return;
+    const isAlsoProfessional = (post.sites ?? []).includes("professional");
+    if (!isAlsoProfessional) return;
+    const canonical = `${window.location.origin}/blog/${post.slug}`;
+    let link = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
+    const created = !link;
+    if (created) {
+      link = document.createElement('link');
+      link.rel = 'canonical';
+      document.head.appendChild(link);
+    }
+    link!.href = canonical;
+    return () => { if (created) link?.remove(); };
+  }, [post]);
 
   // Close lightbox on Escape
   useEffect(() => {

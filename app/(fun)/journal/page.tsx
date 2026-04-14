@@ -16,6 +16,7 @@ type BlogPost = {
   cover_image_url: string | null;
   extra_image_urls: string[];
   category?: "professional" | "journal" | string | null;
+  sites?: string[] | null;
 };
 
 const MARQUEE = ["Shoot Stories","Behind the Scenes","Bay Area","Real Sessions","What Worked","Golden Hour","Grad Season","Shoot Stories","Behind the Scenes","Bay Area","Real Sessions","What Worked","Golden Hour","Grad Season"];
@@ -53,13 +54,15 @@ export default function BlogPage() {
         let { data, error } = await supabase
           .from('blog_posts')
           .select('*')
-          .eq('category', 'journal')
+          .contains('sites', ['journal'])
           .order('published_at', { ascending: false });
 
-        if (error && error.message?.toLowerCase().includes("category")) {
+        if (error) {
+          // Fall back to legacy category column
           const fallback = await supabase
             .from('blog_posts')
             .select('*')
+            .eq('category', 'journal')
             .order('published_at', { ascending: false });
           data = fallback.data;
           error = fallback.error;
