@@ -1,3 +1,32 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// AVAILABILITY PAGE  →  soloxsnaps.com/availability
+// ─────────────────────────────────────────────────────────────────────────────
+// WHAT'S ON THIS PAGE (top to bottom):
+//   1. Hero     — heading + "X open this month" info panel
+//   2. Calendar — interactive month grid (dates from Supabase)
+//   3. Sidebar  — selected date details, upcoming dates, locations list
+//
+// HOW DATES WORK:
+//   Dates are managed in Supabase → Table: "professional_availability"
+//   Each row has: date (YYYY-MM-DD), status ("available"/"booked"/"hold"), note
+//   To add available dates: insert rows in that table via Supabase dashboard.
+//
+// DATE STATUS COLORS (change in the CSS section below):
+//   available → green-tinted  (rgba 112, 139, 133)
+//   hold      → yellow-green  (rgba 189, 214, 75)
+//   booked    → muted gray    (rgba 228, 234, 231)
+//
+// SIDEBAR LOCATIONS TEXT:
+//   Find the "Locations" sidebar panel near the bottom of the JSX.
+//   Edit the h3 text to change which campuses are listed.
+//
+// QUICK EDITS:
+//   → Hero heading:    find the h1 in the JSX
+//   → Hero copy text:  find the p below the h1
+//   → Legend labels:   find the array ["Available", "On hold", "Booked"] in JSX
+//   → Upcoming count:  .slice(0, 4) shows 4 upcoming dates in sidebar — change 4
+// ─────────────────────────────────────────────────────────────────────────────
+
 "use client";
 
 import { useEffect, useState } from "react";

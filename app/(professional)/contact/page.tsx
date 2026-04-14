@@ -1,9 +1,28 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// CONTACT PAGE  →  soloxsnaps.com/contact
+// ─────────────────────────────────────────────────────────────────────────────
+// WHAT'S ON THIS PAGE (top to bottom):
+//   1. Hero      — heading on left, photo on right
+//   2. Form      — name, email, phone, session type, date, message
+//   3. Sidebar   — response time, check dates link, Instagram link
+//
+// QUICK EDITS:
+//   → Hero photo:     change contactImage URL below
+//   → Session types:  edit the sessionTypes array below
+//   → Hero heading:   find the h1 in the JSX
+//   → Sidebar text:   find the contact-side-panel divs at the bottom of the JSX
+//   → Form fields:    each field is a .contact-field div in the form
+// ─────────────────────────────────────────────────────────────────────────────
+
 "use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
+// ── SESSION TYPE DROPDOWN OPTIONS ─────────────────────────────────────────────
+// These appear in the "Session type" select dropdown on the form.
+// Add or remove strings to change the options.
 const sessionTypes = [
   "Graduation Portrait",
   "Family Session",
@@ -13,9 +32,16 @@ const sessionTypes = [
   "Other",
 ];
 
+// ── HERO IMAGE ────────────────────────────────────────────────────────────────
+// The photo shown on the right side of the hero.
+// To change: upload a new photo to Supabase Storage and paste the URL here.
 const contactImage =
   "https://dmtslzwglpezympptqls.supabase.co/storage/v1/object/public/grad-photos/champagne-popping.jpg";
 
+// ── STYLES ────────────────────────────────────────────────────────────────────
+// To change the hero image height: find min-height in .contact-hero-media
+// To change the form panel width: find grid-template-columns in .contact-layout
+// To change button color: find color: #4f6d67 in .submit-btn / .contact-link
 const CSS = `
   .contact-page {
     padding-top: 98px;
@@ -315,6 +341,10 @@ export default function ContactPage() {
     <main className="contact-page">
       <style>{CSS}</style>
 
+      {/* ── HERO ──────────────────────────────────────────────────────────────
+           Left: heading, copy, chips. Right: contactImage photo.
+           To change the heading: edit the h1 text.
+           To change chips (tags): find the contact-chip spans below. */}
       <section className="contact-shell contact-hero">
         <div>
           <p className="contact-kicker">Start the booking note</p>
@@ -429,6 +459,10 @@ export default function ContactPage() {
           </form>
         </div>
 
+        {/* ── SIDEBAR ─────────────────────────────────────────────────────────
+             Three info panels to the right of the form.
+             To change text: edit the h2 and p content in each panel.
+             To add a panel: copy one of the contact-side-panel divs. */}
         <aside className="contact-sidebar" aria-label="Booking details">
           <div className="contact-side-panel">
             <p className="contact-kicker">Response time</p>
@@ -447,6 +481,7 @@ export default function ContactPage() {
           <div className="contact-side-panel">
             <p className="contact-kicker">Instagram</p>
             <h2>@soloxsnaps</h2>
+            {/* To change the Instagram handle/link: update both the URL and display text */}
             <p>
               <a href="https://www.instagram.com/soloxsnaps" target="_blank" rel="noopener noreferrer">See recent work</a>
             </p>

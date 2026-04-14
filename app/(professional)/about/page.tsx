@@ -1,3 +1,20 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// ABOUT PAGE  →  soloxsnaps.com/about
+// ─────────────────────────────────────────────────────────────────────────────
+// WHAT'S ON THIS PAGE (top to bottom):
+//   1. Page header — "I'm Chris." centered title
+//   2. Hero        — big portrait photo + intro paragraphs + "Work with me" button
+//   3. Approach    — 2-column layout: label+heading left, paragraphs right
+//   4. Process     — 3-step numbered list (Planning, Session, Delivery)
+//   5. CTA         — centered "Get in touch" button
+//
+// QUICK EDITS:
+//   → Portrait photo:    change the `portrait` URL below
+//   → Process steps:     edit the `process` array below (number, name, description)
+//   → Bio text:          find the p tags in the Hero section in the JSX
+//   → Approach text:     find the p tags in the Approach section
+// ─────────────────────────────────────────────────────────────────────────────
+
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -12,9 +29,16 @@ export const metadata: Metadata = {
   },
 };
 
+// ── PORTRAIT PHOTO ────────────────────────────────────────────────────────────
+// The large photo shown in the hero (left column).
+// To change: upload a new photo to Supabase Storage and paste the URL here.
 const portrait =
   "https://dmtslzwglpezympptqls.supabase.co/storage/v1/object/public/grad-photos/DSC02593_(2).jpg";
 
+// ── PROCESS STEPS ─────────────────────────────────────────────────────────────
+// The numbered steps shown in the "How it works" section.
+// Format: ["number", "Step name", "Description text"]
+// To add a step: add another array. To rename: edit the strings.
 const process = [
   ["01", "Planning",  "Location, timing, outfit notes, and the reason for the session get set before we shoot."],
   ["02", "Session",   "I give clear direction, then leave enough room for the in-between moments to happen naturally."],

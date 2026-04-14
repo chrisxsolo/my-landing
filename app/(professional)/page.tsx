@@ -1,3 +1,26 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// HOME PAGE  →  soloxsnaps.com
+// ─────────────────────────────────────────────────────────────────────────────
+// WHAT'S ON THIS PAGE (top to bottom):
+//   1. Hero Carousel   — full-width sliding photo carousel
+//   2. Services cards  — 3 cards: Grads, Families, Contact (booking)
+//   3. Editorial       — left copy + stacked photos on right
+//   4. Proof strip     — 4 session highlight facts
+//   5. CTA panel       — "Lock the date" with photo + buttons
+//   6. Instagram strip — 8 thumbnail photos linking to Instagram
+//
+// QUICK EDITS:
+//   → Hero carousel photos: Supabase → portfolio_images → set hero_carousel = true
+//                           Up to 5 images are used (slice(0, 5))
+//   → Service card text:    find portfolioSections.map() in the JSX — edit copy/subline
+//   → Proof strip items:    find the array [["01", "Direction", ...], ...] in JSX
+//   → CTA heading/copy:     find the home-cta section near the bottom of JSX
+//   → Instagram grid count: change .slice(0, 8) to show more/fewer thumbnails
+//   → Instagram handle:     search for "soloxsnaps" to find all occurrences
+//   → Which categories show as cards:
+//       change visiblePortfolioSlugs below (slugs must match Supabase category slugs)
+// ─────────────────────────────────────────────────────────────────────────────
+
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getPortfolioData, getSiteSettings, type PortfolioCategory, type PortfolioImage } from "@/lib/professionalData";
@@ -8,8 +31,15 @@ export const dynamic = "force-dynamic";
 const title = "soloxsnaps | Bay Area Graduation and Family Photographer";
 const description =
   "Bay Area graduation and family photography by Chris Solorzano. Clean direction, warm portraits, and galleries built around real milestones.";
+// ── FALLBACK IMAGE ────────────────────────────────────────────────────────────
+// Used when no portfolio image is found. To change: paste a new Supabase URL.
 const profileImage =
   "https://dmtslzwglpezympptqls.supabase.co/storage/v1/object/public/grad-photos/DSC02593_(2).jpg";
+
+// ── VISIBLE SERVICE CARDS ─────────────────────────────────────────────────────
+// Controls which portfolio categories appear as cards in the "Choose the session" section.
+// Values must match the `slug` column in Supabase portfolio_categories table.
+// Order matters — first slug = first card.
 const visiblePortfolioSlugs = ["grads", "families"];
 
 export const metadata: Metadata = {
