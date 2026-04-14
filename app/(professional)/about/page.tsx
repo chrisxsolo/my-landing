@@ -2,17 +2,18 @@
 // ABOUT PAGE  →  soloxsnaps.com/about
 // ─────────────────────────────────────────────────────────────────────────────
 // WHAT'S ON THIS PAGE (top to bottom):
-//   1. Page header — "I'm Chris." centered title
-//   2. Hero        — big portrait photo + intro paragraphs + "Work with me" button
-//   3. Approach    — 2-column layout: label+heading left, paragraphs right
-//   4. Process     — 3-step numbered list (Planning, Session, Delivery)
-//   5. CTA         — centered "Get in touch" button
+//   1. Hero      — light gray/glass header with "I'm Chris." title
+//   2. Bio       — portrait photo (left) + bio text (right) on white
+//   3. Approach  — 2-column: label/heading left, paragraphs right
+//   4. Process   — numbered steps (Planning, Session, Delivery), glass cards
+//   5. CTA strip — "Ready to work together?" frosted glass panel
 //
 // QUICK EDITS:
-//   → Portrait photo:    change the `portrait` URL below
-//   → Process steps:     edit the `process` array below (number, name, description)
-//   → Bio text:          find the p tags in the Hero section in the JSX
-//   → Approach text:     find the p tags in the Approach section
+//   → Portrait photo:   change the `portrait` URL constant below
+//   → Process steps:    edit the `process` array below
+//   → Bio paragraphs:   find the Bio section in JSX and edit the <p> tags
+//   → Approach text:    find the Approach section in JSX and edit the <p> tags
+//   → Hero title:       find "I'm Chris." in the hero JSX
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { Metadata } from "next";
@@ -30,15 +31,12 @@ export const metadata: Metadata = {
 };
 
 // ── PORTRAIT PHOTO ────────────────────────────────────────────────────────────
-// The large photo shown in the hero (left column).
-// To change: upload a new photo to Supabase Storage and paste the URL here.
+// To change: upload to Supabase Storage and paste the URL here.
 const portrait =
   "https://dmtslzwglpezympptqls.supabase.co/storage/v1/object/public/grad-photos/DSC02593_(2).jpg";
 
 // ── PROCESS STEPS ─────────────────────────────────────────────────────────────
-// The numbered steps shown in the "How it works" section.
-// Format: ["number", "Step name", "Description text"]
-// To add a step: add another array. To rename: edit the strings.
+// Format: ["number", "Step name", "Description"]
 const process = [
   ["01", "Planning",  "Location, timing, outfit notes, and the reason for the session get set before we shoot."],
   ["02", "Session",   "I give clear direction, then leave enough room for the in-between moments to happen naturally."],
@@ -46,167 +44,354 @@ const process = [
 ];
 
 const CSS = `
-  .about-pro-img { transition: transform 0.7s ease; }
-  .about-pro-wrap:hover .about-pro-img { transform: scale(1.03); }
-  .pro-step:not(:last-child) { border-bottom: 1px solid rgba(0,0,0,0.07); }
-  @media (max-width: 720px) {
-    .about-hero-grid { grid-template-columns: 1fr !important; }
-    .about-approach-grid { grid-template-columns: 1fr !important; }
-    .about-process-grid { grid-template-columns: 1fr !important; }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes scaleIn {
+    from { opacity: 0; transform: scale(0.97); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+
+  /* ── PAGE ─────────────────────────────────────────────────────────────────── */
+  .about-page {
+    background: #f5f6f4;
+    color: #101412;
+    font-family: var(--font-dm-sans), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  .about-shell {
+    width: min(1180px, calc(100% - 48px));
+    margin: 0 auto;
+  }
+
+  /* ── HERO ─────────────────────────────────────────────────────────────────────
+     Light gradient hero — clean and airy.
+     padding-top: 120px clears the fixed nav bar + breathing room. */
+  .about-hero {
+    padding: 120px 0 72px;
+    background: linear-gradient(to bottom, #eaf0ec 0%, #f5f6f4 100%);
+    border-bottom: 1px solid rgba(18, 24, 22, 0.07);
+  }
+  .about-kicker {
+    margin: 0 0 16px;
+    color: #667f79;
+    font-size: 13px;
+    font-weight: 820;
+    animation: fadeUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .about-hero-title {
+    margin: 0;
+    color: #101412;
+    font-size: clamp(3.5rem, 9vw, 8rem);
+    font-weight: 900;
+    letter-spacing: -0.035em;
+    line-height: 0.88;
+    text-wrap: balance;
+    animation: fadeUp 0.65s 0.08s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .about-hero-sub {
+    margin: 22px 0 0;
+    color: #4b5a55;
+    font-size: 18px;
+    line-height: 1.7;
+    max-width: 460px;
+    animation: fadeUp 0.65s 0.16s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  /* ── BIO SECTION ─────────────────────────────────────────────────────────── */
+  .about-bio {
+    background: #ffffff;
+    padding: 80px 0 90px;
+  }
+  .about-bio-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    gap: 52px;
+    align-items: start;
+  }
+
+  /* Portrait photo */
+  .about-portrait-wrap {
+    overflow: hidden;
+    border-radius: 12px;
+    background: #dfe8e4;
+    box-shadow: 0 20px 60px rgba(18, 24, 22, 0.1);
+  }
+  .about-portrait-wrap img {
+    width: 100%; max-height: 680px;
+    object-fit: cover; display: block;
+    transition: transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .about-portrait-wrap:hover img { transform: scale(1.03); }
+
+  .about-bio-text { padding-top: 8px; }
+  .about-section-kicker {
+    margin: 0 0 16px;
+    color: #667f79;
+    font-size: 13px;
+    font-weight: 820;
+  }
+  .about-section-title {
+    margin: 0 0 24px;
+    color: #101412;
+    font-size: clamp(2rem, 4vw, 3rem);
+    font-weight: 880;
+    letter-spacing: -0.02em;
+    line-height: 0.98;
+    text-wrap: balance;
+  }
+  .about-body {
+    color: #4b5a55;
+    font-size: 17px;
+    line-height: 1.76;
+    margin: 0 0 20px;
+  }
+  .about-body:last-of-type { margin-bottom: 34px; }
+
+  /* ── BUTTON (shared) ─────────────────────────────────────────────────────── */
+  .about-link {
+    min-height: 46px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 20px;
+    border: 1px solid rgba(112, 139, 133, 0.22);
+    border-radius: 8px;
+    background: rgba(246, 250, 248, 0.94);
+    color: #4f6d67;
+    box-shadow: 0 8px 24px rgba(112, 139, 133, 0.05);
+    font-size: 14px;
+    font-weight: 820;
+    text-decoration: none;
+    transition: background 0.18s ease, transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+  }
+  .about-link:hover {
+    transform: translateY(-1px);
+    border-color: rgba(112, 139, 133, 0.32);
+    background: rgba(239, 246, 244, 0.98);
+    box-shadow: 0 12px 28px rgba(112, 139, 133, 0.07);
+  }
+  .about-link[data-ghost] {
+    border-color: rgba(18, 24, 22, 0.12);
+    background: rgba(255, 255, 255, 0.72);
+    color: #101412;
+    box-shadow: none;
+  }
+  .about-link[data-ghost]:hover {
+    background: #ffffff;
+    box-shadow: 0 10px 22px rgba(18, 24, 22, 0.06);
+  }
+
+  /* ── APPROACH SECTION ────────────────────────────────────────────────────── */
+  .about-approach {
+    background: #f5f6f4;
+    padding: 90px 0;
+    border-top: 1px solid rgba(18, 24, 22, 0.07);
+  }
+  .about-approach-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 0.65fr) minmax(0, 1.35fr);
+    gap: 72px;
+    align-items: start;
+  }
+  .about-approach-label { position: sticky; top: 110px; }
+  .about-approach-body p {
+    color: #4b5a55;
+    font-size: 17px;
+    line-height: 1.76;
+    margin: 0 0 22px;
+  }
+  .about-approach-body p:last-child { margin-bottom: 0; }
+
+  /* ── PROCESS SECTION ─────────────────────────────────────────────────────── */
+  .about-process {
+    background: #ffffff;
+    padding: 90px 0;
+    border-top: 1px solid rgba(18, 24, 22, 0.07);
+  }
+  .about-process-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 0.65fr) minmax(0, 1.35fr);
+    gap: 72px;
+    align-items: start;
+  }
+  .about-process-label { position: sticky; top: 110px; }
+
+  /* Each numbered step — glass card */
+  .about-step {
+    display: grid;
+    grid-template-columns: 80px 1fr;
+    gap: 20px;
+    padding: 28px;
+    margin-bottom: 12px;
+    border: 1px solid rgba(18, 24, 22, 0.08);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.82);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 6px 20px rgba(18, 24, 22, 0.05);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    align-items: start;
+  }
+  .about-step:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 32px rgba(18, 24, 22, 0.08);
+  }
+  .about-step:last-child { margin-bottom: 0; }
+  .about-step-num {
+    color: rgba(18, 24, 22, 0.15);
+    font-size: 2.2rem;
+    font-weight: 900;
+    line-height: 1;
+    letter-spacing: -0.04em;
+  }
+  .about-step-name {
+    margin: 0 0 8px;
+    color: #101412;
+    font-size: 18px;
+    font-weight: 860;
+    letter-spacing: -0.01em;
+    line-height: 1.1;
+  }
+  .about-step-body {
+    margin: 0;
+    color: #4b5a55;
+    font-size: 15px;
+    line-height: 1.68;
+  }
+
+  /* ── BOTTOM CTA ──────────────────────────────────────────────────────────── */
+  .about-cta {
+    background: #f5f6f4;
+    padding: 80px 0 100px;
+    border-top: 1px solid rgba(18, 24, 22, 0.07);
+    text-align: center;
+  }
+  /* Frosted glass CTA card */
+  .about-cta-card {
+    display: inline-block;
+    padding: 48px 56px;
+    border: 1px solid rgba(18, 24, 22, 0.09);
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.82);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow: 0 12px 40px rgba(18, 24, 22, 0.07);
+    text-align: center;
+    max-width: 580px;
+  }
+  .about-cta-title {
+    margin: 0 0 10px;
+    color: #101412;
+    font-size: clamp(1.6rem, 3.5vw, 2.6rem);
+    font-weight: 880;
+    letter-spacing: -0.02em;
+    line-height: 1.05;
+    text-wrap: balance;
+  }
+  .about-cta-sub {
+    margin: 0 0 28px;
+    color: #4b5a55;
+    font-size: 16px;
+    line-height: 1.65;
+  }
+  .about-cta-buttons {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  /* ── RESPONSIVE ──────────────────────────────────────────────────────────── */
+  @media (max-width: 900px) {
+    .about-bio-grid,
+    .about-approach-grid,
+    .about-process-grid { grid-template-columns: 1fr; gap: 40px; }
+    .about-approach-label,
+    .about-process-label { position: static; }
+  }
+  @media (max-width: 760px) {
+    .about-shell { width: min(1180px, calc(100% - 36px)); }
+    .about-bio, .about-approach, .about-process { padding: 62px 0 70px; }
+    .about-hero { padding: 100px 0 56px; }
+    .about-hero-title { font-size: clamp(2.6rem, 12vw, 4rem); }
+    .about-hero-sub { font-size: 16px; }
+    .about-body, .about-approach-body p { font-size: 16px; }
+    .about-section-title { font-size: 26px; }
+    .about-step { grid-template-columns: 52px 1fr; padding: 20px; }
+    .about-step-num { font-size: 1.6rem; }
+    .about-cta-card { padding: 36px 28px; }
   }
 `;
 
 export default function ProfessionalAboutPage() {
   return (
-    <main style={{ background: "#fff", color: "#1a1a1a", paddingTop: 80 }}>
+    <main className="about-page">
       <style>{CSS}</style>
 
-      {/* ── PAGE HEADER ── */}
-      <section style={{ padding: "80px 60px 80px", textAlign: "center" }}>
-        <p style={{
-          fontFamily: "Georgia, 'Times New Roman', serif",
-          fontSize: "0.7rem",
-          letterSpacing: "0.28em",
-          textTransform: "uppercase",
-          color: "#555",
-          marginBottom: 20,
-        }}>
-          All about Chris
-        </p>
-        <h1 style={{
-          fontFamily: "Georgia, 'Times New Roman', serif",
-          fontSize: "clamp(2.5rem, 7vw, 6rem)",
-          fontWeight: 300,
-          letterSpacing: "0.06em",
-          color: "#111",
-          lineHeight: 1.05,
-          margin: "0 auto 28px",
-          maxWidth: 800,
-        }}>
-          I&rsquo;m Chris.
-        </h1>
-        <div style={{ width: 36, height: 1, background: "rgba(0,0,0,0.15)", margin: "0 auto" }} />
+      {/* ── HERO ──────────────────────────────────────────────────────────────────
+           Light gradient header — airy and clean.
+           TO CHANGE: edit h1 and p.about-hero-sub text below. */}
+      <section className="about-hero">
+        <div className="about-shell">
+          <p className="about-kicker">About</p>
+          <h1 className="about-hero-title">I&rsquo;m Chris.</h1>
+          <p className="about-hero-sub">
+            Bay Area photographer. Graduation portraits, families, and people worth documenting.
+          </p>
+        </div>
       </section>
 
-      {/* ── HERO — photo + intro text ── */}
-      <section style={{ padding: "0 60px 100px", maxWidth: 1200, margin: "0 auto" }}>
-        <div className="about-hero-grid" style={{
-          display: "grid",
-          gridTemplateColumns: "1.1fr 0.9fr",
-          gap: "72px",
-          alignItems: "end",
-        }}>
-          <div className="about-pro-wrap" style={{ overflow: "hidden" }}>
-            <img
-              src={portrait}
-              alt="Chris Solorzano"
-              className="about-pro-img"
-              style={{ width: "100%", maxHeight: 780, objectFit: "cover", display: "block" }}
-            />
+      {/* ── BIO ───────────────────────────────────────────────────────────────────
+           Portrait photo (left) + bio paragraphs (right).
+           Portrait URL: change the `portrait` constant at the top of this file. */}
+      <section className="about-bio">
+        <div className="about-shell about-bio-grid">
+          <div className="about-portrait-wrap"
+            style={{ animation: "scaleIn 0.8s 0.1s cubic-bezier(0.22,1,0.36,1) both" }}>
+            <img src={portrait} alt="Chris Solorzano" loading="eager" decoding="async" />
           </div>
-          <div style={{ paddingBottom: 16 }}>
-            <p style={{
-              fontFamily: "Georgia, 'Times New Roman', serif",
-              fontStyle: "italic",
-              fontSize: "1rem",
-              color: "#555",
-              marginBottom: 16,
-            }}>
-              photographer, bay area
+          <div className="about-bio-text">
+            <p className="about-section-kicker">Photographer, Bay Area</p>
+            <h2 className="about-section-title">Clean direction. Real moments.</h2>
+            {/* ── Edit bio text here ── */}
+            <p className="about-body">
+              I photograph people with a clean, direct style built around light, timing, and calm
+              direction. The work is polished, but the session should still feel like a real person
+              made space for you.
             </p>
-            <p style={{
-              fontFamily: "Georgia, 'Times New Roman', serif",
-              fontSize: "1.1rem",
-              lineHeight: 1.9,
-              color: "#555",
-              marginBottom: 32,
-            }}>
-              I photograph people with a clean, direct style built around light, timing,
-              and calm direction. The work is polished, but the session should still feel
-              like a real person made space for you.
+            <p className="about-body">
+              My work spans Bay Area graduation portraits, families, individual portraits, and creative
+              sessions. The common thread: strong light, clean composition, and images that still feel
+              like the moment.
             </p>
-            <p style={{
-              fontFamily: "Georgia, 'Times New Roman', serif",
-              fontSize: "1.1rem",
-              lineHeight: 1.9,
-              color: "#555",
-              marginBottom: 40,
-            }}>
-              My work spans Bay Area graduation portraits, families, individual portraits,
-              and creative sessions. The common thread is simple: strong light, clean
-              composition, and images that still feel like the moment.
-            </p>
-            <Link
-              href="/contact"
-              style={{
-                fontFamily: "Georgia, 'Times New Roman', serif",
-                fontSize: "0.78rem",
-                letterSpacing: 0,
-                color: "#4f6d67",
-                background: "rgba(246, 250, 248, 0.94)",
-                border: "1px solid rgba(112, 139, 133, 0.22)",
-                borderRadius: 8,
-                boxShadow: "0 10px 24px rgba(112, 139, 133, 0.05)",
-                padding: "14px 32px",
-                textDecoration: "none",
-                display: "inline-block",
-                fontWeight: 820,
-              }}
-            >
-              Work with me
-            </Link>
+            <Link href="/contact" className="about-link">Work with me</Link>
           </div>
         </div>
       </section>
 
-      {/* ── APPROACH ── */}
-      <section style={{
-        borderTop: "1px solid rgba(0,0,0,0.07)",
-        padding: "100px 60px",
-        maxWidth: 1200,
-        margin: "0 auto",
-      }}>
-        <div className="about-approach-grid" style={{
-          display: "grid",
-          gridTemplateColumns: "0.65fr 1.35fr",
-          gap: "80px",
-          alignItems: "start",
-        }}>
-          <div>
-            <p style={{
-              fontFamily: "Georgia, 'Times New Roman', serif",
-              fontSize: "0.7rem",
-              letterSpacing: "0.28em",
-              textTransform: "uppercase",
-              color: "#555",
-              marginBottom: 20,
-            }}>
-              Approach
-            </p>
-            <h2 style={{
-              fontFamily: "Georgia, 'Times New Roman', serif",
-              fontSize: "clamp(1.6rem, 3.5vw, 3rem)",
-              fontWeight: 300,
-              letterSpacing: "0.04em",
-              color: "#111",
-              lineHeight: 1.2,
-              margin: 0,
-            }}>
-              Direction without the stiffness.
-            </h2>
+      {/* ── APPROACH ─────────────────────────────────────────────────────────────
+           2-column layout: sticky label (left), paragraphs (right).
+           To change text: edit the <p> tags inside about-approach-body. */}
+      <section className="about-approach">
+        <div className="about-shell about-approach-grid">
+          <div className="about-approach-label">
+            <p className="about-section-kicker">Approach</p>
+            <h2 className="about-section-title">Direction without the stiffness.</h2>
           </div>
-          <div>
-            <p style={{ fontFamily: "Georgia, 'Times New Roman', serif", fontSize: "1.05rem", lineHeight: 1.9, color: "#555", marginBottom: 24 }}>
+          <div className="about-approach-body">
+            {/* ── Edit approach paragraphs here ── */}
+            <p>
               Sessions are built to feel clear and easy. I help with posing, pacing, location choices,
               and small adjustments so the final gallery feels intentional without flattening the person
               in front of the camera.
             </p>
-            <p style={{ fontFamily: "Georgia, 'Times New Roman', serif", fontSize: "1.05rem", lineHeight: 1.9, color: "#555", marginBottom: 24 }}>
+            <p>
               My work spans Bay Area graduation portraits, individual portraits, small events, and
               creative sessions. The common thread: strong light, clean composition, and images that
               still feel like the moment.
             </p>
-            <p style={{ fontFamily: "Georgia, 'Times New Roman', serif", fontSize: "1.05rem", lineHeight: 1.9, color: "#555" }}>
+            <p>
               soloxsnaps is the professional home for that work. The warmer guides and behind-the-scenes
               journal live on the fun side of the site.
             </p>
@@ -214,72 +399,23 @@ export default function ProfessionalAboutPage() {
         </div>
       </section>
 
-      {/* ── PROCESS ── */}
-      <section style={{
-        borderTop: "1px solid rgba(0,0,0,0.07)",
-        padding: "100px 60px",
-        maxWidth: 1200,
-        margin: "0 auto",
-      }}>
-        <div className="about-process-grid" style={{
-          display: "grid",
-          gridTemplateColumns: "0.65fr 1.35fr",
-          gap: "80px",
-          alignItems: "start",
-        }}>
-          <div>
-            <p style={{
-              fontFamily: "Georgia, 'Times New Roman', serif",
-              fontSize: "0.7rem",
-              letterSpacing: "0.28em",
-              textTransform: "uppercase",
-              color: "#555",
-              marginBottom: 20,
-            }}>
-              How it works
-            </p>
-            <h2 style={{
-              fontFamily: "Georgia, 'Times New Roman', serif",
-              fontSize: "clamp(1.6rem, 3.5vw, 3rem)",
-              fontWeight: 300,
-              letterSpacing: "0.04em",
-              color: "#111",
-              lineHeight: 1.2,
-              margin: 0,
-            }}>
-              A simple rhythm from first note to final gallery.
-            </h2>
+      {/* ── PROCESS ───────────────────────────────────────────────────────────────
+           Numbered glass cards. Defined in the `process` array at top of file.
+           To add a step: add another entry to `process`. */}
+      <section className="about-process">
+        <div className="about-shell about-process-grid">
+          <div className="about-process-label">
+            <p className="about-section-kicker">How it works</p>
+            <h2 className="about-section-title">A simple rhythm from first note to final gallery.</h2>
           </div>
           <div>
-            {process.map(([number, name, body]) => (
-              <div key={name} className="pro-step" style={{ padding: "32px 0" }}>
-                <div style={{ display: "grid", gridTemplateColumns: "80px 1fr", gap: 24, alignItems: "start" }}>
-                  <p style={{
-                    fontFamily: "Georgia, 'Times New Roman', serif",
-                    fontSize: "2rem",
-                    fontWeight: 300,
-                    color: "#555",
-                    margin: 0,
-                    lineHeight: 1,
-                  }}>
-                    {number}
-                  </p>
-                  <div>
-                    <h3 style={{
-                      fontFamily: "Georgia, 'Times New Roman', serif",
-                      fontSize: "1.2rem",
-                      fontWeight: 400,
-                      letterSpacing: "0.1em",
-                      textTransform: "uppercase",
-                      color: "#1a1a1a",
-                      margin: "0 0 10px",
-                    }}>
-                      {name}
-                    </h3>
-                    <p style={{ fontSize: "0.9rem", lineHeight: 1.75, color: "#555", margin: 0 }}>
-                      {body}
-                    </p>
-                  </div>
+            {process.map(([number, name, body], i) => (
+              <div key={name} className="about-step"
+                style={{ animation: `fadeUp 0.55s ${0.1 + i * 0.1}s cubic-bezier(0.22,1,0.36,1) both` }}>
+                <span className="about-step-num">{number}</span>
+                <div>
+                  <h3 className="about-step-name">{name}</h3>
+                  <p className="about-step-body">{body}</p>
                 </div>
               </div>
             ))}
@@ -287,38 +423,20 @@ export default function ProfessionalAboutPage() {
         </div>
       </section>
 
-      {/* ── CTA ── */}
-      <section style={{
-        borderTop: "1px solid rgba(0,0,0,0.07)",
-        padding: "100px 60px",
-        textAlign: "center",
-        background: "#fff",
-      }}>
-        <p style={{
-          fontFamily: "Georgia, 'Times New Roman', serif",
-          fontStyle: "italic",
-          fontSize: "clamp(1.1rem, 2.5vw, 1.5rem)",
-          color: "#555",
-          marginBottom: 36,
-          maxWidth: 560,
-          margin: "0 auto 36px",
-          lineHeight: 1.7,
-        }}>
-          Ready to see what this could look like for you?
-        </p>
-        <div style={{ display: "flex", gap: 16, justifyContent: "center", flexWrap: "wrap" }}>
-          <Link href="/contact" style={{
-            fontFamily: "Georgia, 'Times New Roman', serif",
-            fontSize: "0.75rem",
-            letterSpacing: "0.18em",
-            textTransform: "uppercase",
-            color: "#1a1a1a",
-            border: "1px solid rgba(0,0,0,0.2)",
-            padding: "14px 32px",
-            textDecoration: "none",
-          }}>
-            Get in touch
-          </Link>
+      {/* ── CTA STRIP ─────────────────────────────────────────────────────────────
+           Frosted glass card centered on light gray background. */}
+      <section className="about-cta">
+        <div className="about-shell">
+          <div style={{ display: "flex", justifyContent: "center" }}>
+            <div className="about-cta-card">
+              <h2 className="about-cta-title">Ready to see what this could look like for you?</h2>
+              <p className="about-cta-sub">Share your date and session idea. I&rsquo;ll handle the rest.</p>
+              <div className="about-cta-buttons">
+                <Link href="/contact"  className="about-link">Get in touch</Link>
+                <Link href="/portfolio" className="about-link" data-ghost="">View the work</Link>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
     </main>
