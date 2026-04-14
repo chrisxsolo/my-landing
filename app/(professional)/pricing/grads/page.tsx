@@ -39,10 +39,10 @@ const CSS = pricingCSS({ mediaMinHeight: 620, mediaMinHeightMobile: 420, mediaOb
 // To add/remove items: edit this array. Format: { label, price }
 const addOns = [
   { label: "Additional outfit",                  price: "$75" },
-  { label: "Second nearby off-campus location",  price: "$25" },
+  { label: "Second nearby off-campus location",  price: "$125" },
   { label: "72-hour expedited delivery",          price: "$75" },
   { label: "Celebratory elements",               price: "On request" },
-  { label: "Extended time",                      price: "$50 / 30 min" },
+  { label: "Extended time",                      price: "$100 / 30 min" },
 ];
 
 // ── GROUP PRICING TABLE ───────────────────────────────────────────────────────
