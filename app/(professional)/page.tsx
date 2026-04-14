@@ -57,7 +57,7 @@ const CSS = `
   }
   .home-kicker {
     margin: 0 0 14px;
-    color: #008b8b;
+    color: #667f79;
     font-size: 13px;
     font-weight: 820;
   }
@@ -83,11 +83,11 @@ const CSS = `
     align-items: center;
     justify-content: center;
     padding: 0 17px;
-    border: 1px solid rgba(0, 166, 166, 0.3);
+    border: 1px solid rgba(112, 139, 133, 0.22);
     border-radius: 8px;
-    background: rgba(230, 251, 248, 0.95);
-    color: #005f5f;
-    box-shadow: 0 10px 24px rgba(0, 166, 166, 0.08);
+    background: rgba(246, 250, 248, 0.94);
+    color: #4f6d67;
+    box-shadow: 0 10px 24px rgba(112, 139, 133, 0.05);
     font-size: 14px;
     font-weight: 820;
     text-decoration: none;
@@ -101,18 +101,18 @@ const CSS = `
   }
   .home-link:hover {
     transform: translateY(-1px);
-    border-color: rgba(0, 166, 166, 0.46);
-    background: rgba(214, 247, 244, 0.98);
-    box-shadow: 0 14px 28px rgba(0, 166, 166, 0.12);
+    border-color: rgba(112, 139, 133, 0.32);
+    background: rgba(239, 246, 244, 0.98);
+    box-shadow: 0 14px 28px rgba(112, 139, 133, 0.07);
   }
   .home-link[data-variant="ghost"]:hover {
     background: #ffffff;
     box-shadow: 0 10px 22px rgba(18, 24, 22, 0.06);
   }
   .home-proof {
-    margin-top: -34px;
     position: relative;
-    z-index: 5;
+    z-index: 1;
+    padding: 0 0 96px;
   }
   .home-proof-grid {
     display: grid;
@@ -133,11 +133,11 @@ const CSS = `
     display: grid;
     align-content: space-between;
     border-right: 1px solid rgba(18, 24, 22, 0.1);
-    background: rgba(239, 253, 251, 0.72);
+    background: rgba(247, 250, 249, 0.76);
   }
   .home-proof-eyebrow {
     margin: 0 0 28px;
-    color: #008b8b;
+    color: #667f79;
     font-size: 12px;
     font-weight: 820;
     letter-spacing: 0;
@@ -161,7 +161,7 @@ const CSS = `
     border-right: 0;
   }
   .home-proof-number {
-    color: rgba(0, 139, 139, 0.58);
+    color: rgba(112, 139, 133, 0.42);
     font-size: 13px;
     font-weight: 820;
     letter-spacing: 0;
@@ -183,7 +183,7 @@ const CSS = `
     line-height: 1.5;
   }
   .home-editorial {
-    padding: 108px 0 86px;
+    padding: 8px 0 86px;
   }
   .home-editorial-grid {
     display: grid;
@@ -223,7 +223,7 @@ const CSS = `
     border: 8px solid #f7faf8;
   }
   .home-services {
-    padding: 0 0 86px;
+    padding: 82px 0 68px;
   }
   .home-section-heading {
     display: flex;
@@ -243,10 +243,9 @@ const CSS = `
   .home-card {
     min-height: 100%;
     display: grid;
-    grid-template-columns: 148px minmax(0, 1fr);
-    grid-template-rows: 1fr auto;
+    grid-template-rows: auto 1fr auto;
     gap: 14px;
-    padding: 12px;
+    padding: 14px;
     border: 1px solid rgba(18, 24, 22, 0.1);
     border-radius: 8px;
     background: rgba(255, 255, 255, 0.92);
@@ -261,9 +260,9 @@ const CSS = `
   }
   .home-card-media {
     position: relative;
-    grid-row: 1 / span 2;
     overflow: hidden;
-    height: 148px;
+    width: 100%;
+    aspect-ratio: 16 / 10;
     border-radius: 8px;
     background: #dfe8e4;
   }
@@ -274,12 +273,11 @@ const CSS = `
     object-fit: cover;
   }
   .home-card-body {
-    align-self: center;
-    padding: 0 4px 0 0;
+    padding: 0 4px;
   }
   .home-card-kicker {
     margin: 0 0 8px;
-    color: #008b8b;
+    color: #667f79;
     font-size: 12px;
     font-weight: 820;
   }
@@ -302,7 +300,7 @@ const CSS = `
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin: 0 4px 0 0;
+    margin: 0 4px;
     border-top: 1px solid rgba(18, 24, 22, 0.1);
     color: #101412;
     font-size: 13px;
@@ -381,20 +379,11 @@ const CSS = `
       grid-column: 1 / -1;
       min-height: 120px;
       border-right: 0;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+      border-bottom: 1px solid rgba(18, 24, 22, 0.1);
     }
     .home-proof-item:nth-child(3),
     .home-proof-item:last-child {
       border-right: 0;
-    }
-    .home-card {
-      grid-template-columns: 160px minmax(0, 1fr);
-    }
-    .home-card-media {
-      height: 160px;
-    }
-    .home-proof {
-      margin-top: 12px;
     }
     .home-section-heading {
       align-items: start;
@@ -421,7 +410,7 @@ const CSS = `
       font-size: 22px;
     }
     .home-editorial {
-      padding: 78px 0 66px;
+      padding: 0 0 66px;
     }
     .home-title {
       font-size: 40px;
@@ -442,18 +431,14 @@ const CSS = `
       border-width: 6px;
     }
     .home-services {
-      padding-bottom: 62px;
+      padding: 62px 0 54px;
     }
     .home-card-grid {
       gap: 10px;
     }
     .home-card {
-      grid-template-columns: 108px minmax(0, 1fr);
       gap: 10px;
       padding: 10px;
-    }
-    .home-card-media {
-      height: 108px;
     }
     .home-card-kicker {
       font-size: 11px;
@@ -488,19 +473,13 @@ const CSS = `
     .home-proof-item {
       min-height: 112px;
       border-right: 0;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.11);
+      border-bottom: 1px solid rgba(18, 24, 22, 0.1);
     }
     .home-proof-item:last-child {
       border-bottom: 0;
     }
     .home-title {
       font-size: 34px;
-    }
-    .home-card {
-      grid-template-columns: 96px minmax(0, 1fr);
-    }
-    .home-card-media {
-      height: 96px;
     }
     .home-editorial-media {
       min-height: 360px;
@@ -563,60 +542,6 @@ export default async function ProfessionalHomePage() {
 
       <HeroCarousel images={heroImages} />
 
-      <section className="home-proof" aria-label="Session highlights">
-        <div className="home-section home-proof-grid">
-          <div className="home-proof-intro">
-            <p className="home-proof-eyebrow">Session system</p>
-            <h2 className="home-proof-title">A smoother shoot, from first note to final gallery.</h2>
-          </div>
-          {[
-            ["01", "Direction", "Clear posing without stiff, frozen photos."],
-            ["02", "Locations", "SF, Berkeley, Stanford, SJSU, South Bay."],
-            ["03", "Gallery", "Clean delivery for sharing and downloading."],
-            ["04", "Timing", "Peak campus dates move fast."],
-          ].map(([number, title, copy]) => (
-            <div key={title} className="home-proof-item">
-              <span className="home-proof-number">{number}</span>
-              <div>
-                <h3>{title}</h3>
-                <p>{copy}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="home-section home-editorial">
-        <div className="home-editorial-grid">
-          <div className="home-editorial-copy">
-            <div>
-              <p className="home-kicker">Portraits for the people you keep</p>
-              <h2 className="home-title">Clean galleries with a little life left in them.</h2>
-            </div>
-            <p className="home-copy">
-              I keep sessions calm, directed, and fast enough to feel good. The goal is a polished gallery that still feels like the day happened, not like everyone got turned into a template.
-            </p>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-              <Link href="/availability" className="home-link">
-                Check dates
-              </Link>
-              <Link href="/pricing/grads" className="home-link" data-variant="ghost">
-                See grad rates
-              </Link>
-            </div>
-          </div>
-
-          <div className="home-editorial-media" aria-label="Featured photography">
-            <div className="home-stacked-photo" data-size="large">
-              <img src={firstPortfolioImage} alt="Bay Area portrait session" loading="lazy" decoding="async" />
-            </div>
-            <div className="home-stacked-photo" data-size="small">
-              <img src={secondPortfolioImage} alt="Family or graduation session detail" loading="lazy" decoding="async" />
-            </div>
-          </div>
-        </div>
-      </section>
-
       <section className="home-section home-services">
         <div className="home-section-heading">
           <div>
@@ -662,6 +587,60 @@ export default async function ProfessionalHomePage() {
               <span aria-hidden="true">+</span>
             </span>
           </Link>
+        </div>
+      </section>
+
+      <section className="home-section home-editorial">
+        <div className="home-editorial-grid">
+          <div className="home-editorial-copy">
+            <div>
+              <p className="home-kicker">Portraits for the people you keep</p>
+              <h2 className="home-title">Clean galleries with a little life left in them.</h2>
+            </div>
+            <p className="home-copy">
+              I keep sessions calm, directed, and fast enough to feel good. The goal is a polished gallery that still feels like the day happened, not like everyone got turned into a template.
+            </p>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+              <Link href="/availability" className="home-link">
+                Check dates
+              </Link>
+              <Link href="/pricing/grads" className="home-link" data-variant="ghost">
+                See grad rates
+              </Link>
+            </div>
+          </div>
+
+          <div className="home-editorial-media" aria-label="Featured photography">
+            <div className="home-stacked-photo" data-size="large">
+              <img src={firstPortfolioImage} alt="Bay Area portrait session" loading="lazy" decoding="async" />
+            </div>
+            <div className="home-stacked-photo" data-size="small">
+              <img src={secondPortfolioImage} alt="Family or graduation session detail" loading="lazy" decoding="async" />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="home-proof" aria-label="Session highlights">
+        <div className="home-section home-proof-grid">
+          <div className="home-proof-intro">
+            <p className="home-proof-eyebrow">Session system</p>
+            <h2 className="home-proof-title">A smoother shoot, from first note to final gallery.</h2>
+          </div>
+          {[
+            ["01", "Direction", "Clear posing without stiff, frozen photos."],
+            ["02", "Locations", "SF, Berkeley, Stanford, SJSU, South Bay."],
+            ["03", "Gallery", "Clean delivery for sharing and downloading."],
+            ["04", "Timing", "Peak campus dates move fast."],
+          ].map(([number, title, copy]) => (
+            <div key={title} className="home-proof-item">
+              <span className="home-proof-number">{number}</span>
+              <div>
+                <h3>{title}</h3>
+                <p>{copy}</p>
+              </div>
+            </div>
+          ))}
         </div>
       </section>
 

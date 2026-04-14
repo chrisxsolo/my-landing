@@ -56,7 +56,7 @@ const CSS = `
   }
   .pricing-kicker {
     margin: 0 0 14px;
-    color: #008b8b;
+    color: #667f79;
     font-size: 13px;
     font-weight: 820;
   }
@@ -203,7 +203,7 @@ const CSS = `
     width: 8px;
     height: 8px;
     border-radius: 99px;
-    background: #00a6a6;
+    background: #9ab9b2;
   }
   .pricing-addons {
     margin-top: 30px;
@@ -237,11 +237,11 @@ const CSS = `
     align-items: center;
     justify-content: center;
     padding: 0 18px;
-    border: 1px solid rgba(0, 166, 166, 0.3);
+    border: 1px solid rgba(112, 139, 133, 0.22);
     border-radius: 8px;
-    background: rgba(230, 251, 248, 0.95);
-    color: #005f5f;
-    box-shadow: 0 10px 24px rgba(0, 166, 166, 0.08);
+    background: rgba(246, 250, 248, 0.94);
+    color: #4f6d67;
+    box-shadow: 0 10px 24px rgba(112, 139, 133, 0.05);
     font-size: 14px;
     font-weight: 820;
     text-decoration: none;
@@ -249,9 +249,9 @@ const CSS = `
   }
   .pricing-link:hover {
     transform: translateY(-1px);
-    border-color: rgba(0, 166, 166, 0.46);
-    background: rgba(214, 247, 244, 0.98);
-    box-shadow: 0 14px 28px rgba(0, 166, 166, 0.12);
+    border-color: rgba(112, 139, 133, 0.32);
+    background: rgba(239, 246, 244, 0.98);
+    box-shadow: 0 14px 28px rgba(112, 139, 133, 0.07);
   }
   .pricing-note {
     margin: 14px 0 0;

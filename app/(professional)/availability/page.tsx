@@ -91,7 +91,7 @@ const CSS = `
   }
   .availability-kicker {
     margin: 0 0 14px;
-    color: #008b8b;
+    color: #667f79;
     font-size: 13px;
     font-weight: 820;
   }
@@ -238,9 +238,9 @@ const CSS = `
     transform: translateY(-2px);
   }
   .availability-date-button[data-status="available"] {
-    border-color: rgba(0, 166, 166, 0.48);
-    background: rgba(0, 166, 166, 0.14);
-    color: #006e6e;
+    border-color: rgba(112, 139, 133, 0.3);
+    background: rgba(112, 139, 133, 0.1);
+    color: #58746f;
   }
   .availability-date-button[data-status="hold"] {
     border-color: rgba(189, 214, 75, 0.66);
@@ -253,13 +253,13 @@ const CSS = `
     color: #899591;
   }
   .availability-date-button[data-today="true"] {
-    box-shadow: inset 0 0 0 2px rgba(0, 139, 139, 0.58);
+    box-shadow: inset 0 0 0 2px rgba(112, 139, 133, 0.42);
   }
   .availability-date-button[data-selected="true"] {
-    border-color: rgba(0, 166, 166, 0.72);
-    background: rgba(0, 166, 166, 0.18);
-    color: #005f5f;
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.76), 0 10px 22px rgba(0, 166, 166, 0.1);
+    border-color: rgba(112, 139, 133, 0.38);
+    background: rgba(112, 139, 133, 0.12);
+    color: #4f6d67;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.76), 0 10px 22px rgba(112, 139, 133, 0.06);
   }
   .availability-dot {
     position: absolute;
@@ -305,7 +305,7 @@ const CSS = `
   }
   .availability-mini-label {
     margin: 0 0 10px;
-    color: #008b8b;
+    color: #667f79;
     font-size: 12px;
     font-weight: 820;
   }
@@ -353,11 +353,11 @@ const CSS = `
     justify-content: center;
     width: 100%;
     margin-top: 16px;
-    border: 1px solid rgba(0, 166, 166, 0.3);
+    border: 1px solid rgba(112, 139, 133, 0.22);
     border-radius: 8px;
-    background: rgba(230, 251, 248, 0.95);
-    color: #005f5f;
-    box-shadow: 0 10px 24px rgba(0, 166, 166, 0.08);
+    background: rgba(246, 250, 248, 0.94);
+    color: #4f6d67;
+    box-shadow: 0 10px 24px rgba(112, 139, 133, 0.05);
     font-size: 14px;
     font-weight: 820;
     text-decoration: none;
@@ -365,9 +365,9 @@ const CSS = `
   }
   .availability-link:hover {
     transform: translateY(-1px);
-    border-color: rgba(0, 166, 166, 0.46);
-    background: rgba(214, 247, 244, 0.98);
-    box-shadow: 0 14px 28px rgba(0, 166, 166, 0.12);
+    border-color: rgba(112, 139, 133, 0.32);
+    background: rgba(239, 246, 244, 0.98);
+    box-shadow: 0 14px 28px rgba(112, 139, 133, 0.07);
   }
   .availability-loading {
     display: grid;
@@ -607,7 +607,7 @@ export default function AvailabilityPage() {
 
           <div className="availability-legend">
             {[
-              ["Available", "#00a6a6"],
+              ["Available", "#9ab9b2"],
               ["On hold", "#d6f36a"],
               ["Booked", "#c7d1cc"],
             ].map(([label, color]) => (

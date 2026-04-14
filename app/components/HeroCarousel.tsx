@@ -28,7 +28,7 @@ export default function HeroCarousel({ images }: { images: CarouselImage[] }) {
       <style>{`
         .home-hero {
           position: relative;
-          height: 88svh;
+          height: clamp(680px, 88svh, 920px);
           overflow: hidden;
           isolation: isolate;
           background: #101412;
