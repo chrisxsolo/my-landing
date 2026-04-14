@@ -2,7 +2,7 @@
 // FAMILY PRICING PAGE  →  soloxsnaps.com/pricing/families
 // ─────────────────────────────────────────────────────────────────────────────
 // WHAT'S ON THIS PAGE (top to bottom):
-//   1. Hero        — heading on left, "$350 Starting from" panel on right
+//   1. Hero        — full-bleed dark photo header (same vibe as portfolio + grad pricing)
 //   2. Info cards  — Booking / Session flow / Travel
 //   3. Package     — Family Session (text left, photo right)
 //   4. Package     — Extended Family Session (photo left, text right)
@@ -29,10 +29,10 @@ export const metadata: Metadata = {
 };
 
 // ── CSS: generated from shared factory in lib/proStyles.ts ───────────────────
-// heroPanel: true   → shows the 2-column hero with the "$350 starting from" side card
+// heroPanel: false  → no 2-column hero grid (dark hero handles layout now)
 // mediaMinHeight    → desktop package photo height (px)
 // mediaMinHeightMobile → mobile photo height (px)
-const CSS = pricingCSS({ mediaMinHeight: 560, mediaMinHeightMobile: 390, heroPanel: true });
+const CSS = pricingCSS({ mediaMinHeight: 560, mediaMinHeightMobile: 390 });
 
 // ── ADD-ONS LIST ──────────────────────────────────────────────────────────────
 // Shown below each package's bullet list.
@@ -83,32 +83,58 @@ export default async function FamilyPricingPage() {
     <main className="pricing-modern">
       <style>{CSS}</style>
 
-      {/* ── HERO ──────────────────────────────────────────────────────────────
-           2-column layout: heading+copy on left, price panel on right.
-           anim.slideRight() = kicker slides in from left on load
-           anim.fadeUp(n)    = elements fade up with staggered delays
-           To change the hero heading: edit the h1 text below.
-           To change the side panel price: find "$350" in the panel div. */}
-      <section className="pricing-shell pricing-hero">
-        <div>
-          <p className="pricing-kicker" style={anim.slideRight()}>Family pricing</p>
-          <h1 className="pricing-title" style={anim.fadeUp(0.1)}>Clean family photos without turning the day into a production.</h1>
-          <p className="pricing-copy" style={anim.fadeUp(0.2)}>
+      {/* ── DARK PHOTO HERO ───────────────────────────────────────────────────
+           Full-bleed photo background with dark gradient overlay + grain texture.
+           Same vibe as the portfolio page and grad pricing hero.
+           sessionImage (from Supabase) is used as the background.
+           Falls back to solid dark if no image.
+
+           TO CHANGE:
+             → Background photo: set pricing_family_session_image in Supabase site_settings
+             → Overlay darkness: adjust rgba values in .pricing-hero-dark::before (proStyles.ts)
+             → Hero height:      change clamp() in .pricing-hero-dark (proStyles.ts)
+             → Starting price:   find "$350" in the footer row below
+             → Chips:            edit the pricing-chip spans in the footer row
+             → Heading text:     edit the h1 below */}
+      <section
+        className="pricing-hero-dark"
+        style={sessionImage ? { backgroundImage: `url(${sessionImage})` } : {}}
+      >
+        <div className="pricing-shell">
+          {/* Small eyebrow label — change text here */}
+          <p className="pricing-kicker">Family pricing</p>
+
+          {/* Big display heading — change text here */}
+          <h1 className="pricing-title">
+            Clean family photos without turning the day into a production.
+          </h1>
+
+          {/* Subtext — change text here */}
+          <p className="pricing-copy">
             Relaxed sessions with enough structure for kids, grandparents, and everyone who says they feel awkward in photos.
           </p>
-        </div>
 
-        {/* Side panel — shows starting price and chips.
-             To change chips: edit the span text below.
-             To change the price: update "$350" and "private online gallery included". */}
-        <div className="pricing-hero-panel" style={anim.fadeUp(0.15)}>
-          <p className="pricing-kicker">Starting from</p>
-          <p className="pricing-price">$350</p>
-          <p className="pricing-meta">private online gallery included</p>
-          <div className="pricing-chip-row">
-            <span className="pricing-chip">Guided session</span>
-            <span className="pricing-chip">Bay Area locations</span>
-            <span className="pricing-chip">Family-friendly pacing</span>
+          {/* ── HERO FOOTER: price + chips + book button ────────────────────
+               Sits at the very bottom of the dark hero.
+               To remove divider: delete the span.pricing-hero-divider. */}
+          <div className="pricing-hero-dark-footer">
+            {/* Starting price — change "$350" and label here */}
+            <div className="pricing-hero-price-block">
+              <span className="pricing-hero-price-label">starting from</span>
+              <span className="pricing-hero-price-big">$350</span>
+            </div>
+
+            <span className="pricing-hero-divider" aria-hidden="true" />
+
+            {/* Chips — edit or add/remove spans here */}
+            <div className="pricing-chip-row" style={{ marginTop: 0 }}>
+              <span className="pricing-chip">Guided session</span>
+              <span className="pricing-chip">Bay Area locations</span>
+              <span className="pricing-chip">Family-friendly pacing</span>
+            </div>
+
+            {/* CTA button — links to the contact/booking page */}
+            <Link href="/contact" className="pricing-link">Book a session</Link>
           </div>
         </div>
       </section>

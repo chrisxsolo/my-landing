@@ -2,7 +2,7 @@
 // GRAD PRICING PAGE  →  soloxsnaps.com/pricing/grads
 // ─────────────────────────────────────────────────────────────────────────────
 // WHAT'S ON THIS PAGE (top to bottom):
-//   1. Hero        — big heading, no side panel
+//   1. Hero        — full-bleed dark photo header (like portfolio page)
 //   2. Info cards  — Booking / Session flow / Travel
 //   3. Package     — Graduation Package (text left, photo right)
 //   4. Package     — Group Grad Package (photo left, text right)
@@ -107,18 +107,62 @@ export default async function GradPricingPage() {
     <main className="pricing-modern">
       <style>{CSS}</style>
 
-      {/* ── HERO ──────────────────────────────────────────────────────────────
-           Full-width, no side panel.
-           anim.slideRight() = kicker slides in from left on page load
-           anim.fadeUp(0.1)  = title fades up 0.1s after load
-           anim.fadeUp(0.2)  = copy fades up 0.2s after load
-           To change the heading text: edit the h1 content below. */}
-      <section className="pricing-shell pricing-hero">
-        <p className="pricing-kicker" style={anim.slideRight()}>Graduation pricing</p>
-        <h1 className="pricing-title" style={anim.fadeUp(0.1)}>For grads who want the gallery to feel as big as the moment.</h1>
-        <p className="pricing-copy" style={anim.fadeUp(0.2)}>
-          Campus portraits with clean direction, efficient pacing, and enough room for personality, friend groups, and the little details.
-        </p>
+      {/* ── DARK PHOTO HERO ───────────────────────────────────────────────────
+           Full-bleed photo background with dark gradient overlay + grain texture.
+           Same vibe as the portfolio page hero.
+           packageImage (from Supabase) is used as the background.
+           Falls back to solid dark if no image.
+
+           TO CHANGE:
+             → Background photo: set pricing_grad_standard_image in Supabase site_settings
+             → Overlay darkness: adjust rgba values in .pricing-hero-dark::before (proStyles.ts)
+             → Hero height:      change clamp() in .pricing-hero-dark (proStyles.ts)
+             → Price shown:      find "$350" in the footer row below
+             → Chips:            edit the pricing-chip spans in the footer row
+             → Heading text:     edit the h1 below */}
+      <section
+        className="pricing-hero-dark"
+        style={packageImage ? { backgroundImage: `url(${packageImage})` } : {}}
+      >
+        <div className="pricing-shell">
+          {/* Small eyebrow label — change text here */}
+          <p className="pricing-kicker">Graduation pricing</p>
+
+          {/* Big display heading — change text here */}
+          <h1 className="pricing-title">
+            For grads who want the gallery to feel as big as the moment.
+          </h1>
+
+          {/* Subtext — change text here */}
+          <p className="pricing-copy">
+            Campus portraits with clean direction, efficient pacing, and enough room for personality, friend groups, and the little details.
+          </p>
+
+          {/* ── HERO FOOTER: price + chips + book button ────────────────────
+               Sits at the very bottom of the dark hero.
+               pricing-hero-divider = thin vertical line separator.
+               To remove divider: delete the span.pricing-hero-divider. */}
+          <div className="pricing-hero-dark-footer">
+            {/* Price block — change "$350" and "/ hr" here */}
+            <div className="pricing-hero-price-block">
+              <span className="pricing-hero-price-label">from</span>
+              <span className="pricing-hero-price-big">$350</span>
+              <span className="pricing-hero-price-unit">/ hr</span>
+            </div>
+
+            <span className="pricing-hero-divider" aria-hidden="true" />
+
+            {/* Chips — edit or add/remove spans here */}
+            <div className="pricing-chip-row" style={{ marginTop: 0 }}>
+              <span className="pricing-chip">50+ edited images</span>
+              <span className="pricing-chip">Guided posing</span>
+              <span className="pricing-chip">Two-week turnaround</span>
+            </div>
+
+            {/* CTA button — links to the contact/booking page */}
+            <Link href="/contact" className="pricing-link">Book a session</Link>
+          </div>
+        </div>
       </section>
 
       {/* ── INFO CARDS (Booking / Session flow / Travel) ──────────────────────

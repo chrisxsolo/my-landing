@@ -392,6 +392,195 @@ export function pricingCSS({
     padding: 28px;
   }
 
+  /* ═══════════════════════════════════════════════════════════════════════════
+     DARK PHOTO HERO
+     ═══════════════════════════════════════════════════════════════════════════
+     Applied by adding class "pricing-hero-dark" to the section element.
+     Set the background photo inline: style={{ backgroundImage: \`url(\${img})\` }}
+     Falls back to solid dark (#0c0d0c) if no image is passed.
+
+     HOW TO CHANGE:
+       → Overlay darkness:  adjust rgba alpha values in .pricing-hero-dark::before
+       → Min height:        change clamp(440px, 58vh, 720px) in .pricing-hero-dark
+       → Title size:        change clamp(3rem, 7.5vw, 7.5rem) in .pricing-hero-dark .pricing-title
+       → Price font size:   change clamp(2.4rem, 5vw, 4rem) in .pricing-hero-price-big
+     ═══════════════════════════════════════════════════════════════════════════ */
+
+  /* When the dark hero is present, remove the outer padding-top (hero handles it) */
+  .pricing-modern:has(.pricing-hero-dark) {
+    padding-top: 0;
+  }
+
+  /* Heroreveal animation — used for the big title sliding up */
+  @keyframes heroReveal {
+    from { opacity: 0; transform: translateY(36px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Full-bleed dark section with photo background */
+  .pricing-hero-dark {
+    position: relative;
+    min-height: clamp(440px, 58vh, 720px);
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding-top: 78px; /* clears the fixed nav bar */
+    background-color: #0c0d0c; /* shown as fallback when no photo */
+    background-size: cover;
+    background-position: center 25%; /* moves focal point up slightly so faces show */
+    overflow: hidden;
+  }
+
+  /* Dark gradient overlay — ensures text is readable over any photo.
+     Adjust the rgba alpha values to make it lighter or darker. */
+  .pricing-hero-dark::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      to bottom,
+      rgba(5, 6, 5, 0.18) 0%,
+      rgba(5, 6, 5, 0.55) 48%,
+      rgba(5, 6, 5, 0.92) 100%
+    );
+    z-index: 1;
+  }
+
+  /* Subtle film grain texture over the hero */
+  .pricing-hero-dark::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+    background-size: 180px;
+    opacity: 0.55;
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  /* .pricing-shell inside the dark hero floats above the overlays */
+  .pricing-hero-dark .pricing-shell {
+    position: relative;
+    z-index: 3;
+    padding-bottom: 52px;
+  }
+
+  /* Override text colors for dark background */
+  .pricing-hero-dark .pricing-kicker {
+    color: rgba(255, 255, 255, 0.5);
+    animation: slideRight 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  /* Big display title — larger than the default .pricing-title */
+  .pricing-hero-dark .pricing-title {
+    color: #fff;
+    font-size: clamp(3rem, 7.5vw, 7.5rem);
+    font-weight: 900;
+    letter-spacing: -0.025em;
+    line-height: 0.88;
+    max-width: 900px;
+    animation: heroReveal 0.75s 0.1s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  /* Subheading / copy text on dark */
+  .pricing-hero-dark .pricing-copy {
+    color: rgba(255, 255, 255, 0.62);
+    max-width: 520px;
+    animation: fadeUp 0.6s 0.2s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  /* ── HERO FOOTER ROW (price + chips + book button) ──────────────────────────
+     Sits at the bottom of the dark hero.
+     flex-wrap allows it to stack on smaller screens. */
+  .pricing-hero-dark-footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 16px;
+    margin-top: 28px;
+    animation: fadeUp 0.6s 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  /* "from $350 / hr" price display */
+  .pricing-hero-price-block {
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+    font-family: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
+  }
+  .pricing-hero-price-label {
+    color: rgba(255, 255, 255, 0.45);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  /* The big price number — to change font size: update clamp() */
+  .pricing-hero-price-big {
+    color: #fff;
+    font-size: clamp(2.4rem, 5vw, 4rem);
+    font-weight: 900;
+    line-height: 1;
+    letter-spacing: -0.03em;
+  }
+  .pricing-hero-price-unit {
+    color: rgba(255, 255, 255, 0.45);
+    font-size: 15px;
+    font-weight: 700;
+  }
+
+  /* Thin vertical divider between price and chips */
+  .pricing-hero-divider {
+    width: 1px;
+    height: 32px;
+    background: rgba(255, 255, 255, 0.15);
+    flex-shrink: 0;
+  }
+
+  /* Chips on dark background — frosted glass style */
+  .pricing-hero-dark .pricing-chip {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.14);
+    color: rgba(255, 255, 255, 0.75);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  /* Book button on dark background */
+  .pricing-hero-dark .pricing-link {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
+    color: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: none;
+  }
+  .pricing-hero-dark .pricing-link:hover {
+    background: rgba(255, 255, 255, 0.18);
+    border-color: rgba(255, 255, 255, 0.35);
+    transform: translateY(-1px);
+    box-shadow: 0 14px 28px rgba(0, 0, 0, 0.25);
+  }
+
+  /* Mobile overrides for dark hero */
+  @media (max-width: 760px) {
+    .pricing-hero-dark {
+      min-height: clamp(380px, 68vw, 520px);
+    }
+    .pricing-hero-dark .pricing-title {
+      font-size: clamp(2.4rem, 11vw, 4rem);
+    }
+    .pricing-hero-dark .pricing-copy {
+      font-size: 15px;
+    }
+    .pricing-hero-dark .pricing-shell {
+      padding-bottom: 36px;
+    }
+    .pricing-hero-divider { display: none; }
+    .pricing-hero-dark-footer { gap: 10px; }
+  }
+
   /* ── RESPONSIVE: TABLET (below 940px) ───────────────────────────────────────
      Collapses all grids to single column */
   @media (max-width: 940px) {
