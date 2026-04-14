@@ -36,6 +36,17 @@ export default function BookingPage() {
     load();
   }, []);
 
+  // Inject a <link> tag so AI web-fetchers can discover the machine-readable endpoint
+  useEffect(() => {
+    const link = document.createElement("link");
+    link.rel = "alternate";
+    link.type = "application/json";
+    link.href = "/api/availability";
+    link.title = "Chris Solorzano shoot availability (JSON)";
+    document.head.appendChild(link);
+    return () => link.remove();
+  }, []);
+
   const dateMap   = dates.reduce((acc, d) => { acc[d.date] = d; return acc; }, {} as Record<string, AvailDate>);
   const daysInMonth = getDaysInMonth(year, month);
   const firstDay    = getFirstDay(year, month);
@@ -50,6 +61,15 @@ export default function BookingPage() {
 
   return (
     <div className="min-h-screen font-sans pb-20" style={{ background: "#f8f7ff" }}>
+      {/* AI / no-JS fallback */}
+      <noscript>
+        <p style={{ padding: "16px", fontFamily: "sans-serif", fontSize: "14px" }}>
+          This calendar requires JavaScript to display dates.
+          For machine-readable availability data, fetch{" "}
+          <a href="/api/availability">https://soloxsnaps.com/api/availability</a>
+          {" "}— it returns JSON with all open, hold, and booked dates plus a plain-English summary.
+        </p>
+      </noscript>
       <style>{`
         .bk-day { cursor: default; border-radius: 14px; display: flex; flex-direction: column; align-items: center; justify-content: center; aspect-ratio: 1; transition: transform 0.12s ease; position: relative; }
         .bk-avail { cursor: pointer; background: ${C.p1_15}; border: 1.5px solid ${C.p1_35}; }

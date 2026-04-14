@@ -346,6 +346,17 @@ export default function AvailabilityPage() {
     fetchDates();
   }, []);
 
+  // Inject a <link> tag so AI web-fetchers can discover the machine-readable endpoint
+  useEffect(() => {
+    const link = document.createElement("link");
+    link.rel = "alternate";
+    link.type = "application/json";
+    link.href = "/api/availability";
+    link.title = "Chris Solorzano shoot availability (JSON)";
+    document.head.appendChild(link);
+    return () => link.remove();
+  }, []);
+
   const dateMap     = dates.reduce((acc, d) => { acc[d.date] = d; return acc; }, {} as Record<string, AvailDate>);
   const daysInMonth = getDaysInMonth(year, month);
   const firstDay    = getFirstDay(year, month);
@@ -366,6 +377,16 @@ export default function AvailabilityPage() {
   return (
     <main className="avail-page">
       <style>{CSS}</style>
+      {/* AI / no-JS fallback: this text is in the raw HTML so web-fetching assistants
+          can find the machine-readable endpoint without executing JavaScript */}
+      <noscript>
+        <p style={{ padding: "16px", fontFamily: "sans-serif", fontSize: "14px" }}>
+          This calendar requires JavaScript to display dates.
+          For machine-readable availability data, fetch{" "}
+          <a href="/api/availability">https://soloxsnaps.com/api/availability</a>
+          {" "}— it returns JSON with all open, hold, and booked dates plus a plain-English summary.
+        </p>
+      </noscript>
 
       {/* ── HERO ───────────────────────────────────────────────────────────────
            Light gradient section. Edit h1 and p text directly below.
