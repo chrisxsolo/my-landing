@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }
 
-  const { name, email, session_type, date_in_mind, message, phone, previous_draft, feedback, ai_draft, actual_sent } = body;
+  const { name, email, session_type, date_in_mind, message, phone, previous_draft, feedback, ai_draft, actual_sent, thread_context } = body;
 
   if (!name || !email || !message) {
     return NextResponse.json(
@@ -154,6 +154,10 @@ Always:
 
   const systemPrompt = baseInstructions + styleSection;
 
+  const threadSection = thread_context
+    ? `\n\nFull email conversation history with this client (oldest first — use this for context, don't repeat what's already been said):\n\n${thread_context}`
+    : "";
+
   const userPrompt = isRefinement
     ? `You wrote this draft reply for a client inquiry:
 
@@ -173,7 +177,7 @@ Their message:
 ${message}
 
 Current availability:
-${availability}
+${availability}${threadSection}
 
 Write the reply now.`;
 

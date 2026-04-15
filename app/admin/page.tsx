@@ -1920,19 +1920,27 @@ function AdminDashboard() {
                           )}
                         </div>
 
-                        {/* Right: AI draft button (separate from expand) */}
+                        {/* Right: action buttons */}
                         <div className="flex flex-col justify-center gap-2 p-3 sm:p-4 flex-shrink-0 border-l border-slate-100">
+                          {/* Primary: open full conversation page */}
+                          <a href={`/admin/conversation/${inq.id}`}
+                            onClick={e=>e.stopPropagation()}
+                            className="text-xs font-bold px-3 py-2 rounded-xl transition-all hover:opacity-80 flex items-center gap-1.5 whitespace-nowrap text-center justify-center"
+                            style={{background:C.grad12,color:"#fff"}}>
+                            💬 Open Thread
+                          </a>
+                          {/* Secondary: quick draft without leaving admin */}
                           <button
                             onClick={e=>{e.stopPropagation();if(!isOpen)setEditingInquiry(inq);generateDraft(inq);}}
                             disabled={draftLoading===inq.id}
-                            className="text-xs font-bold px-3 py-2 rounded-xl transition-all hover:opacity-80 disabled:opacity-50 flex items-center gap-1.5 whitespace-nowrap"
-                            style={{background:C.grad12,color:"#fff"}}>
+                            className="text-xs font-bold px-3 py-2 rounded-xl transition-all hover:opacity-80 disabled:opacity-50 flex items-center gap-1.5 whitespace-nowrap justify-center"
+                            style={{background:C.p1_08,color:C.p1}}>
                             {draftLoading===inq.id?(
                               <><span className="animate-spin inline-block">◌</span> Writing…</>
                             ):hasDraft?(
                               <>↻ Redraft</>
                             ):(
-                              <>✦ Draft Reply</>
+                              <>✦ Quick Draft</>
                             )}
                           </button>
                           {hasDraft&&(
