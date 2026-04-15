@@ -110,7 +110,7 @@ Write the reply now.`;
   try {
     const client = new Anthropic({ apiKey });
     const response = await client.messages.create({
-      model: "claude-opus-4-5",
+      model: "claude-3-5-sonnet-20241022",
       max_tokens: 600,
       messages: [{ role: "user", content: userPrompt }],
       system: systemPrompt,
@@ -124,9 +124,10 @@ Write the reply now.`;
 
     return NextResponse.json({ draft });
   } catch (err) {
-    console.error("Claude draft-reply error:", err);
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("Claude draft-reply error:", msg);
     return NextResponse.json(
-      { error: "Failed to generate draft. Check ANTHROPIC_API_KEY." },
+      { error: `Draft failed: ${msg}` },
       { status: 500 }
     );
   }
