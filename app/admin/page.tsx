@@ -133,6 +133,20 @@ export default function AdminDashboard() {
   const [settingsSaving, setSettingsSaving] = useState<string|null>(null);
   const [coverPickerKey, setCoverPickerKey] = useState<string|null>(null);
 
+  // ── Reply style ───────────────────────────────────────────────────────
+  const [replyStyleDraft, setReplyStyleDraft] = useState<string>("");
+  const [replyStyleSaving, setReplyStyleSaving] = useState(false);
+  const [replyStyleSaved, setReplyStyleSaved] = useState(false);
+
+  async function saveReplyStyle(){
+    setReplyStyleSaving(true);
+    await supabase.from('site_settings').upsert({key:'reply_style',value:replyStyleDraft,updated_at:new Date().toISOString()},{onConflict:'key'});
+    setSiteSettings(p=>({...p,reply_style:replyStyleDraft}));
+    setReplyStyleSaving(false);
+    setReplyStyleSaved(true);
+    setTimeout(()=>setReplyStyleSaved(false),2500);
+  }
+
   // ── Blog ──────────────────────────────────────────────────────────────
   const [posts,setPosts]=useState<BlogPost[]>([]);
   const [postsLoading,setPostsLoading]=useState(false);
@@ -194,7 +208,12 @@ export default function AdminDashboard() {
 
   async function fetchSiteSettings(){
     const{data}=await supabase.from('site_settings').select('key,value');
-    if(data)setSiteSettings(data.reduce((acc:{[k:string]:string|null},r)=>{acc[r.key]=r.value;return acc;},{}));
+    if(data){
+      const map=data.reduce((acc:{[k:string]:string|null},r)=>{acc[r.key]=r.value;return acc;},{});
+      setSiteSettings(map);
+      // Pre-fill reply style editor with saved value
+      if(map.reply_style)setReplyStyleDraft(map.reply_style);
+    }
   }
 
   function onBatchFiles(e:React.ChangeEvent<HTMLInputElement>){
@@ -1599,6 +1618,39 @@ export default function AdminDashboard() {
         {/* ── INQUIRIES ── */}
         {tab==="inquiries"&&(
           <div className="space-y-6">
+
+            {/* ── Reply Style Editor ── */}
+            <div className={card}>
+              <div className="h-[3px]" style={{background:C.grad90_12}}/>
+              <div className="p-6 space-y-3">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h2 className="text-base font-black text-slate-900">AI Reply Style</h2>
+                    <p className="text-xs font-medium text-slate-400 mt-0.5">Paste your instructions here — Claude reads this before drafting every reply</p>
+                  </div>
+                  <button
+                    onClick={saveReplyStyle}
+                    disabled={replyStyleSaving}
+                    className="text-xs font-bold px-3 py-1.5 rounded-lg transition-all hover:opacity-80 flex-shrink-0 disabled:opacity-50"
+                    style={replyStyleSaved?{background:"#10b981",color:"#fff"}:{background:C.grad12,color:"#fff"}}
+                  >
+                    {replyStyleSaving?"Saving…":replyStyleSaved?"Saved ✓":"Save style"}
+                  </button>
+                </div>
+                <textarea
+                  value={replyStyleDraft}
+                  onChange={e=>setReplyStyleDraft(e.target.value)}
+                  rows={8}
+                  placeholder={"Paste your reply style instructions here.\n\nExample:\n- Always open by acknowledging the specific location they mentioned\n- If they're asking about golden hour, mention I always scout the light 30 min early\n- Keep it under 150 words\n- Never mention competitors\n- Sign off as 'Chris — soloxsnaps'"}
+                  className="w-full text-sm text-slate-700 rounded-xl p-3 outline-none resize-y leading-relaxed"
+                  style={{border:`1px solid ${C.p1_20}`,background:C.p1_04,fontFamily:"inherit"}}
+                />
+                <p className="text-[10px] text-slate-400 font-medium">
+                  {replyStyleDraft.length>0?`${replyStyleDraft.length} chars · Claude will follow these on top of its base instructions`:"Empty — Claude will use its default photography tone"}
+                </p>
+              </div>
+            </div>
+
             <div className={card}>
               <div className="h-[3px]" style={{background:C.grad90_12}}/>
               <div className="p-6">
