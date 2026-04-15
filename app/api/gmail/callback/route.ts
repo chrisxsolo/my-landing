@@ -1,0 +1,82 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/gmail/callback
+//
+// Google redirects here after the user approves (or denies) access.
+// Exchanges the one-time code for access + refresh tokens, grabs the
+// connected email address, stores everything in site_settings, then
+// sends the user back to /admin?tab=inquiries.
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { NextRequest, NextResponse } from "next/server";
+import { createSupabaseServerClient } from "@/lib/supabaseServer";
+
+export const dynamic = "force-dynamic";
+
+export async function GET(req: NextRequest) {
+  const siteUrl      = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  const clientId     = process.env.GOOGLE_CLIENT_ID     ?? "";
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET ?? "";
+  const redirectUri  = `${siteUrl}/api/gmail/callback`;
+
+  const code  = req.nextUrl.searchParams.get("code");
+  const error = req.nextUrl.searchParams.get("error");
+
+  if (error || !code) {
+    return NextResponse.redirect(`${siteUrl}/admin?tab=inquiries&gmail=error`);
+  }
+
+  // ── Exchange code for tokens ──────────────────────────────────────────────
+  const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+    method:  "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      code,
+      client_id:     clientId,
+      client_secret: clientSecret,
+      redirect_uri:  redirectUri,
+      grant_type:    "authorization_code",
+    }),
+  });
+
+  const tokens = await tokenRes.json() as {
+    access_token?: string;
+    refresh_token?: string;
+    expires_in?: number;
+    error?: string;
+  };
+
+  if (!tokens.access_token) {
+    console.error("Gmail OAuth token error:", tokens.error);
+    return NextResponse.redirect(`${siteUrl}/admin?tab=inquiries&gmail=error`);
+  }
+
+  // ── Get the connected Gmail address ──────────────────────────────────────
+  let email = "your Gmail";
+  try {
+    const userRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+      headers: { Authorization: `Bearer ${tokens.access_token}` },
+    });
+    const user = await userRes.json() as { email?: string };
+    if (user.email) email = user.email;
+  } catch {
+    // non-fatal — we still have the token
+  }
+
+  // ── Persist tokens in Supabase ────────────────────────────────────────────
+  const supabase = createSupabaseServerClient();
+  await supabase.from("site_settings").upsert(
+    {
+      key: "gmail_tokens",
+      value: JSON.stringify({
+        access_token:  tokens.access_token,
+        refresh_token: tokens.refresh_token ?? null,
+        expiry_date:   Date.now() + (tokens.expires_in ?? 3600) * 1000,
+        email,
+      }),
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "key" }
+  );
+
+  return NextResponse.redirect(`${siteUrl}/admin?tab=inquiries&gmail=connected`);
+}

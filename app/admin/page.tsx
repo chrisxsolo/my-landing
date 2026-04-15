@@ -1,6 +1,7 @@
 "use client";
 import { supabase } from '@/lib/supabase'
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { C } from "@/lib/colors";
 import { ADMIN_PASSWORD, checkAuth, setAuth } from "@/lib/adminAuth";
 import BayAreaLocationsManager from "@/app/admin/BayAreaLocationsManager";
@@ -70,17 +71,28 @@ function buildDailyStats(days:7|30,clicks:Pick<LinkClickEvent,"clicked_at">[],vi
 }
 
 export default function AdminDashboard() {
+  const searchParams=useSearchParams();
+  const router=useRouter();
   const [authed,setAuthed]=useState(false);
   const [pw,setPw]=useState("");
   const [pwErr,setPwErr]=useState(false);
   const [tab,setTab]=useState<Tab>("poses");
   const [toast,setToast]=useState<{msg:string;ok:boolean}|null>(null);
 
-  // Check localStorage on mount
+  // Check localStorage on mount + handle OAuth callback params
   useEffect(() => {
-    if (checkAuth()) {
-      setAuthed(true);
+    if (checkAuth()) setAuthed(true);
+    const gmailParam=searchParams.get("gmail");
+    const tabParam=searchParams.get("tab") as Tab|null;
+    if(tabParam)setTab(tabParam);
+    if(gmailParam==="connected"){
+      showToast("Gmail connected ✓ — you can now send emails from here");
+      router.replace("/admin?tab=inquiries");
+    } else if(gmailParam==="error"){
+      showToast("Gmail connection failed — try again",false);
+      router.replace("/admin?tab=inquiries");
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const [poses,setPoses]=useState<Pose[]>([]);
@@ -173,6 +185,21 @@ export default function AdminDashboard() {
   const [draftCopied,setDraftCopied]=useState<number|null>(null);
   const [draftFeedback,setDraftFeedback]=useState<Record<number,string>>({});
   const [ruleSaved,setRuleSaved]=useState<number|null>(null);
+  const [showLearnPanel,setShowLearnPanel]=useState<Record<number,boolean>>({});
+  const [actualSent,setActualSent]=useState<Record<number,string>>({});
+  const [learnLoading,setLearnLoading]=useState<number|null>(null);
+  const [learnedRules,setLearnedRules]=useState<Record<number,string[]>>({});
+  const [rulesSaved,setRulesSaved]=useState<number|null>(null);
+
+  // ── Gmail ─────────────────────────────────────────────────────────────────
+  const [gmailConnected,setGmailConnected]=useState(false);
+  const [gmailEmail,setGmailEmail]=useState<string|null>(null);
+  const [gmailLoading,setGmailLoading]=useState(false);
+  const [composeOpen,setComposeOpen]=useState<Record<number,boolean>>({});
+  const [composeSubject,setComposeSubject]=useState<Record<number,string>>({});
+  const [composeBody,setComposeBody]=useState<Record<number,string>>({});
+  const [sendLoading,setSendLoading]=useState<number|null>(null);
+  const [sendSuccess,setSendSuccess]=useState<number|null>(null);
 
   async function generateDraft(inq:Inquiry, feedback?:string){
     setDraftLoading(inq.id);
@@ -207,6 +234,79 @@ export default function AdminDashboard() {
     showToast("Rule saved to style guide ✓");
   }
 
+  async function analyzeAndLearn(inq:Inquiry){
+    const ai_draft=drafts[inq.id];
+    const actual=actualSent[inq.id]?.trim();
+    if(!ai_draft||!actual)return;
+    setLearnLoading(inq.id);
+    try{
+      const res=await fetch("/api/draft-reply",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:inq.name,email:inq.email,message:inq.message,ai_draft,actual_sent:actual})});
+      const json=await res.json();
+      if(json.rules&&json.rules.length>0){setLearnedRules(p=>({...p,[inq.id]:json.rules}));}
+      else if(json.error){showToast(json.error,false);}
+      else{showToast("No differences found — drafts may be very similar",false);}
+    }catch(e){showToast("Analysis failed",false);console.error(e);}
+    finally{setLearnLoading(null);}
+  }
+
+  async function saveLearnedRules(id:number){
+    const rules=learnedRules[id];
+    if(!rules?.length)return;
+    const current=siteSettings.reply_style??replyStyleDraft??"";
+    const newRules=rules.map(r=>`- ${r}`).join("\n");
+    const updated=(current.trim()?current.trim()+"\n"+newRules:newRules);
+    await supabase.from('site_settings').upsert({key:'reply_style',value:updated,updated_at:new Date().toISOString()},{onConflict:'key'});
+    setSiteSettings(p=>({...p,reply_style:updated}));
+    setReplyStyleDraft(updated);
+    setRulesSaved(id);
+    setTimeout(()=>setRulesSaved(null),2500);
+    showToast(`${rules.length} rule${rules.length===1?"":"s"} saved to style guide ✓`);
+  }
+
+  async function fetchGmailStatus(){
+    try{
+      const res=await fetch("/api/gmail/status");
+      const json=await res.json();
+      setGmailConnected(json.connected??false);
+      setGmailEmail(json.email??null);
+    }catch{setGmailConnected(false);}
+  }
+
+  async function disconnectGmail(){
+    if(!confirm("Disconnect Gmail? You'll need to reconnect to send emails from here."))return;
+    await fetch("/api/gmail/status",{method:"DELETE"});
+    setGmailConnected(false);setGmailEmail(null);
+    showToast("Gmail disconnected");
+  }
+
+  function openCompose(inq:Inquiry){
+    const draft=drafts[inq.id]??"";
+    setComposeSubject(p=>({...p,[inq.id]:p[inq.id]??`Re: Your ${inq.session_type?inq.session_type+" ":""}inquiry`}));
+    setComposeBody(p=>({...p,[inq.id]:p[inq.id]??draft}));
+    setComposeOpen(p=>({...p,[inq.id]:true}));
+  }
+
+  async function sendEmail(inq:Inquiry){
+    const subject=composeSubject[inq.id]?.trim();
+    const body=composeBody[inq.id]?.trim();
+    if(!subject||!body)return;
+    setSendLoading(inq.id);
+    try{
+      const res=await fetch("/api/gmail/send",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({to:inq.email,subject,body})});
+      const json=await res.json();
+      if(json.ok){
+        setSendSuccess(inq.id);
+        setComposeOpen(p=>({...p,[inq.id]:false}));
+        updateInquiryStatus(inq.id,"responded");
+        showToast(`Email sent to ${inq.name} ✓`);
+        setTimeout(()=>setSendSuccess(null),3000);
+      }else{
+        showToast(json.error??"Send failed",false);
+      }
+    }catch(e){showToast("Send failed — check console",false);console.error(e);}
+    finally{setSendLoading(null);}
+  }
+
   const [linkStats,setLinkStats]=useState<LinkStat[]>([]);
   const [statsLoading,setStatsLoading]=useState(false);
   const [totalViews,setTotalViews]=useState(0);
@@ -215,6 +315,7 @@ export default function AdminDashboard() {
   const [uniqueClickers,setUniqueClickers]=useState(0);
   const [dailyStats,setDailyStats]=useState<DailyStat[]>([]);
   const [timeRange,setTimeRange]=useState<7|30>(7);
+  const [hoverBarIdx,setHoverBarIdx]=useState<number|null>(null);
 
   function showToast(msg:string,ok=true){setToast({msg,ok});setTimeout(()=>setToast(null),3000);}
 
@@ -407,7 +508,7 @@ export default function AdminDashboard() {
     }
   }
   
-  useEffect(()=>{if(authed){fetchPoses();fetchSpots();fetchCategories();fetchPortfolioImages();fetchPosts();fetchSiteSettings();if(tab==="analytics")fetchLinkStats();if(tab==="inquiries")fetchInquiries();}},[authed,tab,blogCategory]);
+  useEffect(()=>{if(authed){fetchPoses();fetchSpots();fetchCategories();fetchPortfolioImages();fetchPosts();fetchSiteSettings();if(tab==="analytics")fetchLinkStats();if(tab==="inquiries"){fetchInquiries();fetchGmailStatus();}}},[authed,tab,blogCategory]);
 
   async function compressImage(file:File, maxPx=2400, quality=0.82):Promise<Blob>{
     return new Promise(resolve=>{
@@ -1464,8 +1565,8 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* Chart */}
-            <div className={card}>
+            {/* Chart — no overflow-hidden so tooltip never gets clipped */}
+            <div className="bg-white rounded-2xl border border-slate-100">
               <div className="h-[3px]" style={{background:C.grad90}}/>
               <div className="p-6">
                 <div className="flex flex-col gap-1 mb-6 md:flex-row md:items-end md:justify-between">
@@ -1482,71 +1583,89 @@ export default function AdminDashboard() {
                 {statsLoading?(
                   <div className="h-80 flex items-center justify-center text-slate-400 text-sm">Loading chart...</div>
                 ):(
-                  <div className="overflow-x-auto pb-2">
-                    <div className="relative min-w-[620px]">
-                    {/* Chart area */}
-                    <div className="h-80 flex items-end justify-between gap-2 px-4">
+                  <div style={{overflowX:'auto',paddingBottom:'8px'}}>
+                    <div className="relative" style={{minWidth:620}}>
+                    {/* Shared floating tooltip — renders at top, no overflow clip issues */}
+                    <div className="relative h-14 pointer-events-none">
+                      {hoverBarIdx!==null&&dailyStats[hoverBarIdx]&&(()=>{
+                        const s=dailyStats[hoverBarIdx];
+                        const d=dateFromKey(s.date);
+                        const col=hoverBarIdx/Math.max(dailyStats.length-1,1);
+                        const leftPct=Math.min(Math.max(col*100,5),85);
+                        return(
+                          <div className="absolute top-1 z-20 transition-all duration-150"
+                               style={{left:`${leftPct}%`,transform:col>0.7?"translateX(-90%)":col<0.2?"translateX(-5%)":"translateX(-50%)"}}>
+                            <div className="rounded-xl px-3 py-2 shadow-xl whitespace-nowrap" style={{background:"rgba(15,15,25,0.92)",backdropFilter:"blur(8px)"}}>
+                              <p className="text-xs font-bold text-white mb-1">
+                                {d.toLocaleDateString('en-US',{weekday:'short'})}, {d.toLocaleDateString('en-US',{month:'short',day:'numeric'})}
+                              </p>
+                              <div className="flex gap-3">
+                                <span className="text-xs" style={{color:`rgba(${[157,111,232].join(",")},0.9)`}}>👁 {s.views} views</span>
+                                <span className="text-xs" style={{color:`rgba(${[232,121,160].join(",")},0.9)`}}>🔗 {s.clicks} clicks</span>
+                                <span className="text-xs text-white/60">{fmtPercent(s.ctr)} CTR</span>
+                              </div>
+                            </div>
+                            {/* Arrow */}
+                            <div className="w-2 h-2 rotate-45 mt-[-4px] mx-auto" style={{background:"rgba(15,15,25,0.92)"}}/>
+                          </div>
+                        );
+                      })()}
+                    </div>
+
+                    {/* Chart bars */}
+                    <div className="flex items-end justify-between gap-2 px-4" style={{height:256}}>
                       {dailyStats.map((stat,i)=>{
                         const maxVal=Math.max(...dailyStats.map(s=>Math.max(s.clicks,s.views)),1);
                         const clickHeight=(stat.clicks/maxVal)*100;
                         const viewHeight=(stat.views/maxVal)*100;
                         const date=dateFromKey(stat.date);
-                        const dayLabel=date.toLocaleDateString('en-US',{weekday:'short'});
-                        const dateLabel=date.getDate();
-                        
+                        const isHovered=hoverBarIdx===i;
+
                         return(
-                          <div key={i} className="group flex-1 flex flex-col items-center gap-2 cursor-pointer relative">
-                            {/* Hover tooltip */}
-                            <div className="absolute -top-20 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10">
-                              <div className="rounded-xl px-3 py-2 shadow-xl whitespace-nowrap" style={{background:"rgba(0,0,0,0.9)"}}>
-                                <p className="text-xs font-bold text-white mb-1">{dayLabel}, {dateLabel}</p>
-                                <p className="text-xs text-white/70">{stat.views} views</p>
-                                <p className="text-xs text-white/70">{stat.clicks} clicks</p>
-                                <p className="text-xs text-white/70">{fmtPercent(stat.ctr)} CTR</p>
-                              </div>
-                            </div>
-                            
+                          <div key={i}
+                            className="flex-1 flex flex-col items-center gap-2 cursor-pointer"
+                            onMouseEnter={()=>setHoverBarIdx(i)}
+                            onMouseLeave={()=>setHoverBarIdx(null)}>
+
                             {/* Bars container */}
-                            <div className="w-full flex gap-1.5 items-end transition-all duration-300 group-hover:scale-105" style={{height:280}}>
+                            <div className="w-full flex gap-1.5 items-end transition-all duration-200"
+                                 style={{height:220,transform:isHovered?"scaleY(1.04)":"scaleY(1)",transformOrigin:"bottom"}}>
                               {/* Views bar */}
-                              <div className="flex-1 rounded-t-lg transition-all duration-500 ease-out relative overflow-hidden" 
+                              <div className="flex-1 rounded-t-lg transition-all duration-400 ease-out relative overflow-hidden"
                                    style={{
                                      height:`${viewHeight}%`,
-                                     background:`linear-gradient(180deg,${C.p1},${C.p1_35})`,
-                                     minHeight:viewHeight>0?8:0,
-                                     animationDelay:`${i*50}ms`,
-                                     boxShadow:`0 -4px 12px ${C.p1_15}`
-                                   }}>
-                                <div className="absolute inset-0" style={{background:`linear-gradient(180deg,transparent,rgba(255,255,255,0.2))`}}/>
-                              </div>
-                              
+                                     background:isHovered?`linear-gradient(180deg,${C.p1},${C.p1_35})`:`linear-gradient(180deg,${C.p1_25},${C.p1_15})`,
+                                     minHeight:viewHeight>0?6:0,
+                                     boxShadow:isHovered?`0 -4px 16px ${C.p1_25}`:"none",
+                                     transition:"background 0.15s,box-shadow 0.15s,height 0.4s",
+                                   }}/>
+
                               {/* Clicks bar */}
-                              <div className="flex-1 rounded-t-lg transition-all duration-500 ease-out relative overflow-hidden" 
+                              <div className="flex-1 rounded-t-lg transition-all duration-400 ease-out relative overflow-hidden"
                                    style={{
                                      height:`${clickHeight}%`,
-                                     background:`linear-gradient(180deg,${C.p2},${C.p2_30})`,
-                                     minHeight:clickHeight>0?8:0,
-                                     animationDelay:`${i*50+25}ms`,
-                                     boxShadow:`0 -4px 12px ${C.p2_15}`
-                                   }}>
-                                <div className="absolute inset-0" style={{background:`linear-gradient(180deg,transparent,rgba(255,255,255,0.2))`}}/>
-                              </div>
+                                     background:isHovered?`linear-gradient(180deg,${C.p2},${C.p2_30})`:`linear-gradient(180deg,${C.p2_20},${C.p2_12})`,
+                                     minHeight:clickHeight>0?6:0,
+                                     boxShadow:isHovered?`0 -4px 16px ${C.p2_20}`:"none",
+                                     transition:"background 0.15s,box-shadow 0.15s,height 0.4s",
+                                   }}/>
                             </div>
-                            
+
                             {/* Date labels */}
-                            <div className="text-center">
-                              <p className="text-xs font-black text-slate-900 transition-colors group-hover:text-violet-600">{dateLabel}</p>
-                              <p className="text-[10px] font-bold text-slate-300 uppercase">{dayLabel}</p>
+                            <div className="text-center transition-colors duration-150">
+                              <p className="text-xs font-black transition-colors" style={{color:isHovered?C.p1:"#1e293b"}}>{date.getDate()}</p>
+                              <p className="text-[10px] font-bold uppercase" style={{color:isHovered?C.p1:"#cbd5e1"}}>{date.toLocaleDateString('en-US',{weekday:'short'})}</p>
                             </div>
                           </div>
                         );
                       })}
                     </div>
-                    
+
                     {/* Y-axis grid lines */}
-                    <div className="absolute inset-0 pointer-events-none flex flex-col justify-between px-4" style={{paddingBottom:56}}>
-                      {[...Array(5)].map((_,i)=>(
-                        <div key={i} className="w-full h-px" style={{background:"rgba(0,0,0,0.03)"}}/>
+                    <div className="absolute pointer-events-none flex flex-col justify-between px-4"
+                         style={{top:56,left:0,right:0,bottom:56}}>
+                      {[...Array(4)].map((_,i)=>(
+                        <div key={i} className="w-full h-px" style={{background:"rgba(0,0,0,0.04)"}}/>
                       ))}
                     </div>
                     </div>
@@ -1669,160 +1788,410 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            <div className={card}>
-              <div className="h-[3px]" style={{background:C.grad90_12}}/>
-              <div className="p-6">
-                <div className="flex items-center justify-between mb-5">
-                  <div>
-                    <h2 className="text-base font-black text-slate-900">Contact Inquiries</h2>
-                    <p className="text-xs font-medium text-slate-400">{inquiries.length} total · newest first</p>
+            {/* ── Gmail connection card ── */}
+            <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
+              <div className="h-[3px]" style={{background:gmailConnected?"linear-gradient(90deg,#34d399,#10b981)":C.grad90_12}}/>
+              <div className="p-5 flex items-center justify-between gap-4 flex-wrap">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg flex-shrink-0"
+                       style={{background:gmailConnected?"rgba(16,185,129,0.1)":C.p1_08}}>
+                    {gmailConnected?"✉️":"🔗"}
                   </div>
-                  <button onClick={fetchInquiries} disabled={inquiriesLoading} className="text-xs font-bold px-3 py-1.5 rounded-lg transition-all hover:opacity-80" style={{background:C.grad12,color:"#fff"}}>
-                    {inquiriesLoading?"Loading…":"Refresh"}
-                  </button>
+                  <div>
+                    <p className="text-sm font-black text-slate-900">
+                      {gmailConnected?"Gmail Connected":"Connect Gmail"}
+                    </p>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      {gmailConnected
+                        ?<>Sending as <span className="font-semibold text-slate-600">{gmailEmail}</span> · emails send directly from your inbox</>
+                        :"Link your Gmail to send replies without leaving this page"}
+                    </p>
+                  </div>
                 </div>
-                {inquiriesLoading?(
-                  <div className="text-center py-12 text-slate-400 text-sm">Loading inquiries…</div>
-                ):inquiries.length===0?(
-                  <div className="text-center py-12 text-slate-400 text-sm">No inquiries yet.</div>
-                ):(
-                  <div className="space-y-3">
-                    {inquiries.map(inq=>(
-                      <div key={inq.id} className="rounded-xl border border-slate-100 overflow-hidden">
-                        {/* Header row */}
-                        <div className="flex items-start justify-between gap-3 p-4 bg-slate-50">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <p className="text-sm font-black text-slate-900">{inq.name}</p>
-                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${inq.status==="new"?"bg-emerald-100 text-emerald-700":inq.status==="responded"?"bg-blue-100 text-blue-700":"bg-slate-200 text-slate-500"}`}>
-                                {inq.status}
-                              </span>
-                            </div>
-                            <p className="text-xs text-slate-400 mt-0.5">{new Date(inq.created_at).toLocaleString("en-US",{month:"short",day:"numeric",year:"numeric",hour:"numeric",minute:"2-digit"})}</p>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {gmailConnected?(
+                    <button onClick={disconnectGmail}
+                      className="text-xs font-bold px-3 py-1.5 rounded-lg transition-all hover:opacity-80"
+                      style={{background:"rgba(239,68,68,0.08)",color:"#dc2626"}}>
+                      Disconnect
+                    </button>
+                  ):(
+                    <a href="/api/gmail/auth"
+                      className="text-xs font-bold px-4 py-2 rounded-xl transition-all hover:opacity-80 flex items-center gap-1.5"
+                      style={{background:C.grad12,color:"#fff"}}>
+                      Connect Gmail →
+                    </a>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Inquiry list */}
+            <div className="space-y-3">
+              {/* Header row */}
+              <div className="flex items-center justify-between px-1">
+                <div>
+                  <h2 className="text-base font-black text-slate-900">Contact Inquiries</h2>
+                  <p className="text-xs font-medium text-slate-400 mt-0.5">
+                    {inquiries.filter(i=>i.status==="new").length} new · {inquiries.length} total
+                  </p>
+                </div>
+                <button onClick={fetchInquiries} disabled={inquiriesLoading}
+                  className="text-xs font-bold px-3 py-1.5 rounded-lg transition-all hover:opacity-80 flex items-center gap-1.5"
+                  style={{background:C.grad12,color:"#fff"}}>
+                  {inquiriesLoading?"Loading…":"↻ Refresh"}
+                </button>
+              </div>
+
+              {inquiriesLoading?(
+                <div className="text-center py-16 text-slate-400 text-sm bg-white rounded-2xl border border-slate-100">Loading inquiries…</div>
+              ):inquiries.length===0?(
+                <div className="text-center py-16 bg-white rounded-2xl border border-slate-100">
+                  <p className="text-2xl mb-2">📭</p>
+                  <p className="text-slate-500 font-semibold">No inquiries yet</p>
+                  <p className="text-xs text-slate-400 mt-1">New contact form submissions will appear here</p>
+                </div>
+              ):(
+                inquiries.map(inq=>{
+                  const isOpen=editingInquiry?.id===inq.id;
+                  const statusColor=inq.status==="new"?"#10b981":inq.status==="responded"?"#3b82f6":"#94a3b8";
+                  const statusBg=inq.status==="new"?"rgba(16,185,129,0.08)":inq.status==="responded"?"rgba(59,130,246,0.08)":"rgba(148,163,184,0.08)";
+                  const hasDraft=!!drafts[inq.id];
+
+                  return(
+                    <div key={inq.id} className="bg-white rounded-2xl border border-slate-100 overflow-hidden transition-shadow hover:shadow-md"
+                         style={{borderLeft:`3px solid ${statusColor}`}}>
+
+                      {/* ── Card header (always visible) ── */}
+                      <div className="flex items-stretch">
+                        {/* Clickable info area — div so links inside remain functional */}
+                        <div
+                          onClick={()=>setEditingInquiry(isOpen?null:inq)}
+                          className="flex-1 min-w-0 p-4 sm:p-5 hover:bg-slate-50/70 transition-colors duration-150 cursor-pointer">
+                          <div className="flex items-center gap-2 flex-wrap mb-1">
+                            <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full"
+                                  style={{background:statusBg,color:statusColor}}>
+                              {inq.status==="new"?"● New":inq.status==="responded"?"✓ Responded":"○ Archived"}
+                            </span>
+                            <p className="text-sm font-black text-slate-900">{inq.name}</p>
+                            <p className="text-xs text-slate-400">
+                              {new Date(inq.created_at).toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"})}
+                            </p>
                           </div>
-                          <div className="flex gap-2 flex-shrink-0">
-                            <select value={inq.status} onChange={e=>updateInquiryStatus(inq.id,e.target.value)}
-                              className="text-xs font-bold px-2 py-1 rounded-lg border border-slate-200 bg-white text-slate-600 outline-none">
-                              <option value="new">new</option>
-                              <option value="responded">responded</option>
-                              <option value="archived">archived</option>
-                            </select>
-                            <button onClick={()=>setEditingInquiry(editingInquiry?.id===inq.id?null:inq)}
-                              className="text-xs font-bold px-3 py-1 rounded-lg transition-all hover:opacity-80 bg-slate-200 text-slate-700">
-                              {editingInquiry?.id===inq.id?"Close":"View"}
-                            </button>
-                            {inquiryDeleteConfirm===inq.id?(
-                              <div className="flex gap-1">
-                                <button onClick={()=>deleteInquiry(inq.id)} className="text-xs font-bold px-2 py-1 rounded-lg bg-red-500 text-white">Yes</button>
-                                <button onClick={()=>setInquiryDeleteConfirm(null)} className="text-xs font-bold px-2 py-1 rounded-lg bg-slate-200 text-slate-600">No</button>
-                              </div>
-                            ):(
-                              <button onClick={()=>setInquiryDeleteConfirm(inq.id)} className="text-xs font-bold px-2 py-1 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition-all">Delete</button>
+                          {/* Contact + session info — links stop propagation so they don't toggle the card */}
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs mb-2.5">
+                            <a href={`mailto:${inq.email}`}
+                               onClick={e=>e.stopPropagation()}
+                               className="font-semibold hover:underline"
+                               style={{color:C.p1}}>{inq.email}</a>
+                            {inq.phone&&(
+                              <>
+                                <span className="text-slate-300">·</span>
+                                <a href={`tel:${inq.phone}`}
+                                   onClick={e=>e.stopPropagation()}
+                                   className="font-medium text-slate-600 hover:underline hover:text-slate-900 transition-colors">
+                                  {inq.phone}
+                                </a>
+                              </>
                             )}
+                            {inq.session_type&&<><span className="text-slate-300">·</span><span className="font-semibold text-slate-600">{inq.session_type}</span></>}
+                            {inq.date_in_mind&&<><span className="text-slate-300">·</span><span className="text-slate-600">{inq.date_in_mind}</span></>}
                           </div>
+                          {/* Message preview */}
+                          {!isOpen?(
+                            <div>
+                              <p className="text-xs text-slate-700 leading-relaxed line-clamp-2 font-medium">
+                                &ldquo;{inq.message}&rdquo;
+                              </p>
+                              {inq.message.length>120&&(
+                                <p className="text-[10px] font-bold mt-1" style={{color:C.p1}}>Read full message ↓</p>
+                              )}
+                            </div>
+                          ):(
+                            <p className="text-[10px] font-bold" style={{color:C.p1}}>▲ Collapse</p>
+                          )}
                         </div>
-                        {/* Detail panel */}
-                        {editingInquiry?.id===inq.id&&(
-                          <div className="p-4 border-t border-slate-100 space-y-3">
-                            {[
-                              {label:"Email",value:<a href={`mailto:${inq.email}`} className="text-blue-600 hover:underline">{inq.email}</a>},
-                              inq.phone&&{label:"Phone",value:inq.phone},
-                              inq.session_type&&{label:"Session",value:inq.session_type},
-                              inq.date_in_mind&&{label:"Date in mind",value:inq.date_in_mind},
-                            ].filter(Boolean).map((row,i)=>{
-                              const r=row as {label:string;value:React.ReactNode};
-                              return(
-                                <div key={i} className="flex gap-4">
-                                  <span className="text-[10px] font-bold uppercase tracking-widest text-slate-300 min-w-[90px] pt-0.5">{r.label}</span>
-                                  <span className="text-sm text-slate-700">{r.value}</span>
-                                </div>
-                              );
-                            })}
-                            <div className="flex gap-4 pt-1">
-                              <span className="text-[10px] font-bold uppercase tracking-widest text-slate-300 min-w-[90px] pt-0.5">Message</span>
-                              <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{inq.message}</p>
+
+                        {/* Right: AI draft button (separate from expand) */}
+                        <div className="flex flex-col justify-center gap-2 p-3 sm:p-4 flex-shrink-0 border-l border-slate-100">
+                          <button
+                            onClick={e=>{e.stopPropagation();if(!isOpen)setEditingInquiry(inq);generateDraft(inq);}}
+                            disabled={draftLoading===inq.id}
+                            className="text-xs font-bold px-3 py-2 rounded-xl transition-all hover:opacity-80 disabled:opacity-50 flex items-center gap-1.5 whitespace-nowrap"
+                            style={{background:C.grad12,color:"#fff"}}>
+                            {draftLoading===inq.id?(
+                              <><span className="animate-spin inline-block">◌</span> Writing…</>
+                            ):hasDraft?(
+                              <>↻ Redraft</>
+                            ):(
+                              <>✦ Draft Reply</>
+                            )}
+                          </button>
+                          {hasDraft&&(
+                            <button
+                              onClick={e=>{e.stopPropagation();if(!isOpen)setEditingInquiry(inq);copyDraft(inq.id);}}
+                              className="text-[11px] font-bold px-3 py-1.5 rounded-xl transition-all hover:opacity-80 flex items-center gap-1 justify-center"
+                              style={draftCopied===inq.id?{background:"#10b981",color:"#fff"}:{background:C.p1_08,color:C.p1}}>
+                              {draftCopied===inq.id?"✓ Copied":"📋 Copy"}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* ── Expanded detail panel ── */}
+                      {isOpen&&(
+                        <div className="border-t border-slate-100">
+
+                          {/* Full message */}
+                          <div className="p-4 sm:p-5" style={{background:"rgba(248,250,252,0.6)"}}>
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Message</p>
+                            <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{inq.message}</p>
+                          </div>
+
+                          {/* ── AI Draft section ── */}
+                          <div className="p-4 sm:p-5 space-y-4 border-t border-slate-100">
+                            {/* Section header */}
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="flex items-center gap-2">
+                                <div className="w-6 h-6 rounded-lg flex items-center justify-center text-xs" style={{background:C.grad12}}>✦</div>
+                                <p className="text-sm font-black text-slate-900">AI Draft Reply</p>
+                              </div>
+                              <button
+                                onClick={()=>generateDraft(inq)}
+                                disabled={draftLoading===inq.id}
+                                className="text-xs font-bold px-3 py-1.5 rounded-lg transition-all hover:opacity-80 disabled:opacity-50 flex items-center gap-1.5"
+                                style={{background:C.p1_08,color:C.p1}}>
+                                {draftLoading===inq.id?<><span className="animate-spin inline-block">◌</span> Writing…</>:"↻ Regenerate"}
+                              </button>
                             </div>
 
-                            {/* ── AI Draft Reply ── */}
-                            <div className="pt-3 border-t border-slate-100">
-                              <div className="flex items-center justify-between gap-3 mb-2">
-                                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-300">AI Draft Reply</span>
-                                <button
-                                  onClick={()=>generateDraft(inq)}
-                                  disabled={draftLoading===inq.id}
-                                  className="text-xs font-bold px-3 py-1.5 rounded-lg transition-all hover:opacity-80 disabled:opacity-50 flex items-center gap-1.5"
-                                  style={{background:C.grad12,color:"#fff"}}
-                                >
-                                  {draftLoading===inq.id?(
-                                    <><span className="animate-spin inline-block">◌</span> Writing…</>
-                                  ):(
-                                    <>{drafts[inq.id]?"Regenerate":"✦ Draft with AI"}</>
-                                  )}
-                                </button>
-                              </div>
-                              {drafts[inq.id]&&(
+                            {/* Draft textarea */}
+                            {hasDraft?(
+                              <div className="space-y-2">
                                 <div className="relative">
                                   <textarea
                                     readOnly
                                     value={drafts[inq.id]}
-                                    rows={10}
-                                    className="w-full text-sm text-slate-700 leading-relaxed rounded-xl p-3 resize-y outline-none"
+                                    rows={9}
+                                    className="w-full text-sm text-slate-700 leading-relaxed rounded-xl p-4 resize-y outline-none"
                                     style={{border:`1px solid ${C.p1_20}`,background:C.p1_04,fontFamily:"inherit"}}
                                   />
                                   <button
                                     onClick={()=>copyDraft(inq.id)}
-                                    className="absolute top-2 right-2 text-xs font-bold px-2.5 py-1 rounded-lg transition-all"
-                                    style={draftCopied===inq.id?{background:"#10b981",color:"#fff"}:{background:"rgba(255,255,255,0.9)",color:C.p1,border:`1px solid ${C.p1_20}`}}
-                                  >
-                                    {draftCopied===inq.id?"Copied!":"Copy"}
+                                    className="absolute top-2.5 right-2.5 text-xs font-bold px-2.5 py-1 rounded-lg transition-all flex items-center gap-1"
+                                    style={draftCopied===inq.id?{background:"#10b981",color:"#fff"}:{background:"rgba(255,255,255,0.95)",color:C.p1,border:`1px solid ${C.p1_20}`,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
+                                    {draftCopied===inq.id?"✓ Copied":"📋 Copy"}
                                   </button>
-                                  <p className="text-[10px] text-slate-400 mt-1.5 font-medium">
-                                    Review before sending · paste into your email client and send from <strong>{inq.email}</strong>
-                                  </p>
                                 </div>
-                              )}
+                                {/* Send action row */}
+                                {gmailConnected?(
+                                  <button
+                                    onClick={()=>openCompose(inq)}
+                                    className="w-full text-sm font-bold py-2.5 rounded-xl transition-all hover:opacity-90 flex items-center justify-center gap-2"
+                                    style={{background:"linear-gradient(135deg,#10b981,#059669)",color:"#fff"}}>
+                                    ✉️ Send from Gmail
+                                  </button>
+                                ):(
+                                  <div className="flex items-center justify-between flex-wrap gap-2">
+                                    <p className="text-[11px] text-slate-400 font-medium">Copy → paste into Gmail → send to {inq.email}</p>
+                                    <a href={`mailto:${inq.email}?subject=Re: Your inquiry&body=${encodeURIComponent(drafts[inq.id])}`}
+                                       className="text-[11px] font-bold px-2.5 py-1 rounded-lg transition-all hover:opacity-80"
+                                       style={{background:C.p2_08,color:C.p2}}>
+                                      Open in Gmail →
+                                    </a>
+                                  </div>
+                                )}
+                              </div>
+                            ):(
+                              <div className="rounded-xl p-6 text-center" style={{border:`1px dashed ${C.p1_20}`,background:C.p1_04}}>
+                                <p className="text-sm text-slate-500">Click <strong>✦ Draft Reply</strong> to generate a personalized email</p>
+                                <p className="text-xs text-slate-400 mt-1">Uses your style guide + live availability data</p>
+                              </div>
+                            )}
 
-                              {/* ── Refinement row ── */}
-                              {drafts[inq.id]&&(
-                                <div className="space-y-2 pt-1">
-                                  <div className="flex gap-2">
-                                    <input
-                                      type="text"
-                                      value={draftFeedback[inq.id]??""}
-                                      onChange={e=>setDraftFeedback(p=>({...p,[inq.id]:e.target.value}))}
-                                      onKeyDown={e=>{if(e.key==="Enter"&&draftFeedback[inq.id]?.trim())generateDraft(inq,draftFeedback[inq.id]);}}
-                                      placeholder='What to change? e.g. "be more direct" or "remove the pricing mention"'
-                                      className="flex-1 text-xs px-3 py-2 rounded-lg outline-none"
-                                      style={{border:`1px solid ${C.p1_20}`,background:C.p1_04,color:"#334155",fontFamily:"inherit"}}
+                            {/* Refine row */}
+                            {hasDraft&&(
+                              <div className="space-y-2">
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Refine draft</p>
+                                <div className="flex gap-2">
+                                  <input
+                                    type="text"
+                                    value={draftFeedback[inq.id]??""}
+                                    onChange={e=>setDraftFeedback(p=>({...p,[inq.id]:e.target.value}))}
+                                    onKeyDown={e=>{if(e.key==="Enter"&&draftFeedback[inq.id]?.trim())generateDraft(inq,draftFeedback[inq.id]);}}
+                                    placeholder='e.g. "be more direct" · "remove the pricing mention" · "add turnaround time"'
+                                    className="flex-1 text-xs px-3 py-2.5 rounded-xl outline-none"
+                                    style={{border:`1px solid ${C.p1_20}`,background:"#fff",color:"#334155",fontFamily:"inherit"}}
+                                  />
+                                  <button
+                                    onClick={()=>{if(draftFeedback[inq.id]?.trim())generateDraft(inq,draftFeedback[inq.id]);}}
+                                    disabled={!draftFeedback[inq.id]?.trim()||draftLoading===inq.id}
+                                    className="text-xs font-bold px-4 py-2.5 rounded-xl transition-all hover:opacity-80 disabled:opacity-30 flex-shrink-0"
+                                    style={{background:C.grad12,color:"#fff"}}>
+                                    {draftLoading===inq.id?"…":"Refine"}
+                                  </button>
+                                </div>
+                                {draftFeedback[inq.id]?.trim()&&(
+                                  <button
+                                    onClick={()=>saveRuleFromFeedback(inq.id)}
+                                    className="text-[11px] font-bold px-3 py-1.5 rounded-lg transition-all hover:opacity-80 flex items-center gap-1.5"
+                                    style={ruleSaved===inq.id?{background:"#10b981",color:"#fff"}:{background:"rgba(255,255,255,0.9)",color:C.p1,border:`1px solid ${C.p1_20}`}}>
+                                    {ruleSaved===inq.id?"✓ Saved to style guide":"➕ Always remember this"}
+                                  </button>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Learn from actual email */}
+                            {hasDraft&&(
+                              <div className="rounded-xl overflow-hidden" style={{border:`1px solid ${C.p1_12}`}}>
+                                <button
+                                  onClick={()=>setShowLearnPanel(p=>({...p,[inq.id]:!p[inq.id]}))}
+                                  className="w-full flex items-center justify-between px-4 py-3 transition-colors hover:bg-slate-50 text-left"
+                                  style={{background:showLearnPanel[inq.id]?C.p1_04:"transparent"}}>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-base">🧠</span>
+                                    <div>
+                                      <p className="text-xs font-bold text-slate-700">What did you actually send?</p>
+                                      <p className="text-[10px] text-slate-400">Paste your email → Claude extracts style rules automatically</p>
+                                    </div>
+                                  </div>
+                                  <span className="text-slate-400 text-xs">{showLearnPanel[inq.id]?"▲":"▼"}</span>
+                                </button>
+                                {showLearnPanel[inq.id]&&(
+                                  <div className="p-4 space-y-3 border-t border-slate-100" style={{background:C.p1_04}}>
+                                    <textarea
+                                      value={actualSent[inq.id]??""}
+                                      onChange={e=>setActualSent(p=>({...p,[inq.id]:e.target.value}))}
+                                      placeholder="Paste the final email you sent here…"
+                                      rows={6}
+                                      className="w-full text-sm text-slate-700 leading-relaxed rounded-xl p-3 resize-y outline-none"
+                                      style={{border:`1px solid ${C.p1_20}`,background:"#fff",fontFamily:"inherit"}}
                                     />
                                     <button
-                                      onClick={()=>{if(draftFeedback[inq.id]?.trim())generateDraft(inq,draftFeedback[inq.id]);}}
-                                      disabled={!draftFeedback[inq.id]?.trim()||draftLoading===inq.id}
-                                      className="text-xs font-bold px-3 py-2 rounded-lg transition-all hover:opacity-80 disabled:opacity-30 flex-shrink-0"
-                                      style={{background:C.grad12,color:"#fff"}}
-                                    >
-                                      {draftLoading===inq.id?"…":"Refine"}
+                                      onClick={()=>analyzeAndLearn(inq)}
+                                      disabled={!actualSent[inq.id]?.trim()||learnLoading===inq.id}
+                                      className="text-xs font-bold px-4 py-2 rounded-xl transition-all hover:opacity-80 disabled:opacity-30 flex items-center gap-1.5"
+                                      style={{background:C.grad12,color:"#fff"}}>
+                                      {learnLoading===inq.id?<><span className="animate-spin inline-block">◌</span> Analyzing…</>:"🧠 Learn from this →"}
                                     </button>
+                                    {learnedRules[inq.id]?.length>0&&(
+                                      <div className="rounded-xl p-3 space-y-2.5" style={{background:"rgba(16,185,129,0.06)",border:"1px solid rgba(16,185,129,0.18)"}}>
+                                        <p className="text-[10px] font-bold uppercase tracking-widest" style={{color:"#10b981"}}>Rules extracted from your edits</p>
+                                        <ul className="space-y-1.5">
+                                          {learnedRules[inq.id].map((rule,i)=>(
+                                            <li key={i} className="text-xs text-slate-700 flex gap-2 items-start">
+                                              <span className="mt-0.5 flex-shrink-0" style={{color:"#10b981"}}>✓</span>
+                                              <span>{rule}</span>
+                                            </li>
+                                          ))}
+                                        </ul>
+                                        <button
+                                          onClick={()=>saveLearnedRules(inq.id)}
+                                          className="text-[11px] font-bold px-3 py-1.5 rounded-lg transition-all hover:opacity-80 flex items-center gap-1.5"
+                                          style={rulesSaved===inq.id?{background:"#10b981",color:"#fff"}:{background:"rgba(255,255,255,0.9)",color:C.p1,border:`1px solid ${C.p1_20}`}}>
+                                          {rulesSaved===inq.id?"✓ Saved to style guide":"💾 Save all rules"}
+                                        </button>
+                                      </div>
+                                    )}
                                   </div>
-                                  {draftFeedback[inq.id]?.trim()&&(
-                                    <button
-                                      onClick={()=>saveRuleFromFeedback(inq.id)}
-                                      className="text-[11px] font-bold px-2.5 py-1 rounded-lg transition-all hover:opacity-80"
-                                      style={ruleSaved===inq.id?{background:"#10b981",color:"#fff"}:{background:"rgba(255,255,255,0.9)",color:C.p1,border:`1px solid ${C.p1_20}`}}
-                                    >
-                                      {ruleSaved===inq.id?"Saved to style guide ✓":"➕ Always remember this"}
-                                    </button>
-                                  )}
+                                )}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* ── Compose & send panel (Gmail connected) ── */}
+                          {composeOpen[inq.id]&&(
+                            <div className="border-t border-slate-100 p-4 sm:p-5 space-y-3" style={{background:"rgba(16,185,129,0.03)"}}>
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-base">✉️</span>
+                                  <p className="text-sm font-black text-slate-900">Send Email</p>
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{background:"rgba(16,185,129,0.1)",color:"#10b981"}}>via {gmailEmail}</span>
                                 </div>
+                                <button onClick={()=>setComposeOpen(p=>({...p,[inq.id]:false}))} className="text-slate-400 hover:text-slate-600 text-lg leading-none">×</button>
+                              </div>
+                              {/* To (read-only) */}
+                              <div className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm" style={{background:"rgba(0,0,0,0.03)",border:"1px solid rgba(0,0,0,0.06)"}}>
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 flex-shrink-0">To</span>
+                                <span className="text-slate-700 font-medium">{inq.name} &lt;{inq.email}&gt;</span>
+                              </div>
+                              {/* Subject */}
+                              <div>
+                                <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 block mb-1">Subject</label>
+                                <input
+                                  type="text"
+                                  value={composeSubject[inq.id]??""}
+                                  onChange={e=>setComposeSubject(p=>({...p,[inq.id]:e.target.value}))}
+                                  className="w-full text-sm text-slate-700 px-3 py-2 rounded-xl outline-none font-medium"
+                                  style={{border:`1px solid ${C.p1_20}`,background:"#fff",fontFamily:"inherit"}}
+                                />
+                              </div>
+                              {/* Body */}
+                              <div>
+                                <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 block mb-1">Message</label>
+                                <textarea
+                                  value={composeBody[inq.id]??""}
+                                  onChange={e=>setComposeBody(p=>({...p,[inq.id]:e.target.value}))}
+                                  rows={10}
+                                  className="w-full text-sm text-slate-700 leading-relaxed rounded-xl p-3 resize-y outline-none"
+                                  style={{border:`1px solid ${C.p1_20}`,background:"#fff",fontFamily:"inherit"}}
+                                />
+                              </div>
+                              {/* Send button */}
+                              <div className="flex items-center gap-3">
+                                <button
+                                  onClick={()=>sendEmail(inq)}
+                                  disabled={!composeSubject[inq.id]?.trim()||!composeBody[inq.id]?.trim()||sendLoading===inq.id}
+                                  className="flex-1 text-sm font-black py-3 rounded-xl transition-all hover:opacity-90 disabled:opacity-40 flex items-center justify-center gap-2"
+                                  style={{background:"linear-gradient(135deg,#10b981,#059669)",color:"#fff"}}>
+                                  {sendLoading===inq.id?(
+                                    <><span className="animate-spin inline-block">◌</span> Sending…</>
+                                  ):(
+                                    <>✉️ Send now</>
+                                  )}
+                                </button>
+                                <button onClick={()=>setComposeOpen(p=>({...p,[inq.id]:false}))}
+                                  className="text-xs font-bold px-4 py-3 rounded-xl transition-all hover:opacity-80"
+                                  style={{background:"rgba(0,0,0,0.05)",color:"#64748b"}}>
+                                  Cancel
+                                </button>
+                              </div>
+                              <p className="text-[10px] text-slate-400 text-center">Sends from your Gmail · goes into Sent Mail · client sees your real address</p>
+                            </div>
+                          )}
+
+                          {/* ── Footer: status + delete ── */}
+                          <div className="px-4 sm:px-5 py-3 border-t border-slate-100 flex items-center justify-between gap-3 flex-wrap" style={{background:"rgba(248,250,252,0.6)"}}>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mr-1">Status</span>
+                              {(["new","responded","archived"] as const).map(s=>(
+                                <button key={s}
+                                  onClick={()=>updateInquiryStatus(inq.id,s)}
+                                  className="text-[11px] font-bold px-2.5 py-1 rounded-lg transition-all hover:opacity-80 capitalize"
+                                  style={inq.status===s?{background:s==="new"?"rgba(16,185,129,0.15)":s==="responded"?"rgba(59,130,246,0.12)":"rgba(148,163,184,0.15)",color:s==="new"?"#10b981":s==="responded"?"#3b82f6":"#94a3b8",fontWeight:800}:{background:"rgba(0,0,0,0.04)",color:"#94a3b8"}}>
+                                  {s==="new"?"● New":s==="responded"?"✓ Responded":"○ Archive"}
+                                </button>
+                              ))}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {inquiryDeleteConfirm===inq.id?(
+                                <div className="flex gap-1.5 items-center">
+                                  <span className="text-xs text-slate-500">Delete?</span>
+                                  <button onClick={()=>deleteInquiry(inq.id)} className="text-xs font-bold px-2.5 py-1 rounded-lg bg-red-500 text-white">Yes</button>
+                                  <button onClick={()=>setInquiryDeleteConfirm(null)} className="text-xs font-bold px-2.5 py-1 rounded-lg bg-slate-200 text-slate-600">No</button>
+                                </div>
+                              ):(
+                                <button onClick={()=>setInquiryDeleteConfirm(inq.id)} className="text-xs font-medium px-2.5 py-1 rounded-lg transition-all hover:bg-red-50 hover:text-red-500 text-slate-400">🗑 Delete</button>
                               )}
                             </div>
                           </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
         )}

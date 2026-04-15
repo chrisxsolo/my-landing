@@ -1,14 +1,21 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/draft-reply
 //
-// Admin-only endpoint. Takes an inquiry and asks Claude to draft a reply email.
-// Pulls live availability data AND your saved reply style from site_settings.
+// Admin-only endpoint. Three modes:
 //
-// Request body:
-//   { name, email, phone?, session_type?, date_in_mind?, message }
+// 1. Fresh draft
+//    Body: { name, email, phone?, session_type?, date_in_mind?, message }
+//    Response: { draft: "Hi Ryan, ..." }
 //
-// Response:
-//   { draft: "Hi Ryan, ..." }
+// 2. Refinement
+//    Body: { ...same, previous_draft, feedback }
+//    Response: { draft: "Hi Ryan, ..." }  (revised)
+//
+// 3. Analyze & learn
+//    Body: { name, email, message, ai_draft, actual_sent }
+//    Response: { rules: ["be more direct", "skip the weather mention", ...] }
+//    Claude compares the AI draft vs what Chris actually sent and extracts
+//    concrete style rules to save for future drafts.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
@@ -59,7 +66,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }
 
-  const { name, email, session_type, date_in_mind, message, phone, previous_draft, feedback } = body;
+  const { name, email, session_type, date_in_mind, message, phone, previous_draft, feedback, ai_draft, actual_sent } = body;
 
   if (!name || !email || !message) {
     return NextResponse.json(
@@ -68,7 +75,58 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const isRefinement = Boolean(previous_draft && feedback);
+  const isAnalyze    = Boolean(ai_draft && actual_sent);
+  const isRefinement = !isAnalyze && Boolean(previous_draft && feedback);
+
+  // ── Mode 3: Analyze & learn ──────────────────────────────────────────────
+  if (isAnalyze) {
+    try {
+      const client = new Anthropic({ apiKey });
+      const response = await client.messages.create({
+        model: "claude-sonnet-4-5",
+        max_tokens: 500,
+        system: `You are a writing-style analyst. Your job is to compare two email drafts and produce a short, concrete list of style rules that capture how the final version differs from the draft. Each rule should be a single actionable instruction (e.g. "skip the opening weather comment", "be more direct — cut the warm-up sentences", "always mention the turnaround time"). No fluff, no praise, no explanation — just the rules, one per line, starting with a dash.`,
+        messages: [
+          {
+            role: "user",
+            content: `Here is the AI-generated draft:
+
+---
+${ai_draft}
+---
+
+Here is what Chris actually sent instead:
+
+---
+${actual_sent}
+---
+
+List the concrete style rules Claude should follow in future drafts based on the differences. Output only the rules, one per line starting with a dash, nothing else.`,
+          },
+        ],
+      });
+
+      const raw = response.content
+        .filter((b) => b.type === "text")
+        .map((b) => (b as { type: "text"; text: string }).text)
+        .join("")
+        .trim();
+
+      // Parse dash-prefixed lines into an array of rule strings
+      const rules = raw
+        .split("\n")
+        .map((line) => line.replace(/^[-–•*]\s*/, "").trim())
+        .filter((line) => line.length > 0);
+
+      return NextResponse.json({ rules });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("Claude analyze error:", msg);
+      return NextResponse.json({ error: `Analysis failed: ${msg}` }, { status: 500 });
+    }
+  }
+
+  // ── Modes 1 & 2: Fresh draft or refinement ───────────────────────────────
 
   // Fetch both in parallel
   const [availability, replyStyle] = await Promise.all([
