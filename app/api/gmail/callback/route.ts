@@ -18,10 +18,18 @@ export async function GET(req: NextRequest) {
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET ?? "";
   const redirectUri  = `${siteUrl}/api/gmail/callback`;
 
-  const code  = req.nextUrl.searchParams.get("code");
-  const error = req.nextUrl.searchParams.get("error");
+  const code        = req.nextUrl.searchParams.get("code");
+  const error       = req.nextUrl.searchParams.get("error");
+  const stateParam  = req.nextUrl.searchParams.get("state");
+  const storedState = req.cookies.get("oauth_state")?.value;
 
   if (error || !code) {
+    return NextResponse.redirect(`${siteUrl}/admin?tab=inquiries&gmail=error`);
+  }
+
+  // Validate CSRF state — reject if missing or mismatched
+  if (!stateParam || !storedState || stateParam !== storedState) {
+    console.error("OAuth state mismatch — possible CSRF attack");
     return NextResponse.redirect(`${siteUrl}/admin?tab=inquiries&gmail=error`);
   }
 
@@ -78,5 +86,8 @@ export async function GET(req: NextRequest) {
     { onConflict: "key" }
   );
 
-  return NextResponse.redirect(`${siteUrl}/admin?tab=inquiries&gmail=connected`);
+  const successRes = NextResponse.redirect(`${siteUrl}/admin?tab=inquiries&gmail=connected`);
+  // Clear the one-time state cookie
+  successRes.cookies.set("oauth_state", "", { httpOnly: true, maxAge: 0, path: "/" });
+  return successRes;
 }

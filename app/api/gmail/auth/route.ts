@@ -10,6 +10,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextResponse } from "next/server";
+import { randomBytes } from "crypto";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +27,9 @@ export async function GET() {
 
   const redirectUri = `${siteUrl}/api/gmail/callback`;
 
+  // Generate a random state value to prevent CSRF attacks on the OAuth callback
+  const state = randomBytes(16).toString("hex");
+
   const params = new URLSearchParams({
     client_id:     clientId,
     redirect_uri:  redirectUri,
@@ -37,9 +41,21 @@ export async function GET() {
     ].join(" "),
     access_type: "offline",
     prompt:      "consent", // always get a refresh token
+    state,
   });
 
-  return NextResponse.redirect(
+  const res = NextResponse.redirect(
     `https://accounts.google.com/o/oauth2/v2/auth?${params}`
   );
+
+  // Store state in a short-lived httpOnly cookie — verified in the callback
+  res.cookies.set("oauth_state", state, {
+    httpOnly: true,
+    secure:   process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge:   600, // 10 minutes — plenty of time to complete OAuth
+    path:     "/",
+  });
+
+  return res;
 }

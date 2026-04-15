@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }
 
-  const { name, email, session_type, date_in_mind, message, phone, previous_draft, feedback, ai_draft, actual_sent, thread_context } = body;
+  const { name, email, session_type, date_in_mind, message, phone, previous_draft, feedback, ai_draft, actual_sent, thread_context, raw_draft } = body;
 
   if (!name || !email || !message) {
     return NextResponse.json(
@@ -77,6 +77,7 @@ export async function POST(req: NextRequest) {
 
   const isAnalyze    = Boolean(ai_draft && actual_sent);
   const isRefinement = !isAnalyze && Boolean(previous_draft && feedback);
+  const isPolish     = !isAnalyze && !isRefinement && Boolean(raw_draft);
 
   // ── Mode 3: Analyze & learn ──────────────────────────────────────────────
   if (isAnalyze) {
@@ -123,6 +124,65 @@ List the concrete style rules Claude should follow in future drafts based on the
       const msg = err instanceof Error ? err.message : String(err);
       console.error("Claude analyze error:", msg);
       return NextResponse.json({ error: `Analysis failed: ${msg}` }, { status: 500 });
+    }
+  }
+
+  // ── Mode 4: Polish / bullet-to-email ────────────────────────────────────────
+  if (isPolish) {
+    const [availability, replyStyle] = await Promise.all([
+      fetchAvailability(),
+      fetchReplyStyle(),
+    ]);
+
+    const styleSection = replyStyle
+      ? `\n\nAdditional style instructions from Chris (follow these closely):\n${replyStyle}`
+      : "";
+
+    const systemPrompt = `You are Chris Solorzano, a Bay Area graduation and family photographer. You run soloxsnaps.com.
+
+Your tone is warm, personal, and direct — not overly formal, not salesy. You sound like a real person.
+
+Always:
+- Plain text only — no markdown, no bold, no asterisks, no bullet points in the output
+- Start directly with "Hi [Name]," — no subject line
+- Sign as "Chris"
+- Keep it concise` + styleSection;
+
+    try {
+      const client = new Anthropic({ apiKey });
+      const response = await client.messages.create({
+        model: "claude-sonnet-4-5",
+        max_tokens: 600,
+        system: systemPrompt,
+        messages: [{
+          role: "user",
+          content: `Polish the following rough email draft into a proper, well-formatted email in your voice.
+
+Fix any typos, improve the flow, and make it sound natural and professional. If it's written as bullet points or fragments, convert it to proper paragraphs.
+
+Keep all the key information — do not add or remove facts. Just clean it up and make it sound like you.
+
+This is a reply to ${name} about a ${session_type ?? "photography"} session.
+
+Rough draft:
+---
+${raw_draft}
+---
+
+Output only the polished email body, nothing else.`,
+        }],
+      });
+
+      const draft = response.content
+        .filter((b) => b.type === "text")
+        .map((b) => (b as { type: "text"; text: string }).text)
+        .join("")
+        .trim();
+
+      return NextResponse.json({ draft });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return NextResponse.json({ error: `Polish failed: ${msg}` }, { status: 500 });
     }
   }
 

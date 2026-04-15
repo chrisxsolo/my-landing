@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { useEffect, useRef, useState, useCallback, Suspense } from "react";
 import { useRouter } from "next/navigation";
 import { C } from "@/lib/colors";
-import { ADMIN_PASSWORD, checkAuth, setAuth } from "@/lib/adminAuth";
+import { checkAuth, login, logout as adminLogout } from "@/lib/adminAuth";
 import BayAreaLocationsManager from "@/app/admin/BayAreaLocationsManager";
 
 export const dynamic = 'force-dynamic'
@@ -710,10 +710,10 @@ function AdminDashboard() {
             <div className="h-[3px] rounded-full mb-6" style={{background:C.grad90}}/>
             <label className="block text-xs font-bold tracking-widest uppercase text-slate-400 mb-2">Password</label>
             <input type="password" value={pw} onChange={e=>{setPw(e.target.value);setPwErr(false);}}
-              onKeyDown={e=>{if(e.key==="Enter"){if(pw===ADMIN_PASSWORD){setAuth(true);setAuthed(true);}else setPwErr(true);}}}
+              onKeyDown={e=>{if(e.key==="Enter")login(pw).then(ok=>{if(ok)setAuthed(true);else setPwErr(true);});}}
               placeholder="Enter password" className={inp+" mb-4"} style={pwErr?{borderColor:C.p2}:{}}/>
             {pwErr&&<p className="text-xs font-semibold mb-3" style={{color:C.p2}}>Incorrect password</p>}
-            <button onClick={()=>{if(pw===ADMIN_PASSWORD){setAuth(true);setAuthed(true);}else setPwErr(true);}}
+            <button onClick={()=>login(pw).then(ok=>{if(ok)setAuthed(true);else setPwErr(true);})}
               className="w-full py-2.5 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90" style={{background:C.grad12}}>
               Enter →
             </button>
