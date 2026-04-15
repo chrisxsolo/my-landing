@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }
 
-  const { name, email, session_type, date_in_mind, message, phone } = body;
+  const { name, email, session_type, date_in_mind, message, phone, previous_draft, feedback } = body;
 
   if (!name || !email || !message) {
     return NextResponse.json(
@@ -67,6 +67,8 @@ export async function POST(req: NextRequest) {
       { status: 400 }
     );
   }
+
+  const isRefinement = Boolean(previous_draft && feedback);
 
   // Fetch both in parallel
   const [availability, replyStyle] = await Promise.all([
@@ -94,7 +96,17 @@ Always:
 
   const systemPrompt = baseInstructions + styleSection;
 
-  const userPrompt = `Draft a reply to this client inquiry:
+  const userPrompt = isRefinement
+    ? `You wrote this draft reply for a client inquiry:
+
+---
+${previous_draft}
+---
+
+Chris reviewed it and wants this changed: "${feedback}"
+
+Rewrite the reply incorporating that feedback. Keep everything else the same unless it conflicts with the requested change. Output only the revised reply, nothing else.`
+    : `Draft a reply to this client inquiry:
 
 Name: ${name}
 Email: ${email}${phone ? `\nPhone: ${phone}` : ""}${session_type ? `\nSession type: ${session_type}` : ""}${date_in_mind ? `\nDate they have in mind: ${date_in_mind}` : ""}

@@ -171,13 +171,17 @@ export default function AdminDashboard() {
   const [draftLoading,setDraftLoading]=useState<number|null>(null);
   const [drafts,setDrafts]=useState<Record<number,string>>({});
   const [draftCopied,setDraftCopied]=useState<number|null>(null);
+  const [draftFeedback,setDraftFeedback]=useState<Record<number,string>>({});
+  const [ruleSaved,setRuleSaved]=useState<number|null>(null);
 
-  async function generateDraft(inq:Inquiry){
+  async function generateDraft(inq:Inquiry, feedback?:string){
     setDraftLoading(inq.id);
     try{
-      const res=await fetch("/api/draft-reply",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:inq.name,email:inq.email,phone:inq.phone,session_type:inq.session_type,date_in_mind:inq.date_in_mind,message:inq.message})});
+      const payload:Record<string,string|null>={name:inq.name,email:inq.email,phone:inq.phone,session_type:inq.session_type,date_in_mind:inq.date_in_mind,message:inq.message};
+      if(feedback&&drafts[inq.id]){payload.previous_draft=drafts[inq.id];payload.feedback=feedback;}
+      const res=await fetch("/api/draft-reply",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
       const json=await res.json();
-      if(json.draft){setDrafts(p=>({...p,[inq.id]:json.draft}));}
+      if(json.draft){setDrafts(p=>({...p,[inq.id]:json.draft}));setDraftFeedback(p=>({...p,[inq.id]:""}))}
       else{showToast(json.error??"Draft failed",false);}
     }catch(e){showToast("Draft request failed",false);console.error(e);}
     finally{setDraftLoading(null);}
@@ -187,6 +191,20 @@ export default function AdminDashboard() {
     const text=drafts[id];
     if(!text)return;
     navigator.clipboard.writeText(text).then(()=>{setDraftCopied(id);setTimeout(()=>setDraftCopied(null),2000);});
+  }
+
+  async function saveRuleFromFeedback(id:number){
+    const fb=draftFeedback[id]?.trim();
+    if(!fb)return;
+    const current=siteSettings.reply_style??replyStyleDraft??"";
+    const newRule=`- ${fb}`;
+    const updated=(current.trim()?current.trim()+"\n"+newRule:newRule);
+    await supabase.from('site_settings').upsert({key:'reply_style',value:updated,updated_at:new Date().toISOString()},{onConflict:'key'});
+    setSiteSettings(p=>({...p,reply_style:updated}));
+    setReplyStyleDraft(updated);
+    setRuleSaved(id);
+    setTimeout(()=>setRuleSaved(null),2500);
+    showToast("Rule saved to style guide ✓");
   }
 
   const [linkStats,setLinkStats]=useState<LinkStat[]>([]);
@@ -1761,6 +1779,40 @@ export default function AdminDashboard() {
                                   <p className="text-[10px] text-slate-400 mt-1.5 font-medium">
                                     Review before sending · paste into your email client and send from <strong>{inq.email}</strong>
                                   </p>
+                                </div>
+                              )}
+
+                              {/* ── Refinement row ── */}
+                              {drafts[inq.id]&&(
+                                <div className="space-y-2 pt-1">
+                                  <div className="flex gap-2">
+                                    <input
+                                      type="text"
+                                      value={draftFeedback[inq.id]??""}
+                                      onChange={e=>setDraftFeedback(p=>({...p,[inq.id]:e.target.value}))}
+                                      onKeyDown={e=>{if(e.key==="Enter"&&draftFeedback[inq.id]?.trim())generateDraft(inq,draftFeedback[inq.id]);}}
+                                      placeholder='What to change? e.g. "be more direct" or "remove the pricing mention"'
+                                      className="flex-1 text-xs px-3 py-2 rounded-lg outline-none"
+                                      style={{border:`1px solid ${C.p1_20}`,background:C.p1_04,color:"#334155",fontFamily:"inherit"}}
+                                    />
+                                    <button
+                                      onClick={()=>{if(draftFeedback[inq.id]?.trim())generateDraft(inq,draftFeedback[inq.id]);}}
+                                      disabled={!draftFeedback[inq.id]?.trim()||draftLoading===inq.id}
+                                      className="text-xs font-bold px-3 py-2 rounded-lg transition-all hover:opacity-80 disabled:opacity-30 flex-shrink-0"
+                                      style={{background:C.grad12,color:"#fff"}}
+                                    >
+                                      {draftLoading===inq.id?"…":"Refine"}
+                                    </button>
+                                  </div>
+                                  {draftFeedback[inq.id]?.trim()&&(
+                                    <button
+                                      onClick={()=>saveRuleFromFeedback(inq.id)}
+                                      className="text-[11px] font-bold px-2.5 py-1 rounded-lg transition-all hover:opacity-80"
+                                      style={ruleSaved===inq.id?{background:"#10b981",color:"#fff"}:{background:"rgba(255,255,255,0.9)",color:C.p1,border:`1px solid ${C.p1_20}`}}
+                                    >
+                                      {ruleSaved===inq.id?"Saved to style guide ✓":"➕ Always remember this"}
+                                    </button>
+                                  )}
                                 </div>
                               )}
                             </div>
