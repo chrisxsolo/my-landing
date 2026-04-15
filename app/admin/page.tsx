@@ -1,7 +1,7 @@
 "use client";
 import { supabase } from '@/lib/supabase'
-import { useEffect, useRef, useState, useCallback } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useEffect, useRef, useState, useCallback, Suspense } from "react";
+import { useRouter } from "next/navigation";
 import { C } from "@/lib/colors";
 import { ADMIN_PASSWORD, checkAuth, setAuth } from "@/lib/adminAuth";
 import BayAreaLocationsManager from "@/app/admin/BayAreaLocationsManager";
@@ -70,8 +70,15 @@ function buildDailyStats(days:7|30,clicks:Pick<LinkClickEvent,"clicked_at">[],vi
     .sort((a,b)=>a.date.localeCompare(b.date));
 }
 
-export default function AdminDashboard() {
-  const searchParams=useSearchParams();
+export default function AdminPage() {
+  return (
+    <Suspense>
+      <AdminDashboard />
+    </Suspense>
+  );
+}
+
+function AdminDashboard() {
   const router=useRouter();
   const [authed,setAuthed]=useState(false);
   const [pw,setPw]=useState("");
@@ -82,6 +89,7 @@ export default function AdminDashboard() {
   // Check localStorage on mount + handle OAuth callback params
   useEffect(() => {
     if (checkAuth()) setAuthed(true);
+    const searchParams=new URLSearchParams(window.location.search);
     const gmailParam=searchParams.get("gmail");
     const tabParam=searchParams.get("tab") as Tab|null;
     if(tabParam)setTab(tabParam);
