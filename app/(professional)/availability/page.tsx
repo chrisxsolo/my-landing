@@ -67,265 +67,335 @@ const CSS = `
     from { opacity: 0; transform: translateY(20px); }
     to   { opacity: 1; transform: translateY(0); }
   }
+  @keyframes shimmer {
+    0%   { background-position: -200% center; }
+    100% { background-position:  200% center; }
+  }
+  @keyframes pulse {
+    0%,100% { opacity: 1; transform: scale(1); }
+    50%      { opacity: 0.45; transform: scale(0.75); }
+  }
 
   /* ── PAGE ─────────────────────────────────────────────────────────────────── */
   .avail-page {
-    background: #f5f6f4;
-    color: #101412;
-    font-family: var(--font-dm-sans), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #f6f1e9;
+    color: #1c1710;
+    font-family: var(--font-dm-sans), ui-sans-serif, system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
   }
   .avail-shell { width: min(1180px, calc(100% - 48px)); margin: 0 auto; }
 
-  /* ── HERO ─────────────────────────────────────────────────────────────────────
-     Light gradient header. padding-top clears the fixed nav bar. */
+  /* ── HERO ──────────────────────────────────────────────────────────────────── */
   .avail-hero {
-    padding: 120px 0 64px;
+    padding: 128px 0 72px;
+    position: relative;
+    overflow: hidden;
+    border-bottom: 1px solid rgba(160,130,90,0.1);
     background:
-      radial-gradient(ellipse 65% 60% at 8% 10%, rgba(162, 210, 196, 0.16) 0%, transparent 60%),
-      radial-gradient(ellipse 50% 55% at 92% 90%, rgba(130, 185, 175, 0.12) 0%, transparent 55%),
-      linear-gradient(to bottom, #eaf0ec 0%, #f5f6f4 100%);
-    border-bottom: 1px solid rgba(18, 24, 22, 0.07);
+      radial-gradient(ellipse 65% 70% at 5% 10%,  rgba(195,175,135,0.22) 0%, transparent 60%),
+      radial-gradient(ellipse 50% 55% at 95% 90%,  rgba(140,185,165,0.16) 0%, transparent 55%),
+      radial-gradient(ellipse 40% 40% at 60% 20%,  rgba(220,195,155,0.1)  0%, transparent 50%),
+      #f6f1e9;
   }
   .avail-hero-kicker {
-    margin: 0 0 16px;
-    color: #667f79;
-    font-size: 13px;
-    font-weight: 820;
-    animation: fadeUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+    margin: 0 0 18px;
+    display: inline-flex; align-items: center; gap: 8px;
+    color: rgba(88,138,118,0.85);
+    font-size: 12px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase;
+    animation: fadeUp 0.5s cubic-bezier(0.22,1,0.36,1) both;
+  }
+  .avail-hero-kicker::before {
+    content: '';
+    display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+    background: rgba(88,148,122,0.75);
+    box-shadow: 0 0 7px rgba(88,148,122,0.45);
+    animation: pulse 2.4s ease-in-out infinite;
   }
   .avail-hero-title {
     margin: 0;
-    color: #101412;
-    font-size: clamp(3.2rem, 8.5vw, 7.5rem);
+    font-size: clamp(3.4rem, 9vw, 8rem);
     font-weight: 900;
-    letter-spacing: -0.035em;
+    letter-spacing: -0.04em;
     line-height: 0.88;
     text-wrap: balance;
-    animation: fadeUp 0.65s 0.08s cubic-bezier(0.22, 1, 0.36, 1) both;
+    background: linear-gradient(135deg, #2a1f14 0%, #4a3828 45%, rgba(88,138,110,0.95) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: fadeUp 0.65s 0.08s cubic-bezier(0.22,1,0.36,1) both;
   }
   .avail-hero-sub {
-    margin: 20px 0 0;
-    color: #4b5a55;
-    font-size: 17px;
-    line-height: 1.7;
-    max-width: 480px;
-    animation: fadeUp 0.65s 0.16s cubic-bezier(0.22, 1, 0.36, 1) both;
+    margin: 22px 0 0;
+    color: rgba(80,60,38,0.52);
+    font-size: 17px; line-height: 1.7; max-width: 460px;
+    animation: fadeUp 0.65s 0.16s cubic-bezier(0.22,1,0.36,1) both;
   }
-
-  /* Chip row in the hero */
   .avail-hero-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-top: 24px;
-    animation: fadeUp 0.65s 0.24s cubic-bezier(0.22, 1, 0.36, 1) both;
+    display: flex; flex-wrap: wrap; gap: 8px;
+    margin-top: 28px;
+    animation: fadeUp 0.65s 0.24s cubic-bezier(0.22,1,0.36,1) both;
   }
-  /* Glass chips on light background */
   .avail-chip {
-    min-height: 34px;
-    display: inline-flex;
-    align-items: center;
-    padding: 0 12px;
-    border: 1px solid rgba(18, 24, 22, 0.1);
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.92);
-    color: #26312d;
-    font-size: 13px;
-    font-weight: 760;
-    font-family: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
+    min-height: 32px;
+    display: inline-flex; align-items: center; padding: 0 13px;
+    border: 1px solid rgba(160,130,90,0.18);
+    border-radius: 99px;
+    background: rgba(255,255,255,0.62);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    color: rgba(70,52,32,0.68);
+    font-size: 12px; font-weight: 700; letter-spacing: 0.01em;
   }
 
-  /* ── BODY (calendar + sidebar) ───────────────────────────────────────────── */
-  .avail-body { background: #f5f6f4; padding: 28px 0 100px; }
+  /* ── BODY ────────────────────────────────────────────────────────────────── */
+  .avail-body { padding: 32px 0 110px; }
   .avail-layout {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 330px;
-    gap: 16px;
+    grid-template-columns: minmax(0,1fr) 320px;
+    gap: 14px;
     align-items: start;
   }
 
-  /* ── CALENDAR CARD ─────────────────────────────────────────────────────────
-     Frosted glass card. */
+  /* ── GLASS CARD BASE ─────────────────────────────────────────────────────── */
   .avail-calendar, .avail-sidebar-panel {
-    border: 1px solid rgba(18, 24, 22, 0.09);
-    border-radius: 14px;
-    background: #ffffff;
-    box-shadow: 0 8px 32px rgba(18, 24, 22, 0.06);
+    border: 1px solid rgba(255,255,255,0.88);
+    border-radius: 20px;
+    background: rgba(255,255,255,0.68);
+    backdrop-filter: blur(28px);
+    -webkit-backdrop-filter: blur(28px);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.95),
+      0 2px 0 rgba(160,130,90,0.06),
+      0 20px 56px rgba(130,95,55,0.09),
+      0 4px 12px rgba(130,95,55,0.05);
   }
   .avail-calendar { overflow: hidden; }
 
+  /* ── CALENDAR HEADER ─────────────────────────────────────────────────────── */
   .avail-cal-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 16px;
-    padding: 18px;
-    border-bottom: 1px solid rgba(18, 24, 22, 0.07);
+    display: flex; justify-content: space-between; align-items: center; gap: 16px;
+    padding: 20px 20px 18px;
+    border-bottom: 1px solid rgba(160,130,90,0.08);
   }
   .avail-month {
     margin: 0;
-    color: #101412;
-    font-size: 24px;
-    font-weight: 860;
-    letter-spacing: -0.02em;
-    line-height: 1;
+    color: #1c1710;
+    font-size: 22px; font-weight: 860; letter-spacing: -0.025em; line-height: 1;
     text-align: center;
-    font-family: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
   }
   .avail-month-meta {
     margin: 5px 0 0;
-    color: #687571;
-    font-size: 13px;
-    font-weight: 720;
-    text-align: center;
-    font-family: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
+    color: rgba(88,138,118,0.6);
+    font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-align: center; text-transform: uppercase;
   }
   .avail-nav {
-    width: 44px; height: 44px;
-    border: 1px solid rgba(18, 24, 22, 0.1);
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.92);
-    color: #101412;
+    width: 40px; height: 40px; flex-shrink: 0;
+    border: 1px solid rgba(160,130,90,0.14);
+    border-radius: 10px;
+    background: rgba(255,255,255,0.75);
+    color: rgba(60,44,26,0.65);
     cursor: pointer;
-    font-size: 20px;
-    font-weight: 820;
-    font-family: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
-    transition: transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+    font-size: 16px; font-weight: 700;
+    transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
   }
-  .avail-nav:hover { transform: translateY(-1px); background: #eef8f5; box-shadow: 0 6px 16px rgba(18,24,22,0.07); }
+  .avail-nav:hover {
+    background: rgba(255,255,255,0.96);
+    border-color: rgba(88,148,122,0.28);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(130,95,55,0.1);
+  }
 
+  /* ── WEEKDAY LABELS ──────────────────────────────────────────────────────── */
   .avail-weekdays {
-    display: grid;
-    grid-template-columns: repeat(7, minmax(0, 1fr));
-    gap: 1px;
-    padding: 12px 14px 0;
+    display: grid; grid-template-columns: repeat(7, minmax(0,1fr));
+    gap: 1px; padding: 14px 16px 4px;
   }
   .avail-day-label {
-    min-height: 32px;
-    display: grid;
-    place-items: center;
-    color: #687571;
-    font-size: 12px;
-    font-weight: 820;
-    font-family: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
+    min-height: 30px; display: grid; place-items: center;
+    color: rgba(100,78,48,0.32);
+    font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
   }
-  .avail-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 7px; padding: 14px; }
 
-  /* Date button */
-  .avail-date-btn {
-    position: relative;
-    aspect-ratio: 1;
-    min-width: 0;
-    display: grid;
-    place-items: center;
-    border: 1px solid rgba(18, 24, 22, 0.08);
-    border-radius: 8px;
-    background: rgba(247, 250, 248, 0.86);
-    color: #31403a;
-    cursor: default;
-    font-size: 15px;
-    font-weight: 760;
-    font-family: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
-    transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+  /* ── DATE GRID ───────────────────────────────────────────────────────────── */
+  .avail-grid {
+    display: grid; grid-template-columns: repeat(7, minmax(0,1fr));
+    gap: 6px; padding: 12px 16px 16px;
   }
-  .avail-date-btn[data-clickable="true"]       { cursor: pointer; }
-  .avail-date-btn[data-clickable="true"]:hover { transform: translateY(-2px); }
-  .avail-date-btn[data-status="available"]     { border-color: rgba(112,139,133,0.3); background: rgba(112,139,133,0.1); color: #58746f; }
-  .avail-date-btn[data-status="hold"]          { border-color: rgba(189,214,75,0.66); background: rgba(214,243,106,0.42); color: #506000; }
-  .avail-date-btn[data-status="booked"],
-  .avail-date-btn[data-past="true"]            { background: rgba(228,234,231,0.78); color: #899591; }
-  .avail-date-btn[data-today="true"]           { box-shadow: inset 0 0 0 2px rgba(112,139,133,0.42); }
-  .avail-date-btn[data-selected="true"]        { border-color: rgba(112,139,133,0.38); background: rgba(112,139,133,0.12); color: #4f6d67; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.76), 0 10px 22px rgba(112,139,133,0.06); }
-
-  .avail-dot { position: absolute; bottom: 9px; width: 7px; height: 7px; border-radius: 99px; background: currentColor; }
   .avail-blank { aspect-ratio: 1; }
 
-  /* Legend */
-  .avail-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; padding: 0 16px 18px; }
-  .avail-legend-item {
-    min-height: 34px;
-    display: inline-flex; align-items: center; gap: 8px; padding: 0 11px;
-    border: 1px solid rgba(18, 24, 22, 0.1); border-radius: 8px;
-    color: #4d5a55; font-size: 12px; font-weight: 760;
-    font-family: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
+  /* Base date button */
+  .avail-date-btn {
+    position: relative;
+    aspect-ratio: 1; min-width: 0;
+    display: grid; place-items: center;
+    border: 1px solid rgba(160,130,90,0.09);
+    border-radius: 10px;
+    background: rgba(255,255,255,0.42);
+    color: rgba(100,78,48,0.28);
+    cursor: default;
+    font-size: 14px; font-weight: 700;
+    transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease, box-shadow 0.16s ease;
   }
-  .avail-legend-item span { width: 8px; height: 8px; border-radius: 99px; }
+  /* Clickable */
+  .avail-date-btn[data-clickable="true"] { cursor: pointer; }
+  .avail-date-btn[data-clickable="true"]:hover {
+    transform: translateY(-2px) scale(1.04);
+    box-shadow: 0 8px 22px rgba(130,95,55,0.12);
+    border-color: rgba(88,148,122,0.28);
+    background: rgba(255,255,255,0.9);
+  }
+  /* Available — soft sage */
+  .avail-date-btn[data-status="available"] {
+    border-color: rgba(88,148,122,0.28);
+    background: rgba(88,148,122,0.1);
+    color: rgba(42,100,76,0.88);
+  }
+  /* Hold — warm amber */
+  .avail-date-btn[data-status="hold"] {
+    border-color: rgba(195,135,55,0.28);
+    background: rgba(195,135,55,0.1);
+    color: rgba(150,95,20,0.82);
+  }
+  /* Booked / past — ghosted */
+  .avail-date-btn[data-status="booked"],
+  .avail-date-btn[data-past="true"] {
+    background: rgba(255,255,255,0.22);
+    color: rgba(100,78,48,0.18);
+    border-color: transparent;
+  }
+  /* Today ring */
+  .avail-date-btn[data-today="true"] {
+    box-shadow: inset 0 0 0 1.5px rgba(88,148,122,0.38);
+    color: rgba(42,100,76,0.88);
+  }
+  /* Selected */
+  .avail-date-btn[data-selected="true"] {
+    background: rgba(88,148,122,0.16);
+    border-color: rgba(88,148,122,0.42);
+    color: #2a6448;
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.8),
+      0 0 22px rgba(88,148,122,0.18),
+      0 8px 22px rgba(130,95,55,0.08);
+    transform: scale(1.06);
+  }
+  /* Dot indicator */
+  .avail-dot {
+    position: absolute; bottom: 7px;
+    width: 4px; height: 4px; border-radius: 99px;
+    background: currentColor; opacity: 0.5;
+  }
 
-  /* Loading skeleton */
-  .avail-loading { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 7px; padding: 14px; }
-  .avail-loading span { aspect-ratio: 1; border-radius: 8px; background: rgba(228,234,231,0.7); }
+  /* ── LEGEND ──────────────────────────────────────────────────────────────── */
+  .avail-legend {
+    display: flex; flex-wrap: wrap; justify-content: center; gap: 8px;
+    padding: 4px 16px 20px;
+  }
+  .avail-legend-item {
+    min-height: 30px;
+    display: inline-flex; align-items: center; gap: 7px; padding: 0 11px;
+    border: 1px solid rgba(160,130,90,0.1); border-radius: 99px;
+    background: rgba(255,255,255,0.6);
+    color: rgba(80,60,36,0.48); font-size: 11px; font-weight: 700; letter-spacing: 0.03em;
+  }
+  .avail-legend-item span { width: 7px; height: 7px; border-radius: 99px; opacity: 0.8; }
+
+  /* ── SKELETON LOADER ─────────────────────────────────────────────────────── */
+  .avail-loading {
+    display: grid; grid-template-columns: repeat(7, minmax(0,1fr));
+    gap: 6px; padding: 12px 16px 16px;
+  }
+  .avail-loading span {
+    aspect-ratio: 1; border-radius: 10px;
+    background: linear-gradient(90deg, rgba(190,165,125,0.1) 25%, rgba(190,165,125,0.2) 50%, rgba(190,165,125,0.1) 75%);
+    background-size: 200% auto;
+    animation: shimmer 1.6s linear infinite;
+  }
 
   /* ── SIDEBAR ─────────────────────────────────────────────────────────────── */
   .avail-sidebar { display: grid; gap: 12px; }
-  .avail-sidebar-panel { padding: 18px; }
+  .avail-sidebar-panel { padding: 20px; }
   .avail-mini-label {
     margin: 0 0 10px;
-    color: #667f79; font-size: 12px; font-weight: 820;
-    font-family: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
+    color: rgba(88,138,118,0.6);
+    font-size: 11px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase;
   }
   .avail-sidebar-panel h2, .avail-sidebar-panel h3 {
     margin: 0 0 10px;
-    color: #101412; font-size: 20px; font-weight: 860;
-    letter-spacing: -0.01em; line-height: 1.08;
-    font-family: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
+    color: #1c1710;
+    font-size: 19px; font-weight: 860; letter-spacing: -0.015em; line-height: 1.1;
   }
   .avail-sidebar-panel p {
     margin: 0;
-    color: #56635e; font-size: 15px; line-height: 1.65;
-    font-family: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
+    color: rgba(80,60,36,0.5); font-size: 14px; line-height: 1.7;
   }
-  .avail-upcoming { display: grid; gap: 8px; }
+
+  /* Upcoming windows */
+  .avail-upcoming { display: grid; gap: 7px; }
   .avail-upcoming button {
     width: 100%; min-height: 44px;
-    display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 12px;
-    border: 1px solid rgba(18,24,22,0.09); border-radius: 8px;
-    background: rgba(247,250,248,0.86); color: #101412;
-    cursor: pointer; font: inherit; font-size: 14px; font-weight: 760; letter-spacing: 0;
-    font-family: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
-    transition: background 0.15s ease;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 13px;
+    border: 1px solid rgba(160,130,90,0.1); border-radius: 11px;
+    background: rgba(255,255,255,0.55);
+    color: rgba(55,40,22,0.78);
+    cursor: pointer; font: inherit; font-size: 13px; font-weight: 700; letter-spacing: 0;
+    transition: background 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
   }
-  .avail-upcoming button:hover { background: rgba(239,246,244,0.98); }
+  .avail-upcoming button:hover {
+    background: rgba(88,148,122,0.1);
+    border-color: rgba(88,148,122,0.24);
+    transform: translateX(2px);
+  }
+  .avail-upcoming button span:last-child {
+    font-size: 11px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
+    color: rgba(88,148,122,0.68);
+  }
 
-  /* Sidebar CTA link */
+  /* CTA link */
   .avail-link {
-    min-height: 44px;
+    min-height: 46px;
     display: inline-flex; align-items: center; justify-content: center;
-    width: 100%; margin-top: 16px;
-    border: 1px solid rgba(112,139,133,0.22); border-radius: 8px;
-    background: rgba(246,250,248,0.94); color: #4f6d67;
-    box-shadow: 0 8px 24px rgba(112,139,133,0.05);
-    font-size: 14px; font-weight: 820;
-    font-family: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
+    width: 100%; margin-top: 18px;
+    border: 1px solid rgba(88,148,122,0.28);
+    border-radius: 12px;
+    background: linear-gradient(135deg, rgba(88,148,122,0.14) 0%, rgba(60,120,96,0.07) 100%);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    color: #2a6448;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.85), 0 4px 18px rgba(130,95,55,0.08);
+    font-size: 14px; font-weight: 820; letter-spacing: 0.01em;
     text-decoration: none;
-    transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+    transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
   }
   .avail-link:hover {
-    transform: translateY(-1px);
-    border-color: rgba(112,139,133,0.32);
-    background: rgba(239,246,244,0.98);
-    box-shadow: 0 12px 28px rgba(112,139,133,0.07);
+    transform: translateY(-2px);
+    border-color: rgba(88,148,122,0.42);
+    background: linear-gradient(135deg, rgba(88,148,122,0.2) 0%, rgba(60,120,96,0.12) 100%);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 8px 28px rgba(130,95,55,0.1), 0 0 18px rgba(88,148,122,0.1);
   }
 
   /* ── RESPONSIVE ──────────────────────────────────────────────────────────── */
   @media (max-width: 920px) { .avail-layout { grid-template-columns: 1fr; } }
   @media (max-width: 760px) {
-    .avail-shell { width: min(1180px, calc(100% - 36px)); }
-    .avail-hero { padding: 100px 0 52px; }
-    .avail-hero-title { font-size: clamp(2.6rem, 12vw, 4rem); }
-    .avail-hero-sub { font-size: 15px; }
-    .avail-body { padding-bottom: 78px; }
-    .avail-month { font-size: 20px; }
-    .avail-nav { width: 40px; height: 40px; }
-    .avail-grid { gap: 5px; padding: 10px; }
-    .avail-date-btn { border-radius: 6px; font-size: 13px; }
-    .avail-dot { bottom: 6px; width: 5px; height: 5px; }
-    .avail-weekdays { padding: 10px 10px 0; }
-    .avail-day-label { min-height: 26px; font-size: 11px; }
+    .avail-shell  { width: min(1180px, calc(100% - 32px)); }
+    .avail-hero   { padding: 104px 0 56px; }
+    .avail-hero-title { font-size: clamp(2.8rem, 13vw, 4.2rem); }
+    .avail-hero-sub   { font-size: 15px; }
+    .avail-body   { padding-bottom: 80px; }
+    .avail-month  { font-size: 19px; }
+    .avail-nav    { width: 36px; height: 36px; font-size: 14px; }
+    .avail-grid   { gap: 4px; padding: 8px 10px 12px; }
+    .avail-date-btn { border-radius: 8px; font-size: 13px; }
+    .avail-dot    { bottom: 5px; width: 3px; height: 3px; }
+    .avail-weekdays  { padding: 10px 10px 2px; }
+    .avail-day-label { min-height: 26px; font-size: 10px; }
+    .avail-sidebar-panel { padding: 16px; }
+    .avail-sidebar-panel h2, .avail-sidebar-panel h3 { font-size: 17px; }
   }
   @media (max-width: 420px) {
-    .avail-hero-title { font-size: clamp(2.2rem, 11vw, 3.2rem); }
-    .avail-grid { gap: 3px; padding: 8px; }
-    .avail-date-btn { font-size: 12px; }
+    .avail-hero-title { font-size: clamp(2.4rem, 12vw, 3.4rem); }
+    .avail-grid  { gap: 3px; padding: 6px 8px 10px; }
+    .avail-date-btn { font-size: 12px; border-radius: 7px; }
   }
 `;
 
@@ -466,7 +536,7 @@ export default function AvailabilityPage() {
 
             {/* ── Legend — edit color values here ── */}
             <div className="avail-legend">
-              {[["Available", "#9ab9b2"], ["On hold", "#d6f36a"], ["Booked", "#c7d1cc"]].map(([label, color]) => (
+              {[["Available", "#7aad94"], ["On hold", "#c9933a"], ["Booked", "#c4b49e"]].map(([label, color]) => (
                 <span key={label} className="avail-legend-item">
                   <span style={{ background: color }} />{label}
                 </span>
@@ -484,7 +554,19 @@ export default function AvailabilityPage() {
                   ? selected.note || "This date is marked for booking. Send the inquiry and I will confirm timing."
                   : "Open and hold dates show up with color. If a date is not marked, mention it in your inquiry and I can check."}
               </p>
-              <Link href="/contact" className="avail-link">Start inquiry</Link>
+              <Link
+                href={
+                  selected
+                    ? `/contact?date=${encodeURIComponent(
+                        new Date(selected.date + "T12:00:00")
+                          .toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+                      )}`
+                    : "/contact"
+                }
+                className="avail-link"
+              >
+                {selected ? "Book this date →" : "Start inquiry"}
+              </Link>
             </div>
 
             <div className="avail-sidebar-panel" data-reveal data-delay="3">

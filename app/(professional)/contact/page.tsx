@@ -16,8 +16,8 @@
 
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
 // ── SESSION TYPE DROPDOWN OPTIONS ─────────────────────────────────────────────
@@ -301,7 +301,17 @@ const CSS = `
 `;
 
 export default function ContactPage() {
-  const router = useRouter();
+  return (
+    <Suspense>
+      <ContactForm />
+    </Suspense>
+  );
+}
+
+function ContactForm() {
+  const router       = useRouter();
+  const searchParams = useSearchParams();
+
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -312,6 +322,12 @@ export default function ContactPage() {
   });
   const [status, setStatus] = useState<"idle" | "sending" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
+
+  // Pre-fill date from ?date= param (set by the availability calendar)
+  useEffect(() => {
+    const d = searchParams.get("date");
+    if (d) setForm((prev) => ({ ...prev, date: d }));
+  }, [searchParams]);
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) {
     setForm((value) => ({ ...value, [e.target.name]: e.target.value }));
