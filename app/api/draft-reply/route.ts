@@ -21,6 +21,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
+import { requireAdmin } from "@/lib/requireAdmin";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +52,9 @@ async function fetchReplyStyle(): Promise<string | null> {
 }
 
 export async function POST(req: NextRequest) {
+  const deny = requireAdmin(req);
+  if (deny) return deny;
+
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     return NextResponse.json(

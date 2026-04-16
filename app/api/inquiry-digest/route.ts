@@ -29,9 +29,10 @@ function formatDate(iso: string) {
 }
 
 export async function GET(req: NextRequest) {
-  // Verify cron secret so random people can't trigger it
+  // Verify cron secret so random people can't trigger it.
+  // Fail-secure: if CRON_SECRET is not set, ALL requests are rejected.
   const authHeader = req.headers.get("authorization");
-  if (CRON_SECRET && authHeader !== `Bearer ${CRON_SECRET}`) {
+  if (!CRON_SECRET || authHeader !== `Bearer ${CRON_SECRET}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

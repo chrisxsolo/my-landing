@@ -737,6 +737,15 @@ function AdminDashboard() {
       </div>
 
       <div className="max-w-3xl mx-auto px-6 py-8">
+        {/* Top utility row */}
+        <div className="flex items-center justify-between mb-4">
+          <span className="text-xs font-bold text-slate-400">Admin</span>
+          <button
+            onClick={() => { adminLogout().then(() => { setAuthed(false); setPw(""); }); }}
+            className="text-xs font-bold px-3 py-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
+            Sign out
+          </button>
+        </div>
         {/* Tabs */}
         <div className="flex gap-2 mb-8 p-1 rounded-2xl bg-white border border-slate-100 w-fit flex-wrap">
           {(["poses","locations","bayGuide","portfolio","categories","blog","analytics","inquiries"] as Tab[]).map(t=>(

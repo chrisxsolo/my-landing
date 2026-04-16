@@ -9,12 +9,15 @@
 //   NEXT_PUBLIC_SITE_URL  (e.g. https://soloxsnaps.com)
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "crypto";
+import { requireAdmin } from "@/lib/requireAdmin";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const deny = requireAdmin(req);
+  if (deny) return deny;
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const siteUrl  = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 

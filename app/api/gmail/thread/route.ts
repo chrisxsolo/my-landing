@@ -12,6 +12,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getValidTokens } from "@/lib/gmailTokens";
+import { requireAdmin } from "@/lib/requireAdmin";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +35,9 @@ function parseName(from: string): string {
 }
 
 export async function GET(req: NextRequest) {
+  const deny = requireAdmin(req);
+  if (deny) return deny;
+
   const clientEmail = req.nextUrl.searchParams.get("email");
   if (!clientEmail) return NextResponse.json({ error: "email required" }, { status: 400 });
 

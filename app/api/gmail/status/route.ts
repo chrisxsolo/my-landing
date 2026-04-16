@@ -3,12 +3,16 @@
 // DELETE /api/gmail/status — removes stored tokens (disconnect)
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
+import { requireAdmin } from "@/lib/requireAdmin";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const deny = requireAdmin(req);
+  if (deny) return deny;
+
   const supabase = createSupabaseServerClient();
   const { data } = await supabase
     .from("site_settings")
@@ -26,7 +30,10 @@ export async function GET() {
   }
 }
 
-export async function DELETE() {
+export async function DELETE(req: NextRequest) {
+  const deny = requireAdmin(req);
+  if (deny) return deny;
+
   const supabase = createSupabaseServerClient();
   await supabase.from("site_settings").delete().eq("key", "gmail_tokens");
   return NextResponse.json({ ok: true });

@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getValidTokens } from "@/lib/gmailTokens";
+import { requireAdmin } from "@/lib/requireAdmin";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +41,9 @@ function extractText(part: MimePart): string {
 }
 
 export async function GET(req: NextRequest) {
+  const deny = requireAdmin(req);
+  if (deny) return deny;
+
   const id = req.nextUrl.searchParams.get("id");
   if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
 

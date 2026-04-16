@@ -9,20 +9,32 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getValidTokens } from "@/lib/gmailTokens";
+import { requireAdmin } from "@/lib/requireAdmin";
 
 export const dynamic = "force-dynamic";
+
+/** Strip CR/LF to prevent email header injection (e.g. injected Bcc lines) */
+function sanitizeHeader(v: string): string {
+  return v.replace(/[\r\n]+/g, " ").trim();
+}
 
 function buildRawMessage(
   from: string, to: string, subject: string,
   body: string, threadId?: string
 ): string {
+  const safeFrom    = sanitizeHeader(from);
+  const safeTo      = sanitizeHeader(to);
+  const safeSubject = sanitizeHeader(subject);
+  // threadId comes from Gmail's own API responses — sanitize defensively anyway
+  const safeThread  = threadId ? sanitizeHeader(threadId) : undefined;
+
   const lines = [
-    `From: Chris Solorzano <${from}>`,
-    `To: ${to}`,
-    `Subject: ${subject}`,
+    `From: Chris Solorzano <${safeFrom}>`,
+    `To: ${safeTo}`,
+    `Subject: ${safeSubject}`,
     `MIME-Version: 1.0`,
     `Content-Type: text/plain; charset=UTF-8`,
-    ...(threadId ? [`References: ${threadId}`, `In-Reply-To: ${threadId}`] : []),
+    ...(safeThread ? [`References: ${safeThread}`, `In-Reply-To: ${safeThread}`] : []),
     ``,
     body,
   ].join("\r\n");
@@ -32,6 +44,9 @@ function buildRawMessage(
 }
 
 export async function POST(req: NextRequest) {
+  const deny = requireAdmin(req);
+  if (deny) return deny;
+
   let body: Record<string, string>;
   try { body = await req.json(); }
   catch { return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 }); }
