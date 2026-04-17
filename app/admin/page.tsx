@@ -1998,11 +1998,11 @@ function AdminDashboard() {
                               <div className="space-y-2">
                                 <div className="relative">
                                   <textarea
-                                    readOnly
                                     value={drafts[inq.id]}
+                                    onChange={e=>setDrafts(p=>({...p,[inq.id]:e.target.value}))}
                                     rows={9}
-                                    className="w-full text-sm text-slate-700 leading-relaxed rounded-xl p-4 resize-y outline-none"
-                                    style={{border:`1px solid ${C.p1_20}`,background:C.p1_04,fontFamily:"inherit"}}
+                                    className="w-full text-slate-700 leading-relaxed rounded-xl p-4 resize-none sm:resize-y outline-none"
+                                    style={{border:`1px solid ${C.p1_20}`,background:C.p1_04,fontFamily:"inherit",fontSize:"16px"}}
                                   />
                                   <button
                                     onClick={()=>copyDraft(inq.id)}
@@ -2048,8 +2048,8 @@ function AdminDashboard() {
                                     onChange={e=>setDraftFeedback(p=>({...p,[inq.id]:e.target.value}))}
                                     onKeyDown={e=>{if(e.key==="Enter"&&draftFeedback[inq.id]?.trim())generateDraft(inq,draftFeedback[inq.id]);}}
                                     placeholder='e.g. "be more direct" · "remove the pricing mention" · "add turnaround time"'
-                                    className="flex-1 text-xs px-3 py-2.5 rounded-xl outline-none"
-                                    style={{border:`1px solid ${C.p1_20}`,background:"#fff",color:"#334155",fontFamily:"inherit"}}
+                                    className="flex-1 px-3 py-2.5 rounded-xl outline-none"
+                                    style={{border:`1px solid ${C.p1_20}`,background:"#fff",color:"#334155",fontFamily:"inherit",fontSize:"16px"}}
                                   />
                                   <button
                                     onClick={()=>{if(draftFeedback[inq.id]?.trim())generateDraft(inq,draftFeedback[inq.id]);}}
@@ -2093,8 +2093,8 @@ function AdminDashboard() {
                                       onChange={e=>setActualSent(p=>({...p,[inq.id]:e.target.value}))}
                                       placeholder="Paste the final email you sent here…"
                                       rows={6}
-                                      className="w-full text-sm text-slate-700 leading-relaxed rounded-xl p-3 resize-y outline-none"
-                                      style={{border:`1px solid ${C.p1_20}`,background:"#fff",fontFamily:"inherit"}}
+                                      className="w-full text-slate-700 leading-relaxed rounded-xl p-3 resize-none sm:resize-y outline-none"
+                                      style={{border:`1px solid ${C.p1_20}`,background:"#fff",fontFamily:"inherit",fontSize:"16px"}}
                                     />
                                     <button
                                       onClick={()=>analyzeAndLearn(inq)}
@@ -2151,8 +2151,8 @@ function AdminDashboard() {
                                   type="text"
                                   value={composeSubject[inq.id]??""}
                                   onChange={e=>setComposeSubject(p=>({...p,[inq.id]:e.target.value}))}
-                                  className="w-full text-sm text-slate-700 px-3 py-2 rounded-xl outline-none font-medium"
-                                  style={{border:`1px solid ${C.p1_20}`,background:"#fff",fontFamily:"inherit"}}
+                                  className="w-full text-slate-700 px-3 py-2 rounded-xl outline-none font-medium"
+                                  style={{border:`1px solid ${C.p1_20}`,background:"#fff",fontFamily:"inherit",fontSize:"16px"}}
                                 />
                               </div>
                               {/* Body */}
@@ -2162,8 +2162,8 @@ function AdminDashboard() {
                                   value={composeBody[inq.id]??""}
                                   onChange={e=>setComposeBody(p=>({...p,[inq.id]:e.target.value}))}
                                   rows={10}
-                                  className="w-full text-sm text-slate-700 leading-relaxed rounded-xl p-3 resize-y outline-none"
-                                  style={{border:`1px solid ${C.p1_20}`,background:"#fff",fontFamily:"inherit"}}
+                                  className="w-full text-slate-700 leading-relaxed rounded-xl p-3 resize-none sm:resize-y outline-none"
+                                  style={{border:`1px solid ${C.p1_20}`,background:"#fff",fontFamily:"inherit",fontSize:"16px"}}
                                 />
                               </div>
                               {/* Send button */}
