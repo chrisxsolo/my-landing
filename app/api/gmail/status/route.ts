@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { requireAdmin } from "@/lib/requireAdmin";
+import { getValidTokens } from "@/lib/gmailTokens";
 
 export const dynamic = "force-dynamic";
 
@@ -13,17 +14,17 @@ export async function GET(req: NextRequest) {
   const deny = requireAdmin(req);
   if (deny) return deny;
 
-  const supabase = createSupabaseServerClient();
-  const { data } = await supabase
-    .from("site_settings")
-    .select("value")
-    .eq("key", "gmail_tokens")
-    .single();
-
-  if (!data?.value) return NextResponse.json({ connected: false });
-
   try {
-    const tokens = JSON.parse(data.value) as { email?: string };
+    // getValidTokens() also auto-refreshes if expiring — so this is a real
+    // liveness check, not just "does the DB key exist?"
+    const tokens = await getValidTokens();
+    if (!tokens) {
+      // Tokens existed but can't be refreshed (revoked, expired, missing
+      // refresh_token). Clean up the stale entry so the UI shows disconnected.
+      const supabase = createSupabaseServerClient();
+      await supabase.from("site_settings").delete().eq("key", "gmail_tokens");
+      return NextResponse.json({ connected: false });
+    }
     return NextResponse.json({ connected: true, email: tokens.email ?? "Gmail" });
   } catch {
     return NextResponse.json({ connected: false });

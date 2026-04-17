@@ -569,8 +569,8 @@ export default function ConversationPage() {
               <div>
                 <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 block mb-1">Subject</label>
                 <input type="text" value={subject} onChange={e => setSubject(e.target.value)}
-                  className="w-full text-sm text-slate-700 px-3 py-2 rounded-xl outline-none font-medium"
-                  style={{ border: `1px solid ${C.p1_20}`, background: "#fff", fontFamily: "inherit" }} />
+                  className="w-full text-slate-700 px-3 py-2 rounded-xl outline-none font-medium"
+                  style={{ border: `1px solid ${C.p1_20}`, background: "#fff", fontFamily: "inherit", fontSize: "16px" }} />
               </div>
 
               {/* Body — always visible */}
@@ -583,8 +583,8 @@ export default function ConversationPage() {
                   value={draft} onChange={e => setDraft(e.target.value)}
                   rows={11}
                   placeholder={"Write your reply here…\n\nTip: type in bullet points and hit ✨ Polish to auto-format into a proper email."}
-                  className="w-full text-sm text-slate-700 leading-relaxed rounded-xl p-3 resize-y outline-none"
-                  style={{ border: `1px solid ${C.p1_20}`, background: C.p1_04, fontFamily: "inherit" }} />
+                  className="w-full text-slate-700 leading-relaxed rounded-xl p-3 resize-none sm:resize-y outline-none"
+                  style={{ border: `1px solid ${C.p1_20}`, background: C.p1_04, fontFamily: "inherit", fontSize: "16px" }} />
               </div>
 
               {/* Send */}
@@ -606,8 +606,8 @@ export default function ConversationPage() {
                     <input type="text" value={feedback} onChange={e => setFeedback(e.target.value)}
                       onKeyDown={e => { if (e.key === "Enter" && feedback.trim()) generateDraft(feedback); }}
                       placeholder='e.g. "be more direct" · "add turnaround time"'
-                      className="flex-1 text-xs px-3 py-2 rounded-xl outline-none"
-                      style={{ border: `1px solid ${C.p1_20}`, background: "#fff", fontFamily: "inherit" }} />
+                      className="flex-1 px-3 py-2 rounded-xl outline-none"
+                      style={{ border: `1px solid ${C.p1_20}`, background: "#fff", fontFamily: "inherit", fontSize: "16px" }} />
                     <button onClick={() => { if (feedback.trim()) generateDraft(feedback); }}
                       disabled={!feedback.trim() || draftLoading}
                       className="text-xs font-bold px-3 py-2 rounded-xl disabled:opacity-30 flex-shrink-0"
@@ -643,8 +643,8 @@ export default function ConversationPage() {
                 onKeyDown={e => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") saveNotes(notes); }}
                 rows={5}
                 placeholder={"Jot down anything important about this client…\n\ne.g. wants campus + city shots, bringing her mom, prefers afternoon light"}
-                className="w-full text-sm text-slate-700 leading-relaxed rounded-xl p-3 resize-y outline-none"
-                style={{ border: "1px solid rgba(139,92,246,0.2)", background: "rgba(139,92,246,0.03)", fontFamily: "inherit" }} />
+                className="w-full text-slate-700 leading-relaxed rounded-xl p-3 resize-none sm:resize-y outline-none"
+                style={{ border: "1px solid rgba(139,92,246,0.2)", background: "rgba(139,92,246,0.03)", fontFamily: "inherit", fontSize: "16px" }} />
               <div className="flex items-center justify-between">
                 <p className="text-[10px] text-slate-400">Auto-saves on blur · ⌘↵ to save now</p>
                 <button
@@ -712,8 +712,8 @@ export default function ConversationPage() {
                         onChange={e => setManualAiDraft(e.target.value)}
                         rows={4}
                         placeholder="Paste the AI-generated draft here…"
-                        className="w-full text-sm text-slate-500 leading-relaxed rounded-xl p-3 resize-y outline-none"
-                        style={{ border: "1px solid rgba(148,163,184,0.25)", background: "rgba(148,163,184,0.04)", fontFamily: "inherit" }} />
+                        className="w-full text-slate-500 leading-relaxed rounded-xl p-3 resize-none sm:resize-y outline-none"
+                        style={{ border: "1px solid rgba(148,163,184,0.25)", background: "rgba(148,163,184,0.04)", fontFamily: "inherit", fontSize: "16px" }} />
                     </div>
                   )}
 
@@ -726,8 +726,8 @@ export default function ConversationPage() {
                       onChange={e => setActualSent(e.target.value)}
                       rows={6}
                       placeholder="Paste the email you sent here…"
-                      className="w-full text-sm text-slate-700 leading-relaxed rounded-xl p-3 resize-y outline-none"
-                      style={{ border: "1px solid rgba(245,158,11,0.3)", background: "rgba(245,158,11,0.03)", fontFamily: "inherit" }} />
+                      className="w-full text-slate-700 leading-relaxed rounded-xl p-3 resize-none sm:resize-y outline-none"
+                      style={{ border: "1px solid rgba(245,158,11,0.3)", background: "rgba(245,158,11,0.03)", fontFamily: "inherit", fontSize: "16px" }} />
                   </div>
 
                   <button

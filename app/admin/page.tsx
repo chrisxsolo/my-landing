@@ -99,6 +99,9 @@ function AdminDashboard() {
     } else if(gmailParam==="error"){
       showToast("Gmail connection failed — try again",false);
       router.replace("/admin?tab=inquiries");
+    } else if(gmailParam==="auth_required"){
+      showToast("Session expired — sign in again to connect Gmail",false);
+      router.replace("/admin?tab=inquiries");
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

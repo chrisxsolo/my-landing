@@ -72,12 +72,33 @@ export async function GET(req: NextRequest) {
 
   // ── Persist tokens in Supabase ────────────────────────────────────────────
   const supabase = createSupabaseServerClient();
-  await supabase.from("site_settings").upsert(
+
+  // Google only returns a refresh_token on first auth (or when prompt=consent).
+  // If we somehow don't get one, preserve the existing one from the DB so we
+  // don't accidentally lose the ability to auto-refresh.
+  let refreshToken = tokens.refresh_token ?? null;
+  if (!refreshToken) {
+    try {
+      const { data: existing } = await supabase
+        .from("site_settings")
+        .select("value")
+        .eq("key", "gmail_tokens")
+        .single();
+      if (existing?.value) {
+        const prev = JSON.parse(existing.value) as { refresh_token?: string };
+        refreshToken = prev.refresh_token ?? null;
+      }
+    } catch {
+      // If we can't read the old token, proceed without it
+    }
+  }
+
+  const { error: upsertError } = await supabase.from("site_settings").upsert(
     {
       key: "gmail_tokens",
       value: JSON.stringify({
         access_token:  tokens.access_token,
-        refresh_token: tokens.refresh_token ?? null,
+        refresh_token: refreshToken,
         expiry_date:   Date.now() + (tokens.expires_in ?? 3600) * 1000,
         email,
       }),
@@ -85,6 +106,10 @@ export async function GET(req: NextRequest) {
     },
     { onConflict: "key" }
   );
+  if (upsertError) {
+    console.error("Failed to save Gmail tokens to DB:", upsertError);
+    return NextResponse.redirect(`${siteUrl}/admin?tab=inquiries&gmail=error`);
+  }
 
   const successRes = NextResponse.redirect(`${siteUrl}/admin?tab=inquiries&gmail=connected`);
   // Clear the one-time state cookie

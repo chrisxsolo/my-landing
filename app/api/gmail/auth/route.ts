@@ -12,20 +12,35 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 import { requireAdmin } from "@/lib/requireAdmin";
+import { getValidTokens } from "@/lib/gmailTokens";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+
+  // Auth check — if cookie is missing, redirect to admin login page instead of
+  // dumping raw JSON in the browser (which confused the user before).
   const deny = requireAdmin(req);
-  if (deny) return deny;
+  if (deny) {
+    return NextResponse.redirect(`${siteUrl}/admin?tab=inquiries&gmail=auth_required`);
+  }
+
   const clientId = process.env.GOOGLE_CLIENT_ID;
-  const siteUrl  = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
   if (!clientId) {
-    return NextResponse.json(
-      { error: "GOOGLE_CLIENT_ID is not configured." },
-      { status: 503 }
-    );
+    return NextResponse.redirect(`${siteUrl}/admin?tab=inquiries&gmail=error`);
+  }
+
+  // If valid tokens (with a working refresh token) already exist, skip OAuth
+  // entirely — no need to make the user re-authorize when they're already connected.
+  try {
+    const existing = await getValidTokens();
+    if (existing) {
+      return NextResponse.redirect(`${siteUrl}/admin?tab=inquiries&gmail=connected`);
+    }
+  } catch {
+    // Couldn't read tokens — proceed to OAuth below
   }
 
   const redirectUri = `${siteUrl}/api/gmail/callback`;
@@ -43,7 +58,7 @@ export async function GET(req: NextRequest) {
       "https://www.googleapis.com/auth/userinfo.email",
     ].join(" "),
     access_type: "offline",
-    prompt:      "consent", // always get a refresh token
+    prompt:      "consent", // always get a fresh refresh token on first connect
     state,
   });
 
