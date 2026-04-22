@@ -193,6 +193,7 @@ function AdminDashboard() {
   const [editingInquiry,setEditingInquiry]=useState<Inquiry|null>(null);
   const [draftLoading,setDraftLoading]=useState<number|null>(null);
   const [drafts,setDrafts]=useState<Record<number,string>>({});
+  const [originalAiDrafts,setOriginalAiDrafts]=useState<Record<number,string>>({});
   const [draftCopied,setDraftCopied]=useState<number|null>(null);
   const [draftFeedback,setDraftFeedback]=useState<Record<number,string>>({});
   const [ruleSaved,setRuleSaved]=useState<number|null>(null);
@@ -219,7 +220,7 @@ function AdminDashboard() {
       if(feedback&&drafts[inq.id]){payload.previous_draft=drafts[inq.id];payload.feedback=feedback;}
       const res=await fetch("/api/draft-reply",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
       const json=await res.json();
-      if(json.draft){setDrafts(p=>({...p,[inq.id]:json.draft}));setDraftFeedback(p=>({...p,[inq.id]:""}))}
+      if(json.draft){setDrafts(p=>({...p,[inq.id]:json.draft}));setOriginalAiDrafts(p=>({...p,[inq.id]:json.draft}));setDraftFeedback(p=>({...p,[inq.id]:""}))}
       else{showToast(json.error??"Draft failed",false);}
     }catch(e){showToast("Draft request failed",false);console.error(e);}
     finally{setDraftLoading(null);}
@@ -246,7 +247,7 @@ function AdminDashboard() {
   }
 
   async function analyzeAndLearn(inq:Inquiry){
-    const ai_draft=drafts[inq.id];
+    const ai_draft=originalAiDrafts[inq.id]??drafts[inq.id];
     const actual=actualSent[inq.id]?.trim();
     if(!ai_draft||!actual)return;
     setLearnLoading(inq.id);
