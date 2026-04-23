@@ -119,10 +119,12 @@ const CSS = `
     border-radius: 12px;
     background: #dfe8e4;
     box-shadow: 0 20px 60px rgba(18, 24, 22, 0.1);
+    max-width: 460px;
+    margin: 0 auto;
   }
   .about-portrait-wrap img {
-    width: 100%; max-height: 680px;
-    object-fit: cover; display: block;
+    width: 100%; height: auto;
+    display: block;
     transition: transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
   }
   .about-portrait-wrap:hover img { transform: scale(1.03); }

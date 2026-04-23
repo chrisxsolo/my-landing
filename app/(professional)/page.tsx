@@ -363,6 +363,20 @@ const CSS = `
   }
   .home-cta-media img { width: 100%; height: 100%; display: block; object-fit: cover; }
 
+  /* When stacked (single column), cap the image so it doesn't dominate */
+  @media (max-width: 920px) {
+    .home-cta-media {
+      min-height: 0;
+      max-width: 460px;
+      margin: 0 auto;
+      width: 100%;
+    }
+    .home-cta-media img {
+      height: auto;
+      object-fit: contain;
+    }
+  }
+
   /* ═══════════════════════════════════════════════════════════════════════════
      INSTAGRAM STRIP — light gray bg, square thumbnails
      ═══════════════════════════════════════════════════════════════════════════ */
@@ -404,7 +418,8 @@ const CSS = `
     .home-proof-grid       { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .home-services-header  { align-items: flex-start; flex-direction: column; }
     .home-editorial-media  { min-height: 520px; order: -1; }
-    .home-stacked-photo[data-size="large"] { inset: 0 0 54px 48px; }
+    .home-stacked-photo[data-size="large"] { inset: 0 0 36px 22px; }
+    .home-stacked-photo[data-size="small"] { width: 38%; border-width: 6px; }
     .home-proof-intro      { grid-column: 1 / -1; min-height: 120px; border-right: 0; border-bottom: 1px solid rgba(18,24,22,0.09); }
     .home-proof-item:nth-child(3),
     .home-proof-item:last-child { border-right: 0; }
@@ -424,10 +439,10 @@ const CSS = `
     .home-card-footer { font-size: 9px; padding: 6px 10px 10px; }
     .home-card-body { padding: 0 10px; bottom: 28px; }
     .home-cta-copy { padding: 18px 8px 8px; }
-    .home-cta-media { min-height: 340px; }
+    .home-cta-media { max-width: 380px; }
     .home-editorial-media { min-height: 430px; }
-    .home-stacked-photo[data-size="large"] { inset: 0 0 48px 26px; }
-    .home-stacked-photo[data-size="small"] { width: 52%; border-width: 6px; }
+    .home-stacked-photo[data-size="large"] { inset: 0 0 32px 14px; }
+    .home-stacked-photo[data-size="small"] { width: 34%; border-width: 5px; }
   }
   @media (max-width: 540px) {
     .home-proof-grid { grid-template-columns: 1fr; }
@@ -435,6 +450,8 @@ const CSS = `
     .home-proof-item { min-height: 112px; border-right: 0; border-bottom: 1px solid rgba(18,24,22,0.09); }
     .home-proof-item:last-child { border-bottom: 0; }
     .home-editorial-media { min-height: 360px; }
+    .home-stacked-photo[data-size="large"] { inset: 0 0 24px 8px; }
+    .home-stacked-photo[data-size="small"] { width: 30%; border-width: 4px; }
     .home-strip-grid { grid-template-columns: repeat(4, minmax(100px, 1fr)); }
   }
 `;
