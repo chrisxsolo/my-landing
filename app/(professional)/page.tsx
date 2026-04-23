@@ -150,51 +150,56 @@ const CSS = `
       radial-gradient(ellipse 70% 60% at 10% 20%, rgba(162, 210, 196, 0.14) 0%, transparent 60%),
       radial-gradient(ellipse 50% 55% at 90% 80%, rgba(130, 185, 175, 0.10) 0%, transparent 55%),
       #f5f6f4;
-    padding: 80px 0 88px;
+    padding: 56px 0 64px;
   }
   .home-services-header {
     display: flex;
     justify-content: space-between;
     align-items: flex-end;
     gap: 24px;
-    margin-bottom: 30px;
+    margin-bottom: 24px;
   }
   .home-services-header .home-copy { max-width: 400px; }
 
-  /* 3-column card grid */
+  /* 3-column card grid (stays 3-col until narrow mobile) */
   .home-card-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 10px;
   }
 
-  /* Glass card */
+  /* Overlay photo card */
   .home-card {
-    display: grid;
-    grid-template-rows: auto 1fr auto;
-    gap: 14px;
-    padding: 12px;
-    border: 1px solid rgba(18, 24, 22, 0.09);
-    border-radius: 14px;
-    background: #ffffff;
-    color: #101412;
+    display: block;
+    position: relative;
+    overflow: hidden;
+    aspect-ratio: 4 / 5;
+    border-radius: 12px;
+    background: #101412;
+    color: #ffffff;
     text-decoration: none;
-    box-shadow: 0 6px 24px rgba(18, 24, 22, 0.06);
-    transition: background 0.18s ease, border-color 0.18s ease, transform 0.22s cubic-bezier(0.22,1,0.36,1), box-shadow 0.22s ease;
+    box-shadow: 0 8px 28px rgba(18, 24, 22, 0.10);
+    transition: transform 0.22s cubic-bezier(0.22,1,0.36,1), box-shadow 0.22s ease;
   }
   .home-card:hover {
-    background: rgba(255, 255, 255, 0.96);
-    border-color: rgba(18, 24, 22, 0.13);
     transform: translateY(-4px);
-    box-shadow: 0 16px 40px rgba(18, 24, 22, 0.09);
+    box-shadow: 0 20px 48px rgba(18, 24, 22, 0.18);
+  }
+  .home-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.22) 42%, transparent 68%);
+    pointer-events: none;
+    z-index: 1;
   }
 
-  /* Card photo */
+  /* Card photo — fills entire card */
   .home-card-media {
-    overflow: hidden;
+    position: absolute;
+    inset: 0;
     width: 100%;
-    aspect-ratio: 4 / 5;
-    border-radius: 10px;
+    height: 100%;
     background: #dfe8e4;
   }
   .home-card-media img {
@@ -202,29 +207,40 @@ const CSS = `
     display: block; object-fit: cover;
     transition: transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
   }
-  .home-card:hover .home-card-media img { transform: scale(1.04); }
+  .home-card:hover .home-card-media img { transform: scale(1.05); }
 
-  .home-card-body { padding: 0 4px; }
-  .home-card-kicker { margin: 0 0 8px; color: #667f79; font-size: 12px; font-weight: 820; }
+  .home-card-body {
+    position: absolute;
+    bottom: 36px;
+    left: 0; right: 0;
+    padding: 0 16px;
+    z-index: 2;
+  }
+  .home-card-kicker { margin: 0 0 4px; color: rgba(255,255,255,0.65); font-size: 10px; font-weight: 820; letter-spacing: 0.08em; text-transform: uppercase; }
   .home-card h3 {
-    margin: 0 0 10px;
-    color: #101412;
+    margin: 0;
+    color: #ffffff;
     font-size: 20px;
     font-weight: 860;
-    letter-spacing: -0.01em;
-    line-height: 1.02;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    line-height: 1;
   }
-  .home-card p { margin: 0; color: #5b6763; font-size: 14px; line-height: 1.55; }
+  .home-card p { display: none; }
   .home-card-footer {
-    min-height: 34px;
+    position: absolute;
+    bottom: 0;
+    left: 0; right: 0;
+    padding: 8px 16px 14px;
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    margin: 0 4px;
-    border-top: 1px solid rgba(18, 24, 22, 0.08);
-    color: #101412;
-    font-size: 13px;
+    justify-content: flex-start;
+    color: rgba(255,255,255,0.72);
+    font-size: 10px;
     font-weight: 820;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    z-index: 2;
   }
 
   /* ═══════════════════════════════════════════════════════════════════════════
@@ -383,7 +399,6 @@ const CSS = `
 
   /* ── RESPONSIVE ────────────────────────────────────────────────────────────── */
   @media (max-width: 920px) {
-    .home-card-grid        { grid-template-columns: 1fr; }
     .home-editorial-grid   { grid-template-columns: 1fr; }
     .home-cta-panel        { grid-template-columns: 1fr; }
     .home-proof-grid       { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -396,13 +411,18 @@ const CSS = `
   }
   @media (max-width: 760px) {
     .home-shell { width: min(1180px, calc(100% - 36px)); }
-    .home-services, .home-proof { padding: 62px 0 70px; }
+    .home-services { padding: 44px 0 52px; }
+    .home-proof { padding: 62px 0 70px; }
     .home-editorial { padding: 70px 0 76px; }
     .home-cta { padding: 66px 0 78px; }
     .home-strip { padding: 56px 0 68px; }
     .home-title { font-size: clamp(1.8rem, 8vw, 2.6rem); }
     .home-copy  { font-size: 16px; }
-    .home-card-media { aspect-ratio: 16 / 10; }
+    .home-card-grid { gap: 6px; }
+    .home-card h3 { font-size: 15px; letter-spacing: 0.08em; }
+    .home-card-kicker { font-size: 9px; }
+    .home-card-footer { font-size: 9px; padding: 6px 10px 10px; }
+    .home-card-body { padding: 0 10px; bottom: 28px; }
     .home-cta-copy { padding: 18px 8px 8px; }
     .home-cta-media { min-height: 340px; }
     .home-editorial-media { min-height: 430px; }
