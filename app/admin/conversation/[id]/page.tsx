@@ -137,12 +137,6 @@ export default function ConversationPage() {
       if (json.error && !json.messages?.length) showToast(json.error, false);
       setMessages(json.messages ?? []);
       setMyEmail(json.myEmail ?? "");
-      // If there's an existing thread, reply with "Re: [original subject]"
-      const firstSubject = json.messages?.[0]?.subject;
-      if (firstSubject) {
-        const alreadyRe = firstSubject.toLowerCase().startsWith("re:");
-        setSubject(alreadyRe ? firstSubject : `Re: ${firstSubject}`);
-      }
       // Auto-expand + load body for the last message only
       const last = json.messages?.at(-1);
       if (last) {
