@@ -8,8 +8,8 @@ import BayAreaLocationsManager from "@/app/admin/BayAreaLocationsManager";
 
 export const dynamic = 'force-dynamic'
 
-type Tab = "poses"|"locations"|"bayGuide"|"portfolio"|"categories"|"blog"|"analytics"|"inquiries";
-type Inquiry = { id:number; name:string; email:string; phone:string|null; session_type:string|null; date_in_mind:string|null; message:string; status:string; created_at:string; };
+type Tab = "poses"|"locations"|"bayGuide"|"portfolio"|"categories"|"blog"|"analytics"|"inquiries"|"clients";
+type Inquiry = { id:number; name:string; email:string; phone:string|null; session_type:string|null; date_in_mind:string|null; message:string; status:string; created_at:string; payment_status:string|null; payment_note:string|null; session_date:string|null; booking_confirmed:boolean|null; };
 type BlogCategory = "journal"|"professional";
 type Pose = { id:number; title:string; image_url:string; instructions:string; order:number; };
 type Spot = { id:number; school_id:string; school_name:string; school_short:string; name:string; description:string; tip:string; icon:string; image_url:string|null; order:number; };
@@ -186,6 +186,9 @@ function AdminDashboard() {
   const coverFileRef=useRef<HTMLInputElement>(null);
   const extraFileRef=useRef<HTMLInputElement>(null);
 
+  // ── Clients ───────────────────────────────────────────────────────────────
+  const [clientSearch,setClientSearch]=useState("");
+
   // ── Inquiries ─────────────────────────────────────────────────────────
   const [inquiries,setInquiries]=useState<Inquiry[]>([]);
   const [inquiriesLoading,setInquiriesLoading]=useState(false);
@@ -202,6 +205,24 @@ function AdminDashboard() {
   const [learnLoading,setLearnLoading]=useState<number|null>(null);
   const [learnedRules,setLearnedRules]=useState<Record<number,string[]>>({});
   const [rulesSaved,setRulesSaved]=useState<number|null>(null);
+
+  // ── Payment sync ──────────────────────────────────────────────────────────
+  const [syncLoading,setSyncLoading]=useState(false);
+  const [syncResult,setSyncResult]=useState<{name:string;email:string;amount:string;method:string;alreadyPaid:boolean}[]|null>(null);
+  const [syncMsg,setSyncMsg]=useState<string|null>(null);
+
+  async function syncPayments(){
+    setSyncLoading(true);setSyncResult(null);setSyncMsg(null);
+    try{
+      const res=await fetch("/api/sync-payments",{method:"POST"});
+      const json=await res.json();
+      if(!res.ok){setSyncMsg(json.error??"Sync failed");return;}
+      if(json.message){setSyncMsg(json.message);}
+      setSyncResult(json.synced??[]);
+      if((json.synced??[]).length>0)fetchInquiries();
+    }catch{setSyncMsg("Sync request failed");}
+    finally{setSyncLoading(false);}
+  }
 
   // ── Gmail ─────────────────────────────────────────────────────────────────
   const [gmailConnected,setGmailConnected]=useState(false);
@@ -520,7 +541,7 @@ function AdminDashboard() {
     }
   }
   
-  useEffect(()=>{if(authed){fetchPoses();fetchSpots();fetchCategories();fetchPortfolioImages();fetchPosts();fetchSiteSettings();if(tab==="analytics")fetchLinkStats();if(tab==="inquiries"){fetchInquiries();fetchGmailStatus();}}},[authed,tab,blogCategory]);
+  useEffect(()=>{if(authed){fetchPoses();fetchSpots();fetchCategories();fetchPortfolioImages();fetchPosts();fetchSiteSettings();if(tab==="analytics")fetchLinkStats();if(tab==="inquiries"||tab==="clients"){fetchInquiries();fetchGmailStatus();}}},[authed,tab,blogCategory]);
 
   async function compressImage(file:File, maxPx=2400, quality=0.82):Promise<Blob>{
     return new Promise(resolve=>{
@@ -752,11 +773,11 @@ function AdminDashboard() {
         </div>
         {/* Tabs */}
         <div className="flex gap-2 mb-8 p-1 rounded-2xl bg-white border border-slate-100 w-fit flex-wrap">
-          {(["poses","locations","bayGuide","portfolio","categories","blog","analytics","inquiries"] as Tab[]).map(t=>(
+          {(["poses","locations","bayGuide","portfolio","categories","blog","analytics","inquiries","clients"] as Tab[]).map(t=>(
             <button key={t} onClick={()=>{setTab(t);cancelEditPose();cancelEditSpot();cancelEditPortfolioImage();cancelEditCategory();cancelEditPost();setEditingInquiry(null);setInquiryDeleteConfirm(null);}}
               className="px-5 py-2 rounded-xl text-sm font-bold transition-all"
               style={tab===t?{background:C.grad12,color:"#fff"}:{color:"#94a3b8"}}>
-              {t==="poses"?"📸 Grad Poses":t==="locations"?"📍 Campus Spots":t==="bayGuide"?"🗺️ Bay Guide":t==="portfolio"?"🖼️ Portfolio":t==="categories"?"🏷️ Categories":t==="blog"?"✍️ Blog":t==="analytics"?"📊 Analytics":"📬 Inquiries"}
+              {t==="poses"?"📸 Grad Poses":t==="locations"?"📍 Campus Spots":t==="bayGuide"?"🗺️ Bay Guide":t==="portfolio"?"🖼️ Portfolio":t==="categories"?"🏷️ Categories":t==="blog"?"✍️ Blog":t==="analytics"?"📊 Analytics":t==="inquiries"?"📬 Inquiries":"👥 Clients"}
             </button>
           ))}
         </div>
@@ -1857,12 +1878,42 @@ function AdminDashboard() {
                     {inquiries.filter(i=>i.status==="new").length} new · {inquiries.length} total
                   </p>
                 </div>
-                <button onClick={fetchInquiries} disabled={inquiriesLoading}
-                  className="text-xs font-bold px-3 py-1.5 rounded-lg transition-all hover:opacity-80 flex items-center gap-1.5"
-                  style={{background:C.grad12,color:"#fff"}}>
-                  {inquiriesLoading?"Loading…":"↻ Refresh"}
-                </button>
+                <div className="flex gap-2 items-center flex-wrap">
+                  <button onClick={syncPayments} disabled={syncLoading}
+                    className="text-xs font-bold px-3 py-1.5 rounded-lg transition-all hover:opacity-80 flex items-center gap-1.5 disabled:opacity-50"
+                    style={{background:"linear-gradient(135deg,#10b981,#059669)",color:"#fff"}}>
+                    {syncLoading?<><span className="animate-spin inline-block">◌</span> Scanning…</>:"💳 Sync Payments"}
+                  </button>
+                  <button onClick={fetchInquiries} disabled={inquiriesLoading}
+                    className="text-xs font-bold px-3 py-1.5 rounded-lg transition-all hover:opacity-80 flex items-center gap-1.5"
+                    style={{background:C.grad12,color:"#fff"}}>
+                    {inquiriesLoading?"Loading…":"↻ Refresh"}
+                  </button>
+                </div>
               </div>
+
+              {/* Sync result banner */}
+              {(syncResult!==null||syncMsg)&&(
+                <div className="rounded-xl px-4 py-3 text-sm"
+                     style={syncResult?.length?{background:"rgba(16,185,129,0.08)",border:"1px solid rgba(16,185,129,0.2)"}:{background:"rgba(148,163,184,0.08)",border:"1px solid rgba(148,163,184,0.2)"}}>
+                  {syncMsg&&<p className="text-slate-500 text-xs">{syncMsg}</p>}
+                  {syncResult?.length?(
+                    <div className="space-y-1">
+                      <p className="text-xs font-black text-emerald-600 mb-2">✓ {syncResult.length} payment{syncResult.length===1?"":"s"} synced</p>
+                      {syncResult.map((r,i)=>(
+                        <div key={i} className="flex items-center gap-3 text-xs text-slate-600">
+                          <span className="font-semibold">{r.name}</span>
+                          <span className="text-emerald-600 font-bold">{r.amount}</span>
+                          {r.method&&<span className="text-slate-400">via {r.method}</span>}
+                          {r.alreadyPaid&&<span className="text-slate-400">(already marked)</span>}
+                        </div>
+                      ))}
+                    </div>
+                  ):syncResult?.length===0&&!syncMsg?(
+                    <p className="text-slate-500 text-xs">No new Pixieset payments found in Gmail.</p>
+                  ):null}
+                </div>
+              )}
 
               {inquiriesLoading?(
                 <div className="text-center py-16 text-slate-400 text-sm bg-white rounded-2xl border border-slate-100">Loading inquiries…</div>
@@ -2224,6 +2275,160 @@ function AdminDashboard() {
             </div>
           </div>
         )}
+
+        {/* ── CLIENTS ── */}
+        {tab==="clients"&&(()=>{
+          // Deduplicate by email, group all sessions per client
+          const clientMap=new Map<string,{name:string;email:string;phone:string|null;sessions:Inquiry[]}>();
+          [...inquiries].sort((a,b)=>new Date(b.created_at).getTime()-new Date(a.created_at).getTime()).forEach(inq=>{
+            const key=inq.email.toLowerCase();
+            if(!clientMap.has(key))clientMap.set(key,{name:inq.name,email:inq.email,phone:inq.phone,sessions:[]});
+            clientMap.get(key)!.sessions.push(inq);
+          });
+          const clients=Array.from(clientMap.values());
+          const q=clientSearch.toLowerCase().trim();
+          const filtered=q?clients.filter(c=>c.name.toLowerCase().includes(q)||c.email.toLowerCase().includes(q)):clients;
+          return(
+            <div className="space-y-6">
+              {/* Search bar */}
+              <div className={card}>
+                <div className="h-[3px]" style={{background:C.grad12}}/>
+                <div className="p-5">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <div className="flex-1 min-w-[220px]">
+                      <input
+                        type="search"
+                        value={clientSearch}
+                        onChange={e=>setClientSearch(e.target.value)}
+                        placeholder="Search by name or email…"
+                        className="w-full px-4 py-2.5 rounded-xl outline-none text-slate-700 text-sm"
+                        style={{border:`1px solid ${C.p1_20}`,background:C.p1_04,fontFamily:"inherit"}}
+                      />
+                    </div>
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <p className="text-xs text-slate-400 font-medium">
+                        {filtered.length} client{filtered.length===1?"":"s"}
+                        {q?` matching "${q}"`:""}
+                        {" · "}{inquiries.length} total session{inquiries.length===1?"":"s"}
+                      </p>
+                      <button onClick={syncPayments} disabled={syncLoading}
+                        className="text-xs font-bold px-3 py-1.5 rounded-lg transition-all hover:opacity-80 flex items-center gap-1.5 disabled:opacity-50 flex-shrink-0"
+                        style={{background:"linear-gradient(135deg,#10b981,#059669)",color:"#fff"}}>
+                        {syncLoading?<><span className="animate-spin inline-block">◌</span> Scanning…</>:"💳 Sync Payments"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Sync result banner */}
+              {(syncResult!==null||syncMsg)&&(
+                <div className="rounded-xl px-4 py-3 text-sm"
+                     style={syncResult?.length?{background:"rgba(16,185,129,0.08)",border:"1px solid rgba(16,185,129,0.2)"}:{background:"rgba(148,163,184,0.08)",border:"1px solid rgba(148,163,184,0.2)"}}>
+                  {syncMsg&&<p className="text-slate-500 text-xs">{syncMsg}</p>}
+                  {syncResult?.length?(
+                    <div className="space-y-1">
+                      <p className="text-xs font-black text-emerald-600 mb-2">✓ {syncResult.length} payment{syncResult.length===1?"":"s"} synced from Pixieset</p>
+                      {syncResult.map((r,i)=>(
+                        <div key={i} className="flex items-center gap-3 text-xs text-slate-600">
+                          <span className="font-semibold">{r.name}</span>
+                          <span className="text-emerald-600 font-bold">{r.amount}</span>
+                          {r.method&&<span className="text-slate-400">via {r.method}</span>}
+                          {r.alreadyPaid&&<span className="text-slate-400">(already marked)</span>}
+                        </div>
+                      ))}
+                    </div>
+                  ):syncResult?.length===0&&!syncMsg?(
+                    <p className="text-slate-500 text-xs">No new Pixieset payments found in Gmail.</p>
+                  ):null}
+                </div>
+              )}
+
+              {/* Client cards */}
+              {inquiriesLoading?(
+                <div className="text-center py-12 text-slate-400 text-sm">Loading clients…</div>
+              ):filtered.length===0?(
+                <div className="text-center py-12 text-slate-400 text-sm">{q?"No clients match that search.":"No clients yet."}</div>
+              ):(
+                <div className="space-y-3">
+                  {filtered.map(client=>{
+                    const paid=client.sessions.some(s=>s.payment_status==="paid");
+                    const latest=client.sessions[0];
+                    return(
+                      <div key={client.email} className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
+                        <div className="h-[3px]" style={{background:paid?"linear-gradient(90deg,#10b981,#34d399)":C.grad12}}/>
+                        <div className="p-5">
+                          {/* Client header */}
+                          <div className="flex items-start justify-between gap-3 flex-wrap mb-4">
+                            <div>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="text-base font-black text-slate-900">{client.name}</p>
+                                {paid&&(
+                                  <span className="text-[10px] font-black px-2 py-0.5 rounded-lg"
+                                        style={{background:"rgba(16,185,129,0.12)",color:"#059669"}}>
+                                    Paid ✓
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex gap-3 mt-0.5 flex-wrap">
+                                <a href={`mailto:${client.email}`} className="text-xs hover:underline font-medium" style={{color:C.p1}}>{client.email}</a>
+                                {client.phone&&<a href={`tel:${client.phone}`} className="text-xs text-slate-400 hover:underline">{client.phone}</a>}
+                              </div>
+                            </div>
+                            <span className="text-xs text-slate-400 font-medium flex-shrink-0">
+                              {client.sessions.length} session{client.sessions.length===1?"":"s"}
+                            </span>
+                          </div>
+
+                          {/* Session rows */}
+                          <div className="space-y-2">
+                            {client.sessions.map(s=>(
+                              <div key={s.id}
+                                   className="flex items-center gap-3 px-3 py-2.5 rounded-xl flex-wrap"
+                                   style={{background:"rgba(148,163,184,0.06)",border:"1px solid rgba(148,163,184,0.12)"}}>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    {s.session_type&&<span className="text-xs font-semibold text-slate-700">{s.session_type}</span>}
+                                    {s.date_in_mind&&<span className="text-xs text-slate-400">{s.date_in_mind}</span>}
+                                    {s.session_date&&<span className="text-xs font-bold text-emerald-600">{new Date(s.session_date+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}</span>}
+                                  </div>
+                                  <p className="text-[11px] text-slate-400 mt-0.5 truncate">{s.message.slice(0,80)}{s.message.length>80?"…":""}</p>
+                                </div>
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                  {/* Payment badge */}
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg"
+                                        style={s.payment_status==="paid"
+                                          ?{background:"rgba(16,185,129,0.12)",color:"#059669"}
+                                          :{background:"rgba(148,163,184,0.12)",color:"#94a3b8"}}>
+                                    {s.payment_status==="paid"?"Paid":"Unpaid"}
+                                  </span>
+                                  {/* Status badge */}
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg capitalize"
+                                        style={s.status==="new"
+                                          ?{background:"rgba(16,185,129,0.1)",color:"#10b981"}
+                                          :s.status==="responded"
+                                            ?{background:"rgba(59,130,246,0.1)",color:"#3b82f6"}
+                                            :{background:"rgba(148,163,184,0.1)",color:"#94a3b8"}}>
+                                    {s.status}
+                                  </span>
+                                  <a href={`/admin/conversation/${s.id}`}
+                                     className="text-[11px] font-black px-2.5 py-1 rounded-lg transition-all hover:opacity-80"
+                                     style={{background:C.grad12,color:"#fff"}}>
+                                    Open →
+                                  </a>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </div>
     </div>
   );

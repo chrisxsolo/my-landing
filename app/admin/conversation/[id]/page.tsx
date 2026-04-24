@@ -12,6 +12,9 @@ type Inquiry = {
   id: number; name: string; email: string; phone: string | null;
   session_type: string | null; date_in_mind: string | null;
   message: string; status: string; created_at: string;
+  payment_status: string | null; payment_note: string | null;
+  payment_detected_at: string | null; booking_confirmed: boolean | null;
+  session_date: string | null;
 };
 
 function fmtDate(ts: number) {
@@ -85,6 +88,13 @@ export default function ConversationPage() {
   const [sendLoading,   setSendLoading]   = useState(false);
   const [toast,         setToast]         = useState<{ msg: string; ok: boolean } | null>(null);
   const [status,        setStatus]        = useState("new");
+
+  // ── Payment ────────────────────────────────────────────────────────────────
+  const [paymentLoading,    setPaymentLoading]    = useState(false);
+  const [sessionDateInput,  setSessionDateInput]  = useState("");
+  const [previewHtml,       setPreviewHtml]       = useState<string | null>(null);
+  const [confirmLoading,    setConfirmLoading]    = useState(false);
+  const [previewLoading,    setPreviewLoading]    = useState(false);
 
   // ── Things to Remember ─────────────────────────────────────────────────────
   const [notes,         setNotes]         = useState("");
@@ -288,6 +298,88 @@ export default function ConversationPage() {
     await supabase.from("inquiries").update({ status: s }).eq("id", inquiry.id);
     setStatus(s);
     showToast(`Marked as ${s}`);
+  }
+
+  // ── Check payment via Gmail + Claude ──────────────────────────────────────
+  async function checkPayment() {
+    if (!inquiry) return;
+    setPaymentLoading(true);
+    try {
+      const res = await fetch("/api/check-payment", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          inquiry_id:   inquiry.id,
+          email:        inquiry.email,
+          name:         inquiry.name,
+          session_date: sessionDateInput || undefined,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) { showToast(json.error ?? "Check failed", false); return; }
+
+      if (json.paid) {
+        showToast(`Payment confirmed — ${json.note}`);
+        if (json.session_date_booked) showToast(`Calendar marked as booked`);
+      } else {
+        showToast(json.note || "No payment found yet", false);
+      }
+
+      // Refresh inquiry to pick up new payment fields
+      const { data } = await supabase.from("inquiries").select("*").eq("id", inquiry.id).single();
+      if (data) setInquiry(data);
+    } catch {
+      showToast("Payment check failed", false);
+    } finally {
+      setPaymentLoading(false);
+    }
+  }
+
+  // ── Payment confirmation email: preview ───────────────────────────────────
+  async function previewConfirmation() {
+    if (!inquiry) return;
+    setPreviewLoading(true);
+    try {
+      const res = await fetch("/api/payment-confirmation", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ inquiry_id: inquiry.id, mode: "preview" }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.html) { showToast(json.error ?? "Preview failed", false); return; }
+      setPreviewHtml(json.html);
+    } catch {
+      showToast("Preview failed", false);
+    } finally {
+      setPreviewLoading(false);
+    }
+  }
+
+  // ── Payment confirmation email: send ──────────────────────────────────────
+  async function sendConfirmation() {
+    if (!inquiry) return;
+    setConfirmLoading(true);
+    try {
+      const latestThreadId = messages.at(-1)?.threadId;
+      const res = await fetch("/api/payment-confirmation", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({
+          inquiry_id: inquiry.id,
+          mode:       "send",
+          thread_id:  latestThreadId,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) { showToast(json.error ?? "Send failed", false); return; }
+      showToast(`Booking confirmation sent to ${inquiry.name} ✓`);
+      setPreviewHtml(null);
+      setTimeout(() => fetchThread(inquiry!.email), 1500);
+    } catch {
+      showToast("Send failed", false);
+    } finally {
+      setConfirmLoading(false);
+    }
   }
 
   // ── Save notes for this inquiry ────────────────────────────────────────────
@@ -614,6 +706,93 @@ export default function ConversationPage() {
             </div>
           </div>
 
+          {/* ── Payment & Booking ── */}
+          <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
+            <div className="h-[3px]" style={{ background: "linear-gradient(90deg,#10b981,#34d399)" }} />
+            <div className="p-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-lg flex items-center justify-center text-xs"
+                       style={{ background: "rgba(16,185,129,0.12)", color: "#059669" }}>💳</div>
+                  <p className="text-sm font-black text-slate-900">Payment & Booking</p>
+                </div>
+                {/* Status badge */}
+                {inquiry.payment_status === "paid" ? (
+                  <span className="text-[11px] font-black px-2.5 py-1 rounded-lg"
+                        style={{ background: "rgba(16,185,129,0.12)", color: "#059669" }}>
+                    Paid ✓
+                  </span>
+                ) : (
+                  <span className="text-[11px] font-black px-2.5 py-1 rounded-lg"
+                        style={{ background: "rgba(148,163,184,0.12)", color: "#94a3b8" }}>
+                    Unpaid
+                  </span>
+                )}
+              </div>
+
+              {/* Payment note */}
+              {inquiry.payment_note && (
+                <div className="rounded-xl px-3 py-2 text-xs text-emerald-700 leading-relaxed"
+                     style={{ background: "rgba(16,185,129,0.07)", border: "1px solid rgba(16,185,129,0.2)" }}>
+                  {inquiry.payment_note}
+                  {inquiry.payment_detected_at && (
+                    <span className="block text-[10px] text-emerald-400 mt-0.5">
+                      Checked {new Date(inquiry.payment_detected_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* Session date input */}
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 block mb-1">
+                  Session date {inquiry.session_date ? `· ${inquiry.session_date}` : "(optional — books calendar when paid)"}
+                </label>
+                <input
+                  type="date"
+                  value={sessionDateInput || inquiry.session_date || ""}
+                  onChange={e => setSessionDateInput(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl outline-none text-slate-700"
+                  style={{ border: "1px solid rgba(16,185,129,0.25)", background: "#fff", fontFamily: "inherit", fontSize: "15px" }} />
+              </div>
+
+              {/* Check Payment button */}
+              <button
+                onClick={checkPayment}
+                disabled={paymentLoading}
+                className="w-full text-sm font-black py-2.5 rounded-xl transition-all hover:opacity-90 disabled:opacity-40 flex items-center justify-center gap-2"
+                style={{ background: "linear-gradient(135deg,#10b981,#059669)", color: "#fff" }}>
+                {paymentLoading
+                  ? <><span className="animate-spin inline-block">◌</span> Scanning emails…</>
+                  : inquiry.payment_status === "paid"
+                    ? "✓ Re-check payment"
+                    : "Scan Gmail for payment"}
+              </button>
+              <p className="text-[10px] text-slate-400 text-center">
+                Claude scans Venmo, Zelle, PayPal &amp; conversation for payment evidence
+              </p>
+
+              {/* Send booking confirmation — only shown once paid */}
+              {inquiry.payment_status === "paid" && (
+                <div className="pt-2 border-t border-slate-100 space-y-2">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Booking confirmation</p>
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    Send {inquiry.name} a payment receipt + session details + link to your graduation guide.
+                  </p>
+                  <button
+                    onClick={previewConfirmation}
+                    disabled={previewLoading || confirmLoading}
+                    className="w-full text-sm font-black py-2.5 rounded-xl transition-all hover:opacity-90 disabled:opacity-40 flex items-center justify-center gap-2"
+                    style={{ background: "linear-gradient(135deg,#6366f1,#8b5cf6)", color: "#fff" }}>
+                    {previewLoading
+                      ? <><span className="animate-spin inline-block">◌</span> Building email…</>
+                      : "Preview & send confirmation email"}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* ── Things to Remember ── */}
           <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
             <div className="h-[3px]" style={{ background: "linear-gradient(90deg,#8b5cf6,#a78bfa)" }} />
@@ -746,6 +925,7 @@ export default function ConversationPage() {
               inquiry.phone       && { label: "Phone",   value: <a href={`tel:${inquiry.phone}`} className="hover:underline text-slate-700">{inquiry.phone}</a> },
               inquiry.session_type && { label: "Session", value: inquiry.session_type },
               inquiry.date_in_mind && { label: "Date",    value: inquiry.date_in_mind },
+              inquiry.session_date && { label: "Booked",  value: new Date(inquiry.session_date + "T12:00:00").toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) },
             ].filter(Boolean).map((row, i) => {
               const r = row as { label: string; value: ReactNode };
               return (
@@ -764,6 +944,50 @@ export default function ConversationPage() {
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-2xl shadow-xl text-sm font-bold text-white transition-all"
              style={{ background: toast.ok ? "#10b981" : "#ef4444" }}>
           {toast.msg}
+        </div>
+      )}
+
+      {/* ── Email preview modal ── */}
+      {previewHtml && inquiry && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-10 overflow-y-auto"
+             style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)" }}>
+          <div className="w-full max-w-2xl rounded-2xl overflow-hidden shadow-2xl flex flex-col"
+               style={{ background: "#f4f4f0", maxHeight: "calc(100vh - 80px)" }}>
+
+            {/* Modal header */}
+            <div className="flex items-center justify-between px-5 py-4 bg-white border-b border-slate-100 flex-shrink-0">
+              <div>
+                <p className="text-sm font-black text-slate-900">Booking Confirmation Email</p>
+                <p className="text-xs text-slate-400 mt-0.5">To: {inquiry.name} &lt;{inquiry.email}&gt;</p>
+              </div>
+              <button onClick={() => setPreviewHtml(null)}
+                className="text-slate-400 hover:text-slate-700 text-xl font-bold leading-none px-2">×</button>
+            </div>
+
+            {/* Email preview */}
+            <div className="flex-1 overflow-y-auto p-4">
+              <div className="rounded-xl overflow-hidden shadow-sm"
+                   dangerouslySetInnerHTML={{ __html: previewHtml }} />
+            </div>
+
+            {/* Action bar */}
+            <div className="flex gap-3 px-5 py-4 bg-white border-t border-slate-100 flex-shrink-0">
+              <button onClick={() => setPreviewHtml(null)}
+                className="flex-1 text-sm font-bold py-2.5 rounded-xl transition-all hover:opacity-80"
+                style={{ background: "rgba(148,163,184,0.12)", color: "#64748b" }}>
+                Cancel
+              </button>
+              <button
+                onClick={sendConfirmation}
+                disabled={confirmLoading}
+                className="flex-1 text-sm font-black py-2.5 rounded-xl transition-all hover:opacity-90 disabled:opacity-40 flex items-center justify-center gap-2"
+                style={{ background: "linear-gradient(135deg,#6366f1,#8b5cf6)", color: "#fff" }}>
+                {confirmLoading
+                  ? <><span className="animate-spin inline-block">◌</span> Sending…</>
+                  : "Send from Gmail"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
