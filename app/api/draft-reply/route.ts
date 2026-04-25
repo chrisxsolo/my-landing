@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }
 
-  const { name, email, session_type, date_in_mind, message, phone, previous_draft, feedback, ai_draft, actual_sent, thread_context, raw_draft } = body;
+  const { name, email, session_type, date_in_mind, message, phone, previous_draft, feedback, ai_draft, actual_sent, thread_context, raw_draft, latest_message_body, latest_message_from } = body;
 
   if (!name || !email || !message) {
     return NextResponse.json(
@@ -232,7 +232,21 @@ ${previous_draft}
 Chris reviewed it and wants this changed: "${feedback}"
 
 Rewrite the reply incorporating that feedback. Keep everything else the same unless it conflicts with the requested change. Output only the revised reply, nothing else.`
-    : `Draft a reply to this client inquiry:
+    : latest_message_body && latest_message_from !== "me"
+      ? `Draft a reply to the most recent email from ${name}.
+
+Client info:
+Name: ${name}
+Email: ${email}${phone ? `\nPhone: ${phone}` : ""}${session_type ? `\nSession type: ${session_type}` : ""}${date_in_mind ? `\nDate they have in mind: ${date_in_mind}` : ""}
+
+Their most recent email (this is what you are replying to):
+${latest_message_body}
+
+Current availability:
+${availability}${threadSection}
+
+Write the reply now. Focus on responding to what they said in their most recent email.`
+      : `Draft a reply to this client inquiry:
 
 Name: ${name}
 Email: ${email}${phone ? `\nPhone: ${phone}` : ""}${session_type ? `\nSession type: ${session_type}` : ""}${date_in_mind ? `\nDate they have in mind: ${date_in_mind}` : ""}

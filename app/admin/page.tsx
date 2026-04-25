@@ -188,6 +188,7 @@ function AdminDashboard() {
 
   // ── Clients ───────────────────────────────────────────────────────────────
   const [clientSearch,setClientSearch]=useState("");
+  const [clientFilter,setClientFilter]=useState<"all"|"paid"|"unpaid">("all");
 
   // ── Inquiries ─────────────────────────────────────────────────────────
   const [inquiries,setInquiries]=useState<Inquiry[]>([]);
@@ -2287,7 +2288,12 @@ function AdminDashboard() {
           });
           const clients=Array.from(clientMap.values());
           const q=clientSearch.toLowerCase().trim();
-          const filtered=q?clients.filter(c=>c.name.toLowerCase().includes(q)||c.email.toLowerCase().includes(q)):clients;
+          const filtered=clients.filter(c=>{
+            const matchesSearch=!q||c.name.toLowerCase().includes(q)||c.email.toLowerCase().includes(q);
+            const hasPaid=c.sessions.some(s=>s.payment_status==="paid");
+            const matchesFilter=clientFilter==="all"||(clientFilter==="paid"&&hasPaid)||(clientFilter==="unpaid"&&!hasPaid);
+            return matchesSearch&&matchesFilter;
+          });
           return(
             <div className="space-y-6">
               {/* Search bar */}
@@ -2306,6 +2312,20 @@ function AdminDashboard() {
                       />
                     </div>
                     <div className="flex items-center gap-3 flex-wrap">
+                      {/* Payment filter pills */}
+                      <div className="flex gap-1.5">
+                        {(["all","paid","unpaid"] as const).map(f=>(
+                          <button key={f} onClick={()=>setClientFilter(f)}
+                            className="text-[11px] font-bold px-3 py-1 rounded-lg capitalize transition-all"
+                            style={clientFilter===f
+                              ?f==="paid"?{background:"rgba(16,185,129,0.15)",color:"#059669"}
+                                :f==="unpaid"?{background:"rgba(148,163,184,0.18)",color:"#64748b"}
+                                :{background:C.grad12,color:"#fff"}
+                              :{background:"rgba(148,163,184,0.1)",color:"#94a3b8"}}>
+                            {f==="paid"?"✓ Paid":f==="unpaid"?"Unpaid":"All"}
+                          </button>
+                        ))}
+                      </div>
                       <p className="text-xs text-slate-400 font-medium">
                         {filtered.length} client{filtered.length===1?"":"s"}
                         {q?` matching "${q}"`:""}

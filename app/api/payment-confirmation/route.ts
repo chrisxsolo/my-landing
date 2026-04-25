@@ -44,8 +44,9 @@ function buildHtml(opts: {
   method: string;
   invoice: string;
   guideUrl: string;
+  customMessage?: string;
 }) {
-  const { name, sessionType, dateInMind, sessionDate, amount, method, invoice, guideUrl } = opts;
+  const { name, sessionType, dateInMind, sessionDate, amount, method, invoice, guideUrl, customMessage } = opts;
   const safeName    = escapeHtml(name);
   const safeGuide   = escapeHtml(guideUrl);
 
@@ -132,6 +133,13 @@ function buildHtml(opts: {
     </a>
   </div>
 
+  ${customMessage ? `
+  <!-- Custom note from Chris -->
+  <div style="border-left:3px solid #10b981;padding:14px 18px;margin:0 0 28px;background:rgba(16,185,129,0.04);">
+    <p style="font-size:15px;line-height:1.75;color:#303635;margin:0;white-space:pre-wrap;">${escapeHtml(customMessage)}</p>
+  </div>
+  ` : ""}
+
   <!-- Sign-off -->
   <p style="font-size:15px;line-height:1.75;color:#303635;margin:0 0 28px;">
     If you have any questions before shoot day, just reply to this email — I'm always happy to help. See you soon!
@@ -191,11 +199,11 @@ export async function POST(req: NextRequest) {
   const deny = requireAdmin(req);
   if (deny) return deny;
 
-  let body: { inquiry_id: string | number; mode: "preview" | "send"; thread_id?: string };
+  let body: { inquiry_id: string | number; mode: "preview" | "send"; thread_id?: string; custom_message?: string };
   try { body = await req.json(); }
   catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
 
-  const { inquiry_id, mode = "preview", thread_id } = body;
+  const { inquiry_id, mode = "preview", thread_id, custom_message } = body;
   if (!inquiry_id) return NextResponse.json({ error: "inquiry_id required" }, { status: 400 });
 
   const supabase = createSupabaseServerClient();
@@ -216,12 +224,13 @@ export async function POST(req: NextRequest) {
   const { amount, method, invoice } = parseNote(inq.payment_note);
 
   const html = buildHtml({
-    name:        inq.name,
-    sessionType: inq.session_type,
-    dateInMind:  inq.date_in_mind,
-    sessionDate: inq.session_date,
+    name:          inq.name,
+    sessionType:   inq.session_type,
+    dateInMind:    inq.date_in_mind,
+    sessionDate:   inq.session_date,
     amount, method, invoice,
     guideUrl,
+    customMessage: custom_message,
   });
 
   if (mode === "preview") {

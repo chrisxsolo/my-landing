@@ -95,6 +95,13 @@ export default function ConversationPage() {
   const [previewHtml,       setPreviewHtml]       = useState<string | null>(null);
   const [confirmLoading,    setConfirmLoading]    = useState(false);
   const [previewLoading,    setPreviewLoading]    = useState(false);
+  const [customComment,     setCustomComment]     = useState("");
+  // Session date detection
+  const [detectedDate,      setDetectedDate]      = useState<{ date: string; readable: string; confidence: string } | null>(null);
+  const [detectLoading,     setDetectLoading]     = useState(false);
+  const [dateConfirming,    setDateConfirming]    = useState(false);
+  // Day-before reminder
+  const [reminderLoading,   setReminderLoading]   = useState(false);
 
   // ── Things to Remember ─────────────────────────────────────────────────────
   const [notes,         setNotes]         = useState("");
@@ -194,14 +201,22 @@ export default function ConversationPage() {
           }).join("\n\n---\n\n")
         : undefined;
 
+      // Most recent email body — used so AI replies to what was last said, not the original form
+      const lastMsg = messages.at(-1);
+      const latestBody = lastMsg
+        ? (bodies[lastMsg.id] ? stripQuotes(bodies[lastMsg.id]) : lastMsg.snippet)
+        : null;
+
       const payload: Record<string, string | null> = {
-        name:           inquiry.name,
-        email:          inquiry.email,
-        phone:          inquiry.phone,
-        session_type:   inquiry.session_type,
-        date_in_mind:   inquiry.date_in_mind,
-        message:        inquiry.message,
-        thread_context: threadContext ?? null,
+        name:                inquiry.name,
+        email:               inquiry.email,
+        phone:               inquiry.phone,
+        session_type:        inquiry.session_type,
+        date_in_mind:        inquiry.date_in_mind,
+        message:             inquiry.message,
+        thread_context:      threadContext ?? null,
+        latest_message_body: latestBody ?? null,
+        latest_message_from: lastMsg ? (lastMsg.isMe ? "me" : "client") : null,
       };
 
       if (refeedback && draft) {
@@ -343,7 +358,7 @@ export default function ConversationPage() {
       const res = await fetch("/api/payment-confirmation", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ inquiry_id: inquiry.id, mode: "preview" }),
+        body:    JSON.stringify({ inquiry_id: inquiry.id, mode: "preview", custom_message: customComment || undefined }),
       });
       const json = await res.json();
       if (!res.ok || !json.html) { showToast(json.error ?? "Preview failed", false); return; }
@@ -365,20 +380,88 @@ export default function ConversationPage() {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({
-          inquiry_id: inquiry.id,
-          mode:       "send",
-          thread_id:  latestThreadId,
+          inquiry_id:     inquiry.id,
+          mode:           "send",
+          thread_id:      latestThreadId,
+          custom_message: customComment || undefined,
         }),
       });
       const json = await res.json();
       if (!res.ok || !json.ok) { showToast(json.error ?? "Send failed", false); return; }
       showToast(`Booking confirmation sent to ${inquiry.name} ✓`);
       setPreviewHtml(null);
+      setCustomComment("");
       setTimeout(() => fetchThread(inquiry!.email), 1500);
     } catch {
       showToast("Send failed", false);
     } finally {
       setConfirmLoading(false);
+    }
+  }
+
+  // ── Detect session date from emails + inquiry ─────────────────────────────
+  async function detectDate() {
+    if (!inquiry) return;
+    setDetectLoading(true);
+    try {
+      const res = await fetch("/api/detect-session-date", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ inquiry_id: inquiry.id }),
+      });
+      const json = await res.json();
+      if (json.date) {
+        setDetectedDate(json);
+      } else {
+        showToast("Could not find a specific confirmed date in emails", false);
+      }
+    } catch {
+      showToast("Date detection failed", false);
+    } finally {
+      setDetectLoading(false);
+    }
+  }
+
+  // ── Confirm the detected date → save to DB + mark availability ────────────
+  async function confirmDate(dateStr: string) {
+    if (!inquiry) return;
+    setDateConfirming(true);
+    try {
+      await supabase.from("inquiries").update({ session_date: dateStr }).eq("id", inquiry.id);
+      await supabase.from("availability").upsert(
+        { date: dateStr, status: "booked", note: `Booked — ${inquiry.name}` },
+        { onConflict: "date" }
+      );
+      const { data } = await supabase.from("inquiries").select("*").eq("id", inquiry.id).single();
+      if (data) setInquiry(data);
+      setDetectedDate(null);
+      showToast("Session date confirmed and calendar updated ✓");
+    } catch {
+      showToast("Failed to save date", false);
+    } finally {
+      setDateConfirming(false);
+    }
+  }
+
+  // ── Draft day-before reminder into the compose box ────────────────────────
+  async function draftReminder() {
+    if (!inquiry) return;
+    setReminderLoading(true);
+    try {
+      const res = await fetch("/api/draft-reminder", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ inquiry_id: inquiry.id }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.draft) { showToast(json.error ?? "Draft failed", false); return; }
+      setDraft(json.draft);
+      setSubject(json.subject);
+      showToast("Reminder drafted — review and send when ready ✓");
+    } catch {
+      showToast("Reminder draft failed", false);
+    } finally {
+      setReminderLoading(false);
     }
   }
 
@@ -743,17 +826,83 @@ export default function ConversationPage() {
                 </div>
               )}
 
-              {/* Session date input */}
-              <div>
-                <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 block mb-1">
-                  Session date {inquiry.session_date ? `· ${inquiry.session_date}` : "(optional — books calendar when paid)"}
+              {/* Session date section */}
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 block">
+                  Session date
                 </label>
-                <input
-                  type="date"
-                  value={sessionDateInput || inquiry.session_date || ""}
-                  onChange={e => setSessionDateInput(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl outline-none text-slate-700"
-                  style={{ border: "1px solid rgba(16,185,129,0.25)", background: "#fff", fontFamily: "inherit", fontSize: "15px" }} />
+
+                {/* Already confirmed date */}
+                {inquiry.session_date ? (
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl"
+                       style={{ background: "rgba(16,185,129,0.07)", border: "1px solid rgba(16,185,129,0.2)" }}>
+                    <span className="text-emerald-600 font-black text-xs">✓</span>
+                    <span className="text-sm font-bold text-emerald-700">
+                      {new Date(inquiry.session_date + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "long", day: "numeric", year: "numeric" })}
+                    </span>
+                    <button onClick={() => { setSessionDateInput(inquiry.session_date!); }}
+                      className="ml-auto text-[10px] text-slate-400 hover:text-slate-600">edit</button>
+                  </div>
+                ) : null}
+
+                {/* Detected date suggestion */}
+                {detectedDate && !inquiry.session_date && (
+                  <div className="rounded-xl px-3 py-2.5 space-y-2"
+                       style={{ background: "rgba(99,102,241,0.07)", border: "1px solid rgba(99,102,241,0.2)" }}>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-400">
+                      {detectedDate.confidence === "high" ? "✓ Confirmed in emails" : "Found in emails"}
+                    </p>
+                    <p className="text-sm font-bold text-slate-800">{detectedDate.readable}</p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => confirmDate(detectedDate.date)}
+                        disabled={dateConfirming}
+                        className="flex-1 text-xs font-black py-1.5 rounded-lg transition-all hover:opacity-90 disabled:opacity-40"
+                        style={{ background: "linear-gradient(135deg,#10b981,#059669)", color: "#fff" }}>
+                        {dateConfirming ? "Saving…" : "Yes, confirm this date"}
+                      </button>
+                      <button onClick={() => setDetectedDate(null)}
+                        className="text-xs font-bold px-3 py-1.5 rounded-lg"
+                        style={{ background: "rgba(148,163,184,0.12)", color: "#64748b" }}>
+                        Dismiss
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Manual date input */}
+                {(!inquiry.session_date || sessionDateInput) && (
+                  <div className="flex gap-2">
+                    <input
+                      type="date"
+                      value={sessionDateInput}
+                      onChange={e => setSessionDateInput(e.target.value)}
+                      className="flex-1 px-3 py-2 rounded-xl outline-none text-slate-700"
+                      style={{ border: "1px solid rgba(16,185,129,0.25)", background: "#fff", fontFamily: "inherit", fontSize: "15px" }} />
+                    {sessionDateInput && (
+                      <button
+                        onClick={() => confirmDate(sessionDateInput)}
+                        disabled={dateConfirming}
+                        className="text-xs font-black px-3 py-2 rounded-xl disabled:opacity-40 transition-all hover:opacity-90"
+                        style={{ background: "linear-gradient(135deg,#10b981,#059669)", color: "#fff" }}>
+                        {dateConfirming ? "…" : "Confirm"}
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* Scan emails for date button */}
+                {!inquiry.session_date && !detectedDate && (
+                  <button
+                    onClick={detectDate}
+                    disabled={detectLoading}
+                    className="w-full text-xs font-bold py-2 rounded-xl transition-all hover:opacity-80 disabled:opacity-40 flex items-center justify-center gap-1.5"
+                    style={{ background: "rgba(99,102,241,0.08)", color: "#6366f1", border: "1px solid rgba(99,102,241,0.2)" }}>
+                    {detectLoading
+                      ? <><span className="animate-spin inline-block text-[10px]">◌</span> Scanning emails…</>
+                      : "✦ Detect date from email history"}
+                  </button>
+                )}
               </div>
 
               {/* Check Payment button */}
@@ -771,6 +920,25 @@ export default function ConversationPage() {
               <p className="text-[10px] text-slate-400 text-center">
                 Claude scans Venmo, Zelle, PayPal &amp; conversation for payment evidence
               </p>
+
+              {/* Day-before reminder — shown when session date is set */}
+              {inquiry.session_date && (
+                <div className="pt-2 border-t border-slate-100 space-y-2">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Day-before reminder</p>
+                  <button
+                    onClick={draftReminder}
+                    disabled={reminderLoading}
+                    className="w-full text-sm font-black py-2.5 rounded-xl transition-all hover:opacity-90 disabled:opacity-40 flex items-center justify-center gap-2"
+                    style={{ background: "linear-gradient(135deg,#f59e0b,#d97706)", color: "#fff" }}>
+                    {reminderLoading
+                      ? <><span className="animate-spin inline-block">◌</span> Writing…</>
+                      : "Draft reminder for tomorrow"}
+                  </button>
+                  <p className="text-[10px] text-slate-400 text-center">
+                    Fills the compose box with a personalized reminder — review and send
+                  </p>
+                </div>
+              )}
 
               {/* Send booking confirmation — only shown once paid */}
               {inquiry.payment_status === "paid" && (
@@ -962,6 +1130,25 @@ export default function ConversationPage() {
               </div>
               <button onClick={() => setPreviewHtml(null)}
                 className="text-slate-400 hover:text-slate-700 text-xl font-bold leading-none px-2">×</button>
+            </div>
+
+            {/* Custom note input */}
+            <div className="px-5 py-3 border-b border-slate-100 flex-shrink-0 bg-slate-50">
+              <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 block mb-1.5">
+                Add a personal note <span className="normal-case font-normal text-slate-300">(optional — appears in the email)</span>
+              </label>
+              <textarea
+                value={customComment}
+                onChange={e => setCustomComment(e.target.value)}
+                rows={2}
+                placeholder={"e.g. \"Can't wait to shoot with you! Feel free to text me if anything comes up.\""}
+
+                className="w-full text-slate-700 rounded-lg px-3 py-2 outline-none resize-none text-sm leading-relaxed"
+                style={{ border: "1px solid rgba(16,185,129,0.25)", background: "#fff", fontFamily: "inherit" }}
+              />
+              {customComment.trim() && (
+                <p className="text-[10px] text-emerald-600 mt-1 font-medium">↓ Preview will update when you resend</p>
+              )}
             </div>
 
             {/* Email preview */}
