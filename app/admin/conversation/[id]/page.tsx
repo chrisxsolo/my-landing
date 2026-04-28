@@ -123,6 +123,21 @@ export default function ConversationPage() {
     setTimeout(() => setToast(null), 3500);
   }
 
+  // Try to parse a free-form date string (e.g. "June 20", "June 20th") into YYYY-MM-DD
+  function tryParseDate(str: string): string | null {
+    if (!str) return null;
+    const year = new Date().getFullYear();
+    // Strip ordinal suffixes: "20th" → "20"
+    const cleaned = str.replace(/(\d+)(st|nd|rd|th)/gi, "$1");
+    for (const attempt of [cleaned, `${cleaned} ${year}`, `${cleaned} ${year + 1}`]) {
+      const d = new Date(attempt);
+      if (!isNaN(d.getTime())) {
+        return d.toISOString().split("T")[0];
+      }
+    }
+    return null;
+  }
+
   // Fetch sunset + golden-hour start for a Bay Area date (San Jose coords)
   async function fetchSunset(dateStr: string) {
     setSunsetLoading(true);
@@ -154,7 +169,9 @@ export default function ConversationPage() {
         setStatus(data.status);
         setSubject(buildSubject(data));
         fetchThread(data.email);
-        if (data.session_date) fetchSunset(data.session_date);
+        // Show sunset immediately — confirmed date wins, fall back to client's requested date
+        const sunsetDate = data.session_date ?? tryParseDate(data.date_in_mind ?? "");
+        if (sunsetDate) fetchSunset(sunsetDate);
         // Load saved notes for this inquiry
         const { data: nd } = await supabase
           .from("site_settings").select("value")
@@ -719,6 +736,34 @@ export default function ConversationPage() {
         {/* ── RIGHT: AI Draft + Send (sticky) ── */}
         <div className="lg:sticky lg:top-[73px] space-y-4">
 
+          {/* ── Sunset / golden hour card ── */}
+          {(sunsetLoading || sunsetInfo) && (
+            <div className="rounded-2xl px-4 py-3 flex items-center gap-3"
+                 style={{ background: "linear-gradient(135deg,rgba(245,158,11,0.12),rgba(251,191,36,0.08))", border: "1px solid rgba(245,158,11,0.25)" }}>
+              <span className="text-2xl leading-none flex-shrink-0">🌅</span>
+              {sunsetLoading ? (
+                <div className="flex items-center gap-2 text-xs text-amber-600">
+                  <span className="animate-spin inline-block">◌</span> Fetching sunset…
+                </div>
+              ) : sunsetInfo ? (
+                <div className="min-w-0">
+                  <p className="text-sm font-black text-amber-700">
+                    Sunset {sunsetInfo.sunset}
+                    {(inquiry.session_date ?? tryParseDate(inquiry.date_in_mind ?? "")) && (
+                      <span className="text-xs font-normal text-amber-500 ml-2">
+                        {new Date((inquiry.session_date ?? tryParseDate(inquiry.date_in_mind ?? "") ?? "") + "T12:00:00")
+                          .toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                      </span>
+                    )}
+                  </p>
+                  <p className="text-xs text-amber-600 mt-0.5">
+                    Start around <span className="font-bold">{sunsetInfo.goldenStart}</span> for golden hour
+                  </p>
+                </div>
+              ) : null}
+            </div>
+          )}
+
           {/* ── Compose + Send panel ── */}
           <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
             <div className="h-[3px]" style={{ background: C.grad12 }} />
@@ -871,25 +916,6 @@ export default function ConversationPage() {
                   </div>
                 ) : null}
 
-                {/* Sunset / golden hour info — shows as soon as any date is picked or confirmed */}
-                {sunsetLoading && (
-                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-amber-500"
-                       style={{ background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.15)" }}>
-                    <span className="animate-spin inline-block text-[10px]">◌</span> Fetching sunset…
-                  </div>
-                )}
-                {!sunsetLoading && sunsetInfo && (
-                  <div className="rounded-xl px-3 py-2.5 space-y-1"
-                       style={{ background: "rgba(245,158,11,0.07)", border: "1px solid rgba(245,158,11,0.2)" }}>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-base leading-none">🌅</span>
-                      <span className="text-xs font-black text-amber-700">Sunset {sunsetInfo.sunset}</span>
-                    </div>
-                    <p className="text-xs text-amber-600 leading-snug">
-                      Start session around <span className="font-bold">{sunsetInfo.goldenStart}</span> for golden hour
-                    </p>
-                  </div>
-                )}
 
                 {/* Detected date suggestion */}
                 {detectedDate && !inquiry.session_date && (
