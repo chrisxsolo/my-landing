@@ -103,6 +103,10 @@ export default function ConversationPage() {
   // Day-before reminder
   const [reminderLoading,   setReminderLoading]   = useState(false);
 
+  // ── Sunset time ────────────────────────────────────────────────────────────
+  const [sunsetInfo,    setSunsetInfo]    = useState<{ sunset: string; goldenStart: string } | null>(null);
+  const [sunsetLoading, setSunsetLoading] = useState(false);
+
   // ── Things to Remember ─────────────────────────────────────────────────────
   const [notes,         setNotes]         = useState("");
   const [notesSaving,   setNotesSaving]   = useState(false);
@@ -119,6 +123,25 @@ export default function ConversationPage() {
     setTimeout(() => setToast(null), 3500);
   }
 
+  // Fetch sunset + golden-hour start for a Bay Area date (San Jose coords)
+  async function fetchSunset(dateStr: string) {
+    setSunsetLoading(true);
+    setSunsetInfo(null);
+    try {
+      const res = await fetch(
+        `https://api.sunrise-sunset.org/json?lat=37.3382&lng=-121.8863&date=${dateStr}&formatted=0`
+      );
+      const json = await res.json() as { results?: { sunset?: string }; status?: string };
+      if (json.status === "OK" && json.results?.sunset) {
+        const sunsetUTC   = new Date(json.results.sunset);
+        const goldenUTC   = new Date(sunsetUTC.getTime() - 90 * 60 * 1000);
+        const fmt = (d: Date) => d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/Los_Angeles" });
+        setSunsetInfo({ sunset: fmt(sunsetUTC), goldenStart: fmt(goldenUTC) });
+      }
+    } catch { /* silently fail */ }
+    finally { setSunsetLoading(false); }
+  }
+
   // ── Auth guard ──────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!checkAuth()) { router.push("/admin"); return; }
@@ -129,8 +152,9 @@ export default function ConversationPage() {
         if (!data) { router.push("/admin?tab=inquiries"); return; }
         setInquiry(data);
         setStatus(data.status);
-        setSubject(buildSubject(data));   // smart subject — updated again after thread loads
+        setSubject(buildSubject(data));
         fetchThread(data.email);
+        if (data.session_date) fetchSunset(data.session_date);
         // Load saved notes for this inquiry
         const { data: nd } = await supabase
           .from("site_settings").select("value")
@@ -412,8 +436,9 @@ export default function ConversationPage() {
       const json = await res.json();
       if (json.date) {
         setDetectedDate(json);
+        fetchSunset(json.date);
       } else {
-        showToast("Could not find a specific confirmed date in emails", false);
+        showToast(json.reason ?? "Could not find a date in emails", false);
       }
     } catch {
       showToast("Date detection failed", false);
@@ -435,6 +460,7 @@ export default function ConversationPage() {
       const { data } = await supabase.from("inquiries").select("*").eq("id", inquiry.id).single();
       if (data) setInquiry(data);
       setDetectedDate(null);
+      fetchSunset(dateStr);
       showToast("Session date confirmed and calendar updated ✓");
     } catch {
       showToast("Failed to save date", false);
@@ -845,6 +871,26 @@ export default function ConversationPage() {
                   </div>
                 ) : null}
 
+                {/* Sunset / golden hour info — shows as soon as any date is picked or confirmed */}
+                {sunsetLoading && (
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-amber-500"
+                       style={{ background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.15)" }}>
+                    <span className="animate-spin inline-block text-[10px]">◌</span> Fetching sunset…
+                  </div>
+                )}
+                {!sunsetLoading && sunsetInfo && (
+                  <div className="rounded-xl px-3 py-2.5 space-y-1"
+                       style={{ background: "rgba(245,158,11,0.07)", border: "1px solid rgba(245,158,11,0.2)" }}>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-base leading-none">🌅</span>
+                      <span className="text-xs font-black text-amber-700">Sunset {sunsetInfo.sunset}</span>
+                    </div>
+                    <p className="text-xs text-amber-600 leading-snug">
+                      Start session around <span className="font-bold">{sunsetInfo.goldenStart}</span> for golden hour
+                    </p>
+                  </div>
+                )}
+
                 {/* Detected date suggestion */}
                 {detectedDate && !inquiry.session_date && (
                   <div className="rounded-xl px-3 py-2.5 space-y-2"
@@ -876,7 +922,7 @@ export default function ConversationPage() {
                     <input
                       type="date"
                       value={sessionDateInput}
-                      onChange={e => setSessionDateInput(e.target.value)}
+                      onChange={e => { setSessionDateInput(e.target.value); if (e.target.value) fetchSunset(e.target.value); }}
                       className="flex-1 px-3 py-2 rounded-xl outline-none text-slate-700"
                       style={{ border: "1px solid rgba(16,185,129,0.25)", background: "#fff", fontFamily: "inherit", fontSize: "15px" }} />
                     {sessionDateInput && (
