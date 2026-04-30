@@ -14,8 +14,28 @@ function getUserId(): string {
   return userId;
 }
 
+function categorizeReferrer(ref: string): string {
+  if (!ref) return "direct";
+  if (ref.includes("instagram")) return "instagram";
+  if (ref.includes("tiktok")) return "tiktok";
+  if (ref.includes("google")) return "google";
+  if (ref.includes("twitter") || ref.includes("t.co") || ref.includes("x.com")) return "twitter";
+  if (ref.includes("facebook") || ref.includes("fb.com")) return "facebook";
+  if (ref.includes("youtube") || ref.includes("youtu.be")) return "youtube";
+  return "other";
+}
+
+function detectDevice(): "mobile" | "tablet" | "desktop" {
+  const ua = navigator.userAgent;
+  if (/iPad|Tablet/i.test(ua)) return "tablet";
+  if (/iPhone|Android.*Mobile|Mobile/i.test(ua)) return "mobile";
+  return "desktop";
+}
+
 function sendPageView() {
-  const body = JSON.stringify({ userId: getUserId() });
+  const referrer = categorizeReferrer(typeof document !== "undefined" ? document.referrer : "");
+  const device = detectDevice();
+  const body = JSON.stringify({ userId: getUserId(), referrer, device });
 
   if (typeof navigator !== "undefined" && "sendBeacon" in navigator) {
     const blob = new Blob([body], { type: "application/json" });

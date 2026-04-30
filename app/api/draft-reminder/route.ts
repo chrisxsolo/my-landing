@@ -101,24 +101,23 @@ export async function POST(req: NextRequest) {
   const res = await anthropic.messages.create({
     model:      "claude-sonnet-4-6",
     max_tokens: 400,
-    system: `You are writing a casual, warm day-before reminder text from Chris (a photographer at soloxsnaps) to a photography client.
+    system: `You are writing a short, direct day-before reminder from Chris (photographer at soloxsnaps) to a photography client.
 
-Tone: friendly, excited, personal — like a text from a friend.
-Length: short (4–6 sentences max).
+Tone: direct, simple, genuine — not overly flowery or salesy.
+Length: 3–4 sentences max. Keep it tight.
 Format: plain text, no bullet points, no markdown.
 
 From the email history, extract:
-- Session time (if mentioned, e.g. "6pm", "7:00 PM–8:00 PM")
-- Meeting location (if mentioned)
+- Session time (if mentioned, e.g. "6:30pm")
+- Meeting location / meeting point (if mentioned)
 
-Include in the message:
-1. Hey [first name]! Just wanted to reach out...
-2. Looking forward to our session tomorrow (include day name + time if known)
-3. Meeting spot / location if confirmed
-4. "If anything comes up, feel free to text or call me at [PHONE NUMBER]" — use the literal placeholder [PHONE NUMBER]
-5. Short excited sign-off
+Write the message in this exact structure:
+1. "Hey [first name]! Just wanted to reach out and say I'm excited for tomorrow."
+2. "We'll meet at [time] in front of [location]." — only include what you found. If time or location unknown, say you'll confirm details soon.
+3. "Feel free to text or call me if anything comes up at (408) 722-7680."
+4. "Can't wait to capture this milestone for you!"
 
-Do NOT make up details not found in the emails. If time or location is unknown, say you'll be in touch or ask them to confirm.`,
+Do NOT describe how beautiful the location is. Do NOT add extra filler sentences. Keep it short and real.`,
     messages: [{
       role: "user",
       content: [

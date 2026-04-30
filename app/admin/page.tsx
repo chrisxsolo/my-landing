@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { C } from "@/lib/colors";
 import { checkAuth, login, logout as adminLogout } from "@/lib/adminAuth";
 import BayAreaLocationsManager from "@/app/admin/BayAreaLocationsManager";
+import AnalyticsTab from "@/app/admin/AnalyticsTab";
 
 export const dynamic = 'force-dynamic'
 
@@ -16,10 +17,6 @@ type Spot = { id:number; school_id:string; school_name:string; school_short:stri
 type BlogPost = { id:number; title:string; body:string; published_at:string; slug:string; cover_image_url:string|null; extra_image_urls:string[]; category?:BlogCategory|string|null; sites?:string[]|null; };
 type PortfolioCategory = { id:number; name:string; slug:string; description:string|null; sort_order:number; active:boolean; };
 type PortfolioImage = { id:number; title:string; alt:string|null; image_url:string; category_id:number|null; category_slug:string; featured:boolean; hero_carousel:boolean; sort_order:number; created_at:string|null; };
-type LinkClickEvent = { link_id:number|null; user_id:string|null; clicked_at:string; };
-type LinkViewEvent = { user_id:string|null; viewed_at:string; };
-type LinkStat = { id:number; label:string; emoji:string|null; url:string; clicks:number; uniqueClickers:number; ctr:number; clickShare:number; };
-type DailyStat = { date:string; clicks:number; views:number; ctr:number; };
 
 const SCHOOLS = [
   {id:"sjsu",    name:"San Jose State University",      short:"SJSU"},
@@ -39,35 +36,10 @@ const BLOG_CATEGORIES:{value:BlogCategory;label:string;helper:string}[]=[
   {value:"professional",label:"Professional",helper:"Case studies at /blog"},
 ];
 
-const numberFmt=new Intl.NumberFormat("en-US");
-function fmtNum(value:number){return numberFmt.format(value);}
-function fmtPercent(value:number){return `${value.toFixed(1)}%`;}
-function fmtRatio(value:number){return value.toFixed(value>=10?1:2);}
-function dateFromKey(dateKey:string){const[y,m,d]=dateKey.split("-").map(Number);return new Date(y,m-1,d);}
 function matchesPortfolioGroup(image:PortfolioImage,group:"grads"|"families"){
   const slug=image.category_slug;
   if(group==="grads")return slug==="grads"||slug==="graduation";
   return slug==="families"||slug==="family"||slug==="portraits";
-}
-function buildDailyStats(days:7|30,clicks:Pick<LinkClickEvent,"clicked_at">[],views:Pick<LinkViewEvent,"viewed_at">[]):DailyStat[]{
-  const dailyMap:Record<string,{clicks:number;views:number}>={};
-  for(let i=0;i<days;i++){
-    const d=new Date();
-    d.setDate(d.getDate()-i);
-    const key=d.toISOString().split('T')[0];
-    dailyMap[key]={clicks:0,views:0};
-  }
-  clicks.forEach(c=>{
-    const key=c.clicked_at?.split('T')[0];
-    if(key&&dailyMap[key])dailyMap[key].clicks++;
-  });
-  views.forEach(v=>{
-    const key=v.viewed_at?.split('T')[0];
-    if(key&&dailyMap[key])dailyMap[key].views++;
-  });
-  return Object.entries(dailyMap)
-    .map(([date,stats])=>({date,...stats,ctr:stats.views>0?(stats.clicks/stats.views)*100:0}))
-    .sort((a,b)=>a.date.localeCompare(b.date));
 }
 
 export default function AdminPage() {
@@ -341,16 +313,6 @@ function AdminDashboard() {
     finally{setSendLoading(null);}
   }
 
-  const [linkStats,setLinkStats]=useState<LinkStat[]>([]);
-  const [statsLoading,setStatsLoading]=useState(false);
-  const [totalViews,setTotalViews]=useState(0);
-  const [totalClicks,setTotalClicks]=useState(0);
-  const [uniqueVisitors,setUniqueVisitors]=useState(0);
-  const [uniqueClickers,setUniqueClickers]=useState(0);
-  const [dailyStats,setDailyStats]=useState<DailyStat[]>([]);
-  const [timeRange,setTimeRange]=useState<7|30>(7);
-  const [hoverBarIdx,setHoverBarIdx]=useState<number|null>(null);
-
   function showToast(msg:string,ok=true){setToast({msg,ok});setTimeout(()=>setToast(null),3000);}
 
   async function fetchInquiries(){setInquiriesLoading(true);const{data}=await supabase.from('inquiries').select('*').order('created_at',{ascending:false});setInquiries(data??[]);setInquiriesLoading(false);}
@@ -453,96 +415,7 @@ function AdminDashboard() {
     setPostsLoading(false);
   }
   
-  async function fetchLinkStats(){
-    setStatsLoading(true);
-    try{
-      const[
-        {data:views,error:viewsError},
-        {data:clicks,error:clicksError},
-        {data:links,error:linksError},
-      ]=await Promise.all([
-        supabase.from('link_views').select('user_id,viewed_at'),
-        supabase.from('link_clicks').select('link_id,user_id,clicked_at'),
-        supabase.from('links').select('id,label,emoji,url').eq('active',true).order('order',{ascending:true}),
-      ]);
-      if(viewsError||clicksError||linksError)throw viewsError||clicksError||linksError;
-
-      const viewEvents=(views??[]) as LinkViewEvent[];
-      const clickEvents=(clicks??[]) as LinkClickEvent[];
-      const totalViewCount=viewEvents.length;
-      const totalClickCount=clickEvents.length;
-      const uniqueUserIds=new Set(viewEvents.map(v=>v.user_id).filter(Boolean));
-      const uniqueClickerIds=new Set(clickEvents.map(c=>c.user_id).filter(Boolean));
-      const clicksByLink=new Map<number,LinkClickEvent[]>();
-
-      clickEvents.forEach(click=>{
-        if(!click.link_id)return;
-        const existing=clicksByLink.get(click.link_id)??[];
-        existing.push(click);
-        clicksByLink.set(click.link_id,existing);
-      });
-
-      const stats=((links??[]) as {id:number;label:string;emoji:string|null;url:string}[]).map(link=>{
-        const linkClicks=clicksByLink.get(link.id)??[];
-        const clickCount=linkClicks.length;
-        const linkUniqueClickers=new Set(linkClicks.map(click=>click.user_id).filter(Boolean)).size;
-        return {
-          ...link,
-          clicks:clickCount,
-          uniqueClickers:linkUniqueClickers,
-          ctr:totalViewCount>0?(clickCount/totalViewCount)*100:0,
-          clickShare:totalClickCount>0?(clickCount/totalClickCount)*100:0,
-        };
-      }).sort((a,b)=>b.clicks-a.clicks);
-
-      setTotalViews(totalViewCount);
-      setUniqueVisitors(uniqueUserIds.size);
-      setTotalClicks(totalClickCount);
-      setUniqueClickers(uniqueClickerIds.size);
-      setLinkStats(stats);
-      setDailyStats(buildDailyStats(timeRange,clickEvents,viewEvents));
-    }catch(err){
-      console.error("Failed to load link analytics",err);
-      showToast("Failed to load analytics",false);
-    }finally{
-      setStatsLoading(false);
-    }
-  }
-  
-  async function fetchDailyStats(days:7|30){
-    const startDate=new Date();
-    startDate.setDate(startDate.getDate()-days);
-
-    const[{data:clicks},{data:views}]=await Promise.all([
-      supabase.from('link_clicks').select('clicked_at').gte('clicked_at',startDate.toISOString()),
-      supabase.from('link_views').select('viewed_at').gte('viewed_at',startDate.toISOString()),
-    ]);
-
-    setDailyStats(buildDailyStats(days,(clicks??[]) as Pick<LinkClickEvent,"clicked_at">[],(views??[]) as Pick<LinkViewEvent,"viewed_at">[]));
-  }
-  
-  async function clearAllAnalytics(){
-    const confirmed=window.confirm("⚠️ This will permanently delete ALL analytics data (views, clicks, history). Are you sure?");
-    if(!confirmed)return;
-    
-    setStatsLoading(true);
-    try{
-      // Delete all clicks
-      await supabase.from('link_clicks').delete().neq('id',0);
-      // Delete all views
-      await supabase.from('link_views').delete().neq('id',0);
-      
-      showToast("Analytics cleared successfully",true);
-      // Refresh the data
-      await fetchLinkStats();
-    }catch(err){
-      console.error(err);
-      showToast("Failed to clear analytics",false);
-      setStatsLoading(false);
-    }
-  }
-  
-  useEffect(()=>{if(authed){fetchPoses();fetchSpots();fetchCategories();fetchPortfolioImages();fetchPosts();fetchSiteSettings();if(tab==="analytics")fetchLinkStats();if(tab==="inquiries"||tab==="clients"){fetchInquiries();fetchGmailStatus();}}},[authed,tab,blogCategory]);
+  useEffect(()=>{if(authed){fetchPoses();fetchSpots();fetchCategories();fetchPortfolioImages();fetchPosts();fetchSiteSettings();if(tab==="inquiries"||tab==="clients"){fetchInquiries();fetchGmailStatus();}}},[authed,tab,blogCategory]);
 
   async function compressImage(file:File, maxPx=2400, quality=0.82):Promise<Blob>{
     return new Promise(resolve=>{
@@ -715,14 +588,6 @@ function AdminDashboard() {
   const inp="w-full px-3 py-2.5 rounded-xl text-sm font-medium text-slate-800 outline-none border border-slate-200 focus:border-violet-300 bg-white transition-colors";
   const ta=`${inp} resize-none`;
   const card="bg-white rounded-2xl border border-slate-100 overflow-hidden";
-  const overallCtr=totalViews>0?(totalClicks/totalViews)*100:0;
-  const visitorClickRate=uniqueVisitors>0?(uniqueClickers/uniqueVisitors)*100:0;
-  const clicksPerVisitor=uniqueVisitors>0?totalClicks/uniqueVisitors:0;
-  const repeatClicks=Math.max(totalClicks-uniqueClickers,0);
-  const topLink=linkStats[0];
-  const rangeTotals=dailyStats.reduce((acc,stat)=>({views:acc.views+stat.views,clicks:acc.clicks+stat.clicks}),{views:0,clicks:0});
-  const rangeCtr=rangeTotals.views>0?(rangeTotals.clicks/rangeTotals.views)*100:0;
-  const busiestDay=dailyStats.reduce<DailyStat|null>((best,stat)=>!best||stat.clicks+stat.views>best.clicks+best.views?stat:best,null);
 
   if(!authed){
     return(
@@ -1468,332 +1333,9 @@ function AdminDashboard() {
 
         {/* ── ANALYTICS ── */}
         {tab==="analytics"&&(
-          <div className="space-y-6">
-            <div className={card}>
-              <div className="h-[3px]" style={{background:C.grad90}}/>
-              <div className="p-6">
-                <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
-                  <div>
-                    <p className="text-xs font-black uppercase tracking-widest mb-2" style={{color:C.p1}}>Linktree analytics</p>
-                    <h2 className="text-2xl font-black leading-tight text-slate-900">A cleaner read on views, clicks, and who actually clicked.</h2>
-                    <p className="mt-2 text-sm font-medium leading-relaxed text-slate-500">
-                      Stats are based on the link page tracker and a browser-level user id saved locally on each visitor&apos;s device.
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap gap-2 md:justify-end">
-                    <div className="flex gap-2 p-1 rounded-xl bg-slate-50 border border-slate-100 w-fit">
-                      <button onClick={()=>{setTimeRange(7);if(!statsLoading)fetchDailyStats(7);}} className="px-4 py-1.5 rounded-lg text-xs font-bold transition-all" style={timeRange===7?{background:C.p1_10,color:C.p1}:{color:"#94a3b8"}}>7 Days</button>
-                      <button onClick={()=>{setTimeRange(30);if(!statsLoading)fetchDailyStats(30);}} className="px-4 py-1.5 rounded-lg text-xs font-bold transition-all" style={timeRange===30?{background:C.p1_10,color:C.p1}:{color:"#94a3b8"}}>30 Days</button>
-                    </div>
-                    <button onClick={fetchLinkStats} disabled={statsLoading} className="text-xs font-bold px-4 py-2 rounded-lg transition-all hover:opacity-80" style={{background:C.p2_08,color:C.p2}}>
-                      {statsLoading?"Loading...":"Refresh"}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Overview Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className={card}>
-                <div className="h-[3px]" style={{background:C.grad12}}/>
-                <div className="p-6">
-                  <p className="text-xs font-bold tracking-widest uppercase text-slate-400 mb-2">Total Views</p>
-                  <p className="text-4xl font-black mb-1" style={{color:C.p1}}>{fmtNum(totalViews)}</p>
-                  <p className="text-xs leading-relaxed text-slate-400">All link page loads.</p>
-                </div>
-              </div>
-              <div className={card}>
-                <div className="h-[3px]" style={{background:C.grad321}}/>
-                <div className="p-6">
-                  <p className="text-xs font-bold tracking-widest uppercase text-slate-400 mb-2">Unique Visitors</p>
-                  <p className="text-4xl font-black mb-1" style={{color:C.p3}}>{fmtNum(uniqueVisitors)}</p>
-                  <p className="text-xs leading-relaxed text-slate-400">Distinct users who opened the links page.</p>
-                </div>
-              </div>
-              <div className={card}>
-                <div className="h-[3px]" style={{background:C.grad23}}/>
-                <div className="p-6">
-                  <p className="text-xs font-bold tracking-widest uppercase text-slate-400 mb-2">Total Clicks</p>
-                  <p className="text-4xl font-black mb-1" style={{color:C.p2}}>{fmtNum(totalClicks)}</p>
-                  <p className="text-xs leading-relaxed text-slate-400">Every tracked link click, including repeats.</p>
-                </div>
-              </div>
-              <div className={card}>
-                <div className="h-[3px]" style={{background:C.grad90}}/>
-                <div className="p-6">
-                  <p className="text-xs font-bold tracking-widest uppercase text-slate-400 mb-2">Unique Clickers</p>
-                  <p className="text-4xl font-black mb-1" style={{color:C.p1}}>{fmtNum(uniqueClickers)}</p>
-                  <p className="text-xs leading-relaxed text-slate-400">Distinct users who clicked at least one link.</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Engagement Snapshot */}
-            <div className={card}>
-              <div className="h-[3px]" style={{background:C.grad321}}/>
-              <div className="p-6">
-                <div className="flex flex-col gap-2 mb-5 md:flex-row md:items-end md:justify-between">
-                  <div>
-                    <p className="text-xs font-black uppercase tracking-widest mb-1" style={{color:C.p2}}>Engagement snapshot</p>
-                    <h3 className="text-base font-black text-slate-900">The numbers that explain the funnel.</h3>
-                  </div>
-                  <p className="text-xs font-bold text-slate-400">
-                    {timeRange}-day range: {fmtNum(rangeTotals.views)} views · {fmtNum(rangeTotals.clicks)} clicks · {fmtPercent(rangeCtr)} CTR
-                  </p>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-                  <div className="rounded-xl border border-slate-100 p-4" style={{background:C.p1_04}}>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Click-through rate</p>
-                    <p className="text-2xl font-black" style={{color:C.p1}}>{fmtPercent(overallCtr)}</p>
-                    <p className="text-xs leading-relaxed text-slate-400">total clicks divided by total views</p>
-                  </div>
-                  <div className="rounded-xl border border-slate-100 p-4" style={{background:C.p2_06}}>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Visitor to clicker</p>
-                    <p className="text-2xl font-black" style={{color:C.p2}}>{fmtPercent(visitorClickRate)}</p>
-                    <p className="text-xs leading-relaxed text-slate-400">unique clickers divided by unique visitors</p>
-                  </div>
-                  <div className="rounded-xl border border-slate-100 p-4" style={{background:C.p3_08}}>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Clicks per visitor</p>
-                    <p className="text-2xl font-black" style={{color:"#d97706"}}>{fmtRatio(clicksPerVisitor)}</p>
-                    <p className="text-xs leading-relaxed text-slate-400">average clicks per unique visitor</p>
-                  </div>
-                  <div className="rounded-xl border border-slate-100 p-4" style={{background:C.p1_06}}>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Repeat clicks</p>
-                    <p className="text-2xl font-black" style={{color:C.p1}}>{fmtNum(repeatClicks)}</p>
-                    <p className="text-xs leading-relaxed text-slate-400">clicks beyond the first clicker click</p>
-                  </div>
-                  <div className="rounded-xl border border-slate-100 p-4" style={{background:C.p2_08}}>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Top link share</p>
-                    <p className="text-2xl font-black" style={{color:C.p2}}>{topLink?fmtPercent(topLink.clickShare):"0.0%"}</p>
-                    <p className="text-xs leading-relaxed text-slate-400">{topLink?topLink.label:"no clicks yet"}</p>
-                  </div>
-                </div>
-                <div className="mt-5 rounded-xl border border-slate-100 p-4" style={{background:"rgba(248,250,252,0.82)"}}>
-                  <p className="text-sm font-bold leading-relaxed text-slate-600">
-                    {totalViews>0?(
-                      <>
-                        {fmtNum(uniqueClickers)} of {fmtNum(uniqueVisitors)} distinct visitors clicked at least once. {topLink?`${topLink.label} is leading with ${fmtNum(topLink.clicks)} clicks (${fmtPercent(topLink.clickShare)} of all clicks).`:"No link has clicks yet."}
-                      </>
-                    ):(
-                      <>No link page traffic has been recorded yet.</>
-                    )}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Definitions */}
-            <div className={card}>
-              <div className="h-[3px]" style={{background:C.grad90_23}}/>
-              <div className="p-6">
-                <h3 className="text-base font-black text-slate-900 mb-4">What each stat means</h3>
-                <dl className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {[
-                    ["Distinct users","Approximate people/devices, based on the local browser id saved on the link page. A new browser or cleared storage can count as a new distinct user."],
-                    ["Unique visitors","Distinct users who loaded the links page at least once."],
-                    ["Unique clickers","Distinct users who clicked at least one link."],
-                    ["Click-through rate","Total clicks divided by total views, shown as a percentage."],
-                    ["Total clicks","Every recorded link click, including repeat clicks from the same user."],
-                  ].map(([term,definition])=>(
-                    <div key={term} className="rounded-xl border border-slate-100 p-4">
-                      <dt className="text-xs font-black uppercase tracking-widest mb-1" style={{color:C.p1}}>{term}</dt>
-                      <dd className="text-sm font-medium leading-relaxed text-slate-500">{definition}</dd>
-                    </div>
-                  ))}
-                </dl>
-                <button onClick={clearAllAnalytics} disabled={statsLoading} className="mt-5 text-xs font-bold px-4 py-2 rounded-lg transition-all hover:opacity-80" style={{background:"rgba(239,68,68,0.08)",color:"#dc2626"}}>
-                  Clear all analytics
-                </button>
-              </div>
-            </div>
-
-            {/* Chart — no overflow-hidden so tooltip never gets clipped */}
-            <div className="bg-white rounded-2xl border border-slate-100">
-              <div className="h-[3px]" style={{background:C.grad90}}/>
-              <div className="p-6">
-                <div className="flex flex-col gap-1 mb-6 md:flex-row md:items-end md:justify-between">
-                  <div>
-                    <h3 className="text-base font-black text-slate-900">Activity Over Time</h3>
-                    <p className="text-xs font-medium text-slate-400">Views and clicks by day for the selected range.</p>
-                  </div>
-                  {busiestDay&&busiestDay.views+busiestDay.clicks>0&&(
-                    <p className="text-xs font-bold text-slate-400">
-                      Busiest day: {dateFromKey(busiestDay.date).toLocaleDateString('en-US',{month:'short',day:'numeric'})} · {fmtNum(busiestDay.views+busiestDay.clicks)} events
-                    </p>
-                  )}
-                </div>
-                {statsLoading?(
-                  <div className="h-80 flex items-center justify-center text-slate-400 text-sm">Loading chart...</div>
-                ):(
-                  <div style={{overflowX:'auto',paddingBottom:'8px'}}>
-                    <div className="relative" style={{minWidth:620}}>
-                    {/* Shared floating tooltip — renders at top, no overflow clip issues */}
-                    <div className="relative h-14 pointer-events-none">
-                      {hoverBarIdx!==null&&dailyStats[hoverBarIdx]&&(()=>{
-                        const s=dailyStats[hoverBarIdx];
-                        const d=dateFromKey(s.date);
-                        const col=hoverBarIdx/Math.max(dailyStats.length-1,1);
-                        const leftPct=Math.min(Math.max(col*100,5),85);
-                        return(
-                          <div className="absolute top-1 z-20 transition-all duration-150"
-                               style={{left:`${leftPct}%`,transform:col>0.7?"translateX(-90%)":col<0.2?"translateX(-5%)":"translateX(-50%)"}}>
-                            <div className="rounded-xl px-3 py-2 shadow-xl whitespace-nowrap" style={{background:"rgba(15,15,25,0.92)",backdropFilter:"blur(8px)"}}>
-                              <p className="text-xs font-bold text-white mb-1">
-                                {d.toLocaleDateString('en-US',{weekday:'short'})}, {d.toLocaleDateString('en-US',{month:'short',day:'numeric'})}
-                              </p>
-                              <div className="flex gap-3">
-                                <span className="text-xs" style={{color:`rgba(${[157,111,232].join(",")},0.9)`}}>👁 {s.views} views</span>
-                                <span className="text-xs" style={{color:`rgba(${[232,121,160].join(",")},0.9)`}}>🔗 {s.clicks} clicks</span>
-                                <span className="text-xs text-white/60">{fmtPercent(s.ctr)} CTR</span>
-                              </div>
-                            </div>
-                            {/* Arrow */}
-                            <div className="w-2 h-2 rotate-45 mt-[-4px] mx-auto" style={{background:"rgba(15,15,25,0.92)"}}/>
-                          </div>
-                        );
-                      })()}
-                    </div>
-
-                    {/* Chart bars */}
-                    <div className="flex items-end justify-between gap-2 px-4" style={{height:256}}>
-                      {dailyStats.map((stat,i)=>{
-                        const maxVal=Math.max(...dailyStats.map(s=>Math.max(s.clicks,s.views)),1);
-                        const clickHeight=(stat.clicks/maxVal)*100;
-                        const viewHeight=(stat.views/maxVal)*100;
-                        const date=dateFromKey(stat.date);
-                        const isHovered=hoverBarIdx===i;
-
-                        return(
-                          <div key={i}
-                            className="flex-1 flex flex-col items-center gap-2 cursor-pointer"
-                            onMouseEnter={()=>setHoverBarIdx(i)}
-                            onMouseLeave={()=>setHoverBarIdx(null)}>
-
-                            {/* Bars container */}
-                            <div className="w-full flex gap-1.5 items-end transition-all duration-200"
-                                 style={{height:220,transform:isHovered?"scaleY(1.04)":"scaleY(1)",transformOrigin:"bottom"}}>
-                              {/* Views bar */}
-                              <div className="flex-1 rounded-t-lg transition-all duration-400 ease-out relative overflow-hidden"
-                                   style={{
-                                     height:`${viewHeight}%`,
-                                     background:isHovered?`linear-gradient(180deg,${C.p1},${C.p1_35})`:`linear-gradient(180deg,${C.p1_25},${C.p1_15})`,
-                                     minHeight:viewHeight>0?6:0,
-                                     boxShadow:isHovered?`0 -4px 16px ${C.p1_25}`:"none",
-                                     transition:"background 0.15s,box-shadow 0.15s,height 0.4s",
-                                   }}/>
-
-                              {/* Clicks bar */}
-                              <div className="flex-1 rounded-t-lg transition-all duration-400 ease-out relative overflow-hidden"
-                                   style={{
-                                     height:`${clickHeight}%`,
-                                     background:isHovered?`linear-gradient(180deg,${C.p2},${C.p2_30})`:`linear-gradient(180deg,${C.p2_20},${C.p2_12})`,
-                                     minHeight:clickHeight>0?6:0,
-                                     boxShadow:isHovered?`0 -4px 16px ${C.p2_20}`:"none",
-                                     transition:"background 0.15s,box-shadow 0.15s,height 0.4s",
-                                   }}/>
-                            </div>
-
-                            {/* Date labels */}
-                            <div className="text-center transition-colors duration-150">
-                              <p className="text-xs font-black transition-colors" style={{color:isHovered?C.p1:"#1e293b"}}>{date.getDate()}</p>
-                              <p className="text-[10px] font-bold uppercase" style={{color:isHovered?C.p1:"#cbd5e1"}}>{date.toLocaleDateString('en-US',{weekday:'short'})}</p>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {/* Y-axis grid lines */}
-                    <div className="absolute pointer-events-none flex flex-col justify-between px-4"
-                         style={{top:56,left:0,right:0,bottom:56}}>
-                      {[...Array(4)].map((_,i)=>(
-                        <div key={i} className="w-full h-px" style={{background:"rgba(0,0,0,0.04)"}}/>
-                      ))}
-                    </div>
-                    </div>
-                  </div>
-                )}
-                
-                {/* Legend */}
-                <div className="flex items-center justify-center gap-8 mt-6 pt-6 border-t" style={{borderColor:C.p1_08}}>
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-4 h-4 rounded-md shadow-sm" style={{background:`linear-gradient(135deg,${C.p1},${C.p1_35})`}}/>
-                    <span className="text-sm font-bold text-slate-600">Page Views</span>
-                  </div>
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-4 h-4 rounded-md shadow-sm" style={{background:`linear-gradient(135deg,${C.p2},${C.p2_30})`}}/>
-                    <span className="text-sm font-bold text-slate-600">Link Clicks</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Top Links */}
-            <div className={card}>
-              <div className="h-[3px]" style={{background:C.grad90_23}}/>
-              <div className="p-6">
-                <div className="flex flex-col gap-1 mb-5 md:flex-row md:items-end md:justify-between">
-                  <div>
-                    <h2 className="text-base font-black text-slate-900">Top Performing Links</h2>
-                    <p className="text-xs font-medium text-slate-400">Ranked by total clicks. CTR is link clicks divided by all page views.</p>
-                  </div>
-                  <a href="/admin/links" className="text-xs font-bold transition-colors hover:text-slate-700" style={{color:C.p2}}>Manage links</a>
-                </div>
-                {statsLoading?(
-                  <div className="text-center py-12 text-slate-400 text-sm">Loading analytics...</div>
-                ):(
-                  <div className="space-y-3">
-                    {linkStats.length===0?(
-                      <div className="text-center py-12">
-                        <p className="text-slate-400 text-sm mb-2">No links found</p>
-                        <p className="text-xs text-slate-300">Add links from the Links Admin page</p>
-                      </div>
-                    ):(
-                      linkStats.map((stat,idx)=>{
-                        const maxClicks=linkStats[0]?.clicks||1;
-                        const barWidth=(stat.clicks/maxClicks)*100;
-                        return(
-                          <div key={stat.id} className="p-4 rounded-xl border border-slate-100 relative overflow-hidden">
-                            <div className="absolute inset-0 rounded-xl" style={{background:`linear-gradient(90deg,${C.p1_06} ${barWidth}%,transparent ${barWidth}%)`}}/>
-                            <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                              <div className="flex items-center gap-3 flex-1 min-w-0">
-                                <div className="flex items-center justify-center w-6 h-6 rounded-full text-xs font-black" style={{background:idx===0?C.p1_15:idx===1?C.p2_10:idx===2?C.p3_10:C.p1_06,color:idx<3?C.p1:"#94a3b8"}}>#{idx+1}</div>
-                                <span className="text-xl flex-shrink-0">{stat.emoji||"🔗"}</span>
-                                <div className="min-w-0 flex-1">
-                                  <p className="font-black text-sm text-slate-900 truncate">{stat.label}</p>
-                                  <p className="text-xs text-slate-400 truncate">{stat.url}</p>
-                                </div>
-                              </div>
-                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 flex-shrink-0">
-                                <div className="text-right">
-                                  <p className="text-xl font-black" style={{color:C.p1}}>{fmtNum(stat.clicks)}</p>
-                                  <p className="text-[9px] font-bold tracking-widest uppercase text-slate-300">clicks</p>
-                                </div>
-                                <div className="text-right">
-                                  <p className="text-xl font-black" style={{color:C.p3}}>{fmtNum(stat.uniqueClickers)}</p>
-                                  <p className="text-[9px] font-bold tracking-widest uppercase text-slate-300">clickers</p>
-                                </div>
-                                <div className="text-right">
-                                  <p className="text-xl font-black" style={{color:C.p2}}>{fmtPercent(stat.ctr)}</p>
-                                  <p className="text-[9px] font-bold tracking-widest uppercase text-slate-300">CTR</p>
-                                </div>
-                                <div className="text-right">
-                                  <p className="text-xl font-black" style={{color:C.p1}}>{fmtPercent(stat.clickShare)}</p>
-                                  <p className="text-[9px] font-bold tracking-widest uppercase text-slate-300">share</p>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
+          <AnalyticsTab/>
         )}
+
 
         {/* ── INQUIRIES ── */}
         {tab==="inquiries"&&(

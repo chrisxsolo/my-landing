@@ -103,6 +103,11 @@ export default function ConversationPage() {
   // Day-before reminder
   const [reminderLoading,   setReminderLoading]   = useState(false);
 
+  // ── Contract ───────────────────────────────────────────────────────────────
+  const [contractText,    setContractText]    = useState<string | null>(null);
+  const [contractLoading, setContractLoading] = useState(false);
+  const [contractCopied,  setContractCopied]  = useState(false);
+
   // ── Sunset time ────────────────────────────────────────────────────────────
   const [sunsetInfo,    setSunsetInfo]    = useState<{ sunset: string; goldenStart: string } | null>(null);
   const [sunsetLoading, setSunsetLoading] = useState(false);
@@ -123,17 +128,17 @@ export default function ConversationPage() {
     setTimeout(() => setToast(null), 3500);
   }
 
-  // Try to parse a free-form date string (e.g. "June 20", "June 20th") into YYYY-MM-DD
+  // Try to parse a free-form date string (e.g. "June 20", "June 20th") into YYYY-MM-DD.
+  // Requires a recognizable month name — rejects vague strings like "Flexible".
   function tryParseDate(str: string): string | null {
     if (!str) return null;
-    const year = new Date().getFullYear();
-    // Strip ordinal suffixes: "20th" → "20"
+    const hasMonth = /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|january|february|march|april|june|july|august|september|october|november|december)\b/i.test(str);
+    if (!hasMonth) return null;
+    const year    = new Date().getFullYear();
     const cleaned = str.replace(/(\d+)(st|nd|rd|th)/gi, "$1");
     for (const attempt of [cleaned, `${cleaned} ${year}`, `${cleaned} ${year + 1}`]) {
       const d = new Date(attempt);
-      if (!isNaN(d.getTime())) {
-        return d.toISOString().split("T")[0];
-      }
+      if (!isNaN(d.getTime())) return d.toISOString().split("T")[0];
     }
     return null;
   }
@@ -180,6 +185,20 @@ export default function ConversationPage() {
       });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inquiryId]);
+
+  // Load saved draft from localStorage on mount
+  useEffect(() => {
+    if (!inquiryId) return;
+    const saved = localStorage.getItem(`draft_${inquiryId}`);
+    if (saved) setDraft(saved);
+  }, [inquiryId]);
+
+  // Persist draft to localStorage whenever it changes
+  useEffect(() => {
+    if (!inquiryId) return;
+    if (draft) localStorage.setItem(`draft_${inquiryId}`, draft);
+    else localStorage.removeItem(`draft_${inquiryId}`);
+  }, [draft, inquiryId]);
 
   // Auto-scroll to bottom when thread loads
   useEffect(() => {
@@ -508,6 +527,26 @@ export default function ConversationPage() {
     }
   }
 
+  // ── Generate contract from email details ──────────────────────────────────
+  async function generateContract() {
+    if (!inquiry) return;
+    setContractLoading(true);
+    try {
+      const res = await fetch("/api/generate-contract", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ inquiry_id: inquiry.id }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.contract) { showToast(json.error ?? "Contract generation failed", false); return; }
+      setContractText(json.contract);
+    } catch {
+      showToast("Contract generation failed", false);
+    } finally {
+      setContractLoading(false);
+    }
+  }
+
   // ── Save notes for this inquiry ────────────────────────────────────────────
   async function saveNotes(val: string) {
     if (!inquiryId) return;
@@ -749,12 +788,11 @@ export default function ConversationPage() {
                 <div className="min-w-0">
                   <p className="text-sm font-black text-amber-700">
                     Sunset {sunsetInfo.sunset}
-                    {(inquiry.session_date ?? tryParseDate(inquiry.date_in_mind ?? "")) && (
-                      <span className="text-xs font-normal text-amber-500 ml-2">
-                        {new Date((inquiry.session_date ?? tryParseDate(inquiry.date_in_mind ?? "") ?? "") + "T12:00:00")
-                          .toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                      </span>
-                    )}
+                    {(() => {
+                      const d = inquiry.session_date ?? tryParseDate(inquiry.date_in_mind ?? "");
+                      if (!d) return null;
+                      return <span className="text-xs font-normal text-amber-500 ml-2">{new Date(d + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>;
+                    })()}
                   </p>
                   <p className="text-xs text-amber-600 mt-0.5">
                     Start around <span className="font-bold">{sunsetInfo.goldenStart}</span> for golden hour
@@ -884,152 +922,119 @@ export default function ConversationPage() {
                 )}
               </div>
 
-              {/* Payment note */}
+              {/* Payment note — compact single line */}
               {inquiry.payment_note && (
-                <div className="rounded-xl px-3 py-2 text-xs text-emerald-700 leading-relaxed"
-                     style={{ background: "rgba(16,185,129,0.07)", border: "1px solid rgba(16,185,129,0.2)" }}>
-                  {inquiry.payment_note}
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-emerald-700"
+                     style={{ background: "rgba(16,185,129,0.07)", border: "1px solid rgba(16,185,129,0.15)" }}>
+                  <span className="flex-1 truncate">{inquiry.payment_note}</span>
                   {inquiry.payment_detected_at && (
-                    <span className="block text-[10px] text-emerald-400 mt-0.5">
-                      Checked {new Date(inquiry.payment_detected_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                    <span className="text-[10px] text-emerald-400 flex-shrink-0">
+                      {new Date(inquiry.payment_detected_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                     </span>
                   )}
                 </div>
               )}
 
-              {/* Session date section */}
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 block">
-                  Session date
-                </label>
+              {/* Session date — compact */}
+              {inquiry.session_date && !sessionDateInput ? (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg"
+                     style={{ background: "rgba(16,185,129,0.07)", border: "1px solid rgba(16,185,129,0.15)" }}>
+                  <span className="text-emerald-600 text-xs font-black">✓</span>
+                  <span className="text-xs font-bold text-emerald-700 flex-1">
+                    {new Date(inquiry.session_date + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
+                  </span>
+                  <button onClick={() => setSessionDateInput(inquiry.session_date!)}
+                    className="text-[10px] text-slate-400 hover:text-slate-600 flex-shrink-0">edit</button>
+                </div>
+              ) : (
+                <div className="flex gap-1.5">
+                  <input type="date" value={sessionDateInput}
+                    onChange={e => { setSessionDateInput(e.target.value); if (e.target.value) fetchSunset(e.target.value); }}
+                    className="flex-1 px-2.5 py-1.5 rounded-lg outline-none text-slate-700 text-xs"
+                    style={{ border: "1px solid rgba(16,185,129,0.25)", background: "#fff", fontFamily: "inherit" }} />
+                  {sessionDateInput && (
+                    <button onClick={() => confirmDate(sessionDateInput)} disabled={dateConfirming}
+                      className="text-xs font-black px-3 py-1.5 rounded-lg disabled:opacity-40"
+                      style={{ background: "linear-gradient(135deg,#10b981,#059669)", color: "#fff" }}>
+                      {dateConfirming ? "…" : "Set"}
+                    </button>
+                  )}
+                </div>
+              )}
 
-                {/* Already confirmed date */}
-                {inquiry.session_date ? (
-                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl"
-                       style={{ background: "rgba(16,185,129,0.07)", border: "1px solid rgba(16,185,129,0.2)" }}>
-                    <span className="text-emerald-600 font-black text-xs">✓</span>
-                    <span className="text-sm font-bold text-emerald-700">
-                      {new Date(inquiry.session_date + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "long", day: "numeric", year: "numeric" })}
-                    </span>
-                    <button onClick={() => { setSessionDateInput(inquiry.session_date!); }}
-                      className="ml-auto text-[10px] text-slate-400 hover:text-slate-600">edit</button>
-                  </div>
-                ) : null}
-
-
-                {/* Detected date suggestion */}
-                {detectedDate && !inquiry.session_date && (
-                  <div className="rounded-xl px-3 py-2.5 space-y-2"
-                       style={{ background: "rgba(99,102,241,0.07)", border: "1px solid rgba(99,102,241,0.2)" }}>
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-400">
-                      {detectedDate.confidence === "high" ? "✓ Confirmed in emails" : "Found in emails"}
-                    </p>
-                    <p className="text-sm font-bold text-slate-800">{detectedDate.readable}</p>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => confirmDate(detectedDate.date)}
-                        disabled={dateConfirming}
-                        className="flex-1 text-xs font-black py-1.5 rounded-lg transition-all hover:opacity-90 disabled:opacity-40"
-                        style={{ background: "linear-gradient(135deg,#10b981,#059669)", color: "#fff" }}>
-                        {dateConfirming ? "Saving…" : "Yes, confirm this date"}
-                      </button>
-                      <button onClick={() => setDetectedDate(null)}
-                        className="text-xs font-bold px-3 py-1.5 rounded-lg"
-                        style={{ background: "rgba(148,163,184,0.12)", color: "#64748b" }}>
-                        Dismiss
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Manual date input */}
-                {(!inquiry.session_date || sessionDateInput) && (
-                  <div className="flex gap-2">
-                    <input
-                      type="date"
-                      value={sessionDateInput}
-                      onChange={e => { setSessionDateInput(e.target.value); if (e.target.value) fetchSunset(e.target.value); }}
-                      className="flex-1 px-3 py-2 rounded-xl outline-none text-slate-700"
-                      style={{ border: "1px solid rgba(16,185,129,0.25)", background: "#fff", fontFamily: "inherit", fontSize: "15px" }} />
-                    {sessionDateInput && (
-                      <button
-                        onClick={() => confirmDate(sessionDateInput)}
-                        disabled={dateConfirming}
-                        className="text-xs font-black px-3 py-2 rounded-xl disabled:opacity-40 transition-all hover:opacity-90"
-                        style={{ background: "linear-gradient(135deg,#10b981,#059669)", color: "#fff" }}>
-                        {dateConfirming ? "…" : "Confirm"}
-                      </button>
-                    )}
-                  </div>
-                )}
-
-                {/* Scan emails for date button */}
-                {!inquiry.session_date && !detectedDate && (
-                  <button
-                    onClick={detectDate}
-                    disabled={detectLoading}
-                    className="w-full text-xs font-bold py-2 rounded-xl transition-all hover:opacity-80 disabled:opacity-40 flex items-center justify-center gap-1.5"
-                    style={{ background: "rgba(99,102,241,0.08)", color: "#6366f1", border: "1px solid rgba(99,102,241,0.2)" }}>
-                    {detectLoading
-                      ? <><span className="animate-spin inline-block text-[10px]">◌</span> Scanning emails…</>
-                      : "✦ Detect date from email history"}
+              {/* Detected date — compact confirm strip */}
+              {detectedDate && !inquiry.session_date && (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg"
+                     style={{ background: "rgba(99,102,241,0.07)", border: "1px solid rgba(99,102,241,0.2)" }}>
+                  <span className="text-xs text-indigo-500 flex-1 font-medium truncate">✦ {detectedDate.readable}</span>
+                  <button onClick={() => confirmDate(detectedDate.date)} disabled={dateConfirming}
+                    className="text-[11px] font-black px-2.5 py-1 rounded-md flex-shrink-0"
+                    style={{ background: "linear-gradient(135deg,#10b981,#059669)", color: "#fff" }}>
+                    {dateConfirming ? "…" : "Confirm"}
                   </button>
+                  <button onClick={() => setDetectedDate(null)}
+                    className="text-[11px] font-bold px-2 py-1 rounded-md flex-shrink-0"
+                    style={{ background: "rgba(148,163,184,0.15)", color: "#64748b" }}>✕</button>
+                </div>
+              )}
+
+              {/* ── Action buttons grid ── */}
+              <div className="grid grid-cols-2 gap-2">
+
+                {/* Scan payment */}
+                <button onClick={checkPayment} disabled={paymentLoading}
+                  title="Scan Gmail for Venmo/Zelle/PayPal payment"
+                  className="flex flex-col items-center gap-1 py-3 rounded-xl text-white text-xs font-black transition-all hover:opacity-90 disabled:opacity-40"
+                  style={{ background: "linear-gradient(135deg,#10b981,#059669)" }}>
+                  {paymentLoading ? <span className="animate-spin text-base">◌</span> : <span className="text-base">💳</span>}
+                  {paymentLoading ? "Scanning…" : inquiry.payment_status === "paid" ? "Re-check" : "Check Pay"}
+                </button>
+
+                {/* Detect date / reminder */}
+                {inquiry.session_date ? (
+                  <button onClick={draftReminder} disabled={reminderLoading}
+                    title="Draft a day-before reminder into the compose box"
+                    className="flex flex-col items-center gap-1 py-3 rounded-xl text-white text-xs font-black transition-all hover:opacity-90 disabled:opacity-40"
+                    style={{ background: "linear-gradient(135deg,#f59e0b,#d97706)" }}>
+                    {reminderLoading ? <span className="animate-spin text-base">◌</span> : <span className="text-base">🔔</span>}
+                    {reminderLoading ? "Writing…" : "Reminder"}
+                  </button>
+                ) : (
+                  <button onClick={detectDate} disabled={detectLoading}
+                    title="Scan email history to detect the session date"
+                    className="flex flex-col items-center gap-1 py-3 rounded-xl text-xs font-black transition-all hover:opacity-90 disabled:opacity-40"
+                    style={{ background: "rgba(99,102,241,0.1)", color: "#6366f1", border: "1px solid rgba(99,102,241,0.25)" }}>
+                    {detectLoading ? <span className="animate-spin text-base">◌</span> : <span className="text-base">📅</span>}
+                    {detectLoading ? "Scanning…" : "Find Date"}
+                  </button>
+                )}
+
+                {/* Contract */}
+                <button onClick={generateContract} disabled={contractLoading}
+                  title="Fill contract template with client details + agreed price"
+                  className="flex flex-col items-center gap-1 py-3 rounded-xl text-white text-xs font-black transition-all hover:opacity-90 disabled:opacity-40"
+                  style={{ background: "linear-gradient(135deg,#0ea5e9,#6366f1)" }}>
+                  {contractLoading ? <span className="animate-spin text-base">◌</span> : <span className="text-base">📄</span>}
+                  {contractLoading ? "Building…" : "Contract"}
+                </button>
+
+                {/* Confirmation email — only if paid, else placeholder */}
+                {inquiry.payment_status === "paid" ? (
+                  <button onClick={previewConfirmation} disabled={previewLoading || confirmLoading}
+                    title="Preview + send payment confirmation email"
+                    className="flex flex-col items-center gap-1 py-3 rounded-xl text-white text-xs font-black transition-all hover:opacity-90 disabled:opacity-40"
+                    style={{ background: "linear-gradient(135deg,#8b5cf6,#7c3aed)" }}>
+                    {previewLoading ? <span className="animate-spin text-base">◌</span> : <span className="text-base">📧</span>}
+                    {previewLoading ? "Building…" : "Payment Email"}
+                  </button>
+                ) : (
+                  <div className="flex flex-col items-center gap-1 py-3 rounded-xl text-xs font-bold"
+                       style={{ background: "rgba(148,163,184,0.08)", color: "#cbd5e1", border: "1px dashed #e2e8f0" }}>
+                    <span className="text-base opacity-40">📧</span>
+                    <span>Unpaid</span>
+                  </div>
                 )}
               </div>
-
-              {/* Check Payment button */}
-              <button
-                onClick={checkPayment}
-                disabled={paymentLoading}
-                className="w-full text-sm font-black py-2.5 rounded-xl transition-all hover:opacity-90 disabled:opacity-40 flex items-center justify-center gap-2"
-                style={{ background: "linear-gradient(135deg,#10b981,#059669)", color: "#fff" }}>
-                {paymentLoading
-                  ? <><span className="animate-spin inline-block">◌</span> Scanning emails…</>
-                  : inquiry.payment_status === "paid"
-                    ? "✓ Re-check payment"
-                    : "Scan Gmail for payment"}
-              </button>
-              <p className="text-[10px] text-slate-400 text-center">
-                Claude scans Venmo, Zelle, PayPal &amp; conversation for payment evidence
-              </p>
-
-              {/* Day-before reminder — shown when session date is set */}
-              {inquiry.session_date && (
-                <div className="pt-2 border-t border-slate-100 space-y-2">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Day-before reminder</p>
-                  <button
-                    onClick={draftReminder}
-                    disabled={reminderLoading}
-                    className="w-full text-sm font-black py-2.5 rounded-xl transition-all hover:opacity-90 disabled:opacity-40 flex items-center justify-center gap-2"
-                    style={{ background: "linear-gradient(135deg,#f59e0b,#d97706)", color: "#fff" }}>
-                    {reminderLoading
-                      ? <><span className="animate-spin inline-block">◌</span> Writing…</>
-                      : "Draft reminder for tomorrow"}
-                  </button>
-                  <p className="text-[10px] text-slate-400 text-center">
-                    Fills the compose box with a personalized reminder — review and send
-                  </p>
-                </div>
-              )}
-
-              {/* Send booking confirmation — only shown once paid */}
-              {inquiry.payment_status === "paid" && (
-                <div className="pt-2 border-t border-slate-100 space-y-2">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Booking confirmation</p>
-                  <p className="text-xs text-slate-500 leading-relaxed">
-                    Send {inquiry.name} a payment receipt + session details + link to your graduation guide.
-                  </p>
-                  <button
-                    onClick={previewConfirmation}
-                    disabled={previewLoading || confirmLoading}
-                    className="w-full text-sm font-black py-2.5 rounded-xl transition-all hover:opacity-90 disabled:opacity-40 flex items-center justify-center gap-2"
-                    style={{ background: "linear-gradient(135deg,#6366f1,#8b5cf6)", color: "#fff" }}>
-                    {previewLoading
-                      ? <><span className="animate-spin inline-block">◌</span> Building email…</>
-                      : "Preview & send confirmation email"}
-                  </button>
-                </div>
-              )}
             </div>
           </div>
 
@@ -1041,7 +1046,7 @@ export default function ConversationPage() {
                 <div className="flex items-center gap-2">
                   <div className="w-6 h-6 rounded-lg flex items-center justify-center text-xs"
                        style={{ background: "rgba(139,92,246,0.12)", color: "#7c3aed" }}>📌</div>
-                  <p className="text-sm font-black text-slate-900">Things to Remember</p>
+                  <p className="text-sm font-black text-slate-900">AI Training Notes</p>
                 </div>
                 {notesSaving
                   ? <span className="text-[10px] text-slate-400">Saving…</span>
@@ -1055,7 +1060,7 @@ export default function ConversationPage() {
                 onBlur={e => { if (e.target.value !== "") saveNotes(e.target.value); }}
                 onKeyDown={e => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") saveNotes(notes); }}
                 rows={5}
-                placeholder={"Jot down anything important about this client…\n\ne.g. wants campus + city shots, bringing her mom, prefers afternoon light"}
+                placeholder={"Jot down anything for the AI to learn — how to respond to clients like this, what worked, what to avoid.\n\ne.g. clients who say 'flexible' usually want late May · always mention golden hour timing · don't push packages upfront"}
                 className="w-full text-slate-700 leading-relaxed rounded-xl p-3 resize-none sm:resize-y outline-none"
                 style={{ border: "1px solid rgba(139,92,246,0.2)", background: "rgba(139,92,246,0.03)", fontFamily: "inherit", fontSize: "16px" }} />
               <div className="flex items-center justify-between">
@@ -1161,7 +1166,8 @@ export default function ConversationPage() {
           <div className="bg-white rounded-2xl border border-slate-100 p-5 space-y-2">
             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">Client Details</p>
             {[
-              { label: "Email",    value: <a href={`mailto:${inquiry.email}`} className="hover:underline font-medium" style={{ color: C.p1 }}>{inquiry.email}</a> },
+              { label: "Name",    value: <span className="font-semibold text-slate-800">{inquiry.name}</span> },
+              { label: "Email",   value: <a href={`mailto:${inquiry.email}`} className="hover:underline font-medium" style={{ color: C.p1 }}>{inquiry.email}</a> },
               inquiry.phone       && { label: "Phone",   value: <a href={`tel:${inquiry.phone}`} className="hover:underline text-slate-700">{inquiry.phone}</a> },
               inquiry.session_type && { label: "Session", value: inquiry.session_type },
               inquiry.date_in_mind && { label: "Date",    value: inquiry.date_in_mind },
@@ -1244,6 +1250,62 @@ export default function ConversationPage() {
                 {confirmLoading
                   ? <><span className="animate-spin inline-block">◌</span> Sending…</>
                   : "Send from Gmail"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Contract modal ── */}
+      {contractText && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-10 overflow-y-auto"
+             style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)" }}>
+          <div className="w-full max-w-2xl rounded-2xl overflow-hidden shadow-2xl flex flex-col"
+               style={{ background: "#f8fafc", maxHeight: "calc(100vh - 80px)" }}>
+
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 bg-white border-b border-slate-100 flex-shrink-0">
+              <div>
+                <p className="text-sm font-black text-slate-900">Photography Contract</p>
+                <p className="text-xs text-slate-400 mt-0.5">Copy and paste into Pixieset to send</p>
+              </div>
+              <button onClick={() => setContractText(null)}
+                className="text-slate-400 hover:text-slate-700 text-xl font-bold leading-none px-2">×</button>
+            </div>
+
+            {/* Copy button */}
+            <div className="px-5 py-3 border-b border-slate-100 flex-shrink-0 bg-slate-50">
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(contractText);
+                  setContractCopied(true);
+                  setTimeout(() => setContractCopied(false), 2500);
+                }}
+                className="w-full text-sm font-black py-2.5 rounded-xl transition-all hover:opacity-90 flex items-center justify-center gap-2"
+                style={{ background: contractCopied ? "linear-gradient(135deg,#10b981,#059669)" : "linear-gradient(135deg,#0ea5e9,#6366f1)", color: "#fff" }}>
+                {contractCopied ? "✓ Copied to clipboard!" : "📋 Copy entire contract"}
+              </button>
+              <p className="text-[10px] text-slate-400 text-center mt-2">
+                Placeholders in [brackets] need to be filled in manually
+              </p>
+            </div>
+
+            {/* Contract text */}
+            <div className="flex-1 overflow-y-auto p-4">
+              <textarea
+                readOnly
+                value={contractText}
+                rows={30}
+                className="w-full text-xs text-slate-700 leading-relaxed rounded-xl p-4 resize-none outline-none font-mono"
+                style={{ background: "#fff", border: "1px solid #e2e8f0" }}
+              />
+            </div>
+
+            <div className="px-5 py-4 bg-white border-t border-slate-100 flex-shrink-0">
+              <button onClick={() => setContractText(null)}
+                className="w-full text-sm font-bold py-2.5 rounded-xl transition-all hover:opacity-80"
+                style={{ background: "rgba(148,163,184,0.12)", color: "#64748b" }}>
+                Done
               </button>
             </div>
           </div>
