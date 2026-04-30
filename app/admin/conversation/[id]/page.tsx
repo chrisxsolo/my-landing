@@ -194,19 +194,28 @@ export default function ConversationPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inquiryId]);
 
-  // Load saved draft from localStorage on mount
+  // Load saved drafts from localStorage on mount
   useEffect(() => {
     if (!inquiryId) return;
     const saved = localStorage.getItem(`draft_${inquiryId}`);
     if (saved) setDraft(saved);
+    const savedAi = localStorage.getItem(`ai_draft_${inquiryId}`);
+    if (savedAi) setLastAiDraft(savedAi);
   }, [inquiryId]);
 
-  // Persist draft to localStorage whenever it changes
+  // Persist compose draft to localStorage whenever it changes
   useEffect(() => {
     if (!inquiryId) return;
     if (draft) localStorage.setItem(`draft_${inquiryId}`, draft);
     else localStorage.removeItem(`draft_${inquiryId}`);
   }, [draft, inquiryId]);
+
+  // Persist AI draft to localStorage so it survives page refreshes
+  useEffect(() => {
+    if (!inquiryId) return;
+    if (lastAiDraft) localStorage.setItem(`ai_draft_${inquiryId}`, lastAiDraft);
+    else localStorage.removeItem(`ai_draft_${inquiryId}`);
+  }, [lastAiDraft, inquiryId]);
 
   // Auto-scroll to bottom when thread loads
   useEffect(() => {
@@ -615,6 +624,7 @@ export default function ConversationPage() {
       setLearnedRules(newRules);
       setActualSent("");
       setManualAiDraft("");
+      setLastAiDraft("");
       showToast(`✓ ${newRules.length} rule${newRules.length === 1 ? "" : "s"} added to style guide`);
     } catch {
       showToast("Analysis failed — try again", false);
@@ -889,25 +899,23 @@ export default function ConversationPage() {
                 Sends from {myEmail || "your Gmail"} · lands in Sent Mail · marks inquiry as Responded
               </p>
 
-              {/* AI Refine — only useful after AI drafted something */}
-              {lastAiDraft && (
-                <div className="pt-1 border-t border-slate-100 space-y-2">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Refine AI draft</p>
-                  <div className="flex gap-2">
-                    <input type="text" value={feedback} onChange={e => setFeedback(e.target.value)}
-                      onKeyDown={e => { if (e.key === "Enter" && feedback.trim()) generateDraft(feedback); }}
-                      placeholder='e.g. "be more direct" · "add turnaround time"'
-                      className="flex-1 px-3 py-2 rounded-xl outline-none"
-                      style={{ border: `1px solid ${C.p1_20}`, background: "#fff", fontFamily: "inherit", fontSize: "16px" }} />
-                    <button onClick={() => { if (feedback.trim()) generateDraft(feedback); }}
-                      disabled={!feedback.trim() || draftLoading}
-                      className="text-xs font-bold px-3 py-2 rounded-xl disabled:opacity-30 flex-shrink-0"
-                      style={{ background: C.grad12, color: "#fff" }}>
-                      Refine
-                    </button>
-                  </div>
+              {/* AI Refine — always visible so it never disappears after a refine */}
+              <div className="pt-1 border-t border-slate-100 space-y-2">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Refine AI draft</p>
+                <div className="flex gap-2">
+                  <input type="text" value={feedback} onChange={e => setFeedback(e.target.value)}
+                    onKeyDown={e => { if (e.key === "Enter" && feedback.trim()) generateDraft(feedback); }}
+                    placeholder='e.g. "be more direct" · "add turnaround time"'
+                    className="flex-1 px-3 py-2 rounded-xl outline-none"
+                    style={{ border: `1px solid ${C.p1_20}`, background: "#fff", fontFamily: "inherit", fontSize: "16px" }} />
+                  <button onClick={() => { if (feedback.trim()) generateDraft(feedback); }}
+                    disabled={!feedback.trim() || draftLoading}
+                    className="text-xs font-bold px-3 py-2 rounded-xl disabled:opacity-30 flex-shrink-0"
+                    style={{ background: C.grad12, color: "#fff" }}>
+                    Refine
+                  </button>
                 </div>
-              )}
+              </div>
             </div>
           </div>
 
@@ -1115,7 +1123,7 @@ export default function ConversationPage() {
                     ))}
                   </ul>
                   <p className="text-[10px] text-slate-400 pt-1">Applied to all future drafts automatically.</p>
-                  <button onClick={() => { setLearnedRules(null); setActualSent(""); setManualAiDraft(""); }}
+                  <button onClick={() => { setLearnedRules(null); setActualSent(""); setManualAiDraft(""); setLastAiDraft(""); }}
                     className="text-xs font-bold" style={{ color: C.p1 }}>
                     ↩ Analyze another
                   </button>
