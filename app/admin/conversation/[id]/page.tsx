@@ -107,6 +107,14 @@ export default function ConversationPage() {
   const [contractText,    setContractText]    = useState<string | null>(null);
   const [contractLoading, setContractLoading] = useState(false);
   const [contractCopied,  setContractCopied]  = useState(false);
+  const [copiedField,     setCopiedField]     = useState<string | null>(null);
+
+  function copyField(text: string, label: string) {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedField(label);
+      setTimeout(() => setCopiedField(null), 1800);
+    });
+  }
 
   // ── Sunset time ────────────────────────────────────────────────────────────
   const [sunsetInfo,    setSunsetInfo]    = useState<{ sunset: string; goldenStart: string } | null>(null);
@@ -695,7 +703,12 @@ export default function ConversationPage() {
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-right">
-                  <a href={`mailto:${inquiry.email}`} className="font-semibold hover:underline" style={{ color: C.p1 }}>{inquiry.email}</a>
+                  <button onClick={() => copyField(inquiry.email, "Email-header")}
+                    className="font-semibold transition-colors"
+                    style={{ color: copiedField === "Email-header" ? "#10b981" : C.p1 }}
+                    title="Click to copy">
+                    {copiedField === "Email-header" ? "Copied ✓" : inquiry.email}
+                  </button>
                   {inquiry.phone && <span className="text-slate-500">{inquiry.phone}</span>}
                   {inquiry.session_type && <span className="font-semibold text-slate-600">{inquiry.session_type}</span>}
                   {inquiry.date_in_mind && <span className="text-slate-500">{inquiry.date_in_mind}</span>}
@@ -1167,8 +1180,22 @@ export default function ConversationPage() {
             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">Client Details</p>
             {[
               { label: "Name",    value: <span className="font-semibold text-slate-800">{inquiry.name}</span> },
-              { label: "Email",   value: <a href={`mailto:${inquiry.email}`} className="hover:underline font-medium" style={{ color: C.p1 }}>{inquiry.email}</a> },
-              inquiry.phone       && { label: "Phone",   value: <a href={`tel:${inquiry.phone}`} className="hover:underline text-slate-700">{inquiry.phone}</a> },
+              { label: "Email",   value: (
+                <button onClick={() => copyField(inquiry.email, "Email")}
+                  className="text-left transition-colors"
+                  style={{ color: copiedField === "Email" ? "#10b981" : C.p1 }}
+                  title="Click to copy">
+                  {copiedField === "Email" ? "Copied ✓" : inquiry.email}
+                </button>
+              )},
+              inquiry.phone && { label: "Phone", value: (
+                <button onClick={() => copyField(inquiry.phone!, "Phone")}
+                  className="text-left transition-colors"
+                  style={{ color: copiedField === "Phone" ? "#10b981" : "inherit" }}
+                  title="Click to copy">
+                  {copiedField === "Phone" ? "Copied ✓" : inquiry.phone}
+                </button>
+              )},
               inquiry.session_type && { label: "Session", value: inquiry.session_type },
               inquiry.date_in_mind && { label: "Date",    value: inquiry.date_in_mind },
               inquiry.session_date && { label: "Booked",  value: new Date(inquiry.session_date + "T12:00:00").toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) },
