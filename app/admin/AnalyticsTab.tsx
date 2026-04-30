@@ -8,19 +8,20 @@ const card = "bg-white rounded-2xl border border-slate-100 overflow-hidden";
 type ViewEvent  = { user_id:string|null; viewed_at:string; referrer:string|null; device:string|null };
 type ClickEvent = { link_id:number|null; user_id:string|null; clicked_at:string; referrer:string|null; device:string|null };
 type LinkRow    = { id:number; label:string; emoji:string|null; url:string };
+type ViewMode   = "7d" | "30d" | "week";
 
 const SOURCES = [
-  { key:"instagram", label:"Instagram",      color:"#e1306c" },
-  { key:"tiktok",    label:"TikTok",          color:"#00b8a9" },
-  { key:"google",    label:"Google",           color:"#4285f4" },
-  { key:"twitter",   label:"X / Twitter",     color:"#1da1f2" },
-  { key:"facebook",  label:"Facebook",         color:"#1877f2" },
-  { key:"youtube",   label:"YouTube",          color:"#ff0000" },
-  { key:"direct",    label:"Direct / Unknown", color:"#64748b" },
-  { key:"other",     label:"Other",            color:"#a78bfa" },
+  { key:"instagram", label:"Instagram",       color:"#e1306c" },
+  { key:"tiktok",    label:"TikTok",           color:"#00b8a9" },
+  { key:"google",    label:"Google",            color:"#4285f4" },
+  { key:"twitter",   label:"X / Twitter",      color:"#1da1f2" },
+  { key:"facebook",  label:"Facebook",          color:"#1877f2" },
+  { key:"youtube",   label:"YouTube",           color:"#ff0000" },
+  { key:"direct",    label:"Direct / Unknown",  color:"#64748b" },
+  { key:"other",     label:"Other",             color:"#a78bfa" },
 ] as const;
 
-const DEV_COLORS: Record<string,string> = {
+const DEV_COLORS: Record<string, string> = {
   mobile: "#9d6fe8",
   tablet: "#e879a0",
   desktop: "#22d3ee",
@@ -29,10 +30,18 @@ const DEV_COLORS: Record<string,string> = {
 const fmtNum = (n: number) => new Intl.NumberFormat("en-US").format(n);
 const fmtPct = (n: number) => `${n.toFixed(1)}%`;
 
+function fmt12h(h: number): string {
+  if (h === 0)  return "12am";
+  if (h === 12) return "12pm";
+  return h < 12 ? `${h}am` : `${h - 12}pm`;
+}
+
 function dateFromKey(k: string) {
   const [y, m, d] = k.split("-").map(Number);
   return new Date(y, m - 1, d);
 }
+
+function isoDay(d: Date) { return d.toISOString().split("T")[0]; }
 
 function periodStart(daysAgo: number): Date {
   const d = new Date();
@@ -41,12 +50,22 @@ function periodStart(daysAgo: number): Date {
   return d;
 }
 
-function buildDailyStats(days: number, clicks: ClickEvent[], views: ViewEvent[]) {
+// Monday-anchored week start, offset by N weeks back
+function getWeekStart(weeksBack: number): Date {
+  const d = new Date();
+  const day = d.getDay(); // 0=Sun
+  const daysToMon = day === 0 ? 6 : day - 1;
+  d.setDate(d.getDate() - daysToMon - weeksBack * 7);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function buildRangeStats(start: Date, end: Date, clicks: ClickEvent[], views: ViewEvent[]) {
   const map: Record<string, { clicks: number; views: number }> = {};
-  for (let i = 0; i < days; i++) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    map[d.toISOString().split("T")[0]] = { clicks: 0, views: 0 };
+  const cur = new Date(start);
+  while (cur <= end) {
+    map[isoDay(cur)] = { clicks: 0, views: 0 };
+    cur.setDate(cur.getDate() + 1);
   }
   views.forEach(v => { const k = v.viewed_at?.split("T")[0]; if (k && map[k]) map[k].views++; });
   clicks.forEach(c => { const k = c.clicked_at?.split("T")[0]; if (k && map[k]) map[k].clicks++; });
@@ -74,7 +93,7 @@ function CountUp({ target, color, className }: { target: number; color?: string;
   return <span className={className} style={color ? { color } : undefined}>{fmtNum(val)}</span>;
 }
 
-function TrendBadge({ curr, prev }: { curr: number; prev: number }) {
+function TrendBadge({ curr, prev, label }: { curr: number; prev: number; label?: string }) {
   if (!prev && !curr) return null;
   const pct = prev === 0 ? (curr > 0 ? 100 : 0) : ((curr - prev) / prev) * 100;
   const up = pct >= 0;
@@ -82,24 +101,28 @@ function TrendBadge({ curr, prev }: { curr: number; prev: number }) {
     <span
       className="inline-flex items-center gap-0.5 text-[11px] font-bold px-1.5 py-0.5 rounded-full"
       style={{ background: up ? "rgba(16,185,129,0.1)" : "rgba(239,68,68,0.1)", color: up ? "#10b981" : "#ef4444" }}
+      title={label}
     >
       {up ? "↑" : "↓"}{Math.abs(Math.round(pct))}%
     </span>
   );
 }
 
+const MAX_WEEKS_BACK = 12;
+
 export default function AnalyticsTab() {
-  const [loading, setLoading] = useState(true);
-  const [views, setViews] = useState<ViewEvent[]>([]);
-  const [clicks, setClicks] = useState<ClickEvent[]>([]);
-  const [links, setLinks] = useState<LinkRow[]>([]);
-  const [timeRange, setTimeRange] = useState<7 | 30>(7);
-  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
-  const [hoverHour, setHoverHour] = useState<number | null>(null);
+  const [loading, setLoading]       = useState(true);
+  const [views, setViews]           = useState<ViewEvent[]>([]);
+  const [clicks, setClicks]         = useState<ClickEvent[]>([]);
+  const [links, setLinks]           = useState<LinkRow[]>([]);
+  const [viewMode, setViewMode]     = useState<ViewMode>("7d");
+  const [weeksBack, setWeeksBack]   = useState(0);
+  const [hoverIdx, setHoverIdx]     = useState<number | null>(null);
+  const [hoverHour, setHoverHour]   = useState<number | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const since = periodStart(61).toISOString();
+    const since = periodStart(MAX_WEEKS_BACK * 7 + 7).toISOString();
     const [{ data: v }, { data: c }, { data: l }] = await Promise.all([
       supabase.from("link_views").select("user_id,viewed_at,referrer,device").gte("viewed_at", since),
       supabase.from("link_clicks").select("link_id,user_id,clicked_at,referrer,device").gte("clicked_at", since),
@@ -113,26 +136,44 @@ export default function AnalyticsTab() {
 
   useEffect(() => { load(); }, [load]);
 
-  // Partition into current and previous periods
-  const cutoff     = periodStart(timeRange);
-  const prevCutoff = periodStart(timeRange * 2);
+  // ── Derive date boundaries ────────────────────────────────────────────
+  const now = new Date();
+  now.setHours(23, 59, 59, 999);
 
-  const currViews  = views.filter(v => new Date(v.viewed_at) >= cutoff);
-  const prevViews  = views.filter(v => new Date(v.viewed_at) >= prevCutoff && new Date(v.viewed_at) < cutoff);
-  const currClicks = clicks.filter(c => new Date(c.clicked_at) >= cutoff);
-  const prevClicks = clicks.filter(c => new Date(c.clicked_at) >= prevCutoff && new Date(c.clicked_at) < cutoff);
+  let currStart: Date, currEnd: Date, prevStart: Date, prevEnd: Date;
+  let periodLabel = "";
 
-  const totalViews       = currViews.length;
-  const prevTotalViews   = prevViews.length;
-  const totalClicks      = currClicks.length;
-  const prevTotalClicks  = prevClicks.length;
-  const uniqueVisitors      = new Set(currViews.map(v => v.user_id).filter(Boolean)).size;
-  const prevUniqueVisitors  = new Set(prevViews.map(v => v.user_id).filter(Boolean)).size;
-  const uniqueClickers      = new Set(currClicks.map(c => c.user_id).filter(Boolean)).size;
-  const prevUniqueClickers  = new Set(prevClicks.map(c => c.user_id).filter(Boolean)).size;
+  if (viewMode === "week") {
+    currStart = getWeekStart(weeksBack);
+    currEnd   = new Date(currStart); currEnd.setDate(currStart.getDate() + 6); currEnd.setHours(23, 59, 59, 999);
+    prevStart = getWeekStart(weeksBack + 1);
+    prevEnd   = new Date(prevStart); prevEnd.setDate(prevStart.getDate() + 6); prevEnd.setHours(23, 59, 59, 999);
+    const fmt = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    periodLabel = `${fmt(currStart)} – ${fmt(currEnd)}`;
+  } else {
+    const days = viewMode === "7d" ? 7 : 30;
+    currStart = periodStart(days); currEnd = now;
+    prevStart = periodStart(days * 2); prevEnd = new Date(currStart); prevEnd.setMilliseconds(-1);
+    periodLabel = `Last ${days} days`;
+  }
+
+  const inRange   = (ts: string, s: Date, e: Date) => { const d = new Date(ts); return d >= s && d <= e; };
+  const currViews  = views.filter(v => inRange(v.viewed_at, currStart, currEnd));
+  const prevViews  = views.filter(v => inRange(v.viewed_at, prevStart, prevEnd));
+  const currClicks = clicks.filter(c => inRange(c.clicked_at, currStart, currEnd));
+  const prevClicks = clicks.filter(c => inRange(c.clicked_at, prevStart, prevEnd));
+
+  const totalViews      = currViews.length;
+  const prevTotalViews  = prevViews.length;
+  const totalClicks     = currClicks.length;
+  const prevTotalClicks = prevClicks.length;
+  const uniqueVisitors     = new Set(currViews.map(v => v.user_id).filter(Boolean)).size;
+  const prevUniqueVisitors = new Set(prevViews.map(v => v.user_id).filter(Boolean)).size;
+  const uniqueClickers     = new Set(currClicks.map(c => c.user_id).filter(Boolean)).size;
+  const prevUniqueClickers = new Set(prevClicks.map(c => c.user_id).filter(Boolean)).size;
   const overallCtr = totalViews > 0 ? (totalClicks / totalViews) * 100 : 0;
 
-  // Referrer breakdown from views
+  // ── Referrer breakdown ────────────────────────────────────────────────
   const refMap: Record<string, number> = {};
   currViews.forEach(v => { const k = v.referrer ?? "direct"; refMap[k] = (refMap[k] ?? 0) + 1; });
   const sourceData = SOURCES
@@ -140,21 +181,18 @@ export default function AnalyticsTab() {
     .filter(s => s.count > 0)
     .sort((a, b) => b.count - a.count);
 
-  // Device breakdown from views
+  // ── Device breakdown ──────────────────────────────────────────────────
   const devMap: Record<string, number> = { mobile: 0, tablet: 0, desktop: 0 };
   currViews.forEach(v => { const d = v.device ?? "desktop"; devMap[d] = (devMap[d] ?? 0) + 1; });
   const devTotal = Object.values(devMap).reduce((a, b) => a + b, 0);
 
-  // Hour heatmap
+  // ── Hour heatmap ──────────────────────────────────────────────────────
   const hourData = Array(24).fill(0) as number[];
-  currViews.forEach(v => {
-    if (!v.viewed_at) return;
-    hourData[new Date(v.viewed_at).getHours()]++;
-  });
-  const maxHour = Math.max(...hourData, 1);
-  const peakHour = hourData.indexOf(Math.max(...hourData));
+  currViews.forEach(v => { if (v.viewed_at) hourData[new Date(v.viewed_at).getHours()]++; });
+  const maxHourVal = Math.max(...hourData, 1);
+  const peakHour   = hourData.indexOf(Math.max(...hourData));
 
-  // Per-link stats
+  // ── Per-link stats ────────────────────────────────────────────────────
   const clicksByLink = new Map<number, ClickEvent[]>();
   currClicks.forEach(c => {
     if (!c.link_id) return;
@@ -174,7 +212,8 @@ export default function AnalyticsTab() {
     };
   }).sort((a, b) => b.clicks - a.clicks);
 
-  const dailyStats = buildDailyStats(timeRange, currClicks, currViews);
+  // ── Daily stats for chart ─────────────────────────────────────────────
+  const dailyStats = buildRangeStats(currStart, viewMode === "week" ? currEnd : now, currClicks, currViews);
   const busiestDay = dailyStats.reduce<(typeof dailyStats)[0] | null>(
     (best, s) => !best || s.clicks + s.views > best.clicks + best.views ? s : best, null
   );
@@ -188,6 +227,10 @@ export default function AnalyticsTab() {
     load();
   }
 
+  const trendLabel = viewMode === "week"
+    ? `vs. week of ${getWeekStart(weeksBack + 1).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
+    : `vs. previous ${viewMode === "7d" ? 7 : 30} days`;
+
   return (
     <div className="space-y-6">
 
@@ -198,18 +241,41 @@ export default function AnalyticsTab() {
           <div>
             <p className="text-xs font-black uppercase tracking-widest mb-1.5" style={{ color: C.p1 }}>Linktree Analytics</p>
             <h2 className="text-2xl font-black text-slate-900 leading-tight">Views, clicks, and where people come from.</h2>
-            <p className="mt-1.5 text-sm font-medium text-slate-400">Stats update in real-time. Trend arrows compare to the previous {timeRange}-day window.</p>
+            <p className="mt-1.5 text-sm font-medium text-slate-400">
+              Trend arrows compare to the previous {viewMode === "week" ? "week" : viewMode === "7d" ? "7 days" : "30 days"}.
+            </p>
           </div>
-          <div className="flex flex-wrap gap-2 md:justify-end items-center">
+
+          {/* Time controls */}
+          <div className="flex flex-col gap-2 md:items-end">
+            {/* Mode picker */}
             <div className="flex gap-1 p-1 rounded-xl bg-slate-50 border border-slate-100">
-              {([7, 30] as const).map(r => (
-                <button key={r} onClick={() => setTimeRange(r)}
+              {(["7d", "30d", "week"] as ViewMode[]).map(m => (
+                <button key={m} onClick={() => { setViewMode(m); if (m !== "week") setWeeksBack(0); }}
                   className="px-4 py-1.5 rounded-lg text-xs font-bold transition-all"
-                  style={timeRange === r ? { background: C.p1_10, color: C.p1 } : { color: "#94a3b8" }}>
-                  {r}d
+                  style={viewMode === m ? { background: C.p1_10, color: C.p1 } : { color: "#94a3b8" }}>
+                  {m === "7d" ? "7 days" : m === "30d" ? "30 days" : "Week"}
                 </button>
               ))}
             </div>
+
+            {/* Week navigator */}
+            {viewMode === "week" && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setWeeksBack(w => Math.min(w + 1, MAX_WEEKS_BACK))}
+                  disabled={weeksBack >= MAX_WEEKS_BACK}
+                  className="w-7 h-7 rounded-lg flex items-center justify-center text-sm font-bold transition-all disabled:opacity-30"
+                  style={{ background: C.p1_10, color: C.p1 }}>‹</button>
+                <span className="text-xs font-bold text-slate-600 min-w-[130px] text-center">{periodLabel}</span>
+                <button
+                  onClick={() => setWeeksBack(w => Math.max(w - 1, 0))}
+                  disabled={weeksBack === 0}
+                  className="w-7 h-7 rounded-lg flex items-center justify-center text-sm font-bold transition-all disabled:opacity-30"
+                  style={{ background: C.p1_10, color: C.p1 }}>›</button>
+              </div>
+            )}
+
             <button onClick={load} disabled={loading}
               className="text-xs font-bold px-4 py-2 rounded-lg transition-all hover:opacity-80 disabled:opacity-50"
               style={{ background: C.p2_08, color: C.p2 }}>
@@ -222,10 +288,10 @@ export default function AnalyticsTab() {
       {/* ── Stat cards ─────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: "Total Views",      val: totalViews,      prev: prevTotalViews,      color: C.p1, grad: C.grad12  },
-          { label: "Unique Visitors",  val: uniqueVisitors,  prev: prevUniqueVisitors,  color: C.p3, grad: C.grad321 },
-          { label: "Total Clicks",     val: totalClicks,     prev: prevTotalClicks,     color: C.p2, grad: C.grad23  },
-          { label: "Unique Clickers",  val: uniqueClickers,  prev: prevUniqueClickers,  color: C.p1, grad: C.grad90  },
+          { label: "Total Views",     val: totalViews,     prev: prevTotalViews,     color: C.p1, grad: C.grad12  },
+          { label: "Unique Visitors", val: uniqueVisitors, prev: prevUniqueVisitors, color: C.p3, grad: C.grad321 },
+          { label: "Total Clicks",    val: totalClicks,    prev: prevTotalClicks,    color: C.p2, grad: C.grad23  },
+          { label: "Unique Clickers", val: uniqueClickers, prev: prevUniqueClickers, color: C.p1, grad: C.grad90  },
         ].map(({ label, val, prev, color, grad }) => (
           <div key={label} className={card}>
             <div className="h-[3px]" style={{ background: grad }} />
@@ -233,9 +299,9 @@ export default function AnalyticsTab() {
               <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">{label}</p>
               <div className="flex items-end justify-between gap-2 mb-1">
                 <CountUp target={val} color={color} className="text-3xl font-black" />
-                {!loading && <TrendBadge curr={val} prev={prev} />}
+                {!loading && <TrendBadge curr={val} prev={prev} label={trendLabel} />}
               </div>
-              <p className="text-[10px] text-slate-300">prev {timeRange}d: {fmtNum(prev)}</p>
+              <p className="text-[10px] text-slate-300">prev: {fmtNum(prev)}</p>
             </div>
           </div>
         ))}
@@ -252,7 +318,7 @@ export default function AnalyticsTab() {
             {loading ? (
               <div className="py-6 text-center text-sm text-slate-400">Loading…</div>
             ) : sourceData.length === 0 ? (
-              <p className="text-sm text-slate-400">No referrer data yet — will populate as visitors arrive.</p>
+              <p className="text-sm text-slate-400">No referrer data yet.</p>
             ) : (
               <div className="space-y-3.5">
                 {sourceData.map(s => (
@@ -284,7 +350,6 @@ export default function AnalyticsTab() {
               <p className="text-sm text-slate-400">No device data yet.</p>
             ) : (
               <>
-                {/* Segmented pill bar */}
                 <div className="flex rounded-full overflow-hidden h-5 mb-5">
                   {(["mobile", "desktop", "tablet"] as const).map(key => {
                     const pct = devTotal > 0 ? (devMap[key] ?? 0) / devTotal * 100 : 0;
@@ -298,14 +363,15 @@ export default function AnalyticsTab() {
                 </div>
                 <div className="space-y-2.5">
                   {(["mobile", "desktop", "tablet"] as const).map(key => {
-                    const label = { mobile: "📱 Mobile", desktop: "💻 Desktop", tablet: "⬜ Tablet" }[key];
+                    const emoji = { mobile: "📱", desktop: "💻", tablet: "⬜" }[key];
+                    const label = key.charAt(0).toUpperCase() + key.slice(1);
                     const count = devMap[key] ?? 0;
                     const pct = devTotal > 0 ? (count / devTotal) * 100 : 0;
                     return (
                       <div key={key} className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: DEV_COLORS[key] }} />
-                          <span className="text-sm font-medium text-slate-600">{label}</span>
+                          <span className="text-sm font-medium text-slate-600">{emoji} {label}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="text-xs text-slate-400">{fmtNum(count)}</span>
@@ -332,13 +398,13 @@ export default function AnalyticsTab() {
             </div>
             {totalViews > 0 && (
               <p className="text-xs font-bold text-slate-400">
-                Peak: {peakHour}:00–{peakHour + 1}:00 · {fmtNum(hourData[peakHour])} views
+                Peak: {fmt12h(peakHour)}–{fmt12h(peakHour + 1 === 24 ? 0 : peakHour + 1)} · {fmtNum(hourData[peakHour])} views
               </p>
             )}
           </div>
           <div className="grid gap-1.5" style={{ gridTemplateColumns: "repeat(24, 1fr)" }}>
             {hourData.map((count, h) => {
-              const intensity = count / maxHour;
+              const intensity = count / maxHourVal;
               return (
                 <div key={h} className="relative group">
                   <div
@@ -355,7 +421,7 @@ export default function AnalyticsTab() {
                     <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 z-10 pointer-events-none">
                       <div className="rounded-lg px-2.5 py-1.5 text-[10px] font-bold whitespace-nowrap shadow-xl"
                         style={{ background: "rgba(15,15,25,0.92)", color: "white" }}>
-                        {h}:00 · {fmtNum(count)} view{count !== 1 ? "s" : ""}
+                        {fmt12h(h)} · {fmtNum(count)} view{count !== 1 ? "s" : ""}
                       </div>
                     </div>
                   )}
@@ -363,10 +429,11 @@ export default function AnalyticsTab() {
               );
             })}
           </div>
+          {/* Time labels — 12-hour */}
           <div className="flex justify-between mt-2 select-none text-[10px] font-bold text-slate-300">
-            {[0, 6, 12, 18, 23].map(h => <span key={h}>{h}:00</span>)}
+            {[0, 6, 12, 18, 23].map(h => <span key={h}>{fmt12h(h)}</span>)}
           </div>
-          {/* Color scale legend */}
+          {/* Color scale */}
           <div className="flex items-center gap-2 mt-3">
             <span className="text-[10px] font-bold text-slate-300">Less</span>
             <div className="flex gap-0.5">
@@ -386,10 +453,10 @@ export default function AnalyticsTab() {
           <p className="text-xs font-black uppercase tracking-widest mb-4" style={{ color: C.p2 }}>Engagement Snapshot</p>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
-              { label: "Click-through Rate", val: `${overallCtr.toFixed(1)}%`,                                                   color: C.p1 },
-              { label: "Clicks per Visitor", val: (uniqueVisitors > 0 ? totalClicks / uniqueVisitors : 0).toFixed(2),            color: C.p2 },
+              { label: "Click-through Rate", val: `${overallCtr.toFixed(1)}%`,                                                              color: C.p1 },
+              { label: "Clicks per Visitor", val: (uniqueVisitors > 0 ? totalClicks / uniqueVisitors : 0).toFixed(2),                      color: C.p2 },
               { label: "Visitor → Clicker",  val: uniqueVisitors > 0 ? `${((uniqueClickers / uniqueVisitors) * 100).toFixed(1)}%` : "0.0%", color: "#d97706" },
-              { label: "Active Links",       val: fmtNum(links.length),                                                          color: C.p3 },
+              { label: "Active Links",        val: fmtNum(links.length),                                                                    color: C.p3 },
             ].map(item => (
               <div key={item.label} className="rounded-xl border border-slate-100 p-4" style={{ background: "rgba(248,250,252,0.8)" }}>
                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">{item.label}</p>
@@ -407,7 +474,9 @@ export default function AnalyticsTab() {
           <div className="flex flex-col gap-1 mb-6 md:flex-row md:items-end md:justify-between">
             <div>
               <h3 className="text-base font-black text-slate-900">Activity Over Time</h3>
-              <p className="text-xs font-medium text-slate-400">Views and clicks per day.</p>
+              <p className="text-xs font-medium text-slate-400">
+                {viewMode === "week" ? `${periodLabel}` : `Views and clicks per day.`}
+              </p>
             </div>
             {busiestDay && busiestDay.views + busiestDay.clicks > 0 && (
               <p className="text-xs font-bold text-slate-400">
@@ -419,8 +488,8 @@ export default function AnalyticsTab() {
             <div className="h-64 flex items-center justify-center text-slate-400 text-sm">Loading chart…</div>
           ) : (
             <div style={{ overflowX: "auto", paddingBottom: 8 }}>
-              <div className="relative" style={{ minWidth: 520 }}>
-                {/* Floating tooltip */}
+              <div className="relative" style={{ minWidth: viewMode === "week" ? 280 : 520 }}>
+                {/* Tooltip */}
                 <div className="relative h-12 pointer-events-none">
                   {hoverIdx !== null && dailyStats[hoverIdx] && (() => {
                     const s = dailyStats[hoverIdx];
@@ -466,7 +535,9 @@ export default function AnalyticsTab() {
                         </div>
                         <div className="text-center">
                           <p className="text-[9px] font-black" style={{ color: isHov ? C.p1 : "#1e293b" }}>{date.getDate()}</p>
-                          <p className="text-[8px] font-bold uppercase" style={{ color: isHov ? C.p1 : "#cbd5e1" }}>{date.toLocaleDateString("en-US", { weekday: "short" })}</p>
+                          <p className="text-[8px] font-bold uppercase" style={{ color: isHov ? C.p1 : "#cbd5e1" }}>
+                            {date.toLocaleDateString("en-US", { weekday: "short" })}
+                          </p>
                         </div>
                       </div>
                     );
@@ -500,7 +571,7 @@ export default function AnalyticsTab() {
           <div className="flex items-end justify-between mb-5 flex-wrap gap-2">
             <div>
               <h2 className="text-base font-black text-slate-900">Link Performance</h2>
-              <p className="text-xs font-medium text-slate-400">Ranked by clicks. Links with zero clicks are flagged.</p>
+              <p className="text-xs font-medium text-slate-400">Ranked by clicks. Zero-click links are flagged.</p>
             </div>
             <a href="/admin/links" className="text-xs font-bold transition-colors hover:opacity-70" style={{ color: C.p2 }}>Manage links →</a>
           </div>
@@ -509,7 +580,6 @@ export default function AnalyticsTab() {
           ) : linkStats.length === 0 ? (
             <div className="py-10 text-center">
               <p className="text-sm text-slate-400">No links found.</p>
-              <p className="text-xs text-slate-300 mt-1">Add links from the Links Admin page.</p>
             </div>
           ) : (
             <div className="space-y-2.5">
@@ -543,10 +613,10 @@ export default function AnalyticsTab() {
                       </div>
                       <div className="grid grid-cols-4 gap-3 flex-shrink-0 text-right">
                         {[
-                          { val: fmtNum(stat.clicks),                     label: "clicks",  color: stat.isDead ? "#94a3b8" : C.p1 },
-                          { val: fmtNum(stat.uniqueClickers),              label: "uniq",    color: C.p3 },
-                          { val: `${stat.ctr.toFixed(1)}%`,                label: "CTR",     color: C.p2 },
-                          { val: `${stat.clickShare.toFixed(1)}%`,         label: "share",   color: C.p1 },
+                          { val: fmtNum(stat.clicks),          label: "clicks", color: stat.isDead ? "#94a3b8" : C.p1 },
+                          { val: fmtNum(stat.uniqueClickers),  label: "uniq",   color: C.p3 },
+                          { val: `${stat.ctr.toFixed(1)}%`,    label: "CTR",    color: C.p2 },
+                          { val: `${stat.clickShare.toFixed(1)}%`, label: "share", color: C.p1 },
                         ].map(({ val, label, color }) => (
                           <div key={label}>
                             <p className="text-lg font-black" style={{ color }}>{val}</p>
