@@ -8,7 +8,7 @@ const card = "bg-white rounded-2xl border border-slate-100 overflow-hidden";
 type ViewEvent  = { user_id:string|null; viewed_at:string; referrer:string|null; device:string|null };
 type ClickEvent = { link_id:number|null; user_id:string|null; clicked_at:string; referrer:string|null; device:string|null };
 type LinkRow    = { id:number; label:string; emoji:string|null; url:string };
-type ViewMode   = "7d" | "30d" | "week";
+type ViewMode   = "today" | "7d" | "30d" | "week";
 
 const SOURCES = [
   { key:"instagram", label:"Instagram",       color:"#e1306c" },
@@ -115,7 +115,7 @@ export default function AnalyticsTab() {
   const [views, setViews]           = useState<ViewEvent[]>([]);
   const [clicks, setClicks]         = useState<ClickEvent[]>([]);
   const [links, setLinks]           = useState<LinkRow[]>([]);
-  const [viewMode, setViewMode]     = useState<ViewMode>("7d");
+  const [viewMode, setViewMode]     = useState<ViewMode>("today");
   const [weeksBack, setWeeksBack]   = useState(0);
   const [hoverIdx, setHoverIdx]     = useState<number | null>(null);
   const [hoverHour, setHoverHour]   = useState<number | null>(null);
@@ -143,7 +143,13 @@ export default function AnalyticsTab() {
   let currStart: Date, currEnd: Date, prevStart: Date, prevEnd: Date;
   let periodLabel = "";
 
-  if (viewMode === "week") {
+  if (viewMode === "today") {
+    currStart = new Date(); currStart.setHours(0, 0, 0, 0);
+    currEnd   = now;
+    prevStart = new Date(currStart); prevStart.setDate(prevStart.getDate() - 1);
+    prevEnd   = new Date(now);       prevEnd.setDate(prevEnd.getDate() - 1);
+    periodLabel = new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  } else if (viewMode === "week") {
     currStart = getWeekStart(weeksBack);
     currEnd   = new Date(currStart); currEnd.setDate(currStart.getDate() + 6); currEnd.setHours(23, 59, 59, 999);
     prevStart = getWeekStart(weeksBack + 1);
@@ -227,7 +233,9 @@ export default function AnalyticsTab() {
     load();
   }
 
-  const trendLabel = viewMode === "week"
+  const trendLabel = viewMode === "today"
+    ? "vs. yesterday (same time)"
+    : viewMode === "week"
     ? `vs. week of ${getWeekStart(weeksBack + 1).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
     : `vs. previous ${viewMode === "7d" ? 7 : 30} days`;
 
@@ -242,7 +250,7 @@ export default function AnalyticsTab() {
             <p className="text-xs font-black uppercase tracking-widest mb-1.5" style={{ color: C.p1 }}>Linktree Analytics</p>
             <h2 className="text-2xl font-black text-slate-900 leading-tight">Views, clicks, and where people come from.</h2>
             <p className="mt-1.5 text-sm font-medium text-slate-400">
-              Trend arrows compare to the previous {viewMode === "week" ? "week" : viewMode === "7d" ? "7 days" : "30 days"}.
+              Trend arrows compare to {trendLabel}.
             </p>
           </div>
 
@@ -250,11 +258,11 @@ export default function AnalyticsTab() {
           <div className="flex flex-col gap-2 md:items-end">
             {/* Mode picker */}
             <div className="flex gap-1 p-1 rounded-xl bg-slate-50 border border-slate-100">
-              {(["7d", "30d", "week"] as ViewMode[]).map(m => (
+              {(["today", "7d", "30d", "week"] as ViewMode[]).map(m => (
                 <button key={m} onClick={() => { setViewMode(m); if (m !== "week") setWeeksBack(0); }}
                   className="px-4 py-1.5 rounded-lg text-xs font-bold transition-all"
                   style={viewMode === m ? { background: C.p1_10, color: C.p1 } : { color: "#94a3b8" }}>
-                  {m === "7d" ? "7 days" : m === "30d" ? "30 days" : "Week"}
+                  {m === "today" ? "Today" : m === "7d" ? "7 days" : m === "30d" ? "30 days" : "Week"}
                 </button>
               ))}
             </div>
@@ -467,8 +475,8 @@ export default function AnalyticsTab() {
         </div>
       </div>
 
-      {/* ── Activity over time ──────────────────────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-slate-100">
+      {/* ── Activity over time (hidden for Today — heatmap is sufficient) ── */}
+      {viewMode !== "today" && <div className="bg-white rounded-2xl border border-slate-100">
         <div className="h-[3px]" style={{ background: C.grad90 }} />
         <div className="p-6">
           <div className="flex flex-col gap-1 mb-6 md:flex-row md:items-end md:justify-between">
@@ -563,6 +571,8 @@ export default function AnalyticsTab() {
           </div>
         </div>
       </div>
+
+      }
 
       {/* ── Link performance ────────────────────────────────────────────── */}
       <div className={card}>

@@ -39,7 +39,7 @@ function stripQuotes(text: string): string {
 
 // Detect school name from free-form text (message, session_type, etc.)
 function detectSchool(text: string): string | null {
-  const t = text.toLowerCase();
+  const t = text.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
   if (/\bsjsu\b|san jose state/.test(t))               return "SJSU";
   if (/\buc berkeley\b|\bberkeley\b|cal bears/.test(t)) return "UC Berkeley";
   if (/\bsfsu\b|sf state|san francisco state/.test(t))  return "SF State";
@@ -140,13 +140,28 @@ export default function ConversationPage() {
   // Requires a recognizable month name — rejects vague strings like "Flexible".
   function tryParseDate(str: string): string | null {
     if (!str) return null;
-    const hasMonth = /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|january|february|march|april|june|july|august|september|october|november|december)\b/i.test(str);
-    if (!hasMonth) return null;
-    const year    = new Date().getFullYear();
-    const cleaned = str.replace(/(\d+)(st|nd|rd|th)/gi, "$1");
-    for (const attempt of [cleaned, `${cleaned} ${year}`, `${cleaned} ${year + 1}`]) {
-      const d = new Date(attempt);
-      if (!isNaN(d.getTime())) return d.toISOString().split("T")[0];
+    const year = new Date().getFullYear();
+
+    // Try each comma/semicolon-separated segment — take the first that parses
+    for (const seg of str.split(/[,;]/).map(s => s.trim()).filter(Boolean)) {
+      // Numeric M/D/YY or M/D/YYYY (e.g. "6/19/26" or "6/19/2026")
+      const num = seg.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+      if (num) {
+        const [, m, d, y] = num;
+        const fullYear = y.length === 2 ? 2000 + parseInt(y) : parseInt(y);
+        const date = new Date(fullYear, parseInt(m) - 1, parseInt(d));
+        if (!isNaN(date.getTime())) return date.toISOString().split("T")[0];
+      }
+
+      // Month-name format (e.g. "June 19", "June 19th 2026")
+      const hasMonth = /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|january|february|march|april|june|july|august|september|october|november|december)\b/i.test(seg);
+      if (hasMonth) {
+        const cleaned = seg.replace(/(\d+)(st|nd|rd|th)/gi, "$1");
+        for (const attempt of [cleaned, `${cleaned} ${year}`, `${cleaned} ${year + 1}`]) {
+          const d = new Date(attempt);
+          if (!isNaN(d.getTime())) return d.toISOString().split("T")[0];
+        }
+      }
     }
     return null;
   }

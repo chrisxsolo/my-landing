@@ -35,7 +35,32 @@ const BLOG_CATEGORIES:{value:BlogCategory;label:string;helper:string}[]=[
   {value:"journal",label:"Journal",helper:"Fun shoot stories at /journal"},
   {value:"professional",label:"Professional",helper:"Case studies at /blog"},
 ];
+const WEBSITE_TABS:Tab[]=["poses","locations","bayGuide","portfolio","categories","blog"];
+const CLIENT_TABS:Tab[]=["analytics","inquiries","clients"];
+const TAB_LABELS:Record<Tab,string>={poses:"📸 Grad Poses",locations:"📍 Campus Spots",bayGuide:"🗺️ Bay Guide",portfolio:"🖼️ Portfolio",categories:"🏷️ Categories",blog:"✍️ Blog",analytics:"📊 Analytics",inquiries:"📬 Inquiries",clients:"👥 Clients"};
 
+function detectSchool(text:string):string|null{
+  // Normalize accents (e.g. "José" → "Jose") so accented names still match
+  const t=text.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"");
+  if(/\bsjsu\b|san jose state/.test(t))               return "SJSU";
+  if(/\buc berkeley\b|\bberkeley\b|cal bears/.test(t)) return "UC Berkeley";
+  if(/\bsfsu\b|sf state|san francisco state/.test(t))  return "SF State";
+  if(/\bcsueb\b|cal state east bay|eastbay/.test(t))   return "CSUEB";
+  if(/\busf\b|university of san francisco/.test(t))    return "USF";
+  if(/\bstanford\b/.test(t))                           return "Stanford";
+  if(/\bsanta clara\b|\bscu\b/.test(t))                return "Santa Clara";
+  if(/\bsacramento state\b|\bsac state\b|\bcsus\b/.test(t)) return "Sac State";
+  if(/\bchico state\b|\bcsuchico\b/.test(t))           return "Chico State";
+  if(/\bfresno state\b/.test(t))                       return "Fresno State";
+  return null;
+}
+function buildSubject(inq:{session_type:string|null;message:string;date_in_mind:string|null}):string{
+  const isGrad=(inq.session_type??"").toLowerCase().includes("grad");
+  if(!isGrad) return `Re: Your ${inq.session_type??"photography"} inquiry`;
+  const haystack=[inq.message,inq.session_type,inq.date_in_mind].filter(Boolean).join(" ");
+  const school=detectSchool(haystack);
+  return school?`${school} Graduation Inquiry`:"Graduation Inquiry";
+}
 function matchesPortfolioGroup(image:PortfolioImage,group:"grads"|"families"){
   const slug=image.category_slug;
   if(group==="grads")return slug==="grads"||slug==="graduation";
@@ -214,7 +239,14 @@ function AdminDashboard() {
       if(feedback&&drafts[inq.id]){payload.previous_draft=drafts[inq.id];payload.feedback=feedback;}
       const res=await fetch("/api/draft-reply",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
       const json=await res.json();
-      if(json.draft){setDrafts(p=>({...p,[inq.id]:json.draft}));setOriginalAiDrafts(p=>({...p,[inq.id]:json.draft}));setDraftFeedback(p=>({...p,[inq.id]:""}))}
+      if(json.draft){
+        setDrafts(p=>({...p,[inq.id]:json.draft}));
+        setOriginalAiDrafts(p=>({...p,[inq.id]:json.draft}));
+        setDraftFeedback(p=>({...p,[inq.id]:""}));
+        // Persist to localStorage so the conversation thread page picks it up automatically
+        localStorage.setItem(`draft_${inq.id}`, json.draft);
+        localStorage.setItem(`ai_draft_${inq.id}`, json.draft);
+      }
       else{showToast(json.error??"Draft failed",false);}
     }catch(e){showToast("Draft request failed",false);console.error(e);}
     finally{setDraftLoading(null);}
@@ -287,7 +319,7 @@ function AdminDashboard() {
 
   function openCompose(inq:Inquiry){
     const draft=drafts[inq.id]??"";
-    setComposeSubject(p=>({...p,[inq.id]:p[inq.id]??`Re: Your ${inq.session_type?inq.session_type+" ":""}inquiry`}));
+    setComposeSubject(p=>({...p,[inq.id]:p[inq.id]??buildSubject(inq)}));
     setComposeBody(p=>({...p,[inq.id]:p[inq.id]??draft}));
     setComposeOpen(p=>({...p,[inq.id]:true}));
   }
@@ -637,16 +669,33 @@ function AdminDashboard() {
             Sign out
           </button>
         </div>
-        {/* Tabs */}
-        <div className="flex gap-2 mb-8 p-1 rounded-2xl bg-white border border-slate-100 w-fit flex-wrap">
-          {(["poses","locations","bayGuide","portfolio","categories","blog","analytics","inquiries","clients"] as Tab[]).map(t=>(
-            <button key={t} onClick={()=>{setTab(t);cancelEditPose();cancelEditSpot();cancelEditPortfolioImage();cancelEditCategory();cancelEditPost();setEditingInquiry(null);setInquiryDeleteConfirm(null);}}
-              className="px-5 py-2 rounded-xl text-sm font-bold transition-all"
-              style={tab===t?{background:C.grad12,color:"#fff"}:{color:"#94a3b8"}}>
-              {t==="poses"?"📸 Grad Poses":t==="locations"?"📍 Campus Spots":t==="bayGuide"?"🗺️ Bay Guide":t==="portfolio"?"🖼️ Portfolio":t==="categories"?"🏷️ Categories":t==="blog"?"✍️ Blog":t==="analytics"?"📊 Analytics":t==="inquiries"?"📬 Inquiries":"👥 Clients"}
-            </button>
-          ))}
-        </div>
+        {/* Tabs — grouped into Edit Website / Clients */}
+        {(()=>{
+          const tabSection=WEBSITE_TABS.includes(tab)?"website":"clients";
+          const cancelAll=()=>{cancelEditPose();cancelEditSpot();cancelEditPortfolioImage();cancelEditCategory();cancelEditPost();setEditingInquiry(null);setInquiryDeleteConfirm(null);};
+          return(
+            <div className="mb-8 space-y-2">
+              <div className="flex gap-2">
+                {(["website","clients"] as const).map(s=>(
+                  <button key={s} onClick={()=>{cancelAll();setTab(s==="website"?WEBSITE_TABS[0]:CLIENT_TABS[0]);}}
+                    className="px-5 py-2.5 rounded-xl text-sm font-bold transition-all"
+                    style={tabSection===s?{background:C.grad12,color:"#fff",boxShadow:"0 2px 8px rgba(157,111,232,0.25)"}:{color:"#64748b",background:"white",border:"1px solid #e2e8f0"}}>
+                    {s==="website"?"✏️ Edit Website":"👤 Clients"}
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-1.5 p-1 rounded-2xl bg-white border border-slate-100 w-fit flex-wrap">
+                {(tabSection==="website"?WEBSITE_TABS:CLIENT_TABS).map(t=>(
+                  <button key={t} onClick={()=>{setTab(t);cancelAll();}}
+                    className="px-4 py-2 rounded-xl text-sm font-bold transition-all"
+                    style={tab===t?{background:C.grad12,color:"#fff"}:{color:"#94a3b8"}}>
+                    {TAB_LABELS[t]}
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* ── POSES ── */}
         {tab==="poses"&&(
