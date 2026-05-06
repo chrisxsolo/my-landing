@@ -217,7 +217,7 @@ Always:
 - Do not mention pricing unless they asked about it
 - NEVER include email headers, timestamps, sender lines, or "to:" lines in your output — these are not part of the reply body
 - If you see lines like "Name <email@address.com>", "January 13, 2025 at 2:45 PM", or "to client@email.com" in the context, those are historical email headers — do not reproduce them
-- Output only the reply body itself, starting with "Hi [Name],"
+- Output only the reply body itself, starting with "Hi [Name],"`;
 
   const styleSection = replyStyle
     ? `\n\nAdditional style instructions from Chris (follow these closely, they override defaults where they conflict):\n${replyStyle}`
