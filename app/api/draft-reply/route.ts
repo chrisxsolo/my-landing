@@ -177,11 +177,15 @@ Output only the polished email body, nothing else.`,
         }],
       });
 
-      const draft = response.content
+      let draft = response.content
         .filter((b) => b.type === "text")
         .map((b) => (b as { type: "text"; text: string }).text)
         .join("")
         .trim();
+
+      draft = draft.replace(
+        /^(?:[^\n]*<[^\n@>]+@[^\n>]+>[^\n]*\n[^\n]+at\s+\d+:\d+[^\n]*\n(?:to\s+[^\n]+\n)?[\s\n]*)/, ""
+      ).trimStart();
 
       return NextResponse.json({ draft });
     } catch (err) {
@@ -210,7 +214,10 @@ Always:
 - Sign as "Chris"
 - Start directly with "Hi [Name]," — no subject line, no "Dear"
 - Plain text only — no markdown, no bold, no asterisks, no bullet points
-- Do not mention pricing unless they asked about it`;
+- Do not mention pricing unless they asked about it
+- NEVER include email headers, timestamps, sender lines, or "to:" lines in your output — these are not part of the reply body
+- If you see lines like "Name <email@address.com>", "January 13, 2025 at 2:45 PM", or "to client@email.com" in the context, those are historical email headers — do not reproduce them
+- Output only the reply body itself, starting with "Hi [Name],"
 
   const styleSection = replyStyle
     ? `\n\nAdditional style instructions from Chris (follow these closely, they override defaults where they conflict):\n${replyStyle}`
@@ -268,11 +275,17 @@ Write the reply now.`;
       system: systemPrompt,
     });
 
-    const draft = response.content
+    let draft = response.content
       .filter((b) => b.type === "text")
       .map((b) => (b as { type: "text"; text: string }).text)
       .join("")
       .trim();
+
+    // Strip any email-header block from the top of the output.
+    // Pattern: lines like "Name <email>", "Month DD, YYYY at H:MM PM", "to email@..."
+    draft = draft.replace(
+      /^(?:[^\n]*<[^\n@>]+@[^\n>]+>[^\n]*\n[^\n]+at\s+\d+:\d+[^\n]*\n(?:to\s+[^\n]+\n)?[\s\n]*)/, ""
+    ).trimStart();
 
     return NextResponse.json({ draft });
   } catch (err) {

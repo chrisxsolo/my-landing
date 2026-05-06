@@ -206,7 +206,7 @@ function AdminDashboard() {
 
   // ── Payment sync ──────────────────────────────────────────────────────────
   const [syncLoading,setSyncLoading]=useState(false);
-  const [syncResult,setSyncResult]=useState<{name:string;email:string;amount:string;method:string;alreadyPaid:boolean}[]|null>(null);
+  const [syncResult,setSyncResult]=useState<{name:string;email:string;amount:string;method:string;alreadyPaid:boolean;dateBooked?:string}[]|null>(null);
   const [syncMsg,setSyncMsg]=useState<string|null>(null);
 
   async function syncPayments(){
@@ -982,7 +982,7 @@ function AdminDashboard() {
                 <h2 className="text-base font-black text-slate-900 mb-1">Home Page Cover Photos</h2>
                 <p className="text-xs text-slate-400 mb-5">Pick which portfolio image appears on the home page for each section card. Click a slot to open the picker.</p>
                 <div className="space-y-4">
-                  {([["home_cover_grads","Grads card"],["home_cover_families","Families card"],["home_cover_contact","Contact card"]] as [string,string][]).map(([key,label])=>(
+                  {([["home_cover_grads","Grads card"],["home_cover_families","Families card"],["home_cover_contact","Contact card"],["home_editorial_large","Editorial — large photo (right, back)"],["home_editorial_small","Editorial — small photo (right, front)"]] as [string,string][]).map(([key,label])=>(
                     <div key={key}>
                       <p className="text-xs font-black uppercase tracking-widest text-slate-500 mb-2">{label}</p>
                       {coverPickerKey===key?(
@@ -1493,10 +1493,11 @@ function AdminDashboard() {
                     <div className="space-y-1">
                       <p className="text-xs font-black text-emerald-600 mb-2">✓ {syncResult.length} payment{syncResult.length===1?"":"s"} synced</p>
                       {syncResult.map((r,i)=>(
-                        <div key={i} className="flex items-center gap-3 text-xs text-slate-600">
+                        <div key={i} className="flex items-center gap-3 text-xs text-slate-600 flex-wrap">
                           <span className="font-semibold">{r.name}</span>
                           <span className="text-emerald-600 font-bold">{r.amount}</span>
                           {r.method&&<span className="text-slate-400">via {r.method}</span>}
+                          {r.dateBooked&&<span className="font-bold text-violet-600">📅 {new Date(r.dateBooked+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric"})} blocked</span>}
                           {r.alreadyPaid&&<span className="text-slate-400">(already marked)</span>}
                         </div>
                       ))}
@@ -1941,10 +1942,11 @@ function AdminDashboard() {
                     <div className="space-y-1">
                       <p className="text-xs font-black text-emerald-600 mb-2">✓ {syncResult.length} payment{syncResult.length===1?"":"s"} synced from Pixieset</p>
                       {syncResult.map((r,i)=>(
-                        <div key={i} className="flex items-center gap-3 text-xs text-slate-600">
+                        <div key={i} className="flex items-center gap-3 text-xs text-slate-600 flex-wrap">
                           <span className="font-semibold">{r.name}</span>
                           <span className="text-emerald-600 font-bold">{r.amount}</span>
                           {r.method&&<span className="text-slate-400">via {r.method}</span>}
+                          {r.dateBooked&&<span className="font-bold text-violet-600">📅 {new Date(r.dateBooked+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric"})} blocked</span>}
                           {r.alreadyPaid&&<span className="text-slate-400">(already marked)</span>}
                         </div>
                       ))}

@@ -170,13 +170,13 @@ export async function POST(req: NextRequest) {
   const supabase = createSupabaseServerClient();
   const emails = unique.map(p => p.clientEmail.toLowerCase());
 
-  // Fetch all inquiries whose email matches (case-insensitive via ilike)
+  // Fetch all inquiries whose email matches — include session_date for auto-blocking
   const { data: inquiries } = await supabase
     .from("inquiries")
-    .select("id, email, payment_status")
+    .select("id, email, payment_status, session_date")
     .in("email", emails);
 
-  const synced: { name: string; email: string; amount: string; method: string; invoice: string; alreadyPaid: boolean }[] = [];
+  const synced: { name: string; email: string; amount: string; method: string; invoice: string; alreadyPaid: boolean; dateBooked?: string }[] = [];
 
   await Promise.all(
     unique.map(async payment => {
@@ -203,6 +203,21 @@ export async function POST(req: NextRequest) {
         })
         .in("id", matching.map(inq => inq.id));
 
+      // Auto-block the session date on the availability calendar for new payments
+      let dateBooked: string | undefined;
+      if (!alreadyPaid) {
+        const sessionDate = matching.find(inq => inq.session_date)?.session_date;
+        if (sessionDate) {
+          await supabase
+            .from("availability")
+            .upsert(
+              { date: sessionDate, status: "booked", note: payment.clientName },
+              { onConflict: "date" }
+            );
+          dateBooked = sessionDate;
+        }
+      }
+
       synced.push({
         name:       payment.clientName,
         email:      payment.clientEmail,
@@ -210,6 +225,7 @@ export async function POST(req: NextRequest) {
         method:     payment.method,
         invoice:    payment.invoice,
         alreadyPaid,
+        dateBooked,
       });
     })
   );

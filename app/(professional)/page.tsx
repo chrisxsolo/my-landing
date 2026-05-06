@@ -487,8 +487,8 @@ export default async function ProfessionalHomePage() {
   const carouselImages   = images.filter((img) => img.hero_carousel).slice(0, 5);
   const heroImages       = carouselImages.length > 0 ? carouselImages : images.slice(0, 5);
   const instagramImages  = images.slice(0, 8);
-  const firstPortfolioImage  = portfolioSections[0]?.cover?.image_url ?? heroImageUrl;
-  const secondPortfolioImage = portfolioSections[1]?.cover?.image_url ?? heroImageUrl;
+  const firstPortfolioImage  = settings.home_editorial_large ?? portfolioSections[0]?.cover?.image_url ?? heroImageUrl;
+  const secondPortfolioImage = settings.home_editorial_small ?? portfolioSections[1]?.cover?.image_url ?? heroImageUrl;
 
   const jsonLd = {
     "@context": "https://schema.org",

@@ -142,8 +142,8 @@ export default function ConversationPage() {
     if (!str) return null;
     const year = new Date().getFullYear();
 
-    // Try each comma/semicolon-separated segment — take the first that parses
-    for (const seg of str.split(/[,;]/).map(s => s.trim()).filter(Boolean)) {
+    // Try each comma/semicolon/or/and-separated segment — take the first that parses
+    for (const seg of str.split(/[,;]|\bor\b|\band\b/i).map(s => s.trim()).filter(Boolean)) {
       // Numeric M/D/YY or M/D/YYYY (e.g. "6/19/26" or "6/19/2026")
       const num = seg.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
       if (num) {
@@ -813,30 +813,47 @@ export default function ConversationPage() {
         {/* ── RIGHT: AI Draft + Send (sticky) ── */}
         <div className="lg:sticky lg:top-[73px] space-y-4">
 
-          {/* ── Sunset / golden hour card ── */}
-          {(sunsetLoading || sunsetInfo) && (
-            <div className="rounded-2xl px-4 py-3 flex items-center gap-3"
+          {/* ── Sunset / golden hour card — always visible ── */}
+          {inquiry && (
+            <div className="rounded-2xl px-4 py-3"
                  style={{ background: "linear-gradient(135deg,rgba(245,158,11,0.12),rgba(251,191,36,0.08))", border: "1px solid rgba(245,158,11,0.25)" }}>
-              <span className="text-2xl leading-none flex-shrink-0">🌅</span>
-              {sunsetLoading ? (
-                <div className="flex items-center gap-2 text-xs text-amber-600">
-                  <span className="animate-spin inline-block">◌</span> Fetching sunset…
-                </div>
-              ) : sunsetInfo ? (
-                <div className="min-w-0">
-                  <p className="text-sm font-black text-amber-700">
-                    Sunset {sunsetInfo.sunset}
-                    {(() => {
-                      const d = inquiry.session_date ?? tryParseDate(inquiry.date_in_mind ?? "");
-                      if (!d) return null;
-                      return <span className="text-xs font-normal text-amber-500 ml-2">{new Date(d + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>;
-                    })()}
-                  </p>
-                  <p className="text-xs text-amber-600 mt-0.5">
-                    Start around <span className="font-bold">{sunsetInfo.goldenStart}</span> for golden hour
-                  </p>
-                </div>
-              ) : null}
+              <div className="flex items-center gap-3">
+                <span className="text-2xl leading-none flex-shrink-0">🌅</span>
+                {sunsetLoading ? (
+                  <div className="flex items-center gap-2 text-xs text-amber-600">
+                    <span className="animate-spin inline-block">◌</span> Fetching sunset…
+                  </div>
+                ) : sunsetInfo ? (
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-black text-amber-700">
+                      Sunset {sunsetInfo.sunset}
+                      {(() => {
+                        const d = inquiry.session_date ?? tryParseDate(inquiry.date_in_mind ?? "");
+                        if (!d) return null;
+                        return <span className="text-xs font-normal text-amber-500 ml-2">{new Date(d + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>;
+                      })()}
+                    </p>
+                    <p className="text-xs text-amber-600 mt-0.5">
+                      Start around <span className="font-bold">{sunsetInfo.goldenStart}</span> for golden hour
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold text-amber-700 mb-1.5">Golden hour lookup</p>
+                    <div className="flex gap-2 items-center">
+                      <input
+                        type="date"
+                        defaultValue={inquiry.session_date ?? tryParseDate(inquiry.date_in_mind ?? "") ?? ""}
+                        onChange={e => { if (e.target.value) fetchSunset(e.target.value); }}
+                        className="flex-1 text-xs rounded-lg px-2 py-1 border border-amber-200 bg-white/60 text-amber-800 focus:outline-none focus:ring-1 focus:ring-amber-300"
+                      />
+                    </div>
+                    {inquiry.date_in_mind && (
+                      <p className="text-[10px] text-amber-500 mt-1">Client said: {inquiry.date_in_mind}</p>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
