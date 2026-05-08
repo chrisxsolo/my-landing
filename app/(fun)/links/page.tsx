@@ -141,7 +141,7 @@ export default async function LinksPage() {
       </div>
 
       {/* ── CONTENT ─────────────────────────────────────────────── */}
-      <div className="relative z-10 flex flex-col items-center px-5 pt-16 pb-24 max-w-md mx-auto">
+      <div className="relative z-10 flex flex-col items-center px-5 pt-10 pb-24 max-w-md mx-auto">
         <div
           className="mb-5 inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[11px] font-black uppercase tracking-[0.16em]"
           style={{
