@@ -130,6 +130,7 @@ export default function ConversationPage() {
   // ── Sunset time ────────────────────────────────────────────────────────────
   const [sunsetInfo,    setSunsetInfo]    = useState<{ sunset: string; goldenStart: string } | null>(null);
   const [sunsetLoading, setSunsetLoading] = useState(false);
+  const [sunsetDate,    setSunsetDate]    = useState<string>("");
 
   // ── Train AI chat (per-conversation) ──────────────────────────────────────
   const [trainMessages, setTrainMessages] = useState<{role:"user"|"assistant";content:string}[]>([]);
@@ -166,11 +167,18 @@ export default function ConversationPage() {
         if (!isNaN(date.getTime())) return date.toISOString().split("T")[0];
       }
 
-      // Month-name format (e.g. "June 19", "June 19th 2026")
+      // Month-name format (e.g. "June 19", "June 19th 2026", "June 13 afternoon/evening")
       const hasMonth = /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|january|february|march|april|june|july|august|september|october|november|december)\b/i.test(seg);
       if (hasMonth) {
-        const cleaned = seg.replace(/(\d+)(st|nd|rd|th)/gi, "$1");
-        for (const attempt of [cleaned, `${cleaned} ${year}`, `${cleaned} ${year + 1}`]) {
+        const cleaned = seg
+          .replace(/(\d+)(st|nd|rd|th)/gi, "$1")
+          .replace(/\b(morning|afternoon|evening|night|am|pm|noon|midnight|early|late)\b/gi, "")
+          .replace(/[/\\]/g, " ")
+          .replace(/\s+/g, " ").trim();
+        // Check if the string already contains a 4-digit year
+        const alreadyHasYear = /\b(20\d{2})\b/.test(cleaned);
+        const attempts = alreadyHasYear ? [cleaned] : [`${cleaned} ${year}`, `${cleaned} ${year + 1}`];
+        for (const attempt of attempts) {
           const d = new Date(attempt);
           if (!isNaN(d.getTime())) return d.toISOString().split("T")[0];
         }
@@ -181,6 +189,7 @@ export default function ConversationPage() {
 
   // Fetch sunset + golden-hour start for a Bay Area date (San Jose coords)
   async function fetchSunset(dateStr: string) {
+    setSunsetDate(dateStr);
     setSunsetLoading(true);
     setSunsetInfo(null);
     try {
@@ -548,7 +557,7 @@ export default function ConversationPage() {
       const json = await res.json();
       if (json.ok) {
         showToast(`✓ Sent to ${inquiry.name}`);
-        await supabase.from("inquiries").update({ status: "responded" }).eq("id", inquiry.id);
+        await supabase.from("inquiries").update({ status: "responded", reply_sent_at: new Date().toISOString() }).eq("id", inquiry.id);
         setStatus("responded");
         setDraft("");
         // Clear cloud drafts now that it's sent
@@ -1130,42 +1139,36 @@ export default function ConversationPage() {
           {inquiry && (
             <div className="rounded-2xl px-4 py-3"
                  style={{ background: "linear-gradient(135deg,rgba(245,158,11,0.12),rgba(251,191,36,0.08))", border: "1px solid rgba(245,158,11,0.25)" }}>
-              <div className="flex items-center gap-3">
-                <span className="text-2xl leading-none flex-shrink-0">🌅</span>
-                {sunsetLoading ? (
-                  <div className="flex items-center gap-2 text-xs text-amber-600">
-                    <span className="animate-spin inline-block">◌</span> Fetching sunset…
-                  </div>
-                ) : sunsetInfo ? (
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-black text-amber-700">
-                      Sunset {sunsetInfo.sunset}
-                      {(() => {
-                        const d = inquiry.session_date ?? tryParseDate(inquiry.date_in_mind ?? "");
-                        if (!d) return null;
-                        return <span className="text-xs font-normal text-amber-500 ml-2">{new Date(d + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>;
-                      })()}
-                    </p>
-                    <p className="text-xs text-amber-600 mt-0.5">
-                      Start around <span className="font-bold">{sunsetInfo.goldenStart}</span> for golden hour
-                    </p>
-                  </div>
-                ) : (
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-bold text-amber-700 mb-1.5">Golden hour lookup</p>
-                    <div className="flex gap-2 items-center">
-                      <input
-                        type="date"
-                        defaultValue={inquiry.session_date ?? tryParseDate(inquiry.date_in_mind ?? "") ?? ""}
-                        onChange={e => { if (e.target.value) fetchSunset(e.target.value); }}
-                        className="flex-1 text-xs rounded-lg px-2 py-1 border border-amber-200 bg-white/60 text-amber-800 focus:outline-none focus:ring-1 focus:ring-amber-300"
-                      />
+              <div className="flex items-start gap-3">
+                <span className="text-2xl leading-none flex-shrink-0 mt-0.5">🌅</span>
+                <div className="flex-1 min-w-0">
+                  {sunsetLoading ? (
+                    <div className="flex items-center gap-2 text-xs text-amber-600 mb-2">
+                      <span className="animate-spin inline-block">◌</span> Fetching sunset…
                     </div>
-                    {inquiry.date_in_mind && (
-                      <p className="text-[10px] text-amber-500 mt-1">Client said: {inquiry.date_in_mind}</p>
-                    )}
-                  </div>
-                )}
+                  ) : sunsetInfo ? (
+                    <div className="mb-2">
+                      <p className="text-sm font-black text-amber-700">
+                        Sunset {sunsetInfo.sunset}
+                        {sunsetDate && <span className="text-xs font-normal text-amber-500 ml-2">{new Date(sunsetDate + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>}
+                      </p>
+                      <p className="text-xs text-amber-600 mt-0.5">
+                        Start around <span className="font-bold">{sunsetInfo.goldenStart}</span> for golden hour
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-xs font-bold text-amber-700 mb-2">Golden hour lookup</p>
+                  )}
+                  <input
+                    type="date"
+                    value={sunsetDate}
+                    onChange={e => { if (e.target.value) fetchSunset(e.target.value); }}
+                    className="w-full text-xs rounded-lg px-2 py-1 border border-amber-200 bg-white/60 text-amber-800 focus:outline-none focus:ring-1 focus:ring-amber-300"
+                  />
+                  {inquiry.date_in_mind && !sunsetDate && (
+                    <p className="text-[10px] text-amber-500 mt-1">Client said: {inquiry.date_in_mind}</p>
+                  )}
+                </div>
               </div>
             </div>
           )}
