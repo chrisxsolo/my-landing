@@ -238,6 +238,8 @@ function AdminDashboard() {
   // ── Clients ───────────────────────────────────────────────────────────────
   const [clientSearch,setClientSearch]=useState("");
   const [clientFilter,setClientFilter]=useState<"all"|"paid"|"unpaid">("all");
+  const [clientSort,setClientSort]=useState<"newest_inquiry"|"oldest_inquiry"|"session_date"|"alpha">("newest_inquiry");
+  const [inquirySort,setInquirySort]=useState<"needs_reply"|"newest"|"oldest"|"session_date"|"alpha">("needs_reply");
   const [editingSessionType,setEditingSessionType]=useState<number|null>(null);
   const EMPTY_CLIENT={name:"",email:"",phone:"",session_type:"",session_date:"",message:""};
   const [addClientOpen,setAddClientOpen]=useState(false);
@@ -415,7 +417,7 @@ function AdminDashboard() {
   async function fetchInbox(){
     setInboxLoading(true);
     try{
-      const res=await fetch("/api/gmail/inbox?limit=5");
+      const res=await fetch("/api/gmail/inbox?limit=20");
       const json=await res.json();
       setInboxThreads(json.threads??[]);
     }catch{setInboxThreads([]);}
@@ -2136,6 +2138,17 @@ function AdminDashboard() {
                   </p>
                 </div>
                 <div className="flex gap-2 items-center flex-wrap">
+                  <select
+                    value={inquirySort}
+                    onChange={e=>setInquirySort(e.target.value as typeof inquirySort)}
+                    className="text-[11px] font-bold px-2.5 py-1.5 rounded-lg outline-none cursor-pointer"
+                    style={{border:`1px solid ${C.p1_20}`,background:C.p1_04,color:C.p1,fontFamily:"inherit"}}>
+                    <option value="needs_reply">Needs reply first</option>
+                    <option value="newest">Newest inquiry</option>
+                    <option value="oldest">Oldest inquiry</option>
+                    <option value="session_date">Session date</option>
+                    <option value="alpha">A → Z</option>
+                  </select>
                   <button onClick={syncPayments} disabled={syncLoading}
                     className="text-xs font-bold px-3 py-1.5 rounded-lg transition-all hover:opacity-80 flex items-center gap-1.5 disabled:opacity-50"
                     style={{background:"linear-gradient(135deg,#10b981,#059669)",color:"#fff"}}>
@@ -2181,28 +2194,56 @@ function AdminDashboard() {
                   <p className="text-slate-500 font-semibold">No inquiries yet</p>
                   <p className="text-xs text-slate-400 mt-1">New contact form submissions will appear here</p>
                 </div>
-              ):(
-                inquiries.map(inq=>{
+              ):(()=>{
+                const needsReply=(i:Inquiry)=>!i.reply_sent_at&&i.status!=="archived"&&i.status!=="not_interested"&&i.status!=="responded"&&i.status!=="manual";
+                const todayMs=new Date().setHours(0,0,0,0);
+                const sortedInquiries=[...inquiries].sort((a,b)=>{
+                  if(inquirySort==="needs_reply"){
+                    const aNR=needsReply(a)?0:1,bNR=needsReply(b)?0:1;
+                    if(aNR!==bNR)return aNR-bNR;
+                    return new Date(b.created_at).getTime()-new Date(a.created_at).getTime();
+                  }
+                  if(inquirySort==="newest")return new Date(b.created_at).getTime()-new Date(a.created_at).getTime();
+                  if(inquirySort==="oldest")return new Date(a.created_at).getTime()-new Date(b.created_at).getTime();
+                  if(inquirySort==="alpha")return a.name.localeCompare(b.name);
+                  // session_date: upcoming closest first, no-date at end
+                  const aD=a.session_date?new Date(a.session_date+"T12:00:00").getTime():null;
+                  const bD=b.session_date?new Date(b.session_date+"T12:00:00").getTime():null;
+                  const aFut=aD&&aD>=todayMs?aD:Infinity;
+                  const bFut=bD&&bD>=todayMs?bD:Infinity;
+                  return aFut-bFut;
+                });
+                return sortedInquiries.map(inq=>{
                   const isOpen=editingInquiry?.id===inq.id;
                   const statusColor=inq.status==="new"?"#10b981":inq.status==="responded"?"#3b82f6":inq.status==="not_interested"?"#ef4444":"#94a3b8";
                   const statusBg=inq.status==="new"?"rgba(16,185,129,0.08)":inq.status==="responded"?"rgba(59,130,246,0.08)":inq.status==="not_interested"?"rgba(239,68,68,0.08)":"rgba(148,163,184,0.08)";
                   const hasDraft=!!drafts[inq.id];
+                  const unreadThread=inboxThreads.find(t=>t.fromEmail.toLowerCase()===inq.email.toLowerCase()&&t.isUnread);
 
                   return(
-                    <div key={inq.id} className="bg-white rounded-2xl border border-slate-100 overflow-hidden transition-shadow hover:shadow-md"
-                         style={{borderLeft:`3px solid ${statusColor}`}}>
+                    <div key={inq.id}
+                         className={`rounded-2xl overflow-hidden transition-shadow hover:shadow-md ${unreadThread?"border-2 shadow-md shadow-amber-100":"bg-white border border-slate-100"}`}
+                         style={{borderLeft:unreadThread?undefined:`3px solid ${statusColor}`,background:unreadThread?"#fffbeb":undefined,borderColor:unreadThread?"#f59e0b":undefined}}>
 
                       {/* ── Card header (always visible) ── */}
                       <div className="flex items-stretch">
                         {/* Clickable info area — div so links inside remain functional */}
                         <div
                           onClick={()=>setEditingInquiry(isOpen?null:inq)}
-                          className="flex-1 min-w-0 p-4 sm:p-5 hover:bg-slate-50/70 transition-colors duration-150 cursor-pointer">
+                          className={`flex-1 min-w-0 p-4 sm:p-5 transition-colors duration-150 cursor-pointer ${unreadThread?"hover:bg-amber-50/70":"hover:bg-slate-50/70"}`}>
                           <div className="flex items-center gap-2 flex-wrap mb-1">
                             <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full"
                                   style={{background:statusBg,color:statusColor}}>
                               {inq.status==="new"?"● New":inq.status==="responded"?"✓ Responded":inq.status==="not_interested"?"✕ Not Interested":"○ Archived"}
                             </span>
+                            {unreadThread&&(
+                              <button
+                                onClick={e=>{e.stopPropagation();router.push(`/admin/conversation/${inq.id}`);}}
+                                className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full animate-pulse"
+                                style={{background:"#f59e0b",color:"#fff"}}>
+                                ✉ New Reply
+                              </button>
+                            )}
                             <p className="text-sm font-black text-slate-900">{inq.name}</p>
                             <p className="text-xs text-slate-400">
                               {new Date(inq.created_at).toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"})}
@@ -2541,8 +2582,8 @@ function AdminDashboard() {
                       )}
                     </div>
                   );
-                })
-              )}
+                });
+              })()}
             </div>
           </div>
         )}
@@ -2557,16 +2598,17 @@ function AdminDashboard() {
             clientMap.get(key)!.sessions.push(inq);
           });
           const today=new Date();today.setHours(0,0,0,0);
+          const nearestSessionDate=(sessions:Inquiry[])=>{
+            const future=sessions.filter(s=>s.session_date&&new Date(s.session_date+"T12:00:00")>=today).map(s=>new Date(s.session_date!+"T12:00:00").getTime());
+            return future.length?Math.min(...future):Infinity;
+          };
+          const latestInquiryDate=(sessions:Inquiry[])=>Math.max(...sessions.map(s=>new Date(s.created_at).getTime()));
           const clients=Array.from(clientMap.values()).sort((a,b)=>{
-            const aPaid=a.sessions.some(s=>s.payment_status==="paid");
-            const bPaid=b.sessions.some(s=>s.payment_status==="paid");
-            if(aPaid!==bPaid)return aPaid?-1:1;
-            // Within same payment group, sort by nearest upcoming session date
-            const nearestDate=(sessions:Inquiry[])=>{
-              const future=sessions.filter(s=>s.session_date&&new Date(s.session_date+"T12:00:00")>=today).map(s=>new Date(s.session_date!+"T12:00:00").getTime());
-              return future.length?Math.min(...future):Infinity;
-            };
-            return nearestDate(a.sessions)-nearestDate(b.sessions);
+            if(clientSort==="alpha")return a.name.localeCompare(b.name);
+            if(clientSort==="newest_inquiry")return latestInquiryDate(b.sessions)-latestInquiryDate(a.sessions);
+            if(clientSort==="oldest_inquiry")return latestInquiryDate(a.sessions)-latestInquiryDate(b.sessions);
+            // session_date: upcoming first, then no-date clients at end
+            return nearestSessionDate(a.sessions)-nearestSessionDate(b.sessions);
           });
           const q=clientSearch.toLowerCase().trim();
           const filtered=clients.filter(c=>{
@@ -2647,6 +2689,17 @@ function AdminDashboard() {
                           </button>
                         ))}
                       </div>
+                      {/* Sort dropdown */}
+                      <select
+                        value={clientSort}
+                        onChange={e=>setClientSort(e.target.value as typeof clientSort)}
+                        className="text-[11px] font-bold px-2.5 py-1 rounded-lg outline-none cursor-pointer"
+                        style={{border:`1px solid ${C.p1_20}`,background:C.p1_04,color:C.p1,fontFamily:"inherit"}}>
+                        <option value="newest_inquiry">Newest inquiry</option>
+                        <option value="oldest_inquiry">Oldest inquiry</option>
+                        <option value="session_date">Session date</option>
+                        <option value="alpha">A → Z</option>
+                      </select>
                       <p className="text-xs text-slate-400 font-medium">
                         {filtered.length} client{filtered.length===1?"":"s"}
                         {q?` matching "${q}"`:""}
