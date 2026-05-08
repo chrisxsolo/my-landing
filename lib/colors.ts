@@ -12,6 +12,13 @@ const page = "#fffaf5"
 const pageAlt = "#fff5ed"
 const warmEdge = "#eadbcb"
 const warmShadow = "rgba(157,118,86,0.10)"
+const white = "#ffffff"
+const ink = "#0e1412"
+const inkSoft = "#2f3835"
+const muted = "#687571"
+const mutedSoft = "#8b9692"
+const danger = "#b42318"
+const success = "#12805c"
 
 // Derived rgba helpers
 const r1 = "157,111,232"
@@ -25,6 +32,15 @@ export const C = {
   pageAlt,
   warmEdge,
   warmShadow,
+  white,
+  ink,
+  inkSoft,
+  muted,
+  mutedSoft,
+  danger,
+  success,
+  white_22: "rgba(255,255,255,0.22)",
+  white_82: "rgba(255,255,255,0.82)",
 
   // Main gradients
   grad:    `linear-gradient(135deg, ${p1}, ${p2}, ${p3})`,

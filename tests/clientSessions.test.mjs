@@ -1,0 +1,67 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+
+import {
+  CLIENT_SESSION_STATUS_LABELS,
+  CLIENT_SESSION_STATUS_VALUES,
+  getClientSessionProgress,
+  isClientSessionStatus,
+  toClientSessionDTO,
+} from "../lib/clientSessions.ts";
+
+test("client session statuses stay in tracker order with display labels", () => {
+  assert.deepEqual(CLIENT_SESSION_STATUS_VALUES, [
+    "booked",
+    "session_completed",
+    "photos_backed_up",
+    "culling",
+    "editing",
+    "final_review",
+    "delivered",
+  ]);
+
+  assert.equal(CLIENT_SESSION_STATUS_LABELS.delivered, "Delivered");
+});
+
+test("progress marks completed, current, and upcoming steps", () => {
+  const progress = getClientSessionProgress("editing");
+
+  assert.equal(progress[0].state, "completed");
+  assert.equal(progress[3].state, "completed");
+  assert.equal(progress[4].state, "current");
+  assert.equal(progress[5].state, "upcoming");
+});
+
+test("status guard accepts only known status values", () => {
+  assert.equal(isClientSessionStatus("booked"), true);
+  assert.equal(isClientSessionStatus("almost_done"), false);
+  assert.equal(isClientSessionStatus(null), false);
+});
+
+test("client DTO removes admin-only fields", () => {
+  const dto = toClientSessionDTO({
+    id: "session-1",
+    client_user_id: "user-1",
+    client_email: "client@example.com",
+    client_name: "Riley",
+    session_type: "Graduation",
+    session_date: "2026-06-01T18:00:00.000Z",
+    location: "UC Berkeley",
+    meeting_point: "Campanile",
+    current_status: "delivered",
+    estimated_delivery_date: "2026-06-14",
+    gallery_url: "https://example.com/gallery",
+    invoice_status: "paid",
+    contract_status: "signed",
+    backup_status: "complete",
+    internal_notes: "Admin-only context",
+    client_notes: "Your gallery is ready.",
+    created_at: "2026-05-08T00:00:00.000Z",
+    updated_at: "2026-05-08T00:00:00.000Z",
+  });
+
+  assert.equal(dto.clientName, "Riley");
+  assert.equal(dto.currentStatus, "delivered");
+  assert.equal(Object.hasOwn(dto, "internal_notes"), false);
+  assert.equal(Object.hasOwn(dto, "internalNotes"), false);
+});

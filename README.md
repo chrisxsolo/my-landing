@@ -1,36 +1,97 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SoloXSnaps Website
 
-## Getting Started
+Next.js App Router site for SoloXSnaps, with Supabase-backed admin tools and a client photo session portal.
 
-First, run the development server:
+## Local Setup
+
+Install dependencies and run the development server:
 
 ```bash
+npm ci
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open `http://localhost:3000`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Environment Variables
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Create `.env.local` using `.env.example` as the template.
 
-## Learn More
+Required for the client session portal:
 
-To learn more about Next.js, take a look at the following resources:
+```env
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+The service role key is server-only. Never expose it in browser code.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Existing admin and AI features may also use:
 
-## Deploy on Vercel
+```env
+ADMIN_PASSWORD=
+ADMIN_SESSION_SECRET=
+ANTHROPIC_API_KEY=
+OBSIDIAN_VAULT_PATH=
+NEXT_PUBLIC_SITE_URL=
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Client Session Portal Setup
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Run the migration in `supabase/migrations/20260508000000_create_client_sessions.sql`.
+
+It creates:
+
+- `client_sessions`
+- `admin_users`
+- `current_status` check constraints
+- `updated_at` trigger
+- Row Level Security policies for clients and admins
+- Column grants that keep `internal_notes` out of normal client reads
+
+In Supabase Auth, enable Google as an OAuth provider. Add these redirect URLs in the Supabase dashboard:
+
+```txt
+http://localhost:3000/dashboard
+http://localhost:3000/admin/sessions
+https://soloxsnaps.com/dashboard
+https://soloxsnaps.com/admin/sessions
+```
+
+After signing in once with Google, add the photographer account to `admin_users`:
+
+```sql
+insert into public.admin_users (user_id, email)
+select id, email
+from auth.users
+where email = 'your-admin-email@example.com';
+```
+
+## Test The Portal
+
+Client login flow:
+
+1. Visit `/login`.
+2. Click `Continue with Google`.
+3. After redirect, visit `/dashboard`.
+4. Create a `client_sessions` row with `client_email` matching the Google email.
+5. Confirm the dashboard shows only that client's sessions and never shows `internal_notes`.
+
+Admin session updates:
+
+1. Sign in with the Google account listed in `admin_users`.
+2. Visit `/admin/sessions`.
+3. Create a session with the client's email.
+4. Update `current_status`, delivery date, notes, and gallery URL.
+5. Refresh `/dashboard` as the client and confirm the progress tracker reflects the update.
+
+## Verification
+
+Useful checks:
+
+```bash
+node --experimental-default-type=module --test tests/clientSessions.test.mjs
+npm run lint
+npm run build
+```
