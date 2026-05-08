@@ -13,7 +13,7 @@ import VaultTab from "@/app/admin/VaultTab";
 
 export const dynamic = 'force-dynamic'
 
-type Tab = "poses"|"locations"|"bayGuide"|"portfolio"|"categories"|"blog"|"analytics"|"payments"|"inquiries"|"clients"|"funnel"|"vault";
+type Tab = "home"|"poses"|"locations"|"bayGuide"|"portfolio"|"categories"|"blog"|"analytics"|"payments"|"inquiries"|"clients"|"funnel"|"vault";
 type Inquiry = { id:number; name:string; email:string; phone:string|null; session_type:string|null; date_in_mind:string|null; message:string; status:string; created_at:string; payment_status:string|null; payment_note:string|null; payment_detected_at:string|null; session_date:string|null; booking_confirmed:boolean|null; reply_sent_at:string|null; invoice_sent_at:string|null; contract_sent_at:string|null; deposit_paid_at:string|null; gallery_delivered_at:string|null; };
 type BlogCategory = "journal"|"professional";
 type Pose = { id:number; title:string; image_url:string; instructions:string; order:number; };
@@ -42,7 +42,7 @@ const BLOG_CATEGORIES:{value:BlogCategory;label:string;helper:string}[]=[
 const WEBSITE_TABS:Tab[]=["poses","locations","bayGuide","portfolio","categories","blog"];
 const CLIENT_TABS:Tab[]=["analytics","payments","funnel","inquiries","clients"];
 const VAULT_TABS:Tab[]=["vault"];
-const TAB_LABELS:Record<Tab,string>={poses:"📸 Grad Poses",locations:"📍 Campus Spots",bayGuide:"🗺️ Bay Guide",portfolio:"🖼️ Portfolio",categories:"🏷️ Categories",blog:"✍️ Blog",analytics:"📊 Analytics",payments:"💵 Revenue",funnel:"📈 Funnel",inquiries:"📬 Inquiries",clients:"👥 Clients",vault:"📓 Vault"};
+const TAB_LABELS:Record<Tab,string>={home:"🏠 Home",poses:"📸 Grad Poses",locations:"📍 Campus Spots",bayGuide:"🗺️ Bay Guide",portfolio:"🖼️ Portfolio",categories:"🏷️ Categories",blog:"✍️ Blog",analytics:"📊 Analytics",payments:"💵 Revenue",funnel:"📈 Funnel",inquiries:"📬 Inquiries",clients:"👥 Clients",vault:"📓 Vault"};
 
 function detectSchool(text:string):string|null{
   // Normalize accents (e.g. "José" → "Jose") so accented names still match
@@ -85,7 +85,7 @@ function AdminDashboard() {
   const [authed,setAuthed]=useState(false);
   const [pw,setPw]=useState("");
   const [pwErr,setPwErr]=useState(false);
-  const [tab,setTab]=useState<Tab>("poses");
+  const [tab,setTab]=useState<Tab>("home");
   const [toast,setToast]=useState<{msg:string;ok:boolean}|null>(null);
 
   // Check localStorage on mount + handle OAuth callback params
@@ -511,7 +511,8 @@ function AdminDashboard() {
     setPostsLoading(false);
   }
   
-  useEffect(()=>{if(authed){fetchPoses();fetchSpots();fetchCategories();fetchPortfolioImages();fetchPosts();fetchSiteSettings();if(tab==="inquiries"||tab==="clients"){fetchInquiries();fetchGmailStatus();}}},[authed,tab,blogCategory]);
+  useEffect(()=>{if(authed){fetchPoses();fetchSpots();fetchCategories();fetchPortfolioImages();fetchPosts();fetchSiteSettings();fetchInquiries();fetchGmailStatus();}},[authed]);
+  useEffect(()=>{if(authed&&(tab==="inquiries"||tab==="clients")){fetchInquiries();fetchGmailStatus();}},[authed,tab,blogCategory]);
 
   async function compressImage(file:File, maxPx=2400, quality=0.82):Promise<Blob>{
     return new Promise(resolve=>{
@@ -785,22 +786,22 @@ function AdminDashboard() {
             Sign out
           </button>
         </div>
-        {/* Tabs — grouped into Edit Website / Clients */}
+        {/* ── NAV ── */}
         {(()=>{
-          const tabSection=VAULT_TABS.includes(tab)?"vault":WEBSITE_TABS.includes(tab)?"website":"clients";
+          const tabSection=tab==="home"?"home":VAULT_TABS.includes(tab)?"vault":WEBSITE_TABS.includes(tab)?"website":"clients";
           const cancelAll=()=>{cancelEditPose();cancelEditSpot();cancelEditPortfolioImage();cancelEditCategory();cancelEditPost();setEditingInquiry(null);setInquiryDeleteConfirm(null);};
           return(
             <div className="mb-8 space-y-2">
-              <div className="flex gap-2">
-                {(["website","clients","vault"] as const).map(s=>(
-                  <button key={s} onClick={()=>{cancelAll();setTab(s==="website"?WEBSITE_TABS[0]:s==="clients"?CLIENT_TABS[0]:"vault");}}
+              <div className="flex gap-2 flex-wrap">
+                {(["home","clients","website","vault"] as const).map(s=>(
+                  <button key={s} onClick={()=>{cancelAll();setTab(s==="home"?"home":s==="website"?WEBSITE_TABS[0]:s==="clients"?CLIENT_TABS[0]:"vault");}}
                     className="px-5 py-2.5 rounded-xl text-sm font-bold transition-all"
                     style={tabSection===s?{background:C.grad12,color:"#fff",boxShadow:"0 2px 8px rgba(157,111,232,0.25)"}:{color:"#64748b",background:"white",border:"1px solid #e2e8f0"}}>
-                    {s==="website"?"✏️ Edit Website":s==="clients"?"👤 Clients":"📓 Vault"}
+                    {s==="home"?"🏠 Home":s==="website"?"✏️ Edit Website":s==="clients"?"👤 Clients":"📓 Vault"}
                   </button>
                 ))}
               </div>
-              {tabSection!=="vault"&&(
+              {(tabSection==="website"||tabSection==="clients")&&(
                 <div className="flex gap-1.5 p-1 rounded-2xl bg-white border border-slate-100 w-fit flex-wrap">
                   {(tabSection==="website"?WEBSITE_TABS:CLIENT_TABS).map(t=>(
                     <button key={t} onClick={()=>{setTab(t);cancelAll();}}
@@ -811,6 +812,136 @@ function AdminDashboard() {
                   ))}
                 </div>
               )}
+            </div>
+          );
+        })()}
+
+        {/* ── HOME ── */}
+        {tab==="home"&&(()=>{
+          const today=new Date();today.setHours(0,0,0,0);
+          const now=new Date();
+          const monthStart=new Date(now.getFullYear(),now.getMonth(),1);
+
+          // Upcoming confirmed sessions
+          const upcoming=inquiries
+            .filter(inq=>inq.session_date&&inq.booking_confirmed&&new Date(inq.session_date+"T12:00:00")>=today)
+            .sort((a,b)=>new Date(a.session_date!+"T12:00:00").getTime()-new Date(b.session_date!+"T12:00:00").getTime())
+            .slice(0,5);
+
+          // Revenue this month (paid sessions with payment detected this month)
+          const monthRevenue=inquiries
+            .filter(inq=>inq.payment_status==="paid"&&inq.payment_detected_at&&new Date(inq.payment_detected_at)>=monthStart)
+            .reduce((sum,inq)=>{
+              const note=inq.payment_note||"";
+              const match=note.match(/\$?([\d,]+(?:\.\d{2})?)/);
+              return sum+(match?parseFloat(match[1].replace(",","")): 0);
+            },0);
+
+          // Quick stats
+          const totalClients=new Set(inquiries.map(i=>i.email.toLowerCase())).size;
+          const confirmedSessions=inquiries.filter(i=>i.booking_confirmed).length;
+          const newThisMonth=inquiries.filter(i=>new Date(i.created_at)>=monthStart).length;
+          const paidSessions=inquiries.filter(i=>i.payment_status==="paid").length;
+          const pendingInquiries=inquiries.filter(i=>!i.reply_sent_at&&i.status!=="archived").length;
+
+          const dayLabel=(d:string)=>{
+            const dt=new Date(d+"T12:00:00");
+            const diff=Math.round((dt.getTime()-today.getTime())/(1000*60*60*24));
+            if(diff===0)return"TODAY";
+            if(diff===1)return"TOMORROW";
+            return dt.toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"}).toUpperCase();
+          };
+
+          return(
+            <div className="space-y-5">
+              {/* Greeting */}
+              <div>
+                <h1 className="text-2xl font-black text-slate-900">Hey Chris 👋</h1>
+                <p className="text-sm text-slate-400 mt-0.5">{now.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})}</p>
+              </div>
+
+              {/* Quick stats row */}
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {[
+                  {label:"This Month",value:monthRevenue>0?`$${monthRevenue.toLocaleString("en-US",{minimumFractionDigits:0})}`:pendingInquiries>0?"—":"$0",sub:"revenue",accent:"#10b981",bg:"rgba(16,185,129,0.06)",border:"rgba(16,185,129,0.2)"},
+                  {label:"Confirmed",value:String(confirmedSessions),sub:"sessions booked",accent:C.p1,bg:C.p1_04,border:C.p1_20},
+                  {label:"New",value:String(newThisMonth),sub:"inquiries this month",accent:"#f59e0b",bg:"rgba(245,158,11,0.06)",border:"rgba(245,158,11,0.2)"},
+                  {label:"Clients",value:String(totalClients),sub:"total",accent:"#6366f1",bg:"rgba(99,102,241,0.06)",border:"rgba(99,102,241,0.2)"},
+                ].map(s=>(
+                  <div key={s.label} className="rounded-2xl p-4 border" style={{background:s.bg,borderColor:s.border}}>
+                    <p className="text-[10px] font-black uppercase tracking-widest mb-1" style={{color:s.accent}}>{s.label}</p>
+                    <p className="text-2xl font-black text-slate-900 leading-none">{s.value}</p>
+                    <p className="text-[11px] text-slate-400 mt-1">{s.sub}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Upcoming sessions */}
+              <div className="rounded-2xl overflow-hidden border" style={{borderColor:"rgba(16,185,129,0.2)",background:"white"}}>
+                <div className="h-[3px]" style={{background:"linear-gradient(90deg,#10b981,#059669)"}}/>
+                <div className="p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-xs font-black uppercase tracking-widest text-emerald-600">📅 Upcoming Sessions</p>
+                    <button onClick={()=>setTab("clients")} className="text-[11px] font-bold text-slate-400 hover:text-slate-600">All clients →</button>
+                  </div>
+                  {upcoming.length===0?(
+                    <p className="text-sm text-slate-400 py-2">No confirmed sessions yet.</p>
+                  ):(
+                    <div className="flex flex-col gap-2">
+                      {upcoming.map(inq=>{
+                        const diff=Math.round((new Date(inq.session_date!+"T12:00:00").getTime()-today.getTime())/(1000*60*60*24));
+                        const isToday=diff===0;const isTomorrow=diff===1;
+                        return(
+                          <div key={inq.id} className="flex items-center gap-3 p-2.5 rounded-xl border" style={{borderColor:"#f1f5f9",background:"#fafafa"}}>
+                            <div className="flex-shrink-0 w-16 text-center">
+                              <span className={`text-[10px] font-black tracking-wide block ${isToday?"text-rose-500":isTomorrow?"text-amber-500":"text-emerald-600"}`}>{dayLabel(inq.session_date!)}</span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-bold text-slate-900 truncate">{inq.name}</p>
+                              <p className="text-xs text-slate-400 truncate">{inq.session_type||"Session"}</p>
+                            </div>
+                            <div className="flex-shrink-0 flex items-center gap-2">
+                              {inq.payment_status==="paid"&&<span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">PAID</span>}
+                              <button onClick={()=>setTab("clients")} className="text-[11px] font-bold px-2.5 py-1 rounded-lg" style={{background:C.p1_08,color:C.p1}}>View →</button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Pending inquiries alert */}
+              {pendingInquiries>0&&(
+                <button onClick={()=>setTab("inquiries")} className="w-full flex items-center gap-3 p-4 rounded-2xl border text-left transition-all hover:opacity-80" style={{background:"rgba(245,158,11,0.06)",borderColor:"rgba(245,158,11,0.25)"}}>
+                  <span className="text-xl">📬</span>
+                  <div className="flex-1">
+                    <p className="text-sm font-black text-slate-900">{pendingInquiries} unanswered {pendingInquiries===1?"inquiry":"inquiries"}</p>
+                    <p className="text-xs text-slate-400">Tap to go reply</p>
+                  </div>
+                  <span className="text-sm font-bold text-amber-500">→</span>
+                </button>
+              )}
+
+              {/* Nav cards */}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                {[
+                  {label:"Clients",sub:`${paidSessions} paid · ${confirmedSessions} confirmed`,icon:"👥",action:()=>setTab("clients"),grad:"linear-gradient(135deg,#10b981,#059669)"},
+                  {label:"Edit Website",sub:"Poses, portfolio, blog",icon:"✏️",action:()=>setTab("poses"),grad:C.grad12},
+                  {label:"Vault",sub:"Notes & AI context",icon:"📓",action:()=>setTab("vault"),grad:"linear-gradient(135deg,#6366f1,#4f46e5)"},
+                ].map(n=>(
+                  <button key={n.label} onClick={n.action}
+                    className="flex items-center gap-3 p-4 rounded-2xl text-left text-white transition-all hover:opacity-90 active:scale-[0.98]"
+                    style={{background:n.grad}}>
+                    <span className="text-2xl">{n.icon}</span>
+                    <div>
+                      <p className="font-black text-sm">{n.label}</p>
+                      <p className="text-[11px] opacity-80">{n.sub}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
           );
         })()}
@@ -2093,7 +2224,18 @@ function AdminDashboard() {
             if(!clientMap.has(key))clientMap.set(key,{name:inq.name,email:inq.email,phone:inq.phone,sessions:[]});
             clientMap.get(key)!.sessions.push(inq);
           });
-          const clients=Array.from(clientMap.values());
+          const today=new Date();today.setHours(0,0,0,0);
+          const clients=Array.from(clientMap.values()).sort((a,b)=>{
+            const aPaid=a.sessions.some(s=>s.payment_status==="paid");
+            const bPaid=b.sessions.some(s=>s.payment_status==="paid");
+            if(aPaid!==bPaid)return aPaid?-1:1;
+            // Within same payment group, sort by nearest upcoming session date
+            const nearestDate=(sessions:Inquiry[])=>{
+              const future=sessions.filter(s=>s.session_date&&new Date(s.session_date+"T12:00:00")>=today).map(s=>new Date(s.session_date!+"T12:00:00").getTime());
+              return future.length?Math.min(...future):Infinity;
+            };
+            return nearestDate(a.sessions)-nearestDate(b.sessions);
+          });
           const q=clientSearch.toLowerCase().trim();
           const filtered=clients.filter(c=>{
             const matchesSearch=!q||c.name.toLowerCase().includes(q)||c.email.toLowerCase().includes(q);

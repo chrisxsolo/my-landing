@@ -413,7 +413,7 @@ export default function ConversationPage() {
   // ── Voice-to-text (MediaRecorder → Whisper) ───────────────────────────────
   const mediaRecorderRef  = useRef<MediaRecorder | null>(null);
   const audioChunksRef    = useRef<Blob[]>([]);
-  const liveRecogRef      = useRef<InstanceType<typeof window.SpeechRecognition> | null>(null);
+  const liveRecogRef      = useRef<SpeechRecognition | null>(null);
   const voicePreviewRef   = useRef(""); // live interim text shown while recording
   const draftBaseRef      = useRef(""); // text in box before recording started
   const draftRef          = useRef("");
