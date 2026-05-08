@@ -305,6 +305,40 @@ function AdminDashboard() {
   const [sendLoading,setSendLoading]=useState<number|null>(null);
   const [sendSuccess,setSendSuccess]=useState<number|null>(null);
 
+  // ── Quick reminders (home tab upcoming sessions + calendar Next Up) ────────
+  type QuickReminderDraft={id:string;label:string;emoji:string;subject:string;body:string};
+  const [quickRemindersOpen,setQuickRemindersOpen]=useState<Record<number,boolean>>({});
+  const [quickRemindersLoading,setQuickRemindersLoading]=useState<Record<number,boolean>>({});
+  const [quickReminders,setQuickReminders]=useState<Record<number,QuickReminderDraft[]>>({});
+  const [quickSending,setQuickSending]=useState<string|null>(null);
+
+  async function loadQuickReminders(inqId:number){
+    if(quickReminders[inqId]){
+      setQuickRemindersOpen(p=>({...p,[inqId]:!p[inqId]}));
+      return;
+    }
+    setQuickRemindersOpen(p=>({...p,[inqId]:true}));
+    setQuickRemindersLoading(p=>({...p,[inqId]:true}));
+    try{
+      const res=await fetch("/api/session-reminders",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({inquiry_id:inqId})});
+      const json=await res.json();
+      if(!res.ok||!json.reminders){showToast(json.error??"Failed to generate reminders",false);return;}
+      setQuickReminders(p=>({...p,[inqId]:json.reminders}));
+    }catch{showToast("Reminder generation failed",false);}
+    finally{setQuickRemindersLoading(p=>({...p,[inqId]:false}));}
+  }
+
+  async function sendQuickReminder(inq:Inquiry, r:QuickReminderDraft){
+    setQuickSending(r.id);
+    try{
+      const res=await fetch("/api/send-email",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({to:inq.email,subject:r.subject,body:r.body})});
+      const json=await res.json();
+      if(!res.ok){showToast(json.error??"Send failed",false);return;}
+      showToast(`${r.label} sent ✓`);
+    }catch{showToast("Send failed",false);}
+    finally{setQuickSending(null);}
+  }
+
   async function generateDraft(inq:Inquiry, feedback?:string){
     setDraftLoading(inq.id);
     try{
@@ -970,6 +1004,9 @@ function AdminDashboard() {
                   .filter(i=>i.session_date&&i.booking_confirmed)
                   .map(i=>({id:i.id,name:i.name,session_type:i.session_type,session_date:i.session_date!,payment_status:i.payment_status,booking_confirmed:i.booking_confirmed}))}
                 onClientClick={()=>setTab("clients")}
+                onRemindersClick={(id)=>loadQuickReminders(id)}
+                remindersLoading={quickRemindersLoading}
+                remindersOpen={quickRemindersOpen}
               />
 
               {/* Upcoming sessions */}
@@ -987,19 +1024,56 @@ function AdminDashboard() {
                       {upcoming.map(inq=>{
                         const diff=Math.round((new Date(inq.session_date!+"T12:00:00").getTime()-today.getTime())/(1000*60*60*24));
                         const isToday=diff===0;const isTomorrow=diff===1;
+                        const remOpen=quickRemindersOpen[inq.id];
+                        const remLoading=quickRemindersLoading[inq.id];
+                        const remDrafts=quickReminders[inq.id];
                         return(
-                          <div key={inq.id} className="flex items-center gap-3 p-2.5 rounded-xl border" style={{borderColor:"#f1f5f9",background:"#fafafa"}}>
-                            <div className="flex-shrink-0 w-16 text-center">
-                              <span className={`text-[10px] font-black tracking-wide block ${isToday?"text-rose-500":isTomorrow?"text-amber-500":"text-emerald-600"}`}>{dayLabel(inq.session_date!)}</span>
+                          <div key={inq.id} className="rounded-xl border overflow-hidden" style={{borderColor:"#f1f5f9",background:"#fafafa"}}>
+                            <div className="flex items-center gap-3 p-2.5">
+                              <div className="flex-shrink-0 w-16 text-center">
+                                <span className={`text-[10px] font-black tracking-wide block ${isToday?"text-rose-500":isTomorrow?"text-amber-500":"text-emerald-600"}`}>{dayLabel(inq.session_date!)}</span>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-bold text-slate-900 truncate">{inq.name}</p>
+                                <p className="text-xs text-slate-400 truncate">{inq.session_type||"Session"}</p>
+                              </div>
+                              <div className="flex-shrink-0 flex items-center gap-2">
+                                {inq.payment_status==="paid"&&<span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">PAID</span>}
+                                <button
+                                  onClick={()=>loadQuickReminders(inq.id)}
+                                  className="text-[11px] font-bold px-2.5 py-1 rounded-lg transition-all hover:opacity-80"
+                                  style={{background:remOpen?"rgba(245,158,11,0.15)":"rgba(245,158,11,0.08)",color:"#d97706"}}>
+                                  {remLoading?"…":"🔔"}
+                                </button>
+                                <button onClick={()=>router.push(`/admin/conversation/${inq.id}`)} className="text-[11px] font-bold px-2.5 py-1 rounded-lg" style={{background:C.p1_08,color:C.p1}}>View →</button>
+                              </div>
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-bold text-slate-900 truncate">{inq.name}</p>
-                              <p className="text-xs text-slate-400 truncate">{inq.session_type||"Session"}</p>
-                            </div>
-                            <div className="flex-shrink-0 flex items-center gap-2">
-                              {inq.payment_status==="paid"&&<span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">PAID</span>}
-                              <button onClick={()=>setTab("clients")} className="text-[11px] font-bold px-2.5 py-1 rounded-lg" style={{background:C.p1_08,color:C.p1}}>View →</button>
-                            </div>
+                            {remOpen&&(
+                              <div className="border-t px-3 pb-3 pt-2 space-y-2" style={{borderColor:"rgba(245,158,11,0.15)",background:"rgba(245,158,11,0.03)"}}>
+                                {remLoading?(
+                                  <p className="text-xs text-slate-400 py-1">Generating reminders…</p>
+                                ):remDrafts?.length?(
+                                  remDrafts.map(r=>(
+                                    <div key={r.id} className="rounded-lg p-2.5 space-y-1.5" style={{background:"white",border:"1px solid rgba(245,158,11,0.15)"}}>
+                                      <div className="flex items-center justify-between gap-2">
+                                        <p className="text-[11px] font-black text-slate-700">{r.emoji} {r.label}</p>
+                                        <button
+                                          onClick={()=>sendQuickReminder(inq,r)}
+                                          disabled={quickSending===r.id}
+                                          className="text-[10px] font-black px-2.5 py-1 rounded-lg disabled:opacity-40 transition-all hover:opacity-80 flex-shrink-0"
+                                          style={{background:"linear-gradient(135deg,#f59e0b,#d97706)",color:"#fff"}}>
+                                          {quickSending===r.id?"Sending…":"Send"}
+                                        </button>
+                                      </div>
+                                      <p className="text-[10px] text-slate-400 font-medium">Subject: {r.subject}</p>
+                                      <p className="text-[11px] text-slate-600 leading-relaxed line-clamp-3 whitespace-pre-wrap">{r.body}</p>
+                                    </div>
+                                  ))
+                                ):(
+                                  <p className="text-xs text-slate-400 py-1">No reminders generated.</p>
+                                )}
+                              </div>
+                            )}
                           </div>
                         );
                       })}
@@ -2284,7 +2358,7 @@ function AdminDashboard() {
                             ):(
                               <div className="rounded-xl p-6 text-center" style={{border:`1px dashed ${C.p1_20}`,background:C.p1_04}}>
                                 <p className="text-sm text-slate-500">Click <strong>✦ Draft Reply</strong> to generate a personalized email</p>
-                                <p className="text-xs text-slate-400 mt-1">Uses your style guide + live availability data</p>
+                                <p className="text-xs text-slate-400 mt-1">Uses your Obsidian vault + live availability data</p>
                               </div>
                             )}
 
@@ -2315,7 +2389,7 @@ function AdminDashboard() {
                                     onClick={()=>saveRuleFromFeedback(inq.id)}
                                     className="text-[11px] font-bold px-3 py-1.5 rounded-lg transition-all hover:opacity-80 flex items-center gap-1.5"
                                     style={ruleSaved===inq.id?{background:"#10b981",color:"#fff"}:{background:"rgba(255,255,255,0.9)",color:C.p1,border:`1px solid ${C.p1_20}`}}>
-                                    {ruleSaved===inq.id?"✓ Saved to style guide":"➕ Always remember this"}
+                                    {ruleSaved===inq.id?"✓ Saved to Obsidian":"➕ Always remember this"}
                                   </button>
                                 )}
                               </div>

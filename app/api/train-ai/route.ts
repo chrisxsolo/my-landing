@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
 const VAULT_PATH = process.env.OBSIDIAN_VAULT_PATH
   ?? "/Users/chrissolo/Documents/Photography Business Soloxsnaps";
 
-const RULES_NOTE = path.join(VAULT_PATH, "09 AI Instructions", "Email Writer Rules.md");
+const RULES_NOTE = path.join(VAULT_PATH, "09 AI Instructions", "Email Rules.md");
 
 function readCurrentRules(): string {
   try { return fs.readFileSync(RULES_NOTE, "utf-8"); }
@@ -46,15 +46,17 @@ Rules must be:
 
 If Chris is just chatting with no new instruction, return an empty array.`;
 
-const MERGE_SYSTEM = `You are a knowledge base editor for a photography business. Your job is to maintain a clean, conflict-free set of AI email writing rules in a markdown note.
+const MERGE_SYSTEM = `You are a knowledge base editor for a photography business. Your job is to maintain a clean, well-structured markdown note of AI email writing rules.
 
 Editing rules:
 - If a new rule CONTRADICTS or SUPERSEDES an existing rule, DELETE the old rule and ADD the new one
-- If a new rule is essentially the same as an existing one, keep the existing wording (no duplicates)
-- If a new rule is genuinely new, ADD it under the most relevant section
+- If a new rule is essentially the same as an existing one, KEEP the existing wording — no duplicates
+- If a new rule is genuinely new, ADD it under the most relevant ## section
 - NEVER keep two rules that say opposite or conflicting things — always prefer the newer rule
-- Preserve the existing markdown section structure
-- If a new rule doesn't fit any section, add it under ## Additional Rules
+- Preserve all YAML frontmatter exactly as-is (the --- block at the top)
+- Preserve the existing ## section structure
+- Update the last_updated frontmatter field to today's date
+- If a new rule doesn't fit any existing section, add it under ## Learned Rules
 - Output ONLY the updated markdown note — no explanation, no preamble`;
 
 export async function POST(req: NextRequest) {

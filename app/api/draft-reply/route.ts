@@ -46,6 +46,14 @@ async function fetchAvailability(): Promise<string> {
 const VAULT_PATH = process.env.OBSIDIAN_VAULT_PATH
   ?? "/Users/chrissolo/Documents/Photography Business Soloxsnaps";
 
+// Remove any trailing sign-off line (e.g. "Chris", "- Chris", "Best, Chris")
+function stripSignoff(text: string): string {
+  return text
+    .replace(/\n+[-–]?\s*Chris\s*$/i, "")
+    .replace(/\n+(?:best|thanks|cheers|warm regards|regards|sincerely)[,.]?\s*\n+chris\s*$/i, "")
+    .trimEnd();
+}
+
 // Folders that always contain useful context for replies
 const VAULT_ALWAYS_INCLUDE = ["03 Client Communication", "01 SOPs", "09 AI Instructions"];
 
@@ -86,38 +94,48 @@ const LOCATION_NOTE_MAP: Record<string, string> = {
 };
 
 const EMAIL_RULES_PATH = path.join(VAULT_PATH, "09 AI Instructions", "Email Rules.md");
-const LEARNED_SECTION_HEADER = "## Learned Rules";
 
-function writeLearnedRulesToVault(newRules: string[]): number {
+const MERGE_SYSTEM = `You are a knowledge base editor for a photography business. Your job is to maintain a clean, well-structured markdown note of AI email writing rules.
+
+Editing rules:
+- If a new rule CONTRADICTS or SUPERSEDES an existing rule, DELETE the old rule and ADD the new one
+- If a new rule is essentially the same as an existing one, KEEP the existing wording — no duplicates
+- If a new rule is genuinely new, ADD it under the most relevant ## section
+- NEVER keep two rules that say opposite or conflicting things — always prefer the newer rule
+- Preserve all YAML frontmatter exactly as-is (the --- block at the top)
+- Preserve the existing ## section structure
+- Update the last_updated frontmatter field to today's date
+- If a new rule doesn't fit any existing section, add it under ## Learned Rules
+- Output ONLY the updated markdown note — no explanation, no preamble`;
+
+async function mergeRulesToVault(newRules: string[], apiKey: string): Promise<number> {
+  if (newRules.length === 0) return 0;
   try {
     const existing = fs.existsSync(EMAIL_RULES_PATH)
       ? fs.readFileSync(EMAIL_RULES_PATH, "utf-8")
       : "";
 
-    // Collect already-present rule text (case-insensitive) to deduplicate
-    const existingLower = existing.toLowerCase();
-    const toAdd = newRules.filter(r => !existingLower.includes(r.toLowerCase().trim()));
+    const client = new Anthropic({ apiKey });
+    const res = await client.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 2000,
+      system: MERGE_SYSTEM,
+      messages: [{
+        role: "user",
+        content: `Current Email Rules note:\n\n---\n${existing}\n---\n\nNew rules to integrate:\n\n${newRules.map(r => `- ${r}`).join("\n")}\n\nOutput the updated note only.`,
+      }],
+    });
 
-    if (toAdd.length === 0) return 0;
+    const updated = res.content
+      .filter(b => b.type === "text")
+      .map(b => (b as { type: "text"; text: string }).text)
+      .join("")
+      .trim();
 
-    const lines = toAdd.map(r => `- ${r}`).join("\n");
-
-    let updated: string;
-    if (existing.includes(LEARNED_SECTION_HEADER)) {
-      // Append under existing section
-      updated = existing.replace(
-        LEARNED_SECTION_HEADER,
-        `${LEARNED_SECTION_HEADER}\n${lines}`
-      );
-    } else {
-      // Add section at end of file
-      updated = `${existing.trimEnd()}\n\n${LEARNED_SECTION_HEADER}\n${lines}\n`;
-    }
-
-    fs.writeFileSync(EMAIL_RULES_PATH, updated, "utf-8");
-    return toAdd.length;
+    fs.writeFileSync(EMAIL_RULES_PATH, updated + "\n", "utf-8");
+    return newRules.length;
   } catch (err) {
-    console.error("Failed to write learned rules to vault:", err);
+    console.error("Failed to merge rules to vault:", err);
     return 0;
   }
 }
@@ -257,7 +275,7 @@ List the concrete style rules Claude should follow in future drafts based on the
         .map((line) => line.replace(/^[-–•*]\s*/, "").trim())
         .filter((line) => line.length > 0);
 
-      const written = writeLearnedRulesToVault(rules);
+      const written = await mergeRulesToVault(rules, apiKey);
 
       return NextResponse.json({ rules, written });
     } catch (err) {
@@ -283,7 +301,7 @@ All business knowledge — pricing, policies, tone, communication rules — come
 Format rules (always apply):
 - Plain text only — no markdown, no bold, no asterisks, no bullet points in the output
 - Start directly with "Hi [Name]," — no subject line
-- Sign as "Chris"
+- Do NOT add a sign-off or name at the end — end the email with the last line of content only
 - Never include email headers, timestamps, or "to:" lines` + vaultSection;
 
     try {
@@ -320,6 +338,7 @@ Output only the polished email body, nothing else.`,
       draft = draft.replace(
         /^(?:[^\n]*<[^\n@>]+@[^\n>]+>[^\n]*\n[^\n]+at\s+\d+:\d+[^\n]*\n(?:to\s+[^\n]+\n)?[\s\n]*)/, ""
       ).trimStart();
+      draft = stripSignoff(draft);
 
       return NextResponse.json({ draft });
     } catch (err) {
@@ -343,7 +362,7 @@ All business knowledge — pricing, add-ons, travel fees, policies, tone rules, 
 Format rules (always apply, non-negotiable):
 - Plain text only — no markdown, no bold, no asterisks, no bullet points in the output
 - Start directly with "Hi [Name]," — no subject line, no "Dear"
-- Sign as "Chris"
+- Do NOT add a sign-off or name at the end — end the email with the last line of content only
 - NEVER include email headers, timestamps, sender lines, or "to:" lines
 - Output only the reply body itself, starting with "Hi [Name],"`;
 
@@ -410,10 +429,10 @@ Write the reply now.`;
       .trim();
 
     // Strip any email-header block from the top of the output.
-    // Pattern: lines like "Name <email>", "Month DD, YYYY at H:MM PM", "to email@..."
     draft = draft.replace(
       /^(?:[^\n]*<[^\n@>]+@[^\n>]+>[^\n]*\n[^\n]+at\s+\d+:\d+[^\n]*\n(?:to\s+[^\n]+\n)?[\s\n]*)/, ""
     ).trimStart();
+    draft = stripSignoff(draft);
 
     return NextResponse.json({ draft });
   } catch (err) {

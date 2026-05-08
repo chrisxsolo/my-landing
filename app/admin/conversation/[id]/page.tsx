@@ -131,10 +131,12 @@ export default function ConversationPage() {
   const [sunsetInfo,    setSunsetInfo]    = useState<{ sunset: string; goldenStart: string } | null>(null);
   const [sunsetLoading, setSunsetLoading] = useState(false);
 
-  // ── Things to Remember ─────────────────────────────────────────────────────
-  const [notes,         setNotes]         = useState("");
-  const [notesSaving,   setNotesSaving]   = useState(false);
-  const [notesSaved,    setNotesSaved]    = useState(false);
+  // ── Train AI chat (per-conversation) ──────────────────────────────────────
+  const [trainMessages, setTrainMessages] = useState<{role:"user"|"assistant";content:string}[]>([]);
+  const [trainInput,    setTrainInput]    = useState("");
+  const [trainLoading,  setTrainLoading]  = useState(false);
+  const [trainSaved,    setTrainSaved]    = useState<string[]>([]);
+  const trainChatRef = useRef<HTMLDivElement>(null);
 
   // ── Teach AI state ──────────────────────────────────────────────────────────
   const [actualSent,    setActualSent]    = useState("");
@@ -211,11 +213,6 @@ export default function ConversationPage() {
         // Show sunset immediately — confirmed date wins, fall back to client's requested date
         const sunsetDate = data.session_date ?? tryParseDate(data.date_in_mind ?? "");
         if (sunsetDate) fetchSunset(sunsetDate);
-        // Load saved notes for this inquiry
-        const { data: nd } = await supabase
-          .from("site_settings").select("value")
-          .eq("key", `inquiry_notes_${data.id}`).single();
-        if (nd?.value) setNotes(nd.value);
       });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inquiryId]);
@@ -399,7 +396,8 @@ export default function ConversationPage() {
       const json = await res.json();
       if (json.draft) {
         setDraft(json.draft);
-        showToast("✓ Polished");
+        setManualAiDraft(json.draft);
+        showToast("✓ Polished — pre-filled in Learn from Reply");
       } else {
         showToast(json.error ?? "Polish failed", false);
       }
@@ -790,17 +788,36 @@ export default function ConversationPage() {
     }
   }
 
-  // ── Save notes for this inquiry ────────────────────────────────────────────
-  async function saveNotes(val: string) {
-    if (!inquiryId) return;
-    setNotesSaving(true);
-    await supabase.from("site_settings").upsert(
-      { key: `inquiry_notes_${inquiryId}`, value: val, updated_at: new Date().toISOString() },
-      { onConflict: "key" }
-    );
-    setNotesSaving(false);
-    setNotesSaved(true);
-    setTimeout(() => setNotesSaved(false), 2000);
+  // ── Train AI chat ──────────────────────────────────────────────────────────
+  useEffect(() => {
+    const el = trainChatRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [trainMessages]);
+
+  async function sendTrainMessage() {
+    if (!trainInput.trim() || trainLoading) return;
+    const userMsg = { role: "user" as const, content: trainInput.trim() };
+    const next = [...trainMessages, userMsg];
+    setTrainMessages(next);
+    setTrainInput("");
+    setTrainLoading(true);
+    try {
+      const res = await fetch("/api/train-ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: next }),
+      });
+      const json = await res.json() as { reply: string; new_rules: string[]; saved_to_vault: boolean };
+      setTrainMessages(p => [...p, { role: "assistant", content: json.reply }]);
+      if (json.new_rules?.length) {
+        setTrainSaved(json.new_rules);
+        setTimeout(() => setTrainSaved([]), 5000);
+      }
+    } catch {
+      setTrainMessages(p => [...p, { role: "assistant", content: "Something went wrong — try again." }]);
+    } finally {
+      setTrainLoading(false);
+    }
   }
 
   // ── Teach AI: compare AI draft vs actual sent, write new rules to Obsidian vault ──
@@ -1007,6 +1024,107 @@ export default function ConversationPage() {
 
         {/* ── RIGHT: AI Draft + Send (sticky) ── */}
         <div className="lg:sticky lg:top-[73px] space-y-4">
+
+          {/* Client details card */}
+          <div className="bg-white rounded-2xl border border-slate-100 p-5 space-y-2">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">Client Details</p>
+            {[
+              { label: "Name",    value: <span className="font-semibold text-slate-800">{inquiry.name}</span> },
+              { label: "Email",   value: (
+                <button onClick={() => copyField(inquiry.email, "Email")}
+                  className="text-left transition-colors"
+                  style={{ color: copiedField === "Email" ? "#10b981" : C.p1 }}
+                  title="Click to copy">
+                  {copiedField === "Email" ? "Copied ✓" : inquiry.email}
+                </button>
+              )},
+              inquiry.phone && { label: "Phone", value: (
+                <button onClick={() => copyField(inquiry.phone!, "Phone")}
+                  className="text-left transition-colors"
+                  style={{ color: copiedField === "Phone" ? "#10b981" : "inherit" }}
+                  title="Click to copy">
+                  {copiedField === "Phone" ? "Copied ✓" : inquiry.phone}
+                </button>
+              )},
+              inquiry.session_type && { label: "Session", value: inquiry.session_type },
+              inquiry.date_in_mind && { label: "Date",    value: inquiry.date_in_mind },
+              inquiry.session_date && { label: "Booked",  value: new Date(inquiry.session_date + "T12:00:00").toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) },
+            ].filter(Boolean).map((row, i) => {
+              const r = row as { label: string; value: ReactNode };
+              return (
+                <div key={i} className="flex gap-3 items-start">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-slate-300 min-w-[60px] pt-0.5">{r.label}</span>
+                  <span className="text-sm text-slate-700">{r.value}</span>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* ── Train AI ── */}
+          <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
+            <div className="h-[3px]" style={{ background: "linear-gradient(90deg,#8b5cf6,#a78bfa)" }} />
+            <div className="p-4 border-b border-slate-100 flex items-center gap-2">
+              <div className="w-6 h-6 rounded-lg flex items-center justify-center text-xs"
+                   style={{ background: "rgba(139,92,246,0.12)", color: "#7c3aed" }}>💬</div>
+              <div>
+                <p className="text-sm font-black text-slate-900">Train AI</p>
+                <p className="text-[10px] text-slate-400">Rules save directly to Obsidian vault</p>
+              </div>
+            </div>
+            {/* Chat history */}
+            <div ref={trainChatRef} className="p-4 space-y-3 max-h-72 overflow-y-auto">
+              {trainMessages.length === 0 && (
+                <p className="text-xs text-slate-400 text-center py-4 leading-relaxed">
+                  Tell me how to handle this client or any rule you want remembered.<br/>
+                  <span className="text-slate-300">e.g. "Don't push pricing on warm leads" · "Always mention golden hour"</span>
+                </p>
+              )}
+              {trainMessages.map((m, i) => (
+                <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+                  <div className="max-w-[82%] px-3 py-2 rounded-xl text-sm leading-relaxed"
+                    style={m.role === "user"
+                      ? { background: C.grad12, color: "#fff" }
+                      : { background: "rgba(139,92,246,0.08)", color: "#5b21b6", border: "1px solid rgba(139,92,246,0.15)" }}>
+                    {m.content}
+                  </div>
+                </div>
+              ))}
+              {trainLoading && (
+                <div className="flex justify-start">
+                  <div className="px-3 py-2 rounded-xl text-sm"
+                       style={{ background: "rgba(139,92,246,0.08)", color: "#7c3aed" }}>
+                    <span className="animate-spin inline-block mr-1">◌</span> Thinking…
+                  </div>
+                </div>
+              )}
+              {trainSaved.length > 0 && (
+                <div className="px-3 py-2 rounded-xl text-xs"
+                     style={{ background: "rgba(16,185,129,0.08)", color: "#059669", border: "1px solid rgba(16,185,129,0.2)" }}>
+                  ✓ {trainSaved.length} rule{trainSaved.length > 1 ? "s" : ""} saved to Obsidian vault
+                </div>
+              )}
+            </div>
+            {/* Input */}
+            <div className="p-3 border-t border-slate-100 flex gap-2">
+              <input
+                type="text"
+                value={trainInput}
+                onChange={e => setTrainInput(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendTrainMessage(); } }}
+                placeholder="e.g. Keep replies short for warm leads…"
+                disabled={trainLoading}
+                className="flex-1 text-sm px-3 py-2 rounded-xl outline-none disabled:opacity-50"
+                style={{ border: "1px solid rgba(139,92,246,0.2)", background: "rgba(139,92,246,0.03)", fontFamily: "inherit" }}
+              />
+              <button
+                onClick={sendTrainMessage}
+                disabled={!trainInput.trim() || trainLoading}
+                className="text-xs font-bold px-3 py-2 rounded-xl disabled:opacity-30 flex-shrink-0 transition-all hover:opacity-80"
+                style={{ background: "linear-gradient(135deg,#8b5cf6,#7c3aed)", color: "#fff" }}>
+                Send
+              </button>
+            </div>
+          </div>
 
           {/* ── Sunset / golden hour card — always visible ── */}
           {inquiry && (
@@ -1390,44 +1508,6 @@ export default function ConversationPage() {
             </div>
           )}
 
-          {/* ── Things to Remember ── */}
-          <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
-            <div className="h-[3px]" style={{ background: "linear-gradient(90deg,#8b5cf6,#a78bfa)" }} />
-            <div className="p-5 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-lg flex items-center justify-center text-xs"
-                       style={{ background: "rgba(139,92,246,0.12)", color: "#7c3aed" }}>📌</div>
-                  <p className="text-sm font-black text-slate-900">AI Training Notes</p>
-                </div>
-                {notesSaving
-                  ? <span className="text-[10px] text-slate-400">Saving…</span>
-                  : notesSaved
-                    ? <span className="text-[10px] font-bold text-emerald-500">Saved ✓</span>
-                    : null}
-              </div>
-              <textarea
-                value={notes}
-                onChange={e => setNotes(e.target.value)}
-                onBlur={e => { if (e.target.value !== "") saveNotes(e.target.value); }}
-                onKeyDown={e => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") saveNotes(notes); }}
-                rows={5}
-                placeholder={"Jot down anything for the AI to learn — how to respond to clients like this, what worked, what to avoid.\n\ne.g. clients who say 'flexible' usually want late May · always mention golden hour timing · don't push packages upfront"}
-                className="w-full text-slate-700 leading-relaxed rounded-xl p-3 resize-none sm:resize-y outline-none"
-                style={{ border: "1px solid rgba(139,92,246,0.2)", background: "rgba(139,92,246,0.03)", fontFamily: "inherit", fontSize: "16px" }} />
-              <div className="flex items-center justify-between">
-                <p className="text-[10px] text-slate-400">Auto-saves on blur · ⌘↵ to save now</p>
-                <button
-                  onClick={() => saveNotes(notes)}
-                  disabled={notesSaving || !notes.trim()}
-                  className="text-[11px] font-bold px-3 py-1 rounded-lg disabled:opacity-30 transition-all hover:opacity-80"
-                  style={{ background: "rgba(139,92,246,0.1)", color: "#7c3aed" }}>
-                  Save
-                </button>
-              </div>
-            </div>
-          </div>
-
           {/* ── Learn from Reply — always visible ── */}
           <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
             <div className="h-[3px]" style={{ background: "linear-gradient(90deg,#f59e0b,#fbbf24)" }} />
@@ -1443,7 +1523,7 @@ export default function ConversationPage() {
                 <div className="rounded-xl p-4 space-y-2"
                      style={{ background: "rgba(16,185,129,0.06)", border: "1px solid rgba(16,185,129,0.2)" }}>
                   <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600">
-                    ✓ {learnedRules.length} rule{learnedRules.length === 1 ? "" : "s"} saved to style guide
+                    ✓ {learnedRules.length} rule{learnedRules.length === 1 ? "" : "s"} saved to Obsidian vault
                   </p>
                   <ul className="space-y-1.5">
                     {learnedRules.map((rule, i) => (
@@ -1507,47 +1587,13 @@ export default function ConversationPage() {
                     style={{ background: "linear-gradient(135deg,#f59e0b,#d97706)", color: "#fff" }}>
                     {learnLoading
                       ? <><span className="animate-spin inline-block">◌</span> Analyzing…</>
-                      : "✎ Analyze & save to style guide"}
+                      : "✎ Analyze & save to Obsidian"}
                   </button>
                 </>
               )}
             </div>
           </div>
 
-          {/* Client details card */}
-          <div className="bg-white rounded-2xl border border-slate-100 p-5 space-y-2">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">Client Details</p>
-            {[
-              { label: "Name",    value: <span className="font-semibold text-slate-800">{inquiry.name}</span> },
-              { label: "Email",   value: (
-                <button onClick={() => copyField(inquiry.email, "Email")}
-                  className="text-left transition-colors"
-                  style={{ color: copiedField === "Email" ? "#10b981" : C.p1 }}
-                  title="Click to copy">
-                  {copiedField === "Email" ? "Copied ✓" : inquiry.email}
-                </button>
-              )},
-              inquiry.phone && { label: "Phone", value: (
-                <button onClick={() => copyField(inquiry.phone!, "Phone")}
-                  className="text-left transition-colors"
-                  style={{ color: copiedField === "Phone" ? "#10b981" : "inherit" }}
-                  title="Click to copy">
-                  {copiedField === "Phone" ? "Copied ✓" : inquiry.phone}
-                </button>
-              )},
-              inquiry.session_type && { label: "Session", value: inquiry.session_type },
-              inquiry.date_in_mind && { label: "Date",    value: inquiry.date_in_mind },
-              inquiry.session_date && { label: "Booked",  value: new Date(inquiry.session_date + "T12:00:00").toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) },
-            ].filter(Boolean).map((row, i) => {
-              const r = row as { label: string; value: ReactNode };
-              return (
-                <div key={i} className="flex gap-3 items-start">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-slate-300 min-w-[60px] pt-0.5">{r.label}</span>
-                  <span className="text-sm text-slate-700">{r.value}</span>
-                </div>
-              );
-            })}
-          </div>
         </div>
       </div>
 

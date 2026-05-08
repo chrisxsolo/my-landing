@@ -22,7 +22,7 @@ export const dynamic = "force-dynamic";
 const VAULT_PATH = process.env.OBSIDIAN_VAULT_PATH
   ?? "/Users/chrissolo/Documents/Photography Business Soloxsnaps";
 
-const RULES_NOTE = path.join(VAULT_PATH, "09 AI Instructions", "Email Writer Rules.md");
+const RULES_NOTE = path.join(VAULT_PATH, "09 AI Instructions", "Email Rules.md");
 
 export async function POST(req: NextRequest) {
   const deny = requireAdmin(req);
@@ -41,17 +41,18 @@ export async function POST(req: NextRequest) {
   const response = await client.messages.create({
     model: "claude-sonnet-4-6",
     max_tokens: 1200,
-    system: `You are a knowledge base editor for a photography business. Your job is to maintain a clean, conflict-free set of AI email writing rules in a markdown note.
+    system: `You are a knowledge base editor for a photography business. Your job is to maintain a clean, well-structured markdown note of AI email writing rules.
 
-Rules for editing:
+Editing rules:
 - If a new rule CONTRADICTS or SUPERSEDES an existing rule, DELETE the old rule and ADD the new one
-- If a new rule is essentially the same as an existing one, KEEP the existing wording (don't duplicate)
-- If a new rule is genuinely new, ADD it under the most relevant section
-- NEVER have two rules that say opposite things
-- Keep the note clean and well-organized
-- Preserve the existing section structure (## Always, ## Graduation Inquiries, etc.)
-- If a new rule doesn't fit any existing section, add it under a new section or ## Additional Rules
-- Output ONLY the updated markdown note — no explanation, no commentary`,
+- If a new rule is essentially the same as an existing one, KEEP the existing wording — no duplicates
+- If a new rule is genuinely new, ADD it under the most relevant ## section
+- NEVER keep two rules that say opposite or conflicting things — always prefer the newer rule
+- Preserve all YAML frontmatter exactly as-is (the --- block at the top)
+- Preserve the existing ## section structure
+- Update the last_updated frontmatter field to today's date
+- If a new rule doesn't fit any existing section, add it under ## Learned Rules
+- Output ONLY the updated markdown note — no explanation, no preamble`,
     messages: [{
       role: "user",
       content: `Here is the current Email Writer Rules note:

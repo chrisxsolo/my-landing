@@ -11,7 +11,7 @@ type Session = {
   booking_confirmed: boolean | null;
 };
 
-type Props = { sessions: Session[]; onClientClick: () => void };
+type Props = { sessions: Session[]; onClientClick: () => void; onRemindersClick?: (id: number) => void; remindersLoading?: Record<number,boolean>; remindersOpen?: Record<number,boolean> };
 
 const GRAD_COLOR  = { grad: "linear-gradient(135deg,#34d399,#059669)", text: "#059669", bg: "rgba(52,211,153,0.13)" };
 const TODAY_COLOR = { grad: "linear-gradient(135deg,#a78bfa,#7c3aed)", text: "#7c3aed", bg: "rgba(167,139,250,0.13)" };
@@ -33,7 +33,7 @@ function colorFor(s: Session): typeof GRAD_COLOR {
   return OTHER_COLORS[s.id % OTHER_COLORS.length];
 }
 
-export default function SessionCalendar({ sessions, onClientClick }: Props) {
+export default function SessionCalendar({ sessions, onClientClick, onRemindersClick, remindersLoading = {}, remindersOpen = {} }: Props) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -272,7 +272,17 @@ export default function SessionCalendar({ sessions, onClientClick }: Props) {
                       <p className="text-xs font-black text-slate-900 truncate">{s.name}</p>
                       <p className="text-[11px] text-slate-400 truncate">{s.session_type || "Session"}</p>
                     </div>
-                    <span className="text-[10px] font-black flex-shrink-0" style={{ color: col.text }}>{label}</span>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className="text-[10px] font-black" style={{ color: col.text }}>{label}</span>
+                      {onRemindersClick && (
+                        <button
+                          onClick={() => onRemindersClick(s.id)}
+                          className="text-[11px] font-bold px-2 py-1 rounded-lg transition-all hover:opacity-80"
+                          style={{ background: remindersOpen[s.id] ? "rgba(245,158,11,0.25)" : "rgba(245,158,11,0.15)", color: "#d97706" }}>
+                          {remindersLoading[s.id] ? "…" : "🔔"}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 );
               })}
