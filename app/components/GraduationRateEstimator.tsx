@@ -5,18 +5,19 @@ import Link from "next/link"
 import { C } from "@/lib/colors"
 import {
   SCHOOLS,
-  SESSION_LENGTHS,
   calculateGraduationEstimate,
   formatCurrency,
   type SchoolValue,
   type SessionLengthKey,
 } from "@/lib/pricing"
 
-const TOGGLE_STYLE = (on: boolean) => ({
+// ── SHARED STYLE HELPERS ──────────────────────────────────────────────────────
+
+const toggleStyle = (on: boolean): React.CSSProperties => ({
   display: "inline-flex",
   alignItems: "center",
-  gap: 8,
-  padding: "8px 18px",
+  gap: 6,
+  padding: "9px 18px",
   borderRadius: 999,
   border: `1.5px solid ${on ? C.p1 : C.warmEdge}`,
   background: on ? C.p1_08 : "transparent",
@@ -24,13 +25,13 @@ const TOGGLE_STYLE = (on: boolean) => ({
   fontSize: 14,
   fontWeight: on ? 600 : 400,
   cursor: "pointer",
-  transition: "all 0.18s ease",
-  userSelect: "none" as const,
+  transition: "all 0.15s ease",
+  userSelect: "none",
 })
 
 const SELECT_STYLE: React.CSSProperties = {
   width: "100%",
-  padding: "10px 14px",
+  padding: "11px 14px",
   borderRadius: 10,
   border: `1.5px solid ${C.warmEdge}`,
   background: "#fff",
@@ -47,32 +48,33 @@ const SELECT_STYLE: React.CSSProperties = {
 
 const LABEL_STYLE: React.CSSProperties = {
   display: "block",
-  fontSize: 13,
-  fontWeight: 600,
+  fontSize: 12,
+  fontWeight: 700,
   color: "#4b5a55",
-  letterSpacing: "0.05em",
+  letterSpacing: "0.07em",
   textTransform: "uppercase",
   marginBottom: 8,
 }
 
+// ── COMPONENT ─────────────────────────────────────────────────────────────────
+
 export default function GraduationRateEstimator() {
-  const [school, setSchool]             = useState<SchoolValue>("uc-berkeley")
-  const [people, setPeople]             = useState(1)
-  const [sessionLength, setSessionLen]  = useState<SessionLengthKey>("1hr")
-  const [extraOutfit, setExtraOutfit]   = useState(false)
-  const [secondLocation, setSecondLoc]  = useState(false)
-  const [expedited, setExpedited]       = useState(false)
-  const [champagne, setChampagne]       = useState(false)
+  const [school, setSchool]            = useState<SchoolValue>("uc-berkeley")
+  const [people, setPeople]            = useState(1)
+  const [sessionLength, setSessionLen] = useState<SessionLengthKey>("1hr")
+  const [extraOutfit, setExtraOutfit]  = useState(false)
+  const [secondLocation, setSecondLoc] = useState(false)
+  const [expedited, setExpedited]      = useState(false)
+  const [champagne, setChampagne]      = useState(false)
 
   const estimate = useMemo(
     () => calculateGraduationEstimate({ school, people, sessionLength, extraOutfit, secondLocation, expedited, champagne }),
     [school, people, sessionLength, extraOutfit, secondLocation, expedited, champagne]
   )
 
-  // Build query string for the contact form
   const schoolLabel = SCHOOLS.find(s => s.value === school)?.label ?? school
   const sessionLabelMap: Record<SessionLengthKey, string> = {
-    "1hr": "1 hour", "1.5hr": "90 minutes", "2hr": "2 hours"
+    "1hr": "1 hour", "1.5hr": "90 minutes", "2hr": "2 hours",
   }
   const contactParams = new URLSearchParams({
     school: schoolLabel,
@@ -85,177 +87,233 @@ export default function GraduationRateEstimator() {
     estimatedTotal: String(estimate.subtotal),
   })
 
+  const travelDisplay =
+    estimate.travelMethod === "none" ? "Included" :
+    estimate.travelMethod === "tbd"  ? "TBD" :
+    formatCurrency(estimate.travelFee as number)
+
+  const showTravelNote = estimate.travelMethod === "tbd" || estimate.travelMethod === "flat"
+
   return (
-    <section style={{ background: C.surfaceSoft, borderRadius: 20, padding: "48px 40px", maxWidth: 860, margin: "0 auto" }}>
+    <section style={{ maxWidth: 860, margin: "0 auto" }}>
 
-      {/* ── HEADER ────────────────────────────────────────────────────────── */}
-      <div style={{ marginBottom: 36, textAlign: "center" }}>
-        <p style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: C.p1, marginBottom: 8 }}>
-          Graduation Rate Estimator
+      {/* ── INTRO ─────────────────────────────────────────────────────────── */}
+      <div style={{ textAlign: "center", marginBottom: 36 }}>
+        <p style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: C.p1, marginBottom: 10 }}>
+          Session Estimator
         </p>
-        <h2 style={{ fontSize: 26, fontWeight: 700, color: "#101412", margin: "0 0 10px" }}>
-          Get a rough estimate
+        <h2 style={{ fontSize: 26, fontWeight: 700, color: "#101412", margin: "0 0 12px", lineHeight: 1.3 }}>
+          Want a quick estimate before reaching out?
         </h2>
-        <p style={{ fontSize: 15, color: "#4b5a55", maxWidth: 520, margin: "0 auto" }}>
-          Select your school, group size, and any add-ons to see a rough session estimate.
-          Final quote is confirmed after your date and location are reviewed.
+        <p style={{ fontSize: 15, color: "#4b5a55", maxWidth: 500, margin: "0 auto", lineHeight: 1.65 }}>
+          Select your school, group size, and any add-ons below to get a rough idea of what your session will cost.
+          No commitment — just clarity before you inquire.
         </p>
       </div>
 
-      {/* ── INPUTS GRID ───────────────────────────────────────────────────── */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 20, marginBottom: 28 }}>
-
-        {/* School */}
-        <div>
-          <label style={LABEL_STYLE}>School / Location</label>
-          <select style={SELECT_STYLE} value={school} onChange={e => setSchool(e.target.value as SchoolValue)}>
-            {SCHOOLS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-          </select>
-        </div>
-
-        {/* Number of graduates */}
-        <div>
-          <label style={LABEL_STYLE}>Number of Graduates</label>
-          <select style={SELECT_STYLE} value={people} onChange={e => setPeople(Number(e.target.value))}>
-            {[1, 2, 3, 4, 5].map(n => (
-              <option key={n} value={n}>{n === 5 ? "5+" : n}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* Session length */}
-        <div>
-          <label style={LABEL_STYLE}>Session Length</label>
-          <select style={SELECT_STYLE} value={sessionLength} onChange={e => setSessionLen(e.target.value as SessionLengthKey)}>
-            <option value="1hr">1 hour</option>
-            <option value="1.5hr">90 minutes</option>
-            <option value="2hr">2 hours</option>
-          </select>
-          {people >= 3 && sessionLength === "1hr" && (
-            <p style={{ fontSize: 12, color: C.p2, marginTop: 6 }}>
-              Groups of 3+ usually need at least 90 min.
-            </p>
-          )}
-        </div>
-      </div>
-
-      {/* ── ADD-ON TOGGLES ────────────────────────────────────────────────── */}
-      <div style={{ marginBottom: 32 }}>
-        <label style={{ ...LABEL_STYLE, marginBottom: 12 }}>Add-ons</label>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-          <button style={TOGGLE_STYLE(extraOutfit)}    onClick={() => setExtraOutfit(v => !v)}>
-            Extra outfit +$75
-          </button>
-          <button style={TOGGLE_STYLE(secondLocation)} onClick={() => setSecondLoc(v => !v)}>
-            Second location +$125
-          </button>
-          <button style={TOGGLE_STYLE(expedited)}      onClick={() => setExpedited(v => !v)}>
-            72-hr delivery +$75
-          </button>
-          <button style={TOGGLE_STYLE(champagne)}      onClick={() => setChampagne(v => !v)}>
-            Champagne +$15
-          </button>
-        </div>
-      </div>
-
-      {/* ── ESTIMATE CARD ─────────────────────────────────────────────────── */}
+      {/* ── CARD WRAPPER ─────────────────────────────────────────────────── */}
       <div style={{
-        background: "#fff",
-        border: `1.5px solid ${C.warmEdge}`,
-        borderRadius: 16,
-        padding: "28px 28px 24px",
-        marginBottom: 28,
+        background: C.surfaceSoft,
+        borderRadius: 20,
+        padding: "40px 36px 36px",
+        border: `1px solid ${C.warmEdge}`,
       }}>
 
-        {/* Group note */}
-        {estimate.groupNote && (
-          <p style={{ fontSize: 13, color: C.p2, fontWeight: 500, marginBottom: 16, padding: "10px 14px", background: C.p2_08, borderRadius: 8 }}>
-            {estimate.groupNote}
+        {/* ── INPUTS ──────────────────────────────────────────────────────── */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 20, marginBottom: 28 }}>
+
+          <div>
+            <label style={LABEL_STYLE}>School / Location</label>
+            <select
+              style={SELECT_STYLE}
+              value={school}
+              onChange={e => setSchool(e.target.value as SchoolValue)}
+            >
+              {SCHOOLS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+            </select>
+          </div>
+
+          <div>
+            <label style={LABEL_STYLE}>Number of Graduates</label>
+            <select
+              style={SELECT_STYLE}
+              value={people}
+              onChange={e => setPeople(Number(e.target.value))}
+            >
+              {[1, 2, 3, 4, 5].map(n => (
+                <option key={n} value={n}>{n === 5 ? "5 or more" : String(n)}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label style={LABEL_STYLE}>Session Length</label>
+            <select
+              style={SELECT_STYLE}
+              value={sessionLength}
+              onChange={e => setSessionLen(e.target.value as SessionLengthKey)}
+            >
+              <option value="1hr">1 hour</option>
+              <option value="1.5hr">90 minutes</option>
+              <option value="2hr">2 hours</option>
+            </select>
+            {people >= 3 && sessionLength === "1hr" && (
+              <p style={{ fontSize: 12, color: C.p2, marginTop: 7, lineHeight: 1.5 }}>
+                Groups of 3+ usually need at least 90 min.
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* ── ADD-ONS ─────────────────────────────────────────────────────── */}
+        <div style={{ marginBottom: 32 }}>
+          <label style={{ ...LABEL_STYLE, marginBottom: 12 }}>Add-ons</label>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+            <button style={toggleStyle(extraOutfit)}    onClick={() => setExtraOutfit(v => !v)}>
+              {extraOutfit ? "✓ " : ""}Extra outfit +$75
+            </button>
+            <button style={toggleStyle(secondLocation)} onClick={() => setSecondLoc(v => !v)}>
+              {secondLocation ? "✓ " : ""}Second location +$125
+            </button>
+            <button style={toggleStyle(expedited)}      onClick={() => setExpedited(v => !v)}>
+              {expedited ? "✓ " : ""}72-hr delivery +$75
+            </button>
+            <button style={toggleStyle(champagne)}      onClick={() => setChampagne(v => !v)}>
+              {champagne ? "✓ " : ""}Champagne +$15
+            </button>
+          </div>
+        </div>
+
+        {/* ── ESTIMATE RESULT ─────────────────────────────────────────────── */}
+        <div style={{
+          background: "#fff",
+          border: `1.5px solid ${C.warmEdge}`,
+          borderRadius: 16,
+          padding: "28px 28px 24px",
+          marginBottom: 10,
+        }}>
+
+          {/* Group note banner */}
+          {estimate.groupNote && (
+            <div style={{
+              fontSize: 13,
+              color: C.p2,
+              fontWeight: 500,
+              marginBottom: 20,
+              padding: "10px 14px",
+              background: C.p2_08,
+              borderRadius: 8,
+              lineHeight: 1.5,
+            }}>
+              {estimate.groupNote}
+            </div>
+          )}
+
+          {/* Deposit-first hero number — primary conversion anchor */}
+          <div style={{ marginBottom: 20 }}>
+            <p style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: C.p1, marginBottom: 6 }}>
+              Reserve your date with
+            </p>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 42, fontWeight: 800, color: "#101412", lineHeight: 1 }}>
+                {formatCurrency(estimate.deposit)}
+              </span>
+              <span style={{ fontSize: 15, color: "#667f79" }}>deposit</span>
+            </div>
+            <p style={{ fontSize: 13, color: "#667f79", marginTop: 6 }}>
+              {formatCurrency(estimate.remainingBalance)} remaining balance due before final delivery
+            </p>
+          </div>
+
+          {/* Divider */}
+          <div style={{ borderTop: `1px solid ${C.warmEdge}`, margin: "20px 0" }} />
+
+          {/* Breakdown */}
+          <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#4b5a55", marginBottom: 12 }}>
+            Estimate Breakdown
+          </p>
+          <BreakdownRow label="Session Fee"  value={formatCurrency(estimate.sessionBase)} />
+          <BreakdownRow label="Travel Fee"   value={travelDisplay} />
+          {estimate.addons > 0 && <BreakdownRow label="Add-ons" value={formatCurrency(estimate.addons)} />}
+
+          {/* Total line */}
+          <div style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "baseline",
+            marginTop: 14,
+            paddingTop: 14,
+            borderTop: `1px solid ${C.warmEdge}`,
+          }}>
+            <span style={{ fontSize: 14, fontWeight: 700, color: "#101412" }}>Estimated Total</span>
+            <span style={{ fontSize: 22, fontWeight: 800, color: "#101412" }}>{formatCurrency(estimate.subtotal)}</span>
+          </div>
+        </div>
+
+        {/* Travel fee note */}
+        {showTravelNote && (
+          <p style={{ fontSize: 12, color: "#667f79", marginBottom: 20, lineHeight: 1.6 }}>
+            {estimate.travelMethod === "tbd"
+              ? "Travel fee may apply and will be confirmed after your exact location is reviewed."
+              : "Travel fees are included where applicable. Final pricing may vary slightly depending on exact location."}
           </p>
         )}
 
-        {/* Total */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 20, flexWrap: "wrap", gap: 8 }}>
-          <span style={{ fontSize: 15, fontWeight: 600, color: "#4b5a55" }}>Estimated Total</span>
-          <span style={{ fontSize: 32, fontWeight: 700, color: "#101412" }}>{formatCurrency(estimate.subtotal)}</span>
+        {/* Disclaimer */}
+        <p style={{ fontSize: 12, color: "#aaa", lineHeight: 1.6, marginBottom: 28 }}>
+          Rough estimate only — final quote confirmed after date, time, and location are set.
+          Invoice and contract sent once everything is confirmed.
+        </p>
+
+        {/* ── CTAs ──────────────────────────────────────────────────────────── */}
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <Link
+            href={`/contact?${contactParams.toString()}`}
+            style={{
+              padding: "13px 28px",
+              borderRadius: 999,
+              background: C.grad12,
+              color: "#fff",
+              fontWeight: 700,
+              fontSize: 14,
+              textDecoration: "none",
+              letterSpacing: "0.01em",
+            }}
+          >
+            Inquire About This Estimate
+          </Link>
+          <Link
+            href="https://www.soloxsnaps.com/availability"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              padding: "13px 28px",
+              borderRadius: 999,
+              border: `1.5px solid ${C.p1}`,
+              color: C.p1,
+              fontWeight: 600,
+              fontSize: 14,
+              textDecoration: "none",
+              transition: "all 0.15s ease",
+            }}
+          >
+            Check Availability
+          </Link>
         </div>
-
-        {/* Deposit / remaining */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
-          <div style={{ padding: "14px 16px", background: C.p1_06, borderRadius: 10 }}>
-            <p style={{ fontSize: 12, color: C.p1, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 4 }}>Deposit to Book</p>
-            <p style={{ fontSize: 22, fontWeight: 700, color: "#101412" }}>{formatCurrency(estimate.deposit)}</p>
-          </div>
-          <div style={{ padding: "14px 16px", background: C.p1_04, borderRadius: 10 }}>
-            <p style={{ fontSize: 12, color: "#4b5a55", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 4 }}>Remaining Balance</p>
-            <p style={{ fontSize: 22, fontWeight: 700, color: "#101412" }}>{formatCurrency(estimate.remainingBalance)}</p>
-          </div>
-        </div>
-
-        {/* Breakdown */}
-        <div style={{ borderTop: `1px solid ${C.warmEdge}`, paddingTop: 16 }}>
-          <p style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "#4b5a55", marginBottom: 10 }}>Breakdown</p>
-          <Row label="Session" value={formatCurrency(estimate.sessionBase)} />
-          <Row
-            label="Travel"
-            value={
-              estimate.travelMethod === "none" ? "Included" :
-              estimate.travelMethod === "tbd"  ? "TBD — confirmed after review" :
-              formatCurrency(estimate.travelFee as number)
-            }
-          />
-          {estimate.addons > 0 && <Row label="Add-ons" value={formatCurrency(estimate.addons)} />}
-        </div>
-      </div>
-
-      {/* ── DISCLAIMER ────────────────────────────────────────────────────── */}
-      <p style={{ fontSize: 12, color: "#667f79", lineHeight: 1.6, marginBottom: 24 }}>
-        This is a rough estimate. Final quote may vary based on exact location, travel, and custom requests.
-        Travel fee may be confirmed after reviewing the exact location.
-        Invoice and contract are sent after date, time, and price are confirmed.
-      </p>
-
-      {/* ── CTA BUTTONS ───────────────────────────────────────────────────── */}
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-        <Link
-          href="https://www.soloxsnaps.com/availability"
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{
-            padding: "12px 24px",
-            borderRadius: 999,
-            border: `1.5px solid ${C.p1}`,
-            color: C.p1,
-            fontWeight: 600,
-            fontSize: 14,
-            textDecoration: "none",
-            transition: "all 0.18s ease",
-          }}
-        >
-          Check Availability
-        </Link>
-        <Link
-          href={`/contact?${contactParams.toString()}`}
-          style={{
-            padding: "12px 24px",
-            borderRadius: 999,
-            background: C.grad12,
-            color: "#fff",
-            fontWeight: 600,
-            fontSize: 14,
-            textDecoration: "none",
-          }}
-        >
-          Inquire Now
-        </Link>
       </div>
     </section>
   )
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+function BreakdownRow({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, color: "#4b5a55", marginBottom: 6 }}>
+    <div style={{
+      display: "flex",
+      justifyContent: "space-between",
+      fontSize: 14,
+      color: "#4b5a55",
+      marginBottom: 8,
+    }}>
       <span>{label}</span>
       <span style={{ fontWeight: 500, color: "#101412" }}>{value}</span>
     </div>

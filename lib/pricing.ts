@@ -101,8 +101,7 @@ export function calculateGraduationEstimate(input: EstimateInput): EstimateResul
     // Group sessions: rate is per person, session length scales the cost
     // For groups, the per-person rate already implies a full session —
     // extra hours are charged at the per-person rate x people x (hours - 1)
-    sessionBase = ratePerPerson * people + (hours > 1 ? (hours - 1) * 2 * ADDON_EXTRA_30_MIN * people : 0)
-    // Simplified: base session = per-person rate * people, extra time = $100/30min per extra half-hour
+    // Base = per-person rate × headcount; extra time = $100 per additional 30 min
     sessionBase = ratePerPerson * people
     if (hours > 1) {
       const extraHalfHours = (hours - 1) * 2
