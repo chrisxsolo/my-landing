@@ -17,6 +17,7 @@ export type InboxThread = {
   snippet:      string;
   timestamp:    number;
   messageCount: number;
+  isUnread:     boolean;
 };
 
 function parseName(from: string, email: string): string {
@@ -101,6 +102,7 @@ export async function GET(req: NextRequest) {
           id: string;
           messages: {
             id: string; threadId: string; internalDate?: string; snippet?: string;
+            labelIds?: string[];
             payload?: { headers?: { name: string; value: string }[] };
           }[];
         };
@@ -123,6 +125,7 @@ export async function GET(req: NextRequest) {
     if (fromEmail === myEmail) continue;
     if (isAutomated(fromEmail, fromName, subject)) continue;
 
+    const isUnread = thread.messages.some(m => m.labelIds?.includes("UNREAD"));
     threads.push({
       threadId:     thread.id,
       fromName,
@@ -131,6 +134,7 @@ export async function GET(req: NextRequest) {
       snippet:      last.snippet ?? "",
       timestamp:    parseInt(last.internalDate ?? "0"),
       messageCount: thread.messages.length,
+      isUnread,
     });
 
     if (threads.length >= limit) break;

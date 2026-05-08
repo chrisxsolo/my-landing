@@ -282,7 +282,7 @@ function AdminDashboard() {
   const [gmailConnected,setGmailConnected]=useState(false);
   const [gmailEmail,setGmailEmail]=useState<string|null>(null);
   const [gmailLoading,setGmailLoading]=useState(false);
-  type InboxThread={threadId:string;fromName:string;fromEmail:string;subject:string;snippet:string;timestamp:number;messageCount:number};
+  type InboxThread={threadId:string;fromName:string;fromEmail:string;subject:string;snippet:string;timestamp:number;messageCount:number;isUnread:boolean};
   const [inboxThreads,setInboxThreads]=useState<InboxThread[]>([]);
   const [inboxLoading,setInboxLoading]=useState(false);
   // inbox thread reply panels — keyed by threadId string
@@ -1196,7 +1196,7 @@ function AdminDashboard() {
                             const isSending=inboxSendLoading[t.threadId]??false;
                             const name=t.fromName||t.fromEmail;
                             return(
-                              <div key={t.threadId} className="rounded-xl border border-slate-200 overflow-hidden bg-white">
+                              <div key={t.threadId} className={`rounded-xl overflow-hidden ${t.isUnread?"border-2 border-violet-400 bg-violet-50 shadow-md shadow-violet-100":"border border-slate-200 bg-white"}`}>
                                 {/* Sender row */}
                                 <div className="flex items-center gap-3 px-3 pt-3 pb-2">
                                   <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-black text-white flex-shrink-0"
@@ -1205,17 +1205,18 @@ function AdminDashboard() {
                                   </div>
                                   <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2 flex-wrap">
-                                      <p className="text-sm font-black text-slate-900">{name}</p>
+                                      <p className={`text-sm font-black ${t.isUnread?"text-violet-900":"text-slate-900"}`}>{name}</p>
+                                      {t.isUnread&&<span className="text-[10px] font-black text-white bg-violet-500 rounded-full px-1.5 py-0.5 leading-none">NEW</span>}
                                       {t.messageCount>1&&<span className="text-[10px] font-bold text-slate-400">{t.messageCount} msgs</span>}
-                                      <span className="text-[10px] font-bold text-violet-500 ml-auto">{timeAgo(t.timestamp)}</span>
+                                      <span className={`text-[10px] font-bold ml-auto ${t.isUnread?"text-violet-600":"text-violet-500"}`}>{timeAgo(t.timestamp)}</span>
                                     </div>
-                                    <p className="text-[11px] text-slate-400 truncate">{t.fromEmail}</p>
+                                    <p className={`text-[11px] truncate ${t.isUnread?"text-violet-500":"text-slate-400"}`}>{t.fromEmail}</p>
                                   </div>
                                 </div>
                                 {/* Subject + snippet */}
                                 <div className="px-3 pb-3">
-                                  <p className="text-xs font-bold text-slate-700 mb-1">{t.subject}</p>
-                                  <p className="text-[12px] text-slate-500 leading-relaxed line-clamp-3">{decodeSnippet(t.snippet)}</p>
+                                  <p className={`text-xs font-bold mb-1 ${t.isUnread?"text-violet-800":"text-slate-700"}`}>{t.subject}</p>
+                                  <p className={`text-[12px] leading-relaxed line-clamp-3 ${t.isUnread?"text-violet-700":"text-slate-500"}`}>{decodeSnippet(t.snippet)}</p>
                                 </div>
                                 {/* Action buttons */}
                                 {(()=>{
