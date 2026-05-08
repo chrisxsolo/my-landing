@@ -20,6 +20,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getPortfolioData, getSiteSettings } from "@/lib/professionalData";
 import { pricingCSS, anim } from "@/lib/proStyles";
+import GraduationRateEstimator from "@/app/components/GraduationRateEstimator";
 
 // ── SEO metadata (tab title + Google description) ────────────────────────────
 export const metadata: Metadata = {
@@ -281,6 +282,14 @@ export default async function GradPricingPage() {
             <Link href="/contact" className="pricing-link">Inquire about group sessions</Link>
           </div>
         </div>
+      </section>
+
+      {/* ── GRADUATION RATE ESTIMATOR ─────────────────────────────────────────
+           Client-side interactive estimate tool.
+           Pricing logic lives in lib/pricing.ts — update rates there.
+           Component lives in app/components/GraduationRateEstimator.tsx */}
+      <section className="pricing-shell" style={{ paddingTop: 0, paddingBottom: 64 }}>
+        <GraduationRateEstimator />
       </section>
 
       {/* ── BOTTOM CTA STRIP ──────────────────────────────────────────────────
