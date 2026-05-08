@@ -12,11 +12,17 @@ import {
   type AdminClientSessionDTO,
   type ClientSessionStatus,
 } from "@/lib/clientSessions";
+import type { ClientSessionContactOption } from "@/lib/clientSessionContacts";
 import { supabase } from "@/lib/supabase";
 
 type AdminSessionsResponse = {
   sessions?: AdminClientSessionDTO[];
   session?: AdminClientSessionDTO;
+  error?: string;
+};
+
+type AdminSessionContactsResponse = {
+  contacts?: ClientSessionContactOption[];
   error?: string;
 };
 
@@ -37,6 +43,7 @@ function matchesQuery(session: AdminClientSessionDTO, query: string) {
 export default function AdminSessionsDashboard() {
   const router = useRouter();
   const [sessions, setSessions] = useState<AdminClientSessionDTO[]>([]);
+  const [contacts, setContacts] = useState<ClientSessionContactOption[]>([]);
   const [editing, setEditing] = useState<AdminClientSessionDTO | null>(null);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<ClientSessionStatus | "all">("all");
@@ -56,19 +63,23 @@ export default function AdminSessionsDashboard() {
         return;
       }
 
-      const res = await fetch("/api/admin/sessions", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const json = await res.json() as AdminSessionsResponse;
+      const headers = { Authorization: `Bearer ${token}` };
+      const [sessionsRes, contactsRes] = await Promise.all([
+        fetch("/api/admin/sessions", { headers }),
+        fetch("/api/admin/session-contacts", { headers }),
+      ]);
+      const json = await sessionsRes.json() as AdminSessionsResponse;
+      const contactsJson = await contactsRes.json() as AdminSessionContactsResponse;
 
       if (!alive) return;
-      if (!res.ok) {
-        setError(res.status === 403 ? "Your Google account is not listed in admin_users yet." : json.error ?? "Could not load sessions.");
+      if (!sessionsRes.ok) {
+        setError(sessionsRes.status === 403 ? "Your Google account is not listed in admin_users yet." : json.error ?? "Could not load sessions.");
         setLoading(false);
         return;
       }
 
       setSessions(json.sessions ?? []);
+      if (contactsRes.ok) setContacts(contactsJson.contacts ?? []);
       setLoading(false);
     }
 
@@ -196,6 +207,7 @@ export default function AdminSessionsDashboard() {
         <div className="grid gap-6 lg:grid-cols-[minmax(360px,420px)_1fr]">
           <AdminSessionForm
             initialSession={editing}
+            contacts={contacts}
             saving={saving}
             onSubmit={saveSession}
             onCancelEdit={() => setEditing(null)}

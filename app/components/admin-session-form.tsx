@@ -8,6 +8,7 @@ import {
   type AdminClientSessionDTO,
   type ClientSessionStatus,
 } from "@/lib/clientSessions";
+import type { ClientSessionContactOption } from "@/lib/clientSessionContacts";
 
 export type AdminSessionFormPayload = {
   clientEmail: string;
@@ -28,6 +29,7 @@ export type AdminSessionFormPayload = {
 
 type AdminSessionFormProps = {
   initialSession?: AdminClientSessionDTO | null;
+  contacts: ClientSessionContactOption[];
   saving: boolean;
   onSubmit: (payload: AdminSessionFormPayload) => Promise<void>;
   onCancelEdit?: () => void;
@@ -88,6 +90,7 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
 
 export default function AdminSessionForm({
   initialSession,
+  contacts,
   saving,
   onSubmit,
   onCancelEdit,
@@ -101,6 +104,20 @@ export default function AdminSessionForm({
 
   function update<K extends keyof AdminSessionFormPayload>(key: K, value: AdminSessionFormPayload[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function selectContact(contactId: string) {
+    const contact = contacts.find((item) => item.id === contactId);
+    if (!contact) return;
+
+    setForm((prev) => ({
+      ...prev,
+      clientEmail: contact.email,
+      clientName: contact.name ?? prev.clientName,
+      sessionType: contact.sessionType ?? prev.sessionType,
+      sessionDate: contact.sessionDate ? toDateTimeInput(contact.sessionDate) : prev.sessionDate,
+      location: contact.location ?? prev.location,
+    }));
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -138,6 +155,25 @@ export default function AdminSessionForm({
       </div>
 
       <div className="mt-5 grid gap-4 md:grid-cols-2">
+        {contacts.length > 0 && (
+          <div className="grid gap-2 md:col-span-2">
+            <FieldLabel>Choose existing client</FieldLabel>
+            <select
+              defaultValue=""
+              onChange={(event) => selectContact(event.target.value)}
+              className="min-h-11 rounded-lg border px-3 text-sm font-semibold outline-none"
+              style={{ background: C.surfaceStrong, borderColor: C.borderSubtle, color: C.ink }}
+            >
+              <option value="">Select from inquiries or past sessions</option>
+              {contacts.map((contact) => (
+                <option key={contact.id} value={contact.id}>
+                  {contact.name || contact.email} - {contact.email}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         <div className="grid gap-2">
           <FieldLabel>Client email</FieldLabel>
           <input
