@@ -5,6 +5,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { C } from "@/lib/colors";
 
+const CLIENT_PORTAL_HREF = "/login";
+
 const navLinks = [
   { label: "Home", href: "/home" },
   { label: "Me", href: "/me" },
@@ -12,6 +14,7 @@ const navLinks = [
   { label: "Locations", href: "/bay-area-locations" },
   { label: "Availability", href: "/booking" },
   { label: "Journal", href: "/journal" },
+  { label: "Client Portal", href: CLIENT_PORTAL_HREF },
 ];
 
 function isActivePath(pathname: string, href: string) {
@@ -25,10 +28,6 @@ function isActivePath(pathname: string, href: string) {
 export default function Nav() {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
-
-  useEffect(() => {
-    setMobileOpen(false);
-  }, [pathname]);
 
   useEffect(() => {
     document.body.style.overflow = mobileOpen ? "hidden" : "";
@@ -171,6 +170,7 @@ export default function Nav() {
                 <Link
                   key={link.href}
                   href={link.href}
+                  onClick={() => setMobileOpen(false)}
                   className="rounded-2xl px-4 py-3 text-base font-bold text-slate-700 transition-all"
                   style={{
                     background: isActivePath(pathname, link.href)

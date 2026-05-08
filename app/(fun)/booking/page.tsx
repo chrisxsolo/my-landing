@@ -10,6 +10,7 @@ type AvailDate = { id: number; date: string; status: "available" | "booked" | "h
 
 const DAYS   = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const CLIENT_PORTAL_HREF = "/login";
 
 function getDaysInMonth(y: number, m: number) { return new Date(y, m + 1, 0).getDate(); }
 function getFirstDay(y: number, m: number)    { return new Date(y, m, 1).getDay(); }
@@ -219,6 +220,24 @@ export default function BookingPage() {
           >
             Book your session →
           </a>
+          <div
+            className="mt-4 rounded-2xl border px-4 py-3"
+            style={{ background: C.surfaceWarm, borderColor: C.borderSubtle }}
+          >
+            <p className="text-xs font-black uppercase tracking-[0.18em]" style={{ color: C.p1 }}>
+              Already booked?
+            </p>
+            <p className="mt-1 text-sm font-medium leading-relaxed text-slate-600">
+              Log in with Google to see your session progress, delivery estimate, and gallery link when it is ready.
+            </p>
+            <Link
+              href={CLIENT_PORTAL_HREF}
+              className="mt-3 inline-flex rounded-full px-5 py-2.5 text-sm font-black text-white"
+              style={{ background: C.grad12, boxShadow: C.shadowWarmSm }}
+            >
+              Log in / create account
+            </Link>
+          </div>
         </div>
 
       </div>

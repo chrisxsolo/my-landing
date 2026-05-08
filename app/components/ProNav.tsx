@@ -5,6 +5,7 @@
 //   → Add/remove primary links:   edit the primaryLinks array
 //   → Add/remove portfolio pages: edit the portfolioLinks array
 //   → Add/remove pricing pages:   edit the pricingLinks array
+//   → Client portal link:         edit CLIENT_PORTAL_HREF below
 //   → CTA button text/href:       find "Book a shoot" below
 //   → Nav pill color:             change .pro-nav-shell background/border values
 // ─────────────────────────────────────────────────────────────────────────────
@@ -14,6 +15,10 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+
+const CLIENT_PORTAL_HREF = "/login";
+const CLIENT_DASHBOARD_HREF = "/dashboard";
+const CONTACT_HREF = "/contact";
 
 const primaryLinks = [
   { label: "Home",    href: "/" },
@@ -47,6 +52,13 @@ export default function ProNav() {
 
   const isPortfolioActive = portfolioLinks.some((link) => isActive(pathname, link.href));
   const isPricingActive   = pricingLinks.some((link) => isActive(pathname, link.href));
+  const isPortalActive = isActive(pathname, CLIENT_PORTAL_HREF) || isActive(pathname, CLIENT_DASHBOARD_HREF);
+
+  const closeMenus = () => {
+    setMenuOpen(false);
+    setPortfolioOpen(false);
+    setPricingOpen(false);
+  };
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -62,14 +74,13 @@ export default function ProNav() {
     return () => { document.removeEventListener("mousedown", handleClick); document.removeEventListener("keydown", handleKeydown); };
   }, []);
 
-  useEffect(() => { setMenuOpen(false); setPortfolioOpen(false); setPricingOpen(false); }, [pathname]);
-
   const renderDropdownLink = (link: { label: string; href: string }) => (
     <Link
       key={link.href}
       href={link.href}
       className="pro-nav-dropdown-link"
       aria-current={isActive(pathname, link.href) ? "page" : undefined}
+      onClick={closeMenus}
     >
       {link.label}
     </Link>
@@ -262,12 +273,13 @@ export default function ProNav() {
 
       <header ref={navRef} className="pro-header">
         <div className="pro-nav-shell">
-          <Link href="/" className="pro-nav-brand" aria-label="soloxsnaps home">soloxsnaps</Link>
+          <Link href="/" className="pro-nav-brand" aria-label="soloxsnaps home" onClick={closeMenus}>soloxsnaps</Link>
 
           <nav className="pro-desktop-nav" aria-label="Primary navigation">
             {primaryLinks.map((link) => (
               <Link key={link.href} href={link.href} className="pro-nav-link"
-                aria-current={isActive(pathname, link.href) ? "page" : undefined}>
+                aria-current={isActive(pathname, link.href) ? "page" : undefined}
+                onClick={closeMenus}>
                 {link.label}
               </Link>
             ))}
@@ -294,7 +306,15 @@ export default function ProNav() {
           </nav>
 
           <div className="pro-nav-actions">
-            <Link href="/contact" className="pro-nav-cta">Book a shoot</Link>
+            <Link
+              href={CLIENT_PORTAL_HREF}
+              className="pro-nav-link"
+              aria-current={isPortalActive ? "page" : undefined}
+              onClick={closeMenus}
+            >
+              Client login
+            </Link>
+            <Link href={CONTACT_HREF} className="pro-nav-cta" onClick={closeMenus}>Book a shoot</Link>
           </div>
 
           <button className="pro-nav-button pro-mobile-button" type="button"
@@ -307,7 +327,8 @@ export default function ProNav() {
             <nav id="pro-mobile-menu" className="pro-mobile-panel" aria-label="Mobile navigation">
               {primaryLinks.map((link) => (
                 <Link key={link.href} href={link.href} className="pro-nav-link"
-                  aria-current={isActive(pathname, link.href) ? "page" : undefined}>
+                  aria-current={isActive(pathname, link.href) ? "page" : undefined}
+                  onClick={closeMenus}>
                   {link.label}
                 </Link>
               ))}
@@ -321,7 +342,15 @@ export default function ProNav() {
                 Rates <span className="pro-nav-caret">{pricingOpen ? "▲" : "▼"}</span>
               </button>
               {pricingOpen && <div className="pro-mobile-submenu">{pricingLinks.map(renderDropdownLink)}</div>}
-              <Link href="/contact" className="pro-nav-cta">Book a shoot</Link>
+              <Link
+                href={CLIENT_PORTAL_HREF}
+                className="pro-nav-link"
+                aria-current={isPortalActive ? "page" : undefined}
+                onClick={closeMenus}
+              >
+                Client login
+              </Link>
+              <Link href={CONTACT_HREF} className="pro-nav-cta" onClick={closeMenus}>Book a shoot</Link>
             </nav>
           )}
         </div>
