@@ -70,6 +70,11 @@ export async function POST(req: NextRequest) {
     const sessionType = cleanText(body.sessionType);
     const date = cleanText(body.date);
     const message = cleanText(body.message);
+    const instagram = cleanText(body.instagram);
+    const school = cleanText(body.school);
+    const preferredTime = cleanText(body.preferredTime);
+    const people = cleanText(body.people);
+    const location = cleanText(body.location);
 
     if (!name || !email || !message) {
       return NextResponse.json({ error: "Name, email, and message are required." }, { status: 400 });
@@ -92,6 +97,11 @@ export async function POST(req: NextRequest) {
         date_in_mind: date || null,
         message,
         status: "new",
+        instagram: instagram || null,
+        school: school || null,
+        preferred_time: preferredTime || null,
+        people: people || null,
+        location: location || null,
       })
       .select("id")
       .single();
@@ -122,15 +132,25 @@ export async function POST(req: NextRequest) {
         const safeSessionType = escapeHtml(sessionType);
         const safeDate = escapeHtml(date);
         const safeMessage = escapeHtml(message).replace(/\n/g, "<br>");
+        const safeInstagram = escapeHtml(instagram);
+        const safeSchool = escapeHtml(school);
+        const safePreferredTime = escapeHtml(preferredTime);
+        const safePeople = escapeHtml(people);
+        const safeLocation = escapeHtml(location);
         const safeInquiryId = inquiry?.id ? escapeHtml(String(inquiry.id)) : "";
         const subject = `New inquiry from ${name}${sessionType ? ` - ${sessionType}` : ""}`.replace(/[\r\n]+/g, " ");
         const confirmationSubject = "Your soloxsnaps inquiry and next steps";
         const responseRows = [
           renderInquiryRow("Name", safeName),
           renderInquiryRow("Email", `<a href="mailto:${safeEmail}" style="color: #111513;">${safeEmail}</a>`),
-          renderInquiryRow("Phone", safePhone || "Not provided"),
-          renderInquiryRow("Session", safeSessionType || "Not provided"),
-          renderInquiryRow("Date in mind", safeDate || "Not provided"),
+          ...(safePhone         ? [renderInquiryRow("Phone", safePhone)] : []),
+          ...(safeInstagram     ? [renderInquiryRow("Instagram", `@${safeInstagram.replace(/^@/, "")}`)] : []),
+          ...(safeSessionType   ? [renderInquiryRow("Session", safeSessionType)] : []),
+          ...(safeSchool        ? [renderInquiryRow("School / Location", safeSchool)] : []),
+          ...(safePeople        ? [renderInquiryRow("# of people", safePeople)] : []),
+          ...(safeDate          ? [renderInquiryRow("Date in mind", safeDate)] : []),
+          ...(safePreferredTime ? [renderInquiryRow("Preferred time", safePreferredTime)] : []),
+          ...(safeLocation      ? [renderInquiryRow("Desired location", safeLocation)] : []),
         ].join("");
 
         // Send both emails in parallel — cuts total email time roughly in half.
@@ -163,10 +183,35 @@ export async function POST(req: NextRequest) {
                   <td style="padding: 12px 0; color: #555; font-size: 0.72rem; letter-spacing: 0.14em; text-transform: uppercase;">Session</td>
                   <td style="padding: 12px 0; color: #444;">${safeSessionType}</td>
                 </tr>` : ""}
+                ${school ? `
+                <tr style="border-bottom: 1px solid rgba(0,0,0,0.07);">
+                  <td style="padding: 12px 0; color: #555; font-size: 0.72rem; letter-spacing: 0.14em; text-transform: uppercase;">School</td>
+                  <td style="padding: 12px 0; color: #444;">${safeSchool}</td>
+                </tr>` : ""}
+                ${people ? `
+                <tr style="border-bottom: 1px solid rgba(0,0,0,0.07);">
+                  <td style="padding: 12px 0; color: #555; font-size: 0.72rem; letter-spacing: 0.14em; text-transform: uppercase;">People</td>
+                  <td style="padding: 12px 0; color: #444;">${safePeople}</td>
+                </tr>` : ""}
                 ${date ? `
                 <tr style="border-bottom: 1px solid rgba(0,0,0,0.07);">
                   <td style="padding: 12px 0; color: #555; font-size: 0.72rem; letter-spacing: 0.14em; text-transform: uppercase;">Date in mind</td>
                   <td style="padding: 12px 0; color: #444;">${safeDate}</td>
+                </tr>` : ""}
+                ${preferredTime ? `
+                <tr style="border-bottom: 1px solid rgba(0,0,0,0.07);">
+                  <td style="padding: 12px 0; color: #555; font-size: 0.72rem; letter-spacing: 0.14em; text-transform: uppercase;">Preferred time</td>
+                  <td style="padding: 12px 0; color: #444;">${safePreferredTime}</td>
+                </tr>` : ""}
+                ${location ? `
+                <tr style="border-bottom: 1px solid rgba(0,0,0,0.07);">
+                  <td style="padding: 12px 0; color: #555; font-size: 0.72rem; letter-spacing: 0.14em; text-transform: uppercase;">Location</td>
+                  <td style="padding: 12px 0; color: #444;">${safeLocation}</td>
+                </tr>` : ""}
+                ${instagram ? `
+                <tr style="border-bottom: 1px solid rgba(0,0,0,0.07);">
+                  <td style="padding: 12px 0; color: #555; font-size: 0.72rem; letter-spacing: 0.14em; text-transform: uppercase;">Instagram</td>
+                  <td style="padding: 12px 0; color: #444;">@${escapeHtml(instagram.replace(/^@/, ""))}</td>
                 </tr>` : ""}
                 ${safeInquiryId ? `
                 <tr style="border-bottom: 1px solid rgba(0,0,0,0.07);">
@@ -192,7 +237,7 @@ export async function POST(req: NextRequest) {
             text: [
               `Hi ${name},`,
               "",
-              "Thanks for reaching out to soloxsnaps. I received your inquiry and I will get back to you within 24 to 48 hours.",
+              "Thanks for reaching out to soloxsnaps. I received your inquiry and will get back to you within 24 hours.",
               "",
               "While you wait, you can check out my graduation guide to prepare for your shoot and learn more about how grad sessions work:",
               guideUrl,
@@ -200,9 +245,14 @@ export async function POST(req: NextRequest) {
               "Your responses:",
               `Name: ${name}`,
               `Email: ${email}`,
-              `Phone: ${phone || "Not provided"}`,
-              `Session: ${sessionType || "Not provided"}`,
-              `Date in mind: ${date || "Not provided"}`,
+              ...(phone         ? [`Phone: ${phone}`] : []),
+              ...(instagram     ? [`Instagram: @${instagram.replace(/^@/, "")}`] : []),
+              ...(sessionType   ? [`Session: ${sessionType}`] : []),
+              ...(school        ? [`School / Location: ${school}`] : []),
+              ...(people        ? [`Number of people: ${people}`] : []),
+              ...(date          ? [`Date in mind: ${date}`] : []),
+              ...(preferredTime ? [`Preferred time: ${preferredTime}`] : []),
+              ...(location      ? [`Desired location: ${location}`] : []),
               "Message:",
               message,
               "",
@@ -217,7 +267,7 @@ export async function POST(req: NextRequest) {
                 Thanks for reaching out, ${safeName}.
               </h1>
               <p style="font-size: 16px; line-height: 1.7; color: #303635; margin: 0 0 24px;">
-                I received your inquiry and will get back to you within <strong>24 to 48 hours</strong>. Your responses are copied below so you have everything in one place.
+                I received your inquiry and will get back to you within <strong>24 hours</strong>. Your responses are copied below so you have everything in one place.
               </p>
 
               <div style="border: 1px solid rgba(17,21,19,0.1); border-radius: 8px; padding: 22px; background: #f7f8f5; margin: 0 0 26px;">

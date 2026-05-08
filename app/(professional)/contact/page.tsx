@@ -316,17 +316,30 @@ function ContactForm() {
     name: "",
     email: "",
     phone: "",
+    instagram: "",
     sessionType: "",
+    school: "",
+    people: "",
     date: "",
+    preferredTime: "",
+    location: "",
     message: "",
   });
   const [status, setStatus] = useState<"idle" | "sending" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
 
-  // Pre-fill date from ?date= param (set by the availability calendar)
+  // Pre-fill fields from query params (availability calendar, estimator, etc.)
   useEffect(() => {
+    const updates: Partial<typeof form> = {};
     const d = searchParams.get("date");
-    if (d) setForm((prev) => ({ ...prev, date: d }));
+    if (d) updates.date = d;
+    const s = searchParams.get("school");
+    if (s) updates.school = s;
+    const p = searchParams.get("graduates");
+    if (p) updates.people = p === "1" ? "Just me" : `${p} people`;
+    const st = searchParams.get("sessionType");
+    if (st) updates.sessionType = st;
+    if (Object.keys(updates).length) setForm((prev) => ({ ...prev, ...updates }));
   }, [searchParams]);
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) {
@@ -368,7 +381,7 @@ function ContactForm() {
           <p className="contact-kicker">Start the booking note</p>
           <h1 className="contact-title">Tell me the date, location, and what this is for.</h1>
           <p className="contact-copy">
-            Send the basics and I will reply within 24 to 48 hours with availability, next steps, and anything useful for your session.
+            Send the details and I will reply within 24 hours with availability, next steps, and anything useful for your session.
           </p>
           <div className="contact-chip-row">
             <span className="contact-chip">Graduation</span>
@@ -427,6 +440,21 @@ function ContactForm() {
                 />
               </div>
               <div className="contact-field">
+                <label htmlFor="instagram" className="contact-label">Instagram</label>
+                <input
+                  id="instagram"
+                  name="instagram"
+                  type="text"
+                  placeholder="@handle (optional)"
+                  className="contact-input"
+                  value={form.instagram}
+                  onChange={handleChange}
+                />
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="contact-field">
                 <label htmlFor="sessionType" className="contact-label">Session type</label>
                 <select
                   id="sessionType"
@@ -441,19 +469,82 @@ function ContactForm() {
                   ))}
                 </select>
               </div>
+              <div className="contact-field">
+                <label htmlFor="school" className="contact-label">School / Campus</label>
+                <input
+                  id="school"
+                  name="school"
+                  type="text"
+                  placeholder="UC Berkeley, SF State, etc."
+                  className="contact-input"
+                  value={form.school}
+                  onChange={handleChange}
+                />
+              </div>
             </div>
 
-            <div className="contact-field">
-              <label htmlFor="date" className="contact-label">Date in mind</label>
-              <input
-                id="date"
-                name="date"
-                type="text"
-                placeholder="May 15, flexible, or a few options"
-                className="contact-input"
-                value={form.date}
-                onChange={handleChange}
-              />
+            <div className="form-row">
+              <div className="contact-field">
+                <label htmlFor="people" className="contact-label">Number of people</label>
+                <select
+                  id="people"
+                  name="people"
+                  className="contact-select"
+                  value={form.people}
+                  onChange={handleChange}
+                >
+                  <option value="">Select</option>
+                  <option value="1">Just me</option>
+                  <option value="2">2 people</option>
+                  <option value="3">3 people</option>
+                  <option value="4">4 people</option>
+                  <option value="5+">5 or more</option>
+                </select>
+              </div>
+              <div className="contact-field">
+                <label htmlFor="date" className="contact-label">Date in mind</label>
+                <input
+                  id="date"
+                  name="date"
+                  type="text"
+                  placeholder="May 15, flexible, or a few options"
+                  className="contact-input"
+                  value={form.date}
+                  onChange={handleChange}
+                />
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="contact-field">
+                <label htmlFor="preferredTime" className="contact-label">Preferred time</label>
+                <select
+                  id="preferredTime"
+                  name="preferredTime"
+                  className="contact-select"
+                  value={form.preferredTime}
+                  onChange={handleChange}
+                >
+                  <option value="">No preference</option>
+                  <option value="Early morning (golden hour)">Early morning (golden hour)</option>
+                  <option value="Morning">Morning</option>
+                  <option value="Midday">Midday</option>
+                  <option value="Afternoon">Afternoon</option>
+                  <option value="Late afternoon / golden hour">Late afternoon / golden hour</option>
+                </select>
+              </div>
+              <div className="contact-field">
+                <label htmlFor="location" className="contact-label">Desired location</label>
+                <input
+                  id="location"
+                  name="location"
+                  type="text"
+                  placeholder="Specific spot, or leave blank"
+                  className="contact-input"
+                  value={form.location}
+                  onChange={handleChange}
+                />
+              </div>
             </div>
 
             <div className="contact-field">
@@ -462,7 +553,7 @@ function ContactForm() {
                 id="message"
                 name="message"
                 required
-                placeholder="Tell me the campus or location, how many people, and the vibe you want."
+                placeholder="Anything else — vibe you want, questions, or whatever's on your mind."
                 className="contact-textarea"
                 value={form.message}
                 onChange={handleChange}
@@ -484,8 +575,26 @@ function ContactForm() {
         <aside className="contact-sidebar" aria-label="Booking details">
           <div className="contact-side-panel">
             <p className="contact-kicker">Response time</p>
-            <h2>24 to 48 hours.</h2>
-            <p>You will also get a copy of your responses and the graduation guide after submitting.</p>
+            <h2>Within 24 hours.</h2>
+            <p>Most inquiries are answered within 24 hours. You will also get a copy of your responses and the graduation guide after submitting.</p>
+          </div>
+
+          <div className="contact-side-panel">
+            <p className="contact-kicker">What to expect</p>
+            <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 10, marginTop: 4 }}>
+              {[
+                "Guided posing — no awkward standing around",
+                "Fast, clear communication",
+                "Private gallery delivered on time",
+                "Bay Area campus expertise",
+                "50% deposit to reserve your date",
+              ].map((item) => (
+                <li key={item} style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: 14, color: "#56635e", lineHeight: 1.5 }}>
+                  <span style={{ color: "#4f6d67", fontWeight: 700, flexShrink: 0 }}>✓</span>
+                  {item}
+                </li>
+              ))}
+            </ul>
           </div>
 
           <div className="contact-side-panel">
