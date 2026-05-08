@@ -10,8 +10,11 @@ export default function VaultTab() {
   const [selectedNote, setSelectedNote] = useState<VaultNote | null>(null);
   const [openFolders, setOpenFolders] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState<string | null>(null);
 
-  useEffect(() => {
+  function loadVault() {
+    setLoading(true);
     fetch("/api/vault", { credentials: "include" })
       .then(r => r.json())
       .then(d => {
@@ -22,9 +25,27 @@ export default function VaultTab() {
           if (first.notes.length) setSelectedNote(first.notes[0]);
         }
       })
-      .catch(() => setError("Could not load vault — is the vault path correct?"))
+      .catch(() => setError("Could not load vault"))
       .finally(() => setLoading(false));
-  }, []);
+  }
+
+  useEffect(() => { loadVault(); }, []);
+
+  async function handleSync() {
+    setSyncing(true);
+    setSyncMsg(null);
+    try {
+      const r = await fetch("/api/vault/sync", { method: "POST", credentials: "include" });
+      const d = await r.json();
+      if (d.error) { setSyncMsg(`Error: ${d.error}`); return; }
+      setSyncMsg(`Synced ${d.synced} notes`);
+      loadVault();
+    } catch {
+      setSyncMsg("Sync failed");
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   const filteredFolders = useMemo(() => {
     if (!search.trim()) return folders;
@@ -63,8 +84,33 @@ export default function VaultTab() {
         flexDirection: "column",
         background: C.surface,
       }}>
+        {/* Sync */}
+        <div style={{ padding: "12px 12px 4px", display: "flex", alignItems: "center", gap: 8 }}>
+          <button
+            onClick={handleSync}
+            disabled={syncing}
+            style={{
+              padding: "5px 12px",
+              borderRadius: 6,
+              border: `1px solid ${C.borderSubtle}`,
+              background: syncing ? "#e2e8f0" : C.p1,
+              color: syncing ? "#94a3b8" : "#fff",
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: syncing ? "not-allowed" : "pointer",
+            }}
+          >
+            {syncing ? "Syncing…" : "Sync Vault"}
+          </button>
+          {syncMsg && (
+            <span style={{ fontSize: 12, color: syncMsg.startsWith("Error") ? "#ef4444" : "#22c55e" }}>
+              {syncMsg}
+            </span>
+          )}
+        </div>
+
         {/* Search */}
-        <div style={{ padding: "12px 12px 8px" }}>
+        <div style={{ padding: "4px 12px 8px" }}>
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}

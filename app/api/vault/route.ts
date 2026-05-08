@@ -1,17 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/requireAdmin";
-import fs from "fs";
-import path from "path";
+import { createSupabaseServerClient } from "@/lib/supabaseServer";
 
 export const dynamic = "force-dynamic";
 
-const VAULT_PATH = process.env.OBSIDIAN_VAULT_PATH
-  ?? "/Users/chrissolo/Documents/Photography Business Soloxsnaps";
-
-const SKIP_DIRS = new Set([".obsidian", ".trash", "99 Archive", "Inbox"]);
-
 export type VaultNote = {
-  id: string;       // relative path from vault root
+  id: string;
   title: string;
   folder: string;
   content: string;
@@ -22,49 +16,31 @@ export type VaultFolder = {
   notes: VaultNote[];
 };
 
-function readVault(): VaultFolder[] {
-  const folders: VaultFolder[] = [];
+async function readVaultFromSupabase(): Promise<VaultFolder[]> {
+  const supabase = createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("vault_notes")
+    .select("id, title, folder, content")
+    .order("folder")
+    .order("title");
 
-  const entries = fs.readdirSync(VAULT_PATH, { withFileTypes: true });
+  if (error) throw error;
 
-  // Root-level notes (HOME.md, Welcome.md, CLAUDE_CONTEXT.md)
-  const rootNotes: VaultNote[] = [];
-  for (const entry of entries) {
-    if (entry.isFile() && entry.name.endsWith(".md")) {
-      const fullPath = path.join(VAULT_PATH, entry.name);
-      const content = fs.readFileSync(fullPath, "utf-8");
-      rootNotes.push({
-        id: entry.name,
-        title: entry.name.replace(".md", ""),
-        folder: "Root",
-        content,
-      });
-    }
-  }
-  if (rootNotes.length) folders.push({ name: "Root", notes: rootNotes });
-
-  // Subfolders
-  const subdirs = entries
-    .filter(e => e.isDirectory() && !SKIP_DIRS.has(e.name))
-    .sort((a, b) => a.name.localeCompare(b.name));
-
-  for (const dir of subdirs) {
-    const dirPath = path.join(VAULT_PATH, dir.name);
-    const noteFiles = fs.readdirSync(dirPath).filter(f => f.endsWith(".md"));
-    const notes: VaultNote[] = noteFiles.map(f => {
-      const fullPath = path.join(dirPath, f);
-      const content = fs.readFileSync(fullPath, "utf-8");
-      return {
-        id: `${dir.name}/${f}`,
-        title: f.replace(".md", ""),
-        folder: dir.name,
-        content,
-      };
-    });
-    if (notes.length) folders.push({ name: dir.name, notes });
+  const folderMap = new Map<string, VaultNote[]>();
+  for (const row of data ?? []) {
+    const notes = folderMap.get(row.folder) ?? [];
+    notes.push({ id: row.id, title: row.title, folder: row.folder, content: row.content });
+    folderMap.set(row.folder, notes);
   }
 
-  return folders;
+  // Sort folders: Root first, then alphabetical
+  const sorted = [...folderMap.entries()].sort(([a], [b]) => {
+    if (a === "Root") return -1;
+    if (b === "Root") return 1;
+    return a.localeCompare(b);
+  });
+
+  return sorted.map(([name, notes]) => ({ name, notes }));
 }
 
 // GET /api/vault — returns full folder tree with content
@@ -73,7 +49,7 @@ export async function GET(req: NextRequest) {
   if (deny) return deny;
 
   try {
-    const folders = readVault();
+    const folders = await readVaultFromSupabase();
     return NextResponse.json({ folders });
   } catch (err) {
     console.error("[vault] read error", err);
@@ -88,12 +64,20 @@ export async function POST(req: NextRequest) {
   if (deny) return deny;
 
   const { keywords = [] }: { keywords: string[] } = await req.json();
-  const folders = readVault();
-  const allNotes = folders.flatMap(f => f.notes);
+
+  const supabase = createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("vault_notes")
+    .select("id, title, folder, content");
+
+  if (error) {
+    console.error("[vault] context error", error);
+    return NextResponse.json({ error: "Failed to read vault" }, { status: 500 });
+  }
 
   const lower = keywords.map((k: string) => k.toLowerCase());
 
-  const relevant = allNotes.filter(note => {
+  const relevant = (data ?? []).filter(note => {
     const haystack = (note.title + " " + note.folder + " " + note.content).toLowerCase();
     return lower.some(k => haystack.includes(k));
   });
