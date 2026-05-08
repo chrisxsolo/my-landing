@@ -40,7 +40,7 @@ const BLOG_CATEGORIES:{value:BlogCategory;label:string;helper:string}[]=[
   {value:"professional",label:"Professional",helper:"Case studies at /blog"},
 ];
 const WEBSITE_TABS:Tab[]=["poses","locations","bayGuide","portfolio","categories","blog"];
-const CLIENT_TABS:Tab[]=["analytics","payments","funnel","inquiries","clients"];
+const CLIENT_TABS:Tab[]=["inquiries","clients","analytics","payments","funnel"];
 const VAULT_TABS:Tab[]=["vault"];
 const TAB_LABELS:Record<Tab,string>={home:"🏠 Home",poses:"📸 Grad Poses",locations:"📍 Campus Spots",bayGuide:"🗺️ Bay Guide",portfolio:"🖼️ Portfolio",categories:"🏷️ Categories",blog:"✍️ Blog",analytics:"📊 Analytics",payments:"💵 Revenue",funnel:"📈 Funnel",inquiries:"📬 Inquiries",clients:"👥 Clients",vault:"📓 Vault"};
 
@@ -274,6 +274,23 @@ function AdminDashboard() {
   const [gmailConnected,setGmailConnected]=useState(false);
   const [gmailEmail,setGmailEmail]=useState<string|null>(null);
   const [gmailLoading,setGmailLoading]=useState(false);
+  type InboxThread={threadId:string;fromName:string;fromEmail:string;subject:string;snippet:string;timestamp:number;messageCount:number};
+  const [inboxThreads,setInboxThreads]=useState<InboxThread[]>([]);
+  const [inboxLoading,setInboxLoading]=useState(false);
+  // inbox thread reply panels — keyed by threadId string
+  const [inboxReplyOpen,setInboxReplyOpen]=useState<Record<string,boolean>>({});
+  const [inboxContext,setInboxContext]=useState<Record<string,string>>({});
+  const [inboxDraft,setInboxDraft]=useState<Record<string,string>>({});
+  const [inboxDraftLoading,setInboxDraftLoading]=useState<Record<string,boolean>>({});
+  const [inboxSendLoading,setInboxSendLoading]=useState<Record<string,boolean>>({});
+  // freeform compose
+  const [freeComposeOpen,setFreeComposeOpen]=useState(false);
+  const [freeComposeTo,setFreeComposeTo]=useState("");
+  const [freeComposeSubject,setFreeComposeSubject]=useState("");
+  const [freeComposeBody,setFreeComposeBody]=useState("");
+  const [freeComposePolishing,setFreeComposePolishing]=useState(false);
+  const [freeComposeSending,setFreeComposeSending]=useState(false);
+
   const [composeOpen,setComposeOpen]=useState<Record<number,boolean>>({});
   const [composeSubject,setComposeSubject]=useState<Record<number,string>>({});
   const [composeBody,setComposeBody]=useState<Record<number,string>>({});
@@ -359,6 +376,78 @@ function AdminDashboard() {
       setGmailConnected(json.connected??false);
       setGmailEmail(json.email??null);
     }catch{setGmailConnected(false);}
+  }
+
+  async function fetchInbox(){
+    setInboxLoading(true);
+    try{
+      const res=await fetch("/api/gmail/inbox?limit=5");
+      const json=await res.json();
+      setInboxThreads(json.threads??[]);
+    }catch{setInboxThreads([]);}
+    finally{setInboxLoading(false);}
+  }
+
+  async function generateInboxDraft(t:InboxThread){
+    setInboxDraftLoading(p=>({...p,[t.threadId]:true}));
+    try{
+      const payload={
+        name:t.fromName,email:t.fromEmail,
+        message:`Subject: ${t.subject}\n\n${inboxContext[t.threadId]??t.snippet}`,
+        session_type:null,date_in_mind:null,phone:null,
+      };
+      const res=await fetch("/api/draft-reply",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+      const json=await res.json();
+      if(json.draft)setInboxDraft(p=>({...p,[t.threadId]:json.draft}));
+      else showToast(json.error??"Draft failed",false);
+    }catch{showToast("Draft failed",false);}
+    finally{setInboxDraftLoading(p=>({...p,[t.threadId]:false}));}
+  }
+
+  async function sendInboxReply(t:InboxThread){
+    const body=inboxDraft[t.threadId]?.trim();
+    const subject=`Re: ${t.subject}`;
+    if(!body)return;
+    setInboxSendLoading(p=>({...p,[t.threadId]:true}));
+    try{
+      const res=await fetch("/api/gmail/send",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({to:t.fromEmail,subject,body})});
+      const json=await res.json();
+      if(json.ok){
+        showToast(`Reply sent to ${t.fromName} ✓`);
+        setInboxReplyOpen(p=>({...p,[t.threadId]:false}));
+        setInboxDraft(p=>({...p,[t.threadId]:""}));
+        setInboxThreads(p=>p.filter(x=>x.threadId!==t.threadId));
+      }else{showToast(json.error??"Send failed",false);}
+    }catch{showToast("Send failed",false);}
+    finally{setInboxSendLoading(p=>({...p,[t.threadId]:false}));}
+  }
+
+  async function polishFreeCompose(){
+    if(!freeComposeBody.trim())return;
+    setFreeComposePolishing(true);
+    try{
+      const payload={name:freeComposeTo||"",email:freeComposeTo,message:freeComposeBody,session_type:null,date_in_mind:null,phone:null};
+      const res=await fetch("/api/draft-reply",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+      const json=await res.json();
+      if(json.draft)setFreeComposeBody(json.draft);
+      else showToast(json.error??"Polish failed",false);
+    }catch{showToast("Polish failed",false);}
+    finally{setFreeComposePolishing(false);}
+  }
+
+  async function sendFreeCompose(){
+    if(!freeComposeTo.trim()||!freeComposeSubject.trim()||!freeComposeBody.trim()){showToast("Fill in all fields",false);return;}
+    setFreeComposeSending(true);
+    try{
+      const res=await fetch("/api/gmail/send",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({to:freeComposeTo.trim(),subject:freeComposeSubject.trim(),body:freeComposeBody.trim()})});
+      const json=await res.json();
+      if(json.ok){
+        showToast("Email sent ✓");
+        setFreeComposeOpen(false);
+        setFreeComposeTo("");setFreeComposeSubject("");setFreeComposeBody("");
+      }else{showToast(json.error??"Send failed",false);}
+    }catch{showToast("Send failed",false);}
+    finally{setFreeComposeSending(false);}
   }
 
   async function disconnectGmail(){
@@ -511,7 +600,7 @@ function AdminDashboard() {
     setPostsLoading(false);
   }
   
-  useEffect(()=>{if(authed){fetchPoses();fetchSpots();fetchCategories();fetchPortfolioImages();fetchPosts();fetchSiteSettings();fetchInquiries();fetchGmailStatus();}},[authed]);
+  useEffect(()=>{if(authed){fetchPoses();fetchSpots();fetchCategories();fetchPortfolioImages();fetchPosts();fetchSiteSettings();fetchInquiries();fetchGmailStatus();fetchInbox();}},[authed]);
   useEffect(()=>{if(authed&&(tab==="inquiries"||tab==="clients")){fetchInquiries();fetchGmailStatus();}},[authed,tab,blogCategory]);
 
   async function compressImage(file:File, maxPx=2400, quality=0.82):Promise<Blob>{
@@ -842,7 +931,7 @@ function AdminDashboard() {
           const confirmedSessions=inquiries.filter(i=>i.booking_confirmed).length;
           const newThisMonth=inquiries.filter(i=>new Date(i.created_at)>=monthStart).length;
           const paidSessions=inquiries.filter(i=>i.payment_status==="paid").length;
-          const pendingInquiries=inquiries.filter(i=>!i.reply_sent_at&&i.status!=="archived").length;
+          const pendingInquiries=inquiries.filter(i=>!i.reply_sent_at&&i.status!=="archived"&&i.status!=="not_interested").length;
 
           const dayLabel=(d:string)=>{
             const dt=new Date(d+"T12:00:00");
@@ -912,17 +1001,204 @@ function AdminDashboard() {
                 </div>
               </div>
 
-              {/* Pending inquiries alert */}
-              {pendingInquiries>0&&(
-                <button onClick={()=>setTab("inquiries")} className="w-full flex items-center gap-3 p-4 rounded-2xl border text-left transition-all hover:opacity-80" style={{background:"rgba(245,158,11,0.06)",borderColor:"rgba(245,158,11,0.25)"}}>
-                  <span className="text-xl">📬</span>
-                  <div className="flex-1">
-                    <p className="text-sm font-black text-slate-900">{pendingInquiries} unanswered {pendingInquiries===1?"inquiry":"inquiries"}</p>
-                    <p className="text-xs text-slate-400">Tap to go reply</p>
+              {/* New inquiries card */}
+              {pendingInquiries>0&&(()=>{
+                const newInqs=inquiries
+                  .filter(i=>!i.reply_sent_at&&i.status!=="archived"&&i.status!=="not_interested")
+                  .sort((a,b)=>new Date(b.created_at).getTime()-new Date(a.created_at).getTime())
+                  .slice(0,3);
+                const hoursAgo=(iso:string)=>{
+                  const h=Math.round((Date.now()-new Date(iso).getTime())/(1000*60*60));
+                  if(h<1)return"just now";if(h===1)return"1h ago";if(h<24)return`${h}h ago`;
+                  const d=Math.round(h/24);return d===1?"1d ago":`${d}d ago`;
+                };
+                return(
+                  <div className="rounded-2xl overflow-hidden border" style={{borderColor:"rgba(245,158,11,0.3)",background:"white"}}>
+                    <div className="h-[3px]" style={{background:"linear-gradient(90deg,#f59e0b,#d97706)"}}/>
+                    <div className="p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <p className="text-xs font-black uppercase tracking-widest text-amber-600">📬 New Inquiries</p>
+                        <button onClick={()=>setTab("inquiries")} className="text-[11px] font-bold text-slate-400 hover:text-slate-600">
+                          {pendingInquiries>3?`+${pendingInquiries-3} more — view all →`:"View all →"}
+                        </button>
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        {newInqs.map(inq=>(
+                          <div key={inq.id} className="flex items-center gap-3 p-2.5 rounded-xl border" style={{borderColor:"#fef3c7",background:"#fffbeb"}}>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="text-sm font-bold text-slate-900">{inq.name}</p>
+                                <span className="text-[10px] text-amber-600 font-bold">{hoursAgo(inq.created_at)}</span>
+                              </div>
+                              <p className="text-xs text-slate-500 truncate">
+                                {inq.session_type||"Session"}{inq.date_in_mind?` · ${inq.date_in_mind}`:""}
+                              </p>
+                            </div>
+                            <button onClick={()=>setTab("inquiries")}
+                              className="flex-shrink-0 text-[11px] font-bold px-2.5 py-1 rounded-lg text-white"
+                              style={{background:"linear-gradient(135deg,#f59e0b,#d97706)"}}>
+                              Reply →
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
-                  <span className="text-sm font-bold text-amber-500">→</span>
-                </button>
-              )}
+                );
+              })()}
+
+              {/* Client email replies */}
+              {gmailConnected&&(()=>{
+                const timeAgo=(ts:number)=>{
+                  const h=Math.round((Date.now()-ts)/(1000*60*60));
+                  if(h<1)return"just now";if(h===1)return"1h ago";if(h<24)return`${h}h ago`;
+                  const d=Math.round(h/24);return d===1?"1d ago":`${d}d ago`;
+                };
+                const decodeSnippet=(s:string)=>{
+                  try{const el=document.createElement("textarea");el.innerHTML=s;return el.value;}catch{return s;}
+                };
+                const initials=(name:string)=>{
+                  const parts=name.trim().split(/\s+/);
+                  if(parts.length>=2)return(parts[0][0]+(parts[parts.length-1][0])).toUpperCase();
+                  return(name[0]??"?").toUpperCase();
+                };
+                return(
+                  <div className="rounded-2xl overflow-hidden border border-slate-200 bg-white">
+                    <div className="h-[3px]" style={{background:"linear-gradient(90deg,#6366f1,#8b5cf6)"}}/>
+                    <div className="p-4">
+                      {/* Header */}
+                      <div className="flex items-center justify-between mb-3">
+                        <p className="text-xs font-black uppercase tracking-widest text-slate-500">✉️ Client Emails</p>
+                        <div className="flex items-center gap-3">
+                          <button onClick={()=>setFreeComposeOpen(p=>!p)}
+                            className="text-[11px] font-bold px-2.5 py-1 rounded-lg transition-all"
+                            style={freeComposeOpen?{background:C.grad12,color:"#fff"}:{background:C.p1_04,color:C.p1,border:`1px solid ${C.p1_20}`}}>
+                            {freeComposeOpen?"✕ Cancel":"+ Compose"}
+                          </button>
+                          <button onClick={fetchInbox} className="text-[11px] font-bold text-slate-400 hover:text-slate-600">Refresh</button>
+                        </div>
+                      </div>
+
+                      {/* Freeform compose panel */}
+                      {freeComposeOpen&&(
+                        <div className="mb-4 p-3 rounded-xl border border-slate-200 bg-slate-50 space-y-2">
+                          <p className="text-xs font-black text-slate-700">New Email</p>
+                          <input className="w-full px-3 py-2 rounded-lg text-sm outline-none border border-slate-200 bg-white text-slate-700" placeholder="To (email address)" value={freeComposeTo} onChange={e=>setFreeComposeTo(e.target.value)} style={{fontFamily:"inherit"}}/>
+                          <input className="w-full px-3 py-2 rounded-lg text-sm outline-none border border-slate-200 bg-white text-slate-700" placeholder="Subject" value={freeComposeSubject} onChange={e=>setFreeComposeSubject(e.target.value)} style={{fontFamily:"inherit"}}/>
+                          <textarea rows={4} className="w-full px-3 py-2 rounded-lg text-sm outline-none border border-slate-200 bg-white text-slate-700 resize-none" placeholder="Write your message — or jot rough notes and hit AI Polish…" value={freeComposeBody} onChange={e=>setFreeComposeBody(e.target.value)} style={{fontFamily:"inherit"}}/>
+                          <div className="flex gap-2">
+                            <button onClick={polishFreeCompose} disabled={freeComposePolishing||!freeComposeBody.trim()}
+                              className="flex-1 py-2 rounded-lg text-xs font-bold transition-all disabled:opacity-50"
+                              style={{background:C.p1_08,color:C.p1,border:`1px solid ${C.p1_20}`}}>
+                              {freeComposePolishing?"Polishing…":"✨ AI Polish"}
+                            </button>
+                            <button onClick={sendFreeCompose} disabled={freeComposeSending||!freeComposeTo.trim()||!freeComposeBody.trim()}
+                              className="flex-1 py-2 rounded-lg text-xs font-bold text-white transition-all disabled:opacity-50"
+                              style={{background:C.grad12}}>
+                              {freeComposeSending?"Sending…":"Send →"}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Thread list */}
+                      {inboxLoading?(
+                        <p className="text-xs text-slate-400 py-2">Loading…</p>
+                      ):inboxThreads.length===0&&!freeComposeOpen?(
+                        <p className="text-xs text-slate-400 py-2">No new client emails.</p>
+                      ):(
+                        <div className="flex flex-col gap-3">
+                          {inboxThreads.map(t=>{
+                            const isOpen=inboxReplyOpen[t.threadId]??false;
+                            const draft=inboxDraft[t.threadId]??"";
+                            const isGenerating=inboxDraftLoading[t.threadId]??false;
+                            const isSending=inboxSendLoading[t.threadId]??false;
+                            const name=t.fromName||t.fromEmail;
+                            return(
+                              <div key={t.threadId} className="rounded-xl border border-slate-200 overflow-hidden bg-white">
+                                {/* Sender row */}
+                                <div className="flex items-center gap-3 px-3 pt-3 pb-2">
+                                  <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-black text-white flex-shrink-0"
+                                    style={{background:"linear-gradient(135deg,#6366f1,#8b5cf6)"}}>
+                                    {initials(name)}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <p className="text-sm font-black text-slate-900">{name}</p>
+                                      {t.messageCount>1&&<span className="text-[10px] font-bold text-slate-400">{t.messageCount} msgs</span>}
+                                      <span className="text-[10px] font-bold text-violet-500 ml-auto">{timeAgo(t.timestamp)}</span>
+                                    </div>
+                                    <p className="text-[11px] text-slate-400 truncate">{t.fromEmail}</p>
+                                  </div>
+                                </div>
+                                {/* Subject + snippet */}
+                                <div className="px-3 pb-3">
+                                  <p className="text-xs font-bold text-slate-700 mb-1">{t.subject}</p>
+                                  <p className="text-[12px] text-slate-500 leading-relaxed line-clamp-3">{decodeSnippet(t.snippet)}</p>
+                                </div>
+                                {/* Action buttons */}
+                                {(()=>{
+                                  const matchedInquiry=inquiries.find(i=>i.email.toLowerCase()===t.fromEmail.toLowerCase());
+                                  return(
+                                    <div className="flex border-t border-slate-100">
+                                      <button
+                                        onClick={()=>{
+                                          if(matchedInquiry){
+                                            router.push(`/admin/conversation/${matchedInquiry.id}`);
+                                          }else{
+                                            setClientSearch(t.fromEmail);
+                                            setTab("clients");
+                                          }
+                                        }}
+                                        className="flex-1 py-2 text-[11px] font-bold text-slate-600 hover:bg-slate-50 transition-colors">
+                                        ✏️ Draft Reply
+                                      </button>
+                                      <div className="w-px bg-slate-100"/>
+                                      <a href={`https://mail.google.com/mail/u/0/#inbox/${t.threadId}`}
+                                        target="_blank" rel="noopener noreferrer"
+                                        className="flex-1 py-2 text-[11px] font-bold text-slate-600 hover:bg-slate-50 transition-colors text-center">
+                                        Open in Gmail ↗
+                                      </a>
+                                    </div>
+                                  );
+                                })()}
+                                {/* Reply panel — kept for future inline use, hidden for now */}
+                                {isOpen&&(
+                                  <div className="border-t border-slate-100 p-3 bg-slate-50 space-y-2">
+                                    <textarea rows={2} className="w-full px-3 py-2 rounded-lg text-xs outline-none border border-slate-200 bg-white text-slate-600 resize-none" placeholder="Add context for the AI (optional) — e.g. 'Tell them SFSU spots are available May 18'" value={inboxContext[t.threadId]??""} onChange={e=>setInboxContext(p=>({...p,[t.threadId]:e.target.value}))} style={{fontFamily:"inherit"}}/>
+                                    <button onClick={()=>generateInboxDraft(t)} disabled={isGenerating}
+                                      className="w-full py-2 rounded-lg text-xs font-bold transition-all disabled:opacity-50"
+                                      style={{background:C.p1_08,color:C.p1,border:`1px solid ${C.p1_20}`}}>
+                                      {isGenerating?"Drafting…":"✨ AI Draft"}
+                                    </button>
+                                    {draft&&(
+                                      <>
+                                        <textarea rows={6} className="w-full px-3 py-2 rounded-lg text-xs outline-none border border-slate-200 bg-white text-slate-700 resize-y" value={draft} onChange={e=>setInboxDraft(p=>({...p,[t.threadId]:e.target.value}))} style={{fontFamily:"inherit"}}/>
+                                        <div className="flex gap-2">
+                                          <button onClick={()=>navigator.clipboard.writeText(draft).then(()=>showToast("Copied ✓"))}
+                                            className="flex-1 py-2 rounded-lg text-xs font-bold transition-all"
+                                            style={{background:"rgba(148,163,184,0.12)",color:"#64748b"}}>
+                                            Copy
+                                          </button>
+                                          <button onClick={()=>sendInboxReply(t)} disabled={isSending}
+                                            className="flex-1 py-2 rounded-lg text-xs font-bold text-white transition-all disabled:opacity-50"
+                                            style={{background:C.grad12}}>
+                                            {isSending?"Sending…":"Send →"}
+                                          </button>
+                                        </div>
+                                      </>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Nav cards */}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -2243,8 +2519,48 @@ function AdminDashboard() {
             const matchesFilter=clientFilter==="all"||(clientFilter==="paid"&&hasPaid)||(clientFilter==="unpaid"&&!hasPaid);
             return matchesSearch&&matchesFilter;
           });
+          const pendingOnClients=inquiries.filter(i=>!i.reply_sent_at&&i.status!=="archived"&&i.status!=="not_interested").sort((a,b)=>new Date(b.created_at).getTime()-new Date(a.created_at).getTime());
+          const hoursAgoClient=(iso:string)=>{
+            const h=Math.round((Date.now()-new Date(iso).getTime())/(1000*60*60));
+            if(h<1)return"just now";if(h===1)return"1h ago";if(h<24)return`${h}h ago`;
+            const d=Math.round(h/24);return d===1?"1d ago":`${d}d ago`;
+          };
           return(
             <div className="space-y-6">
+              {/* New inquiries section */}
+              {pendingOnClients.length>0&&(
+                <div className="rounded-2xl overflow-hidden border" style={{borderColor:"rgba(245,158,11,0.3)",background:"white"}}>
+                  <div className="h-[3px]" style={{background:"linear-gradient(90deg,#f59e0b,#d97706)"}}/>
+                  <div className="p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-xs font-black uppercase tracking-widest text-amber-600">📬 New Inquiries — Needs Reply</p>
+                      <button onClick={()=>setTab("inquiries")} className="text-[11px] font-bold text-slate-400 hover:text-slate-600">Open Inquiries tab →</button>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      {pendingOnClients.map(inq=>(
+                        <div key={inq.id} className="flex items-center gap-3 p-2.5 rounded-xl border" style={{borderColor:"#fef3c7",background:"#fffbeb"}}>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="text-sm font-bold text-slate-900">{inq.name}</p>
+                              <span className="text-[10px] text-amber-600 font-bold">{hoursAgoClient(inq.created_at)}</span>
+                            </div>
+                            <p className="text-xs text-slate-500 truncate">
+                              {inq.session_type||"Session"}{inq.date_in_mind?` · ${inq.date_in_mind}`:""}
+                            </p>
+                            <p className="text-[11px] text-slate-400 truncate mt-0.5">{inq.email}</p>
+                          </div>
+                          <button onClick={()=>setTab("inquiries")}
+                            className="flex-shrink-0 text-[11px] font-bold px-2.5 py-1 rounded-lg text-white"
+                            style={{background:"linear-gradient(135deg,#f59e0b,#d97706)"}}>
+                            Reply →
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Search bar */}
               <div className={card}>
                 <div className="h-[3px]" style={{background:C.grad12}}/>

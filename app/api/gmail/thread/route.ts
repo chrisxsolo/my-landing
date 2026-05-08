@@ -67,7 +67,7 @@ export async function GET(req: NextRequest) {
       try {
         const r = await fetch(
           `https://gmail.googleapis.com/gmail/v1/users/me/threads/${threadId}` +
-          `?format=metadata&metadataHeaders=From,To,Subject,Date`,
+          `?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Subject&metadataHeaders=Date`,
           { headers: { Authorization: auth } }
         );
         if (!r.ok) return null;

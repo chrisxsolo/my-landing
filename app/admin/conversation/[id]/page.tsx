@@ -373,8 +373,9 @@ export default function ConversationPage() {
   }
 
   // ── Polish: fix typos / convert bullet points to email ─────────────────────
-  async function polishDraft() {
-    if (!inquiry || !draft.trim()) return;
+  async function polishDraft(textOverride?: string) {
+    const textToPolish = textOverride ?? draft;
+    if (!inquiry || !textToPolish.trim()) return;
     setPolishLoading(true);
     try {
       const threadContext = messages.length > 0
@@ -393,7 +394,7 @@ export default function ConversationPage() {
           message:        inquiry.message,
           session_type:   inquiry.session_type,
           thread_context: threadContext ?? null,
-          raw_draft:      draft,
+          raw_draft:      textToPolish,
         }),
       });
       const json = await res.json();
@@ -479,9 +480,11 @@ export default function ConversationPage() {
           const res  = await fetch("/api/transcribe", { method: "POST", body: fd });
           const json = await res.json() as { text?: string; error?: string };
           if (json.text) {
-            // Replace the live preview with Whisper's accurate final transcript
             const base = draftBaseRef.current;
-            setDraft(base ? base + "\n" + json.text : json.text);
+            const transcript = base ? base + "\n" + json.text : json.text;
+            setDraft(transcript);
+            // Auto-polish immediately — pass text directly since state hasn't updated yet
+            await polishDraft(transcript);
           } else {
             setVoiceError(json.error ?? "Transcription failed");
             setTimeout(() => setVoiceError(null), 5000);
@@ -1081,7 +1084,7 @@ export default function ConversationPage() {
                 {/* AI action buttons */}
                 <div className="flex gap-2">
                   <button onClick={toggleVoice}
-                    title={voiceActive ? "Stop recording" : "Speak your reply — then hit Polish"}
+                    title={voiceActive ? "Stop recording — will auto-polish" : "Speak your reply — auto-polishes when done"}
                     className="text-xs font-bold px-2.5 py-1.5 rounded-lg transition-all hover:opacity-80 flex items-center gap-1"
                     style={voiceActive
                       ? { background: "rgba(239,68,68,0.12)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.3)" }
@@ -1122,7 +1125,7 @@ export default function ConversationPage() {
                 <div className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium"
                      style={{ background: "rgba(239,68,68,0.07)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.2)" }}>
                   <span className="inline-block w-2 h-2 rounded-full bg-red-500 animate-pulse flex-shrink-0" />
-                  <span>Recording… speak naturally. Hit Stop when done — Whisper will clean it up.</span>
+                  <span>Recording… speak naturally. Hit Stop when done — auto-transcribes and polishes.</span>
                 </div>
               )}
               {draftLoading && !voiceActive && (
