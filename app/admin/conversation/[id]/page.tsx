@@ -413,7 +413,8 @@ export default function ConversationPage() {
   // ── Voice-to-text (MediaRecorder → Whisper) ───────────────────────────────
   const mediaRecorderRef  = useRef<MediaRecorder | null>(null);
   const audioChunksRef    = useRef<Blob[]>([]);
-  const liveRecogRef      = useRef<SpeechRecognition | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const liveRecogRef      = useRef<any>(null);
   const voicePreviewRef   = useRef(""); // live interim text shown while recording
   const draftBaseRef      = useRef(""); // text in box before recording started
   const draftRef          = useRef("");
@@ -430,13 +431,15 @@ export default function ConversationPage() {
 
       // ── Live preview via SpeechRecognition ──────────────────────────────
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const SR: (new () => SpeechRecognition) | undefined = (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const SR: (new () => any) | undefined = (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition;
       if (SR) {
         const rec = new SR();
         rec.continuous     = true;
         rec.interimResults = true;
         rec.lang           = "en-US";
-        rec.onresult = (e: SpeechRecognitionEvent) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        rec.onresult = (e: any) => {
           let preview = "";
           for (let i = 0; i < e.results.length; i++) {
             preview += e.results[i][0].transcript;
