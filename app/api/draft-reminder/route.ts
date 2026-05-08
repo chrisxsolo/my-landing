@@ -18,6 +18,13 @@ export const dynamic = "force-dynamic";
 
 type MimePart = { mimeType?: string; body?: { data?: string }; parts?: MimePart[] };
 
+function stripSignoff(text: string): string {
+  return text
+    .replace(/\n+[-–]?\s*Chris\s*$/i, "")
+    .replace(/\n+(?:best|thanks|cheers|warm regards|regards|sincerely)[,.]?\s*\n+chris\s*$/i, "")
+    .trimEnd();
+}
+
 function decodeBody(data: string): string {
   try {
     const base64 = data.replace(/-/g, "+").replace(/_/g, "/");
@@ -129,7 +136,7 @@ Do NOT describe how beautiful the location is. Do NOT add extra filler sentences
     }],
   });
 
-  const draft = res.content[0].type === "text" ? res.content[0].text.trim() : "";
+  const draft = stripSignoff(res.content[0].type === "text" ? res.content[0].text.trim() : "");
   const subject = `See you tomorrow! 🎓`;
 
   return NextResponse.json({ subject, draft });

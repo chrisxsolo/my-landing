@@ -44,7 +44,11 @@ Rules must be:
 - Written as instructions for Claude: "Always X", "Never Y", "If Z then W"
 - Specific enough to be unambiguous
 
-If Chris is just chatting with no new instruction, return an empty array.`;
+If Chris is just chatting with no new instruction, return an empty array.
+
+Hard rules already in place (do not re-extract these — they are already saved):
+- Never add a sign-off or name at the end of emails — end with the last line of content only
+- No em dashes (—) in email output — use commas or rewrite the sentence instead`;
 
 const MERGE_SYSTEM = `You are a knowledge base editor for a photography business. Your job is to maintain a clean, well-structured markdown note of AI email writing rules.
 

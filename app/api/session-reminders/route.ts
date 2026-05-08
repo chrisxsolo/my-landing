@@ -21,6 +21,13 @@ export type ReminderDraft = {
 
 type MimePart = { mimeType?: string; body?: { data?: string }; parts?: MimePart[] };
 
+function stripSignoff(text: string): string {
+  return text
+    .replace(/\n+[-–]?\s*Chris\s*$/i, "")
+    .replace(/\n+(?:best|thanks|cheers|warm regards|regards|sincerely)[,.]?\s*\n+chris\s*$/i, "")
+    .trimEnd();
+}
+
 function decodeBody(data: string): string {
   try {
     const base64 = data.replace(/-/g, "+").replace(/_/g, "/");
@@ -81,7 +88,7 @@ async function generateOne(
     system: systemPrompt,
     messages: [{ role: "user", content: userContent }],
   });
-  return res.content[0].type === "text" ? res.content[0].text.trim() : "";
+  return stripSignoff(res.content[0].type === "text" ? res.content[0].text.trim() : "");
 }
 
 export async function POST(req: NextRequest) {

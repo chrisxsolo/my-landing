@@ -240,7 +240,7 @@ export async function POST(req: NextRequest) {
     try {
       const client = new Anthropic({ apiKey });
       const response = await client.messages.create({
-        model: "claude-sonnet-4-5",
+        model: "claude-sonnet-4-6",
         max_tokens: 500,
         system: `You are a writing-style analyst. Your job is to compare two email drafts and produce a short, concrete list of style rules that capture how the final version differs from the draft. Each rule should be a single actionable instruction (e.g. "skip the opening weather comment", "be more direct — cut the warm-up sentences", "always mention the turnaround time"). No fluff, no praise, no explanation — just the rules, one per line, starting with a dash.`,
         messages: [
@@ -302,12 +302,13 @@ Format rules (always apply):
 - Plain text only — no markdown, no bold, no asterisks, no bullet points in the output
 - Start directly with "Hi [Name]," — no subject line
 - Do NOT add a sign-off or name at the end — end the email with the last line of content only
-- Never include email headers, timestamps, or "to:" lines` + vaultSection;
+- Never include email headers, timestamps, or "to:" lines
+- No em dashes (—) — use commas or rewrite the sentence instead` + vaultSection;
 
     try {
       const client = new Anthropic({ apiKey });
       const response = await client.messages.create({
-        model: "claude-sonnet-4-5",
+        model: "claude-sonnet-4-6",
         max_tokens: 600,
         system: systemPrompt,
         messages: [{
@@ -364,7 +365,8 @@ Format rules (always apply, non-negotiable):
 - Start directly with "Hi [Name]," — no subject line, no "Dear"
 - Do NOT add a sign-off or name at the end — end the email with the last line of content only
 - NEVER include email headers, timestamps, sender lines, or "to:" lines
-- Output only the reply body itself, starting with "Hi [Name],"`;
+- Output only the reply body itself, starting with "Hi [Name],"
+- No em dashes (—) — use commas or rewrite the sentence instead`;
 
   const vaultSection = vaultContext
     ? `\n\n---\nBUSINESS KNOWLEDGE BASE (Obsidian vault — single source of truth. Use this and only this for all business facts, pricing, policies, and tone):\n\n${vaultContext}\n---`
@@ -416,7 +418,7 @@ Write the reply now.`;
   try {
     const client = new Anthropic({ apiKey });
     const response = await client.messages.create({
-      model: "claude-sonnet-4-5",
+      model: "claude-sonnet-4-6",
       max_tokens: 600,
       messages: [{ role: "user", content: userPrompt }],
       system: systemPrompt,
