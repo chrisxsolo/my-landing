@@ -19,6 +19,7 @@ const primaryLinks = [
   { label: "Home",    href: "/" },
   { label: "Dates",   href: "/availability" },
   { label: "About",   href: "/about" },
+  { label: "FAQ",     href: "/faq" },
   { label: "Journal", href: "/blog" },
 ];
 

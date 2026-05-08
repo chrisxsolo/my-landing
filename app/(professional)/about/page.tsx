@@ -38,9 +38,9 @@ const portrait =
 // ── PROCESS STEPS ─────────────────────────────────────────────────────────────
 // Format: ["number", "Step name", "Description"]
 const process = [
-  ["01", "Planning",  "Location, timing, outfit notes, and the reason for the session get set before we shoot."],
-  ["02", "Session",   "I give clear direction, then leave enough room for the in-between moments to happen naturally."],
-  ["03", "Delivery",  "The final gallery is edited cleanly and delivered in a private online space, ready to share."],
+  ["01", "Inquiry to booking",  "Send the date, campus, and headcount. I reply within 24 hours with availability, pricing, and next steps. 50% deposit reserves the date."],
+  ["02", "Session day",         "Campus route, light, and timing are planned before you arrive. I give clear direction throughout so you're never stuck wondering what to do."],
+  ["03", "Gallery delivery",    "50+ professionally edited images delivered to a private online gallery within two weeks. Clean download link, easy sharing."],
 ];
 
 const CSS = `
@@ -351,7 +351,7 @@ export default function ProfessionalAboutPage() {
           <p className="about-kicker">About</p>
           <h1 className="about-hero-title">I&rsquo;m Chris.</h1>
           <p className="about-hero-sub">
-            Bay Area photographer. Graduation portraits, families, and people worth documenting.
+            Bay Area graduation and family photographer. I guide every session so the photos feel natural — even if you hate being in front of the camera.
           </p>
         </div>
       </section>
@@ -366,17 +366,22 @@ export default function ProfessionalAboutPage() {
           </div>
           <div className="about-bio-text" data-reveal data-delay="2">
             <p className="about-section-kicker">Photographer, Bay Area</p>
-            <h2 className="about-section-title">Clean direction. Real moments.</h2>
+            <h2 className="about-section-title">You don&rsquo;t need to know how to pose.</h2>
             {/* ── Edit bio text here ── */}
             <p className="about-body">
-              I photograph people with a clean, direct style built around light, timing, and calm
-              direction. The work is polished, but the session should still feel like a real person
-              made space for you.
+              Most clients tell me they feel awkward in front of the camera. That&rsquo;s completely normal —
+              and it&rsquo;s exactly why I do this the way I do. I guide you through the entire session so
+              you always know what to do next. There&rsquo;s no standing around hoping something looks right.
             </p>
             <p className="about-body">
-              My work spans Bay Area graduation portraits, families, individual portraits, and creative
-              sessions. The common thread: strong light, clean composition, and images that still feel
-              like the moment.
+              My work is focused on Bay Area graduation portraits, families, and individual sessions.
+              I know the light at Sather Gate in the morning, the best spots at SJSU before crowds
+              arrive, and how to keep a group session from turning into chaos. That location knowledge
+              is part of what you&rsquo;re booking.
+            </p>
+            <p className="about-body">
+              The experience is efficient, premium, and genuinely easy. Inquiry to gallery delivery —
+              you&rsquo;ll always know where things stand.
             </p>
             <Link href="/contact" className="about-link">Work with me</Link>
           </div>
@@ -390,23 +395,25 @@ export default function ProfessionalAboutPage() {
         <div className="about-shell about-approach-grid">
           <div className="about-approach-label" data-reveal="left">
             <p className="about-section-kicker">Approach</p>
-            <h2 className="about-section-title">Direction without the stiffness.</h2>
+            <h2 className="about-section-title">Highly directed. Completely natural.</h2>
           </div>
           <div className="about-approach-body" data-reveal data-delay="2">
             {/* ── Edit approach paragraphs here ── */}
             <p>
-              Sessions are built to feel clear and easy. I help with posing, pacing, location choices,
-              and small adjustments so the final gallery feels intentional without flattening the person
-              in front of the camera.
+              Before the session, I plan the campus route around light and ceremony timing so we&rsquo;re
+              never rushing or guessing. On shoot day, I give clear, specific direction — move your
+              weight here, look this way, laugh at that — so you spend your time feeling good, not
+              standing awkwardly wondering what to do with your hands.
             </p>
             <p>
-              My work spans Bay Area graduation portraits, individual portraits, small events, and
-              creative sessions. The common thread: strong light, clean composition, and images that
-              still feel like the moment.
+              That direction is what produces natural-looking photos. It sounds like a contradiction,
+              but the more guided the session, the more relaxed and genuine the expressions become.
+              People stop thinking about the camera and start being themselves.
             </p>
             <p>
-              soloxsnaps is the professional home for that work. The warmer guides and behind-the-scenes
-              journal live on the fun side of the site.
+              After the session, you get a private online gallery with 50+ professionally edited images,
+              a clean download link, and a two-week turnaround. Communication throughout is fast, clear,
+              and low-friction — no chasing, no guessing, no surprises.
             </p>
           </div>
         </div>

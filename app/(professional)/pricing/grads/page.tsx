@@ -292,6 +292,34 @@ export default async function GradPricingPage() {
         <GraduationRateEstimator />
       </section>
 
+      {/* ── MICRO TRUST CHECKLIST ─────────────────────────────────────────────────
+           Subtle trust reinforcement just before the final CTA. */}
+      <section className="pricing-shell" style={{ paddingTop: 0, paddingBottom: 56 }}>
+        <div style={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: "12px 32px",
+          justifyContent: "center",
+          padding: "22px 28px",
+          border: "1px solid rgba(18,24,22,0.08)",
+          borderRadius: 12,
+          background: "rgba(247,250,248,0.9)",
+        }}>
+          {[
+            "Guided posing — no awkward standing around",
+            "Fast communication, clear next steps",
+            "Private online gallery delivery",
+            "Bay Area campus expertise",
+            "50% deposit to reserve your date",
+          ].map((item) => (
+            <span key={item} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, color: "#4b5a55" }}>
+              <span style={{ color: "#4f6d67", fontWeight: 700 }}>✓</span>
+              {item}
+            </span>
+          ))}
+        </div>
+      </section>
+
       {/* ── BOTTOM CTA STRIP ──────────────────────────────────────────────────
            The panel at the very bottom before the footer.
            To change the heading text: edit the h2 below.
