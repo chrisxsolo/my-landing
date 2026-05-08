@@ -354,9 +354,8 @@ export default function ConversationPage() {
       const json = await res.json();
       if (json.draft) {
         setDraft(json.draft);
-        setLastAiDraft(json.draft);   // remember the original AI text for "teach" comparison
-        setLearnedRules(null);        // reset any previous learning result
-        setActualSent("");
+        setLastAiDraft(json.draft);
+        setLearnedRules(null);
         setFeedback("");
         // Persist to Supabase so draft is accessible on any device
         await supabase.from("site_settings").upsert([
@@ -804,13 +803,12 @@ export default function ConversationPage() {
     setTimeout(() => setNotesSaved(false), 2000);
   }
 
-  // ── Teach AI: compare AI draft vs actual sent, append rules to style guide ──
+  // ── Teach AI: compare AI draft vs actual sent, write new rules to Obsidian vault ──
   async function learnFromReply() {
     const aiDraftToUse = lastAiDraft || manualAiDraft.trim();
     if (!inquiry || !aiDraftToUse || !actualSent.trim()) return;
     setLearnLoading(true);
     try {
-      // Step 1: analyze the diff and extract rules
       const analyzeRes = await fetch("/api/draft-reply", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
@@ -822,37 +820,22 @@ export default function ConversationPage() {
           actual_sent: actualSent.trim(),
         }),
       });
-      const analyzeJson = await analyzeRes.json() as { rules?: string[]; error?: string };
+      const analyzeJson = await analyzeRes.json() as { rules?: string[]; written?: number; error?: string };
 
       if (!analyzeJson.rules?.length) {
         showToast(analyzeJson.error ?? "Replies look similar — nothing new to learn", false);
         return;
       }
 
-      const newRules = analyzeJson.rules;
-
-      // Step 2: fetch existing reply_style and append new rules
-      const { data: existing } = await supabase
-        .from("site_settings")
-        .select("value")
-        .eq("key", "reply_style")
-        .single();
-
-      const current  = existing?.value?.trim() ?? "";
-      const newLines = newRules.map(r => `- ${r}`).join("\n");
-      const merged   = current ? `${current}\n${newLines}` : newLines;
-
-      // Step 3: save back
-      await supabase.from("site_settings").upsert(
-        { key: "reply_style", value: merged, updated_at: new Date().toISOString() },
-        { onConflict: "key" }
-      );
-
-      setLearnedRules(newRules);
+      const { rules, written = 0 } = analyzeJson;
+      setLearnedRules(rules);
       setActualSent("");
       setManualAiDraft("");
-      setLastAiDraft("");
-      showToast(`✓ ${newRules.length} rule${newRules.length === 1 ? "" : "s"} added to style guide`);
+
+      const msg = written === 0
+        ? "Rules already in vault — nothing new to add"
+        : `✓ ${written} new rule${written === 1 ? "" : "s"} saved to Obsidian vault`;
+      showToast(msg, written > 0);
     } catch {
       showToast("Analysis failed — try again", false);
     } finally {
@@ -1471,7 +1454,7 @@ export default function ConversationPage() {
                     ))}
                   </ul>
                   <p className="text-[10px] text-slate-400 pt-1">Applied to all future drafts automatically.</p>
-                  <button onClick={() => { setLearnedRules(null); setActualSent(""); setManualAiDraft(""); setLastAiDraft(""); }}
+                  <button onClick={() => { setLearnedRules(null); setActualSent(""); setManualAiDraft(""); }}
                     className="text-xs font-bold" style={{ color: C.p1 }}>
                     ↩ Analyze another
                   </button>

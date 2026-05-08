@@ -3,6 +3,26 @@ import { supabase } from '@/lib/supabase'
 import { useEffect, useRef, useState, useCallback, Suspense } from "react";
 import { useRouter } from "next/navigation";
 import { C } from "@/lib/colors";
+
+// Stable inline editor — lives outside the IIFE so autoFocus isn't killed by re-renders
+function SessionTypeEditor({id,value,onSave,onCancel}:{id:number;value:string;onSave:(id:number,v:string)=>void;onCancel:()=>void}){
+  const [v,setV]=useState(value);
+  return(
+    <form onSubmit={e=>{e.preventDefault();onSave(id,v);}} onClick={e=>e.stopPropagation()} className="flex items-center gap-1">
+      <input
+        autoFocus
+        className="text-xs font-semibold px-2 py-0.5 rounded-lg border outline-none"
+        style={{borderColor:C.p1_20,background:C.p1_04,color:"#334155",fontFamily:"inherit",width:"160px"}}
+        value={v}
+        onChange={e=>setV(e.target.value)}
+        onKeyDown={e=>{if(e.key==="Escape")onCancel();}}
+        placeholder="e.g. Grad Portraits"
+      />
+      <button type="submit" className="text-[10px] font-black px-2 py-0.5 rounded-lg text-white" style={{background:C.grad12}}>✓</button>
+      <button type="button" onClick={onCancel} className="text-[10px] font-bold px-1.5 py-0.5 rounded-lg text-slate-400 hover:text-slate-600">✕</button>
+    </form>
+  );
+}
 import { checkAuth, login, logout as adminLogout } from "@/lib/adminAuth";
 import BayAreaLocationsManager from "@/app/admin/BayAreaLocationsManager";
 import AnalyticsTab from "@/app/admin/AnalyticsTab";
@@ -10,6 +30,7 @@ import PaymentAnalyticsTab from "@/app/admin/PaymentAnalyticsTab";
 import ClientTimeline from "@/app/admin/ClientTimeline";
 import InquiryAnalyticsTab from "@/app/admin/InquiryAnalyticsTab";
 import VaultTab from "@/app/admin/VaultTab";
+import SessionCalendar from "@/app/admin/SessionCalendar";
 
 export const dynamic = 'force-dynamic'
 
@@ -159,10 +180,6 @@ function AdminDashboard() {
   const [coverPickerKey, setCoverPickerKey] = useState<string|null>(null);
 
   // ── Reply style ───────────────────────────────────────────────────────
-  const [replyStyleDraft, setReplyStyleDraft] = useState<string>("");
-  const [replyStyleSaving, setReplyStyleSaving] = useState(false);
-  const [replyStyleSaved, setReplyStyleSaved] = useState(false);
-  const [replyStyleOpen, setReplyStyleOpen] = useState(false);
 
   // ── Train AI chat ─────────────────────────────────────────────────────
   const [trainOpen, setTrainOpen] = useState(false);
@@ -202,15 +219,6 @@ function AdminDashboard() {
     }
   }
 
-  async function saveReplyStyle(){
-    setReplyStyleSaving(true);
-    await supabase.from('site_settings').upsert({key:'reply_style',value:replyStyleDraft,updated_at:new Date().toISOString()},{onConflict:'key'});
-    setSiteSettings(p=>({...p,reply_style:replyStyleDraft}));
-    setReplyStyleSaving(false);
-    setReplyStyleSaved(true);
-    setTimeout(()=>setReplyStyleSaved(false),2500);
-  }
-
   // ── Blog ──────────────────────────────────────────────────────────────
   const [posts,setPosts]=useState<BlogPost[]>([]);
   const [postsLoading,setPostsLoading]=useState(false);
@@ -230,6 +238,7 @@ function AdminDashboard() {
   // ── Clients ───────────────────────────────────────────────────────────────
   const [clientSearch,setClientSearch]=useState("");
   const [clientFilter,setClientFilter]=useState<"all"|"paid"|"unpaid">("all");
+  const [editingSessionType,setEditingSessionType]=useState<number|null>(null);
   const EMPTY_CLIENT={name:"",email:"",phone:"",session_type:"",session_date:"",message:""};
   const [addClientOpen,setAddClientOpen]=useState(false);
   const [addClientForm,setAddClientForm]=useState(EMPTY_CLIENT);
@@ -250,7 +259,6 @@ function AdminDashboard() {
   const [actualSent,setActualSent]=useState<Record<number,string>>({});
   const [learnLoading,setLearnLoading]=useState<number|null>(null);
   const [learnedRules,setLearnedRules]=useState<Record<number,string[]>>({});
-  const [rulesSaved,setRulesSaved]=useState<number|null>(null);
 
   // ── Payment sync ──────────────────────────────────────────────────────────
   const [syncLoading,setSyncLoading]=useState(false);
@@ -326,15 +334,18 @@ function AdminDashboard() {
   async function saveRuleFromFeedback(id:number){
     const fb=draftFeedback[id]?.trim();
     if(!fb)return;
-    const current=siteSettings.reply_style??replyStyleDraft??"";
-    const newRule=`- ${fb}`;
-    const updated=(current.trim()?current.trim()+"\n"+newRule:newRule);
-    await supabase.from('site_settings').upsert({key:'reply_style',value:updated,updated_at:new Date().toISOString()},{onConflict:'key'});
-    setSiteSettings(p=>({...p,reply_style:updated}));
-    setReplyStyleDraft(updated);
-    setRuleSaved(id);
-    setTimeout(()=>setRuleSaved(null),2500);
-    showToast("Rule saved to style guide ✓");
+    try{
+      await fetch("/api/vault/update-rules",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({new_rules:[fb]}),
+      });
+      setRuleSaved(id);
+      setTimeout(()=>setRuleSaved(null),2500);
+      showToast("Rule saved to Obsidian vault ✓");
+    }catch{
+      showToast("Failed to save rule to vault",false);
+    }
   }
 
   async function analyzeAndLearn(inq:Inquiry){
@@ -344,29 +355,18 @@ function AdminDashboard() {
     setLearnLoading(inq.id);
     try{
       const res=await fetch("/api/draft-reply",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:inq.name,email:inq.email,message:inq.message,ai_draft,actual_sent:actual})});
-      const json=await res.json();
-      if(json.rules&&json.rules.length>0){setLearnedRules(p=>({...p,[inq.id]:json.rules}));}
-      else if(json.error){showToast(json.error,false);}
+      const json=await res.json() as {rules?:string[];written?:number;error?:string};
+      if(json.rules?.length){
+        setLearnedRules(p=>({...p,[inq.id]:json.rules!}));
+        const written=json.written??0;
+        const msg=written===0
+          ?"Rules already in vault — nothing new to add"
+          :`✓ ${written} new rule${written===1?"":"s"} saved to Obsidian vault`;
+        showToast(msg,written>0);
+      }else if(json.error){showToast(json.error,false);}
       else{showToast("No differences found — drafts may be very similar",false);}
     }catch(e){showToast("Analysis failed",false);console.error(e);}
     finally{setLearnLoading(null);}
-  }
-
-  async function saveLearnedRules(id:number){
-    const rules=learnedRules[id];
-    if(!rules?.length)return;
-    try{
-      await fetch("/api/vault/update-rules",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({new_rules:rules}),
-      });
-      setRulesSaved(id);
-      setTimeout(()=>setRulesSaved(null),2500);
-      showToast(`${rules.length} rule${rules.length===1?"":"s"} saved to Obsidian vault ✓`);
-    }catch{
-      showToast("Failed to save rules to vault",false);
-    }
   }
 
   async function fetchGmailStatus(){
@@ -490,6 +490,7 @@ function AdminDashboard() {
   async function fetchInquiries(){setInquiriesLoading(true);const{data}=await supabase.from('inquiries').select('*').order('created_at',{ascending:false});setInquiries(data??[]);setInquiriesLoading(false);}
   async function deleteInquiry(id:number){const{error}=await supabase.from('inquiries').delete().eq('id',id);if(error){showToast("Delete failed",false);}else{setInquiries(p=>p.filter(x=>x.id!==id));setInquiryDeleteConfirm(null);showToast("Inquiry deleted");}}
   async function updateInquiryStatus(id:number,status:string){const{error}=await supabase.from('inquiries').update({status}).eq('id',id);if(error){showToast("Update failed",false);}else{setInquiries(p=>p.map(x=>x.id===id?{...x,status}:x));showToast("Status updated");}}
+  async function saveSessionType(id:number,value:string){const{error}=await supabase.from('inquiries').update({session_type:value.trim()||null}).eq('id',id);if(error){showToast("Update failed",false);}else{setInquiries(p=>p.map(x=>x.id===id?{...x,session_type:value.trim()||null}:x));setEditingSessionType(null);showToast("Session type updated ✓");}}
   async function saveManualClient(){
     const{name,email,session_type,session_date,phone,message}=addClientForm;
     if(!name.trim()||!email.trim()){showToast("Name and email are required",false);return;}
@@ -511,8 +512,6 @@ function AdminDashboard() {
     if(data){
       const map=data.reduce((acc:{[k:string]:string|null},r)=>{acc[r.key]=r.value;return acc;},{});
       setSiteSettings(map);
-      // Pre-fill reply style editor with saved value
-      if(map.reply_style)setReplyStyleDraft(map.reply_style);
     }
   }
 
@@ -931,7 +930,7 @@ function AdminDashboard() {
           const confirmedSessions=inquiries.filter(i=>i.booking_confirmed).length;
           const newThisMonth=inquiries.filter(i=>new Date(i.created_at)>=monthStart).length;
           const paidSessions=inquiries.filter(i=>i.payment_status==="paid").length;
-          const pendingInquiries=inquiries.filter(i=>!i.reply_sent_at&&i.status!=="archived"&&i.status!=="not_interested").length;
+          const pendingInquiries=inquiries.filter(i=>!i.reply_sent_at&&i.status!=="archived"&&i.status!=="not_interested"&&i.status!=="responded"&&i.status!=="manual").length;
 
           const dayLabel=(d:string)=>{
             const dt=new Date(d+"T12:00:00");
@@ -964,6 +963,14 @@ function AdminDashboard() {
                   </div>
                 ))}
               </div>
+
+              {/* Session calendar */}
+              <SessionCalendar
+                sessions={inquiries
+                  .filter(i=>i.session_date&&i.booking_confirmed)
+                  .map(i=>({id:i.id,name:i.name,session_type:i.session_type,session_date:i.session_date!,payment_status:i.payment_status,booking_confirmed:i.booking_confirmed}))}
+                onClientClick={()=>setTab("clients")}
+              />
 
               {/* Upcoming sessions */}
               <div className="rounded-2xl overflow-hidden border" style={{borderColor:"rgba(16,185,129,0.2)",background:"white"}}>
@@ -1004,7 +1011,7 @@ function AdminDashboard() {
               {/* New inquiries card */}
               {pendingInquiries>0&&(()=>{
                 const newInqs=inquiries
-                  .filter(i=>!i.reply_sent_at&&i.status!=="archived"&&i.status!=="not_interested")
+                  .filter(i=>!i.reply_sent_at&&i.status!=="archived"&&i.status!=="not_interested"&&i.status!=="responded"&&i.status!=="manual")
                   .sort((a,b)=>new Date(b.created_at).getTime()-new Date(a.created_at).getTime())
                   .slice(0,3);
                 const hoursAgo=(iso:string)=>{
@@ -1936,43 +1943,6 @@ function AdminDashboard() {
         {tab==="inquiries"&&(
           <div className="space-y-6">
 
-            {/* ── Reply Style Editor (collapsible) ── */}
-            <div className={card}>
-              <div className="h-[3px]" style={{background:C.grad90_12}}/>
-              <button className="w-full p-5 flex items-center justify-between gap-4 text-left" onClick={()=>setReplyStyleOpen(p=>!p)}>
-                <div className="flex items-center gap-3">
-                  <div className="w-7 h-7 rounded-lg flex items-center justify-center text-sm" style={{background:C.p1_08}}>🧠</div>
-                  <div>
-                    <p className="text-sm font-black text-slate-900">AI Reply Style</p>
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      {replyStyleDraft.length>0?`${replyStyleDraft.length} chars saved`:"No rules yet — Claude uses defaults"}
-                    </p>
-                  </div>
-                </div>
-                <span className="text-slate-400 text-sm transition-transform" style={{transform:replyStyleOpen?"rotate(180deg)":"rotate(0deg)"}}>▾</span>
-              </button>
-              {replyStyleOpen&&(
-                <div className="px-5 pb-5 space-y-3 border-t border-slate-100 pt-4">
-                  <textarea
-                    value={replyStyleDraft}
-                    onChange={e=>setReplyStyleDraft(e.target.value)}
-                    rows={8}
-                    placeholder={"Paste your reply style instructions here.\n\nExample:\n- Always open by acknowledging the specific location they mentioned\n- Never mention a travel fee unless asked\n- Keep it under 150 words"}
-                    className="w-full text-sm text-slate-700 rounded-xl p-3 outline-none resize-y leading-relaxed"
-                    style={{border:`1px solid ${C.p1_20}`,background:C.p1_04,fontFamily:"inherit"}}
-                  />
-                  <div className="flex items-center justify-between">
-                    <p className="text-[10px] text-slate-400 font-medium">Claude reads this before every draft</p>
-                    <button onClick={saveReplyStyle} disabled={replyStyleSaving}
-                      className="text-xs font-bold px-3 py-1.5 rounded-lg transition-all hover:opacity-80 disabled:opacity-50"
-                      style={replyStyleSaved?{background:"#10b981",color:"#fff"}:{background:C.grad12,color:"#fff"}}>
-                      {replyStyleSaving?"Saving…":replyStyleSaved?"Saved ✓":"Save style"}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
             {/* ── Train AI Chat (collapsible) ── */}
             <div className={card}>
               <div className="h-[3px]" style={{background:"linear-gradient(90deg,#6366f1,#8b5cf6)"}}/>
@@ -2179,7 +2149,23 @@ function AdminDashboard() {
                                 </a>
                               </>
                             )}
-                            {inq.session_type&&<><span className="text-slate-300">·</span><span className="font-semibold text-slate-600">{inq.session_type}</span></>}
+                            <span className="text-slate-300">·</span>
+                            {editingSessionType===inq.id?(
+                              <SessionTypeEditor
+                                id={inq.id}
+                                value={inq.session_type??""}
+                                onSave={saveSessionType}
+                                onCancel={()=>setEditingSessionType(null)}
+                              />
+                            ):(
+                              <button
+                                onClick={e=>{e.stopPropagation();setEditingSessionType(inq.id);}}
+                                className="font-semibold text-slate-600 hover:text-violet-600 transition-colors group flex items-center gap-1"
+                                title="Edit session type">
+                                {inq.session_type||<span className="text-slate-400 italic">Set type</span>}
+                                <span className="opacity-0 group-hover:opacity-100 text-[9px] text-slate-400 transition-opacity">✏️</span>
+                              </button>
+                            )}
                             {inq.date_in_mind&&<><span className="text-slate-300">·</span><span className="text-slate-600">{inq.date_in_mind}</span></>}
                           </div>
                           {/* Message preview */}
@@ -2379,12 +2365,7 @@ function AdminDashboard() {
                                             </li>
                                           ))}
                                         </ul>
-                                        <button
-                                          onClick={()=>saveLearnedRules(inq.id)}
-                                          className="text-[11px] font-bold px-3 py-1.5 rounded-lg transition-all hover:opacity-80 flex items-center gap-1.5"
-                                          style={rulesSaved===inq.id?{background:"#10b981",color:"#fff"}:{background:"rgba(255,255,255,0.9)",color:C.p1,border:`1px solid ${C.p1_20}`}}>
-                                          {rulesSaved===inq.id?"✓ Saved to Obsidian":"💾 Save to Obsidian"}
-                                        </button>
+                                        <p className="text-[10px] text-slate-400">Saved to Obsidian vault automatically</p>
                                       </div>
                                     )}
                                   </div>
@@ -2519,7 +2500,7 @@ function AdminDashboard() {
             const matchesFilter=clientFilter==="all"||(clientFilter==="paid"&&hasPaid)||(clientFilter==="unpaid"&&!hasPaid);
             return matchesSearch&&matchesFilter;
           });
-          const pendingOnClients=inquiries.filter(i=>!i.reply_sent_at&&i.status!=="archived"&&i.status!=="not_interested").sort((a,b)=>new Date(b.created_at).getTime()-new Date(a.created_at).getTime());
+          const pendingOnClients=inquiries.filter(i=>!i.reply_sent_at&&i.status!=="archived"&&i.status!=="not_interested"&&i.status!=="responded"&&i.status!=="manual").sort((a,b)=>new Date(b.created_at).getTime()-new Date(a.created_at).getTime());
           const hoursAgoClient=(iso:string)=>{
             const h=Math.round((Date.now()-new Date(iso).getTime())/(1000*60*60));
             if(h<1)return"just now";if(h===1)return"1h ago";if(h<24)return`${h}h ago`;
@@ -2703,7 +2684,22 @@ function AdminDashboard() {
                                 <div className="flex items-center gap-3 flex-wrap">
                                   <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2 flex-wrap">
-                                      {s.session_type&&<span className="text-xs font-semibold text-slate-700">{s.session_type}</span>}
+                                      {editingSessionType===s.id?(
+                                        <SessionTypeEditor
+                                          id={s.id}
+                                          value={s.session_type??""}
+                                          onSave={saveSessionType}
+                                          onCancel={()=>setEditingSessionType(null)}
+                                        />
+                                      ):(
+                                        <button
+                                          onClick={()=>setEditingSessionType(s.id)}
+                                          className="text-xs font-semibold text-slate-700 hover:text-violet-600 transition-colors group flex items-center gap-1"
+                                          title="Edit session type">
+                                          {s.session_type||<span className="text-slate-300 italic">No session type</span>}
+                                          <span className="opacity-0 group-hover:opacity-100 text-[9px] text-slate-400 transition-opacity">✏️</span>
+                                        </button>
+                                      )}
                                       {s.date_in_mind&&<span className="text-xs text-slate-400">{s.date_in_mind}</span>}
                                       {s.session_date&&<span className="text-xs font-bold text-emerald-600">{new Date(s.session_date+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}</span>}
                                     </div>

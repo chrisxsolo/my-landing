@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/draft-reply
 //
-// Admin-only endpoint. Three modes:
+// Admin-only endpoint. Four modes:
 //
 // 1. Fresh draft
 //    Body: { name, email, phone?, session_type?, date_in_mind?, message }
@@ -13,14 +13,18 @@
 //
 // 3. Analyze & learn
 //    Body: { name, email, message, ai_draft, actual_sent }
-//    Response: { rules: ["be more direct", "skip the weather mention", ...] }
-//    Claude compares the AI draft vs what Chris actually sent and extracts
-//    concrete style rules to save for future drafts.
+//    Response: { rules: [...], written: number }
+//    Claude compares AI draft vs what Chris actually sent, extracts concrete
+//    style rules, deduplicates, and appends new ones to the Obsidian vault's
+//    "09 AI Instructions/Email Rules.md" under a "## Learned Rules" section.
+//
+// 4. Polish / bullet-to-email
+//    Body: { ...same, raw_draft }
+//    Response: { draft: "Hi Ryan, ..." }
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { requireAdmin } from "@/lib/requireAdmin";
 import fs from "fs";
 import path from "path";
@@ -80,6 +84,43 @@ const LOCATION_NOTE_MAP: Record<string, string> = {
   "crissy field":                "SF Outdoor Spots.md",
   "golden gate park":            "SF Outdoor Spots.md",
 };
+
+const EMAIL_RULES_PATH = path.join(VAULT_PATH, "09 AI Instructions", "Email Rules.md");
+const LEARNED_SECTION_HEADER = "## Learned Rules";
+
+function writeLearnedRulesToVault(newRules: string[]): number {
+  try {
+    const existing = fs.existsSync(EMAIL_RULES_PATH)
+      ? fs.readFileSync(EMAIL_RULES_PATH, "utf-8")
+      : "";
+
+    // Collect already-present rule text (case-insensitive) to deduplicate
+    const existingLower = existing.toLowerCase();
+    const toAdd = newRules.filter(r => !existingLower.includes(r.toLowerCase().trim()));
+
+    if (toAdd.length === 0) return 0;
+
+    const lines = toAdd.map(r => `- ${r}`).join("\n");
+
+    let updated: string;
+    if (existing.includes(LEARNED_SECTION_HEADER)) {
+      // Append under existing section
+      updated = existing.replace(
+        LEARNED_SECTION_HEADER,
+        `${LEARNED_SECTION_HEADER}\n${lines}`
+      );
+    } else {
+      // Add section at end of file
+      updated = `${existing.trimEnd()}\n\n${LEARNED_SECTION_HEADER}\n${lines}\n`;
+    }
+
+    fs.writeFileSync(EMAIL_RULES_PATH, updated, "utf-8");
+    return toAdd.length;
+  } catch (err) {
+    console.error("Failed to write learned rules to vault:", err);
+    return 0;
+  }
+}
 
 function fetchVaultContext(sessionType?: string, message?: string): string {
   try {
@@ -143,19 +184,6 @@ function fetchVaultContext(sessionType?: string, message?: string): string {
   }
 }
 
-async function fetchReplyStyle(): Promise<string | null> {
-  try {
-    const supabase = createSupabaseServerClient();
-    const { data } = await supabase
-      .from("site_settings")
-      .select("value")
-      .eq("key", "reply_style")
-      .single();
-    return data?.value?.trim() || null;
-  } catch {
-    return null;
-  }
-}
 
 export async function POST(req: NextRequest) {
   const deny = requireAdmin(req);
@@ -229,7 +257,9 @@ List the concrete style rules Claude should follow in future drafts based on the
         .map((line) => line.replace(/^[-–•*]\s*/, "").trim())
         .filter((line) => line.length > 0);
 
-      return NextResponse.json({ rules });
+      const written = writeLearnedRulesToVault(rules);
+
+      return NextResponse.json({ rules, written });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error("Claude analyze error:", msg);
@@ -239,18 +269,11 @@ List the concrete style rules Claude should follow in future drafts based on the
 
   // ── Mode 4: Polish / bullet-to-email ────────────────────────────────────────
   if (isPolish) {
-    const [availability, replyStyle] = await Promise.all([
-      fetchAvailability(),
-      fetchReplyStyle(),
-    ]);
+    const availability = await fetchAvailability();
     const vaultContext = fetchVaultContext(session_type, message);
 
     const vaultSection = vaultContext
       ? `\n\n---\nBUSINESS KNOWLEDGE BASE (Obsidian vault — single source of truth for all pricing, policies, tone rules, and templates. Use this and only this for business facts):\n\n${vaultContext}\n---`
-      : "";
-
-    const styleSection = replyStyle
-      ? `\n\nLearned style rules from Chris (override vault defaults where they conflict):\n${replyStyle}`
       : "";
 
     const systemPrompt = `You are Chris Solorzano, a Bay Area photography business owner. You run soloxsnaps.com.
@@ -261,7 +284,7 @@ Format rules (always apply):
 - Plain text only — no markdown, no bold, no asterisks, no bullet points in the output
 - Start directly with "Hi [Name]," — no subject line
 - Sign as "Chris"
-- Never include email headers, timestamps, or "to:" lines` + vaultSection + styleSection;
+- Never include email headers, timestamps, or "to:" lines` + vaultSection;
 
     try {
       const client = new Anthropic({ apiKey });
@@ -308,11 +331,10 @@ Output only the polished email body, nothing else.`,
   // ── Modes 1 & 2: Fresh draft or refinement ───────────────────────────────
 
   // Fetch all context in parallel
-  const [availability, replyStyle] = await Promise.all([
+  const [availability, vaultContext] = await Promise.all([
     fetchAvailability(),
-    fetchReplyStyle(),
+    Promise.resolve(fetchVaultContext(session_type, message)),
   ]);
-  const vaultContext = fetchVaultContext(session_type, message);
 
   const baseInstructions = `You are Chris Solorzano, a Bay Area photography business owner. You run soloxsnaps.com.
 
@@ -329,11 +351,7 @@ Format rules (always apply, non-negotiable):
     ? `\n\n---\nBUSINESS KNOWLEDGE BASE (Obsidian vault — single source of truth. Use this and only this for all business facts, pricing, policies, and tone):\n\n${vaultContext}\n---`
     : "";
 
-  const styleSection = replyStyle
-    ? `\n\nLearned style rules from Chris (these override vault tone defaults where they conflict):\n${replyStyle}`
-    : "";
-
-  const systemPrompt = baseInstructions + vaultSection + styleSection;
+  const systemPrompt = baseInstructions + vaultSection;
 
   const threadSection = thread_context
     ? `\n\nFull email conversation history with this client (oldest first — use this for context, don't repeat what's already been said):\n\n${thread_context}`
