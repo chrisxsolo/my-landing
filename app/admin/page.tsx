@@ -6,11 +6,15 @@ import { C } from "@/lib/colors";
 import { checkAuth, login, logout as adminLogout } from "@/lib/adminAuth";
 import BayAreaLocationsManager from "@/app/admin/BayAreaLocationsManager";
 import AnalyticsTab from "@/app/admin/AnalyticsTab";
+import PaymentAnalyticsTab from "@/app/admin/PaymentAnalyticsTab";
+import ClientTimeline from "@/app/admin/ClientTimeline";
+import InquiryAnalyticsTab from "@/app/admin/InquiryAnalyticsTab";
+import VaultTab from "@/app/admin/VaultTab";
 
 export const dynamic = 'force-dynamic'
 
-type Tab = "poses"|"locations"|"bayGuide"|"portfolio"|"categories"|"blog"|"analytics"|"inquiries"|"clients";
-type Inquiry = { id:number; name:string; email:string; phone:string|null; session_type:string|null; date_in_mind:string|null; message:string; status:string; created_at:string; payment_status:string|null; payment_note:string|null; session_date:string|null; booking_confirmed:boolean|null; };
+type Tab = "poses"|"locations"|"bayGuide"|"portfolio"|"categories"|"blog"|"analytics"|"payments"|"inquiries"|"clients"|"funnel"|"vault";
+type Inquiry = { id:number; name:string; email:string; phone:string|null; session_type:string|null; date_in_mind:string|null; message:string; status:string; created_at:string; payment_status:string|null; payment_note:string|null; payment_detected_at:string|null; session_date:string|null; booking_confirmed:boolean|null; reply_sent_at:string|null; invoice_sent_at:string|null; contract_sent_at:string|null; deposit_paid_at:string|null; gallery_delivered_at:string|null; };
 type BlogCategory = "journal"|"professional";
 type Pose = { id:number; title:string; image_url:string; instructions:string; order:number; };
 type Spot = { id:number; school_id:string; school_name:string; school_short:string; name:string; description:string; tip:string; icon:string; image_url:string|null; order:number; };
@@ -36,8 +40,9 @@ const BLOG_CATEGORIES:{value:BlogCategory;label:string;helper:string}[]=[
   {value:"professional",label:"Professional",helper:"Case studies at /blog"},
 ];
 const WEBSITE_TABS:Tab[]=["poses","locations","bayGuide","portfolio","categories","blog"];
-const CLIENT_TABS:Tab[]=["analytics","inquiries","clients"];
-const TAB_LABELS:Record<Tab,string>={poses:"📸 Grad Poses",locations:"📍 Campus Spots",bayGuide:"🗺️ Bay Guide",portfolio:"🖼️ Portfolio",categories:"🏷️ Categories",blog:"✍️ Blog",analytics:"📊 Analytics",inquiries:"📬 Inquiries",clients:"👥 Clients"};
+const CLIENT_TABS:Tab[]=["analytics","payments","funnel","inquiries","clients"];
+const VAULT_TABS:Tab[]=["vault"];
+const TAB_LABELS:Record<Tab,string>={poses:"📸 Grad Poses",locations:"📍 Campus Spots",bayGuide:"🗺️ Bay Guide",portfolio:"🖼️ Portfolio",categories:"🏷️ Categories",blog:"✍️ Blog",analytics:"📊 Analytics",payments:"💵 Revenue",funnel:"📈 Funnel",inquiries:"📬 Inquiries",clients:"👥 Clients",vault:"📓 Vault"};
 
 function detectSchool(text:string):string|null{
   // Normalize accents (e.g. "José" → "Jose") so accented names still match
@@ -157,6 +162,45 @@ function AdminDashboard() {
   const [replyStyleDraft, setReplyStyleDraft] = useState<string>("");
   const [replyStyleSaving, setReplyStyleSaving] = useState(false);
   const [replyStyleSaved, setReplyStyleSaved] = useState(false);
+  const [replyStyleOpen, setReplyStyleOpen] = useState(false);
+
+  // ── Train AI chat ─────────────────────────────────────────────────────
+  const [trainOpen, setTrainOpen] = useState(false);
+  const [trainMessages, setTrainMessages] = useState<{role:"user"|"assistant";content:string}[]>([]);
+  const [trainInput, setTrainInput] = useState("");
+  const [trainLoading, setTrainLoading] = useState(false);
+  const [trainSavedRules, setTrainSavedRules] = useState<string[]>([]);
+  const trainBottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(()=>{
+    if(trainOpen) trainBottomRef.current?.scrollIntoView({behavior:"smooth"});
+  },[trainMessages, trainOpen]);
+
+  async function sendTrainMessage(){
+    if(!trainInput.trim()||trainLoading) return;
+    const userMsg = {role:"user" as const, content:trainInput.trim()};
+    const next = [...trainMessages, userMsg];
+    setTrainMessages(next);
+    setTrainInput("");
+    setTrainLoading(true);
+    try {
+      const res = await fetch("/api/train-ai",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({messages:next}),
+      });
+      const json = await res.json() as {reply:string; new_rules:string[]; saved_to_vault:boolean};
+      setTrainMessages(p=>[...p,{role:"assistant",content:json.reply}]);
+      if(json.new_rules?.length){
+        setTrainSavedRules(json.new_rules);
+        setTimeout(()=>setTrainSavedRules([]),4000);
+      }
+    } catch {
+      setTrainMessages(p=>[...p,{role:"assistant",content:"Sorry, something went wrong. Try again."}]);
+    } finally {
+      setTrainLoading(false);
+    }
+  }
 
   async function saveReplyStyle(){
     setReplyStyleSaving(true);
@@ -186,6 +230,10 @@ function AdminDashboard() {
   // ── Clients ───────────────────────────────────────────────────────────────
   const [clientSearch,setClientSearch]=useState("");
   const [clientFilter,setClientFilter]=useState<"all"|"paid"|"unpaid">("all");
+  const EMPTY_CLIENT={name:"",email:"",phone:"",session_type:"",session_date:"",message:""};
+  const [addClientOpen,setAddClientOpen]=useState(false);
+  const [addClientForm,setAddClientForm]=useState(EMPTY_CLIENT);
+  const [addClientSaving,setAddClientSaving]=useState(false);
 
   // ── Inquiries ─────────────────────────────────────────────────────────
   const [inquiries,setInquiries]=useState<Inquiry[]>([]);
@@ -290,15 +338,18 @@ function AdminDashboard() {
   async function saveLearnedRules(id:number){
     const rules=learnedRules[id];
     if(!rules?.length)return;
-    const current=siteSettings.reply_style??replyStyleDraft??"";
-    const newRules=rules.map(r=>`- ${r}`).join("\n");
-    const updated=(current.trim()?current.trim()+"\n"+newRules:newRules);
-    await supabase.from('site_settings').upsert({key:'reply_style',value:updated,updated_at:new Date().toISOString()},{onConflict:'key'});
-    setSiteSettings(p=>({...p,reply_style:updated}));
-    setReplyStyleDraft(updated);
-    setRulesSaved(id);
-    setTimeout(()=>setRulesSaved(null),2500);
-    showToast(`${rules.length} rule${rules.length===1?"":"s"} saved to style guide ✓`);
+    try{
+      await fetch("/api/vault/update-rules",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({new_rules:rules}),
+      });
+      setRulesSaved(id);
+      setTimeout(()=>setRulesSaved(null),2500);
+      showToast(`${rules.length} rule${rules.length===1?"":"s"} saved to Obsidian vault ✓`);
+    }catch{
+      showToast("Failed to save rules to vault",false);
+    }
   }
 
   async function fetchGmailStatus(){
@@ -350,6 +401,19 @@ function AdminDashboard() {
   async function fetchInquiries(){setInquiriesLoading(true);const{data}=await supabase.from('inquiries').select('*').order('created_at',{ascending:false});setInquiries(data??[]);setInquiriesLoading(false);}
   async function deleteInquiry(id:number){const{error}=await supabase.from('inquiries').delete().eq('id',id);if(error){showToast("Delete failed",false);}else{setInquiries(p=>p.filter(x=>x.id!==id));setInquiryDeleteConfirm(null);showToast("Inquiry deleted");}}
   async function updateInquiryStatus(id:number,status:string){const{error}=await supabase.from('inquiries').update({status}).eq('id',id);if(error){showToast("Update failed",false);}else{setInquiries(p=>p.map(x=>x.id===id?{...x,status}:x));showToast("Status updated");}}
+  async function saveManualClient(){
+    const{name,email,session_type,session_date,phone,message}=addClientForm;
+    if(!name.trim()||!email.trim()){showToast("Name and email are required",false);return;}
+    setAddClientSaving(true);
+    const row={name:name.trim(),email:email.trim().toLowerCase(),phone:phone.trim()||null,session_type:session_type.trim()||null,session_date:session_date||null,message:message.trim()||"Added manually from Instagram DM",status:"manual",payment_status:null,booking_confirmed:null,date_in_mind:null};
+    const{data,error}=await supabase.from('inquiries').insert(row).select().single();
+    setAddClientSaving(false);
+    if(error){showToast("Failed to add client",false);return;}
+    setInquiries(p=>[data,...p]);
+    setAddClientForm(EMPTY_CLIENT);
+    setAddClientOpen(false);
+    showToast(`${name} added ✓`);
+  }
 
   function isSetupMissing(error:{code?:string;message?:string}|null){const message=error?.message?.toLowerCase()??"";return error?.code==="42P01"||error?.code==="42703"||message.includes("does not exist")||message.includes("schema cache");}
 
@@ -578,13 +642,65 @@ function AdminDashboard() {
 
   // ── Blog handlers ──────────────────────────────────────────────────────
   function slugify(s:string){return s.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");}
+
+  function parseJournalEntry(raw:string){
+    const lines=raw.split("\n");
+    const title=lines.find(l=>l.trim())?.trim()??"";
+
+    // Look for a date pattern like "May 7, 2025", "5/7/25", "May 7, 2025 · 3:45 PM", "May 7th, 2025"
+    const dateRe=/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{2,4}/i;
+    const numericDateRe=/\b\d{1,2}\/\d{1,2}\/\d{2,4}\b/;
+    const timeRe=/\b(\d{1,2}:\d{2}\s*(?:am|pm)?)/i;
+
+    let dateStr="";
+    let timeStr="";
+    let dateLine=-1;
+    for(let i=0;i<lines.length;i++){
+      const line=lines[i];
+      const dMatch=line.match(dateRe)||line.match(numericDateRe);
+      if(dMatch){
+        dateStr=dMatch[0];
+        const tMatch=line.match(timeRe);
+        if(tMatch)timeStr=tMatch[1];
+        dateLine=i;
+        break;
+      }
+    }
+
+    // Parse into datetime-local value (yyyy-MM-ddTHH:mm)
+    let published_at=new Date().toISOString().slice(0,16);
+    if(dateStr){
+      const parsed=new Date(dateStr+(timeStr?" "+timeStr:""));
+      if(!isNaN(parsed.getTime())){
+        const offset=parsed.getTimezoneOffset();
+        const local=new Date(parsed.getTime()-offset*60000);
+        published_at=local.toISOString().slice(0,16);
+      }
+    }
+
+    // Body = everything after title line and date line
+    const skipLines=new Set([lines.findIndex(l=>l.trim()===title)]);
+    if(dateLine>=0)skipLines.add(dateLine);
+    const body=lines.filter((_,i)=>!skipLines.has(i)).join("\n").replace(/^\n+/,"").trim();
+
+    return {title,slug:slugify(title),published_at,body};
+  }
+
+  const [journalDraft,setJournalDraft]=useState("");
+  function onJournalDraftChange(raw:string){
+    setJournalDraft(raw);
+    if(!raw.trim())return;
+    const parsed=parseJournalEntry(raw);
+    setPostForm(f=>({...f,...parsed}));
+  }
+
   function startEditPost(post:BlogPost){
     const sites=post.sites&&post.sites.length>0?post.sites:[post.category==="professional"?"professional":"journal"];
     const primaryCat=(sites.includes("professional")?"professional":"journal") as BlogCategory;
     setEditingPost(post);setPostForm({title:post.title,body:post.body,slug:post.slug,category:primaryCat,sites,published_at:post.published_at.slice(0,16)});
     setBlogCategory(primaryCat);setCoverImg(null);setCoverImgPreview(post.cover_image_url||null);setExtraImgs([]);setExtraPreviews(post.extra_image_urls??[]);window.scrollTo({top:0,behavior:"smooth"});
   }
-  function cancelEditPost(){setEditingPost(null);setPostForm({...EMPTY_POST,category:blogCategory,sites:[blogCategory]});setCoverImg(null);setCoverImgPreview(null);setExtraImgs([]);setExtraPreviews([]);if(coverFileRef.current)coverFileRef.current.value="";if(extraFileRef.current)extraFileRef.current.value="";}
+  function cancelEditPost(){setEditingPost(null);setPostForm({...EMPTY_POST,category:blogCategory,sites:[blogCategory]});setCoverImg(null);setCoverImgPreview(null);setExtraImgs([]);setExtraPreviews([]);setJournalDraft("");if(coverFileRef.current)coverFileRef.current.value="";if(extraFileRef.current)extraFileRef.current.value="";}
   function onCoverImg(e:React.ChangeEvent<HTMLInputElement>){const f=e.target.files?.[0];if(!f)return;setCoverImg(f);setCoverImgPreview(URL.createObjectURL(f));}
   function onExtraImgs(e:React.ChangeEvent<HTMLInputElement>){const files=Array.from(e.target.files??[]);if(!files.length)return;setExtraImgs(prev=>[...prev,...files]);setExtraPreviews(prev=>[...prev,...files.map(f=>URL.createObjectURL(f))]);}
   function removeExtraPreview(i:number){setExtraPreviews(p=>p.filter((_,j)=>j!==i));setExtraImgs(p=>p.filter((_,j)=>j!==i));}
@@ -671,28 +787,30 @@ function AdminDashboard() {
         </div>
         {/* Tabs — grouped into Edit Website / Clients */}
         {(()=>{
-          const tabSection=WEBSITE_TABS.includes(tab)?"website":"clients";
+          const tabSection=VAULT_TABS.includes(tab)?"vault":WEBSITE_TABS.includes(tab)?"website":"clients";
           const cancelAll=()=>{cancelEditPose();cancelEditSpot();cancelEditPortfolioImage();cancelEditCategory();cancelEditPost();setEditingInquiry(null);setInquiryDeleteConfirm(null);};
           return(
             <div className="mb-8 space-y-2">
               <div className="flex gap-2">
-                {(["website","clients"] as const).map(s=>(
-                  <button key={s} onClick={()=>{cancelAll();setTab(s==="website"?WEBSITE_TABS[0]:CLIENT_TABS[0]);}}
+                {(["website","clients","vault"] as const).map(s=>(
+                  <button key={s} onClick={()=>{cancelAll();setTab(s==="website"?WEBSITE_TABS[0]:s==="clients"?CLIENT_TABS[0]:"vault");}}
                     className="px-5 py-2.5 rounded-xl text-sm font-bold transition-all"
                     style={tabSection===s?{background:C.grad12,color:"#fff",boxShadow:"0 2px 8px rgba(157,111,232,0.25)"}:{color:"#64748b",background:"white",border:"1px solid #e2e8f0"}}>
-                    {s==="website"?"✏️ Edit Website":"👤 Clients"}
+                    {s==="website"?"✏️ Edit Website":s==="clients"?"👤 Clients":"📓 Vault"}
                   </button>
                 ))}
               </div>
-              <div className="flex gap-1.5 p-1 rounded-2xl bg-white border border-slate-100 w-fit flex-wrap">
-                {(tabSection==="website"?WEBSITE_TABS:CLIENT_TABS).map(t=>(
-                  <button key={t} onClick={()=>{setTab(t);cancelAll();}}
-                    className="px-4 py-2 rounded-xl text-sm font-bold transition-all"
-                    style={tab===t?{background:C.grad12,color:"#fff"}:{color:"#94a3b8"}}>
-                    {TAB_LABELS[t]}
-                  </button>
-                ))}
-              </div>
+              {tabSection!=="vault"&&(
+                <div className="flex gap-1.5 p-1 rounded-2xl bg-white border border-slate-100 w-fit flex-wrap">
+                  {(tabSection==="website"?WEBSITE_TABS:CLIENT_TABS).map(t=>(
+                    <button key={t} onClick={()=>{setTab(t);cancelAll();}}
+                      className="px-4 py-2 rounded-xl text-sm font-bold transition-all"
+                      style={tab===t?{background:C.grad12,color:"#fff"}:{color:"#94a3b8"}}>
+                      {TAB_LABELS[t]}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           );
         })()}
@@ -1273,6 +1391,20 @@ function AdminDashboard() {
                   {(postForm.sites??[]).length===0&&<p className="text-xs font-bold mt-1.5" style={{color:"#be123c"}}>Select at least one site.</p>}
                 </div>
 
+                {/* Journal paste box */}
+                <div className="mb-4 rounded-xl p-4" style={{background:C.p1_04,border:`1.5px dashed ${C.p1_20}`}}>
+                  <label className="block text-xs font-bold uppercase tracking-widest mb-1.5" style={{color:C.p1}}>Paste Journal Entry</label>
+                  <p className="text-xs text-slate-400 mb-2">Paste your raw entry — first line becomes the title, date line sets the date, the rest becomes the body.</p>
+                  <textarea
+                    className={ta}
+                    rows={5}
+                    placeholder={"Golden Hour at SJSU — Mia's Grad Shoot\nMay 7, 2025 · 3:45 PM\n\nThe light was absolutely perfect that evening..."}
+                    value={journalDraft}
+                    onChange={e=>onJournalDraftChange(e.target.value)}
+                  />
+                  {journalDraft&&<button onClick={()=>{setJournalDraft("");}} className="mt-1.5 text-xs font-bold text-slate-400 underline">Clear</button>}
+                </div>
+
                 {/* Cover image */}
                 <div className="mb-4">
                   <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Cover Photo</label>
@@ -1385,41 +1517,122 @@ function AdminDashboard() {
           <AnalyticsTab/>
         )}
 
+        {tab==="payments"&&(
+          <PaymentAnalyticsTab/>
+        )}
+
+        {tab==="funnel"&&(
+          <InquiryAnalyticsTab/>
+        )}
 
         {/* ── INQUIRIES ── */}
         {tab==="inquiries"&&(
           <div className="space-y-6">
 
-            {/* ── Reply Style Editor ── */}
+            {/* ── Reply Style Editor (collapsible) ── */}
             <div className={card}>
               <div className="h-[3px]" style={{background:C.grad90_12}}/>
-              <div className="p-6 space-y-3">
-                <div className="flex items-start justify-between gap-4">
+              <button className="w-full p-5 flex items-center justify-between gap-4 text-left" onClick={()=>setReplyStyleOpen(p=>!p)}>
+                <div className="flex items-center gap-3">
+                  <div className="w-7 h-7 rounded-lg flex items-center justify-center text-sm" style={{background:C.p1_08}}>🧠</div>
                   <div>
-                    <h2 className="text-base font-black text-slate-900">AI Reply Style</h2>
-                    <p className="text-xs font-medium text-slate-400 mt-0.5">Paste your instructions here — Claude reads this before drafting every reply</p>
+                    <p className="text-sm font-black text-slate-900">AI Reply Style</p>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      {replyStyleDraft.length>0?`${replyStyleDraft.length} chars saved`:"No rules yet — Claude uses defaults"}
+                    </p>
                   </div>
-                  <button
-                    onClick={saveReplyStyle}
-                    disabled={replyStyleSaving}
-                    className="text-xs font-bold px-3 py-1.5 rounded-lg transition-all hover:opacity-80 flex-shrink-0 disabled:opacity-50"
-                    style={replyStyleSaved?{background:"#10b981",color:"#fff"}:{background:C.grad12,color:"#fff"}}
-                  >
-                    {replyStyleSaving?"Saving…":replyStyleSaved?"Saved ✓":"Save style"}
-                  </button>
                 </div>
-                <textarea
-                  value={replyStyleDraft}
-                  onChange={e=>setReplyStyleDraft(e.target.value)}
-                  rows={8}
-                  placeholder={"Paste your reply style instructions here.\n\nExample:\n- Always open by acknowledging the specific location they mentioned\n- If they're asking about golden hour, mention I always scout the light 30 min early\n- Keep it under 150 words\n- Never mention competitors\n- Sign off as 'Chris — soloxsnaps'"}
-                  className="w-full text-sm text-slate-700 rounded-xl p-3 outline-none resize-y leading-relaxed"
-                  style={{border:`1px solid ${C.p1_20}`,background:C.p1_04,fontFamily:"inherit"}}
-                />
-                <p className="text-[10px] text-slate-400 font-medium">
-                  {replyStyleDraft.length>0?`${replyStyleDraft.length} chars · Claude will follow these on top of its base instructions`:"Empty — Claude will use its default photography tone"}
-                </p>
-              </div>
+                <span className="text-slate-400 text-sm transition-transform" style={{transform:replyStyleOpen?"rotate(180deg)":"rotate(0deg)"}}>▾</span>
+              </button>
+              {replyStyleOpen&&(
+                <div className="px-5 pb-5 space-y-3 border-t border-slate-100 pt-4">
+                  <textarea
+                    value={replyStyleDraft}
+                    onChange={e=>setReplyStyleDraft(e.target.value)}
+                    rows={8}
+                    placeholder={"Paste your reply style instructions here.\n\nExample:\n- Always open by acknowledging the specific location they mentioned\n- Never mention a travel fee unless asked\n- Keep it under 150 words"}
+                    className="w-full text-sm text-slate-700 rounded-xl p-3 outline-none resize-y leading-relaxed"
+                    style={{border:`1px solid ${C.p1_20}`,background:C.p1_04,fontFamily:"inherit"}}
+                  />
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] text-slate-400 font-medium">Claude reads this before every draft</p>
+                    <button onClick={saveReplyStyle} disabled={replyStyleSaving}
+                      className="text-xs font-bold px-3 py-1.5 rounded-lg transition-all hover:opacity-80 disabled:opacity-50"
+                      style={replyStyleSaved?{background:"#10b981",color:"#fff"}:{background:C.grad12,color:"#fff"}}>
+                      {replyStyleSaving?"Saving…":replyStyleSaved?"Saved ✓":"Save style"}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* ── Train AI Chat (collapsible) ── */}
+            <div className={card}>
+              <div className="h-[3px]" style={{background:"linear-gradient(90deg,#6366f1,#8b5cf6)"}}/>
+              <button className="w-full p-5 flex items-center justify-between gap-4 text-left" onClick={()=>setTrainOpen(p=>!p)}>
+                <div className="flex items-center gap-3">
+                  <div className="w-7 h-7 rounded-lg flex items-center justify-center text-sm" style={{background:"rgba(99,102,241,0.1)"}}>💬</div>
+                  <div>
+                    <p className="text-sm font-black text-slate-900">Train AI</p>
+                    <p className="text-xs text-slate-400 mt-0.5">Chat to teach Claude what to say — rules save automatically</p>
+                  </div>
+                </div>
+                <span className="text-slate-400 text-sm transition-transform" style={{transform:trainOpen?"rotate(180deg)":"rotate(0deg)"}}>▾</span>
+              </button>
+              {trainOpen&&(
+                <div className="border-t border-slate-100">
+                  {/* Chat history */}
+                  <div className="p-4 space-y-3 max-h-80 overflow-y-auto">
+                    {trainMessages.length===0&&(
+                      <p className="text-xs text-slate-400 text-center py-4">
+                        Tell me how you want Claude to write your emails.<br/>
+                        <span className="text-slate-300">e.g. "Never add a travel fee for Santa Clara" or "Don't mention pricing unless they ask"</span>
+                      </p>
+                    )}
+                    {trainMessages.map((m,i)=>(
+                      <div key={i} className={`flex ${m.role==="user"?"justify-end":"justify-start"}`}>
+                        <div className="max-w-[80%] px-3 py-2 rounded-xl text-sm leading-relaxed"
+                          style={m.role==="user"
+                            ?{background:C.grad12,color:"#fff"}
+                            :{background:"rgba(99,102,241,0.08)",color:"#3730a3",border:"1px solid rgba(99,102,241,0.15)"}}>
+                          {m.content}
+                        </div>
+                      </div>
+                    ))}
+                    {trainLoading&&(
+                      <div className="flex justify-start">
+                        <div className="px-3 py-2 rounded-xl text-sm" style={{background:"rgba(99,102,241,0.08)",color:"#6366f1"}}>
+                          <span className="animate-spin inline-block mr-1">◌</span> Thinking…
+                        </div>
+                      </div>
+                    )}
+                    {trainSavedRules.length>0&&(
+                      <div className="px-3 py-2 rounded-xl text-xs" style={{background:"rgba(16,185,129,0.08)",color:"#059669",border:"1px solid rgba(16,185,129,0.2)"}}>
+                        ✓ Saved {trainSavedRules.length} rule{trainSavedRules.length>1?"s":""} to Obsidian vault
+                      </div>
+                    )}
+                    <div ref={trainBottomRef}/>
+                  </div>
+                  {/* Input */}
+                  <div className="p-4 border-t border-slate-100 flex gap-2">
+                    <input
+                      type="text"
+                      value={trainInput}
+                      onChange={e=>setTrainInput(e.target.value)}
+                      onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendTrainMessage();}}}
+                      placeholder="e.g. Don't add travel fees for South Bay shoots…"
+                      disabled={trainLoading}
+                      className="flex-1 text-sm px-3 py-2 rounded-xl outline-none disabled:opacity-50"
+                      style={{border:`1px solid ${C.p1_20}`,background:"#fff",fontFamily:"inherit"}}
+                    />
+                    <button onClick={sendTrainMessage} disabled={!trainInput.trim()||trainLoading}
+                      className="text-xs font-bold px-3 py-2 rounded-xl disabled:opacity-30 flex-shrink-0"
+                      style={{background:"linear-gradient(135deg,#6366f1,#8b5cf6)",color:"#fff"}}>
+                      Send
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* ── Gmail connection card ── */}
@@ -1519,8 +1732,8 @@ function AdminDashboard() {
               ):(
                 inquiries.map(inq=>{
                   const isOpen=editingInquiry?.id===inq.id;
-                  const statusColor=inq.status==="new"?"#10b981":inq.status==="responded"?"#3b82f6":"#94a3b8";
-                  const statusBg=inq.status==="new"?"rgba(16,185,129,0.08)":inq.status==="responded"?"rgba(59,130,246,0.08)":"rgba(148,163,184,0.08)";
+                  const statusColor=inq.status==="new"?"#10b981":inq.status==="responded"?"#3b82f6":inq.status==="not_interested"?"#ef4444":"#94a3b8";
+                  const statusBg=inq.status==="new"?"rgba(16,185,129,0.08)":inq.status==="responded"?"rgba(59,130,246,0.08)":inq.status==="not_interested"?"rgba(239,68,68,0.08)":"rgba(148,163,184,0.08)";
                   const hasDraft=!!drafts[inq.id];
 
                   return(
@@ -1536,7 +1749,7 @@ function AdminDashboard() {
                           <div className="flex items-center gap-2 flex-wrap mb-1">
                             <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full"
                                   style={{background:statusBg,color:statusColor}}>
-                              {inq.status==="new"?"● New":inq.status==="responded"?"✓ Responded":"○ Archived"}
+                              {inq.status==="new"?"● New":inq.status==="responded"?"✓ Responded":inq.status==="not_interested"?"✕ Not Interested":"○ Archived"}
                             </span>
                             <p className="text-sm font-black text-slate-900">{inq.name}</p>
                             <p className="text-xs text-slate-400">
@@ -1763,7 +1976,7 @@ function AdminDashboard() {
                                           onClick={()=>saveLearnedRules(inq.id)}
                                           className="text-[11px] font-bold px-3 py-1.5 rounded-lg transition-all hover:opacity-80 flex items-center gap-1.5"
                                           style={rulesSaved===inq.id?{background:"#10b981",color:"#fff"}:{background:"rgba(255,255,255,0.9)",color:C.p1,border:`1px solid ${C.p1_20}`}}>
-                                          {rulesSaved===inq.id?"✓ Saved to style guide":"💾 Save all rules"}
+                                          {rulesSaved===inq.id?"✓ Saved to Obsidian":"💾 Save to Obsidian"}
                                         </button>
                                       </div>
                                     )}
@@ -1838,12 +2051,14 @@ function AdminDashboard() {
                           <div className="px-4 sm:px-5 py-3 border-t border-slate-100 flex items-center justify-between gap-3 flex-wrap" style={{background:"rgba(248,250,252,0.6)"}}>
                             <div className="flex items-center gap-2">
                               <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mr-1">Status</span>
-                              {(["new","responded","archived"] as const).map(s=>(
+                              {(["new","responded","archived","not_interested"] as const).map(s=>(
                                 <button key={s}
                                   onClick={()=>updateInquiryStatus(inq.id,s)}
                                   className="text-[11px] font-bold px-2.5 py-1 rounded-lg transition-all hover:opacity-80 capitalize"
-                                  style={inq.status===s?{background:s==="new"?"rgba(16,185,129,0.15)":s==="responded"?"rgba(59,130,246,0.12)":"rgba(148,163,184,0.15)",color:s==="new"?"#10b981":s==="responded"?"#3b82f6":"#94a3b8",fontWeight:800}:{background:"rgba(0,0,0,0.04)",color:"#94a3b8"}}>
-                                  {s==="new"?"● New":s==="responded"?"✓ Responded":"○ Archive"}
+                                  style={inq.status===s
+                                    ?{background:s==="new"?"rgba(16,185,129,0.15)":s==="responded"?"rgba(59,130,246,0.12)":s==="not_interested"?"rgba(239,68,68,0.15)":"rgba(148,163,184,0.15)",color:s==="new"?"#10b981":s==="responded"?"#3b82f6":s==="not_interested"?"#ef4444":"#94a3b8",fontWeight:800}
+                                    :{background:"rgba(0,0,0,0.04)",color:"#94a3b8"}}>
+                                  {s==="new"?"● New":s==="responded"?"✓ Responded":s==="not_interested"?"✕ Not Interested":"○ Archive"}
                                 </button>
                               ))}
                             </div>
@@ -1928,10 +2143,38 @@ function AdminDashboard() {
                         style={{background:"linear-gradient(135deg,#10b981,#059669)",color:"#fff"}}>
                         {syncLoading?<><span className="animate-spin inline-block">◌</span> Scanning…</>:"💳 Sync Payments"}
                       </button>
+                      <button onClick={()=>setAddClientOpen(o=>!o)}
+                        className="text-xs font-bold px-3 py-1.5 rounded-lg transition-all hover:opacity-80 flex items-center gap-1.5 flex-shrink-0"
+                        style={addClientOpen?{background:C.grad12,color:"#fff"}:{background:C.p1_04,color:C.p1,border:`1px solid ${C.p1_20}`}}>
+                        {addClientOpen?"✕ Cancel":"+ Add Client"}
+                      </button>
                     </div>
                   </div>
                 </div>
               </div>
+
+              {/* Add client form */}
+              {addClientOpen&&(
+                <div className={card}>
+                  <div className="h-[3px]" style={{background:C.grad12}}/>
+                  <div className="p-5 space-y-3">
+                    <p className="text-sm font-black text-slate-900">Add Client from Instagram DM</p>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div><label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">Name *</label><input className={inp} placeholder="e.g. Karina Lopez" value={addClientForm.name} onChange={e=>setAddClientForm(f=>({...f,name:e.target.value}))}/></div>
+                      <div><label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">Email *</label><input className={inp} type="email" placeholder="e.g. karina@gmail.com" value={addClientForm.email} onChange={e=>setAddClientForm(f=>({...f,email:e.target.value}))}/></div>
+                      <div><label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">Phone</label><input className={inp} type="tel" placeholder="e.g. (408) 555-1234" value={addClientForm.phone} onChange={e=>setAddClientForm(f=>({...f,phone:e.target.value}))}/></div>
+                      <div><label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">Session Type</label><input className={inp} placeholder="e.g. Grad Portraits" value={addClientForm.session_type} onChange={e=>setAddClientForm(f=>({...f,session_type:e.target.value}))}/></div>
+                      <div className="sm:col-span-2"><label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">Session Date</label><input className={inp} type="date" value={addClientForm.session_date} onChange={e=>setAddClientForm(f=>({...f,session_date:e.target.value}))}/></div>
+                      <div className="sm:col-span-2"><label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">Notes</label><textarea className={ta} rows={2} placeholder="Anything from the DM — location, time, vibe, etc." value={addClientForm.message} onChange={e=>setAddClientForm(f=>({...f,message:e.target.value}))}/></div>
+                    </div>
+                    <button onClick={saveManualClient} disabled={addClientSaving}
+                      className="w-full py-3 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90 active:scale-95"
+                      style={{background:C.grad,opacity:addClientSaving?0.7:1}}>
+                      {addClientSaving?"Adding…":"Add Client →"}
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Sync result banner */}
               {(syncResult!==null||syncMsg)&&(
@@ -1994,42 +2237,65 @@ function AdminDashboard() {
                           </div>
 
                           {/* Session rows */}
-                          <div className="space-y-2">
+                          <div className="space-y-3">
                             {client.sessions.map(s=>(
                               <div key={s.id}
-                                   className="flex items-center gap-3 px-3 py-2.5 rounded-xl flex-wrap"
+                                   className="px-3 py-2.5 rounded-xl"
                                    style={{background:"rgba(148,163,184,0.06)",border:"1px solid rgba(148,163,184,0.12)"}}>
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    {s.session_type&&<span className="text-xs font-semibold text-slate-700">{s.session_type}</span>}
-                                    {s.date_in_mind&&<span className="text-xs text-slate-400">{s.date_in_mind}</span>}
-                                    {s.session_date&&<span className="text-xs font-bold text-emerald-600">{new Date(s.session_date+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}</span>}
+                                <div className="flex items-center gap-3 flex-wrap">
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      {s.session_type&&<span className="text-xs font-semibold text-slate-700">{s.session_type}</span>}
+                                      {s.date_in_mind&&<span className="text-xs text-slate-400">{s.date_in_mind}</span>}
+                                      {s.session_date&&<span className="text-xs font-bold text-emerald-600">{new Date(s.session_date+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}</span>}
+                                    </div>
+                                    <p className="text-[11px] text-slate-400 mt-0.5 truncate">{s.message.slice(0,80)}{s.message.length>80?"…":""}</p>
                                   </div>
-                                  <p className="text-[11px] text-slate-400 mt-0.5 truncate">{s.message.slice(0,80)}{s.message.length>80?"…":""}</p>
+                                  <div className="flex items-center gap-2 flex-shrink-0">
+                                    {/* Payment badge */}
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg"
+                                          style={s.payment_status==="paid"
+                                            ?{background:"rgba(16,185,129,0.12)",color:"#059669"}
+                                            :{background:"rgba(148,163,184,0.12)",color:"#94a3b8"}}>
+                                      {s.payment_status==="paid"?"Paid":"Unpaid"}
+                                    </span>
+                                    {/* Status badge */}
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg"
+                                          style={s.status==="new"
+                                            ?{background:"rgba(16,185,129,0.1)",color:"#10b981"}
+                                            :s.status==="responded"
+                                              ?{background:"rgba(59,130,246,0.1)",color:"#3b82f6"}
+                                              :s.status==="not_interested"
+                                                ?{background:"rgba(239,68,68,0.1)",color:"#ef4444"}
+                                                :{background:"rgba(148,163,184,0.1)",color:"#94a3b8"}}>
+                                      {s.status==="not_interested"?"✕ Not Interested":s.status}
+                                    </span>
+                                    <a href={`/admin/conversation/${s.id}`}
+                                       className="text-[11px] font-black px-2.5 py-1 rounded-lg transition-all hover:opacity-80"
+                                       style={{background:C.grad12,color:"#fff"}}>
+                                      Open →
+                                    </a>
+                                    {/* Delete duplicate */}
+                                    {inquiryDeleteConfirm===s.id?(
+                                      <span className="flex items-center gap-1">
+                                        <span className="text-[10px] text-slate-500">Delete?</span>
+                                        <button onClick={()=>deleteInquiry(s.id)} className="text-[10px] font-black px-2 py-0.5 rounded-lg bg-red-500 text-white">Yes</button>
+                                        <button onClick={()=>setInquiryDeleteConfirm(null)} className="text-[10px] font-black px-2 py-0.5 rounded-lg bg-slate-200 text-slate-600">No</button>
+                                      </span>
+                                    ):(
+                                      <button onClick={()=>setInquiryDeleteConfirm(s.id)}
+                                        className="text-[11px] px-2 py-0.5 rounded-lg transition-all hover:opacity-80"
+                                        style={{background:"rgba(239,68,68,0.08)",color:"#ef4444"}}
+                                        title="Delete duplicate inquiry">
+                                        🗑
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
-                                <div className="flex items-center gap-2 flex-shrink-0">
-                                  {/* Payment badge */}
-                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg"
-                                        style={s.payment_status==="paid"
-                                          ?{background:"rgba(16,185,129,0.12)",color:"#059669"}
-                                          :{background:"rgba(148,163,184,0.12)",color:"#94a3b8"}}>
-                                    {s.payment_status==="paid"?"Paid":"Unpaid"}
-                                  </span>
-                                  {/* Status badge */}
-                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg capitalize"
-                                        style={s.status==="new"
-                                          ?{background:"rgba(16,185,129,0.1)",color:"#10b981"}
-                                          :s.status==="responded"
-                                            ?{background:"rgba(59,130,246,0.1)",color:"#3b82f6"}
-                                            :{background:"rgba(148,163,184,0.1)",color:"#94a3b8"}}>
-                                    {s.status}
-                                  </span>
-                                  <a href={`/admin/conversation/${s.id}`}
-                                     className="text-[11px] font-black px-2.5 py-1 rounded-lg transition-all hover:opacity-80"
-                                     style={{background:C.grad12,color:"#fff"}}>
-                                    Open →
-                                  </a>
-                                </div>
+                                <ClientTimeline
+                                  inq={s}
+                                  onUpdate={patch=>setInquiries(prev=>prev.map(x=>x.id===s.id?{...x,...patch}:x))}
+                                />
                               </div>
                             ))}
                           </div>
@@ -2042,6 +2308,9 @@ function AdminDashboard() {
             </div>
           );
         })()}
+
+        {/* ── VAULT ── */}
+        {tab==="vault"&&<VaultTab />}
       </div>
     </div>
   );

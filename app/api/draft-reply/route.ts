@@ -22,6 +22,8 @@ import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { requireAdmin } from "@/lib/requireAdmin";
+import fs from "fs";
+import path from "path";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +36,110 @@ async function fetchAvailability(): Promise<string> {
     return json.quick_read ?? "Availability data unavailable.";
   } catch {
     return "Availability data unavailable — tell them to check soloxsnaps.com/availability for open dates.";
+  }
+}
+
+const VAULT_PATH = process.env.OBSIDIAN_VAULT_PATH
+  ?? "/Users/chrissolo/Documents/Photography Business Soloxsnaps";
+
+// Folders that always contain useful context for replies
+const VAULT_ALWAYS_INCLUDE = ["03 Client Communication", "01 SOPs", "09 AI Instructions"];
+
+const VAULT_KEYWORD_MAP: Record<string, string[]> = {
+  grad:       ["02 Pricing", "07 Client Experience", "10 Templates"],
+  family:     ["02 Pricing", "07 Client Experience"],
+  couple:     ["02 Pricing", "07 Client Experience"],
+  pricing:    ["02 Pricing"],
+  reschedule: ["10 Templates"],
+  cancel:     ["10 Templates"],
+  confirm:    ["10 Templates"],
+};
+
+// Maps keywords → specific location note filename (in "06 Locations/")
+const LOCATION_NOTE_MAP: Record<string, string> = {
+  "berkeley":           "UC Berkeley.md",
+  "uc berkeley":        "UC Berkeley.md",
+  "sfsu":                        "SF State.md",
+  "sf state":                    "SF State.md",
+  "san francisco state":         "SF State.md",
+  "usf":                         "USF.md",
+  "university of san francisco":  "USF.md",
+  "sjsu":                        "SJSU.md",
+  "san jose state":              "SJSU.md",
+  "csueb":                       "CSUEB.md",
+  "cal state east bay":          "CSUEB.md",
+  "east bay":                    "CSUEB.md",
+  "hayward":                     "CSUEB.md",
+  "legion of honor":             "Legion of Honor.md",
+  "palace of fine arts":         "SF Outdoor Spots.md",
+  "sutro":                       "SF Outdoor Spots.md",
+  "ocean beach":                 "SF Outdoor Spots.md",
+  "baker beach":                 "SF Outdoor Spots.md",
+  "dolores park":                "SF Outdoor Spots.md",
+  "alamo square":                "SF Outdoor Spots.md",
+  "crissy field":                "SF Outdoor Spots.md",
+  "golden gate park":            "SF Outdoor Spots.md",
+};
+
+function fetchVaultContext(sessionType?: string, message?: string): string {
+  try {
+    const foldersToRead = new Set(VAULT_ALWAYS_INCLUDE);
+    const specificNotes: string[] = []; // full paths to specific files
+    const haystack = `${sessionType ?? ""} ${message ?? ""}`.toLowerCase();
+
+    // Folder-level keywords
+    for (const [kw, folders] of Object.entries(VAULT_KEYWORD_MAP)) {
+      if (haystack.includes(kw)) folders.forEach(f => foldersToRead.add(f));
+    }
+
+    // If any grad keywords: add pricing and client experience
+    if (haystack.includes("grad")) {
+      foldersToRead.add("02 Pricing");
+      foldersToRead.add("07 Client Experience");
+    }
+
+    // Location-specific notes
+    for (const [kw, noteFile] of Object.entries(LOCATION_NOTE_MAP)) {
+      if (haystack.includes(kw)) {
+        const notePath = path.join(VAULT_PATH, "06 Locations", noteFile);
+        if (fs.existsSync(notePath)) specificNotes.push(notePath);
+      }
+    }
+    // If location mentioned but no specific note matched, include whole locations folder
+    const locationKeywords = ["location", "campus", "shoot at", "shoot in", "session at"];
+    if (locationKeywords.some(k => haystack.includes(k)) && specificNotes.length === 0) {
+      foldersToRead.add("06 Locations");
+    }
+
+    const sections: string[] = [];
+
+    // Specific location notes first (highest priority)
+    const seenPaths = new Set<string>();
+    for (const notePath of specificNotes) {
+      if (seenPaths.has(notePath)) continue;
+      seenPaths.add(notePath);
+      const content = fs.readFileSync(notePath, "utf-8").trim();
+      const label = path.basename(notePath).replace(".md", "");
+      if (content) sections.push(`### 06 Locations / ${label}\n${content}`);
+    }
+
+    // Folder-level reads
+    for (const folder of foldersToRead) {
+      const dirPath = path.join(VAULT_PATH, folder);
+      if (!fs.existsSync(dirPath)) continue;
+      const files = fs.readdirSync(dirPath).filter(f => f.endsWith(".md"));
+      for (const file of files) {
+        const fullPath = path.join(dirPath, file);
+        if (seenPaths.has(fullPath)) continue;
+        seenPaths.add(fullPath);
+        const content = fs.readFileSync(fullPath, "utf-8").trim();
+        if (content) sections.push(`### ${folder} / ${file.replace(".md", "")}\n${content}`);
+      }
+    }
+
+    return sections.join("\n\n---\n\n");
+  } catch {
+    return "";
   }
 }
 
@@ -137,20 +243,25 @@ List the concrete style rules Claude should follow in future drafts based on the
       fetchAvailability(),
       fetchReplyStyle(),
     ]);
+    const vaultContext = fetchVaultContext(session_type, message);
 
-    const styleSection = replyStyle
-      ? `\n\nAdditional style instructions from Chris (follow these closely):\n${replyStyle}`
+    const vaultSection = vaultContext
+      ? `\n\n---\nBUSINESS KNOWLEDGE BASE (Obsidian vault — single source of truth for all pricing, policies, tone rules, and templates. Use this and only this for business facts):\n\n${vaultContext}\n---`
       : "";
 
-    const systemPrompt = `You are Chris Solorzano, a Bay Area graduation and family photographer. You run soloxsnaps.com.
+    const styleSection = replyStyle
+      ? `\n\nLearned style rules from Chris (override vault defaults where they conflict):\n${replyStyle}`
+      : "";
 
-Your tone is warm, personal, and direct — not overly formal, not salesy. You sound like a real person.
+    const systemPrompt = `You are Chris Solorzano, a Bay Area photography business owner. You run soloxsnaps.com.
 
-Always:
+All business knowledge — pricing, policies, tone, communication rules — comes exclusively from the Obsidian vault below. Do not invent facts not in the vault.
+
+Format rules (always apply):
 - Plain text only — no markdown, no bold, no asterisks, no bullet points in the output
 - Start directly with "Hi [Name]," — no subject line
 - Sign as "Chris"
-- Keep it concise` + styleSection;
+- Never include email headers, timestamps, or "to:" lines` + vaultSection + styleSection;
 
     try {
       const client = new Anthropic({ apiKey });
@@ -164,10 +275,10 @@ Always:
 
 Fix any typos, improve the flow, and make it sound natural and professional. If it's written as bullet points or fragments, convert it to proper paragraphs.
 
-Keep all the key information — do not add or remove facts. Just clean it up and make it sound like you.
+IMPORTANT — transcription error correction: This draft may have been dictated via voice-to-text, so it may contain speech recognition mistakes (wrong words that sound similar to the intended word). Use the conversation context below to identify and fix these errors. For example, if the draft says "Palisades of Fine Arts" but the conversation mentions "Palace of Fine Arts", correct it. Always trust what the client said in the conversation over what appears in the rough draft.
 
 This is a reply to ${name} about a ${session_type ?? "photography"} session.
-
+${thread_context ? `\nConversation context (use this to fix any transcription errors in the draft):\n---\n${thread_context}\n---` : ""}
 Rough draft:
 ---
 ${raw_draft}
@@ -196,34 +307,33 @@ Output only the polished email body, nothing else.`,
 
   // ── Modes 1 & 2: Fresh draft or refinement ───────────────────────────────
 
-  // Fetch both in parallel
+  // Fetch all context in parallel
   const [availability, replyStyle] = await Promise.all([
     fetchAvailability(),
     fetchReplyStyle(),
   ]);
+  const vaultContext = fetchVaultContext(session_type, message);
 
-  const baseInstructions = `You are Chris Solorzano, a Bay Area graduation and family photographer. You run soloxsnaps.com.
+  const baseInstructions = `You are Chris Solorzano, a Bay Area photography business owner. You run soloxsnaps.com.
 
-Your tone is warm, personal, and direct — not overly formal, not salesy. You sound like a real person who genuinely cares about making their shoot great. Keep replies concise (3–5 short paragraphs max).
+All business knowledge — pricing, add-ons, travel fees, policies, tone rules, communication structure — comes exclusively from the Obsidian vault below. Do not invent or assume any facts not present in the vault.
 
-Always:
-- Use the client's first name naturally
-- Acknowledge what they want specifically (session type, date, etc.)
-- Mention 2–3 specific open dates from the availability data when relevant (pick ones closest to their requested date if they gave one, otherwise the next soonest)
-- End with a clear next step: they should reply to confirm a date or ask questions
-- Sign as "Chris"
+Format rules (always apply, non-negotiable):
+- Plain text only — no markdown, no bold, no asterisks, no bullet points in the output
 - Start directly with "Hi [Name]," — no subject line, no "Dear"
-- Plain text only — no markdown, no bold, no asterisks, no bullet points
-- Do not mention pricing unless they asked about it
-- NEVER include email headers, timestamps, sender lines, or "to:" lines in your output — these are not part of the reply body
-- If you see lines like "Name <email@address.com>", "January 13, 2025 at 2:45 PM", or "to client@email.com" in the context, those are historical email headers — do not reproduce them
+- Sign as "Chris"
+- NEVER include email headers, timestamps, sender lines, or "to:" lines
 - Output only the reply body itself, starting with "Hi [Name],"`;
 
-  const styleSection = replyStyle
-    ? `\n\nAdditional style instructions from Chris (follow these closely, they override defaults where they conflict):\n${replyStyle}`
+  const vaultSection = vaultContext
+    ? `\n\n---\nBUSINESS KNOWLEDGE BASE (Obsidian vault — single source of truth. Use this and only this for all business facts, pricing, policies, and tone):\n\n${vaultContext}\n---`
     : "";
 
-  const systemPrompt = baseInstructions + styleSection;
+  const styleSection = replyStyle
+    ? `\n\nLearned style rules from Chris (these override vault tone defaults where they conflict):\n${replyStyle}`
+    : "";
+
+  const systemPrompt = baseInstructions + vaultSection + styleSection;
 
   const threadSection = thread_context
     ? `\n\nFull email conversation history with this client (oldest first — use this for context, don't repeat what's already been said):\n\n${thread_context}`

@@ -83,6 +83,10 @@ export default function ConversationPage() {
   const [lastAiDraft,   setLastAiDraft]   = useState("");   // snapshot of the AI-generated text for teaching
   const [draftLoading,  setDraftLoading]  = useState(false);
   const [polishLoading, setPolishLoading] = useState(false);
+  const [draftSaving,   setDraftSaving]   = useState(false);
+  const [draftSaved,    setDraftSaved]    = useState(false);
+  const [voiceActive,   setVoiceActive]   = useState(false);
+  const [voiceError,    setVoiceError]    = useState<string | null>(null);
   const [subject,       setSubject]       = useState("");
   const [feedback,      setFeedback]      = useState("");
   const [sendLoading,   setSendLoading]   = useState(false);
@@ -102,6 +106,13 @@ export default function ConversationPage() {
   const [dateConfirming,    setDateConfirming]    = useState(false);
   // Day-before reminder
   const [reminderLoading,   setReminderLoading]   = useState(false);
+
+  // Session reminders panel
+  type ReminderDraft = { id: string; label: string; emoji: string; subject: string; body: string };
+  const [remindersOpen,    setRemindersOpen]    = useState(false);
+  const [remindersLoading, setRemindersLoading] = useState(false);
+  const [reminders,        setReminders]        = useState<ReminderDraft[]>([]);
+  const [sendingReminder,  setSendingReminder]  = useState<string | null>(null);
 
   // ── Contract ───────────────────────────────────────────────────────────────
   const [contractText,    setContractText]    = useState<string | null>(null);
@@ -209,13 +220,32 @@ export default function ConversationPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inquiryId]);
 
-  // Load saved drafts from localStorage on mount
+  // Load saved drafts — localStorage first (fast), fall back to Supabase (cross-device)
   useEffect(() => {
     if (!inquiryId) return;
-    const saved = localStorage.getItem(`draft_${inquiryId}`);
-    if (saved) setDraft(saved);
-    const savedAi = localStorage.getItem(`ai_draft_${inquiryId}`);
-    if (savedAi) setLastAiDraft(savedAi);
+    const localDraft = localStorage.getItem(`draft_${inquiryId}`);
+    const localAi    = localStorage.getItem(`ai_draft_${inquiryId}`);
+    if (localDraft) setDraft(localDraft);
+    if (localAi)    setLastAiDraft(localAi);
+
+    // Only hit Supabase if localStorage was empty (other device may have saved)
+    if (!localDraft || !localAi) {
+      supabase.from("site_settings").select("key,value")
+        .in("key", [`draft_${inquiryId}`, `ai_draft_${inquiryId}`])
+        .then(({ data }) => {
+          if (!data) return;
+          for (const row of data) {
+            if (row.key === `draft_${inquiryId}` && !localDraft && row.value) {
+              setDraft(row.value);
+              localStorage.setItem(`draft_${inquiryId}`, row.value);
+            }
+            if (row.key === `ai_draft_${inquiryId}` && !localAi && row.value) {
+              setLastAiDraft(row.value);
+              localStorage.setItem(`ai_draft_${inquiryId}`, row.value);
+            }
+          }
+        });
+    }
   }, [inquiryId]);
 
   // Persist compose draft to localStorage whenever it changes
@@ -328,6 +358,11 @@ export default function ConversationPage() {
         setLearnedRules(null);        // reset any previous learning result
         setActualSent("");
         setFeedback("");
+        // Persist to Supabase so draft is accessible on any device
+        await supabase.from("site_settings").upsert([
+          { key: `draft_${inquiryId}`,    value: json.draft },
+          { key: `ai_draft_${inquiryId}`, value: json.draft },
+        ], { onConflict: "key" });
       }
       else showToast(json.error ?? "Draft failed", false);
     } catch {
@@ -342,15 +377,23 @@ export default function ConversationPage() {
     if (!inquiry || !draft.trim()) return;
     setPolishLoading(true);
     try {
+      const threadContext = messages.length > 0
+        ? messages.map(m => {
+            const body = bodies[m.id] ? stripQuotes(bodies[m.id]).slice(0, 800) : m.snippet;
+            return `[${m.isMe ? "Chris" : inquiry.name}]: ${body}`;
+          }).join("\n\n")
+        : undefined;
+
       const res  = await fetch("/api/draft-reply", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name:         inquiry.name,
-          email:        inquiry.email,
-          message:      inquiry.message,
-          session_type: inquiry.session_type,
-          raw_draft:    draft,
+          name:           inquiry.name,
+          email:          inquiry.email,
+          message:        inquiry.message,
+          session_type:   inquiry.session_type,
+          thread_context: threadContext ?? null,
+          raw_draft:      draft,
         }),
       });
       const json = await res.json();
@@ -364,6 +407,123 @@ export default function ConversationPage() {
       showToast("Polish failed", false);
     } finally {
       setPolishLoading(false);
+    }
+  }
+
+  // ── Voice-to-text (MediaRecorder → Whisper) ───────────────────────────────
+  const mediaRecorderRef  = useRef<MediaRecorder | null>(null);
+  const audioChunksRef    = useRef<Blob[]>([]);
+  const liveRecogRef      = useRef<InstanceType<typeof window.SpeechRecognition> | null>(null);
+  const voicePreviewRef   = useRef(""); // live interim text shown while recording
+  const draftBaseRef      = useRef(""); // text in box before recording started
+  const draftRef          = useRef("");
+  useEffect(() => { draftRef.current = draft; }, [draft]);
+
+  async function startVoice() {
+    setVoiceError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      // Snapshot existing text before we start appending live preview
+      draftBaseRef.current  = draftRef.current.trimEnd();
+      voicePreviewRef.current = "";
+
+      // ── Live preview via SpeechRecognition ──────────────────────────────
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const SR: (new () => SpeechRecognition) | undefined = (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition;
+      if (SR) {
+        const rec = new SR();
+        rec.continuous     = true;
+        rec.interimResults = true;
+        rec.lang           = "en-US";
+        rec.onresult = (e: SpeechRecognitionEvent) => {
+          let preview = "";
+          for (let i = 0; i < e.results.length; i++) {
+            preview += e.results[i][0].transcript;
+          }
+          voicePreviewRef.current = preview;
+          const base = draftBaseRef.current;
+          setDraft(base ? base + "\n" + preview : preview);
+        };
+        rec.onerror = () => { /* ignore — Whisper is the source of truth */ };
+        rec.start();
+        liveRecogRef.current = rec;
+      }
+
+      // ── Audio recording for Whisper ──────────────────────────────────────
+      const mime = ["audio/webm;codecs=opus", "audio/webm", "audio/ogg", "audio/mp4"]
+        .find(t => MediaRecorder.isTypeSupported(t)) ?? "";
+      const recorder = new MediaRecorder(stream, mime ? { mimeType: mime } : {});
+      audioChunksRef.current = [];
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
+
+      recorder.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop());
+        liveRecogRef.current?.stop();
+        liveRecogRef.current = null;
+
+        const blob = new Blob(audioChunksRef.current, { type: mime || "audio/webm" });
+        audioChunksRef.current = [];
+
+        if (blob.size < 1000) { setVoiceActive(false); return; }
+
+        setVoiceActive(false);
+        setDraftLoading(true);
+
+        try {
+          const fd = new FormData();
+          fd.append("audio", blob, "audio.webm");
+          const res  = await fetch("/api/transcribe", { method: "POST", body: fd });
+          const json = await res.json() as { text?: string; error?: string };
+          if (json.text) {
+            // Replace the live preview with Whisper's accurate final transcript
+            const base = draftBaseRef.current;
+            setDraft(base ? base + "\n" + json.text : json.text);
+          } else {
+            setVoiceError(json.error ?? "Transcription failed");
+            setTimeout(() => setVoiceError(null), 5000);
+          }
+        } catch {
+          setVoiceError("Transcription failed");
+          setTimeout(() => setVoiceError(null), 5000);
+        } finally {
+          setDraftLoading(false);
+        }
+      };
+
+      recorder.start();
+      mediaRecorderRef.current = recorder;
+      setVoiceActive(true);
+    } catch {
+      setVoiceError("Mic access denied — check browser permissions.");
+      setTimeout(() => setVoiceError(null), 5000);
+    }
+  }
+
+  function stopVoice() {
+    mediaRecorderRef.current?.stop();
+    mediaRecorderRef.current = null;
+  }
+
+  function toggleVoice() {
+    if (voiceActive) { stopVoice(); } else { startVoice(); }
+  }
+
+  // ── Save draft to Supabase (cross-device sync) ────────────────────────────
+  async function saveDraftToCloud() {
+    if (!draft.trim()) return;
+    setDraftSaving(true);
+    try {
+      await supabase.from("site_settings").upsert(
+        [{ key: `draft_${inquiryId}`, value: draft }],
+        { onConflict: "key" }
+      );
+      setDraftSaved(true);
+      setTimeout(() => setDraftSaved(false), 2500);
+    } catch {
+      showToast("Failed to save draft", false);
+    } finally {
+      setDraftSaving(false);
     }
   }
 
@@ -388,6 +548,11 @@ export default function ConversationPage() {
         await supabase.from("inquiries").update({ status: "responded" }).eq("id", inquiry.id);
         setStatus("responded");
         setDraft("");
+        // Clear cloud drafts now that it's sent
+        await supabase.from("site_settings").delete()
+          .in("key", [`draft_${inquiryId}`, `ai_draft_${inquiryId}`]);
+        localStorage.removeItem(`draft_${inquiryId}`);
+        localStorage.removeItem(`ai_draft_${inquiryId}`);
         // Refresh thread to show the sent message
         setTimeout(() => fetchThread(inquiry.email), 1500);
       } else {
@@ -556,6 +721,47 @@ export default function ConversationPage() {
       showToast("Reminder draft failed", false);
     } finally {
       setReminderLoading(false);
+    }
+  }
+
+  // ── Generate all session reminder drafts ─────────────────────────────────
+  async function scheduleReminders() {
+    if (!inquiry) return;
+    setRemindersLoading(true);
+    setRemindersOpen(true);
+    try {
+      const res = await fetch("/api/session-reminders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ inquiry_id: inquiry.id }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.reminders) { showToast(json.error ?? "Failed to generate reminders", false); return; }
+      setReminders(json.reminders);
+    } catch {
+      showToast("Reminder generation failed", false);
+    } finally {
+      setRemindersLoading(false);
+    }
+  }
+
+  // ── Send a reminder email directly via Gmail ─────────────────────────────
+  async function sendReminderViaGmail(r: ReminderDraft) {
+    if (!inquiry) return;
+    setSendingReminder(r.id);
+    try {
+      const res = await fetch("/api/send-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to: inquiry.email, subject: r.subject, body: r.body }),
+      });
+      const json = await res.json();
+      if (!res.ok) { showToast(json.error ?? "Send failed", false); return; }
+      showToast(`${r.label} sent via Gmail ✓`);
+    } catch {
+      showToast("Send failed", false);
+    } finally {
+      setSendingReminder(null);
     }
   }
 
@@ -871,6 +1077,16 @@ export default function ConversationPage() {
                 </div>
                 {/* AI action buttons */}
                 <div className="flex gap-2">
+                  <button onClick={toggleVoice}
+                    title={voiceActive ? "Stop recording" : "Speak your reply — then hit Polish"}
+                    className="text-xs font-bold px-2.5 py-1.5 rounded-lg transition-all hover:opacity-80 flex items-center gap-1"
+                    style={voiceActive
+                      ? { background: "rgba(239,68,68,0.12)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.3)" }
+                      : { background: "rgba(99,102,241,0.1)", color: "#6366f1", border: "1px solid rgba(99,102,241,0.25)" }}>
+                    {voiceActive
+                      ? <><span className="inline-block w-2 h-2 rounded-full bg-red-500 animate-pulse" /> Stop</>
+                      : "🎤 Speak"}
+                  </button>
                   <button onClick={() => polishDraft()} disabled={polishLoading || !draft.trim()}
                     title="Fix typos, convert bullet points to paragraphs"
                     className="text-xs font-bold px-2.5 py-1.5 rounded-lg transition-all hover:opacity-80 disabled:opacity-30 flex items-center gap-1"
@@ -898,6 +1114,28 @@ export default function ConversationPage() {
                 </div>
               )}
 
+              {/* Voice recording indicator */}
+              {voiceActive && (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium"
+                     style={{ background: "rgba(239,68,68,0.07)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.2)" }}>
+                  <span className="inline-block w-2 h-2 rounded-full bg-red-500 animate-pulse flex-shrink-0" />
+                  <span>Recording… speak naturally. Hit Stop when done — Whisper will clean it up.</span>
+                </div>
+              )}
+              {draftLoading && !voiceActive && (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium"
+                     style={{ background: "rgba(99,102,241,0.07)", color: "#6366f1", border: "1px solid rgba(99,102,241,0.2)" }}>
+                  <span className="animate-spin inline-block">◌</span>
+                  <span>Transcribing with Whisper…</span>
+                </div>
+              )}
+              {voiceError && (
+                <div className="px-3 py-2 rounded-xl text-xs font-medium"
+                     style={{ background: "rgba(239,68,68,0.07)", color: "#dc2626" }}>
+                  {voiceError}
+                </div>
+              )}
+
               {/* Subject — always visible */}
               <div>
                 <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 block mb-1">Subject</label>
@@ -908,10 +1146,17 @@ export default function ConversationPage() {
 
               {/* Body — always visible */}
               <div>
-                <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 block mb-1">
-                  Message
-                  <span className="normal-case font-normal text-slate-300 ml-1">· type your own, paste, or use AI above</span>
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                    Message
+                    <span className="normal-case font-normal text-slate-300 ml-1">· type your own, paste, or use AI above</span>
+                  </label>
+                  <button onClick={saveDraftToCloud} disabled={draftSaving || !draft.trim()}
+                    className="text-[10px] font-bold px-2 py-1 rounded-lg transition-all disabled:opacity-30"
+                    style={{ background: draftSaved ? "rgba(16,185,129,0.12)" : "rgba(148,163,184,0.1)", color: draftSaved ? "#059669" : "#94a3b8", border: `1px solid ${draftSaved ? "rgba(16,185,129,0.25)" : "rgba(148,163,184,0.2)"}` }}>
+                    {draftSaving ? "Saving…" : draftSaved ? "✓ Saved" : "Save draft"}
+                  </button>
+                </div>
                 <textarea
                   value={draft} onChange={e => setDraft(e.target.value)}
                   rows={11}
@@ -1043,16 +1288,8 @@ export default function ConversationPage() {
                   {paymentLoading ? "Scanning…" : inquiry.payment_status === "paid" ? "Re-check" : "Check Pay"}
                 </button>
 
-                {/* Detect date / reminder */}
-                {inquiry.session_date ? (
-                  <button onClick={draftReminder} disabled={reminderLoading}
-                    title="Draft a day-before reminder into the compose box"
-                    className="flex flex-col items-center gap-1 py-3 rounded-xl text-white text-xs font-black transition-all hover:opacity-90 disabled:opacity-40"
-                    style={{ background: "linear-gradient(135deg,#f59e0b,#d97706)" }}>
-                    {reminderLoading ? <span className="animate-spin text-base">◌</span> : <span className="text-base">🔔</span>}
-                    {reminderLoading ? "Writing…" : "Reminder"}
-                  </button>
-                ) : (
+                {/* Find Date (if no session date yet) */}
+                {!inquiry.session_date && (
                   <button onClick={detectDate} disabled={detectLoading}
                     title="Scan email history to detect the session date"
                     className="flex flex-col items-center gap-1 py-3 rounded-xl text-xs font-black transition-all hover:opacity-90 disabled:opacity-40"
@@ -1061,6 +1298,15 @@ export default function ConversationPage() {
                     {detectLoading ? "Scanning…" : "Find Date"}
                   </button>
                 )}
+
+                {/* Schedule Reminders */}
+                <button onClick={scheduleReminders} disabled={remindersLoading}
+                  title="Generate all 5 client touchpoint drafts"
+                  className="flex flex-col items-center gap-1 py-3 rounded-xl text-white text-xs font-black transition-all hover:opacity-90 disabled:opacity-40"
+                  style={{ background: remindersOpen ? "linear-gradient(135deg,#d97706,#b45309)" : "linear-gradient(135deg,#f59e0b,#d97706)" }}>
+                  {remindersLoading ? <span className="animate-spin text-base">◌</span> : <span className="text-base">🗓️</span>}
+                  {remindersLoading ? "Building…" : "Reminders"}
+                </button>
 
                 {/* Contract */}
                 <button onClick={generateContract} disabled={contractLoading}
@@ -1090,6 +1336,70 @@ export default function ConversationPage() {
               </div>
             </div>
           </div>
+
+          {/* ── Session Reminders Panel ── */}
+          {remindersOpen && (
+            <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
+              <div className="h-[3px]" style={{ background: "linear-gradient(90deg,#f59e0b,#d97706)" }} />
+              <div className="p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-lg flex items-center justify-center text-xs"
+                         style={{ background: "rgba(245,158,11,0.12)", color: "#d97706" }}>🗓️</div>
+                    <p className="text-sm font-black text-slate-900">Session Reminders</p>
+                  </div>
+                  <button onClick={() => setRemindersOpen(false)}
+                    className="text-xs font-bold text-slate-400 hover:text-slate-600">✕ Close</button>
+                </div>
+
+                {remindersLoading ? (
+                  <div className="flex flex-col items-center gap-3 py-10 text-slate-400">
+                    <span className="animate-spin text-2xl">◌</span>
+                    <p className="text-sm font-semibold">Generating all 5 drafts…</p>
+                  </div>
+                ) : reminders.length === 0 ? (
+                  <p className="text-sm text-slate-400 text-center py-6">No drafts yet — click Reminders to generate.</p>
+                ) : (
+                  <div className="space-y-4">
+                    {reminders.map((r, i) => (
+                      <div key={r.id} className="rounded-xl overflow-hidden border border-slate-100">
+                        <div className="flex items-center justify-between px-4 py-2.5"
+                             style={{ background: "rgba(245,158,11,0.06)", borderBottom: "1px solid rgba(245,158,11,0.12)" }}>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm">{r.emoji}</span>
+                            <p className="text-xs font-black text-slate-800">{i + 1}. {r.label}</p>
+                          </div>
+                          <button
+                            onClick={() => sendReminderViaGmail(r)}
+                            disabled={sendingReminder === r.id}
+                            className="text-[11px] font-black px-2.5 py-1 rounded-lg text-white transition-all hover:opacity-80 disabled:opacity-60"
+                            style={{ background: "linear-gradient(135deg,#f59e0b,#d97706)" }}>
+                            {sendingReminder === r.id ? "Sending…" : "Send via Gmail →"}
+                          </button>
+                        </div>
+                        <div className="px-4 py-3 bg-white">
+                          <p className="text-[11px] font-bold text-slate-400 mb-1">Subject: {r.subject}</p>
+                          <textarea
+                            value={r.body}
+                            onChange={e => {
+                              const updated = e.target.value;
+                              setReminders(prev => prev.map((x, j) => j === i ? { ...x, body: updated } : x));
+                            }}
+                            rows={4}
+                            className="w-full text-xs text-slate-700 leading-relaxed rounded-lg p-2 resize-none outline-none"
+                            style={{ border: "1px solid rgba(245,158,11,0.2)", background: "rgba(245,158,11,0.03)", fontFamily: "inherit" }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                    <p className="text-[11px] text-slate-400 text-center pt-1">
+                      Edit any draft above — "Open in Mail" always uses the current text.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* ── Things to Remember ── */}
           <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
