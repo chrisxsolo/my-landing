@@ -52,6 +52,10 @@ export default function AdminSessionsDashboard() {
   const [statusFilter, setStatusFilter] = useState<ClientSessionStatus | "all">("all");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [statusSaving, setStatusSaving] = useState<{
+    id: string;
+    status: ClientSessionStatus;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -157,6 +161,44 @@ export default function AdminSessionsDashboard() {
       setError("Could not save session.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function updateSessionStatus(session: AdminClientSessionDTO, status: ClientSessionStatus) {
+    setStatusSaving({ id: session.id, status });
+    setError(null);
+    setMessage(null);
+
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch("/api/admin/sessions", {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          quickStatusUpdate: true,
+          id: session.id,
+          clientEmail: session.clientEmail,
+          clientName: session.clientName,
+          sessionType: session.sessionType,
+          sessionDate: session.sessionDate,
+          location: session.location,
+          currentStatus: status,
+        }),
+      });
+      const json = await res.json() as AdminSessionsResponse;
+
+      if (!res.ok || !json.session) {
+        setError(json.error ?? "Could not update session progress.");
+        return;
+      }
+
+      setSessions((prev) => prev.map((item) => item.id === json.session!.id ? json.session! : item));
+      setMessage(`Updated ${json.session.clientName || "client"} to ${CLIENT_SESSION_STATUS_LABELS[status]}.`);
+    } catch (err) {
+      console.error("[admin-sessions-dashboard] quick status", err);
+      setError("Could not update session progress.");
+    } finally {
+      setStatusSaving(null);
     }
   }
 
@@ -269,7 +311,12 @@ export default function AdminSessionsDashboard() {
               </div>
             </div>
 
-            <AdminSessionTable sessions={filteredSessions} onEdit={setEditing} />
+            <AdminSessionTable
+              sessions={filteredSessions}
+              onEdit={setEditing}
+              onUpdateStatus={updateSessionStatus}
+              statusSaving={statusSaving}
+            />
           </section>
         </div>
       </div>

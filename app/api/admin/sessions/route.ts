@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserFromRequest } from "@/lib/auth/get-user";
 import { isAdminUser } from "@/lib/auth/is-admin";
+import { ensureAdminPortalSession } from "@/lib/adminPortalSessionUpsert";
 import {
   CLIENT_SESSION_TABLE,
   isClientSessionStatus,
   type ClientSessionRow,
   toAdminClientSessionDTO,
 } from "@/lib/clientSessions";
+import { requireAdmin } from "@/lib/requireAdmin";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +30,11 @@ type AdminCheck =
   | { userId: null; response: NextResponse };
 
 async function requireSupabaseAdmin(req: NextRequest): Promise<AdminCheck> {
+  const cookieAuth = requireAdmin(req);
+  if (!cookieAuth) {
+    return { userId: "cookie-admin", response: null };
+  }
+
   const user = await getUserFromRequest(req);
   if (!user) {
     return { userId: null, response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
@@ -158,11 +165,39 @@ export async function PATCH(req: NextRequest) {
     if (admin.response) return admin.response;
 
     const body = await req.json() as Record<string, unknown>;
+    const supabase = createSupabaseAdminClient();
+    const quickStatusUpdate = body.quickStatusUpdate === true;
+
+    if (quickStatusUpdate) {
+      if (!isClientSessionStatus(body.currentStatus)) {
+        return NextResponse.json({ error: "Invalid session status." }, { status: 400 });
+      }
+
+      const sessionId = await ensureAdminPortalSession(supabase, {
+        id: typeof body.id === "string" && body.id ? body.id : undefined,
+        clientEmail: readText(body.clientEmail) ?? "",
+        clientName: readText(body.clientName),
+        sessionType: readText(body.sessionType),
+        sessionDate: readDateTime(body.sessionDate) ?? readDate(body.sessionDate) ?? null,
+        location: readText(body.location),
+        currentStatus: body.currentStatus,
+      });
+
+      const { data, error } = await supabase
+        .from(CLIENT_SESSION_TABLE)
+        .update({ current_status: body.currentStatus })
+        .eq("id", sessionId)
+        .select("*")
+        .single<ClientSessionRow>();
+
+      if (error) throw error;
+      return NextResponse.json({ session: toAdminClientSessionDTO(data) });
+    }
+
     if (typeof body.id !== "string" || !body.id) {
       return NextResponse.json({ error: "Session id is required." }, { status: 400 });
     }
 
-    const supabase = createSupabaseAdminClient();
     const { data: existingSession, error: existingError } = await supabase
       .from(CLIENT_SESSION_TABLE)
       .select("client_email,client_user_id")

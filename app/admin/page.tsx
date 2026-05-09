@@ -24,6 +24,7 @@ function SessionTypeEditor({id,value,onSave,onCancel}:{id:number;value:string;on
   );
 }
 import { checkAuth, login, logout as adminLogout } from "@/lib/adminAuth";
+import AdminSessionStatusStrip from "@/app/components/admin-session-status-strip";
 import BayAreaLocationsManager from "@/app/admin/BayAreaLocationsManager";
 import AnalyticsTab from "@/app/admin/AnalyticsTab";
 import PaymentAnalyticsTab from "@/app/admin/PaymentAnalyticsTab";
@@ -31,11 +32,19 @@ import ClientTimeline from "@/app/admin/ClientTimeline";
 import InquiryAnalyticsTab from "@/app/admin/InquiryAnalyticsTab";
 import VaultTab from "@/app/admin/VaultTab";
 import SessionCalendar from "@/app/admin/SessionCalendar";
+import {
+  findMatchingClientSession,
+  getClientSessionEmailMatches,
+  CLIENT_SESSION_STATUS_LABELS,
+  type AdminClientSessionDTO,
+  type ClientSessionStatus,
+} from "@/lib/clientSessions";
 
 export const dynamic = 'force-dynamic'
 
 type Tab = "home"|"poses"|"locations"|"bayGuide"|"portfolio"|"categories"|"blog"|"analytics"|"payments"|"inquiries"|"clients"|"funnel"|"vault";
 type Inquiry = { id:number; name:string; email:string; phone:string|null; session_type:string|null; date_in_mind:string|null; message:string; status:string; created_at:string; payment_status:string|null; payment_note:string|null; payment_detected_at:string|null; session_date:string|null; booking_confirmed:boolean|null; reply_sent_at:string|null; invoice_sent_at:string|null; contract_sent_at:string|null; deposit_paid_at:string|null; gallery_delivered_at:string|null; };
+type AdminSessionsResponse = { sessions?: AdminClientSessionDTO[]; session?: AdminClientSessionDTO; error?: string; };
 type BlogCategory = "journal"|"professional";
 type Pose = { id:number; title:string; image_url:string; instructions:string; order:number; };
 type Spot = { id:number; school_id:string; school_name:string; school_short:string; name:string; description:string; tip:string; icon:string; image_url:string|null; order:number; };
@@ -245,6 +254,9 @@ function AdminDashboard() {
   const [addClientOpen,setAddClientOpen]=useState(false);
   const [addClientForm,setAddClientForm]=useState(EMPTY_CLIENT);
   const [addClientSaving,setAddClientSaving]=useState(false);
+  const [portalSessions,setPortalSessions]=useState<AdminClientSessionDTO[]>([]);
+  const [portalSessionsLoading,setPortalSessionsLoading]=useState(false);
+  const [portalStatusSavingKey,setPortalStatusSavingKey]=useState<string|null>(null);
 
   // ── Inquiries ─────────────────────────────────────────────────────────
   const [inquiries,setInquiries]=useState<Inquiry[]>([]);
@@ -523,7 +535,30 @@ function AdminDashboard() {
 
   function showToast(msg:string,ok=true){setToast({msg,ok});setTimeout(()=>setToast(null),3000);}
 
+  async function getAdminSessionsHeaders(includeJson=false){
+    const headers:Record<string,string>={};
+    const{data}=await supabase.auth.getSession();
+    const token=data.session?.access_token;
+    if(token)headers.Authorization=`Bearer ${token}`;
+    if(includeJson)headers["Content-Type"]="application/json";
+    return Object.keys(headers).length?{headers}:undefined;
+  }
+
   async function fetchInquiries(){setInquiriesLoading(true);const{data}=await supabase.from('inquiries').select('*').order('created_at',{ascending:false});setInquiries(data??[]);setInquiriesLoading(false);}
+  async function fetchPortalSessions(){
+    setPortalSessionsLoading(true);
+    try{
+      const res=await fetch("/api/admin/sessions",await getAdminSessionsHeaders());
+      const json=await res.json() as AdminSessionsResponse;
+      if(!res.ok){showToast(json.error??"Failed to load portal sessions",false);return;}
+      setPortalSessions(json.sessions??[]);
+    }catch(e){
+      console.error("[admin] fetchPortalSessions",e);
+      showToast("Failed to load portal sessions",false);
+    }finally{
+      setPortalSessionsLoading(false);
+    }
+  }
   async function deleteInquiry(id:number){const{error}=await supabase.from('inquiries').delete().eq('id',id);if(error){showToast("Delete failed",false);}else{setInquiries(p=>p.filter(x=>x.id!==id));setInquiryDeleteConfirm(null);showToast("Inquiry deleted");}}
   async function updateInquiryStatus(id:number,status:string){const{error}=await supabase.from('inquiries').update({status}).eq('id',id);if(error){showToast("Update failed",false);}else{setInquiries(p=>p.map(x=>x.id===id?{...x,status}:x));showToast("Status updated");}}
   async function saveSessionType(id:number,value:string){const{error}=await supabase.from('inquiries').update({session_type:value.trim()||null}).eq('id',id);if(error){showToast("Update failed",false);}else{setInquiries(p=>p.map(x=>x.id===id?{...x,session_type:value.trim()||null}:x));setEditingSessionType(null);showToast("Session type updated ✓");}}
@@ -539,6 +574,67 @@ function AdminDashboard() {
     setAddClientForm(EMPTY_CLIENT);
     setAddClientOpen(false);
     showToast(`${name} added ✓`);
+  }
+
+  function replacePortalSession(next:AdminClientSessionDTO){
+    setPortalSessions(prev=>{
+      const index=prev.findIndex(item=>item.id===next.id);
+      if(index===-1)return[next,...prev];
+      return prev.map(item=>item.id===next.id?next:item);
+    });
+  }
+
+  function getPortalMatchInput(inquiry:Inquiry){
+    return{
+      clientEmail:inquiry.email,
+      sessionType:inquiry.session_type,
+      sessionDate:inquiry.session_date??inquiry.date_in_mind,
+    };
+  }
+
+  function getPortalSessionForInquiry(inquiry:Inquiry):AdminClientSessionDTO|null{
+    return findMatchingClientSession(portalSessions,getPortalMatchInput(inquiry)) as AdminClientSessionDTO|null;
+  }
+
+  function isPortalMatchAmbiguous(inquiry:Inquiry){
+    const matches=getClientSessionEmailMatches(portalSessions,inquiry.email);
+    return matches.length>1&&!getPortalSessionForInquiry(inquiry);
+  }
+
+  async function updatePortalStatusFromInquiry(inquiry:Inquiry,status:ClientSessionStatus){
+    if(isPortalMatchAmbiguous(inquiry)){
+      showToast("This client has multiple portal sessions. Open Client Sessions to update the right one.",false);
+      return;
+    }
+
+    const existing=getPortalSessionForInquiry(inquiry);
+    const savingKey=`${inquiry.id}:${status}`;
+    setPortalStatusSavingKey(savingKey);
+
+    try{
+      const res=await fetch("/api/admin/sessions",{
+        method:"PATCH",
+        ...(await getAdminSessionsHeaders(true)),
+        body:JSON.stringify({
+          quickStatusUpdate:true,
+          id:existing?.id,
+          clientEmail:inquiry.email,
+          clientName:inquiry.name,
+          sessionType:inquiry.session_type,
+          sessionDate:inquiry.session_date??inquiry.date_in_mind,
+          currentStatus:status,
+        }),
+      });
+      const json=await res.json() as AdminSessionsResponse;
+      if(!res.ok||!json.session){showToast(json.error??"Portal update failed",false);return;}
+      replacePortalSession(json.session);
+      showToast(`Portal updated to ${CLIENT_SESSION_STATUS_LABELS[status]} ✓`);
+    }catch(e){
+      console.error("[admin] updatePortalStatusFromInquiry",e);
+      showToast("Portal update failed",false);
+    }finally{
+      setPortalStatusSavingKey(null);
+    }
   }
 
   function isSetupMissing(error:{code?:string;message?:string}|null){const message=error?.message?.toLowerCase()??"";return error?.code==="42P01"||error?.code==="42703"||message.includes("does not exist")||message.includes("schema cache");}
@@ -635,8 +731,8 @@ function AdminDashboard() {
     setPostsLoading(false);
   }
   
-  useEffect(()=>{if(authed){fetchPoses();fetchSpots();fetchCategories();fetchPortfolioImages();fetchPosts();fetchSiteSettings();fetchInquiries();fetchGmailStatus();fetchInbox();}},[authed]);
-  useEffect(()=>{if(authed&&(tab==="inquiries"||tab==="clients")){fetchInquiries();fetchGmailStatus();}},[authed,tab,blogCategory]);
+  useEffect(()=>{if(authed){fetchPoses();fetchSpots();fetchCategories();fetchPortfolioImages();fetchPosts();fetchSiteSettings();fetchInquiries();fetchPortalSessions();fetchGmailStatus();fetchInbox();}},[authed]);
+  useEffect(()=>{if(authed&&(tab==="inquiries"||tab==="clients")){fetchInquiries();fetchPortalSessions();fetchGmailStatus();}},[authed,tab,blogCategory]);
 
   async function compressImage(file:File, maxPx=2400, quality=0.82):Promise<Blob>{
     return new Promise(resolve=>{
@@ -2776,7 +2872,6 @@ function AdminDashboard() {
                 <div className="space-y-3">
                   {filtered.map(client=>{
                     const paid=client.sessions.some(s=>s.payment_status==="paid");
-                    const latest=client.sessions[0];
                     return(
                       <div key={client.email} className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
                         <div className="h-[3px]" style={{background:paid?"linear-gradient(90deg,#10b981,#34d399)":C.grad12}}/>
@@ -2805,7 +2900,17 @@ function AdminDashboard() {
 
                           {/* Session rows */}
                           <div className="space-y-3">
-                            {client.sessions.map(s=>(
+                            {client.sessions.map(s=>{
+                              const portalSession=getPortalSessionForInquiry(s);
+                              const portalAmbiguous=isPortalMatchAmbiguous(s);
+                              const portalSavingStatus=portalStatusSavingKey?.startsWith(`${s.id}:`)
+                                ? portalStatusSavingKey.split(":")[1] as ClientSessionStatus
+                                : null;
+                              const portalStatusLabel=portalSession
+                                ? CLIENT_SESSION_STATUS_LABELS[portalSession.currentStatus as ClientSessionStatus]
+                                : null;
+
+                              return(
                               <div key={s.id}
                                    className="px-3 py-2.5 rounded-xl"
                                    style={{background:"rgba(148,163,184,0.06)",border:"1px solid rgba(148,163,184,0.12)"}}>
@@ -2874,12 +2979,42 @@ function AdminDashboard() {
                                     )}
                                   </div>
                                 </div>
+                                <div className="mt-3 rounded-xl border p-3" style={{background:"rgba(255,255,255,0.8)",borderColor:"rgba(139,92,246,0.14)"}}>
+                                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                                    <div>
+                                      <p className="text-[10px] font-black uppercase tracking-widest" style={{color:C.p1}}>Client Portal Progress</p>
+                                      <p className="mt-1 text-[11px] text-slate-400">
+                                        {portalSessionsLoading
+                                          ?"Loading portal state..."
+                                          :portalSession
+                                            ?`Currently ${portalStatusLabel}`
+                                            :"No portal session yet. Your first click will create one."}
+                                      </p>
+                                    </div>
+                                    {portalAmbiguous&&(
+                                      <a href="/admin/sessions" className="text-[11px] font-black px-2.5 py-1 rounded-lg"
+                                         style={{background:C.p1_04,color:C.p1,border:`1px solid ${C.p1_20}`}}>
+                                        Open Client Sessions →
+                                      </a>
+                                    )}
+                                  </div>
+                                  {!portalAmbiguous&&(
+                                    <div className="mt-3">
+                                      <AdminSessionStatusStrip
+                                        compact
+                                        currentStatus={portalSession?.currentStatus??"inquiry_received"}
+                                        savingStatus={portalSavingStatus}
+                                        onSelect={status=>updatePortalStatusFromInquiry(s,status)}
+                                      />
+                                    </div>
+                                  )}
+                                </div>
                                 <ClientTimeline
                                   inq={s}
                                   onUpdate={patch=>setInquiries(prev=>prev.map(x=>x.id===s.id?{...x,...patch}:x))}
                                 />
                               </div>
-                            ))}
+                            )})}
                           </div>
                         </div>
                       </div>

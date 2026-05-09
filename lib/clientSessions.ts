@@ -27,6 +27,18 @@ export const CLIENT_SESSION_STATUS_LABELS: Record<ClientSessionStatus, string> =
   delivered: "Delivered",
 };
 
+export const CLIENT_SESSION_STATUS_SHORT_LABELS: Record<ClientSessionStatus, string> = {
+  inquiry_received: "Inquiry",
+  booking_in_progress: "Booking",
+  booked: "Booked",
+  session_completed: "Completed",
+  photos_backed_up: "Backed Up",
+  culling: "Culling",
+  editing: "Editing",
+  final_review: "Review",
+  delivered: "Delivered",
+};
+
 export type ClientSessionProgressState = "completed" | "current" | "upcoming";
 
 export type ClientSessionProgressStep = {
@@ -80,6 +92,12 @@ export type AdminClientSessionDTO = ClientSessionDTO & {
   updatedAt: string;
 };
 
+export type ClientSessionMatchInput = {
+  clientEmail: string | null | undefined;
+  sessionType?: string | null;
+  sessionDate?: string | null;
+};
+
 const STATUS_SET = new Set<string>(CLIENT_SESSION_STATUS_VALUES);
 
 export function isClientSessionStatus(value: unknown): value is ClientSessionStatus {
@@ -98,6 +116,98 @@ export function getClientSessionProgress(status: ClientSessionStatus): ClientSes
 
 export function normalizeClientSessionStatus(value: string): ClientSessionStatus {
   return isClientSessionStatus(value) ? value : "inquiry_received";
+}
+
+export function normalizeClientSessionEmail(value: string | null | undefined) {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim().toLowerCase();
+  return trimmed.length ? trimmed : null;
+}
+
+function normalizeClientSessionText(value: string | null | undefined) {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim().toLowerCase();
+  return trimmed.length ? trimmed : null;
+}
+
+export function normalizeClientSessionDate(value: string | null | undefined) {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+
+  const date = new Date(trimmed);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString().slice(0, 10);
+}
+
+export function buildClientSessionMatchKey(input: ClientSessionMatchInput) {
+  return {
+    email: normalizeClientSessionEmail(input.clientEmail),
+    sessionType: normalizeClientSessionText(input.sessionType),
+    sessionDate: normalizeClientSessionDate(input.sessionDate),
+  };
+}
+
+type MatchableClientSession = {
+  id: string;
+  client_email?: string | null;
+  clientEmail?: string | null;
+  session_type?: string | null;
+  sessionType?: string | null;
+  session_date?: string | null;
+  sessionDate?: string | null;
+};
+
+function getMatchableEmail(row: MatchableClientSession) {
+  return row.client_email ?? row.clientEmail ?? null;
+}
+
+function getMatchableSessionType(row: MatchableClientSession) {
+  return row.session_type ?? row.sessionType ?? null;
+}
+
+function getMatchableSessionDate(row: MatchableClientSession) {
+  return row.session_date ?? row.sessionDate ?? null;
+}
+
+export function getClientSessionEmailMatches(
+  rows: MatchableClientSession[],
+  clientEmail: string | null | undefined,
+) {
+  const normalizedEmail = normalizeClientSessionEmail(clientEmail);
+  if (!normalizedEmail) return [];
+  return rows.filter((row) => normalizeClientSessionEmail(getMatchableEmail(row)) === normalizedEmail);
+}
+
+export function findMatchingClientSession<T extends MatchableClientSession>(
+  rows: T[],
+  input: ClientSessionMatchInput,
+) {
+  const target = buildClientSessionMatchKey(input);
+  if (!target.email) return null;
+
+  const emailMatches = getClientSessionEmailMatches(rows, target.email);
+  if (emailMatches.length === 0) return null;
+  if (emailMatches.length === 1) return emailMatches[0] ?? null;
+
+  const exactMatch = emailMatches.find((row) => {
+    const candidate = buildClientSessionMatchKey({
+      clientEmail: getMatchableEmail(row),
+      sessionType: getMatchableSessionType(row),
+      sessionDate: getMatchableSessionDate(row),
+    });
+
+    return (
+      candidate.sessionDate !== null &&
+      candidate.sessionDate === target.sessionDate &&
+      candidate.sessionType !== null &&
+      candidate.sessionType === target.sessionType
+    );
+  });
+
+  return exactMatch ?? null;
 }
 
 export function toClientSessionDTO(row: ClientSessionRow): ClientSessionDTO {

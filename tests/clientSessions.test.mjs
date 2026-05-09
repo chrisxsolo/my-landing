@@ -2,8 +2,11 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  buildClientSessionMatchKey,
   CLIENT_SESSION_STATUS_LABELS,
+  CLIENT_SESSION_STATUS_SHORT_LABELS,
   CLIENT_SESSION_STATUS_VALUES,
+  findMatchingClientSession,
   getClientSessionProgress,
   isClientSessionStatus,
   normalizeClientSessionStatus,
@@ -25,6 +28,7 @@ test("client session statuses stay in tracker order with display labels", () => 
 
   assert.equal(CLIENT_SESSION_STATUS_LABELS.delivered, "Delivered");
   assert.equal(CLIENT_SESSION_STATUS_LABELS.inquiry_received, "Inquiry Received");
+  assert.equal(CLIENT_SESSION_STATUS_SHORT_LABELS.final_review, "Review");
 });
 
 test("progress marks completed, current, and upcoming steps", () => {
@@ -42,6 +46,47 @@ test("status guard accepts only known status values", () => {
   assert.equal(isClientSessionStatus("almost_done"), false);
   assert.equal(isClientSessionStatus(null), false);
   assert.equal(normalizeClientSessionStatus("almost_done"), "inquiry_received");
+});
+
+test("match key normalizes email and session metadata", () => {
+  assert.deepEqual(
+    buildClientSessionMatchKey({
+      clientEmail: "Chris@Example.com ",
+      sessionType: "Graduation",
+      sessionDate: "2026-06-01T18:00:00.000Z",
+    }),
+    {
+      email: "chris@example.com",
+      sessionType: "graduation",
+      sessionDate: "2026-06-01",
+    },
+  );
+});
+
+test("matching prefers exact session metadata before email-only fallback", () => {
+  const rows = [
+    {
+      id: "a",
+      client_email: "client@example.com",
+      session_type: "Graduation",
+      session_date: "2026-06-01T18:00:00.000Z",
+    },
+    {
+      id: "b",
+      client_email: "client@example.com",
+      session_type: "Family",
+      session_date: "2026-06-20T18:00:00.000Z",
+    },
+  ];
+
+  assert.equal(
+    findMatchingClientSession(rows, {
+      clientEmail: "client@example.com",
+      sessionType: "Family",
+      sessionDate: "2026-06-20",
+    })?.id,
+    "b",
+  );
 });
 
 test("client DTO removes admin-only fields", () => {

@@ -1,14 +1,18 @@
 "use client";
 
 import { C } from "@/lib/colors";
+import AdminSessionStatusStrip from "@/app/components/admin-session-status-strip";
 import {
   CLIENT_SESSION_STATUS_LABELS,
   type AdminClientSessionDTO,
+  type ClientSessionStatus,
 } from "@/lib/clientSessions";
 
 type AdminSessionTableProps = {
   sessions: AdminClientSessionDTO[];
   onEdit: (session: AdminClientSessionDTO) => void;
+  onUpdateStatus: (session: AdminClientSessionDTO, status: ClientSessionStatus) => void;
+  statusSaving: { id: string; status: ClientSessionStatus } | null;
 };
 
 function formatDate(value: string | null) {
@@ -24,7 +28,12 @@ function getLinkStatus(session: AdminClientSessionDTO) {
   return session.clientUserId ? "Google linked" : "Waiting for first login";
 }
 
-export default function AdminSessionTable({ sessions, onEdit }: AdminSessionTableProps) {
+export default function AdminSessionTable({
+  sessions,
+  onEdit,
+  onUpdateStatus,
+  statusSaving,
+}: AdminSessionTableProps) {
   if (sessions.length === 0) {
     return (
       <div className="rounded-xl border p-6" style={{ background: C.surfaceSoft, borderColor: C.borderWarm }}>
@@ -73,6 +82,27 @@ export default function AdminSessionTable({ sessions, onEdit }: AdminSessionTabl
             >
               Edit
             </button>
+          </div>
+
+          <div className="mt-4 rounded-xl border p-3" style={{ background: C.surfaceStrong, borderColor: C.borderSubtle }}>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-[11px] font-black uppercase tracking-[0.14em]" style={{ color: C.p1 }}>
+                  Portal progress
+                </div>
+                <p className="mt-1 text-xs font-semibold" style={{ color: C.muted }}>
+                  Click any stage and the client dashboard updates to match.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-3">
+              <AdminSessionStatusStrip
+                currentStatus={session.currentStatus}
+                savingStatus={statusSaving?.id === session.id ? statusSaving.status : null}
+                onSelect={(status) => onUpdateStatus(session, status)}
+              />
+            </div>
           </div>
 
           <div className="mt-4 grid gap-2 text-sm md:grid-cols-4">

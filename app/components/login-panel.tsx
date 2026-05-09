@@ -170,7 +170,7 @@ export default function LoginPanel() {
             Client portal
           </h1>
           <p className="mt-4 max-w-md text-sm font-semibold leading-7 md:text-base" style={{ color: C.inkSoft }}>
-            Sign in with the Google account tied to your inquiry to unlock your session timeline, delivery updates, and direct contact with Chris.
+            Sign in with the Google account tied to your inquiry to unlock your session timeline and delivery updates.
           </p>
 
           <div className="mt-6 grid gap-3 sm:grid-cols-3">
@@ -192,10 +192,10 @@ export default function LoginPanel() {
             </div>
             <div className="rounded-[1.2rem] border p-4" style={{ background: C.surfaceStrong, borderColor: C.borderSubtle }}>
               <p className="text-[10px] font-black uppercase tracking-[0.16em]" style={{ color: C.p1 }}>
-                Contact
+                Updates
               </p>
               <p className="mt-2 text-sm font-bold leading-5" style={{ color: C.ink }}>
-                Reach Chris directly from the portal
+                Progress stays visible as your session moves forward
               </p>
             </div>
           </div>
