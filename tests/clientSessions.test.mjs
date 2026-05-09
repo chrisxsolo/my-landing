@@ -6,6 +6,7 @@ import {
   CLIENT_SESSION_STATUS_VALUES,
   getClientSessionProgress,
   isClientSessionStatus,
+  normalizeClientSessionStatus,
   toClientSessionDTO,
 } from "../lib/clientSessions.ts";
 
@@ -36,9 +37,11 @@ test("progress marks completed, current, and upcoming steps", () => {
 });
 
 test("status guard accepts only known status values", () => {
+  assert.equal(isClientSessionStatus("inquiry_received"), true);
   assert.equal(isClientSessionStatus("booked"), true);
   assert.equal(isClientSessionStatus("almost_done"), false);
   assert.equal(isClientSessionStatus(null), false);
+  assert.equal(normalizeClientSessionStatus("almost_done"), "inquiry_received");
 });
 
 test("client DTO removes admin-only fields", () => {
