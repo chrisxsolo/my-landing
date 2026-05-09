@@ -40,8 +40,23 @@ function DetailItem({ label, value }: { label: string; value: string | null }) {
   );
 }
 
+function getSessionIntro(session: ClientSessionDTO) {
+  if (session.currentStatus === "delivered") {
+    return "Your gallery is ready! You can view your photos using the button below.";
+  }
+
+  if (session.currentStatus === "inquiry_received") {
+    return "I received your inquiry. This tracker will move with you from booking details to session day, editing, final review, and delivery.";
+  }
+
+  if (session.currentStatus === "booking_in_progress") {
+    return "We are getting the details locked in. Once your date, contract, and invoice are confirmed, your session will move into booked.";
+  }
+
+  return "Here's the current progress for your photo session. I'll update this as your gallery moves through backup, culling, editing, final review, and delivery.";
+}
+
 export default function SessionCard({ session }: SessionCardProps) {
-  const delivered = session.currentStatus === "delivered";
   const statusLabel = CLIENT_SESSION_STATUS_LABELS[session.currentStatus];
 
   return (
@@ -116,9 +131,7 @@ export default function SessionCard({ session }: SessionCardProps) {
             {session.clientName || "Your photo session"}
           </h2>
           <p className="mt-3 max-w-2xl text-sm font-medium leading-6" style={{ color: C.muted }}>
-            {delivered
-              ? "Your gallery is ready! You can view your photos using the button below."
-              : "Here's the current progress for your photo session. I'll update this as your gallery moves through backup, culling, editing, final review, and delivery."}
+            {getSessionIntro(session)}
           </p>
         </div>
 
@@ -137,7 +150,7 @@ export default function SessionCard({ session }: SessionCardProps) {
 
       <div className="mt-7">
         <div className="mb-3 text-[11px] font-black uppercase tracking-[0.18em]" style={{ color: C.mutedSoft }}>
-          Current photo progress
+          Inquiry to delivery progress
         </div>
         <SessionProgressTracker status={session.currentStatus} />
       </div>

@@ -199,7 +199,7 @@ export default function ClientSessionDashboard() {
                 Your photo session, beautifully tracked.
               </h1>
               <p className="mt-5 max-w-2xl text-base font-semibold leading-7 md:text-lg" style={{ color: C.muted }}>
-                Follow your gallery from backup to delivery. I&apos;ll keep this updated as your images move through the editing desk.
+                Follow everything from your first inquiry through booking, session day, editing, final review, and gallery delivery.
               </p>
             </div>
 

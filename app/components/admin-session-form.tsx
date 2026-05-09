@@ -42,7 +42,7 @@ const BLANK_FORM: AdminSessionFormPayload = {
   sessionDate: "",
   location: "",
   meetingPoint: "",
-  currentStatus: "booked",
+  currentStatus: "inquiry_received",
   estimatedDeliveryDate: "",
   galleryUrl: "",
   invoiceStatus: "",

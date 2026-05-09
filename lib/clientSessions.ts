@@ -2,6 +2,8 @@ export const CLIENT_SESSION_TABLE = "client_sessions";
 export const ADMIN_USERS_TABLE = "admin_users";
 
 export const CLIENT_SESSION_STATUS_VALUES = [
+  "inquiry_received",
+  "booking_in_progress",
   "booked",
   "session_completed",
   "photos_backed_up",
@@ -14,6 +16,8 @@ export const CLIENT_SESSION_STATUS_VALUES = [
 export type ClientSessionStatus = (typeof CLIENT_SESSION_STATUS_VALUES)[number];
 
 export const CLIENT_SESSION_STATUS_LABELS: Record<ClientSessionStatus, string> = {
+  inquiry_received: "Inquiry Received",
+  booking_in_progress: "Booking In Progress",
   booked: "Booked",
   session_completed: "Session Completed",
   photos_backed_up: "Photos Backed Up",
