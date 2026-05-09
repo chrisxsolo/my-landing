@@ -1,0 +1,185 @@
+<h2>Pick the Mobile Direction</h2>
+<p class="subtitle">Same session data, but denser and easier to scan with less scrolling.</p>
+
+<div class="cards">
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup">
+        <div class="mockup-header">A. Snapshot First</div>
+        <div class="mockup-body" style="padding:16px;background:linear-gradient(180deg,#fffdf9,#fff7ef);display:grid;gap:12px;">
+          <div style="border-radius:22px;background:linear-gradient(135deg,#8f6ae5,#dd8f7f);color:#fff;padding:14px 14px 12px;">
+            <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;">
+              <div>
+                <div style="font-size:11px;letter-spacing:.18em;text-transform:uppercase;opacity:.82;font-weight:800;">Current step</div>
+                <div style="font-size:28px;font-weight:900;line-height:1.02;margin-top:6px;">Booked</div>
+              </div>
+              <div style="background:rgba(255,255,255,.18);border-radius:999px;padding:8px 10px;font-size:11px;font-weight:800;">3 of 9</div>
+            </div>
+            <div style="margin-top:12px;height:7px;border-radius:999px;background:rgba(255,255,255,.22);overflow:hidden;">
+              <div style="width:33%;height:100%;background:#fff;border-radius:999px;"></div>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;">
+            <div style="border:1px solid #ede7fb;border-radius:16px;padding:10px 12px;background:#fff;">
+              <div style="font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#8f6ae5;font-weight:800;">Date</div>
+              <div style="margin-top:5px;font-weight:800;color:#1e2227;">May 8, 4:44 PM</div>
+            </div>
+            <div style="border:1px solid #ede7fb;border-radius:16px;padding:10px 12px;background:#fff;">
+              <div style="font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#8f6ae5;font-weight:800;">Location</div>
+              <div style="margin-top:5px;font-weight:800;color:#1e2227;">SF State</div>
+            </div>
+            <div style="border:1px solid #ede7fb;border-radius:16px;padding:10px 12px;background:#fff;">
+              <div style="font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#8f6ae5;font-weight:800;">Delivery</div>
+              <div style="margin-top:5px;font-weight:800;color:#87919a;">Not set</div>
+            </div>
+            <div style="border:1px solid #ede7fb;border-radius:16px;padding:10px 12px;background:#fff;">
+              <div style="font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#8f6ae5;font-weight:800;">Gallery</div>
+              <div style="margin-top:5px;font-weight:800;color:#87919a;">Not ready</div>
+            </div>
+          </div>
+
+          <div style="border:1px solid #f0eaf9;border-radius:18px;padding:12px;background:#fff;">
+            <div style="font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#98a19f;font-weight:800;">Timeline</div>
+            <div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:10px;">
+              <span style="padding:6px 10px;border-radius:999px;background:#f3ecff;color:#7d5fd7;font-size:11px;font-weight:800;">Inquiry</span>
+              <span style="padding:6px 10px;border-radius:999px;background:#f3ecff;color:#7d5fd7;font-size:11px;font-weight:800;">Booking</span>
+              <span style="padding:6px 10px;border-radius:999px;background:linear-gradient(135deg,#8f6ae5,#dd8f7f);color:#fff;font-size:11px;font-weight:800;">Booked</span>
+              <span style="padding:6px 10px;border-radius:999px;background:#f6f3fb;color:#a2aaa8;font-size:11px;font-weight:800;">Editing</span>
+              <span style="padding:6px 10px;border-radius:999px;background:#f6f3fb;color:#a2aaa8;font-size:11px;font-weight:800;">Delivered</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Snapshot First</h3>
+      <p>Best if you want the screen to feel much shorter. Current step, top facts, and a compact pill timeline all fit near the top.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup">
+        <div class="mockup-header">B. Current Step Focus</div>
+        <div class="mockup-body" style="padding:16px;background:linear-gradient(180deg,#fffdf9,#fff7ef);display:grid;gap:12px;">
+          <div style="display:grid;gap:9px;">
+            <div style="border-radius:22px;background:linear-gradient(135deg,#8f6ae5,#dd8f7f);padding:14px;color:#fff;">
+              <div style="display:flex;justify-content:space-between;gap:8px;">
+                <div>
+                  <div style="font-size:10px;letter-spacing:.16em;text-transform:uppercase;opacity:.82;font-weight:800;">Now happening</div>
+                  <div style="font-size:27px;font-weight:900;margin-top:7px;">Booked</div>
+                  <div style="margin-top:4px;font-size:13px;font-weight:700;opacity:.88;">Next up: Session Completed</div>
+                </div>
+                <div style="font-size:12px;font-weight:800;background:rgba(255,255,255,.16);padding:8px 10px;border-radius:16px;height:max-content;">33%</div>
+              </div>
+            </div>
+
+            <div style="border-radius:18px;background:#fff;border:1px solid #efe8fb;padding:12px;">
+              <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;">
+                <div style="font-size:12px;font-weight:900;color:#1e2227;">Progress</div>
+                <div style="font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:#8f9897;font-weight:800;">Tap to expand</div>
+              </div>
+              <div style="display:grid;gap:8px;margin-top:10px;">
+                <div style="display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:center;">
+                  <div style="height:28px;width:28px;border-radius:999px;background:#f1eaff;color:#7d5fd7;display:grid;place-items:center;font-size:12px;font-weight:900;">1</div>
+                  <div style="font-weight:800;color:#7d5fd7;">Inquiry Received</div>
+                  <div style="font-size:11px;font-weight:800;color:#7d5fd7;">Done</div>
+                </div>
+                <div style="display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:center;">
+                  <div style="height:28px;width:28px;border-radius:999px;background:#f1eaff;color:#7d5fd7;display:grid;place-items:center;font-size:12px;font-weight:900;">2</div>
+                  <div style="font-weight:800;color:#7d5fd7;">Booking In Progress</div>
+                  <div style="font-size:11px;font-weight:800;color:#7d5fd7;">Done</div>
+                </div>
+                <div style="display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:center;">
+                  <div style="height:28px;width:28px;border-radius:999px;background:linear-gradient(135deg,#8f6ae5,#dd8f7f);color:#fff;display:grid;place-items:center;font-size:12px;font-weight:900;">3</div>
+                  <div style="font-weight:900;color:#1e2227;">Booked</div>
+                  <div style="font-size:11px;font-weight:800;color:#de8d7d;">Now</div>
+                </div>
+              </div>
+            </div>
+
+            <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;">
+              <div style="border-radius:16px;background:#fff;border:1px solid #efe8fb;padding:10px 12px;">
+                <div style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#8f6ae5;font-weight:800;">Date</div>
+                <div style="margin-top:5px;font-size:14px;font-weight:800;color:#1e2227;">May 8</div>
+              </div>
+              <div style="border-radius:16px;background:#fff;border:1px solid #efe8fb;padding:10px 12px;">
+                <div style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#8f6ae5;font-weight:800;">Location</div>
+                <div style="margin-top:5px;font-size:14px;font-weight:800;color:#1e2227;">SF State</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Current Step Focus</h3>
+      <p>Best if you want a calmer story: current stage stays large, upcoming steps are compressed, and the details become supporting info.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup">
+        <div class="mockup-header">C. Tight Card Stack</div>
+        <div class="mockup-body" style="padding:16px;background:linear-gradient(180deg,#fffdf9,#fff7ef);display:grid;gap:12px;">
+          <div style="border-radius:22px;background:#fff;border:1px solid #efe8fb;padding:14px;">
+            <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;">
+              <div>
+                <div style="display:inline-flex;border-radius:999px;padding:6px 10px;background:#f2ebff;color:#7d5fd7;font-size:11px;font-weight:900;">BOOKED</div>
+                <div style="margin-top:10px;font-size:30px;line-height:1;font-weight:900;color:#1e2227;">Chris</div>
+              </div>
+              <div style="font-size:12px;color:#8d9594;font-weight:800;">3 / 9</div>
+            </div>
+            <div style="margin-top:12px;height:6px;border-radius:999px;background:#f4effd;overflow:hidden;">
+              <div style="width:33%;height:100%;background:linear-gradient(90deg,#8f6ae5,#dd8f7f);"></div>
+            </div>
+          </div>
+
+          <div style="display:grid;gap:8px;">
+            <div style="display:grid;grid-template-columns:1fr auto;gap:10px;border-radius:16px;background:#fff;border:1px solid #efe8fb;padding:11px 12px;">
+              <div>
+                <div style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#8f6ae5;font-weight:800;">Session</div>
+                <div style="margin-top:3px;font-weight:800;color:#1e2227;">Graduation</div>
+              </div>
+              <div style="text-align:right;">
+                <div style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#8f6ae5;font-weight:800;">Date</div>
+                <div style="margin-top:3px;font-weight:800;color:#1e2227;">May 8</div>
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr auto;gap:10px;border-radius:16px;background:#fff;border:1px solid #efe8fb;padding:11px 12px;">
+              <div>
+                <div style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#8f6ae5;font-weight:800;">Location</div>
+                <div style="margin-top:3px;font-weight:800;color:#1e2227;">SF State</div>
+              </div>
+              <div style="text-align:right;">
+                <div style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#8f6ae5;font-weight:800;">Delivery</div>
+                <div style="margin-top:3px;font-weight:800;color:#8a9493;">Not set</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <span style="padding:7px 10px;border-radius:999px;background:#f2ebff;color:#7d5fd7;font-size:11px;font-weight:900;">Meeting point: not set</span>
+              <span style="padding:7px 10px;border-radius:999px;background:#f7f4fb;color:#98a19f;font-size:11px;font-weight:900;">Invoice: not set</span>
+              <span style="padding:7px 10px;border-radius:999px;background:#f7f4fb;color:#98a19f;font-size:11px;font-weight:900;">Contract: not set</span>
+            </div>
+          </div>
+
+          <div style="border-radius:18px;background:#fff;border:1px solid #efe8fb;padding:12px;">
+            <div style="font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:#98a19f;font-weight:800;">Progress strip</div>
+            <div style="display:flex;gap:7px;overflow:hidden;margin-top:10px;">
+              <div style="min-width:72px;border-radius:14px;background:#f2ebff;padding:10px;color:#7d5fd7;font-size:11px;font-weight:900;">1 Done</div>
+              <div style="min-width:72px;border-radius:14px;background:#f2ebff;padding:10px;color:#7d5fd7;font-size:11px;font-weight:900;">2 Done</div>
+              <div style="min-width:82px;border-radius:14px;background:linear-gradient(135deg,#8f6ae5,#dd8f7f);padding:10px;color:#fff;font-size:11px;font-weight:900;">3 Current</div>
+              <div style="min-width:82px;border-radius:14px;background:#f7f4fb;padding:10px;color:#98a19f;font-size:11px;font-weight:900;">4 Next</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Tight Card Stack</h3>
+      <p>Best if you want to keep the existing card vibe, but reduce vertical space by turning the details into denser rows and chips.</p>
+    </div>
+  </div>
+</div>
