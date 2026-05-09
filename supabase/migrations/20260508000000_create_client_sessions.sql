@@ -17,7 +17,7 @@ create table if not exists public.client_sessions (
   session_date timestamp with time zone null,
   location text null,
   meeting_point text null,
-  current_status text not null default 'booked',
+  current_status text not null default 'inquiry_received',
   estimated_delivery_date date null,
   gallery_url text null,
   invoice_status text null,
@@ -30,6 +30,8 @@ create table if not exists public.client_sessions (
   constraint client_sessions_client_email_not_blank check (length(trim(client_email)) > 0),
   constraint client_sessions_current_status_check check (
     current_status in (
+      'inquiry_received',
+      'booking_in_progress',
       'booked',
       'session_completed',
       'photos_backed_up',

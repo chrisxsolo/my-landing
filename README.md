@@ -51,6 +51,20 @@ It creates:
 - Row Level Security policies for clients and admins
 - Column grants that keep `internal_notes` out of normal client reads
 
+The client journey statuses are:
+
+```txt
+inquiry_received
+booking_in_progress
+booked
+session_completed
+photos_backed_up
+culling
+editing
+final_review
+delivered
+```
+
 In Supabase Auth, enable Google as an OAuth provider. Add these redirect URLs in the Supabase dashboard:
 
 ```txt

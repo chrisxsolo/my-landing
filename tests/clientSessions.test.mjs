@@ -11,6 +11,8 @@ import {
 
 test("client session statuses stay in tracker order with display labels", () => {
   assert.deepEqual(CLIENT_SESSION_STATUS_VALUES, [
+    "inquiry_received",
+    "booking_in_progress",
     "booked",
     "session_completed",
     "photos_backed_up",
@@ -21,15 +23,16 @@ test("client session statuses stay in tracker order with display labels", () => 
   ]);
 
   assert.equal(CLIENT_SESSION_STATUS_LABELS.delivered, "Delivered");
+  assert.equal(CLIENT_SESSION_STATUS_LABELS.inquiry_received, "Inquiry Received");
 });
 
 test("progress marks completed, current, and upcoming steps", () => {
   const progress = getClientSessionProgress("editing");
 
   assert.equal(progress[0].state, "completed");
-  assert.equal(progress[3].state, "completed");
-  assert.equal(progress[4].state, "current");
-  assert.equal(progress[5].state, "upcoming");
+  assert.equal(progress[5].state, "completed");
+  assert.equal(progress[6].state, "current");
+  assert.equal(progress[7].state, "upcoming");
 });
 
 test("status guard accepts only known status values", () => {

@@ -97,7 +97,7 @@ export function getClientSessionProgress(status: ClientSessionStatus): ClientSes
 }
 
 export function normalizeClientSessionStatus(value: string): ClientSessionStatus {
-  return isClientSessionStatus(value) ? value : "booked";
+  return isClientSessionStatus(value) ? value : "inquiry_received";
 }
 
 export function toClientSessionDTO(row: ClientSessionRow): ClientSessionDTO {
