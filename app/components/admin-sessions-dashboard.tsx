@@ -3,7 +3,10 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import AdminSessionForm, { type AdminSessionFormPayload } from "@/app/components/admin-session-form";
+import AdminSessionForm, {
+  ADMIN_SESSION_FORM_ID,
+  type AdminSessionFormPayload,
+} from "@/app/components/admin-session-form";
 import AdminSessionTable from "@/app/components/admin-session-table";
 import { C } from "@/lib/colors";
 import {
@@ -94,6 +97,21 @@ export default function AdminSessionsDashboard() {
     return () => { alive = false; };
   }, [router]);
 
+  useEffect(() => {
+    if (!editing) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      const form = document.getElementById(ADMIN_SESSION_FORM_ID);
+      if (!form) return;
+
+      form.scrollIntoView({ behavior: "smooth", block: "start" });
+      const input = form.querySelector<HTMLInputElement>("[data-admin-session-primary]");
+      input?.focus();
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [editing]);
+
   const filteredSessions = useMemo(() => {
     return sessions.filter((session) => {
       const queryMatch = query.trim() ? matchesQuery(session, query.trim()) : true;
@@ -159,7 +177,7 @@ export default function AdminSessionsDashboard() {
   }
 
   return (
-    <main className="min-h-screen px-5 py-8 md:px-8 md:py-10" style={{ background: C.page }}>
+    <main className="min-h-screen overflow-x-hidden px-5 py-8 md:px-8 md:py-10" style={{ background: C.page }}>
       <div className="mx-auto max-w-7xl">
         <header className="mb-7 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
@@ -204,7 +222,7 @@ export default function AdminSessionsDashboard() {
           </div>
         )}
 
-        <div className="grid gap-6 lg:grid-cols-[minmax(360px,420px)_1fr]">
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
           <AdminSessionForm
             initialSession={editing}
             contacts={contacts}
@@ -213,20 +231,34 @@ export default function AdminSessionsDashboard() {
             onCancelEdit={() => setEditing(null)}
           />
 
-          <section className="grid content-start gap-4">
+          <section className="grid min-w-0 content-start gap-4">
+            {editing && (
+              <div className="rounded-xl border p-4" style={{ background: C.surfaceSoft, borderColor: C.borderWarm }}>
+                <div className="text-[11px] font-black uppercase tracking-[0.14em]" style={{ color: C.p1 }}>
+                  Edit mode
+                </div>
+                <p className="mt-1 break-words text-sm font-bold" style={{ color: C.ink }}>
+                  Updating {editing.clientName || "Unnamed client"} for {editing.clientEmail}
+                </p>
+                <p className="mt-2 text-xs font-semibold leading-5" style={{ color: C.muted }}>
+                  On mobile, the form opens above this list and scrolls into view automatically.
+                </p>
+              </div>
+            )}
+
             <div className="rounded-xl border p-4" style={{ background: C.surfaceSoft, borderColor: C.borderWarm }}>
               <div className="grid gap-3 md:grid-cols-[1fr_220px]">
                 <input
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder="Search name, email, type, location, date..."
-                  className="min-h-11 rounded-lg border px-3 text-sm font-semibold outline-none"
+                  className="min-h-11 w-full min-w-0 rounded-lg border px-3 text-sm font-semibold outline-none"
                   style={{ background: C.surfaceStrong, borderColor: C.borderSubtle, color: C.ink }}
                 />
                 <select
                   value={statusFilter}
                   onChange={(event) => setStatusFilter(event.target.value as ClientSessionStatus | "all")}
-                  className="min-h-11 rounded-lg border px-3 text-sm font-semibold outline-none"
+                  className="min-h-11 w-full min-w-0 rounded-lg border px-3 text-sm font-semibold outline-none"
                   style={{ background: C.surfaceStrong, borderColor: C.borderSubtle, color: C.ink }}
                 >
                   <option value="all">All statuses</option>

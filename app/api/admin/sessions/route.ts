@@ -162,10 +162,24 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "Session id is required." }, { status: 400 });
     }
 
+    const supabase = createSupabaseAdminClient();
+    const { data: existingSession, error: existingError } = await supabase
+      .from(CLIENT_SESSION_TABLE)
+      .select("client_email,client_user_id")
+      .eq("id", body.id)
+      .single<Pick<ClientSessionRow, "client_email" | "client_user_id">>();
+
+    if (existingError) throw existingError;
+
     const result = buildWriteData(body, false);
     if ("error" in result) return NextResponse.json({ error: result.error }, { status: 400 });
 
-    const supabase = createSupabaseAdminClient();
+    const nextEmail = readText(body.clientEmail)?.toLowerCase();
+    const currentEmail = existingSession.client_email.toLowerCase();
+    if (nextEmail && nextEmail !== currentEmail) {
+      result.data.client_user_id = null;
+    }
+
     const { data, error } = await supabase
       .from(CLIENT_SESSION_TABLE)
       .update(result.data)

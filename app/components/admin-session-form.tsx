@@ -10,6 +10,8 @@ import {
 } from "@/lib/clientSessions";
 import type { ClientSessionContactOption } from "@/lib/clientSessionContacts";
 
+export const ADMIN_SESSION_FORM_ID = "admin-session-form";
+
 export type AdminSessionFormPayload = {
   clientEmail: string;
   clientName: string;
@@ -128,11 +130,12 @@ export default function AdminSessionForm({
 
   return (
     <form
+      id={ADMIN_SESSION_FORM_ID}
       onSubmit={handleSubmit}
-      className="rounded-xl border p-5"
+      className="w-full overflow-hidden rounded-xl border p-5"
       style={{ background: C.surfaceSoft, borderColor: C.borderWarm, boxShadow: C.shadowWarmSm }}
     >
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="text-xl font-black" style={{ color: C.ink }}>
             {editing ? "Edit session" : "Create session"}
@@ -146,13 +149,29 @@ export default function AdminSessionForm({
           <button
             type="button"
             onClick={onCancelEdit}
-            className="rounded-lg border px-3 py-2 text-xs font-black"
+            className="min-h-10 w-full rounded-lg border px-3 py-2 text-xs font-black sm:w-auto"
             style={{ background: C.surfaceStrong, borderColor: C.borderSubtle, color: C.muted }}
           >
             Cancel
           </button>
         )}
       </div>
+
+      {editing && (
+        <div className="mt-4 rounded-lg border p-4" style={{ background: C.surfaceStrong, borderColor: C.borderSubtle }}>
+          <div className="text-[11px] font-black uppercase tracking-[0.14em]" style={{ color: C.p1 }}>
+            Editing now
+          </div>
+          <p className="mt-1 break-words text-sm font-bold" style={{ color: C.ink }}>
+            {initialSession?.clientName || "Unnamed client"} {initialSession?.clientEmail ? `(${initialSession.clientEmail})` : ""}
+          </p>
+          <p className="mt-2 text-xs font-semibold leading-5" style={{ color: C.muted }}>
+            {initialSession?.clientUserId
+              ? "This session is already linked to a Google account. That link will stay intact unless you change the client email."
+              : "This session will link to the client automatically the first time they sign in with the matching Google email."}
+          </p>
+        </div>
+      )}
 
       <div className="mt-5 grid gap-4 md:grid-cols-2">
         {contacts.length > 0 && (
@@ -181,7 +200,8 @@ export default function AdminSessionForm({
             type="email"
             value={form.clientEmail}
             onChange={(event) => update("clientEmail", event.target.value)}
-            className="min-h-11 rounded-lg border px-3 text-sm font-semibold outline-none"
+            data-admin-session-primary
+            className="min-h-11 w-full min-w-0 rounded-lg border px-3 text-sm font-semibold outline-none"
             style={{ background: C.surfaceStrong, borderColor: C.borderSubtle, color: C.ink }}
           />
         </div>
@@ -191,7 +211,7 @@ export default function AdminSessionForm({
           <input
             value={form.clientName}
             onChange={(event) => update("clientName", event.target.value)}
-            className="min-h-11 rounded-lg border px-3 text-sm font-semibold outline-none"
+            className="min-h-11 w-full min-w-0 rounded-lg border px-3 text-sm font-semibold outline-none"
             style={{ background: C.surfaceStrong, borderColor: C.borderSubtle, color: C.ink }}
           />
         </div>
@@ -202,7 +222,7 @@ export default function AdminSessionForm({
             value={form.sessionType}
             onChange={(event) => update("sessionType", event.target.value)}
             placeholder="Graduation, family, couples..."
-            className="min-h-11 rounded-lg border px-3 text-sm font-semibold outline-none"
+            className="min-h-11 w-full min-w-0 rounded-lg border px-3 text-sm font-semibold outline-none"
             style={{ background: C.surfaceStrong, borderColor: C.borderSubtle, color: C.ink }}
           />
         </div>
@@ -213,7 +233,7 @@ export default function AdminSessionForm({
             type="datetime-local"
             value={form.sessionDate}
             onChange={(event) => update("sessionDate", event.target.value)}
-            className="min-h-11 rounded-lg border px-3 text-sm font-semibold outline-none"
+            className="min-h-11 w-full min-w-0 rounded-lg border px-3 text-sm font-semibold outline-none"
             style={{ background: C.surfaceStrong, borderColor: C.borderSubtle, color: C.ink }}
           />
         </div>
@@ -223,7 +243,7 @@ export default function AdminSessionForm({
           <input
             value={form.location}
             onChange={(event) => update("location", event.target.value)}
-            className="min-h-11 rounded-lg border px-3 text-sm font-semibold outline-none"
+            className="min-h-11 w-full min-w-0 rounded-lg border px-3 text-sm font-semibold outline-none"
             style={{ background: C.surfaceStrong, borderColor: C.borderSubtle, color: C.ink }}
           />
         </div>
@@ -233,7 +253,7 @@ export default function AdminSessionForm({
           <input
             value={form.meetingPoint}
             onChange={(event) => update("meetingPoint", event.target.value)}
-            className="min-h-11 rounded-lg border px-3 text-sm font-semibold outline-none"
+            className="min-h-11 w-full min-w-0 rounded-lg border px-3 text-sm font-semibold outline-none"
             style={{ background: C.surfaceStrong, borderColor: C.borderSubtle, color: C.ink }}
           />
         </div>
@@ -243,7 +263,7 @@ export default function AdminSessionForm({
           <select
             value={form.currentStatus}
             onChange={(event) => update("currentStatus", event.target.value as ClientSessionStatus)}
-            className="min-h-11 rounded-lg border px-3 text-sm font-semibold outline-none"
+            className="min-h-11 w-full min-w-0 rounded-lg border px-3 text-sm font-semibold outline-none"
             style={{ background: C.surfaceStrong, borderColor: C.borderSubtle, color: C.ink }}
           >
             {CLIENT_SESSION_STATUS_VALUES.map((status) => (
@@ -258,7 +278,7 @@ export default function AdminSessionForm({
             type="date"
             value={form.estimatedDeliveryDate}
             onChange={(event) => update("estimatedDeliveryDate", event.target.value)}
-            className="min-h-11 rounded-lg border px-3 text-sm font-semibold outline-none"
+            className="min-h-11 w-full min-w-0 rounded-lg border px-3 text-sm font-semibold outline-none"
             style={{ background: C.surfaceStrong, borderColor: C.borderSubtle, color: C.ink }}
           />
         </div>
@@ -270,7 +290,7 @@ export default function AdminSessionForm({
             value={form.galleryUrl}
             onChange={(event) => update("galleryUrl", event.target.value)}
             placeholder="https://..."
-            className="min-h-11 rounded-lg border px-3 text-sm font-semibold outline-none"
+            className="min-h-11 w-full min-w-0 rounded-lg border px-3 text-sm font-semibold outline-none"
             style={{ background: C.surfaceStrong, borderColor: C.borderSubtle, color: C.ink }}
           />
         </div>
@@ -280,7 +300,7 @@ export default function AdminSessionForm({
           <input
             value={form.invoiceStatus}
             onChange={(event) => update("invoiceStatus", event.target.value)}
-            className="min-h-11 rounded-lg border px-3 text-sm font-semibold outline-none"
+            className="min-h-11 w-full min-w-0 rounded-lg border px-3 text-sm font-semibold outline-none"
             style={{ background: C.surfaceStrong, borderColor: C.borderSubtle, color: C.ink }}
           />
         </div>
@@ -290,7 +310,7 @@ export default function AdminSessionForm({
           <input
             value={form.contractStatus}
             onChange={(event) => update("contractStatus", event.target.value)}
-            className="min-h-11 rounded-lg border px-3 text-sm font-semibold outline-none"
+            className="min-h-11 w-full min-w-0 rounded-lg border px-3 text-sm font-semibold outline-none"
             style={{ background: C.surfaceStrong, borderColor: C.borderSubtle, color: C.ink }}
           />
         </div>
@@ -300,7 +320,7 @@ export default function AdminSessionForm({
           <input
             value={form.backupStatus}
             onChange={(event) => update("backupStatus", event.target.value)}
-            className="min-h-11 rounded-lg border px-3 text-sm font-semibold outline-none"
+            className="min-h-11 w-full min-w-0 rounded-lg border px-3 text-sm font-semibold outline-none"
             style={{ background: C.surfaceStrong, borderColor: C.borderSubtle, color: C.ink }}
           />
         </div>
@@ -311,7 +331,7 @@ export default function AdminSessionForm({
             value={form.clientNotes}
             onChange={(event) => update("clientNotes", event.target.value)}
             rows={3}
-            className="rounded-lg border px-3 py-3 text-sm font-semibold outline-none"
+            className="w-full min-w-0 rounded-lg border px-3 py-3 text-sm font-semibold outline-none"
             style={{ background: C.surfaceStrong, borderColor: C.borderSubtle, color: C.ink }}
           />
         </div>
@@ -322,7 +342,7 @@ export default function AdminSessionForm({
             value={form.internalNotes}
             onChange={(event) => update("internalNotes", event.target.value)}
             rows={3}
-            className="rounded-lg border px-3 py-3 text-sm font-semibold outline-none"
+            className="w-full min-w-0 rounded-lg border px-3 py-3 text-sm font-semibold outline-none"
             style={{ background: C.surfaceStrong, borderColor: C.borderSubtle, color: C.ink }}
           />
         </div>
