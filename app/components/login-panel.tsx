@@ -12,6 +12,14 @@ type AuthMeResponse = {
   error?: string;
 };
 
+function getOAuthOrigin() {
+  const configuredSiteUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "");
+  const browserOrigin = window.location.origin;
+  const isLocal = browserOrigin.includes("localhost") || browserOrigin.includes("127.0.0.1");
+
+  return isLocal ? browserOrigin : configuredSiteUrl || browserOrigin;
+}
+
 function getSafeNext(value: string | null) {
   if (!value || !value.startsWith("/") || value.startsWith("//")) return "/dashboard";
   return value;
@@ -58,7 +66,7 @@ export default function LoginPanel() {
 
   async function continueWithGoogle() {
     setError(null);
-    const redirectTo = `${window.location.origin}${nextPath}`;
+    const redirectTo = `${getOAuthOrigin()}${nextPath}`;
     const { error: signInError } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo },

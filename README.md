@@ -23,9 +23,11 @@ Required for the client session portal:
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
+NEXT_PUBLIC_SITE_URL=https://soloxsnaps.com
 ```
 
 The service role key is server-only. Never expose it in browser code.
+`NEXT_PUBLIC_SITE_URL` is used for production OAuth redirects, so Google returns clients to `/dashboard` instead of falling back to the homepage.
 
 Existing admin and AI features may also use:
 
@@ -34,7 +36,6 @@ ADMIN_PASSWORD=
 ADMIN_SESSION_SECRET=
 ANTHROPIC_API_KEY=
 OBSIDIAN_VAULT_PATH=
-NEXT_PUBLIC_SITE_URL=
 ```
 
 ## Client Session Portal Setup
@@ -57,6 +58,8 @@ http://localhost:3000/dashboard
 http://localhost:3000/admin/sessions
 https://soloxsnaps.com/dashboard
 https://soloxsnaps.com/admin/sessions
+https://www.soloxsnaps.com/dashboard
+https://www.soloxsnaps.com/admin/sessions
 ```
 
 After signing in once with Google, add the photographer account to `admin_users`:
