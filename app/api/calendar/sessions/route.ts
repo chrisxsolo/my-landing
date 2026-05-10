@@ -5,8 +5,8 @@ import { CLIENT_SESSION_TABLE, type ClientSessionRow } from "@/lib/clientSession
 export const dynamic = "force-dynamic";
 
 function icsDate(dateStr: string): string {
-  // dateStr is "YYYY-MM-DD" — emit as all-day DATE value
-  return dateStr.replace(/-/g, "");
+  // dateStr may be a full ISO timestamptz — extract just YYYY-MM-DD portion
+  return dateStr.slice(0, 10).replace(/-/g, "");
 }
 
 function icsEscape(str: string): string {
@@ -25,7 +25,13 @@ export async function GET(req: NextRequest) {
     return new NextResponse("Unauthorized", { status: 401 });
   }
 
-  const supabase = createSupabaseAdminClient();
+  let supabase;
+  try {
+    supabase = createSupabaseAdminClient();
+  } catch (e) {
+    return new NextResponse(`Supabase init failed: ${e}`, { status: 500 });
+  }
+
   const { data, error } = await supabase
     .from(CLIENT_SESSION_TABLE)
     .select("id, client_name, session_type, session_date, location")
@@ -33,7 +39,7 @@ export async function GET(req: NextRequest) {
     .order("session_date", { ascending: true });
 
   if (error) {
-    return new NextResponse("Failed to load sessions", { status: 500 });
+    return new NextResponse(`Failed to load sessions: ${error.message}`, { status: 500 });
   }
 
   const rows = (data ?? []) as Pick<ClientSessionRow, "id" | "client_name" | "session_type" | "session_date" | "location">[];
@@ -41,8 +47,9 @@ export async function GET(req: NextRequest) {
   const now = stamp();
   const events = rows.map(row => {
     const dateVal = icsDate(row.session_date!);
-    // All-day event: DTEND is the next day
-    const d = new Date(row.session_date! + "T00:00:00");
+    // All-day event: DTEND is the next calendar day
+    const datePart = row.session_date!.slice(0, 10);
+    const d = new Date(datePart + "T12:00:00");
     d.setDate(d.getDate() + 1);
     const nextDay = d.toISOString().slice(0, 10).replace(/-/g, "");
 

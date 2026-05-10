@@ -1270,7 +1270,7 @@ function AdminDashboard() {
 
               {/* Apple Calendar subscribe */}
               <a
-                href={`webcal://soloxsnaps.com/api/calendar/sessions.ics?token=${process.env.NEXT_PUBLIC_ICS_TOKEN??""}`}
+                href={`webcal://soloxsnaps.com/api/calendar/sessions?token=${process.env.NEXT_PUBLIC_ICS_TOKEN??""}`}
                 className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all hover:opacity-80"
                 style={{background:"rgba(16,185,129,0.08)",color:"#059669",border:"1px solid rgba(16,185,129,0.2)"}}>
                 <span>📅</span> Subscribe in Apple Calendar
