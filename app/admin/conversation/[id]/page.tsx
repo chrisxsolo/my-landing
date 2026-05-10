@@ -1069,110 +1069,6 @@ export default function ConversationPage() {
             })}
           </div>
 
-          {/* ── Train AI ── */}
-          <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
-            <div className="h-[3px]" style={{ background: "linear-gradient(90deg,#8b5cf6,#a78bfa)" }} />
-            <div className="p-4 border-b border-slate-100 flex items-center gap-2">
-              <div className="w-6 h-6 rounded-lg flex items-center justify-center text-xs"
-                   style={{ background: "rgba(139,92,246,0.12)", color: "#7c3aed" }}>💬</div>
-              <div>
-                <p className="text-sm font-black text-slate-900">Train AI</p>
-                <p className="text-[10px] text-slate-400">Rules save directly to Obsidian vault</p>
-              </div>
-            </div>
-            {/* Chat history */}
-            <div ref={trainChatRef} className="p-4 space-y-3 max-h-72 overflow-y-auto">
-              {trainMessages.length === 0 && (
-                <p className="text-xs text-slate-400 text-center py-4 leading-relaxed">
-                  Tell me how to handle this client or any rule you want remembered.<br/>
-                  <span className="text-slate-300">e.g. "Don't push pricing on warm leads" · "Always mention golden hour"</span>
-                </p>
-              )}
-              {trainMessages.map((m, i) => (
-                <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-                  <div className="max-w-[82%] px-3 py-2 rounded-xl text-sm leading-relaxed"
-                    style={m.role === "user"
-                      ? { background: C.grad12, color: "#fff" }
-                      : { background: "rgba(139,92,246,0.08)", color: "#5b21b6", border: "1px solid rgba(139,92,246,0.15)" }}>
-                    {m.content}
-                  </div>
-                </div>
-              ))}
-              {trainLoading && (
-                <div className="flex justify-start">
-                  <div className="px-3 py-2 rounded-xl text-sm"
-                       style={{ background: "rgba(139,92,246,0.08)", color: "#7c3aed" }}>
-                    <span className="animate-spin inline-block mr-1">◌</span> Thinking…
-                  </div>
-                </div>
-              )}
-              {trainSaved.length > 0 && (
-                <div className="px-3 py-2 rounded-xl text-xs"
-                     style={{ background: "rgba(16,185,129,0.08)", color: "#059669", border: "1px solid rgba(16,185,129,0.2)" }}>
-                  ✓ {trainSaved.length} rule{trainSaved.length > 1 ? "s" : ""} saved to Obsidian vault
-                </div>
-              )}
-            </div>
-            {/* Input */}
-            <div className="p-3 border-t border-slate-100 flex gap-2">
-              <input
-                type="text"
-                value={trainInput}
-                onChange={e => setTrainInput(e.target.value)}
-                onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendTrainMessage(); } }}
-                placeholder="e.g. Keep replies short for warm leads…"
-                disabled={trainLoading}
-                className="flex-1 text-sm px-3 py-2 rounded-xl outline-none disabled:opacity-50"
-                style={{ border: "1px solid rgba(139,92,246,0.2)", background: "rgba(139,92,246,0.03)", fontFamily: "inherit" }}
-              />
-              <button
-                onClick={sendTrainMessage}
-                disabled={!trainInput.trim() || trainLoading}
-                className="text-xs font-bold px-3 py-2 rounded-xl disabled:opacity-30 flex-shrink-0 transition-all hover:opacity-80"
-                style={{ background: "linear-gradient(135deg,#8b5cf6,#7c3aed)", color: "#fff" }}>
-                Send
-              </button>
-            </div>
-          </div>
-
-          {/* ── Sunset / golden hour card — always visible ── */}
-          {inquiry && (
-            <div className="rounded-2xl px-4 py-3"
-                 style={{ background: "linear-gradient(135deg,rgba(245,158,11,0.12),rgba(251,191,36,0.08))", border: "1px solid rgba(245,158,11,0.25)" }}>
-              <div className="flex items-start gap-3">
-                <span className="text-2xl leading-none flex-shrink-0 mt-0.5">🌅</span>
-                <div className="flex-1 min-w-0">
-                  {sunsetLoading ? (
-                    <div className="flex items-center gap-2 text-xs text-amber-600 mb-2">
-                      <span className="animate-spin inline-block">◌</span> Fetching sunset…
-                    </div>
-                  ) : sunsetInfo ? (
-                    <div className="mb-2">
-                      <p className="text-sm font-black text-amber-700">
-                        Sunset {sunsetInfo.sunset}
-                        {sunsetDate && <span className="text-xs font-normal text-amber-500 ml-2">{new Date(sunsetDate + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>}
-                      </p>
-                      <p className="text-xs text-amber-600 mt-0.5">
-                        Start around <span className="font-bold">{sunsetInfo.goldenStart}</span> for golden hour
-                      </p>
-                    </div>
-                  ) : (
-                    <p className="text-xs font-bold text-amber-700 mb-2">Golden hour lookup</p>
-                  )}
-                  <input
-                    type="date"
-                    value={sunsetDate}
-                    onChange={e => { if (e.target.value) fetchSunset(e.target.value); }}
-                    className="w-full text-xs rounded-lg px-2 py-1 border border-amber-200 bg-white/60 text-amber-800 focus:outline-none focus:ring-1 focus:ring-amber-300"
-                  />
-                  {inquiry.date_in_mind && !sunsetDate && (
-                    <p className="text-[10px] text-amber-500 mt-1">Client said: {inquiry.date_in_mind}</p>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* ── Compose + Send panel ── */}
           <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
             <div className="h-[3px]" style={{ background: C.grad12 }} />
@@ -1305,6 +1201,110 @@ export default function ConversationPage() {
               </div>
             </div>
           </div>
+
+          {/* ── Train AI ── */}
+          <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
+            <div className="h-[3px]" style={{ background: "linear-gradient(90deg,#8b5cf6,#a78bfa)" }} />
+            <div className="p-4 border-b border-slate-100 flex items-center gap-2">
+              <div className="w-6 h-6 rounded-lg flex items-center justify-center text-xs"
+                   style={{ background: "rgba(139,92,246,0.12)", color: "#7c3aed" }}>💬</div>
+              <div>
+                <p className="text-sm font-black text-slate-900">Train AI</p>
+                <p className="text-[10px] text-slate-400">Rules save directly to Obsidian vault</p>
+              </div>
+            </div>
+            {/* Chat history */}
+            <div ref={trainChatRef} className="p-4 space-y-3 max-h-72 overflow-y-auto">
+              {trainMessages.length === 0 && (
+                <p className="text-xs text-slate-400 text-center py-4 leading-relaxed">
+                  Tell me how to handle this client or any rule you want remembered.<br/>
+                  <span className="text-slate-300">e.g. "Don't push pricing on warm leads" · "Always mention golden hour"</span>
+                </p>
+              )}
+              {trainMessages.map((m, i) => (
+                <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+                  <div className="max-w-[82%] px-3 py-2 rounded-xl text-sm leading-relaxed"
+                    style={m.role === "user"
+                      ? { background: C.grad12, color: "#fff" }
+                      : { background: "rgba(139,92,246,0.08)", color: "#5b21b6", border: "1px solid rgba(139,92,246,0.15)" }}>
+                    {m.content}
+                  </div>
+                </div>
+              ))}
+              {trainLoading && (
+                <div className="flex justify-start">
+                  <div className="px-3 py-2 rounded-xl text-sm"
+                       style={{ background: "rgba(139,92,246,0.08)", color: "#7c3aed" }}>
+                    <span className="animate-spin inline-block mr-1">◌</span> Thinking…
+                  </div>
+                </div>
+              )}
+              {trainSaved.length > 0 && (
+                <div className="px-3 py-2 rounded-xl text-xs"
+                     style={{ background: "rgba(16,185,129,0.08)", color: "#059669", border: "1px solid rgba(16,185,129,0.2)" }}>
+                  ✓ {trainSaved.length} rule{trainSaved.length > 1 ? "s" : ""} saved to Obsidian vault
+                </div>
+              )}
+            </div>
+            {/* Input */}
+            <div className="p-3 border-t border-slate-100 flex gap-2">
+              <input
+                type="text"
+                value={trainInput}
+                onChange={e => setTrainInput(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendTrainMessage(); } }}
+                placeholder="e.g. Keep replies short for warm leads…"
+                disabled={trainLoading}
+                className="flex-1 text-sm px-3 py-2 rounded-xl outline-none disabled:opacity-50"
+                style={{ border: "1px solid rgba(139,92,246,0.2)", background: "rgba(139,92,246,0.03)", fontFamily: "inherit" }}
+              />
+              <button
+                onClick={sendTrainMessage}
+                disabled={!trainInput.trim() || trainLoading}
+                className="text-xs font-bold px-3 py-2 rounded-xl disabled:opacity-30 flex-shrink-0 transition-all hover:opacity-80"
+                style={{ background: "linear-gradient(135deg,#8b5cf6,#7c3aed)", color: "#fff" }}>
+                Send
+              </button>
+            </div>
+          </div>
+
+          {/* ── Sunset / golden hour card — always visible ── */}
+          {inquiry && (
+            <div className="rounded-2xl px-4 py-3"
+                 style={{ background: "linear-gradient(135deg,rgba(245,158,11,0.12),rgba(251,191,36,0.08))", border: "1px solid rgba(245,158,11,0.25)" }}>
+              <div className="flex items-start gap-3">
+                <span className="text-2xl leading-none flex-shrink-0 mt-0.5">🌅</span>
+                <div className="flex-1 min-w-0">
+                  {sunsetLoading ? (
+                    <div className="flex items-center gap-2 text-xs text-amber-600 mb-2">
+                      <span className="animate-spin inline-block">◌</span> Fetching sunset…
+                    </div>
+                  ) : sunsetInfo ? (
+                    <div className="mb-2">
+                      <p className="text-sm font-black text-amber-700">
+                        Sunset {sunsetInfo.sunset}
+                        {sunsetDate && <span className="text-xs font-normal text-amber-500 ml-2">{new Date(sunsetDate + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>}
+                      </p>
+                      <p className="text-xs text-amber-600 mt-0.5">
+                        Start around <span className="font-bold">{sunsetInfo.goldenStart}</span> for golden hour
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-xs font-bold text-amber-700 mb-2">Golden hour lookup</p>
+                  )}
+                  <input
+                    type="date"
+                    value={sunsetDate}
+                    onChange={e => { if (e.target.value) fetchSunset(e.target.value); }}
+                    className="w-full text-xs rounded-lg px-2 py-1 border border-amber-200 bg-white/60 text-amber-800 focus:outline-none focus:ring-1 focus:ring-amber-300"
+                  />
+                  {inquiry.date_in_mind && !sunsetDate && (
+                    <p className="text-[10px] text-amber-500 mt-1">Client said: {inquiry.date_in_mind}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* ── Payment & Booking ── */}
           <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">

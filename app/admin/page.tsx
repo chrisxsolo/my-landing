@@ -1268,6 +1268,14 @@ function AdminDashboard() {
                 remindersOpen={quickRemindersOpen}
               />
 
+              {/* Apple Calendar subscribe */}
+              <a
+                href={`webcal://soloxsnaps.com/api/calendar/sessions.ics?token=${process.env.NEXT_PUBLIC_ICS_TOKEN??""}`}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all hover:opacity-80"
+                style={{background:"rgba(16,185,129,0.08)",color:"#059669",border:"1px solid rgba(16,185,129,0.2)"}}>
+                <span>📅</span> Subscribe in Apple Calendar
+              </a>
+
               {/* Upcoming sessions */}
               <div className="rounded-2xl overflow-hidden border" style={{borderColor:"rgba(16,185,129,0.2)",background:"white"}}>
                 <div className="h-[3px]" style={{background:"linear-gradient(90deg,#10b981,#059669)"}}/>
