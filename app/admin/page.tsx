@@ -2485,11 +2485,13 @@ function AdminDashboard() {
                 </div>
               ):(()=>{
                 const needsReply=(i:Inquiry)=>!i.reply_sent_at&&i.status!=="archived"&&i.status!=="not_interested"&&i.status!=="responded"&&i.status!=="manual";
+                const hasUnread=(i:Inquiry)=>!!inboxThreads.find(t=>t.fromEmail.toLowerCase()===i.email.toLowerCase()&&t.isUnread);
                 const todayMs=new Date().setHours(0,0,0,0);
                 const sortedInquiries=[...inquiries].sort((a,b)=>{
                   if(inquirySort==="needs_reply"){
-                    const aNR=needsReply(a)?0:1,bNR=needsReply(b)?0:1;
-                    if(aNR!==bNR)return aNR-bNR;
+                    const aPriority=(hasUnread(a)?0:1)*2+(needsReply(a)?0:1);
+                    const bPriority=(hasUnread(b)?0:1)*2+(needsReply(b)?0:1);
+                    if(aPriority!==bPriority)return aPriority-bPriority;
                     return new Date(b.created_at).getTime()-new Date(a.created_at).getTime();
                   }
                   if(inquirySort==="newest")return new Date(b.created_at).getTime()-new Date(a.created_at).getTime();
