@@ -413,9 +413,15 @@ function AdminDashboard() {
   }
 
   async function analyzeAndLearn(inq:Inquiry){
-    const ai_draft=originalAiDrafts[inq.id]??drafts[inq.id];
+    // originalAiDrafts is React state — lost on page refresh.
+    // Fall back to localStorage where the original AI draft is persisted.
+    const ai_draft=originalAiDrafts[inq.id]
+      ??localStorage.getItem(`ai_draft_${inq.id}`)
+      ??undefined;
     const actual=actualSent[inq.id]?.trim();
-    if(!ai_draft||!actual)return;
+    if(!actual){showToast("Paste the email you actually sent first",false);return;}
+    if(!ai_draft){showToast("No original AI draft found — generate a draft first, then edit and learn from it",false);return;}
+    if(ai_draft.trim()===actual){showToast("The two drafts are identical — paste the email you actually sent (after your edits)",false);return;}
     setLearnLoading(inq.id);
     try{
       const res=await fetch("/api/draft-reply",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:inq.name,email:inq.email,message:inq.message,ai_draft,actual_sent:actual})});
