@@ -119,6 +119,55 @@ const CSS = `
     border-radius: 8px;
     background: rgba(247, 250, 248, 0.82);
   }
+  .thanks-portal-card {
+    padding: 20px;
+    border: 1px solid rgba(157, 111, 232, 0.18);
+    border-radius: 8px;
+    background: rgba(157, 111, 232, 0.04);
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+  }
+  .thanks-portal-icon {
+    flex-shrink: 0;
+    width: 36px; height: 36px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #9d6fe8, #e879a0);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .thanks-portal-body h2 {
+    margin: 0 0 5px;
+    color: #101412;
+    font-size: 16px;
+    font-weight: 860;
+    line-height: 1.2;
+  }
+  .thanks-portal-body p {
+    margin: 0 0 12px;
+    color: #55635e;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  .thanks-portal-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 36px;
+    padding: 0 14px;
+    border-radius: 6px;
+    background: linear-gradient(135deg, #9d6fe8, #e879a0);
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: 820;
+    text-decoration: none;
+    transition: opacity 0.18s ease, transform 0.18s ease;
+  }
+  .thanks-portal-btn:hover {
+    opacity: 0.88;
+    transform: translateY(-1px);
+  }
   .thanks-card h2 {
     margin: 0 0 10px;
     color: #101412;
@@ -255,6 +304,24 @@ export default function ThanksPage() {
                 <p className="thanks-kicker">Then</p>
                 <h2>We lock the session.</h2>
                 <p>Once the date works, I send the contract, deposit step, and any prep notes you need.</p>
+              </div>
+            </div>
+
+            <div className="thanks-portal-card" style={{ marginTop: 12 }}>
+              <div className="thanks-portal-icon" aria-hidden="true">
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                  <path d="M2.25 5.25A1.5 1.5 0 013.75 3.75h10.5A1.5 1.5 0 0115.75 5.25v7.5a1.5 1.5 0 01-1.5 1.5H3.75a1.5 1.5 0 01-1.5-1.5v-7.5z" stroke="#fff" strokeWidth="1.25"/>
+                  <path d="M2.25 5.25l6.75 5.25 6.75-5.25" stroke="#fff" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+              <div className="thanks-portal-body">
+                <h2>Track your shoot from booking to gallery.</h2>
+                <p>
+                  Once you&apos;re booked, sign in with this same Gmail account to get a private client dashboard — see your session status, milestones, and gallery delivery all in one place.
+                </p>
+                <Link href="/login" className="thanks-portal-btn">
+                  Set up your account <span aria-hidden="true">→</span>
+                </Link>
               </div>
             </div>
 

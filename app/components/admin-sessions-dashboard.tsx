@@ -209,7 +209,25 @@ export default function AdminSessionsDashboard() {
 
   if (loading) {
     return (
-      <main className="min-h-screen px-5 py-8" style={{ background: C.page }}>
+      <main
+        className="relative min-h-screen overflow-hidden px-5 py-8"
+        style={{ background: "linear-gradient(180deg, #ffffff 0%, #f8fbff 100%)" }}
+      >
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            ...C.gridBg(0.035),
+            maskImage: "radial-gradient(circle at 50% 30%, black, transparent 82%)",
+          }}
+        />
+        <div
+          className="pointer-events-none absolute -left-24 top-0 h-72 w-72 rounded-full blur-3xl"
+          style={{ background: C.blob1, opacity: 0.9 }}
+        />
+        <div
+          className="pointer-events-none absolute bottom-0 right-0 h-80 w-80 rounded-full blur-3xl"
+          style={{ background: C.blob2, opacity: 0.75 }}
+        />
         <div className="mx-auto max-w-6xl">
           <div className="h-10 w-64 animate-pulse rounded" style={{ background: C.p1_08 }} />
           <div className="mt-6 h-96 animate-pulse rounded-xl" style={{ background: C.surfaceStrong }} />
@@ -219,26 +237,55 @@ export default function AdminSessionsDashboard() {
   }
 
   return (
-    <main className="min-h-screen overflow-x-hidden px-5 py-8 md:px-8 md:py-10" style={{ background: C.page }}>
-      <div className="mx-auto max-w-7xl">
+    <main
+      className="relative min-h-screen overflow-x-hidden px-5 py-8 md:px-8 md:py-10"
+      style={{ background: "linear-gradient(180deg, #ffffff 0%, #f8fbff 100%)" }}
+    >
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          ...C.gridBg(0.035),
+          maskImage: "radial-gradient(circle at 50% 30%, black, transparent 82%)",
+        }}
+      />
+      <div
+        className="pointer-events-none absolute -left-24 top-0 h-72 w-72 rounded-full blur-3xl"
+        style={{ background: C.blob1, opacity: 0.9 }}
+      />
+      <div
+        className="pointer-events-none absolute right-[-3rem] top-32 h-64 w-64 rounded-full blur-3xl"
+        style={{ background: C.blob3, opacity: 0.55 }}
+      />
+      <div
+        className="pointer-events-none absolute bottom-0 right-0 h-80 w-80 rounded-full blur-3xl"
+        style={{ background: C.blob2, opacity: 0.75 }}
+      />
+      <div className="relative z-10 mx-auto max-w-7xl">
         <header className="mb-7 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <Link href="/admin" className="text-sm font-black" style={{ color: C.p1 }}>
-              Admin
+              Studio Admin
             </Link>
             <h1 className="mt-3 text-3xl font-black md:text-5xl" style={{ color: C.ink }}>
-              Client sessions
+              Portal Sessions
             </h1>
             <p className="mt-2 text-sm font-semibold" style={{ color: C.muted }}>
-              Create, update, and deliver session progress for the client portal.
+              Manage client portal progress, linking, and delivery visibility.
             </p>
           </div>
 
           <div className="flex flex-wrap gap-2">
             <Link
+              href="/admin"
+              className="inline-flex min-h-10 items-center rounded-lg border px-4 text-sm font-black"
+              style={{ background: "rgba(255,255,255,0.68)", borderColor: C.borderSubtle, color: C.inkSoft, backdropFilter: "blur(14px)" }}
+            >
+              Studio Dashboard
+            </Link>
+            <Link
               href="/dashboard"
               className="inline-flex min-h-10 items-center rounded-lg border px-4 text-sm font-black"
-              style={{ background: C.surfaceStrong, borderColor: C.borderSubtle, color: C.inkSoft }}
+              style={{ background: "rgba(255,255,255,0.68)", borderColor: C.borderSubtle, color: C.inkSoft, backdropFilter: "blur(14px)" }}
             >
               Client view
             </Link>
@@ -246,7 +293,7 @@ export default function AdminSessionsDashboard() {
               type="button"
               onClick={signOut}
               className="min-h-10 rounded-lg border px-4 text-sm font-black"
-              style={{ background: C.surfaceStrong, borderColor: C.borderSubtle, color: C.muted }}
+              style={{ background: "rgba(255,255,255,0.68)", borderColor: C.borderSubtle, color: C.muted, backdropFilter: "blur(14px)" }}
             >
               Sign out
             </button>

@@ -411,6 +411,195 @@ const CSS = `
   .home-strip-link:hover { transform: scale(1.03); }
   .home-strip-link img { width: 100%; height: 100%; display: block; object-fit: cover; }
 
+  /* ═══════════════════════════════════════════════════════════════════════════
+     CLIENT PORTAL SECTION — dark premium, gradient accent
+     ═══════════════════════════════════════════════════════════════════════════ */
+  .home-portal {
+    background:
+      radial-gradient(ellipse 72% 55% at 15% 10%, rgba(157,111,232,0.08) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 50% at 85% 90%, rgba(232,121,160,0.07) 0%, transparent 60%),
+      #ffffff;
+    padding: 96px 0 112px;
+    border-top: 1px solid rgba(18,24,22,0.06);
+    position: relative;
+    overflow: hidden;
+  }
+  .home-portal::before {
+    content: '';
+    position: absolute;
+    top: -80px; left: 50%;
+    transform: translateX(-50%);
+    width: 900px;
+    height: 360px;
+    background: radial-gradient(ellipse at center, rgba(157,111,232,0.06) 0%, rgba(232,121,160,0.04) 50%, transparent 72%);
+    pointer-events: none;
+  }
+  .home-portal-inner {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 64px;
+    align-items: center;
+  }
+  .home-portal-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 5px 12px 5px 8px;
+    border-radius: 999px;
+    background: rgba(157,111,232,0.08);
+    border: 1px solid rgba(157,111,232,0.18);
+    color: #7c4fcf;
+    font-size: 11px;
+    font-weight: 820;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 22px;
+  }
+  .home-portal-badge-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #9d6fe8;
+    box-shadow: 0 0 6px rgba(157,111,232,0.8);
+    animation: pulse-dot 2.2s ease-in-out infinite;
+  }
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%       { opacity: 0.6; transform: scale(0.75); }
+  }
+  .home-portal-title {
+    margin: 0 0 20px;
+    color: #101412;
+    font-size: clamp(1.85rem, 3.8vw, 3rem);
+    font-weight: 880;
+    letter-spacing: -0.025em;
+    line-height: 0.96;
+    text-wrap: balance;
+  }
+  .home-portal-title span {
+    background: linear-gradient(135deg, #9d6fe8, #e879a0);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .home-portal-copy {
+    margin: 0 0 32px;
+    color: #4b5a55;
+    font-size: 16px;
+    line-height: 1.78;
+    text-wrap: pretty;
+  }
+  .home-portal-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 48px;
+    padding: 0 22px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #9d6fe8, #e879a0);
+    color: #ffffff;
+    font-size: 14px;
+    font-weight: 820;
+    text-decoration: none;
+    box-shadow: 0 8px 28px rgba(157,111,232,0.35);
+    transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+  }
+  .home-portal-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 36px rgba(157,111,232,0.48);
+    opacity: 0.93;
+  }
+  .home-portal-features {
+    margin: 28px 0 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 10px;
+  }
+  .home-portal-features li {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    color: #5f6c67;
+    font-size: 13.5px;
+    line-height: 1.5;
+  }
+  .home-portal-features li::before {
+    content: '';
+    flex-shrink: 0;
+    margin-top: 5px;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #9d6fe8, #e879a0);
+  }
+  .home-portal-card {
+    padding: 2px;
+    border-radius: 20px;
+    background: linear-gradient(135deg, rgba(157,111,232,0.28), rgba(232,121,160,0.2));
+  }
+  .home-portal-card-inner {
+    border-radius: 18px;
+    background: #ffffff;
+    padding: 36px 32px;
+    display: grid;
+    gap: 24px;
+  }
+  .home-portal-card-eyebrow {
+    color: #8b9692;
+    font-size: 10px;
+    font-weight: 820;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin: 0 0 4px;
+  }
+  .home-portal-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+  }
+  .home-portal-step-icon {
+    flex-shrink: 0;
+    width: 38px; height: 38px;
+    border-radius: 10px;
+    background: rgba(157,111,232,0.07);
+    border: 1px solid rgba(157,111,232,0.14);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 17px;
+  }
+  .home-portal-step-text h4 {
+    margin: 0 0 3px;
+    color: #101412;
+    font-size: 14px;
+    font-weight: 760;
+    letter-spacing: -0.01em;
+  }
+  .home-portal-step-text p {
+    margin: 0;
+    color: #687571;
+    font-size: 12.5px;
+    line-height: 1.55;
+  }
+  .home-portal-divider {
+    height: 1px;
+    background: rgba(18,24,22,0.07);
+  }
+  .home-portal-note {
+    color: #8b9692;
+    font-size: 11.5px;
+    line-height: 1.6;
+  }
+  @media (max-width: 920px) {
+    .home-portal-inner { grid-template-columns: 1fr; gap: 48px; }
+    .home-portal-card  { max-width: 480px; }
+  }
+  @media (max-width: 760px) {
+    .home-portal { padding: 72px 0 88px; }
+    .home-portal-card-inner { padding: 28px 22px; }
+  }
+
   /* ── RESPONSIVE ────────────────────────────────────────────────────────────── */
   @media (max-width: 920px) {
     .home-editorial-grid   { grid-template-columns: 1fr; }
@@ -692,6 +881,86 @@ export default async function ProfessionalHomePage() {
           </div>
         </div>
       )}
+
+      {/* ── CLIENT PORTAL ─────────────────────────────────────────────────────────
+           Dark premium section. Advertises Gmail-based live session updates.
+           CTA links to /login so clients can sign in with the Gmail they booked with. */}
+      <section className="home-portal" aria-label="Client portal — live photo shoot updates">
+        <div className="home-shell">
+          <div className="home-portal-inner">
+
+            {/* Left: copy */}
+            <div data-reveal="left">
+              <div className="home-portal-badge">
+                <span className="home-portal-badge-dot" aria-hidden="true" />
+                Exclusive to soloxsnaps clients
+              </div>
+              <h2 className="home-portal-title">
+                Live updates on your session —{" "}
+                <span>right in your inbox.</span>
+              </h2>
+              <p className="home-portal-copy">
+                After you book, log in with the same Gmail you used to submit your inquiry
+                and get a private client dashboard — no app downloads, no follow-up texts needed.
+                Track exactly where your session stands from booking to gallery delivery.
+              </p>
+              <Link href="/login" className="home-portal-btn">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <path d="M2 4.5A1.5 1.5 0 013.5 3h9A1.5 1.5 0 0114 4.5v7a1.5 1.5 0 01-1.5 1.5h-9A1.5 1.5 0 012 11.5v-7z" stroke="currentColor" strokeWidth="1.25"/>
+                  <path d="M2 5l6 4.5L14 5" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                Sign in with Gmail
+              </Link>
+              <ul className="home-portal-features">
+                <li>Real-time status updates from booking through gallery delivery</li>
+                <li>Session notes, location info, and shoot-day reminders in one place</li>
+                <li>Gallery-ready download links the moment your photos are edited</li>
+                <li>No account creation — just the Gmail you already booked with</li>
+              </ul>
+            </div>
+
+            {/* Right: how-it-works card */}
+            <div data-reveal data-delay="2">
+              <div className="home-portal-card">
+                <div className="home-portal-card-inner">
+                  <div>
+                    <p className="home-portal-card-eyebrow">How it works</p>
+                  </div>
+                  <div className="home-portal-step">
+                    <div className="home-portal-step-icon">📩</div>
+                    <div className="home-portal-step-text">
+                      <h4>Submit your inquiry</h4>
+                      <p>Fill out the contact form with the Gmail you check most — that email becomes your login.</p>
+                    </div>
+                  </div>
+                  <div className="home-portal-divider" />
+                  <div className="home-portal-step">
+                    <div className="home-portal-step-icon">🔐</div>
+                    <div className="home-portal-step-text">
+                      <h4>Sign in after booking</h4>
+                      <p>Head to the client portal and sign in with that same Google account — one click, zero passwords.</p>
+                    </div>
+                  </div>
+                  <div className="home-portal-divider" />
+                  <div className="home-portal-step">
+                    <div className="home-portal-step-icon">📸</div>
+                    <div className="home-portal-step-text">
+                      <h4>Track every step live</h4>
+                      <p>Watch your session move from confirmed → in editing → gallery ready, all in real time.</p>
+                    </div>
+                  </div>
+                  <div className="home-portal-divider" />
+                  <p className="home-portal-note">
+                    Most photographers email you once and go quiet. This keeps you in the loop at every stage —
+                    because your milestone deserves more than radio silence.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
     </main>
   );
 }

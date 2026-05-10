@@ -4,6 +4,7 @@
 // (not me, not automated/promotional). Used on the home dashboard.
 
 import { NextRequest, NextResponse } from "next/server";
+import { getBlockedSenders } from "@/lib/gmailBlockedSenders";
 import { getValidTokens } from "@/lib/gmailTokens";
 import { requireAdmin } from "@/lib/requireAdmin";
 
@@ -65,6 +66,7 @@ export async function GET(req: NextRequest) {
   const deny = requireAdmin(req);
   if (deny) return deny;
 
+  const blockedSenders = new Set(await getBlockedSenders());
   const tokens = await getValidTokens();
   if (!tokens) return NextResponse.json({ threads: [], connected: false });
 
@@ -123,6 +125,7 @@ export async function GET(req: NextRequest) {
     const subject   = h("Subject");
 
     if (fromEmail === myEmail) continue;
+    if (blockedSenders.has(fromEmail)) continue;
     if (isAutomated(fromEmail, fromName, subject)) continue;
 
     const isUnread = thread.messages.some(m => m.labelIds?.includes("UNREAD"));

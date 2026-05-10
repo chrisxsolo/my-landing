@@ -1,5 +1,7 @@
 "use client";
 import { supabase } from '@/lib/supabase'
+import Link from "next/link";
+import { buildJournalImageLibraryRows } from '@/lib/imageLibraryShared';
 import { useEffect, useRef, useState, useCallback, Suspense } from "react";
 import { useRouter } from "next/navigation";
 import { C } from "@/lib/colors";
@@ -42,7 +44,8 @@ import {
 
 export const dynamic = 'force-dynamic'
 
-type Tab = "home"|"poses"|"locations"|"bayGuide"|"portfolio"|"categories"|"blog"|"analytics"|"payments"|"inquiries"|"clients"|"funnel"|"vault";
+type Tab = "home"|"poses"|"locations"|"bayGuide"|"portfolio"|"categories"|"blog"|"library"|"analytics"|"payments"|"inquiries"|"clients"|"funnel"|"vault";
+type ImageLibraryRow = { id:number; title:string; alt:string|null; image_url:string; source_type:string; source_post_id:number|null; source_post_slug:string|null; source_role:string; in_portfolio:boolean; created_at:string; };
 type Inquiry = { id:number; name:string; email:string; phone:string|null; session_type:string|null; date_in_mind:string|null; message:string; status:string; created_at:string; payment_status:string|null; payment_note:string|null; payment_detected_at:string|null; session_date:string|null; booking_confirmed:boolean|null; reply_sent_at:string|null; invoice_sent_at:string|null; contract_sent_at:string|null; deposit_paid_at:string|null; gallery_delivered_at:string|null; };
 type AdminSessionsResponse = { sessions?: AdminClientSessionDTO[]; session?: AdminClientSessionDTO; error?: string; };
 type BlogCategory = "journal"|"professional";
@@ -69,10 +72,10 @@ const BLOG_CATEGORIES:{value:BlogCategory;label:string;helper:string}[]=[
   {value:"journal",label:"Journal",helper:"Fun shoot stories at /journal"},
   {value:"professional",label:"Professional",helper:"Case studies at /blog"},
 ];
-const WEBSITE_TABS:Tab[]=["poses","locations","bayGuide","portfolio","categories","blog"];
+const WEBSITE_TABS:Tab[]=["poses","locations","bayGuide","portfolio","categories","blog","library"];
 const CLIENT_TABS:Tab[]=["inquiries","clients","analytics","payments","funnel"];
 const VAULT_TABS:Tab[]=["vault"];
-const TAB_LABELS:Record<Tab,string>={home:"🏠 Home",poses:"📸 Grad Poses",locations:"📍 Campus Spots",bayGuide:"🗺️ Bay Guide",portfolio:"🖼️ Portfolio",categories:"🏷️ Categories",blog:"✍️ Blog",analytics:"📊 Analytics",payments:"💵 Revenue",funnel:"📈 Funnel",inquiries:"📬 Inquiries",clients:"👥 Clients",vault:"📓 Vault"};
+const TAB_LABELS:Record<Tab,string>={home:"🏠 Home",poses:"📸 Grad Poses",locations:"📍 Campus Spots",bayGuide:"🗺️ Bay Guide",portfolio:"🖼️ Portfolio",categories:"🏷️ Categories",blog:"✍️ Blog",library:"🗄️ Image Library",analytics:"📊 Analytics",payments:"💵 Revenue",funnel:"📈 Funnel",inquiries:"📬 Inquiries",clients:"👥 Clients",vault:"📓 Vault"};
 
 function detectSchool(text:string):string|null{
   // Normalize accents (e.g. "José" → "Jose") so accented names still match
@@ -157,6 +160,16 @@ function AdminDashboard() {
   const [editingSpot,setEditingSpot]=useState<Spot|null>(null);
   const [spotDeleteConfirm,setSpotDeleteConfirm]=useState<number|null>(null);
   const spotFileRef=useRef<HTMLInputElement>(null);
+
+  // ── Image library ────────────────────────────────────────────────────
+  const [libraryImages,setLibraryImages]=useState<ImageLibraryRow[]>([]);
+  const [libraryLoading,setLibraryLoading]=useState(false);
+  const [libraryFilter,setLibraryFilter]=useState<"all"|"portfolio"|"unset">("all");
+  const [libraryPushingId,setLibraryPushingId]=useState<number|null>(null);
+  const [libraryPushCategory,setLibraryPushCategory]=useState("grads");
+  const [libraryUploading,setLibraryUploading]=useState(false);
+  const [libraryUploadPreviews,setLibraryUploadPreviews]=useState<{file:File;preview:string}[]>([]);
+  const libraryUploadRef=useRef<HTMLInputElement>(null);
 
   // ── Professional portfolio ───────────────────────────────────────────
   const [portfolioImages,setPortfolioImages]=useState<PortfolioImage[]>([]);
@@ -299,6 +312,9 @@ function AdminDashboard() {
   type InboxThread={threadId:string;fromName:string;fromEmail:string;subject:string;snippet:string;timestamp:number;messageCount:number;isUnread:boolean};
   const [inboxThreads,setInboxThreads]=useState<InboxThread[]>([]);
   const [inboxLoading,setInboxLoading]=useState(false);
+  const [blockedSenders,setBlockedSenders]=useState<string[]>([]);
+  const [blockedSendersLoading,setBlockedSendersLoading]=useState(false);
+  const [blockingSender,setBlockingSender]=useState<string|null>(null);
   // inbox thread reply panels — keyed by threadId string
   const [inboxReplyOpen,setInboxReplyOpen]=useState<Record<string,boolean>>({});
   const [inboxContext,setInboxContext]=useState<Record<string,string>>({});
@@ -434,6 +450,62 @@ function AdminDashboard() {
       setInboxThreads(json.threads??[]);
     }catch{setInboxThreads([]);}
     finally{setInboxLoading(false);}
+  }
+
+  async function fetchBlockedSenders(){
+    setBlockedSendersLoading(true);
+    try{
+      const res=await fetch("/api/gmail/blocked-senders");
+      const json=await res.json();
+      setBlockedSenders(json.senders??[]);
+    }catch{
+      setBlockedSenders([]);
+    }finally{
+      setBlockedSendersLoading(false);
+    }
+  }
+
+  async function blockInboxSender(thread:InboxThread){
+    const sender=thread.fromEmail.toLowerCase();
+    setBlockingSender(sender);
+    try{
+      const res=await fetch("/api/gmail/blocked-senders",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({email:sender}),
+      });
+      const json=await res.json();
+      if(!res.ok){showToast(json.error??"Could not block sender",false);return;}
+      setBlockedSenders(json.senders??[]);
+      setInboxThreads(prev=>prev.filter(item=>item.fromEmail.toLowerCase()!==sender));
+      setInboxReplyOpen(prev=>Object.fromEntries(Object.entries(prev).filter(([threadId])=>threadId!==thread.threadId)));
+      showToast("Sender hidden from Studio Admin inbox ✓");
+    }catch{
+      showToast("Could not block sender",false);
+    }finally{
+      setBlockingSender(null);
+    }
+  }
+
+  async function unblockInboxSender(email:string){
+    const sender=email.toLowerCase();
+    setBlockingSender(sender);
+    try{
+      const res=await fetch("/api/gmail/blocked-senders",{
+        method:"DELETE",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({email:sender}),
+      });
+      const json=await res.json();
+      if(!res.ok){showToast(json.error??"Could not unblock sender",false);return;}
+      setBlockedSenders(json.senders??[]);
+      showToast("Sender restored to Studio Admin inbox ✓");
+      fetchInbox();
+    }catch{
+      showToast("Could not unblock sender",false);
+    }finally{
+      setBlockingSender(null);
+    }
   }
 
   async function generateInboxDraft(t:InboxThread){
@@ -710,6 +782,62 @@ function AdminDashboard() {
     if(data)setCategories(data);
     setCategoriesLoading(false);
   }
+  function onLibraryFilePick(e:React.ChangeEvent<HTMLInputElement>){
+    const files=Array.from(e.target.files??[]);
+    if(!files.length)return;
+    setLibraryUploadPreviews(prev=>[...prev,...files.map(f=>({file:f,preview:URL.createObjectURL(f)}))]);
+    if(libraryUploadRef.current)libraryUploadRef.current.value="";
+  }
+  function removeLibraryPreview(i:number){
+    setLibraryUploadPreviews(p=>p.filter((_,j)=>j!==i));
+  }
+  async function uploadLibraryFiles(){
+    if(!libraryUploadPreviews.length)return;
+    setLibraryUploading(true);
+    let saved=0;
+    for(const{file}of libraryUploadPreviews){
+      const url=await uploadImage(file,"library");
+      if(!url)continue;
+      const title=file.name.replace(/\.[^.]+$/,"").replace(/[-_]/g," ")||"Library photo";
+      const{error}=await supabase.from('image_library').insert({
+        title,alt:title,image_url:url,
+        source_type:"manual",source_role:"gallery",in_portfolio:false,
+      });
+      if(!error)saved++;
+    }
+    setLibraryUploadPreviews([]);
+    setLibraryUploading(false);
+    if(saved>0){showToast(`${saved} photo${saved>1?"s":""} added to library!`);fetchLibraryImages();}
+    else showToast("Upload failed",false);
+  }
+
+  async function fetchLibraryImages(){
+    setLibraryLoading(true);
+    const{data,error}=await supabase.from('image_library').select('*').order('created_at',{ascending:false});
+    if(error)console.error(error);
+    if(data)setLibraryImages(data);
+    setLibraryLoading(false);
+  }
+  async function pushLibraryImageToPortfolio(row:ImageLibraryRow){
+    setLibraryPushingId(row.id);
+    const cat=categories.find(c=>c.slug===libraryPushCategory);
+    const{error}=await supabase.from('portfolio_images').insert({
+      title:row.title,
+      alt:row.alt||row.title,
+      image_url:row.image_url,
+      category_id:cat?.id??null,
+      category_slug:libraryPushCategory,
+      featured:false,
+      sort_order:portfolioImages.length+1,
+    });
+    if(error){showToast("Failed to add to portfolio",false);}else{
+      await supabase.from('image_library').update({in_portfolio:true}).eq('id',row.id);
+      setLibraryImages(p=>p.map(x=>x.id===row.id?{...x,in_portfolio:true}:x));
+      fetchPortfolioImages();
+      showToast("Added to portfolio!");
+    }
+    setLibraryPushingId(null);
+  }
   async function fetchPortfolioImages(){
     setPortfolioLoading(true);
     const{data,error}=await supabase.from('portfolio_images').select('*').order('featured',{ascending:false}).order('sort_order',{ascending:true});
@@ -731,8 +859,8 @@ function AdminDashboard() {
     setPostsLoading(false);
   }
   
-  useEffect(()=>{if(authed){fetchPoses();fetchSpots();fetchCategories();fetchPortfolioImages();fetchPosts();fetchSiteSettings();fetchInquiries();fetchPortalSessions();fetchGmailStatus();fetchInbox();}},[authed]);
-  useEffect(()=>{if(authed&&(tab==="inquiries"||tab==="clients")){fetchInquiries();fetchPortalSessions();fetchGmailStatus();}},[authed,tab,blogCategory]);
+  useEffect(()=>{if(authed){fetchPoses();fetchSpots();fetchCategories();fetchPortfolioImages();fetchLibraryImages();fetchPosts();fetchSiteSettings();fetchInquiries();fetchPortalSessions();fetchGmailStatus();fetchInbox();fetchBlockedSenders();}},[authed]);
+  useEffect(()=>{if(authed&&(tab==="inquiries"||tab==="clients")){fetchInquiries();fetchPortalSessions();fetchGmailStatus();fetchBlockedSenders();}},[authed,tab,blogCategory]);
 
   async function compressImage(file:File, maxPx=2400, quality=0.82):Promise<Blob>{
     return new Promise(resolve=>{
@@ -926,17 +1054,21 @@ function AdminDashboard() {
   function onExtraImgs(e:React.ChangeEvent<HTMLInputElement>){const files=Array.from(e.target.files??[]);if(!files.length)return;setExtraImgs(prev=>[...prev,...files]);setExtraPreviews(prev=>[...prev,...files.map(f=>URL.createObjectURL(f))]);}
   function removeExtraPreview(i:number){setExtraPreviews(p=>p.filter((_,j)=>j!==i));setExtraImgs(p=>p.filter((_,j)=>j!==i));}
 
+  async function syncImagesToLibrary(postId:number, postSlug:string, postTitle:string, cover_image_url:string|null, extra_image_urls:string[]){
+    const rows = buildJournalImageLibraryRows({postId, postSlug, postTitle, coverImageUrl: cover_image_url, extraImageUrls: extra_image_urls});
+    if(!rows.length) return;
+    await supabase.from('image_library').upsert(rows, {onConflict:'source_post_id,source_role,image_url', ignoreDuplicates:true});
+  }
+
   async function savePost(){
     if(!postForm.title||!postForm.body){showToast("Title and body required",false);return;}
     setPostSaving(true);
     const slug=postForm.slug||slugify(postForm.title);
     let cover_image_url=editingPost?.cover_image_url??null;
     if(coverImg){const url=await uploadImage(coverImg,"blog");if(!url){setPostSaving(false);return;}cover_image_url=url;}
-    // Upload extra images (new ones only — existing ones kept from editingPost)
     const existingExtras=editingPost?.extra_image_urls??[];
     const newExtraUrls:string[]=[];
     for(const f of extraImgs){const url=await uploadImage(f,"blog");if(url)newExtraUrls.push(url);}
-    // extra_image_urls = existing that still show in previews + newly uploaded
     const existingKept=existingExtras.filter(url=>extraPreviews.includes(url));
     const extra_image_urls=[...existingKept,...newExtraUrls];
     const sites=postForm.sites&&postForm.sites.length>0?postForm.sites:[postForm.category];
@@ -944,10 +1076,16 @@ function AdminDashboard() {
     const payload={title:postForm.title,body:postForm.body,slug,category:primaryCategory,sites,cover_image_url,extra_image_urls,published_at:new Date(postForm.published_at).toISOString()};
     if(editingPost){
       const{error}=await supabase.from('blog_posts').update(payload).eq('id',editingPost.id);
-      if(error)showToast("Update failed",false);else{showToast("Post updated!");cancelEditPost();fetchPosts();}
+      if(error){showToast("Update failed",false);}else{
+        await syncImagesToLibrary(editingPost.id, slug, postForm.title, cover_image_url, extra_image_urls);
+        showToast("Post updated!");cancelEditPost();fetchPosts();
+      }
     }else{
-      const{error}=await supabase.from('blog_posts').insert(payload);
-      if(error)showToast("Save failed — "+error.message,false);else{showToast("Post published!");cancelEditPost();fetchPosts();}
+      const{data:inserted,error}=await supabase.from('blog_posts').insert(payload).select('id').single();
+      if(error||!inserted){showToast("Save failed — "+(error?.message??""),false);}else{
+        await syncImagesToLibrary(inserted.id, slug, postForm.title, cover_image_url, extra_image_urls);
+        showToast("Post published!");cancelEditPost();fetchPosts();
+      }
     }
     setPostSaving(false);
   }
@@ -964,7 +1102,7 @@ function AdminDashboard() {
         <div className="w-full max-w-sm">
           <div className="text-center mb-8">
             <span className="font-black text-2xl" style={C.text}>Chris.</span>
-            <p className="text-slate-400 text-sm mt-1 font-medium">Admin Dashboard</p>
+            <p className="text-slate-400 text-sm mt-1 font-medium">Studio Admin</p>
           </div>
           <div className="rounded-2xl p-8 shadow-xl" style={{border:`1px solid ${C.p1_15}`}}>
             <div className="h-[3px] rounded-full mb-6" style={{background:C.grad90}}/>
@@ -988,8 +1126,15 @@ function AdminDashboard() {
       {toast&&<div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 rounded-full text-white text-sm font-bold shadow-xl" style={{background:toast.ok?C.grad12:"#be123c"}}>{toast.msg}</div>}
 
       <div className="sticky top-0 z-40 border-b border-black/[0.06] px-6 h-14 flex items-center justify-between" style={{background:"rgba(255,255,255,0.95)",backdropFilter:"blur(20px)"}}>
-        <span className="font-black text-lg" style={C.text}>Chris. Admin</span>
-        <div className="flex items-center gap-4">
+        <span className="font-black text-lg" style={C.text}>Chris. Studio Admin</span>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/admin/sessions"
+            className="inline-flex items-center rounded-full px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.12em] transition-all hover:opacity-90"
+            style={{background:C.p1_08,color:C.p1,border:`1px solid ${C.p1_20}`}}
+          >
+            Portal Sessions
+          </Link>
           <a href="/bay-area-locations" className="text-xs font-bold text-slate-400 hover:text-slate-700 transition-colors">🗺️ Bay Guide</a>
           <a href="/admin/availability" className="text-xs font-bold text-slate-400 hover:text-slate-700 transition-colors">📅 Availability</a>
           <a href="/" className="text-xs font-bold text-slate-400 hover:text-slate-700 transition-colors">← Site</a>
@@ -999,7 +1144,7 @@ function AdminDashboard() {
       <div className="max-w-3xl mx-auto px-6 py-8">
         {/* Top utility row */}
         <div className="flex items-center justify-between mb-4">
-          <span className="text-xs font-bold text-slate-400">Admin</span>
+          <span className="text-xs font-bold text-slate-400">Studio Dashboard</span>
           <button
             onClick={() => { adminLogout().then(() => { setAuthed(false); setPw(""); }); }}
             className="text-xs font-bold px-3 py-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
@@ -1075,9 +1220,19 @@ function AdminDashboard() {
           return(
             <div className="space-y-5">
               {/* Greeting */}
-              <div>
-                <h1 className="text-2xl font-black text-slate-900">Hey Chris 👋</h1>
-                <p className="text-sm text-slate-400 mt-0.5">{now.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})}</p>
+              <div className="flex items-start justify-between gap-4 flex-wrap">
+                <div>
+                  <h1 className="text-2xl font-black text-slate-900">Hey Chris 👋</h1>
+                  <p className="text-sm text-slate-400 mt-0.5">{now.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})}</p>
+                </div>
+                <Link
+                  href="/admin/sessions"
+                  className="inline-flex items-center gap-2 rounded-2xl border px-4 py-3 text-sm font-black transition-all hover:-translate-y-0.5"
+                  style={{background:"white",borderColor:C.p1_20,color:C.p1,boxShadow:"0 8px 24px rgba(157,111,232,0.08)"}}
+                >
+                  <span className="text-base">🗂️</span>
+                  Portal Sessions →
+                </Link>
               </div>
 
               {/* Quick stats row */}
@@ -1258,6 +1413,30 @@ function AdminDashboard() {
                         </div>
                       </div>
 
+                      <div className="mb-3 rounded-xl border px-3 py-2.5" style={{borderColor:"rgba(99,102,241,0.12)",background:"rgba(99,102,241,0.04)"}}>
+                        <div className="flex items-center justify-between gap-3 flex-wrap">
+                          <p className="text-[11px] font-bold text-slate-500">
+                            Dashboard-only blocking. Hidden here, untouched in Gmail.
+                          </p>
+                          {blockedSendersLoading&&<span className="text-[10px] font-bold text-slate-400">Loading blocked senders…</span>}
+                        </div>
+                        {blockedSenders.length>0&&(
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {blockedSenders.map(email=>(
+                              <button
+                                key={email}
+                                onClick={()=>unblockInboxSender(email)}
+                                disabled={blockingSender===email}
+                                className="rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] transition-all disabled:opacity-50"
+                                style={{borderColor:C.p1_20,background:"white",color:C.p1}}
+                              >
+                                {blockingSender===email?`Restoring ${email}...`:`Unblock ${email}`}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
                       {/* Freeform compose panel */}
                       {freeComposeOpen&&(
                         <div className="mb-4 p-3 rounded-xl border border-slate-200 bg-slate-50 space-y-2">
@@ -1332,6 +1511,14 @@ function AdminDashboard() {
                                         }}
                                         className="flex-1 py-2 text-[11px] font-bold text-slate-600 hover:bg-slate-50 transition-colors">
                                         ✏️ Draft Reply
+                                      </button>
+                                      <div className="w-px bg-slate-100"/>
+                                      <button
+                                        onClick={()=>blockInboxSender(t)}
+                                        disabled={blockingSender===t.fromEmail.toLowerCase()}
+                                        className="flex-1 py-2 text-[11px] font-bold text-rose-500 hover:bg-rose-50 transition-colors disabled:opacity-50"
+                                      >
+                                        {blockingSender===t.fromEmail.toLowerCase()?"Blocking…":"🚫 Block Sender"}
                                       </button>
                                       <div className="w-px bg-slate-100"/>
                                       <a href={`https://mail.google.com/mail/u/0/#inbox/${t.threadId}`}
@@ -3017,6 +3204,130 @@ function AdminDashboard() {
                             )})}
                           </div>
                         </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* ── IMAGE LIBRARY ── */}
+        {tab==="library"&&(()=>{
+          const existingPortfolioUrls=new Set(portfolioImages.map(p=>p.image_url));
+          const filtered=libraryImages.filter(img=>
+            libraryFilter==="all"?true:
+            libraryFilter==="portfolio"?img.in_portfolio:
+            !img.in_portfolio
+          );
+          return(
+            <div className="space-y-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-xl font-black text-slate-800">Image Library</h2>
+                  <p className="text-sm text-slate-400 mt-0.5">Upload from your phone or desktop. Push any photo to the portfolio with one click.</p>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {(["all","unset","portfolio"] as const).map(f=>(
+                    <button key={f} onClick={()=>setLibraryFilter(f)}
+                      className="px-3 py-1.5 rounded-full text-xs font-black transition-colors"
+                      style={libraryFilter===f?{background:C.grad12,color:"#fff"}:{background:C.p1_08,color:C.p1}}>
+                      {f==="all"?"All":f==="portfolio"?"In Portfolio":"Not in Portfolio"}
+                      {" "}({f==="all"?libraryImages.length:f==="portfolio"?libraryImages.filter(x=>x.in_portfolio).length:libraryImages.filter(x=>!x.in_portfolio).length})
+                    </button>
+                  ))}
+                  <button onClick={fetchLibraryImages} className="px-3 py-1.5 rounded-full text-xs font-black" style={{background:C.p1_08,color:C.p1}}>↻ Refresh</button>
+                </div>
+              </div>
+
+              {/* ── Upload panel ── */}
+              <div className="rounded-2xl border-2 border-dashed p-4 space-y-3" style={{borderColor:C.p1_25,background:C.p1_04}}>
+                <input ref={libraryUploadRef} type="file" accept="image/*" multiple className="hidden" onChange={onLibraryFilePick}/>
+                {libraryUploadPreviews.length===0?(
+                  <button onClick={()=>libraryUploadRef.current?.click()}
+                    className="w-full flex flex-col items-center justify-center gap-2 py-6 text-center">
+                    <span className="text-3xl">📷</span>
+                    <span className="font-black text-sm" style={{color:C.p1}}>Upload photos</span>
+                    <span className="text-xs text-slate-400">Tap to choose from your camera roll or take a new photo</span>
+                  </button>
+                ):(
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+                      {libraryUploadPreviews.map(({preview},i)=>(
+                        <div key={i} className="relative aspect-square rounded-xl overflow-hidden bg-slate-100">
+                          <img src={preview} className="w-full h-full object-cover"/>
+                          <button onClick={()=>removeLibraryPreview(i)}
+                            className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 text-white text-[10px] font-black flex items-center justify-center">✕</button>
+                        </div>
+                      ))}
+                      <button onClick={()=>libraryUploadRef.current?.click()}
+                        className="aspect-square rounded-xl border-2 border-dashed flex items-center justify-center text-2xl"
+                        style={{borderColor:C.p1_25,color:C.p1}}>+</button>
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={uploadLibraryFiles} disabled={libraryUploading}
+                        className="flex-1 py-2.5 rounded-xl text-sm font-black text-white disabled:opacity-60"
+                        style={{background:C.grad12}}>
+                        {libraryUploading?`Uploading…`:`Save ${libraryUploadPreviews.length} photo${libraryUploadPreviews.length>1?"s":""} to library`}
+                      </button>
+                      <button onClick={()=>setLibraryUploadPreviews([])} disabled={libraryUploading}
+                        className="px-4 py-2.5 rounded-xl text-sm font-black text-slate-400 border"
+                        style={{borderColor:"rgba(0,0,0,0.08)"}}>Clear</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Category picker for push */}
+              <div className="flex flex-wrap items-center gap-3 p-3 rounded-xl border text-sm" style={{borderColor:C.p1_15,background:C.p1_04}}>
+                <span className="font-black text-slate-600">Push to portfolio as:</span>
+                <select value={libraryPushCategory} onChange={e=>setLibraryPushCategory(e.target.value)}
+                  className="rounded-lg border px-2 py-1 text-sm font-semibold text-slate-700 outline-none"
+                  style={{borderColor:C.p1_20,background:"#fff"}}>
+                  {categories.map(c=><option key={c.slug} value={c.slug}>{c.name}</option>)}
+                </select>
+                <span className="text-slate-400 text-xs">Select a category, then click "Add to Portfolio" on any image below.</span>
+              </div>
+
+              {libraryLoading?(
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                  {Array.from({length:10}).map((_,i)=><div key={i} className="aspect-square rounded-xl bg-slate-100 animate-pulse"/>)}
+                </div>
+              ):filtered.length===0?(
+                <div className="text-center py-16 text-slate-400 text-sm font-semibold">
+                  {libraryImages.length===0?"No images yet — save a journal post to populate the library.":"No images match this filter."}
+                </div>
+              ):(
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                  {filtered.map(img=>{
+                    const alreadyInPortfolio=img.in_portfolio||existingPortfolioUrls.has(img.image_url);
+                    const isPushing=libraryPushingId===img.id;
+                    return(
+                      <div key={img.id} className="group relative rounded-xl overflow-hidden border bg-slate-50" style={{borderColor:alreadyInPortfolio?C.p1_25:"rgba(0,0,0,0.07)"}}>
+                        <div className="aspect-square">
+                          <img src={img.image_url} alt={img.alt||img.title} className="w-full h-full object-cover"/>
+                        </div>
+                        {/* Overlay on hover */}
+                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-2 gap-1.5">
+                          <p className="text-white text-[10px] font-bold leading-tight truncate">{img.title}</p>
+                          <p className="text-white/60 text-[9px] font-semibold uppercase tracking-wide">{img.source_role} · {img.source_post_slug??""}</p>
+                          {alreadyInPortfolio?(
+                            <span className="text-[10px] font-black px-2 py-1 rounded-lg text-center" style={{background:C.p1_25,color:"#fff"}}>✓ In Portfolio</span>
+                          ):(
+                            <button
+                              onClick={()=>pushLibraryImageToPortfolio(img)}
+                              disabled={isPushing}
+                              className="text-[10px] font-black px-2 py-1 rounded-lg text-white text-center disabled:opacity-60"
+                              style={{background:C.grad12}}>
+                              {isPushing?"Adding…":"Add to Portfolio"}
+                            </button>
+                          )}
+                        </div>
+                        {/* In-portfolio badge */}
+                        {alreadyInPortfolio&&(
+                          <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full flex items-center justify-center text-white text-[10px] font-black" style={{background:C.p1}}>✓</div>
+                        )}
                       </div>
                     );
                   })}
