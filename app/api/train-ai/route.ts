@@ -2,7 +2,7 @@
 //
 // Conversational training endpoint. Chris chats naturally about how he wants
 // the AI to behave. Claude extracts concrete style rules, then writes them
-// directly into the Obsidian vault (09 AI Instructions/Email Writer Rules.md),
+// into the Supabase vault_notes table ("09 AI Instructions" / "Email Rules"),
 // replacing any conflicting rules so the note stays clean and authoritative.
 //
 // Body: { messages: {role:"user"|"assistant", content:string}[] }
@@ -11,19 +11,36 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { requireAdmin } from "@/lib/requireAdmin";
-import fs from "fs";
-import path from "path";
+import { createSupabaseServerClient } from "@/lib/supabaseServer";
 
 export const dynamic = "force-dynamic";
 
-const VAULT_PATH = process.env.OBSIDIAN_VAULT_PATH
-  ?? "/Users/chrissolo/Documents/Photography Business Soloxsnaps";
+async function readCurrentRules(): Promise<{ id: string | null; content: string }> {
+  try {
+    const supabase = createSupabaseServerClient();
+    const { data } = await supabase
+      .from("vault_notes")
+      .select("id, content")
+      .eq("folder", "09 AI Instructions")
+      .eq("title", "Email Rules")
+      .single();
+    return { id: data?.id ?? null, content: data?.content ?? "" };
+  } catch {
+    return { id: null, content: "" };
+  }
+}
 
-const RULES_NOTE = path.join(VAULT_PATH, "09 AI Instructions", "Email Rules.md");
-
-function readCurrentRules(): string {
-  try { return fs.readFileSync(RULES_NOTE, "utf-8"); }
-  catch { return ""; }
+async function writeRules(id: string | null, content: string): Promise<void> {
+  const supabase = createSupabaseServerClient();
+  if (id) {
+    await supabase.from("vault_notes").update({ content }).eq("id", id);
+  } else {
+    await supabase.from("vault_notes").insert({
+      folder: "09 AI Instructions",
+      title: "Email Rules",
+      content,
+    });
+  }
 }
 
 const EXTRACT_SYSTEM = `You are a helpful assistant that helps Chris Solorzano train an AI email assistant for his photography business (soloxsnaps.com).
@@ -75,10 +92,10 @@ export async function POST(req: NextRequest) {
   };
 
   const client = new Anthropic({ apiKey });
-  const currentRules = readCurrentRules();
+  const { id: rulesId, content: currentRules } = await readCurrentRules();
 
   const contextNote = currentRules
-    ? `\n\nCurrent Email Writer Rules (from Obsidian vault):\n${currentRules}`
+    ? `\n\nCurrent Email Writer Rules (from vault):\n${currentRules}`
     : "\n\nNo rules saved yet.";
 
   // Step 1: Conversation + rule extraction
@@ -105,7 +122,7 @@ export async function POST(req: NextRequest) {
 
   // Step 2: If there are new rules, merge them into the vault note
   let savedToVault = false;
-  if (newRules.length > 0 && currentRules) {
+  if (newRules.length > 0) {
     try {
       const mergeRes = await client.messages.create({
         model: "claude-sonnet-4-6",
@@ -113,7 +130,7 @@ export async function POST(req: NextRequest) {
         system: MERGE_SYSTEM,
         messages: [{
           role: "user",
-          content: `Current Email Writer Rules note:\n\n---\n${currentRules}\n---\n\nNew rules to integrate (replace conflicts, add new, remove outdated):\n\n${newRules.map(r => `- ${r}`).join("\n")}\n\nOutput the updated note only.`,
+          content: `Current Email Writer Rules note:\n\n---\n${currentRules || "(empty)"}\n---\n\nNew rules to integrate (replace conflicts, add new, remove outdated):\n\n${newRules.map(r => `- ${r}`).join("\n")}\n\nOutput the updated note only.`,
         }],
       });
 
@@ -123,7 +140,7 @@ export async function POST(req: NextRequest) {
         .join("")
         .trim();
 
-      fs.writeFileSync(RULES_NOTE, updatedNote + "\n", "utf-8");
+      await writeRules(rulesId, updatedNote);
       savedToVault = true;
     } catch (err) {
       console.error("[train-ai] vault write error", err);

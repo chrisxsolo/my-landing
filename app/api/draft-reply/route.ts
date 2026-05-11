@@ -15,8 +15,8 @@
 //    Body: { name, email, message, ai_draft, actual_sent }
 //    Response: { rules: [...], written: number }
 //    Claude compares AI draft vs what Chris actually sent, extracts concrete
-//    style rules, deduplicates, and appends new ones to the Obsidian vault's
-//    "09 AI Instructions/Email Rules.md" under a "## Learned Rules" section.
+//    style rules, deduplicates, and appends new ones to the vault note
+//    "09 AI Instructions / Email Rules" in Supabase.
 //
 // 4. Polish / bullet-to-email
 //    Body: { ...same, raw_draft }
@@ -26,10 +26,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { requireAdmin } from "@/lib/requireAdmin";
-import fs from "fs";
-import path from "path";
+import { createSupabaseServerClient } from "@/lib/supabaseServer";
 
 export const dynamic = "force-dynamic";
+
+type VaultRow = { id: string; title: string; folder: string; content: string };
 
 async function fetchAvailability(): Promise<string> {
   try {
@@ -43,9 +44,6 @@ async function fetchAvailability(): Promise<string> {
   }
 }
 
-const VAULT_PATH = process.env.OBSIDIAN_VAULT_PATH
-  ?? "/Users/chrissolo/Documents/Photography Business Soloxsnaps";
-
 // Remove any trailing sign-off line (e.g. "Chris", "- Chris", "Best, Chris")
 function stripSignoff(text: string): string {
   return text
@@ -54,8 +52,17 @@ function stripSignoff(text: string): string {
     .trimEnd();
 }
 
+async function getAllVaultNotes(): Promise<VaultRow[]> {
+  const supabase = createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("vault_notes")
+    .select("id, title, folder, content");
+  if (error) throw error;
+  return data ?? [];
+}
+
 // Folders that always contain useful context for replies
-const VAULT_ALWAYS_INCLUDE = ["03 Client Communication", "01 SOPs", "09 AI Instructions"];
+const VAULT_ALWAYS_INCLUDE = new Set(["03 Client Communication", "01 SOPs", "09 AI Instructions"]);
 
 const VAULT_KEYWORD_MAP: Record<string, string[]> = {
   grad:       ["02 Pricing", "07 Client Experience", "10 Templates"],
@@ -67,33 +74,78 @@ const VAULT_KEYWORD_MAP: Record<string, string[]> = {
   confirm:    ["10 Templates"],
 };
 
-// Maps keywords → specific location note filename (in "06 Locations/")
+// Maps keywords → specific location note title (in "06 Locations" folder)
 const LOCATION_NOTE_MAP: Record<string, string> = {
-  "berkeley":           "UC Berkeley.md",
-  "uc berkeley":        "UC Berkeley.md",
-  "sfsu":                        "SF State.md",
-  "sf state":                    "SF State.md",
-  "san francisco state":         "SF State.md",
-  "usf":                         "USF.md",
-  "university of san francisco":  "USF.md",
-  "sjsu":                        "SJSU.md",
-  "san jose state":              "SJSU.md",
-  "csueb":                       "CSUEB.md",
-  "cal state east bay":          "CSUEB.md",
-  "east bay":                    "CSUEB.md",
-  "hayward":                     "CSUEB.md",
-  "legion of honor":             "Legion of Honor.md",
-  "palace of fine arts":         "SF Outdoor Spots.md",
-  "sutro":                       "SF Outdoor Spots.md",
-  "ocean beach":                 "SF Outdoor Spots.md",
-  "baker beach":                 "SF Outdoor Spots.md",
-  "dolores park":                "SF Outdoor Spots.md",
-  "alamo square":                "SF Outdoor Spots.md",
-  "crissy field":                "SF Outdoor Spots.md",
-  "golden gate park":            "SF Outdoor Spots.md",
+  "berkeley":                    "UC Berkeley",
+  "uc berkeley":                 "UC Berkeley",
+  "sfsu":                        "SF State",
+  "sf state":                    "SF State",
+  "san francisco state":         "SF State",
+  "usf":                         "USF",
+  "university of san francisco":  "USF",
+  "sjsu":                        "SJSU",
+  "san jose state":              "SJSU",
+  "csueb":                       "CSUEB",
+  "cal state east bay":          "CSUEB",
+  "east bay":                    "CSUEB",
+  "hayward":                     "CSUEB",
+  "legion of honor":             "Legion of Honor",
+  "palace of fine arts":         "SF Outdoor Spots",
+  "sutro":                       "SF Outdoor Spots",
+  "ocean beach":                 "SF Outdoor Spots",
+  "baker beach":                 "SF Outdoor Spots",
+  "dolores park":                "SF Outdoor Spots",
+  "alamo square":                "SF Outdoor Spots",
+  "crissy field":                "SF Outdoor Spots",
+  "golden gate park":            "SF Outdoor Spots",
 };
 
-const EMAIL_RULES_PATH = path.join(VAULT_PATH, "09 AI Instructions", "Email Rules.md");
+function buildVaultContext(notes: VaultRow[], sessionType?: string, message?: string): string {
+  const haystack = `${sessionType ?? ""} ${message ?? ""}`.toLowerCase();
+
+  const foldersToInclude = new Set(VAULT_ALWAYS_INCLUDE);
+  const specificTitles = new Set<string>(); // location note titles to prioritize
+
+  // Folder-level keyword matching
+  for (const [kw, folders] of Object.entries(VAULT_KEYWORD_MAP)) {
+    if (haystack.includes(kw)) folders.forEach(f => foldersToInclude.add(f));
+  }
+
+  // Location-specific note matching
+  for (const [kw, title] of Object.entries(LOCATION_NOTE_MAP)) {
+    if (haystack.includes(kw)) specificTitles.add(title);
+  }
+
+  // If location keyword present but no specific note matched, include whole Locations folder
+  const locationKeywords = ["location", "campus", "shoot at", "shoot in", "session at"];
+  if (locationKeywords.some(k => haystack.includes(k)) && specificTitles.size === 0) {
+    foldersToInclude.add("06 Locations");
+  }
+
+  const sections: string[] = [];
+  const seen = new Set<string>();
+
+  // Specific location notes first (highest priority)
+  for (const note of notes) {
+    if (note.folder === "06 Locations" && specificTitles.has(note.title)) {
+      const key = `${note.folder}/${note.title}`;
+      if (seen.has(key) || !note.content.trim()) continue;
+      seen.add(key);
+      sections.push(`### ${note.folder} / ${note.title}\n${note.content.trim()}`);
+    }
+  }
+
+  // Folder-level notes
+  for (const note of notes) {
+    if (!foldersToInclude.has(note.folder)) continue;
+    const key = `${note.folder}/${note.title}`;
+    if (seen.has(key) || !note.content.trim()) continue;
+    seen.add(key);
+    sections.push(`### ${note.folder} / ${note.title}\n${note.content.trim()}`);
+  }
+
+  return sections.join("\n\n---\n\n");
+}
 
 const MERGE_SYSTEM = `You are a knowledge base editor for a photography business. Your job is to maintain a clean, well-structured markdown note of AI email writing rules.
 
@@ -111,9 +163,15 @@ Editing rules:
 async function mergeRulesToVault(newRules: string[], apiKey: string): Promise<number> {
   if (newRules.length === 0) return 0;
   try {
-    const existing = fs.existsSync(EMAIL_RULES_PATH)
-      ? fs.readFileSync(EMAIL_RULES_PATH, "utf-8")
-      : "";
+    const supabase = createSupabaseServerClient();
+    const { data } = await supabase
+      .from("vault_notes")
+      .select("id, content")
+      .eq("folder", "09 AI Instructions")
+      .eq("title", "Email Rules")
+      .single();
+
+    const existing = data?.content ?? "";
 
     const client = new Anthropic({ apiKey });
     const res = await client.messages.create({
@@ -132,76 +190,22 @@ async function mergeRulesToVault(newRules: string[], apiKey: string): Promise<nu
       .join("")
       .trim();
 
-    fs.writeFileSync(EMAIL_RULES_PATH, updated + "\n", "utf-8");
+    if (data?.id) {
+      await supabase.from("vault_notes").update({ content: updated }).eq("id", data.id);
+    } else {
+      await supabase.from("vault_notes").insert({
+        folder: "09 AI Instructions",
+        title: "Email Rules",
+        content: updated,
+      });
+    }
+
     return newRules.length;
   } catch (err) {
     console.error("Failed to merge rules to vault:", err);
     return 0;
   }
 }
-
-function fetchVaultContext(sessionType?: string, message?: string): string {
-  try {
-    const foldersToRead = new Set(VAULT_ALWAYS_INCLUDE);
-    const specificNotes: string[] = []; // full paths to specific files
-    const haystack = `${sessionType ?? ""} ${message ?? ""}`.toLowerCase();
-
-    // Folder-level keywords
-    for (const [kw, folders] of Object.entries(VAULT_KEYWORD_MAP)) {
-      if (haystack.includes(kw)) folders.forEach(f => foldersToRead.add(f));
-    }
-
-    // If any grad keywords: add pricing and client experience
-    if (haystack.includes("grad")) {
-      foldersToRead.add("02 Pricing");
-      foldersToRead.add("07 Client Experience");
-    }
-
-    // Location-specific notes
-    for (const [kw, noteFile] of Object.entries(LOCATION_NOTE_MAP)) {
-      if (haystack.includes(kw)) {
-        const notePath = path.join(VAULT_PATH, "06 Locations", noteFile);
-        if (fs.existsSync(notePath)) specificNotes.push(notePath);
-      }
-    }
-    // If location mentioned but no specific note matched, include whole locations folder
-    const locationKeywords = ["location", "campus", "shoot at", "shoot in", "session at"];
-    if (locationKeywords.some(k => haystack.includes(k)) && specificNotes.length === 0) {
-      foldersToRead.add("06 Locations");
-    }
-
-    const sections: string[] = [];
-
-    // Specific location notes first (highest priority)
-    const seenPaths = new Set<string>();
-    for (const notePath of specificNotes) {
-      if (seenPaths.has(notePath)) continue;
-      seenPaths.add(notePath);
-      const content = fs.readFileSync(notePath, "utf-8").trim();
-      const label = path.basename(notePath).replace(".md", "");
-      if (content) sections.push(`### 06 Locations / ${label}\n${content}`);
-    }
-
-    // Folder-level reads
-    for (const folder of foldersToRead) {
-      const dirPath = path.join(VAULT_PATH, folder);
-      if (!fs.existsSync(dirPath)) continue;
-      const files = fs.readdirSync(dirPath).filter(f => f.endsWith(".md"));
-      for (const file of files) {
-        const fullPath = path.join(dirPath, file);
-        if (seenPaths.has(fullPath)) continue;
-        seenPaths.add(fullPath);
-        const content = fs.readFileSync(fullPath, "utf-8").trim();
-        if (content) sections.push(`### ${folder} / ${file.replace(".md", "")}\n${content}`);
-      }
-    }
-
-    return sections.join("\n\n---\n\n");
-  } catch {
-    return "";
-  }
-}
-
 
 export async function POST(req: NextRequest) {
   const deny = requireAdmin(req);
@@ -222,7 +226,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }
 
-  const { name, email, session_type, date_in_mind, message, phone, previous_draft, feedback, ai_draft, actual_sent, thread_context, raw_draft, latest_message_body, latest_message_from } = body;
+  const {
+    name, email, session_type, date_in_mind, message, phone,
+    previous_draft, feedback, ai_draft, actual_sent,
+    thread_context, raw_draft, latest_message_body, latest_message_from,
+  } = body;
 
   if (!name || !email || !message) {
     return NextResponse.json(
@@ -243,37 +251,22 @@ export async function POST(req: NextRequest) {
         model: "claude-sonnet-4-6",
         max_tokens: 500,
         system: `You are a writing-style analyst. Your job is to compare two email drafts and produce a short, concrete list of style rules that capture how the final version differs from the draft. Each rule should be a single actionable instruction (e.g. "skip the opening weather comment", "be more direct — cut the warm-up sentences", "always mention the turnaround time"). No fluff, no praise, no explanation — just the rules, one per line, starting with a dash.`,
-        messages: [
-          {
-            role: "user",
-            content: `Here is the AI-generated draft:
-
----
-${ai_draft}
----
-
-Here is what Chris actually sent instead:
-
----
-${actual_sent}
----
-
-List the concrete style rules Claude should follow in future drafts based on the differences. Output only the rules, one per line starting with a dash, nothing else.`,
-          },
-        ],
+        messages: [{
+          role: "user",
+          content: `Here is the AI-generated draft:\n\n---\n${ai_draft}\n---\n\nHere is what Chris actually sent instead:\n\n---\n${actual_sent}\n---\n\nList the concrete style rules Claude should follow in future drafts based on the differences. Output only the rules, one per line starting with a dash, nothing else.`,
+        }],
       });
 
       const raw = response.content
-        .filter((b) => b.type === "text")
-        .map((b) => (b as { type: "text"; text: string }).text)
+        .filter(b => b.type === "text")
+        .map(b => (b as { type: "text"; text: string }).text)
         .join("")
         .trim();
 
-      // Parse dash-prefixed lines into an array of rule strings
       const rules = raw
         .split("\n")
-        .map((line) => line.replace(/^[-–•*]\s*/, "").trim())
-        .filter((line) => line.length > 0);
+        .map(line => line.replace(/^[-–•*]\s*/, "").trim())
+        .filter(line => line.length > 0);
 
       const written = await mergeRulesToVault(rules, apiKey);
 
@@ -285,10 +278,20 @@ List the concrete style rules Claude should follow in future drafts based on the
     }
   }
 
+  // Fetch vault notes once for modes 1, 2, 4
+  let allNotes: VaultRow[] = [];
+  try {
+    allNotes = await getAllVaultNotes();
+  } catch (err) {
+    console.error("[draft-reply] vault fetch error", err);
+  }
+
   // ── Mode 4: Polish / bullet-to-email ────────────────────────────────────────
   if (isPolish) {
-    const availability = await fetchAvailability();
-    const vaultContext = fetchVaultContext(session_type, message);
+    const [availability, vaultContext] = await Promise.all([
+      fetchAvailability(),
+      Promise.resolve(buildVaultContext(allNotes, session_type, message)),
+    ]);
 
     const vaultSection = vaultContext
       ? `\n\n---\nBUSINESS KNOWLEDGE BASE (Obsidian vault — single source of truth for all pricing, policies, tone rules, and templates. Use this and only this for business facts):\n\n${vaultContext}\n---`
@@ -331,8 +334,8 @@ Output only the polished email body, nothing else.`,
       });
 
       let draft = response.content
-        .filter((b) => b.type === "text")
-        .map((b) => (b as { type: "text"; text: string }).text)
+        .filter(b => b.type === "text")
+        .map(b => (b as { type: "text"; text: string }).text)
         .join("")
         .trim();
 
@@ -350,10 +353,9 @@ Output only the polished email body, nothing else.`,
 
   // ── Modes 1 & 2: Fresh draft or refinement ───────────────────────────────
 
-  // Fetch all context in parallel
   const [availability, vaultContext] = await Promise.all([
     fetchAvailability(),
-    Promise.resolve(fetchVaultContext(session_type, message)),
+    Promise.resolve(buildVaultContext(allNotes, session_type, message)),
   ]);
 
   const baseInstructions = `You are Chris Solorzano, a Bay Area photography business owner. You run soloxsnaps.com.
@@ -425,12 +427,11 @@ Write the reply now.`;
     });
 
     let draft = response.content
-      .filter((b) => b.type === "text")
-      .map((b) => (b as { type: "text"; text: string }).text)
+      .filter(b => b.type === "text")
+      .map(b => (b as { type: "text"; text: string }).text)
       .join("")
       .trim();
 
-    // Strip any email-header block from the top of the output.
     draft = draft.replace(
       /^(?:[^\n]*<[^\n@>]+@[^\n>]+>[^\n]*\n[^\n]+at\s+\d+:\d+[^\n]*\n(?:to\s+[^\n]+\n)?[\s\n]*)/, ""
     ).trimStart();
