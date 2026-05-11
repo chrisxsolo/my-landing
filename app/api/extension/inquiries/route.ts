@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json(data, {
     headers: {
-      "Access-Control-Allow-Origin": "https://studio.pixieset.com",
+      "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Headers": "x-extension-secret",
     },
   });
@@ -33,7 +33,7 @@ export async function OPTIONS() {
   return new NextResponse(null, {
     status: 204,
     headers: {
-      "Access-Control-Allow-Origin": "https://studio.pixieset.com",
+      "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET, OPTIONS",
       "Access-Control-Allow-Headers": "x-extension-secret",
     },
