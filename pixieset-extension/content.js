@@ -49,7 +49,7 @@ function calcPrice(inquiry) {
     ? GRAD_HOURLY_RATE
     : (GROUP_RATES[people] ?? GROUP_RATE_6_PLUS) * people;
 
-  const schoolKey = detectSchoolKey(inquiry._school || inquiry.school || "");
+  const schoolKey = detectSchoolKey(inquiry._school || inquiry.school || inquiry.message || "");
   const travelFee = schoolKey != null && TRAVEL_FEES[schoolKey] != null
     ? TRAVEL_FEES[schoolKey]
     : null;
@@ -193,7 +193,7 @@ async function renderDetail(inq) {
   // Skip Gmail scan on create pages — we only need the client name there
   let sessionDate   = inq.date_in_mind || "TBD";
   let sessionTime   = "TBD";
-  let sessionSchool = inq.school || "";
+  let sessionSchool = inq.school || inq.message || "";
 
   if (isCreatePage) {
     const previewRows = document.getElementById("sxs-preview-rows");
