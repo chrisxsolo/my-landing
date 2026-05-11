@@ -314,6 +314,7 @@ function AdminDashboard() {
   const [inboxLoading,setInboxLoading]=useState(false);
   const [blockedSenders,setBlockedSenders]=useState<string[]>([]);
   const [blockedSendersLoading,setBlockedSendersLoading]=useState(false);
+  const [blockedSendersOpen,setBlockedSendersOpen]=useState(false);
   const [blockingSender,setBlockingSender]=useState<string|null>(null);
   // inbox thread reply panels — keyed by threadId string
   const [inboxReplyOpen,setInboxReplyOpen]=useState<Record<string,boolean>>({});
@@ -1427,26 +1428,37 @@ function AdminDashboard() {
                         </div>
                       </div>
 
-                      <div className="mb-3 rounded-xl border px-3 py-2.5" style={{borderColor:"rgba(99,102,241,0.12)",background:"rgba(99,102,241,0.04)"}}>
-                        <div className="flex items-center justify-between gap-3 flex-wrap">
-                          <p className="text-[11px] font-bold text-slate-500">
-                            Dashboard-only blocking. Hidden here, untouched in Gmail.
-                          </p>
-                          {blockedSendersLoading&&<span className="text-[10px] font-bold text-slate-400">Loading blocked senders…</span>}
-                        </div>
-                        {blockedSenders.length>0&&(
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            {blockedSenders.map(email=>(
-                              <button
-                                key={email}
-                                onClick={()=>unblockInboxSender(email)}
-                                disabled={blockingSender===email}
-                                className="rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] transition-all disabled:opacity-50"
-                                style={{borderColor:C.p1_20,background:"white",color:C.p1}}
-                              >
-                                {blockingSender===email?`Restoring ${email}...`:`Unblock ${email}`}
-                              </button>
-                            ))}
+                      <div className="mb-3 rounded-xl border" style={{borderColor:"rgba(99,102,241,0.12)",background:"rgba(99,102,241,0.04)"}}>
+                        <button
+                          onClick={()=>setBlockedSendersOpen(o=>!o)}
+                          className="w-full flex items-center justify-between gap-3 px-3 py-2 text-left"
+                        >
+                          <span className="text-[11px] font-bold text-slate-500">
+                            🚫 Blocked senders {blockedSenders.length>0&&<span className="ml-1 rounded-full px-1.5 py-0.5 text-[10px]" style={{background:"rgba(99,102,241,0.12)",color:C.p1}}>{blockedSenders.length}</span>}
+                          </span>
+                          <span className="text-[10px] text-slate-400">{blockedSendersOpen?"▲ hide":"▼ show"}</span>
+                        </button>
+                        {blockedSendersOpen&&(
+                          <div className="px-3 pb-2.5 border-t" style={{borderColor:"rgba(99,102,241,0.1)"}}>
+                            <p className="text-[10px] text-slate-400 mt-2 mb-2">Dashboard-only. Hidden here, untouched in Gmail.</p>
+                            {blockedSendersLoading&&<span className="text-[10px] font-bold text-slate-400">Loading…</span>}
+                            {blockedSenders.length>0?(
+                              <div className="flex flex-wrap gap-2">
+                                {blockedSenders.map(email=>(
+                                  <button
+                                    key={email}
+                                    onClick={()=>unblockInboxSender(email)}
+                                    disabled={blockingSender===email}
+                                    className="rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] transition-all disabled:opacity-50"
+                                    style={{borderColor:C.p1_20,background:"white",color:C.p1}}
+                                  >
+                                    {blockingSender===email?`Restoring…`:`Unblock ${email}`}
+                                  </button>
+                                ))}
+                              </div>
+                            ):(
+                              !blockedSendersLoading&&<p className="text-[10px] text-slate-400">No blocked senders.</p>
+                            )}
                           </div>
                         )}
                       </div>

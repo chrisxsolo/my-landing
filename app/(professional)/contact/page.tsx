@@ -352,20 +352,22 @@ function ContactForm() {
     setStatus("sending");
     setErrorMsg("");
 
-    // Save immediately so the thanks page can render the summary at once.
-    sessionStorage.setItem("inquiry_submitted", JSON.stringify(form));
-    // Navigate now — don't wait for the API. The client-side router
-    // keeps the fetch alive in the same JS context.
-    router.push("/contact/thanks");
-
-    // Fire-and-forget: DB save + emails happen in the background.
-    fetch("/api/contact", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
-    }).catch(() => {
-      console.error("[contact] Background submission failed");
-    });
+    try {
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Something went wrong. Please try again.");
+      }
+      sessionStorage.setItem("inquiry_submitted", JSON.stringify(form));
+      router.push("/contact/thanks");
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+      setStatus("error");
+    }
   }
 
   return (
