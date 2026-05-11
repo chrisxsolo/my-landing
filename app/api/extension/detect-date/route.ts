@@ -101,25 +101,27 @@ export async function POST(req: NextRequest) {
     const anthropic = new Anthropic();
     const res = await anthropic.messages.create({
       model: "claude-haiku-4-5-20251001",
-      max_tokens: 250,
-      system: `You extract confirmed photography session dates AND times from email conversations. Today is ${today}. Current year is ${currentYear}.
+      max_tokens: 350,
+      system: `You extract confirmed photography session details from email conversations. Today is ${today}. Current year is ${currentYear}.
+
+Extract:
+1. Date: the most recently confirmed/agreed session date
+2. Time: confirmed session time (e.g. "10:00 AM", "6:30 PM", "golden hour"). null if not mentioned.
+3. Location: the school or specific location mentioned (e.g. "UC Berkeley", "SJSU", "San Jose State", "SF State", "USF", "Cal", "East Bay"). Return the raw name as mentioned. null if not found.
 
 Rules:
-- Find the most recently confirmed/agreed date and time
-- Time formats: "10am", "10:00 AM", "golden hour", "sunset", "morning", "afternoon"
-- If no specific time is agreed, return null for time
 - Confirmation language: "works great", "sounds good", "perfect", "see you then", "confirmed"
 - If month+day given without year, use ${currentYear}. Only use ${currentYear + 1} if date has already passed.
 
 Respond ONLY with valid JSON:
-{"date":"YYYY-MM-DD","readable":"e.g. Saturday, May 31, 2026","time":"e.g. 10:00 AM","confidence":"high|medium|low"}
-If no date found: {"date":null,"readable":null,"time":null,"confidence":"low"}`,
+{"date":"YYYY-MM-DD","readable":"e.g. Saturday, May 31, 2026","time":"e.g. 10:00 AM","location":"e.g. UC Berkeley","confidence":"high|medium|low"}
+If no date found: {"date":null,"readable":null,"time":null,"location":null,"confidence":"low"}`,
       messages: [{ role: "user", content: `Client: ${inq.name}\nOriginal request: ${inq.date_in_mind ?? "not specified"}\n\nEmail thread:\n${emailContext}` }],
     });
 
     try {
       const raw = res.content[0].type === "text" ? res.content[0].text : "{}";
-      const result = JSON.parse(extractJson(raw)) as { date: string | null; readable: string | null; time: string | null; confidence: string };
+      const result = JSON.parse(extractJson(raw)) as { date: string | null; readable: string | null; time: string | null; location: string | null; confidence: string };
       if (result.date) {
         return NextResponse.json({ ...result, source: "email" }, { headers: CORS });
       }
