@@ -126,8 +126,8 @@ export function calculateGraduationEstimate(input: EstimateInput): EstimateResul
   const travelAmount = travelFee ?? 0
 
   const subtotal = sessionBase + addons + travelAmount
-  const deposit  = Math.ceil(subtotal * 0.5)
-  const remainingBalance = subtotal - deposit
+  const deposit  = subtotal / 2
+  const remainingBalance = subtotal / 2
 
   // Group note
   const groupNote =

@@ -86,7 +86,6 @@ export async function GET(req: NextRequest) {
     status: 200,
     headers: {
       "Content-Type": "text/calendar; charset=utf-8",
-      "Content-Disposition": 'attachment; filename="sessions.ics"',
       "Cache-Control": "no-store",
     },
   });

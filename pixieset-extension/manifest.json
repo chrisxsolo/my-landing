@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "SoloXSnaps → PixiSet Autofill",
+  "version": "1.0.2",
+  "description": "Autofill PixiSet invoices and contracts from your SoloXSnaps inquiries.",
+  "permissions": ["storage", "activeTab"],
+  "host_permissions": [
+    "https://studio.pixieset.com/*",
+    "https://soloxsnaps.com/*",
+    "https://www.soloxsnaps.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://studio.pixieset.com/*"],
+      "js": ["content.js"],
+      "css": ["panel.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "SoloXSnaps Autofill"
+  },
+  "icons": {
+    "48": "icon.png",
+    "128": "icon.png"
+  }
+}
