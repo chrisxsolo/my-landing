@@ -42,7 +42,7 @@ const addOns = [
   { label: "Additional outfit",                  price: "$75" },
   { label: "Second nearby off-campus location",  price: "$125" },
   { label: "72-hour expedited delivery",          price: "$75" },
-  { label: "Celebratory elements",               price: "On request" },
+  { label: "Champagne setup (provided by photographer)", price: "$15" },
   { label: "Extended time",                      price: "$100 / 30 min" },
 ];
 
@@ -70,7 +70,7 @@ const GROUP_GRAD_IMAGE_URL =
 const infoCards = [
   {
     heading: "Booking",
-    items: ["50% deposit to reserve the date.", "Contract completed before the session.", "Remaining balance due on shoot day."],
+    items: ["50% deposit to reserve the date. Deposits are non-refundable but transferable.", "Contract completed before the session.", "Remaining balance due on shoot day."],
     delay: 0.28,
   },
   {
@@ -80,7 +80,7 @@ const infoCards = [
   },
   {
     heading: "Travel",
-    items: ["Bay Area campuses covered.", "Locations outside 20 miles from SF may include a $20-$75 travel fee."],
+    items: ["Bay Area campuses covered.", "Locations outside San Francisco may include a $30–$75 travel fee."],
     delay: 0.52,
   },
 ];
@@ -157,7 +157,7 @@ export default async function GradPricingPage() {
             <div className="pricing-chip-row" style={{ marginTop: 0 }}>
               <span className="pricing-chip">50+ edited images</span>
               <span className="pricing-chip">Guided posing</span>
-              <span className="pricing-chip">Two-week turnaround</span>
+              <span className="pricing-chip">Up to 2-week turnaround</span>
             </div>
 
             {/* CTA button — links to the contact/booking page */}
@@ -200,7 +200,7 @@ export default async function GradPricingPage() {
               "Multiple on-campus location selections",
               "Private online gallery",
               "50+ professionally edited images",
-              "Standard two-week turnaround",
+              "Up to two-week standard turnaround",
             ].map((item) => <li key={item}>{item}</li>)}
           </ul>
 
@@ -260,7 +260,7 @@ export default async function GradPricingPage() {
               "Professionally guided posing and direction",
               "Strategic on-campus location planning",
               "Private online gallery delivery",
-              "Professionally edited images per person",
+              "25+ professionally edited images per person",
             ].map((item) => <li key={item}>{item}</li>)}
           </ul>
 

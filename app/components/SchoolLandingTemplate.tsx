@@ -368,7 +368,7 @@ export default function SchoolLandingTemplate({ data }: { data: SchoolLandingDat
               "Multiple on-campus location selections",
               "50+ professionally edited images",
               "Private online gallery with download link",
-              "Standard two-week turnaround",
+              "Up to two-week standard turnaround",
               "Clear communication from inquiry to delivery",
             ].map((item) => (
               <p key={item} className="school-body-copy" style={{ display: "flex", gap: 10, alignItems: "flex-start", margin: "0 0 12px" }}>
@@ -409,7 +409,7 @@ export default function SchoolLandingTemplate({ data }: { data: SchoolLandingDat
               { label: "Starting rate",    value: "$350 / hour" },
               { label: "Session length",   value: "1, 1.5, or 2 hours" },
               { label: "Deposit",          value: "50% to reserve" },
-              { label: "Turnaround",       value: "~2 weeks" },
+              { label: "Turnaround",       value: "Up to 2 weeks" },
               { label: "Delivery",         value: "Private online gallery" },
               { label: "Response time",    value: "Within 24 hours" },
             ].map(({ label, value }) => (

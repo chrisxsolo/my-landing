@@ -38,7 +38,7 @@ const CSS = pricingCSS({ mediaMinHeight: 560, mediaMinHeightMobile: 390 });
 // Shown below each package's bullet list.
 // To add/remove items: edit this array. Format: { label, price }
 const addOns = [
-  { label: "Additional nearby location",  price: "$25" },
+  { label: "Additional nearby location",  price: "$125" },
   { label: "72-hour expedited delivery",  price: "$75" },
   { label: "Extended family members",     price: "$50-$75" },
   { label: "Additional time",             price: "$100 / 30 min" },
@@ -51,7 +51,7 @@ const addOns = [
 const infoCards = [
   {
     heading: "Booking",
-    items: ["50% deposit to reserve the date.", "Contract completed before the session.", "Remaining balance due after the shoot."],
+    items: ["50% deposit to reserve the date. Deposits are non-refundable but transferable.", "Contract completed before the session.", "Remaining balance due on shoot day."],
     delay: 0.28,
   },
   {
@@ -61,7 +61,7 @@ const infoCards = [
   },
   {
     heading: "Travel",
-    items: ["Some locations include travel fees.", "Locations outside 20 miles from SF may include a $20-$50 travel fee."],
+    items: ["Bay Area locations covered.", "Locations outside San Francisco may include a $30–$75 travel fee."],
     delay: 0.52,
   },
 ];
@@ -171,7 +171,7 @@ export default async function FamilyPricingPage() {
               "Guided, relaxed session",
               "Minimum 10 professionally edited images",
               "Private online gallery",
-              "Standard turnaround",
+              "Up to two-week standard turnaround",
             ].map((item) => <li key={item}>{item}</li>)}
           </ul>
 
@@ -232,7 +232,7 @@ export default async function FamilyPricingPage() {
               "Greater variety of groupings and moments",
               "Minimum 30 professionally edited images",
               "Private online gallery",
-              "Standard turnaround",
+              "Up to two-week standard turnaround",
             ].map((item) => <li key={item}>{item}</li>)}
           </ul>
 

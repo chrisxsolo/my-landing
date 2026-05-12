@@ -29,6 +29,7 @@ import { checkAuth, login, logout as adminLogout } from "@/lib/adminAuth";
 import AdminSessionStatusStrip from "@/app/components/admin-session-status-strip";
 import BayAreaLocationsManager from "@/app/admin/BayAreaLocationsManager";
 import AnalyticsTab from "@/app/admin/AnalyticsTab";
+import QuickFormatTool from "@/app/admin/QuickFormatTool";
 import PaymentAnalyticsTab from "@/app/admin/PaymentAnalyticsTab";
 import ClientTimeline from "@/app/admin/ClientTimeline";
 import InquiryAnalyticsTab from "@/app/admin/InquiryAnalyticsTab";
@@ -2992,8 +2993,11 @@ function AdminDashboard() {
             if(h<1)return"just now";if(h===1)return"1h ago";if(h<24)return`${h}h ago`;
             const d=Math.round(h/24);return d===1?"1d ago":`${d}d ago`;
           };
+          const quickFormatClients=Array.from(clientMap.values()).map(c=>({name:c.name,email:c.email}));
           return(
             <div className="space-y-6">
+              {/* Quick Format Tool */}
+              <QuickFormatTool clients={quickFormatClients}/>
               {/* New inquiries section */}
               {pendingOnClients.length>0&&(
                 <div className="rounded-2xl overflow-hidden border" style={{borderColor:"rgba(245,158,11,0.3)",background:"white"}}>

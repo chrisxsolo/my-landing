@@ -24,7 +24,7 @@ const FAQS: { topic: string; emoji: string; items: { q: string; a: string }[] }[
       },
       {
         q: "What's the deposit and when is it due?",
-        a: "The deposit is 50% of the session total. It's due when you confirm your date and is non-refundable. It can be applied toward rescheduling if you give advance notice.",
+        a: "The deposit is 50% of the session total. It's due when you confirm your date and is non-refundable but transferable — it can be applied toward rescheduling or a future session with advance notice.",
       },
       {
         q: "What happens if I need to reschedule?",
@@ -102,7 +102,7 @@ const FAQS: { topic: string; emoji: string; items: { q: string; a: string }[] }[
     items: [
       {
         q: "How long until I receive my photos?",
-        a: "Standard turnaround is approximately two weeks from shoot day. If you need your photos faster, 72-hour expedited delivery is available as an add-on for $75.",
+        a: "Standard turnaround is up to two weeks from shoot day. If you need your photos faster, 72-hour expedited delivery is available as an add-on for $75.",
       },
       {
         q: "How are the photos delivered?",
