@@ -378,6 +378,32 @@ export default function ConversationPage() {
   }
 
   // ── Polish: fix typos / convert bullet points to email ─────────────────────
+
+  // Derive Gmail search keywords from the draft text + inquiry context so we
+  // can pull matching sent emails as tone examples.
+  function buildGmailQuery(text: string, sessionType: string | null): string {
+    const haystack = `${text} ${sessionType ?? ""}`.toLowerCase();
+    const terms: string[] = [];
+
+    if (/confirm|confirmed|session date|meeting point|my number|deposit paid|signed|contract/.test(haystack))
+      terms.push("confirmed session meeting point");
+    if (/first reply|inquiry|interested|reach out|session type|packages|pricing/.test(haystack))
+      terms.push("photography inquiry packages");
+    if (/reminder|day before|tomorrow|heads up/.test(haystack))
+      terms.push("session reminder tomorrow");
+    if (/reschedule|change.*date|move.*date/.test(haystack))
+      terms.push("reschedule session");
+    if (/cancel/.test(haystack))
+      terms.push("cancel session");
+    if (/location|shoot at|meet at/.test(haystack))
+      terms.push("location directions meet");
+
+    // Always include session type keywords so results stay relevant
+    if (sessionType) terms.push(sessionType.split(" ")[0]);
+
+    return terms.length ? terms.join(" ") : "photography session";
+  }
+
   async function polishDraft(textOverride?: string) {
     const textToPolish = textOverride ?? draft;
     if (!inquiry || !textToPolish.trim()) return;
@@ -390,16 +416,25 @@ export default function ConversationPage() {
           }).join("\n\n")
         : undefined;
 
+      // Fetch similar sent emails in parallel with no blocking
+      const gmailQuery = buildGmailQuery(textToPolish, inquiry.session_type);
+      const gmailRes = await fetch(
+        `/api/gmail/similar-sent?query=${encodeURIComponent(gmailQuery)}`
+      ).catch(() => null);
+      const gmailJson = gmailRes?.ok ? await gmailRes.json().catch(() => null) : null;
+      const gmailExamples: string[] = gmailJson?.examples ?? [];
+
       const res  = await fetch("/api/draft-reply", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name:           inquiry.name,
-          email:          inquiry.email,
-          message:        inquiry.message,
-          session_type:   inquiry.session_type,
-          thread_context: threadContext ?? null,
-          raw_draft:      textToPolish,
+          name:            inquiry.name,
+          email:           inquiry.email,
+          message:         inquiry.message,
+          session_type:    inquiry.session_type,
+          thread_context:  threadContext ?? null,
+          raw_draft:       textToPolish,
+          gmail_examples:  gmailExamples.length ? gmailExamples : undefined,
         }),
       });
       const json = await res.json();

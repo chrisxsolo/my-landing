@@ -219,7 +219,8 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  let body: Record<string, string>;
+  // gmail_examples is the only array field; everything else is a plain string
+  let body: Record<string, string> & { gmail_examples?: string[] };
   try {
     body = await req.json();
   } catch {
@@ -230,6 +231,7 @@ export async function POST(req: NextRequest) {
     name, email, session_type, date_in_mind, message, phone,
     previous_draft, feedback, ai_draft, actual_sent,
     thread_context, raw_draft, latest_message_body, latest_message_from,
+    gmail_examples,
   } = body;
 
   if (!name || !email || !message) {
@@ -308,18 +310,23 @@ Format rules (always apply):
 - Never include email headers, timestamps, or "to:" lines
 - No em dashes (—) — use commas or rewrite the sentence instead` + vaultSection;
 
+    const examples = Array.isArray(gmail_examples) ? gmail_examples as string[] : [];
+    const examplesSection = examples.length
+      ? `\n\nREAL EXAMPLES — past emails Chris actually sent for similar situations (study the tone, length, structure, and phrasing closely and mirror it):\n\n${examples.map((ex, i) => `--- Example ${i + 1} ---\n${ex}`).join("\n\n")}\n\n---`
+      : "";
+
     try {
       const client = new Anthropic({ apiKey });
       const response = await client.messages.create({
         model: "claude-sonnet-4-6",
         max_tokens: 600,
-        system: systemPrompt,
+        system: systemPrompt + examplesSection,
         messages: [{
           role: "user",
           content: `Polish the following rough email draft into a proper, well-formatted email in your voice.
 
 Fix any typos, improve the flow, and make it sound natural and professional. If it's written as bullet points or fragments, convert it to proper paragraphs.
-
+${examples.length ? `\nIMPORTANT — tone matching: You have been given real past emails Chris sent for similar situations. Match the tone, warmth, sentence length, and phrasing style from those examples as closely as possible while still covering the content in the rough draft.` : ""}
 IMPORTANT — transcription error correction: This draft may have been dictated via voice-to-text, so it may contain speech recognition mistakes (wrong words that sound similar to the intended word). Use the conversation context below to identify and fix these errors. For example, if the draft says "Palisades of Fine Arts" but the conversation mentions "Palace of Fine Arts", correct it. Always trust what the client said in the conversation over what appears in the rough draft.
 
 This is a reply to ${name} about a ${session_type ?? "photography"} session.
