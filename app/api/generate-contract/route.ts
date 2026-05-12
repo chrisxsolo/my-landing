@@ -325,8 +325,25 @@ ${emailContext || "(no email history found)"}`,
   else if (inq.date_in_mind && inq.date_in_mind.toLowerCase() !== "flexible")
                                        sessionDate = inq.date_in_mind;
 
-  const totalFeeStr  = extracted.totalFee ?? "[TOTAL FEE — fill in]";
-  const totalNum     = parseAmount(totalFeeStr);
+  // ── Apply travel fee for known schools ──────────────────────────────────
+  // Detect school from the school field, session_type, and message text
+  const haystack = [inq.school, inq.session_type, inq.message, inq.email].filter(Boolean).join(" ").toLowerCase();
+  function detectTravelFee(text: string): number {
+    if (/\bstanford\b/.test(text))                                  return 45;
+    if (/\buc berkeley\b|\bberkeley\b|cal bears/.test(text))        return 35;
+    if (/\bcsueb\b|cal state east bay|eastbay/.test(text))          return 30;
+    if (/\bsjsu\b|san jose state/.test(text))                       return 75;
+    if (/\bsanta clara\b|\bscu\b/.test(text))                       return 70;
+    return 0;
+  }
+  const travelFee = detectTravelFee(haystack);
+
+  let totalFeeStr  = extracted.totalFee ?? "[TOTAL FEE — fill in]";
+  let totalNum     = parseAmount(totalFeeStr);
+  if (totalNum && travelFee) {
+    totalNum    += travelFee;
+    totalFeeStr  = fmtMoney(totalNum);
+  }
   const retainerStr  = totalNum ? fmtMoney(Math.ceil(totalNum / 2))  : "[RETAINER — fill in]";
   const remainingStr = totalNum ? fmtMoney(Math.floor(totalNum / 2)) : "[REMAINING — fill in]";
 

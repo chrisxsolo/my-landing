@@ -260,11 +260,11 @@ export async function POST(req: NextRequest) {
 
       const systemPrompt = perfect_draft
         ? `You are a writing-style analyst. An AI-generated email draft was sent to a client without any edits — meaning it was perfect. Your job is to extract concrete style rules from this email that describe what made it good and should be preserved in future drafts. Each rule should be a single actionable instruction (e.g. "keep replies to 3 sentences or fewer for pricing questions", "open with a direct answer before adding context", "use a warm but efficient tone — no filler phrases"). No fluff, no praise, no explanation — just the rules, one per line, starting with a dash.`
-        : `You are a writing-style analyst. Your job is to compare two email drafts and produce a short, concrete list of style rules that capture how the final version differs from the draft. Each rule should be a single actionable instruction (e.g. "skip the opening weather comment", "be more direct — cut the warm-up sentences", "always mention the turnaround time"). No fluff, no praise, no explanation — just the rules, one per line, starting with a dash.`;
+        : `You are a writing-style analyst. Your job is to compare two email drafts and produce a short, concrete list of style rules that capture how the final version differs from the draft. Each rule should be a single actionable instruction (e.g. "skip the opening weather comment", "be more direct — cut the warm-up sentences", "always mention the turnaround time"). No fluff, no praise, no explanation — just the rules, one per line, starting with a dash. If the two drafts are substantively identical with no meaningful differences, output only the single word NONE on its own line and nothing else.`;
 
       const userContent = perfect_draft
         ? `This AI-generated draft was sent to a client exactly as written — no edits were made. Extract concrete style rules from it that should be preserved in future drafts.\n\n---\n${ai_draft}\n---\n\nList the style rules, one per line starting with a dash, nothing else.`
-        : `Here is the AI-generated draft:\n\n---\n${ai_draft}\n---\n\nHere is what Chris actually sent instead:\n\n---\n${actual_sent}\n---\n\nList the concrete style rules Claude should follow in future drafts based on the differences. Output only the rules, one per line starting with a dash, nothing else.`;
+        : `Here is the AI-generated draft:\n\n---\n${ai_draft}\n---\n\nHere is what Chris actually sent instead:\n\n---\n${actual_sent}\n---\n\nList the concrete style rules Claude should follow in future drafts based on the differences. Output only the rules, one per line starting with a dash, nothing else. If the drafts are substantively identical, output only NONE.`;
 
       const response = await client.messages.create({
         model: "claude-sonnet-4-6",
@@ -279,10 +279,16 @@ export async function POST(req: NextRequest) {
         .join("")
         .trim();
 
+      if (raw.trim().toUpperCase() === "NONE") {
+        return NextResponse.json({ rules: [], written: 0 });
+      }
+
+      const EXPLANATION_PATTERN = /identical|no (?:meaningful |significant |style |real )?diff|no changes|same email|essentially the same|no differences/i;
+
       const rules = raw
         .split("\n")
         .map(line => line.replace(/^[-–•*]\s*/, "").trim())
-        .filter(line => line.length > 0);
+        .filter(line => line.length > 0 && !EXPLANATION_PATTERN.test(line));
 
       const written = await mergeRulesToVault(rules, apiKey);
 

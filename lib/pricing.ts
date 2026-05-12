@@ -37,7 +37,7 @@ export const TRAVEL_FEES: Record<string, number | null | undefined> = {
   "csueb":       30,
   "sjsu":        75,
   "santa-clara": 70,
-  "stanford":    undefined, // TODO: confirm
+  "stanford":    45,
   "other":       undefined, // calculated or TBD
 }
 
