@@ -261,7 +261,7 @@ function AdminDashboard() {
   // ── Clients ───────────────────────────────────────────────────────────────
   const [clientSearch,setClientSearch]=useState("");
   const [clientFilter,setClientFilter]=useState<"all"|"paid"|"unpaid">("all");
-  const [clientSort,setClientSort]=useState<"newest_inquiry"|"oldest_inquiry"|"session_date"|"alpha"|"paid_recently">("newest_inquiry");
+  const [clientSort,setClientSort]=useState<"recent_activity"|"newest_inquiry"|"oldest_inquiry"|"session_date"|"alpha"|"paid_recently">("recent_activity");
   const [inquirySort,setInquirySort]=useState<"needs_reply"|"newest"|"oldest"|"session_date"|"alpha"|"paid_recently">("needs_reply");
   const [editingSessionType,setEditingSessionType]=useState<number|null>(null);
   const EMPTY_CLIENT={name:"",email:"",phone:"",session_type:"",session_date:"",message:""};
@@ -2962,6 +2962,12 @@ function AdminDashboard() {
             return future.length?Math.min(...future):Infinity;
           };
           const latestInquiryDate=(sessions:Inquiry[])=>Math.max(...sessions.map(s=>new Date(s.created_at).getTime()));
+          // Most recent activity = latest of: client message (created_at) or your reply (reply_sent_at)
+          const latestActivityDate=(sessions:Inquiry[])=>Math.max(...sessions.map(s=>{
+            const inq=new Date(s.created_at).getTime();
+            const reply=s.reply_sent_at?new Date(s.reply_sent_at).getTime():0;
+            return Math.max(inq,reply);
+          }));
           const latestDepositDate=(sessions:Inquiry[])=>{
             const paid=sessions.filter(s=>s.payment_status==="paid");
             if(!paid.length)return 0;
@@ -2969,6 +2975,7 @@ function AdminDashboard() {
           };
           const clients=Array.from(clientMap.values()).sort((a,b)=>{
             if(clientSort==="alpha")return a.name.localeCompare(b.name);
+            if(clientSort==="recent_activity")return latestActivityDate(b.sessions)-latestActivityDate(a.sessions);
             if(clientSort==="newest_inquiry")return latestInquiryDate(b.sessions)-latestInquiryDate(a.sessions);
             if(clientSort==="oldest_inquiry")return latestInquiryDate(a.sessions)-latestInquiryDate(b.sessions);
             if(clientSort==="paid_recently"){
@@ -3068,6 +3075,7 @@ function AdminDashboard() {
                         onChange={e=>setClientSort(e.target.value as typeof clientSort)}
                         className="text-[11px] font-bold px-2.5 py-1 rounded-lg outline-none cursor-pointer"
                         style={{border:`1px solid ${C.p1_20}`,background:C.p1_04,color:C.p1,fontFamily:"inherit"}}>
+                        <option value="recent_activity">Most recent message</option>
                         <option value="paid_recently">Paid recently</option>
                         <option value="newest_inquiry">Newest inquiry</option>
                         <option value="oldest_inquiry">Oldest inquiry</option>
@@ -3158,7 +3166,7 @@ function AdminDashboard() {
                           <div className="flex items-start justify-between gap-3 flex-wrap mb-4">
                             <div>
                               <div className="flex items-center gap-2 flex-wrap">
-                                <p className="text-base font-black text-slate-900">{client.name}</p>
+                                <p className="text-base font-black text-slate-900 cursor-pointer select-none hover:opacity-70 transition-opacity" title="Click to copy name" onClick={()=>navigator.clipboard.writeText(client.name).then(()=>showToast("Name copied ✓"))}>{client.name}</p>
                                 {paid&&(
                                   <span className="text-[10px] font-black px-2 py-0.5 rounded-lg"
                                         style={{background:"rgba(16,185,129,0.12)",color:"#059669"}}>
