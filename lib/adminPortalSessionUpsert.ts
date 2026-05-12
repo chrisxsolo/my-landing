@@ -14,6 +14,8 @@ type EnsureAdminPortalSessionInput = {
   sessionType?: string | null;
   sessionDate?: string | null;
   location?: string | null;
+  invoiceStatus?: string | null;
+  contractStatus?: string | null;
   currentStatus: ClientSessionStatus;
 };
 
@@ -53,7 +55,16 @@ export async function ensureAdminPortalSession(
     sessionDate: input.sessionDate,
   });
 
-  if (matched) return matched.id;
+  if (matched) {
+    const updateFields: Record<string, unknown> = {};
+    if (input.location) updateFields.location = input.location.trim();
+    if (input.invoiceStatus) updateFields.invoice_status = input.invoiceStatus;
+    if (input.contractStatus) updateFields.contract_status = input.contractStatus;
+    if (Object.keys(updateFields).length > 0) {
+      await supabase.from(CLIENT_SESSION_TABLE).update(updateFields).eq("id", matched.id);
+    }
+    return matched.id;
+  }
 
   const { data: created, error: createError } = await supabase
     .from(CLIENT_SESSION_TABLE)
@@ -63,6 +74,8 @@ export async function ensureAdminPortalSession(
       session_type: input.sessionType?.trim() || null,
       session_date: input.sessionDate || null,
       location: input.location?.trim() || null,
+      invoice_status: input.invoiceStatus || null,
+      contract_status: input.contractStatus || null,
       current_status: input.currentStatus,
     })
     .select("id")

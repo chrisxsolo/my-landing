@@ -613,6 +613,25 @@ export default function ConversationPage() {
         showToast(`✓ Sent to ${inquiry.name}`);
         await supabase.from("inquiries").update({ status: "responded", reply_sent_at: new Date().toISOString() }).eq("id", inquiry.id);
         setStatus("responded");
+
+        // Auto-learn from every send — fire and forget (don't block UX)
+        if (lastAiDraft) {
+          const sentDraft = draft;
+          const aiDraft   = lastAiDraft;
+          fetch("/api/draft-reply", {
+            method:  "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name:         inquiry.name,
+              email:        inquiry.email,
+              message:      inquiry.message,
+              ai_draft:     aiDraft,
+              actual_sent:  sentDraft,
+              perfect_draft: sentDraft.trim() === aiDraft.trim(),
+            }),
+          }).catch(() => {});
+        }
+
         setDraft("");
         // Clear cloud drafts now that it's sent
         await supabase.from("site_settings").delete()

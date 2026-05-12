@@ -64,7 +64,7 @@ async function linkEmailMatches(userId: string, email: string) {
   const supabase = createSupabaseAdminClient();
   const { error } = await supabase
     .from(CLIENT_SESSION_TABLE)
-    .update({ client_user_id: userId })
+    .update({ client_user_id: userId, google_linked_at: new Date().toISOString() })
     .is("client_user_id", null)
     .ilike("client_email", email);
 

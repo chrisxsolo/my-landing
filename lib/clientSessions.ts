@@ -66,6 +66,7 @@ export type ClientSessionRow = {
   client_notes: string | null;
   created_at: string;
   updated_at: string;
+  google_linked_at: string | null;
 };
 
 export type ClientSessionDTO = {
@@ -90,6 +91,7 @@ export type AdminClientSessionDTO = ClientSessionDTO & {
   internalNotes: string | null;
   createdAt: string;
   updatedAt: string;
+  googleLinkedAt: string | null;
 };
 
 export type ClientSessionMatchInput = {
@@ -236,5 +238,6 @@ export function toAdminClientSessionDTO(row: ClientSessionRow): AdminClientSessi
     internalNotes: row.internal_notes,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    googleLinkedAt: row.google_linked_at,
   };
 }

@@ -56,6 +56,7 @@ export default function AdminSessionsDashboard() {
     id: string;
     status: ClientSessionStatus;
   } | null>(null);
+  const [gmailSyncing, setGmailSyncing] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -199,6 +200,37 @@ export default function AdminSessionsDashboard() {
       setError("Could not update session progress.");
     } finally {
       setStatusSaving(null);
+    }
+  }
+
+  async function syncFromGmail(session: AdminClientSessionDTO) {
+    setGmailSyncing(session.id);
+    setError(null);
+    setMessage(null);
+
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch("/api/admin/sessions/sync-gmail", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ session_id: session.id }),
+      });
+      const json = await res.json() as { session?: AdminClientSessionDTO; message?: string; error?: string };
+
+      if (!res.ok) {
+        setError(json.error ?? "Gmail sync failed.");
+        return;
+      }
+
+      if (json.session) {
+        setSessions((prev) => prev.map((item) => item.id === json.session!.id ? json.session! : item));
+      }
+      setMessage(json.message ?? "Synced from Gmail.");
+    } catch (err) {
+      console.error("[admin-sessions-dashboard] gmail sync", err);
+      setError("Gmail sync failed.");
+    } finally {
+      setGmailSyncing(null);
     }
   }
 
@@ -363,6 +395,8 @@ export default function AdminSessionsDashboard() {
               onEdit={setEditing}
               onUpdateStatus={updateSessionStatus}
               statusSaving={statusSaving}
+              gmailSyncing={gmailSyncing}
+              onSyncFromGmail={syncFromGmail}
             />
           </section>
         </div>

@@ -147,22 +147,29 @@ function buildVaultContext(notes: VaultRow[], sessionType?: string, message?: st
   return sections.join("\n\n---\n\n");
 }
 
-const MERGE_SYSTEM = `You are a knowledge base editor for a photography business. Your job is to maintain a clean, well-structured markdown note of AI email writing rules.
+function buildMergeSystem(today: string): string {
+  return `You are a knowledge base editor for a photography business. Your job is to maintain a clean, well-structured markdown note of AI email writing rules.
+
+Each rule in the note is timestamped in the format [YYYY-MM-DD] at the start of the line (e.g. "- [2026-05-11] always mention the travel fee upfront").
+New rules being integrated today are dated ${today}.
 
 Editing rules:
-- If a new rule CONTRADICTS or SUPERSEDES an existing rule, DELETE the old rule and ADD the new one
-- If a new rule is essentially the same as an existing one, KEEP the existing wording — no duplicates
-- If a new rule is genuinely new, ADD it under the most relevant ## section
-- NEVER keep two rules that say opposite or conflicting things — always prefer the newer rule
+- If a new rule CONTRADICTS or SUPERSEDES an existing rule: DELETE the old rule, ADD the new one with today's date [${today}]
+- When two rules conflict, ALWAYS prefer the one with the NEWER date — recency is the single source of truth
+- If a new rule is essentially the same as an existing one: KEEP the existing rule unchanged (do not re-date it)
+- If a new rule is genuinely new: ADD it under the most relevant ## section with today's date [${today}]
+- NEVER keep two rules that say opposite or conflicting things
 - Preserve all YAML frontmatter exactly as-is (the --- block at the top)
+- Update the "updated" frontmatter field to ${today}
 - Preserve the existing ## section structure
-- Update the last_updated frontmatter field to today's date
 - If a new rule doesn't fit any existing section, add it under ## Learned Rules
 - Output ONLY the updated markdown note — no explanation, no preamble`;
+}
 
 async function mergeRulesToVault(newRules: string[], apiKey: string): Promise<number> {
   if (newRules.length === 0) return 0;
   try {
+    const today = new Date().toISOString().slice(0, 10);
     const supabase = createSupabaseServerClient();
     const { data } = await supabase
       .from("vault_notes")
@@ -177,10 +184,10 @@ async function mergeRulesToVault(newRules: string[], apiKey: string): Promise<nu
     const res = await client.messages.create({
       model: "claude-sonnet-4-6",
       max_tokens: 2000,
-      system: MERGE_SYSTEM,
+      system: buildMergeSystem(today),
       messages: [{
         role: "user",
-        content: `Current Email Rules note:\n\n---\n${existing}\n---\n\nNew rules to integrate:\n\n${newRules.map(r => `- ${r}`).join("\n")}\n\nOutput the updated note only.`,
+        content: `Current Email Rules note:\n\n---\n${existing}\n---\n\nNew rules to integrate (dated ${today}):\n\n${newRules.map(r => `- [${today}] ${r}`).join("\n")}\n\nOutput the updated note only.`,
       }],
     });
 
@@ -233,6 +240,7 @@ export async function POST(req: NextRequest) {
     thread_context, raw_draft, latest_message_body, latest_message_from,
     gmail_examples,
   } = body;
+  const perfect_draft = (body as Record<string, unknown>).perfect_draft === true;
 
   if (!name || !email || !message) {
     return NextResponse.json(
@@ -249,14 +257,20 @@ export async function POST(req: NextRequest) {
   if (isAnalyze) {
     try {
       const client = new Anthropic({ apiKey });
+
+      const systemPrompt = perfect_draft
+        ? `You are a writing-style analyst. An AI-generated email draft was sent to a client without any edits — meaning it was perfect. Your job is to extract concrete style rules from this email that describe what made it good and should be preserved in future drafts. Each rule should be a single actionable instruction (e.g. "keep replies to 3 sentences or fewer for pricing questions", "open with a direct answer before adding context", "use a warm but efficient tone — no filler phrases"). No fluff, no praise, no explanation — just the rules, one per line, starting with a dash.`
+        : `You are a writing-style analyst. Your job is to compare two email drafts and produce a short, concrete list of style rules that capture how the final version differs from the draft. Each rule should be a single actionable instruction (e.g. "skip the opening weather comment", "be more direct — cut the warm-up sentences", "always mention the turnaround time"). No fluff, no praise, no explanation — just the rules, one per line, starting with a dash.`;
+
+      const userContent = perfect_draft
+        ? `This AI-generated draft was sent to a client exactly as written — no edits were made. Extract concrete style rules from it that should be preserved in future drafts.\n\n---\n${ai_draft}\n---\n\nList the style rules, one per line starting with a dash, nothing else.`
+        : `Here is the AI-generated draft:\n\n---\n${ai_draft}\n---\n\nHere is what Chris actually sent instead:\n\n---\n${actual_sent}\n---\n\nList the concrete style rules Claude should follow in future drafts based on the differences. Output only the rules, one per line starting with a dash, nothing else.`;
+
       const response = await client.messages.create({
         model: "claude-sonnet-4-6",
         max_tokens: 500,
-        system: `You are a writing-style analyst. Your job is to compare two email drafts and produce a short, concrete list of style rules that capture how the final version differs from the draft. Each rule should be a single actionable instruction (e.g. "skip the opening weather comment", "be more direct — cut the warm-up sentences", "always mention the turnaround time"). No fluff, no praise, no explanation — just the rules, one per line, starting with a dash.`,
-        messages: [{
-          role: "user",
-          content: `Here is the AI-generated draft:\n\n---\n${ai_draft}\n---\n\nHere is what Chris actually sent instead:\n\n---\n${actual_sent}\n---\n\nList the concrete style rules Claude should follow in future drafts based on the differences. Output only the rules, one per line starting with a dash, nothing else.`,
-        }],
+        system: systemPrompt,
+        messages: [{ role: "user", content: userContent }],
       });
 
       const raw = response.content

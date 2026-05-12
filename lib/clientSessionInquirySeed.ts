@@ -20,6 +20,7 @@ export type ClientSessionInsertSeed = {
   session_date: string | null;
   location: string | null;
   current_status: "inquiry_received";
+  google_linked_at: string;
 };
 
 function cleanText(value: string | null | undefined) {
@@ -67,5 +68,6 @@ export function buildClientSessionInsertSeed(userId: string, inquiry: InquirySee
     session_date: normalizeSessionDate(inquiry),
     location: cleanText(inquiry.location) ?? cleanText(inquiry.school),
     current_status: "inquiry_received",
+    google_linked_at: new Date().toISOString(),
   };
 }

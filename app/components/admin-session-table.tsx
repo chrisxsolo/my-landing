@@ -13,6 +13,8 @@ type AdminSessionTableProps = {
   onEdit: (session: AdminClientSessionDTO) => void;
   onUpdateStatus: (session: AdminClientSessionDTO, status: ClientSessionStatus) => void;
   statusSaving: { id: string; status: ClientSessionStatus } | null;
+  gmailSyncing: string | null;
+  onSyncFromGmail: (session: AdminClientSessionDTO) => void;
 };
 
 function formatDate(value: string | null) {
@@ -21,6 +23,17 @@ function formatDate(value: string | null) {
     month: "short",
     day: "numeric",
     year: "numeric",
+  }).format(new Date(value));
+}
+
+function formatDateTime(value: string | null) {
+  if (!value) return null;
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
   }).format(new Date(value));
 }
 
@@ -33,6 +46,8 @@ export default function AdminSessionTable({
   onEdit,
   onUpdateStatus,
   statusSaving,
+  gmailSyncing,
+  onSyncFromGmail,
 }: AdminSessionTableProps) {
   if (sessions.length === 0) {
     return (
@@ -65,6 +80,11 @@ export default function AdminSessionTable({
                 >
                   {getLinkStatus(session)}
                 </span>
+                {session.googleLinkedAt && (
+                  <span className="text-[10px] font-semibold" style={{ color: C.muted }}>
+                    Signed in {formatDateTime(session.googleLinkedAt)}
+                  </span>
+                )}
               </div>
               <h3 className="mt-1 text-lg font-black" style={{ color: C.ink }}>
                 {session.clientName || "Unnamed client"}
@@ -74,14 +94,25 @@ export default function AdminSessionTable({
               </p>
             </div>
 
-            <button
-              type="button"
-              onClick={() => onEdit(session)}
-              className="min-h-10 w-full rounded-lg border px-4 text-sm font-black md:w-auto"
-              style={{ background: C.surfaceStrong, borderColor: C.borderSubtle, color: C.inkSoft }}
-            >
-              Edit
-            </button>
+            <div className="flex w-full gap-2 md:w-auto">
+              <button
+                type="button"
+                onClick={() => onSyncFromGmail(session)}
+                disabled={gmailSyncing === session.id}
+                className="min-h-10 flex-1 rounded-lg border px-3 text-sm font-black md:flex-none"
+                style={{ background: C.p1_08, borderColor: C.p1_20, color: C.p1, opacity: gmailSyncing === session.id ? 0.6 : 1 }}
+              >
+                {gmailSyncing === session.id ? "Syncing…" : "Sync Gmail"}
+              </button>
+              <button
+                type="button"
+                onClick={() => onEdit(session)}
+                className="min-h-10 flex-1 rounded-lg border px-4 text-sm font-black md:flex-none"
+                style={{ background: C.surfaceStrong, borderColor: C.borderSubtle, color: C.inkSoft }}
+              >
+                Edit
+              </button>
+            </div>
           </div>
 
           <div className="mt-4 rounded-xl border p-3" style={{ background: C.surfaceStrong, borderColor: C.borderSubtle }}>
@@ -111,12 +142,22 @@ export default function AdminSessionTable({
               <div className="break-words font-semibold" style={{ color: C.muted }}>{session.sessionType || "Not set"}</div>
             </div>
             <div className="min-w-0">
-              <span className="font-black" style={{ color: C.ink }}>Date</span>
-              <div className="font-semibold" style={{ color: C.muted }}>{formatDate(session.sessionDate)}</div>
+              <span className="font-black" style={{ color: C.ink }}>Date &amp; Time</span>
+              <div className="font-semibold" style={{ color: C.muted }}>
+                {formatDate(session.sessionDate)}
+                {session.sessionDate && formatDateTime(session.sessionDate) !== formatDate(session.sessionDate) && (
+                  <span className="ml-1 text-[11px]" style={{ color: C.p1 }}>
+                    {new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(new Date(session.sessionDate))}
+                  </span>
+                )}
+              </div>
             </div>
             <div className="min-w-0">
               <span className="font-black" style={{ color: C.ink }}>Location</span>
               <div className="break-words font-semibold" style={{ color: C.muted }}>{session.location || "Not set"}</div>
+              {session.meetingPoint && (
+                <div className="mt-0.5 break-words text-xs font-semibold" style={{ color: C.p1 }}>{session.meetingPoint}</div>
+              )}
             </div>
             <div className="min-w-0">
               <span className="font-black" style={{ color: C.ink }}>Delivery</span>

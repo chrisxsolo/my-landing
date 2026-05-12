@@ -46,7 +46,7 @@ export const dynamic = 'force-dynamic'
 
 type Tab = "home"|"poses"|"locations"|"bayGuide"|"portfolio"|"categories"|"blog"|"library"|"analytics"|"payments"|"inquiries"|"clients"|"funnel"|"vault";
 type ImageLibraryRow = { id:number; title:string; alt:string|null; image_url:string; source_type:string; source_post_id:number|null; source_post_slug:string|null; source_role:string; in_portfolio:boolean; created_at:string; };
-type Inquiry = { id:number; name:string; email:string; phone:string|null; session_type:string|null; date_in_mind:string|null; message:string; status:string; created_at:string; payment_status:string|null; payment_note:string|null; payment_detected_at:string|null; session_date:string|null; booking_confirmed:boolean|null; reply_sent_at:string|null; invoice_sent_at:string|null; contract_sent_at:string|null; deposit_paid_at:string|null; gallery_delivered_at:string|null; confirmation_sent_at:string|null; };
+type Inquiry = { id:number; name:string; email:string; phone:string|null; session_type:string|null; date_in_mind:string|null; message:string; status:string; created_at:string; payment_status:string|null; payment_note:string|null; payment_detected_at:string|null; session_date:string|null; booking_confirmed:boolean|null; reply_sent_at:string|null; invoice_sent_at:string|null; contract_sent_at:string|null; deposit_paid_at:string|null; gallery_delivered_at:string|null; confirmation_sent_at:string|null; preferred_time:string|null; location:string|null; };
 type AdminSessionsResponse = { sessions?: AdminClientSessionDTO[]; session?: AdminClientSessionDTO; error?: string; };
 type BlogCategory = "journal"|"professional";
 type Pose = { id:number; title:string; image_url:string; instructions:string; order:number; };
@@ -701,6 +701,9 @@ function AdminDashboard() {
           clientName:inquiry.name,
           sessionType:inquiry.session_type,
           sessionDate:inquiry.session_date??inquiry.date_in_mind,
+          location:inquiry.location,
+          invoiceStatus:inquiry.invoice_sent_at?"sent":null,
+          contractStatus:inquiry.contract_sent_at?"sent":null,
           currentStatus:status,
         }),
       });
@@ -3204,8 +3207,8 @@ function AdminDashboard() {
                                           <span className="opacity-0 group-hover:opacity-100 text-[9px] text-slate-400 transition-opacity">✏️</span>
                                         </button>
                                       )}
-                                      {s.date_in_mind&&<span className="text-xs text-slate-400">{s.date_in_mind}</span>}
-                                      {s.session_date&&<span className="text-xs font-bold text-emerald-600">{new Date(s.session_date+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}</span>}
+                                      {s.date_in_mind&&!s.session_date&&<span className="text-xs text-slate-400">{s.date_in_mind}</span>}
+                                      {s.session_date&&<span className="text-xs font-bold text-emerald-600">{new Date(s.session_date+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}{s.preferred_time?` · ${s.preferred_time}`:""}</span>}
                                     </div>
                                     <p className="text-[11px] text-slate-400 mt-0.5 truncate">{s.message.slice(0,80)}{s.message.length>80?"…":""}</p>
                                     {(s.deposit_paid_at||s.invoice_sent_at||s.contract_sent_at||s.confirmation_sent_at||s.gallery_delivered_at)&&(

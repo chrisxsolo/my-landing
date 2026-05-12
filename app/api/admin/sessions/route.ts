@@ -180,6 +180,8 @@ export async function PATCH(req: NextRequest) {
         sessionType: readText(body.sessionType),
         sessionDate: readDateTime(body.sessionDate) ?? readDate(body.sessionDate) ?? null,
         location: readText(body.location),
+        invoiceStatus: readText(body.invoiceStatus),
+        contractStatus: readText(body.contractStatus),
         currentStatus: body.currentStatus,
       });
 
