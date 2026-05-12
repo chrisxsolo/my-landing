@@ -53,12 +53,31 @@ function detectSchool(text: string): string | null {
   return null;
 }
 
+// Extract a human-readable school name from a .edu email domain
+function detectSchoolFromEmail(email: string): string | null {
+  const match = email.match(/@([\w.-]+\.edu)/i);
+  if (!match) return null;
+  const domain = match[1].toLowerCase();
+  // Check known domains first
+  const known: Record<string, string> = {
+    "sjsu.edu": "SJSU", "berkeley.edu": "UC Berkeley", "sfsu.edu": "SF State",
+    "csueastbay.edu": "CSUEB", "usfca.edu": "USF", "stanford.edu": "Stanford",
+    "scu.edu": "Santa Clara", "csus.edu": "Sac State", "csuchico.edu": "Chico State",
+    "csufresno.edu": "Fresno State",
+  };
+  if (known[domain]) return known[domain];
+  // Fall back to a generic prettified name from the subdomain
+  const base = domain.replace(/\.edu$/, "").split(".").at(-1) ?? domain;
+  return base.charAt(0).toUpperCase() + base.slice(1);
+}
+
 // Build a smart default subject for a new outreach
-function buildSubject(inquiry: { session_type: string | null; message: string; date_in_mind: string | null }): string {
+function buildSubject(inquiry: { session_type: string | null; message: string; date_in_mind: string | null; email?: string }): string {
   const isGrad = (inquiry.session_type ?? "").toLowerCase().includes("grad");
   if (!isGrad) return `Re: Your ${inquiry.session_type ?? "photography"} inquiry`;
   const haystack = [inquiry.message, inquiry.session_type, inquiry.date_in_mind].filter(Boolean).join(" ");
-  const school   = detectSchool(haystack);
+  const school   = detectSchool(haystack)
+    ?? (inquiry.email ? detectSchoolFromEmail(inquiry.email) : null);
   return school ? `${school} Graduation Inquiry` : "Graduation Inquiry";
 }
 
