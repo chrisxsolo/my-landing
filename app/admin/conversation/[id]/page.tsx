@@ -702,6 +702,11 @@ export default function ConversationPage() {
         { date: dateStr, status: "booked", note: `Booked — ${inquiry.name}` },
         { onConflict: "date" }
       );
+      // Keep client_sessions in sync so the ICS calendar feed stays accurate
+      await supabase.from("client_sessions")
+        .update({ session_date: dateStr })
+        .eq("client_email", inquiry.email)
+        .is("session_date", null);
       const { data } = await supabase.from("inquiries").select("*").eq("id", inquiry.id).single();
       if (data) setInquiry(data);
       setDetectedDate(null);

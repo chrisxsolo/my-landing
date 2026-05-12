@@ -173,7 +173,7 @@ export async function POST(req: NextRequest) {
   // Fetch all inquiries whose email matches — include session_date for auto-blocking
   const { data: inquiries } = await supabase
     .from("inquiries")
-    .select("id, email, payment_status, session_date")
+    .select("id, email, payment_status, session_date, deposit_paid_at")
     .in("email", emails);
 
   const synced: { name: string; email: string; amount: string; method: string; invoice: string; alreadyPaid: boolean; dateBooked?: string }[] = [];
@@ -193,15 +193,29 @@ export async function POST(req: NextRequest) {
         payment.invoice && `Invoice ${payment.invoice}`,
       ].filter(Boolean).join(" · ");
 
+      const now = new Date().toISOString();
+      // Always update payment fields; only set deposit_paid_at if not already set
+      const newlyPaidIds = matching.filter(inq => inq.payment_status !== "paid").map(inq => inq.id);
+      const allIds = matching.map(inq => inq.id);
+
+      // Update all matching with payment info
       await supabase
         .from("inquiries")
         .update({
           payment_status:      "paid",
           payment_note:        note,
-          payment_detected_at: new Date().toISOString(),
+          payment_detected_at: now,
           booking_confirmed:   true,
         })
-        .in("id", matching.map(inq => inq.id));
+        .in("id", allIds);
+
+      // Only stamp deposit_paid_at for newly-paid ones (don't overwrite existing)
+      if (newlyPaidIds.length) {
+        await supabase
+          .from("inquiries")
+          .update({ deposit_paid_at: now })
+          .in("id", newlyPaidIds);
+      }
 
       // Auto-block the session date on the availability calendar for new payments
       let dateBooked: string | undefined;

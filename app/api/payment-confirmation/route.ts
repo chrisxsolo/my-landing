@@ -265,7 +265,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Mark that confirmation was sent
-  await supabase.from("inquiries").update({ status: "responded" }).eq("id", inq.id);
+  await supabase.from("inquiries").update({ status: "responded", confirmation_sent_at: new Date().toISOString() }).eq("id", inq.id);
 
   return NextResponse.json({ ok: true });
 }

@@ -46,7 +46,7 @@ export const dynamic = 'force-dynamic'
 
 type Tab = "home"|"poses"|"locations"|"bayGuide"|"portfolio"|"categories"|"blog"|"library"|"analytics"|"payments"|"inquiries"|"clients"|"funnel"|"vault";
 type ImageLibraryRow = { id:number; title:string; alt:string|null; image_url:string; source_type:string; source_post_id:number|null; source_post_slug:string|null; source_role:string; in_portfolio:boolean; created_at:string; };
-type Inquiry = { id:number; name:string; email:string; phone:string|null; session_type:string|null; date_in_mind:string|null; message:string; status:string; created_at:string; payment_status:string|null; payment_note:string|null; payment_detected_at:string|null; session_date:string|null; booking_confirmed:boolean|null; reply_sent_at:string|null; invoice_sent_at:string|null; contract_sent_at:string|null; deposit_paid_at:string|null; gallery_delivered_at:string|null; };
+type Inquiry = { id:number; name:string; email:string; phone:string|null; session_type:string|null; date_in_mind:string|null; message:string; status:string; created_at:string; payment_status:string|null; payment_note:string|null; payment_detected_at:string|null; session_date:string|null; booking_confirmed:boolean|null; reply_sent_at:string|null; invoice_sent_at:string|null; contract_sent_at:string|null; deposit_paid_at:string|null; gallery_delivered_at:string|null; confirmation_sent_at:string|null; };
 type AdminSessionsResponse = { sessions?: AdminClientSessionDTO[]; session?: AdminClientSessionDTO; error?: string; };
 type BlogCategory = "journal"|"professional";
 type Pose = { id:number; title:string; image_url:string; instructions:string; order:number; };
@@ -260,8 +260,8 @@ function AdminDashboard() {
   // ── Clients ───────────────────────────────────────────────────────────────
   const [clientSearch,setClientSearch]=useState("");
   const [clientFilter,setClientFilter]=useState<"all"|"paid"|"unpaid">("all");
-  const [clientSort,setClientSort]=useState<"newest_inquiry"|"oldest_inquiry"|"session_date"|"alpha">("newest_inquiry");
-  const [inquirySort,setInquirySort]=useState<"needs_reply"|"newest"|"oldest"|"session_date"|"alpha">("needs_reply");
+  const [clientSort,setClientSort]=useState<"newest_inquiry"|"oldest_inquiry"|"session_date"|"alpha"|"paid_recently">("newest_inquiry");
+  const [inquirySort,setInquirySort]=useState<"needs_reply"|"newest"|"oldest"|"session_date"|"alpha"|"paid_recently">("needs_reply");
   const [editingSessionType,setEditingSessionType]=useState<number|null>(null);
   const EMPTY_CLIENT={name:"",email:"",phone:"",session_type:"",session_date:"",message:""};
   const [addClientOpen,setAddClientOpen]=useState(false);
@@ -2453,6 +2453,7 @@ function AdminDashboard() {
                     className="text-[11px] font-bold px-2.5 py-1.5 rounded-lg outline-none cursor-pointer"
                     style={{border:`1px solid ${C.p1_20}`,background:C.p1_04,color:C.p1,fontFamily:"inherit"}}>
                     <option value="needs_reply">Needs reply first</option>
+                    <option value="paid_recently">Paid recently</option>
                     <option value="newest">Newest inquiry</option>
                     <option value="oldest">Oldest inquiry</option>
                     <option value="session_date">Session date</option>
@@ -2513,6 +2514,15 @@ function AdminDashboard() {
                     const bPriority=(hasUnread(b)?0:1)*2+(needsReply(b)?0:1);
                     if(aPriority!==bPriority)return aPriority-bPriority;
                     return new Date(b.created_at).getTime()-new Date(a.created_at).getTime();
+                  }
+                  if(inquirySort==="paid_recently"){
+                    // Most recent payment first; unpaid sink to bottom
+                    const aPaid=a.payment_status==="paid";
+                    const bPaid=b.payment_status==="paid";
+                    if(aPaid!==bPaid)return aPaid?-1:1;
+                    const aP=a.deposit_paid_at?new Date(a.deposit_paid_at).getTime():a.payment_detected_at?new Date(a.payment_detected_at).getTime():new Date(a.created_at).getTime();
+                    const bP=b.deposit_paid_at?new Date(b.deposit_paid_at).getTime():b.payment_detected_at?new Date(b.payment_detected_at).getTime():new Date(b.created_at).getTime();
+                    return bP-aP;
                   }
                   if(inquirySort==="newest")return new Date(b.created_at).getTime()-new Date(a.created_at).getTime();
                   if(inquirySort==="oldest")return new Date(a.created_at).getTime()-new Date(b.created_at).getTime();
@@ -2595,6 +2605,40 @@ function AdminDashboard() {
                             )}
                             {inq.date_in_mind&&<><span className="text-slate-300">·</span><span className="text-slate-600">{inq.date_in_mind}</span></>}
                           </div>
+                          {/* Payment / confirmation status pills */}
+                          {(inq.deposit_paid_at||inq.invoice_sent_at||inq.contract_sent_at||inq.confirmation_sent_at||inq.gallery_delivered_at)&&(
+                            <div className="flex flex-wrap gap-1 mb-2">
+                              {inq.invoice_sent_at&&(
+                                <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full"
+                                      style={{background:"rgba(99,102,241,0.1)",color:"#6366f1"}}>
+                                  📄 Invoice {new Date(inq.invoice_sent_at).toLocaleDateString("en-US",{month:"short",day:"numeric"})}
+                                </span>
+                              )}
+                              {inq.contract_sent_at&&(
+                                <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full"
+                                      style={{background:"rgba(139,92,246,0.1)",color:"#7c3aed"}}>
+                                  📝 Contract {new Date(inq.contract_sent_at).toLocaleDateString("en-US",{month:"short",day:"numeric"})}
+                                </span>
+                              )}
+                              {inq.deposit_paid_at&&(
+                                <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full flex items-center gap-1"
+                                      style={{background:"rgba(16,185,129,0.12)",color:"#059669"}}>
+                                  💳 Paid {new Date(inq.deposit_paid_at).toLocaleDateString("en-US",{month:"short",day:"numeric"})}
+                                  {inq.confirmation_sent_at?(
+                                    <span style={{color:"#059669"}}>· ✉ Confirmed</span>
+                                  ):(
+                                    <span style={{color:"#d97706"}}>· ✉ Not confirmed</span>
+                                  )}
+                                </span>
+                              )}
+                              {inq.gallery_delivered_at&&(
+                                <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full"
+                                      style={{background:"rgba(251,146,60,0.12)",color:"#ea580c"}}>
+                                  🖼 Gallery {new Date(inq.gallery_delivered_at).toLocaleDateString("en-US",{month:"short",day:"numeric"})}
+                                </span>
+                              )}
+                            </div>
+                          )}
                           {/* Message preview */}
                           {!isOpen?(
                             <div>
@@ -2914,10 +2958,21 @@ function AdminDashboard() {
             return future.length?Math.min(...future):Infinity;
           };
           const latestInquiryDate=(sessions:Inquiry[])=>Math.max(...sessions.map(s=>new Date(s.created_at).getTime()));
+          const latestDepositDate=(sessions:Inquiry[])=>{
+            const paid=sessions.filter(s=>s.payment_status==="paid");
+            if(!paid.length)return 0;
+            return Math.max(...paid.map(s=>s.deposit_paid_at?new Date(s.deposit_paid_at).getTime():s.payment_detected_at?new Date(s.payment_detected_at).getTime():new Date(s.created_at).getTime()));
+          };
           const clients=Array.from(clientMap.values()).sort((a,b)=>{
             if(clientSort==="alpha")return a.name.localeCompare(b.name);
             if(clientSort==="newest_inquiry")return latestInquiryDate(b.sessions)-latestInquiryDate(a.sessions);
             if(clientSort==="oldest_inquiry")return latestInquiryDate(a.sessions)-latestInquiryDate(b.sessions);
+            if(clientSort==="paid_recently"){
+              const aPaid=a.sessions.some(s=>s.payment_status==="paid");
+              const bPaid=b.sessions.some(s=>s.payment_status==="paid");
+              if(aPaid!==bPaid)return aPaid?-1:1;
+              return latestDepositDate(b.sessions)-latestDepositDate(a.sessions);
+            }
             // session_date: upcoming first, then no-date clients at end
             return nearestSessionDate(a.sessions)-nearestSessionDate(b.sessions);
           });
@@ -3006,6 +3061,7 @@ function AdminDashboard() {
                         onChange={e=>setClientSort(e.target.value as typeof clientSort)}
                         className="text-[11px] font-bold px-2.5 py-1 rounded-lg outline-none cursor-pointer"
                         style={{border:`1px solid ${C.p1_20}`,background:C.p1_04,color:C.p1,fontFamily:"inherit"}}>
+                        <option value="paid_recently">Paid recently</option>
                         <option value="newest_inquiry">Newest inquiry</option>
                         <option value="oldest_inquiry">Oldest inquiry</option>
                         <option value="session_date">Session date</option>
@@ -3152,6 +3208,14 @@ function AdminDashboard() {
                                       {s.session_date&&<span className="text-xs font-bold text-emerald-600">{new Date(s.session_date+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}</span>}
                                     </div>
                                     <p className="text-[11px] text-slate-400 mt-0.5 truncate">{s.message.slice(0,80)}{s.message.length>80?"…":""}</p>
+                                    {(s.deposit_paid_at||s.invoice_sent_at||s.contract_sent_at||s.confirmation_sent_at||s.gallery_delivered_at)&&(
+                                      <div className="flex flex-wrap gap-1 mt-1">
+                                        {s.invoice_sent_at&&<span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full" style={{background:"rgba(99,102,241,0.1)",color:"#6366f1"}}>📄 Invoice {new Date(s.invoice_sent_at).toLocaleDateString("en-US",{month:"short",day:"numeric"})}</span>}
+                                        {s.contract_sent_at&&<span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full" style={{background:"rgba(139,92,246,0.1)",color:"#7c3aed"}}>📝 Contract {new Date(s.contract_sent_at).toLocaleDateString("en-US",{month:"short",day:"numeric"})}</span>}
+                                        {s.deposit_paid_at&&<span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full inline-flex items-center gap-1" style={{background:"rgba(16,185,129,0.12)",color:"#059669"}}>💳 Paid {new Date(s.deposit_paid_at).toLocaleDateString("en-US",{month:"short",day:"numeric"})}{s.confirmation_sent_at?<span style={{color:"#059669"}}>· ✉ Confirmed</span>:<span style={{color:"#d97706"}}>· ✉ Not confirmed</span>}</span>}
+                                        {s.gallery_delivered_at&&<span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full" style={{background:"rgba(251,146,60,0.12)",color:"#ea580c"}}>🖼 Gallery {new Date(s.gallery_delivered_at).toLocaleDateString("en-US",{month:"short",day:"numeric"})}</span>}
+                                      </div>
+                                    )}
                                   </div>
                                   <div className="flex items-center gap-2 flex-shrink-0">
                                     {/* Payment badge */}

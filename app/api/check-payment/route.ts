@@ -158,15 +158,17 @@ Respond with ONLY valid JSON (no markdown, no explanation):
 
   // ── 5. Update inquiry in database ─────────────────────────────────────────
   const supabase = createSupabaseServerClient();
-  const paymentNote = [result.note, result.amount, result.method]
+  const paymentNote = [result.note, result.amount, result.method && `via ${result.method}`]
     .filter(Boolean)
     .join(" · ");
 
   if (result.paid) {
+    const now = new Date().toISOString();
     await supabase.from("inquiries").update({
       payment_status:      "paid",
       payment_note:        paymentNote,
-      payment_detected_at: new Date().toISOString(),
+      payment_detected_at: now,
+      deposit_paid_at:     now,
       booking_confirmed:   true,
       ...(session_date ? { session_date } : {}),
     }).eq("id", inquiry_id);
