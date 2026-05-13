@@ -10,11 +10,14 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
+import Anthropic from "@anthropic-ai/sdk";
 import { getValidTokens } from "@/lib/gmailTokens";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { requireAdmin } from "@/lib/requireAdmin";
 
 export const dynamic = "force-dynamic";
+
+const CHRIS_PHONE = "(408) 722-7680";
 
 function escapeHtml(v: string) {
   return v
@@ -35,18 +38,141 @@ function parseNote(note: string | null) {
   return { amount, method, invoice };
 }
 
+// ── Gmail email body helpers ──────────────────────────────────────────────────
+
+type MimePart = { mimeType?: string; body?: { data?: string }; parts?: MimePart[] };
+
+function decodeBody(data: string): string {
+  try {
+    const base64 = data.replace(/-/g, "+").replace(/_/g, "/");
+    const padded  = base64.padEnd(base64.length + (4 - (base64.length % 4)) % 4, "=");
+    return decodeURIComponent(
+      Array.from(atob(padded))
+        .map(c => "%" + c.charCodeAt(0).toString(16).padStart(2, "0"))
+        .join("")
+    );
+  } catch { return ""; }
+}
+
+function stripHtml(html: string): string {
+  return html
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ").replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"')
+    .replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+function extractBestText(part: MimePart): string {
+  let plain = ""; let html = "";
+  function walk(p: MimePart) {
+    if (p.mimeType === "text/plain" && p.body?.data && !plain)
+      plain = decodeBody(p.body.data);
+    else if (p.mimeType === "text/html" && p.body?.data && !html)
+      html = decodeBody(p.body.data);
+    (p.parts ?? []).forEach(walk);
+  }
+  walk(part);
+  return plain || stripHtml(html);
+}
+
+function extractJson(raw: string): string {
+  return raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+}
+
+/** Scan the Gmail thread and return the single most-recently-agreed date.
+ *  Returns a formatted readable string like "Friday, June 20, 2026", or null. */
+async function detectConfirmedDate(
+  email: string,
+  dateInMind: string | null,
+  sessionDate: string | null,
+): Promise<string | null> {
+  // If there's already a confirmed session_date set, format and use it
+  if (sessionDate) {
+    return new Date(sessionDate + "T12:00:00").toLocaleDateString("en-US", {
+      weekday: "long", month: "long", day: "numeric", year: "numeric",
+    });
+  }
+
+  const tokens = await getValidTokens();
+  if (!tokens) return dateInMind ?? null;
+
+  const auth = `Bearer ${tokens.access_token}`;
+  const searchRes = await fetch(
+    `https://gmail.googleapis.com/gmail/v1/users/me/messages` +
+    `?q=${encodeURIComponent(`from:${email} OR to:${email}`)}&maxResults=20`,
+    { headers: { Authorization: auth } }
+  );
+  if (!searchRes.ok) return dateInMind ?? null;
+
+  const searchData = await searchRes.json() as { messages?: { id: string }[] };
+  const ids = (searchData.messages ?? []).map(m => m.id).slice(0, 15);
+  if (!ids.length) return dateInMind ?? null;
+
+  const bodies = await Promise.all(ids.map(async id => {
+    try {
+      const r = await fetch(
+        `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=full`,
+        { headers: { Authorization: auth } }
+      );
+      if (!r.ok) return "";
+      const msg = await r.json() as { payload?: MimePart; snippet?: string };
+      const text = extractBestText(msg.payload ?? {});
+      return (text || msg.snippet || "").slice(0, 2000);
+    } catch { return ""; }
+  }));
+
+  const emailContext = bodies
+    .filter(Boolean)
+    .map((b, i) => `--- Email ${i + 1} ---\n${b}`)
+    .join("\n\n");
+
+  if (!emailContext) return dateInMind ?? null;
+
+  const today = new Date().toISOString().split("T")[0];
+  const currentYear = new Date().getFullYear();
+  const anthropic = new Anthropic();
+
+  const res = await anthropic.messages.create({
+    model:      "claude-haiku-4-5-20251001",
+    max_tokens: 150,
+    system: `You extract the single confirmed photography session date from an email thread. Today is ${today}. Current year is ${currentYear}.
+
+Rules:
+- Find the ONE date that was most recently agreed upon between the photographer and client
+- Prefer dates with confirmation language: "works", "perfect", "see you then", "confirmed", "sounds good", "can't wait"
+- A date proposed + positive reply = confirmed
+- If multiple dates were discussed, return only the final agreed one
+- If only month+day is given, use ${currentYear}. Use ${currentYear + 1} only if the date has already passed.
+- Return ONLY valid JSON, no markdown: {"date":"YYYY-MM-DD","readable":"Friday, June 20, 2026"}
+- If no date found: {"date":null,"readable":null}`,
+    messages: [{
+      role: "user",
+      content: `Client's original date request: ${dateInMind ?? "not specified"}\n\nEmail thread:\n${emailContext}`,
+    }],
+  });
+
+  try {
+    const raw = res.content[0].type === "text" ? res.content[0].text : "{}";
+    const result = JSON.parse(extractJson(raw)) as { date: string | null; readable: string | null };
+    if (result.readable) return result.readable;
+  } catch { /* fall through */ }
+
+  return dateInMind ?? null;
+}
+
 function buildHtml(opts: {
   name: string;
   sessionType: string | null;
-  dateInMind: string | null;
-  sessionDate: string | null;
+  confirmedDateLabel: string | null;
   amount: string;
   method: string;
   invoice: string;
   guideUrl: string;
   customMessage?: string;
 }) {
-  const { name, sessionType, dateInMind, sessionDate, amount, method, invoice, guideUrl, customMessage } = opts;
+  const { name, sessionType, confirmedDateLabel, amount, method, invoice, guideUrl, customMessage } = opts;
   const safeName    = escapeHtml(name);
   const safeGuide   = escapeHtml(guideUrl);
 
@@ -57,14 +183,10 @@ function buildHtml(opts: {
        </tr>`
     : "";
 
-  const confirmedDate = sessionDate
-    ? new Date(sessionDate + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })
-    : null;
-
-  const dateRow = (confirmedDate || dateInMind)
+  const dateRow = confirmedDateLabel
     ? `<tr style="border-bottom:1px solid rgba(17,21,19,0.09);">
          <td style="padding:13px 0;color:#6a716f;width:140px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Date</td>
-         <td style="padding:13px 0;color:#1b201f;font-size:15px;font-weight:${confirmedDate ? "700" : "400"};">${escapeHtml(confirmedDate ?? dateInMind ?? "")}</td>
+         <td style="padding:13px 0;color:#1b201f;font-size:15px;font-weight:700;">${escapeHtml(confirmedDateLabel)}</td>
        </tr>`
     : "";
 
@@ -142,13 +264,14 @@ function buildHtml(opts: {
 
   <!-- Sign-off -->
   <p style="font-size:15px;line-height:1.75;color:#303635;margin:0 0 28px;">
-    If you have any questions before shoot day, just reply to this email — I'm always happy to help. See you soon!
+    If you need to reach me before shoot day, feel free to text or call: <strong style="color:#111513;">${CHRIS_PHONE}</strong>. Otherwise just reply to this email — I'm always happy to help. See you soon!
   </p>
 
   <!-- Footer -->
   <p style="font-size:13px;line-height:1.6;color:#6a716f;border-top:1px solid rgba(17,21,19,0.1);padding-top:20px;margin:0;">
     <strong style="color:#111513;">Chris · soloxsnaps</strong><br>
     <a href="https://soloxsnaps.com" style="color:#6a716f;text-decoration:none;">soloxsnaps.com</a>
+    &nbsp;·&nbsp; ${CHRIS_PHONE}
   </p>
 
 </div>
@@ -223,11 +346,17 @@ export async function POST(req: NextRequest) {
 
   const { amount, method, invoice } = parseNote(inq.payment_note);
 
+  // Use AI to pick the single confirmed date from the email thread
+  const confirmedDateLabel = await detectConfirmedDate(
+    inq.email,
+    inq.date_in_mind,
+    inq.session_date,
+  );
+
   const html = buildHtml({
-    name:          inq.name,
-    sessionType:   inq.session_type,
-    dateInMind:    inq.date_in_mind,
-    sessionDate:   inq.session_date,
+    name:               inq.name,
+    sessionType:        inq.session_type,
+    confirmedDateLabel,
     amount, method, invoice,
     guideUrl,
     customMessage: custom_message,

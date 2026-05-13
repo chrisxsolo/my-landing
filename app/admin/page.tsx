@@ -257,6 +257,11 @@ function AdminDashboard() {
   const [postDeleteConfirm,setPostDeleteConfirm]=useState<number|null>(null);
   const coverFileRef=useRef<HTMLInputElement>(null);
   const extraFileRef=useRef<HTMLInputElement>(null);
+  const aiDropRef=useRef<HTMLInputElement>(null);
+  const [aiDropFiles,setAiDropFiles]=useState<File[]>([]);
+  const [aiDropPreviews,setAiDropPreviews]=useState<string[]>([]);
+  const [aiDropDragging,setAiDropDragging]=useState(false);
+  const [aiGenerating,setAiGenerating]=useState(false);
 
   // ── Clients ───────────────────────────────────────────────────────────────
   const [clientSearch,setClientSearch]=useState("");
@@ -1060,7 +1065,34 @@ function AdminDashboard() {
     setEditingPost(post);setPostForm({title:post.title,body:post.body,slug:post.slug,category:primaryCat,sites,published_at:post.published_at.slice(0,16)});
     setBlogCategory(primaryCat);setCoverImg(null);setCoverImgPreview(post.cover_image_url||null);setExtraImgs([]);setExtraPreviews(post.extra_image_urls??[]);window.scrollTo({top:0,behavior:"smooth"});
   }
-  function cancelEditPost(){setEditingPost(null);setPostForm({...EMPTY_POST,category:blogCategory,sites:[blogCategory]});setCoverImg(null);setCoverImgPreview(null);setExtraImgs([]);setExtraPreviews([]);setJournalDraft("");if(coverFileRef.current)coverFileRef.current.value="";if(extraFileRef.current)extraFileRef.current.value="";}
+  function cancelEditPost(){setEditingPost(null);setPostForm({...EMPTY_POST,category:blogCategory,sites:[blogCategory]});setCoverImg(null);setCoverImgPreview(null);setExtraImgs([]);setExtraPreviews([]);setJournalDraft("");setAiDropFiles([]);setAiDropPreviews([]);if(coverFileRef.current)coverFileRef.current.value="";if(extraFileRef.current)extraFileRef.current.value="";}
+
+  function onAiDropFiles(incoming:File[]){
+    const valid=incoming.filter(f=>f.type.startsWith("image/"));
+    if(!valid.length)return;
+    setAiDropFiles(prev=>[...prev,...valid].slice(0,30));
+    setAiDropPreviews(prev=>[...prev,...valid.map(f=>URL.createObjectURL(f))].slice(0,30));
+  }
+  function removeAiDropFile(i:number){setAiDropFiles(p=>p.filter((_,j)=>j!==i));setAiDropPreviews(p=>p.filter((_,j)=>j!==i));}
+
+  async function generateBlogFromPhotos(){
+    if(aiDropFiles.length<1){showToast("Drop at least 1 photo",false);return;}
+    setAiGenerating(true);
+    try{
+      const fd=new FormData();
+      aiDropFiles.forEach(f=>fd.append("images",f));
+      fd.append("sites",(postForm.sites??[blogCategory]).join(","));
+      const res=await fetch("/api/ai-blog-from-photos",{method:"POST",body:fd});
+      const json=await res.json();
+      if(!res.ok){showToast(json.error||"AI generation failed",false);return;}
+      showToast(`Published: "${json.title}" — ${json.photo_count} photos`);
+      setAiDropFiles([]);setAiDropPreviews([]);fetchPosts();
+    }catch(err){
+      console.error("[ai-blog]",err);
+      showToast("AI generation failed",false);
+    }finally{setAiGenerating(false);}
+  }
+
   function onCoverImg(e:React.ChangeEvent<HTMLInputElement>){const f=e.target.files?.[0];if(!f)return;setCoverImg(f);setCoverImgPreview(URL.createObjectURL(f));}
   function onExtraImgs(e:React.ChangeEvent<HTMLInputElement>){const files=Array.from(e.target.files??[]);if(!files.length)return;setExtraImgs(prev=>[...prev,...files]);setExtraPreviews(prev=>[...prev,...files.map(f=>URL.createObjectURL(f))]);}
   function removeExtraPreview(i:number){setExtraPreviews(p=>p.filter((_,j)=>j!==i));setExtraImgs(p=>p.filter((_,j)=>j!==i));}
@@ -2195,6 +2227,77 @@ function AdminDashboard() {
                   {(postForm.sites??[]).length===0&&<p className="text-xs font-bold mt-1.5" style={{color:"#be123c"}}>Select at least one site.</p>}
                 </div>
 
+                {/* ── AI Photo Drop ─────────────────────────────────── */}
+                <div className="mb-5 rounded-xl p-4" style={{background:"#f0fdf4",border:`1.5px dashed #22c55e`}}>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="text-base">✨</span>
+                    <label className="block text-xs font-bold uppercase tracking-widest" style={{color:"#16a34a"}}>AI: Drop Photos → Auto-Post</label>
+                  </div>
+                  <p className="text-xs text-slate-400 mb-3">Drop 10–30 photos. Claude picks the best 10, writes the post, and publishes it instantly.</p>
+
+                  {/* Drop zone */}
+                  <div
+                    className="w-full rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-2 cursor-pointer transition-all"
+                    style={{
+                      minHeight:"100px",
+                      borderColor:aiDropDragging?"#16a34a":"#86efac",
+                      background:aiDropDragging?"#dcfce7":"#f0fdf4",
+                    }}
+                    onClick={()=>aiDropRef.current?.click()}
+                    onDragOver={e=>{e.preventDefault();setAiDropDragging(true);}}
+                    onDragLeave={()=>setAiDropDragging(false)}
+                    onDrop={e=>{e.preventDefault();setAiDropDragging(false);onAiDropFiles(Array.from(e.dataTransfer.files));}}
+                  >
+                    {aiDropFiles.length===0?(
+                      <>
+                        <span className="text-2xl">📷</span>
+                        <span className="text-xs font-bold" style={{color:"#16a34a"}}>Drop photos here or tap to select</span>
+                        <span className="text-xs text-slate-400">Up to 30 photos · JPG, PNG, HEIC</span>
+                      </>
+                    ):(
+                      <div className="w-full p-2">
+                        <div className="grid grid-cols-5 gap-1.5 mb-2">
+                          {aiDropPreviews.map((url,i)=>(
+                            <div key={i} className="relative aspect-square rounded-lg overflow-hidden">
+                              <img src={url} className="w-full h-full object-cover"/>
+                              <button
+                                onClick={e=>{e.stopPropagation();removeAiDropFile(i);}}
+                                className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-black/60 text-white text-[9px] font-bold flex items-center justify-center"
+                              >✕</button>
+                            </div>
+                          ))}
+                          <div
+                            className="aspect-square rounded-lg border border-dashed flex items-center justify-center"
+                            style={{borderColor:"#86efac",background:"#dcfce7"}}
+                          >
+                            <span className="text-lg text-green-400">+</span>
+                          </div>
+                        </div>
+                        <p className="text-xs font-bold text-center" style={{color:"#16a34a"}}>{aiDropFiles.length} photo{aiDropFiles.length!==1?"s":""} selected — Claude picks the best 10</p>
+                      </div>
+                    )}
+                  </div>
+                  <input ref={aiDropRef} type="file" accept="image/*" multiple className="hidden" onChange={e=>onAiDropFiles(Array.from(e.target.files??[]))}/>
+
+                  {aiDropFiles.length>0&&(
+                    <div className="flex gap-2 mt-3">
+                      <button
+                        onClick={generateBlogFromPhotos}
+                        disabled={aiGenerating}
+                        className="flex-1 py-2.5 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90 active:scale-95"
+                        style={{background:aiGenerating?"#86efac":"#16a34a",opacity:aiGenerating?0.8:1}}
+                      >
+                        {aiGenerating?"✨ Analyzing & Publishing…":"✨ Generate & Publish with AI"}
+                      </button>
+                      <button
+                        onClick={()=>{setAiDropFiles([]);setAiDropPreviews([]);}}
+                        disabled={aiGenerating}
+                        className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-400 bg-slate-100 hover:bg-slate-200 transition-colors"
+                      >Clear</button>
+                    </div>
+                  )}
+                </div>
+
                 {/* Journal paste box */}
                 <div className="mb-4 rounded-xl p-4" style={{background:C.p1_04,border:`1.5px dashed ${C.p1_20}`}}>
                   <label className="block text-xs font-bold uppercase tracking-widest mb-1.5" style={{color:C.p1}}>Paste Journal Entry</label>
@@ -2524,8 +2627,8 @@ function AdminDashboard() {
                     const aPaid=a.payment_status==="paid";
                     const bPaid=b.payment_status==="paid";
                     if(aPaid!==bPaid)return aPaid?-1:1;
-                    const aP=a.deposit_paid_at?new Date(a.deposit_paid_at).getTime():a.payment_detected_at?new Date(a.payment_detected_at).getTime():new Date(a.created_at).getTime();
-                    const bP=b.deposit_paid_at?new Date(b.deposit_paid_at).getTime():b.payment_detected_at?new Date(b.payment_detected_at).getTime():new Date(b.created_at).getTime();
+                    const aP=a.deposit_paid_at?new Date(a.deposit_paid_at).getTime():a.payment_detected_at?new Date(a.payment_detected_at).getTime():0;
+                    const bP=b.deposit_paid_at?new Date(b.deposit_paid_at).getTime():b.payment_detected_at?new Date(b.payment_detected_at).getTime():0;
                     return bP-aP;
                   }
                   if(inquirySort==="newest")return new Date(b.created_at).getTime()-new Date(a.created_at).getTime();
@@ -2971,7 +3074,7 @@ function AdminDashboard() {
           const latestDepositDate=(sessions:Inquiry[])=>{
             const paid=sessions.filter(s=>s.payment_status==="paid");
             if(!paid.length)return 0;
-            return Math.max(...paid.map(s=>s.deposit_paid_at?new Date(s.deposit_paid_at).getTime():s.payment_detected_at?new Date(s.payment_detected_at).getTime():new Date(s.created_at).getTime()));
+            return Math.max(...paid.map(s=>s.deposit_paid_at?new Date(s.deposit_paid_at).getTime():s.payment_detected_at?new Date(s.payment_detected_at).getTime():0));
           };
           const clients=Array.from(clientMap.values()).sort((a,b)=>{
             if(clientSort==="alpha")return a.name.localeCompare(b.name);
@@ -3166,7 +3269,7 @@ function AdminDashboard() {
                           <div className="flex items-start justify-between gap-3 flex-wrap mb-4">
                             <div>
                               <div className="flex items-center gap-2 flex-wrap">
-                                <p className="text-base font-black text-slate-900 cursor-pointer select-none hover:opacity-70 transition-opacity" title="Click to copy name" onClick={()=>navigator.clipboard.writeText(client.name).then(()=>showToast("Name copied ✓"))}>{client.name}</p>
+                                <button className="text-base font-black text-slate-900 cursor-pointer select-none hover:opacity-70 transition-opacity text-left" title="View client profile" onClick={()=>{const latest=client.sessions.slice().sort((a,b)=>new Date(b.created_at).getTime()-new Date(a.created_at).getTime())[0];if(latest)router.push(`/admin/conversation/${latest.id}`)}}>{client.name}</button>
                                 {paid&&(
                                   <span className="text-[10px] font-black px-2 py-0.5 rounded-lg"
                                         style={{background:"rgba(16,185,129,0.12)",color:"#059669"}}>
