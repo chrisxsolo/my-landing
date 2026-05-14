@@ -229,10 +229,21 @@ export async function POST(req: NextRequest) {
       : [];
 
     if (!matching.length && clientName) {
-      const firstName = clientName.split(" ")[0];
+      const nameParts = clientName.split(" ");
+      const firstName = nameParts[0];
+      const lastName  = nameParts[nameParts.length - 1];
+      const hasLastName = nameParts.length >= 2;
       matching = inquiries.filter(inq => {
         const n = inq.name?.toLowerCase().trim() ?? "";
-        return n === clientName || n.startsWith(firstName + " ") || n.endsWith(" " + firstName);
+        if (n === clientName) return true;
+        // Require both first AND last name when available — first name alone causes false matches
+        if (hasLastName) {
+          const nParts = n.split(" ");
+          const nFirst = nParts[0];
+          const nLast  = nParts[nParts.length - 1];
+          return nFirst === firstName && nLast === lastName;
+        }
+        return n === firstName;
       });
     }
 
@@ -288,13 +299,11 @@ export async function POST(req: NextRequest) {
     await Promise.all(batch.map(async inq => {
       if (markedPaid.has(inq.id)) return;
 
-      const firstName = (inq.name ?? "").split(" ")[0];
-
-      // Search Gmail for any email to/from this client OR mentioning payment + their name
+      // Search Gmail for any email to/from this client OR mentioning payment + their full name
       const [threadIds, paymentMentionIds] = await Promise.all([
         searchMessageIds(`from:${inq.email} OR to:${inq.email}`, auth, 10),
         searchMessageIds(
-          `("${firstName}" OR "${inq.name}") (paid OR payment OR deposit OR venmo OR zelle OR "cash app" OR sent)`,
+          `"${inq.name}" (paid OR payment OR deposit OR venmo OR zelle OR "cash app" OR sent)`,
           auth, 5
         ),
       ]);

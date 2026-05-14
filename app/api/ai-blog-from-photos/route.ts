@@ -22,8 +22,6 @@ import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { buildJournalImageLibraryRows } from "@/lib/imageLibraryShared";
 
 export const dynamic = "force-dynamic";
-
-// Raise the body size limit for image uploads
 export const maxDuration = 60;
 
 function slugify(s: string) {
@@ -237,17 +235,26 @@ Output ONLY the JSON object — no markdown, no preamble.`,
     return data.publicUrl;
   }
 
-  const uploadResults = await Promise.all(
-    selectedFiles.map((file, i) => uploadToStorage(file, i))
-  );
+  // Upload AI-selected images first (they become the post cover + gallery),
+  // then upload the remaining user-selected images so they all land in the library.
+  const remainingFiles = files.filter((_, i) => !selectedIndices.includes(i));
 
-  const successUrls = uploadResults.filter((u): u is string => u !== null);
+  const [selectedUploadResults, remainingUploadResults] = await Promise.all([
+    Promise.all(selectedFiles.map((file, i) => uploadToStorage(file, i))),
+    Promise.all(remainingFiles.map((file, i) => uploadToStorage(file, selectedFiles.length + i))),
+  ]);
+
+  const successUrls = selectedUploadResults.filter((u): u is string => u !== null);
   if (successUrls.length === 0) {
     return NextResponse.json({ error: "All image uploads failed" }, { status: 500 });
   }
 
   const cover_image_url = successUrls[0];
   const extra_image_urls = successUrls.slice(1);
+  const allUploadedUrls = [
+    ...successUrls,
+    ...remainingUploadResults.filter((u): u is string => u !== null),
+  ];
 
   // ── Step 4: Insert blog post ──────────────────────────────────────────────
   const slug = slugify(copy.title);
@@ -276,14 +283,16 @@ Output ONLY the JSON object — no markdown, no preamble.`,
     );
   }
 
-  // ── Step 5: Sync to image library ────────────────────────────────────────
+  // ── Step 5: Sync ALL uploaded photos to image library ────────────────────
+  // cover + AI-gallery go in as cover/gallery roles; remaining user-selected
+  // photos go in as gallery too so they're all available in the library.
   try {
     const rows = buildJournalImageLibraryRows({
       postId: inserted.id,
       postSlug: slug,
       postTitle: copy.title,
       coverImageUrl: cover_image_url,
-      extraImageUrls: extra_image_urls,
+      extraImageUrls: allUploadedUrls.slice(1), // everything except the cover
     });
     if (rows.length) {
       await supabase
@@ -299,6 +308,6 @@ Output ONLY the JSON object — no markdown, no preamble.`,
     slug,
     title: copy.title,
     cover_image_url,
-    photo_count: successUrls.length,
+    photo_count: allUploadedUrls.length,
   });
 }

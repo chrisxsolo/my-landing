@@ -876,7 +876,8 @@ function AdminDashboard() {
   }
   
   useEffect(()=>{if(authed){fetchPoses();fetchSpots();fetchCategories();fetchPortfolioImages();fetchLibraryImages();fetchPosts();fetchSiteSettings();fetchInquiries();fetchPortalSessions();fetchGmailStatus();fetchInbox();fetchBlockedSenders();}},[authed]);
-  useEffect(()=>{if(authed&&(tab==="inquiries"||tab==="clients")){fetchInquiries();fetchPortalSessions();fetchGmailStatus();fetchBlockedSenders();}},[authed,tab,blogCategory]);
+  useEffect(()=>{if(authed)fetchPosts();},[authed,blogCategory]);
+  useEffect(()=>{if(authed&&(tab==="inquiries"||tab==="clients")){fetchInquiries();fetchPortalSessions();fetchGmailStatus();fetchBlockedSenders();}},[authed,tab]);
 
   async function compressImage(file:File, maxPx=2400, quality=0.82):Promise<Blob>{
     return new Promise(resolve=>{
@@ -1079,14 +1080,20 @@ function AdminDashboard() {
     if(aiDropFiles.length<1){showToast("Drop at least 1 photo",false);return;}
     setAiGenerating(true);
     try{
+      // Compress to ≤1600px before uploading to stay under Vercel's 4.5MB body limit
+      const compressedBlobs=await Promise.all(aiDropFiles.map(f=>compressImage(f,1600)));
       const fd=new FormData();
-      aiDropFiles.forEach(f=>fd.append("images",f));
-      fd.append("sites",(postForm.sites??[blogCategory]).join(","));
+      compressedBlobs.forEach((blob,i)=>{
+        const name=aiDropFiles[i].name.replace(/\.[^.]+$/,".jpg");
+        fd.append("images",new File([blob],name,{type:"image/jpeg"}));
+      });
+      // AI-generated posts go to professional by default; user can edit after
+      fd.append("sites","professional");
       const res=await fetch("/api/ai-blog-from-photos",{method:"POST",body:fd});
       const json=await res.json();
       if(!res.ok){showToast(json.error||"AI generation failed",false);return;}
       showToast(`Published: "${json.title}" — ${json.photo_count} photos`);
-      setAiDropFiles([]);setAiDropPreviews([]);fetchPosts();
+      setAiDropFiles([]);setAiDropPreviews([]);setBlogCategory("professional");fetchPosts();
     }catch(err){
       console.error("[ai-blog]",err);
       showToast("AI generation failed",false);
@@ -2651,7 +2658,7 @@ function AdminDashboard() {
                   return(
                     <div key={inq.id}
                          className={`rounded-2xl overflow-hidden transition-shadow hover:shadow-md ${unreadThread?"border-2 shadow-md shadow-amber-100":"bg-white border border-slate-100"}`}
-                         style={{borderLeft:unreadThread?undefined:`3px solid ${statusColor}`,background:unreadThread?"#fffbeb":undefined,borderColor:unreadThread?"#f59e0b":undefined}}>
+                         style={unreadThread?{background:"#fffbeb"}:{borderLeftWidth:"3px",borderLeftStyle:"solid",borderLeftColor:statusColor,background:"#fff"}}>
 
                       {/* ── Card header (always visible) ── */}
                       <div className="flex items-stretch">
@@ -2759,6 +2766,19 @@ function AdminDashboard() {
                           ):(
                             <p className="text-[10px] font-bold" style={{color:C.p1}}>▲ Collapse</p>
                           )}
+                          {/* Quick status buttons — always visible */}
+                          <div className="flex items-center gap-1 mt-2 flex-wrap" onClick={e=>e.stopPropagation()}>
+                            {(["new","responded","archived","not_interested"] as const).map(s=>(
+                              <button key={s}
+                                onClick={()=>updateInquiryStatus(inq.id,s)}
+                                className="text-[10px] font-bold px-2 py-0.5 rounded-lg transition-all hover:opacity-80"
+                                style={inq.status===s
+                                  ?{background:s==="new"?"rgba(16,185,129,0.15)":s==="responded"?"rgba(59,130,246,0.12)":s==="not_interested"?"rgba(239,68,68,0.15)":"rgba(148,163,184,0.15)",color:s==="new"?"#10b981":s==="responded"?"#3b82f6":s==="not_interested"?"#ef4444":"#94a3b8",fontWeight:800}
+                                  :{background:"rgba(0,0,0,0.04)",color:"#94a3b8"}}>
+                                {s==="new"?"● New":s==="responded"?"✓ Replied":s==="not_interested"?"✕ Not Int.":"○ Archive"}
+                              </button>
+                            ))}
+                          </div>
                         </div>
 
                         {/* Right: action buttons */}
@@ -3343,17 +3363,31 @@ function AdminDashboard() {
                                             :{background:"rgba(148,163,184,0.12)",color:"#94a3b8"}}>
                                       {s.payment_status==="paid"?"Paid":"Unpaid"}
                                     </span>
-                                    {/* Status badge */}
-                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg"
-                                          style={s.status==="new"
-                                            ?{background:"rgba(16,185,129,0.1)",color:"#10b981"}
-                                            :s.status==="responded"
-                                              ?{background:"rgba(59,130,246,0.1)",color:"#3b82f6"}
-                                              :s.status==="not_interested"
-                                                ?{background:"rgba(239,68,68,0.1)",color:"#ef4444"}
-                                                :{background:"rgba(148,163,184,0.1)",color:"#94a3b8"}}>
-                                      {s.status==="not_interested"?"✕ Not Interested":s.status}
-                                    </span>
+                                    {/* Status picker */}
+                                    <div className="relative group">
+                                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg cursor-pointer hover:opacity-80 transition-opacity"
+                                            style={s.status==="new"
+                                              ?{background:"rgba(16,185,129,0.1)",color:"#10b981"}
+                                              :s.status==="responded"
+                                                ?{background:"rgba(59,130,246,0.1)",color:"#3b82f6"}
+                                                :s.status==="not_interested"
+                                                  ?{background:"rgba(239,68,68,0.1)",color:"#ef4444"}
+                                                  :{background:"rgba(148,163,184,0.1)",color:"#94a3b8"}}>
+                                        {s.status==="new"?"● New":s.status==="responded"?"✓ Replied":s.status==="not_interested"?"✕ Not Int.":"○ Archive"} ▾
+                                      </span>
+                                      <div className="absolute right-0 top-full mt-1 z-20 hidden group-hover:flex flex-col gap-0.5 bg-white rounded-xl shadow-lg border border-slate-100 p-1.5 min-w-[120px]">
+                                        {(["new","responded","archived","not_interested"] as const).map(st=>(
+                                          <button key={st}
+                                            onClick={e=>{e.stopPropagation();updateInquiryStatus(s.id,st);}}
+                                            className="text-left text-[11px] font-bold px-2.5 py-1 rounded-lg transition-all hover:opacity-80"
+                                            style={s.status===st
+                                              ?{background:st==="new"?"rgba(16,185,129,0.15)":st==="responded"?"rgba(59,130,246,0.12)":st==="not_interested"?"rgba(239,68,68,0.15)":"rgba(148,163,184,0.15)",color:st==="new"?"#10b981":st==="responded"?"#3b82f6":st==="not_interested"?"#ef4444":"#94a3b8"}
+                                              :{background:"transparent",color:"#64748b"}}>
+                                            {st==="new"?"● New":st==="responded"?"✓ Replied":st==="not_interested"?"✕ Not Interested":"○ Archive"}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
                                     <a href={`/admin/conversation/${s.id}`}
                                        className="text-[11px] font-black px-2.5 py-1 rounded-lg transition-all hover:opacity-80"
                                        style={{background:C.grad12,color:"#fff"}}>
