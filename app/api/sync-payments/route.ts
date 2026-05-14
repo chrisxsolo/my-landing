@@ -1,14 +1,20 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/sync-payments
 //
-// Two-pass payment sync with full Gmail access:
+// Three-pass payment sync with full Gmail access:
 //
 // Pass 1 — Known payment senders: Searches Pixieset, Venmo, Zelle, PayPal,
 //           Cash App notification emails and extracts client info via Claude.
+//           Records EVERY payment (deposit 1, deposit 2, etc.) in `payments`.
+//           Orphan contacts (no matching inquiry) also get a payment row.
 //
 // Pass 2 — Per-client sweep: For every unpaid inquiry, searches ALL of Gmail
 //           for emails to/from that client and asks Claude if any contains
 //           payment evidence. Catches anything Pass 1 misses.
+//
+// Pass 3 — Orphan sweep: Re-scans Pass 1 emails for payers not matched to any
+//           inquiry and inserts them as orphan payment rows with whatever name/
+//           email/info Claude can extract.
 //
 // Returns: { synced: [...], total: number }
 // ─────────────────────────────────────────────────────────────────────────────
@@ -63,11 +69,12 @@ function stripHtml(html: string): string {
 }
 
 type PaymentInfo = {
-  clientEmail: string;
-  clientName:  string;
-  amount:      string;
-  method:      string;
-  invoice:     string;
+  clientEmail:  string;
+  clientName:   string;
+  amount:       string;
+  method:       string;
+  invoice:      string;
+  paymentType:  string; // "deposit_1" | "deposit_2" | "full" | "other"
 };
 
 async function searchMessageIds(query: string, auth: string, maxResults: number): Promise<string[]> {
@@ -96,27 +103,29 @@ async function fetchMessageContent(id: string, auth: string): Promise<string> {
   } catch { return ""; }
 }
 
-// Pass 1: extract structured payment info from a known payment notification email
+// Pass 1 / Pass 3: extract structured payment info from a known payment notification email
 async function extractPaymentFromNotification(content: string, anthropic: Anthropic): Promise<PaymentInfo | null> {
   try {
     const res = await anthropic.messages.create({
       model:      "claude-haiku-4-5-20251001",
-      max_tokens: 200,
+      max_tokens: 300,
       system: `Extract payment info from this payment notification email (Pixieset, Venmo, Zelle, PayPal, or Cash App).
 Respond ONLY with valid JSON, no markdown:
-{"clientEmail":"","clientName":"","amount":"","method":"","invoice":""}
+{"clientEmail":"","clientName":"","amount":"","method":"","invoice":"","paymentType":"deposit_1"}
 - clientEmail: payer's email if present, else empty string
-- clientName: the person who paid (the payer, NOT the recipient)
+- clientName: the person who paid (the payer, NOT the recipient). Include first and last name if available.
 - amount: dollar amount e.g. "$200"
 - method: "Venmo", "Zelle", "PayPal", "Cash App", or "Pixieset"
 - invoice: invoice number if present, else empty string
-Use empty string for any missing field.`,
+- paymentType: "deposit_1" if it looks like a first/only deposit, "deposit_2" if it looks like a second/final payment, "full" if described as full payment, "other" if unclear
+Use empty string for any missing field. Never return null for clientName — use whatever name is available.`,
       messages: [{ role: "user", content: content.slice(0, 3000) }],
     });
     const raw = res.content[0].type === "text" ? res.content[0].text.trim() : "";
     const jsonStr = raw.replace(/^```[a-z]*\n?/i, "").replace(/\n?```$/, "");
     const parsed = JSON.parse(jsonStr) as PaymentInfo;
     if (!parsed.clientName?.trim()) return null;
+    if (!["deposit_1","deposit_2","full","other"].includes(parsed.paymentType)) parsed.paymentType = "deposit_1";
     return parsed;
   } catch { return null; }
 }
@@ -124,18 +133,22 @@ Use empty string for any missing field.`,
 // Pass 2: ask Claude if any email thread for a specific client shows payment evidence
 async function detectPaymentForClient(
   clientName: string, clientEmail: string, emailContext: string, anthropic: Anthropic
-): Promise<{ paid: boolean; amount: string; method: string; note: string } | null> {
+): Promise<{ paid: boolean; amount: string; method: string; note: string; paymentType: string } | null> {
   try {
     const res = await anthropic.messages.create({
       model:      "claude-haiku-4-5-20251001",
-      max_tokens: 200,
+      max_tokens: 300,
       system: `You are a payment detection assistant for a photographer named Chris.
 Analyze these emails and determine if client "${clientName}" has paid a deposit or session fee.
 
 Payment evidence: Venmo/Zelle/PayPal/Cash App transfer confirmations, client saying "I sent it" / "I paid" / "just sent" / "deposit sent", bank receipts, amount mentions in payment context.
 
+If you find multiple payments (e.g. a first deposit and a second/final payment), report only the MOST RECENT one — the caller will query again for others separately.
+
+paymentType: "deposit_1" for a first/only deposit, "deposit_2" for a second/final payment, "full" for a stated full payment, "other" if unclear.
+
 Respond ONLY with valid JSON, no markdown:
-{"paid":false,"amount":"","method":"","note":""}`,
+{"paid":false,"amount":"","method":"","note":"","paymentType":"deposit_1"}`,
       messages: [{
         role: "user",
         content: `Client: ${clientName} (${clientEmail})\n\nEmails:\n\n${emailContext.slice(0, 3000)}`,
@@ -143,8 +156,15 @@ Respond ONLY with valid JSON, no markdown:
     });
     const raw = res.content[0].type === "text" ? res.content[0].text.trim() : "";
     const jsonStr = raw.replace(/^```[a-z]*\n?/i, "").replace(/\n?```$/, "");
-    return JSON.parse(jsonStr) as { paid: boolean; amount: string; method: string; note: string };
+    const result = JSON.parse(jsonStr) as { paid: boolean; amount: string; method: string; note: string; paymentType: string };
+    if (!["deposit_1","deposit_2","full","other"].includes(result.paymentType)) result.paymentType = "deposit_1";
+    return result;
   } catch { return null; }
+}
+
+// Dedup key: same person + same amount (case-insensitive, trimmed)
+function paymentKey(name: string, email: string, amount: string): string {
+  return `${(email || name).toLowerCase().trim()}::${amount.toLowerCase().trim()}`;
 }
 
 export async function POST(req: NextRequest) {
@@ -168,12 +188,20 @@ export async function POST(req: NextRequest) {
   const inquiries = allInquiries ?? [];
   const unpaid = inquiries.filter(inq => inq.payment_status !== "paid");
 
-  // Track which inquiry IDs got marked paid (to avoid double-updating)
+  // Load existing payment keys to avoid inserting duplicates
+  const { data: existingPayments } = await supabase
+    .from("payments")
+    .select("client_name, client_email, amount");
+  const existingKeys = new Set<string>(
+    (existingPayments ?? []).map(p => paymentKey(p.client_name, p.client_email, p.amount))
+  );
+
   const markedPaid = new Set<number>();
 
   const synced: {
     name: string; email: string; amount: string; method: string;
-    invoice: string; alreadyPaid: boolean; dateBooked?: string; pass: number;
+    invoice: string; paymentType: string; alreadyPaid: boolean;
+    dateBooked?: string; pass: number; orphan: boolean;
   }[] = [];
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -182,14 +210,13 @@ export async function POST(req: NextRequest) {
 
   const [pixiesetIds, venmoIds, zelleIds, paypalIds, cashIds] = await Promise.all([
     searchMessageIds(`subject:"Payment on the way" "invoice"`, auth, 50),
-    searchMessageIds(`from:venmo@venmo.com "paid you"`, auth, 25),
-    searchMessageIds(`from:no-reply@zelle.com "sent you"`, auth, 25),
-    searchMessageIds(`from:service@paypal.com "sent you"`, auth, 25),
-    searchMessageIds(`(from:cash@square.com OR from:no-reply@cash.app) "sent you"`, auth, 25),
+    searchMessageIds(`from:venmo@venmo.com "paid you"`, auth, 50),
+    searchMessageIds(`from:no-reply@zelle.com "sent you"`, auth, 50),
+    searchMessageIds(`from:service@paypal.com "sent you"`, auth, 50),
+    searchMessageIds(`(from:cash@square.com OR from:no-reply@cash.app) "sent you"`, auth, 50),
   ]);
 
   const pass1Ids = [...new Set([...pixiesetIds, ...venmoIds, ...zelleIds, ...paypalIds, ...cashIds])];
-
   const pass1Contents = await Promise.all(pass1Ids.map(id => fetchMessageContent(id, auth)));
 
   const pass1Payments: PaymentInfo[] = [];
@@ -201,26 +228,8 @@ export async function POST(req: NextRequest) {
     results.forEach(r => { if (r) pass1Payments.push(r); });
   }
 
-  // Deduplicate pass 1 results
-  const seenEmails = new Set<string>();
-  const seenNames  = new Set<string>();
-  const uniquePass1 = pass1Payments.filter(p => {
-    const ek = p.clientEmail?.toLowerCase();
-    const nk = p.clientName?.toLowerCase().trim();
-    if (ek?.includes("@")) {
-      if (seenEmails.has(ek)) return false;
-      seenEmails.add(ek);
-      if (nk) seenNames.add(nk);
-      return true;
-    }
-    if (!nk) return false;
-    if (seenNames.has(nk)) return false;
-    seenNames.add(nk);
-    return true;
-  });
-
-  // Match pass 1 payments to inquiries
-  for (const payment of uniquePass1) {
+  // Match pass 1 payments to inquiries (allow multiple payments per person)
+  for (const payment of pass1Payments) {
     const clientEmail = payment.clientEmail?.toLowerCase();
     const clientName  = payment.clientName?.toLowerCase().trim();
 
@@ -236,70 +245,120 @@ export async function POST(req: NextRequest) {
       matching = inquiries.filter(inq => {
         const n = inq.name?.toLowerCase().trim() ?? "";
         if (n === clientName) return true;
-        // Require both first AND last name when available — first name alone causes false matches
         if (hasLastName) {
           const nParts = n.split(" ");
-          const nFirst = nParts[0];
-          const nLast  = nParts[nParts.length - 1];
-          return nFirst === firstName && nLast === lastName;
+          return nParts[0] === firstName && nParts[nParts.length - 1] === lastName;
         }
         return n === firstName;
       });
     }
 
-    if (!matching.length) continue;
+    const pKey = paymentKey(payment.clientName, payment.clientEmail, payment.amount);
+    const alreadyRecorded = existingKeys.has(pKey);
 
-    const alreadyPaid = matching.every(inq => inq.payment_status === "paid");
-    const note = [
-      payment.amount && `${payment.method || "Payment"}: ${payment.amount}`,
-      payment.invoice && `Invoice ${payment.invoice}`,
-    ].filter(Boolean).join(" · ");
+    if (matching.length) {
+      // Known inquiry — update payment_status and insert payment row
+      const alreadyPaid = matching.every(inq => inq.payment_status === "paid");
+      const note = [
+        payment.amount && `${payment.method || "Payment"}: ${payment.amount}`,
+        payment.invoice && `Invoice ${payment.invoice}`,
+      ].filter(Boolean).join(" · ");
 
-    const now = new Date().toISOString();
-    const newlyPaidIds = matching.filter(inq => !markedPaid.has(inq.id) && inq.payment_status !== "paid").map(inq => inq.id);
-    const allMatchIds  = matching.map(inq => inq.id);
+      const now = new Date().toISOString();
+      const newlyPaidIds = matching.filter(inq => !markedPaid.has(inq.id) && inq.payment_status !== "paid").map(inq => inq.id);
+      const allMatchIds  = matching.map(inq => inq.id);
 
-    await supabase.from("inquiries").update({
-      payment_status: "paid", payment_note: note,
-      payment_detected_at: now, booking_confirmed: true,
-    }).in("id", allMatchIds);
+      await supabase.from("inquiries").update({
+        payment_status: "paid", payment_note: note,
+        payment_detected_at: now, booking_confirmed: true,
+      }).in("id", allMatchIds);
 
-    if (newlyPaidIds.length) {
-      await supabase.from("inquiries").update({ deposit_paid_at: now }).in("id", newlyPaidIds);
-    }
+      if (newlyPaidIds.length) {
+        await supabase.from("inquiries").update({ deposit_paid_at: now }).in("id", newlyPaidIds);
+      }
 
-    allMatchIds.forEach(id => markedPaid.add(id));
+      allMatchIds.forEach(id => markedPaid.add(id));
 
-    let dateBooked: string | undefined;
-    if (!alreadyPaid) {
-      const sessionDate = matching.find(inq => inq.session_date)?.session_date;
-      if (sessionDate) {
-        await supabase.from("availability").upsert(
-          { date: sessionDate, status: "booked", note: payment.clientName },
-          { onConflict: "date" }
-        );
-        dateBooked = sessionDate;
+      if (!alreadyRecorded) {
+        existingKeys.add(pKey);
+        await supabase.from("payments").insert({
+          inquiry_id:   matching[0].id,
+          client_name:  payment.clientName,
+          client_email: payment.clientEmail,
+          amount:       payment.amount,
+          method:       payment.method,
+          payment_type: payment.paymentType,
+          invoice:      payment.invoice,
+          note,
+          source:       "pass1",
+          paid_at:      now,
+        });
+      }
+
+      let dateBooked: string | undefined;
+      if (!alreadyPaid) {
+        const sessionDate = matching.find(inq => inq.session_date)?.session_date;
+        if (sessionDate) {
+          await supabase.from("availability").upsert(
+            { date: sessionDate, status: "booked", note: payment.clientName },
+            { onConflict: "date" }
+          );
+          dateBooked = sessionDate;
+        }
+      }
+
+      synced.push({
+        name: payment.clientName, email: payment.clientEmail,
+        amount: payment.amount, method: payment.method,
+        invoice: payment.invoice, paymentType: payment.paymentType,
+        alreadyPaid, dateBooked, pass: 1, orphan: false,
+      });
+    } else {
+      // No matching inquiry — orphan payment (Pass 3 territory, handled below)
+      // Store the payment info for Pass 3 processing
+      if (!alreadyRecorded && payment.clientName.trim()) {
+        existingKeys.add(pKey);
+        const now = new Date().toISOString();
+        const note = [
+          payment.amount && `${payment.method || "Payment"}: ${payment.amount}`,
+          payment.invoice && `Invoice ${payment.invoice}`,
+        ].filter(Boolean).join(" · ");
+
+        await supabase.from("payments").insert({
+          inquiry_id:   null,
+          client_name:  payment.clientName,
+          client_email: payment.clientEmail,
+          amount:       payment.amount,
+          method:       payment.method,
+          payment_type: payment.paymentType,
+          invoice:      payment.invoice,
+          note,
+          source:       "orphan",
+          paid_at:      now,
+        });
+
+        synced.push({
+          name: payment.clientName, email: payment.clientEmail,
+          amount: payment.amount, method: payment.method,
+          invoice: payment.invoice, paymentType: payment.paymentType,
+          alreadyPaid: false, pass: 1, orphan: true,
+        });
       }
     }
-
-    synced.push({ name: payment.clientName, email: payment.clientEmail, amount: payment.amount, method: payment.method, invoice: payment.invoice, alreadyPaid, dateBooked, pass: 1 });
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
   // PASS 2 — Per-client full Gmail sweep for remaining unpaid inquiries
   // ═══════════════════════════════════════════════════════════════════════════
 
-  // Only check clients not already caught in pass 1
   const stillUnpaid = unpaid.filter(inq => !markedPaid.has(inq.id));
 
-  // Process in batches of 3 to stay within rate limits
   for (let i = 0; i < stillUnpaid.length; i += 3) {
     const batch = stillUnpaid.slice(i, i + 3);
 
     await Promise.all(batch.map(async inq => {
       if (markedPaid.has(inq.id)) return;
 
-      // Search Gmail for any email to/from this client OR mentioning payment + their full name
       const [threadIds, paymentMentionIds] = await Promise.all([
         searchMessageIds(`from:${inq.email} OR to:${inq.email}`, auth, 10),
         searchMessageIds(
@@ -312,7 +371,7 @@ export async function POST(req: NextRequest) {
       if (!ids.length) return;
 
       const bodies = await Promise.all(ids.map(id => fetchMessageContent(id, auth)));
-      const context = bodies.filter(Boolean).map((b, i) => `--- Email ${i + 1} ---\n${b}`).join("\n\n");
+      const context = bodies.filter(Boolean).map((b, idx) => `--- Email ${idx + 1} ---\n${b}`).join("\n\n");
       if (!context) return;
 
       const result = await detectPaymentForClient(inq.name ?? "", inq.email ?? "", context, anthropic);
@@ -333,6 +392,23 @@ export async function POST(req: NextRequest) {
 
       markedPaid.add(inq.id);
 
+      const pKey = paymentKey(inq.name ?? "", inq.email ?? "", result.amount);
+      if (!existingKeys.has(pKey)) {
+        existingKeys.add(pKey);
+        await supabase.from("payments").insert({
+          inquiry_id:   inq.id,
+          client_name:  inq.name ?? "",
+          client_email: inq.email ?? "",
+          amount:       result.amount,
+          method:       result.method,
+          payment_type: result.paymentType,
+          invoice:      "",
+          note,
+          source:       "pass2",
+          paid_at:      now,
+        });
+      }
+
       let dateBooked: string | undefined;
       if (inq.session_date) {
         await supabase.from("availability").upsert(
@@ -345,7 +421,8 @@ export async function POST(req: NextRequest) {
       synced.push({
         name: inq.name ?? "", email: inq.email ?? "",
         amount: result.amount, method: result.method,
-        invoice: "", alreadyPaid: false, dateBooked, pass: 2,
+        invoice: "", paymentType: result.paymentType,
+        alreadyPaid: false, dateBooked, pass: 2, orphan: false,
       });
     }));
   }
