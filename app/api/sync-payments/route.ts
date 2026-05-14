@@ -6,15 +6,17 @@
 // Pass 1 — Known payment senders: Searches Pixieset, Venmo, Zelle, PayPal,
 //           Cash App notification emails and extracts client info via Claude.
 //           Records EVERY payment (deposit 1, deposit 2, etc.) in `payments`.
+//           paid_at = actual email Date header (not sync time).
 //           Orphan contacts (no matching inquiry) also get a payment row.
 //
 // Pass 2 — Per-client sweep: For every unpaid inquiry, searches ALL of Gmail
 //           for emails to/from that client and asks Claude if any contains
 //           payment evidence. Catches anything Pass 1 misses.
 //
-// Pass 3 — Orphan sweep: Re-scans Pass 1 emails for payers not matched to any
-//           inquiry and inserts them as orphan payment rows with whatever name/
-//           email/info Claude can extract.
+// Auto deposit_2 — For any inquiry whose session_date is in the past and only
+//           has a deposit_1 in payments, we assume the final payment was made
+//           (clients often pay the balance in person or via direct transfer with
+//           no notification email) and insert a synthetic deposit_2 row.
 //
 // Returns: { synced: [...], total: number }
 // ─────────────────────────────────────────────────────────────────────────────
@@ -27,7 +29,18 @@ import { requireAdmin } from "@/lib/requireAdmin";
 
 export const dynamic = "force-dynamic";
 
-type MimePart = { mimeType?: string; body?: { data?: string }; parts?: MimePart[] };
+type MimePart = {
+  mimeType?: string;
+  body?: { data?: string };
+  parts?: MimePart[];
+  headers?: { name: string; value: string }[];
+};
+
+type GmailMessage = {
+  payload?: MimePart;
+  snippet?: string;
+  internalDate?: string; // epoch ms string
+};
 
 function decodeBody(data: string): string {
   try {
@@ -68,6 +81,15 @@ function stripHtml(html: string): string {
     .trim();
 }
 
+// Parse "$200", "200.00", "$1,200" → cents integer
+function parseCents(amount: string): number {
+  if (!amount) return 0;
+  const digits = amount.replace(/[^0-9.]/g, "");
+  const n = parseFloat(digits);
+  if (isNaN(n)) return 0;
+  return Math.round(n * 100);
+}
+
 type PaymentInfo = {
   clientEmail:  string;
   clientName:   string;
@@ -90,21 +112,40 @@ async function searchMessageIds(query: string, auth: string, maxResults: number)
   } catch { return []; }
 }
 
-async function fetchMessageContent(id: string, auth: string): Promise<string> {
+// Returns body text AND the actual email send date from the Date header / internalDate
+async function fetchMessage(id: string, auth: string): Promise<{ content: string; sentAt: string }> {
   try {
     const res = await fetch(
       `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=full`,
       { headers: { Authorization: auth } }
     );
-    if (!res.ok) return "";
-    const msg = await res.json() as { payload?: MimePart; snippet?: string };
+    if (!res.ok) return { content: "", sentAt: "" };
+    const msg = await res.json() as GmailMessage;
+
+    // Extract body
     const { text, html } = extractContent(msg.payload ?? {});
-    return text || stripHtml(html) || msg.snippet || "";
-  } catch { return ""; }
+    const content = text || stripHtml(html) || msg.snippet || "";
+
+    // Real send date: prefer the Date header, fall back to internalDate (epoch ms)
+    const headers = msg.payload?.headers ?? [];
+    const dateHeader = headers.find(h => h.name.toLowerCase() === "date")?.value ?? "";
+    let sentAt = "";
+    if (dateHeader) {
+      const parsed = new Date(dateHeader);
+      if (!isNaN(parsed.getTime())) sentAt = parsed.toISOString();
+    }
+    if (!sentAt && msg.internalDate) {
+      sentAt = new Date(parseInt(msg.internalDate, 10)).toISOString();
+    }
+
+    return { content, sentAt };
+  } catch { return { content: "", sentAt: "" }; }
 }
 
-// Pass 1 / Pass 3: extract structured payment info from a known payment notification email
-async function extractPaymentFromNotification(content: string, anthropic: Anthropic): Promise<PaymentInfo | null> {
+// Pass 1: extract structured payment info from a known payment notification email
+async function extractPaymentFromNotification(
+  content: string, anthropic: Anthropic
+): Promise<PaymentInfo | null> {
   try {
     const res = await anthropic.messages.create({
       model:      "claude-haiku-4-5-20251001",
@@ -143,8 +184,6 @@ Analyze these emails and determine if client "${clientName}" has paid a deposit 
 
 Payment evidence: Venmo/Zelle/PayPal/Cash App transfer confirmations, client saying "I sent it" / "I paid" / "just sent" / "deposit sent", bank receipts, amount mentions in payment context.
 
-If you find multiple payments (e.g. a first deposit and a second/final payment), report only the MOST RECENT one — the caller will query again for others separately.
-
 paymentType: "deposit_1" for a first/only deposit, "deposit_2" for a second/final payment, "full" for a stated full payment, "other" if unclear.
 
 Respond ONLY with valid JSON, no markdown:
@@ -167,6 +206,73 @@ function paymentKey(name: string, email: string, amount: string): string {
   return `${(email || name).toLowerCase().trim()}::${amount.toLowerCase().trim()}`;
 }
 
+// Search Gmail for emails to/from clientEmail and ask Claude for the session date.
+// Returns a YYYY-MM-DD string, or null if not found.
+async function detectSessionDate(
+  clientEmail: string,
+  clientName: string,
+  dateInMind: string | null,
+  auth: string,
+  anthropic: Anthropic
+): Promise<string | null> {
+  try {
+    const searchRes = await fetch(
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages` +
+      `?q=${encodeURIComponent(`from:${clientEmail} OR to:${clientEmail}`)}&maxResults=20`,
+      { headers: { Authorization: auth } }
+    );
+    if (!searchRes.ok) return null;
+    const searchData = await searchRes.json() as { messages?: { id: string }[] };
+    const ids = (searchData.messages ?? []).map(m => m.id).slice(0, 15);
+    if (!ids.length) return null;
+
+    const bodies = await Promise.all(ids.map(async id => {
+      try {
+        const r = await fetch(
+          `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=full`,
+          { headers: { Authorization: auth } }
+        );
+        if (!r.ok) return "";
+        const msg = await r.json() as GmailMessage;
+        const { text, html } = extractContent(msg.payload ?? {});
+        return (text || stripHtml(html) || msg.snippet || "").slice(0, 2000);
+      } catch { return ""; }
+    }));
+
+    const emailContext = bodies
+      .filter(Boolean)
+      .map((b, i) => `--- Email ${i + 1} ---\n${b}`)
+      .join("\n\n");
+    if (!emailContext) return null;
+
+    const today = new Date().toISOString().split("T")[0];
+    const currentYear = new Date().getFullYear();
+
+    const res = await anthropic.messages.create({
+      model:      "claude-haiku-4-5-20251001",
+      max_tokens: 150,
+      system: `Extract the confirmed or agreed photography session date from these emails. Today is ${today}. Current year is ${currentYear}.
+Rules:
+- Find the most recently discussed/confirmed date.
+- If month+day given without year, use ${currentYear}. Only use ${currentYear + 1} if that date is already past.
+- Confirmation = one person proposes a date + the other agrees ("sounds good", "perfect", "see you then", "that works", "confirmed").
+- Return ONLY valid JSON, no markdown:
+{"date":"YYYY-MM-DD"}
+If no specific session date is mentioned: {"date":null}`,
+      messages: [{
+        role: "user",
+        content: `Client: ${clientName}\nDate they mentioned: ${dateInMind ?? "not specified"}\n\n${emailContext}`,
+      }],
+    });
+
+    const raw = res.content[0].type === "text" ? res.content[0].text.trim() : "{}";
+    const jsonStr = raw.replace(/^```[a-z]*\n?/i, "").replace(/\n?```$/, "");
+    const parsed = JSON.parse(jsonStr) as { date: string | null };
+    if (!parsed.date || !/^\d{4}-\d{2}-\d{2}$/.test(parsed.date)) return null;
+    return parsed.date;
+  } catch { return null; }
+}
+
 export async function POST(req: NextRequest) {
   const deny = requireAdmin(req);
   if (deny) return deny;
@@ -176,32 +282,50 @@ export async function POST(req: NextRequest) {
 
   const auth = `Bearer ${tokens.access_token}`;
   const anthropic = new Anthropic();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
 
   // ── Load all inquiries upfront ────────────────────────────────────────────
   const supabase = createSupabaseServerClient();
   const { data: allInquiries } = await supabase
     .from("inquiries")
-    .select("id, name, email, payment_status, session_date, deposit_paid_at")
+    .select("id, name, email, status, payment_status, session_date, deposit_paid_at")
     .order("created_at", { ascending: false })
     .limit(300);
 
   const inquiries = allInquiries ?? [];
-  const unpaid = inquiries.filter(inq => inq.payment_status !== "paid");
 
-  // Load existing payment keys to avoid inserting duplicates
-  const { data: existingPayments } = await supabase
+  // Never touch inquiries that are closed/rejected — these statuses mean the
+  // client didn't book, so any matching payment notification is a false positive
+  // (e.g. same invoice number belonging to someone else, or a payment that was
+  // refunded). Keeps them out of all three passes.
+  const SKIP_STATUSES = new Set(["not_interested", "archived", "declined", "cancelled", "ghosted"]);
+  const activeInquiries = inquiries.filter(inq => !SKIP_STATUSES.has(inq.status));
+  const unpaid = activeInquiries.filter(inq => inq.payment_status !== "paid");
+
+  // Load existing payments for dedup + deposit_2 backfill logic
+  const { data: existingPaymentRows } = await supabase
     .from("payments")
-    .select("client_name, client_email, amount");
+    .select("client_name, client_email, amount, payment_type, inquiry_id");
+
+  const existingPayments = existingPaymentRows ?? [];
   const existingKeys = new Set<string>(
-    (existingPayments ?? []).map(p => paymentKey(p.client_name, p.client_email, p.amount))
+    existingPayments.map(p => paymentKey(p.client_name, p.client_email, p.amount))
+  );
+
+  // inquiry IDs that already have a deposit_1 recorded
+  const inquiryHasDeposit1 = new Set<number>(
+    existingPayments
+      .filter(p => p.inquiry_id && p.payment_type === "deposit_1")
+      .map(p => p.inquiry_id as number)
   );
 
   const markedPaid = new Set<number>();
 
   const synced: {
     name: string; email: string; amount: string; method: string;
-    invoice: string; paymentType: string; alreadyPaid: boolean;
-    dateBooked?: string; pass: number; orphan: boolean;
+    invoice: string; paymentType: string; paidAt: string;
+    alreadyPaid: boolean; dateBooked?: string; pass: number; orphan: boolean;
   }[] = [];
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -217,24 +341,28 @@ export async function POST(req: NextRequest) {
   ]);
 
   const pass1Ids = [...new Set([...pixiesetIds, ...venmoIds, ...zelleIds, ...paypalIds, ...cashIds])];
-  const pass1Contents = await Promise.all(pass1Ids.map(id => fetchMessageContent(id, auth)));
+  const pass1Messages = await Promise.all(pass1Ids.map(id => fetchMessage(id, auth)));
 
-  const pass1Payments: PaymentInfo[] = [];
-  for (let i = 0; i < pass1Contents.length; i += 5) {
-    const batch = pass1Contents.slice(i, i + 5);
+  // Extract payment info in batches of 5
+  type Pass1Entry = { payment: PaymentInfo; sentAt: string };
+  const pass1Entries: Pass1Entry[] = [];
+  for (let i = 0; i < pass1Messages.length; i += 5) {
+    const batch = pass1Messages.slice(i, i + 5);
     const results = await Promise.all(
-      batch.map(c => c ? extractPaymentFromNotification(c, anthropic) : null)
+      batch.map(m => m.content ? extractPaymentFromNotification(m.content, anthropic) : null)
     );
-    results.forEach(r => { if (r) pass1Payments.push(r); });
+    results.forEach((r, j) => {
+      if (r) pass1Entries.push({ payment: r, sentAt: batch[j].sentAt });
+    });
   }
 
   // Match pass 1 payments to inquiries (allow multiple payments per person)
-  for (const payment of pass1Payments) {
+  for (const { payment, sentAt } of pass1Entries) {
     const clientEmail = payment.clientEmail?.toLowerCase();
     const clientName  = payment.clientName?.toLowerCase().trim();
 
     let matching = clientEmail?.includes("@")
-      ? inquiries.filter(inq => inq.email?.toLowerCase() === clientEmail)
+      ? activeInquiries.filter(inq => inq.email?.toLowerCase() === clientEmail)
       : [];
 
     if (!matching.length && clientName) {
@@ -242,7 +370,7 @@ export async function POST(req: NextRequest) {
       const firstName = nameParts[0];
       const lastName  = nameParts[nameParts.length - 1];
       const hasLastName = nameParts.length >= 2;
-      matching = inquiries.filter(inq => {
+      matching = activeInquiries.filter(inq => {
         const n = inq.name?.toLowerCase().trim() ?? "";
         if (n === clientName) return true;
         if (hasLastName) {
@@ -255,9 +383,10 @@ export async function POST(req: NextRequest) {
 
     const pKey = paymentKey(payment.clientName, payment.clientEmail, payment.amount);
     const alreadyRecorded = existingKeys.has(pKey);
+    // Use the real email send date; fall back to now only if unavailable
+    const paidAt = sentAt || new Date().toISOString();
 
     if (matching.length) {
-      // Known inquiry — update payment_status and insert payment row
       const alreadyPaid = matching.every(inq => inq.payment_status === "paid");
       const note = [
         payment.amount && `${payment.method || "Payment"}: ${payment.amount}`,
@@ -265,8 +394,10 @@ export async function POST(req: NextRequest) {
       ].filter(Boolean).join(" · ");
 
       const now = new Date().toISOString();
-      const newlyPaidIds = matching.filter(inq => !markedPaid.has(inq.id) && inq.payment_status !== "paid").map(inq => inq.id);
-      const allMatchIds  = matching.map(inq => inq.id);
+      const newlyPaidIds = matching
+        .filter(inq => !markedPaid.has(inq.id) && inq.payment_status !== "paid")
+        .map(inq => inq.id);
+      const allMatchIds = matching.map(inq => inq.id);
 
       await supabase.from("inquiries").update({
         payment_status: "paid", payment_note: note,
@@ -274,51 +405,74 @@ export async function POST(req: NextRequest) {
       }).in("id", allMatchIds);
 
       if (newlyPaidIds.length) {
-        await supabase.from("inquiries").update({ deposit_paid_at: now }).in("id", newlyPaidIds);
+        await supabase.from("inquiries").update({ deposit_paid_at: paidAt }).in("id", newlyPaidIds);
       }
 
       allMatchIds.forEach(id => markedPaid.add(id));
 
       if (!alreadyRecorded) {
         existingKeys.add(pKey);
+        const inq = matching[0];
+        const sessionDate: string | null = inq.session_date ?? null;
         await supabase.from("payments").insert({
-          inquiry_id:   matching[0].id,
+          inquiry_id:   inq.id,
           client_name:  payment.clientName,
           client_email: payment.clientEmail,
           amount:       payment.amount,
+          amount_cents: parseCents(payment.amount),
           method:       payment.method,
           payment_type: payment.paymentType,
           invoice:      payment.invoice,
           note,
           source:       "pass1",
-          paid_at:      now,
+          paid_at:      paidAt,
+          session_date: sessionDate,
         });
+        if (payment.paymentType === "deposit_1") inquiryHasDeposit1.add(inq.id);
       }
 
       let dateBooked: string | undefined;
-      if (!alreadyPaid) {
-        const sessionDate = matching.find(inq => inq.session_date)?.session_date;
-        if (sessionDate) {
-          await supabase.from("availability").upsert(
-            { date: sessionDate, status: "booked", note: payment.clientName },
-            { onConflict: "date" }
-          );
-          dateBooked = sessionDate;
+      const primaryInq = matching[0];
+
+      // Try to auto-detect session date from Gmail if not already set
+      let resolvedSessionDate = matching.find(inq => inq.session_date)?.session_date ?? null;
+      if (!resolvedSessionDate && payment.clientEmail?.includes("@")) {
+        resolvedSessionDate = await detectSessionDate(
+          payment.clientEmail, payment.clientName, null, auth, anthropic
+        );
+        if (resolvedSessionDate) {
+          await supabase.from("inquiries")
+            .update({ session_date: resolvedSessionDate })
+            .in("id", allMatchIds);
         }
+      }
+
+      if (!alreadyPaid && resolvedSessionDate) {
+        await supabase.from("availability").upsert(
+          { date: resolvedSessionDate, status: "booked", note: payment.clientName },
+          { onConflict: "date" }
+        );
+        dateBooked = resolvedSessionDate;
+      }
+
+      // Update the payment row's session_date if we just found one
+      if (resolvedSessionDate && !alreadyRecorded) {
+        await supabase.from("payments")
+          .update({ session_date: resolvedSessionDate })
+          .eq("inquiry_id", primaryInq.id)
+          .eq("client_email", payment.clientEmail);
       }
 
       synced.push({
         name: payment.clientName, email: payment.clientEmail,
         amount: payment.amount, method: payment.method,
         invoice: payment.invoice, paymentType: payment.paymentType,
-        alreadyPaid, dateBooked, pass: 1, orphan: false,
+        paidAt, alreadyPaid, dateBooked, pass: 1, orphan: false,
       });
     } else {
-      // No matching inquiry — orphan payment (Pass 3 territory, handled below)
-      // Store the payment info for Pass 3 processing
+      // No matching inquiry — orphan payment
       if (!alreadyRecorded && payment.clientName.trim()) {
         existingKeys.add(pKey);
-        const now = new Date().toISOString();
         const note = [
           payment.amount && `${payment.method || "Payment"}: ${payment.amount}`,
           payment.invoice && `Invoice ${payment.invoice}`,
@@ -329,19 +483,21 @@ export async function POST(req: NextRequest) {
           client_name:  payment.clientName,
           client_email: payment.clientEmail,
           amount:       payment.amount,
+          amount_cents: parseCents(payment.amount),
           method:       payment.method,
           payment_type: payment.paymentType,
           invoice:      payment.invoice,
           note,
           source:       "orphan",
-          paid_at:      now,
+          paid_at:      paidAt,
+          session_date: null,
         });
 
         synced.push({
           name: payment.clientName, email: payment.clientEmail,
           amount: payment.amount, method: payment.method,
           invoice: payment.invoice, paymentType: payment.paymentType,
-          alreadyPaid: false, pass: 1, orphan: true,
+          paidAt, alreadyPaid: false, pass: 1, orphan: true,
         });
       }
     }
@@ -370,13 +526,18 @@ export async function POST(req: NextRequest) {
       const ids = [...new Set([...threadIds, ...paymentMentionIds])].slice(0, 12);
       if (!ids.length) return;
 
-      const bodies = await Promise.all(ids.map(id => fetchMessageContent(id, auth)));
-      const context = bodies.filter(Boolean).map((b, idx) => `--- Email ${idx + 1} ---\n${b}`).join("\n\n");
+      const messages = await Promise.all(ids.map(id => fetchMessage(id, auth)));
+      const context = messages
+        .filter(m => m.content)
+        .map((m, idx) => `--- Email ${idx + 1} ---\n${m.content}`)
+        .join("\n\n");
       if (!context) return;
 
       const result = await detectPaymentForClient(inq.name ?? "", inq.email ?? "", context, anthropic);
       if (!result?.paid) return;
 
+      // Use earliest message date that has content as the paid_at approximation
+      const paidAt = messages.find(m => m.content && m.sentAt)?.sentAt || new Date().toISOString();
       const now = new Date().toISOString();
       const note = [
         result.note,
@@ -386,7 +547,7 @@ export async function POST(req: NextRequest) {
 
       await supabase.from("inquiries").update({
         payment_status: "paid", payment_note: note,
-        payment_detected_at: now, deposit_paid_at: now,
+        payment_detected_at: now, deposit_paid_at: paidAt,
         booking_confirmed: true,
       }).eq("id", inq.id);
 
@@ -400,31 +561,119 @@ export async function POST(req: NextRequest) {
           client_name:  inq.name ?? "",
           client_email: inq.email ?? "",
           amount:       result.amount,
+          amount_cents: parseCents(result.amount),
           method:       result.method,
           payment_type: result.paymentType,
           invoice:      "",
           note,
           source:       "pass2",
-          paid_at:      now,
+          paid_at:      paidAt,
+          session_date: inq.session_date ?? null,
         });
+        if (result.paymentType === "deposit_1") inquiryHasDeposit1.add(inq.id);
+      }
+
+      // Auto-detect session date from Gmail if not already set
+      let resolvedDate = inq.session_date ?? null;
+      if (!resolvedDate && inq.email) {
+        resolvedDate = await detectSessionDate(
+          inq.email, inq.name ?? "", null, auth, anthropic
+        );
+        if (resolvedDate) {
+          await supabase.from("inquiries")
+            .update({ session_date: resolvedDate })
+            .eq("id", inq.id);
+          // Back-fill the payment row we just inserted
+          await supabase.from("payments")
+            .update({ session_date: resolvedDate })
+            .eq("inquiry_id", inq.id)
+            .eq("source", "pass2");
+        }
       }
 
       let dateBooked: string | undefined;
-      if (inq.session_date) {
+      if (resolvedDate) {
         await supabase.from("availability").upsert(
-          { date: inq.session_date, status: "booked", note: inq.name },
+          { date: resolvedDate, status: "booked", note: inq.name },
           { onConflict: "date" }
         );
-        dateBooked = inq.session_date;
+        dateBooked = resolvedDate;
       }
 
       synced.push({
         name: inq.name ?? "", email: inq.email ?? "",
         amount: result.amount, method: result.method,
         invoice: "", paymentType: result.paymentType,
-        alreadyPaid: false, dateBooked, pass: 2, orphan: false,
+        paidAt, alreadyPaid: false, dateBooked, pass: 2, orphan: false,
       });
     }));
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // AUTO DEPOSIT_2 — Past sessions where deposit_1 exists but no deposit_2
+  //
+  // If the session date has already passed and we only have a deposit_1,
+  // assume the client paid the balance (possibly in person or via direct
+  // transfer with no notification email) and record a synthetic deposit_2.
+  // paid_at is set to the session date (noon) as best estimate.
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  const inquiriesNeedingDeposit2 = activeInquiries.filter(inq => {
+    if (!inq.session_date) return false;
+    const sessionDay = new Date(inq.session_date + "T00:00:00");
+    if (sessionDay >= today) return false; // session hasn't happened yet
+    return inquiryHasDeposit1.has(inq.id); // has deposit_1 but no deposit_2 (checked below)
+  });
+
+  // Check which already have a deposit_2
+  const { data: existingDeposit2Rows } = await supabase
+    .from("payments")
+    .select("inquiry_id")
+    .eq("payment_type", "deposit_2");
+
+  const alreadyHasDeposit2 = new Set<number>(
+    (existingDeposit2Rows ?? []).map(r => r.inquiry_id as number).filter(Boolean)
+  );
+
+  for (const inq of inquiriesNeedingDeposit2) {
+    if (alreadyHasDeposit2.has(inq.id)) continue;
+
+    // Get the deposit_1 amount to use as the estimate for deposit_2
+    const deposit1 = existingPayments.find(
+      p => p.inquiry_id === inq.id && p.payment_type === "deposit_1"
+    );
+    const estimatedAmount = deposit1?.amount ?? "";
+    const pKey2 = paymentKey(inq.name ?? "", inq.email ?? "", `deposit_2_auto_${inq.id}`);
+    if (existingKeys.has(pKey2)) continue;
+    existingKeys.add(pKey2);
+
+    // paid_at = session date noon local time (best estimate for when balance was collected)
+    const sessionNoon = new Date(inq.session_date + "T12:00:00").toISOString();
+
+    await supabase.from("payments").insert({
+      inquiry_id:   inq.id,
+      client_name:  inq.name ?? "",
+      client_email: inq.email ?? "",
+      amount:       estimatedAmount,
+      amount_cents: parseCents(estimatedAmount),
+      method:       "",
+      payment_type: "deposit_2",
+      invoice:      "",
+      note:         "Auto-recorded: session already passed, balance assumed paid",
+      source:       "auto",
+      paid_at:      sessionNoon,
+      session_date: inq.session_date,
+    });
+
+    alreadyHasDeposit2.add(inq.id);
+
+    synced.push({
+      name: inq.name ?? "", email: inq.email ?? "",
+      amount: estimatedAmount, method: "",
+      invoice: "", paymentType: "deposit_2",
+      paidAt: sessionNoon, alreadyPaid: true,
+      dateBooked: inq.session_date, pass: 3, orphan: false,
+    });
   }
 
   return NextResponse.json({ synced, total: synced.length });
