@@ -521,6 +521,24 @@ function AdminDashboard() {
     }
   }
 
+  async function createInquiryFromThread(t:InboxThread){
+    // Check if an inquiry already exists for this email to avoid duplicates
+    const existing=inquiries.find(i=>i.email.toLowerCase()===t.fromEmail.toLowerCase());
+    if(existing)return existing;
+    const row={
+      name:t.fromName||t.fromEmail.split("@")[0],
+      email:t.fromEmail.toLowerCase(),
+      phone:null,session_type:null,session_date:null,date_in_mind:null,
+      message:`Subject: ${t.subject}\n\n${t.snippet}`,
+      status:"manual",payment_status:null,booking_confirmed:null,
+    };
+    const{data,error}=await supabase.from("inquiries").insert(row).select().single();
+    if(error){console.error("createInquiryFromThread",error);return null;}
+    setInquiries(p=>[data,...p]);
+    showToast(`Client card created for ${row.name} ✓`);
+    return data as Inquiry;
+  }
+
   async function generateInboxDraft(t:InboxThread){
     setInboxDraftLoading(p=>({...p,[t.threadId]:true}));
     try{
@@ -1570,12 +1588,12 @@ function AdminDashboard() {
                                   return(
                                     <div className="flex border-t border-slate-100">
                                       <button
-                                        onClick={()=>{
+                                        onClick={async()=>{
                                           if(matchedInquiry){
                                             router.push(`/admin/conversation/${matchedInquiry.id}`);
                                           }else{
-                                            setClientSearch(t.fromEmail);
-                                            setTab("clients");
+                                            const created=await createInquiryFromThread(t);
+                                            if(created)router.push(`/admin/conversation/${created.id}`);
                                           }
                                         }}
                                         className="flex-1 py-2 text-[11px] font-bold text-slate-600 hover:bg-slate-50 transition-colors">
@@ -1598,7 +1616,6 @@ function AdminDashboard() {
                                     </div>
                                   );
                                 })()}
-                                {/* Reply panel — kept for future inline use, hidden for now */}
                                 {isOpen&&(
                                   <div className="border-t border-slate-100 p-3 bg-slate-50 space-y-2">
                                     <textarea rows={2} className="w-full px-3 py-2 rounded-lg text-xs outline-none border border-slate-200 bg-white text-slate-600 resize-none" placeholder="Add context for the AI (optional) — e.g. 'Tell them SFSU spots are available May 18'" value={inboxContext[t.threadId]??""} onChange={e=>setInboxContext(p=>({...p,[t.threadId]:e.target.value}))} style={{fontFamily:"inherit"}}/>
