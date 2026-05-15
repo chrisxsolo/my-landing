@@ -515,7 +515,9 @@ export default function ConversationPage() {
       }
 
       // ── Audio recording for Whisper ──────────────────────────────────────
-      const mime = ["audio/webm;codecs=opus", "audio/webm", "audio/ogg", "audio/mp4"]
+      // Prefer mp4 (AAC) — best Whisper compatibility across Safari/mobile and desktop.
+      // Fall back to webm/opus for browsers that don't support mp4.
+      const mime = ["audio/mp4", "audio/webm;codecs=opus", "audio/webm", "audio/ogg"]
         .find(t => MediaRecorder.isTypeSupported(t)) ?? "";
       const recorder = new MediaRecorder(stream, mime ? { mimeType: mime } : {});
       audioChunksRef.current = [];
@@ -526,7 +528,7 @@ export default function ConversationPage() {
         liveRecogRef.current?.stop();
         liveRecogRef.current = null;
 
-        const blob = new Blob(audioChunksRef.current, { type: mime || "audio/webm" });
+        const blob = new Blob(audioChunksRef.current, { type: mime || "audio/mp4" });
         audioChunksRef.current = [];
 
         if (blob.size < 1000) { setVoiceActive(false); return; }
@@ -534,9 +536,21 @@ export default function ConversationPage() {
         setVoiceActive(false);
         setDraftLoading(true);
 
+        // Derive the correct file extension from the actual mime type so Whisper
+        // decodes it correctly (Safari records mp4 but the old code sent it as .webm).
+        const ext = mime.includes("mp4") ? "m4a" : mime.includes("ogg") ? "ogg" : "webm";
+
         try {
           const fd = new FormData();
-          fd.append("audio", blob, "audio.webm");
+          fd.append("audio", blob, `audio.${ext}`);
+          if (inquiry) {
+            const recentText = messages
+              .slice(-6)
+              .map(m => stripQuotes(m.body ?? "").slice(0, 120))
+              .join(" ");
+            const ctx = [inquiry.name, inquiry.session_type, recentText].filter(Boolean).join(", ");
+            fd.append("context", ctx);
+          }
           const res  = await fetch("/api/transcribe", { method: "POST", body: fd });
           const json = await res.json() as { text?: string; error?: string };
           if (json.text) {

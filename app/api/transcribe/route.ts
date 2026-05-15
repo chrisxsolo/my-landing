@@ -11,10 +11,15 @@ export async function POST(req: NextRequest) {
   const audio = formData.get("audio") as Blob | null;
   if (!audio) return NextResponse.json({ error: "No audio" }, { status: 400 });
 
+  const context = formData.get("context");
+
   const body = new FormData();
   body.append("file", audio, "audio.webm");
   body.append("model", "whisper-1");
   body.append("language", "en");
+  if (context && typeof context === "string" && context.trim()) {
+    body.append("prompt", context.slice(0, 224));
+  }
 
   const res = await fetch("https://api.openai.com/v1/audio/transcriptions", {
     method: "POST",
