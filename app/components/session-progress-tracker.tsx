@@ -21,7 +21,10 @@ const TRACKER_STYLES = `
     height: 100%;
     border-radius: inherit;
     background: rgba(0,0,0,0.40);
-    transition: width 600ms cubic-bezier(0.22, 0.68, 0, 1.05);
+    animation: spt-fill-in 800ms cubic-bezier(0.4, 0, 0.2, 1) 200ms both;
+  }
+  @keyframes spt-fill-in {
+    from { width: 0% !important; }
   }
 
   .spt-step {
@@ -31,7 +34,21 @@ const TRACKER_STYLES = `
     border-radius: 10px;
     border: 1px solid transparent;
     position: relative;
+    animation: spt-step-in 380ms cubic-bezier(0.22, 0.68, 0, 1.05) both;
     transition: border-color 180ms ease, background 180ms ease;
+  }
+  .spt-step:nth-child(1)  { animation-delay: 80ms;  }
+  .spt-step:nth-child(2)  { animation-delay: 120ms; }
+  .spt-step:nth-child(3)  { animation-delay: 160ms; }
+  .spt-step:nth-child(4)  { animation-delay: 200ms; }
+  .spt-step:nth-child(5)  { animation-delay: 240ms; }
+  .spt-step:nth-child(6)  { animation-delay: 280ms; }
+  .spt-step:nth-child(7)  { animation-delay: 320ms; }
+  .spt-step:nth-child(8)  { animation-delay: 360ms; }
+  .spt-step:nth-child(9)  { animation-delay: 400ms; }
+  @keyframes spt-step-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
   }
 
   .spt-step[data-state="completed"] {
@@ -43,6 +60,13 @@ const TRACKER_STYLES = `
     background: rgba(0,0,0,0.05);
     border-color: rgba(0,0,0,0.12);
     box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    animation: spt-step-in 380ms cubic-bezier(0.22, 0.68, 0, 1.05) both,
+               spt-current-glow 600ms cubic-bezier(0.22, 0.68, 0, 1.2) 500ms both;
+  }
+  @keyframes spt-current-glow {
+    0%   { box-shadow: 0 0 0 0 rgba(0,0,0,0.12); }
+    50%  { box-shadow: 0 0 0 4px rgba(0,0,0,0.05); }
+    100% { box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
   }
 
   .spt-step[data-state="upcoming"] {
@@ -59,7 +83,7 @@ const TRACKER_STYLES = `
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .spt-fill { transition: none; }
+    .spt-fill, .spt-step { animation: none !important; }
   }
 `;
 

@@ -54,19 +54,20 @@ const CARD_STYLES = `
     box-shadow: 0 2px 4px rgba(0,0,0,0.04), 0 12px 32px rgba(0,0,0,0.06);
   }
 
+  /* Top accent bar — draws in from left */
   .sc-shell::before {
     content: "";
     position: absolute;
     top: 0; left: 0; right: 0;
-    height: 1px;
-    background: linear-gradient(90deg,
-      transparent 0%,
-      rgba(0,0,0,0.09) 30%,
-      rgba(0,0,0,0.14) 50%,
-      rgba(0,0,0,0.09) 70%,
-      transparent 100%
-    );
+    height: 2px;
+    background: linear-gradient(90deg, #1a1a18 0%, rgba(0,0,0,0.35) 60%, transparent 100%);
     pointer-events: none;
+    transform-origin: left;
+    animation: sc-bar-in 650ms cubic-bezier(0.4, 0, 0.2, 1) both;
+  }
+  @keyframes sc-bar-in {
+    from { transform: scaleX(0); }
+    to   { transform: scaleX(1); }
   }
 
   .sc-inner {
@@ -88,11 +89,13 @@ const CARD_STYLES = `
     border: 1px solid rgba(0,0,0,0.07);
     border-radius: 12px;
     padding: 14px 16px;
-    transition: border-color 180ms ease, background 180ms ease;
+    transition: border-color 180ms ease, background 180ms ease, transform 180ms ease, box-shadow 180ms ease;
   }
   .sc-detail:hover {
-    border-color: rgba(0,0,0,0.12);
+    border-color: rgba(0,0,0,0.13);
     background: rgba(0,0,0,0.04);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.06);
   }
 
   .sc-rule {
@@ -114,16 +117,26 @@ const CARD_STYLES = `
     font-weight: 700;
     text-decoration: none;
     letter-spacing: 0.01em;
-    transition: background 160ms ease, transform 160ms ease;
+    overflow: hidden;
+    position: relative;
+    transition: background 160ms ease, transform 160ms ease, box-shadow 160ms ease;
     flex-shrink: 0;
+  }
+  .sc-gallery-btn::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.10) 50%, transparent 60%);
+    transform: translateX(-100%);
+    transition: transform 450ms ease;
   }
   .sc-gallery-btn:hover {
     background: #1e1d1b;
     transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(0,0,0,0.22);
   }
-  .sc-gallery-btn:active {
-    transform: translateY(0);
-  }
+  .sc-gallery-btn:hover::after { transform: translateX(100%); }
+  .sc-gallery-btn:active { transform: translateY(0); }
 
   .sc-status-chip {
     display: inline-flex;
@@ -138,11 +151,17 @@ const CARD_STYLES = `
     letter-spacing: 0.06em;
     text-transform: uppercase;
     color: rgba(0,0,0,0.48);
+    animation: sc-chip-in 400ms cubic-bezier(0.22, 0.68, 0, 1.2) 100ms both;
+  }
+  @keyframes sc-chip-in {
+    from { opacity: 0; transform: scale(0.88); }
+    to   { opacity: 1; transform: scale(1); }
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .sc-gallery-btn:hover { transform: none; }
-    .sc-detail { transition: none; }
+    .sc-shell::before, .sc-status-chip { animation: none !important; }
+    .sc-gallery-btn:hover, .sc-detail:hover { transform: none; box-shadow: none; }
+    .sc-gallery-btn::after { display: none; }
   }
 `;
 

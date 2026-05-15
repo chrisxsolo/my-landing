@@ -52,6 +52,7 @@ const SHARED_STYLES = `
     overflow: hidden;
   }
 
+  /* Top accent line draws in */
   .pd-panel::before {
     content: "";
     position: absolute;
@@ -65,6 +66,12 @@ const SHARED_STYLES = `
       transparent 100%
     );
     pointer-events: none;
+    transform-origin: left;
+    animation: pd-line-in 700ms cubic-bezier(0.4, 0, 0.2, 1) 300ms both;
+  }
+  @keyframes pd-line-in {
+    from { transform: scaleX(0); }
+    to   { transform: scaleX(1); }
   }
 
   .pd-panel-inner {
@@ -79,11 +86,21 @@ const SHARED_STYLES = `
     border: 1px solid rgba(0,0,0,0.07);
     border-radius: 14px;
     padding: 20px;
-    transition: border-color 200ms ease, background 200ms ease;
+    animation: pd-stat-in 440ms cubic-bezier(0.22, 0.68, 0, 1.2) both;
+    transition: border-color 200ms ease, background 200ms ease, transform 200ms ease, box-shadow 200ms ease;
+  }
+  .pd-stat:nth-child(1) { animation-delay: 280ms; }
+  .pd-stat:nth-child(2) { animation-delay: 340ms; }
+  .pd-stat:nth-child(3) { animation-delay: 400ms; }
+  @keyframes pd-stat-in {
+    from { opacity: 0; transform: translateY(12px) scale(0.96); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
   }
   .pd-stat:hover {
-    border-color: rgba(0,0,0,0.12);
+    border-color: rgba(0,0,0,0.14);
     background: rgba(0,0,0,0.05);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.07);
   }
 
   /* ── Nav pill ── */
@@ -102,14 +119,17 @@ const SHARED_STYLES = `
     letter-spacing: 0.01em;
     cursor: pointer;
     text-decoration: none;
-    transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+    transition: background 160ms ease, border-color 160ms ease, color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
     white-space: nowrap;
   }
   .pd-pill:hover {
     background: #ffffff;
     border-color: rgba(0,0,0,0.16);
     color: rgba(0,0,0,0.75);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.07);
   }
+  .pd-pill:active { transform: translateY(0); }
 
   /* ── Primary action ── */
   .pd-cta {
@@ -127,17 +147,37 @@ const SHARED_STYLES = `
     text-decoration: none;
     cursor: pointer;
     border: none;
-    transition: background 160ms ease;
+    overflow: hidden;
+    position: relative;
+    transition: background 160ms ease, transform 160ms ease, box-shadow 160ms ease;
     white-space: nowrap;
+  }
+  .pd-cta::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.08) 50%, transparent 60%);
+    transform: translateX(-100%);
+    transition: transform 450ms ease;
   }
   .pd-cta:hover {
     background: #1e1d1b;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(0,0,0,0.22);
   }
+  .pd-cta:hover::after { transform: translateX(100%); }
+  .pd-cta:active { transform: translateY(0); }
 
   /* ── Divider ── */
   .pd-rule {
     height: 1px;
     background: linear-gradient(90deg, transparent, rgba(0,0,0,0.08) 20%, rgba(0,0,0,0.08) 80%, transparent);
+    transform-origin: left;
+    animation: pd-rule-in 600ms cubic-bezier(0.4, 0, 0.2, 1) 450ms both;
+  }
+  @keyframes pd-rule-in {
+    from { transform: scaleX(0); opacity: 0; }
+    to   { transform: scaleX(1); opacity: 1; }
   }
 
   /* ── Status dot ── */
@@ -148,6 +188,12 @@ const SHARED_STYLES = `
     background: #4caf7d;
     box-shadow: 0 0 0 2px rgba(76,175,125,0.20);
     flex-shrink: 0;
+    animation: pd-dot-in 800ms cubic-bezier(0.22, 0.68, 0, 1.4) 400ms both;
+  }
+  @keyframes pd-dot-in {
+    from { transform: scale(0); opacity: 0; }
+    60%  { transform: scale(1.3); }
+    to   { transform: scale(1); opacity: 1; }
   }
 
   /* ── Entrance ── */
@@ -155,7 +201,7 @@ const SHARED_STYLES = `
     animation: pd-up 480ms cubic-bezier(0.22, 0.68, 0, 1.05) both;
   }
   @keyframes pd-up {
-    from { opacity: 0; transform: translateY(10px); }
+    from { opacity: 0; transform: translateY(12px); }
     to   { opacity: 1; transform: translateY(0); }
   }
 
@@ -171,7 +217,10 @@ const SHARED_STYLES = `
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .pd-in, .pd-skeleton { animation: none; }
+    .pd-in, .pd-skeleton, .pd-stat,
+    .pd-panel::before, .pd-dot, .pd-rule { animation: none !important; }
+    .pd-stat:hover, .pd-pill:hover, .pd-cta:hover { transform: none; box-shadow: none; }
+    .pd-cta::after { display: none; }
   }
 `;
 

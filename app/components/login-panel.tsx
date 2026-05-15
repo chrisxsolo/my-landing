@@ -105,9 +105,14 @@ export default function LoginPanel() {
             0 12px 40px rgba(0,0,0,0.08),
             0 32px 80px rgba(0,0,0,0.05);
           overflow: hidden;
+          animation: lp-card-in 600ms cubic-bezier(0.22, 0.68, 0, 1.05) both;
+        }
+        @keyframes lp-card-in {
+          from { opacity: 0; transform: translateY(20px) scale(0.985); }
+          to   { opacity: 1; transform: translateY(0) scale(1); }
         }
 
-        /* Top warm edge line */
+        /* Top accent line — draws itself in */
         .lp-card::before {
           content: "";
           position: absolute;
@@ -121,6 +126,12 @@ export default function LoginPanel() {
             transparent 100%
           );
           pointer-events: none;
+          transform-origin: left;
+          animation: lp-line-in 700ms cubic-bezier(0.4, 0, 0.2, 1) 200ms both;
+        }
+        @keyframes lp-line-in {
+          from { transform: scaleX(0); opacity: 0; }
+          to   { transform: scaleX(1); opacity: 1; }
         }
 
         .lp-card-inner {
@@ -146,7 +157,7 @@ export default function LoginPanel() {
           margin: 28px 0;
         }
 
-        /* ── Status dot ── */
+        /* ── Status dot — single pulse on load ── */
         .lp-dot {
           width: 6px;
           height: 6px;
@@ -154,6 +165,12 @@ export default function LoginPanel() {
           background: #4caf7d;
           box-shadow: 0 0 0 2px rgba(76,175,125,0.20);
           flex-shrink: 0;
+          animation: lp-dot-pop 1s cubic-bezier(0.22, 0.68, 0, 1.4) 500ms both;
+        }
+        @keyframes lp-dot-pop {
+          0%   { transform: scale(0); opacity: 0; box-shadow: 0 0 0 0 rgba(76,175,125,0.45); }
+          60%  { transform: scale(1.3); box-shadow: 0 0 0 5px rgba(76,175,125,0); }
+          100% { transform: scale(1); opacity: 1; box-shadow: 0 0 0 2px rgba(76,175,125,0.20); }
         }
 
         /* ── Feature list ── */
@@ -163,8 +180,16 @@ export default function LoginPanel() {
           gap: 12px;
           padding: 14px 0;
           border-bottom: 1px solid rgba(0,0,0,0.055);
+          animation: lp-feature-in 420ms cubic-bezier(0.22, 0.68, 0, 1.05) both;
         }
+        .lp-feature:nth-child(1) { animation-delay: 260ms; }
+        .lp-feature:nth-child(2) { animation-delay: 330ms; }
+        .lp-feature:nth-child(3) { animation-delay: 400ms; }
         .lp-feature:last-child { border-bottom: none; }
+        @keyframes lp-feature-in {
+          from { opacity: 0; transform: translateX(-8px); }
+          to   { opacity: 1; transform: translateX(0); }
+        }
         .lp-feature-num {
           font-family: 'DM Mono', monospace;
           font-size: 10px;
@@ -206,15 +231,29 @@ export default function LoginPanel() {
           font-weight: 600;
           letter-spacing: 0.01em;
           cursor: pointer;
+          overflow: hidden;
           transition:
             background 180ms ease,
             border-color 180ms ease,
+            box-shadow 180ms ease,
             transform 160ms ease;
+        }
+        .lp-google-btn::after {
+          content: "";
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(105deg, transparent 40%, rgba(0,0,0,0.04) 50%, transparent 60%);
+          transform: translateX(-100%);
+          transition: transform 500ms ease;
         }
         .lp-google-btn:hover {
           background: rgba(0,0,0,0.07);
           border-color: rgba(0,0,0,0.18);
+          box-shadow: 0 4px 16px rgba(0,0,0,0.08);
           transform: translateY(-1px);
+        }
+        .lp-google-btn:hover::after {
+          transform: translateX(100%);
         }
         .lp-google-btn:active {
           transform: translateY(0);
@@ -237,13 +276,27 @@ export default function LoginPanel() {
           letter-spacing: 0.01em;
           cursor: pointer;
           text-decoration: none;
+          overflow: hidden;
           transition:
             background 180ms ease,
+            box-shadow 180ms ease,
             transform 160ms ease;
+        }
+        .lp-dash-btn::after {
+          content: "";
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.07) 50%, transparent 60%);
+          transform: translateX(-100%);
+          transition: transform 500ms ease;
         }
         .lp-dash-btn:hover {
           background: #1e1d1b;
+          box-shadow: 0 6px 20px rgba(0,0,0,0.20);
           transform: translateY(-1px);
+        }
+        .lp-dash-btn:hover::after {
+          transform: translateX(100%);
         }
         .lp-dash-btn:active {
           transform: translateY(0);
@@ -303,22 +356,37 @@ export default function LoginPanel() {
           50% { opacity: 1; }
         }
 
-        /* ── Entrance ── */
+        /* ── Staggered entrance ── */
         .lp-fade {
-          animation: lp-up 500ms cubic-bezier(0.22, 0.68, 0, 1.1) both;
+          animation: lp-up 480ms cubic-bezier(0.22, 0.68, 0, 1.05) both;
         }
-        .lp-fade-1 { animation-delay: 0ms; }
-        .lp-fade-2 { animation-delay: 60ms; }
-        .lp-fade-3 { animation-delay: 120ms; }
-        .lp-fade-4 { animation-delay: 180ms; }
+        .lp-fade-1 { animation-delay: 80ms; }
+        .lp-fade-2 { animation-delay: 160ms; }
+        .lp-fade-3 { animation-delay: 220ms; }
+        .lp-fade-4 { animation-delay: 380ms; }
         @keyframes lp-up {
-          from { opacity: 0; transform: translateY(12px); }
+          from { opacity: 0; transform: translateY(10px); }
           to   { opacity: 1; transform: translateY(0); }
         }
 
+        /* ── Divider draws in ── */
+        .lp-divider-animated {
+          transform-origin: left;
+          animation: lp-line-draw 600ms cubic-bezier(0.4, 0, 0.2, 1) both;
+        }
+        .lp-divider-animated-1 { animation-delay: 200ms; }
+        .lp-divider-animated-2 { animation-delay: 470ms; }
+        @keyframes lp-line-draw {
+          from { transform: scaleX(0); opacity: 0; }
+          to   { transform: scaleX(1); opacity: 1; }
+        }
+
         @media (prefers-reduced-motion: reduce) {
-          .lp-fade, .lp-skeleton { animation: none; }
+          .lp-fade, .lp-skeleton, .lp-card,
+          .lp-card::before, .lp-dot, .lp-feature,
+          .lp-divider-animated { animation: none !important; }
           .lp-google-btn:hover, .lp-dash-btn:hover { transform: none; }
+          .lp-google-btn::after, .lp-dash-btn::after { display: none; }
         }
 
         @media (max-width: 480px) {
@@ -368,7 +436,7 @@ export default function LoginPanel() {
             </p>
           </div>
 
-          <div className="lp-divider" />
+          <div className="lp-divider lp-divider-animated lp-divider-animated-1" />
 
           {/* Feature list */}
           <div className="lp-fade lp-fade-3">
@@ -387,7 +455,7 @@ export default function LoginPanel() {
             ))}
           </div>
 
-          <div className="lp-divider" />
+          <div className="lp-divider lp-divider-animated lp-divider-animated-2" />
 
           {/* Auth area */}
           <div className="lp-fade lp-fade-4">
