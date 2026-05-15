@@ -138,6 +138,7 @@ export async function POST(req: NextRequest) {
         const safePeople = escapeHtml(people);
         const safeLocation = escapeHtml(location);
         const safeInquiryId = inquiry?.id ? escapeHtml(String(inquiry.id)) : "";
+        const isGradInquiry = /grad/i.test(sessionType);
         const subject = `New inquiry from ${name}${sessionType ? ` - ${sessionType}` : ""}`.replace(/[\r\n]+/g, " ");
         const confirmationSubject = "Your soloxsnaps inquiry and next steps";
         const responseRows = [
@@ -238,9 +239,11 @@ export async function POST(req: NextRequest) {
               `Hi ${name},`,
               "",
               "Thanks for reaching out to soloxsnaps. I received your inquiry and will get back to you within 24 hours.",
-              "",
-              "While you wait, you can check out my graduation guide to prepare for your shoot and learn more about how grad sessions work:",
-              guideUrl,
+              ...(isGradInquiry ? [
+                "",
+                "While you wait, you can check out my graduation guide to prepare for your shoot and learn more about how grad sessions work:",
+                guideUrl,
+              ] : []),
               "",
               "Your responses:",
               `Name: ${name}`,
@@ -270,6 +273,7 @@ export async function POST(req: NextRequest) {
                 I received your inquiry and will get back to you within <strong>24 hours</strong>. Your responses are copied below so you have everything in one place.
               </p>
 
+              ${isGradInquiry ? `
               <div style="border: 1px solid rgba(17,21,19,0.1); border-radius: 8px; padding: 22px; background: #f7f8f5; margin: 0 0 26px;">
                 <p style="font-size: 13px; font-weight: 700; text-transform: uppercase; color: #111513; margin: 0 0 10px;">
                   Before your shoot
@@ -280,7 +284,7 @@ export async function POST(req: NextRequest) {
                 <a href="${safeGuideUrl}" style="display: inline-block; background: #141716; color: #ffffff; text-decoration: none; border-radius: 8px; padding: 12px 18px; font-size: 13px; font-weight: 700;">
                   Open the graduation guide
                 </a>
-              </div>
+              </div>` : ""}
 
               <div style="margin: 0 0 28px;">
                 <p style="font-size: 13px; font-weight: 700; text-transform: uppercase; color: #111513; margin: 0 0 10px;">
