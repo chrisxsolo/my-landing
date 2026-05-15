@@ -255,7 +255,11 @@ export default function ProfessionalLayout({ children }: Readonly<{ children: Re
 
           <div className="professional-footer-bottom">
             <span>© {new Date().getFullYear()} soloxsnaps</span>
-            <span>San Francisco, California</span>
+            <div style={{ display: "flex", gap: 16 }}>
+              <Link href="/privacy" style={{ color: "#64716d", textDecoration: "none" }}>Privacy</Link>
+              <Link href="/terms" style={{ color: "#64716d", textDecoration: "none" }}>Terms</Link>
+              <span>San Francisco, California</span>
+            </div>
           </div>
         </div>
       </footer>
