@@ -32,6 +32,14 @@ export const dynamic = "force-dynamic";
 
 type VaultRow = { id: string; title: string; folder: string; content: string };
 
+function friendlyAiError(err: unknown): string {
+  const msg = err instanceof Error ? err.message : String(err);
+  if (/overloaded/i.test(msg))  return "AI is overloaded right now — try again in a moment.";
+  if (/rate.?limit/i.test(msg)) return "Rate limit hit — wait a few seconds and try again.";
+  if (/timeout/i.test(msg))     return "Request timed out — try again.";
+  return "AI request failed — try again.";
+}
+
 async function fetchAvailability(): Promise<string> {
   try {
     const base = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
@@ -294,9 +302,8 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json({ rules, written });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error("Claude analyze error:", msg);
-      return NextResponse.json({ error: `Analysis failed: ${msg}` }, { status: 500 });
+      console.error("Claude analyze error:", err);
+      return NextResponse.json({ error: friendlyAiError(err) }, { status: 500 });
     }
   }
 
@@ -373,8 +380,8 @@ Output only the polished email body, nothing else.`,
 
       return NextResponse.json({ draft });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      return NextResponse.json({ error: `Polish failed: ${msg}` }, { status: 500 });
+      console.error("Claude polish error:", err);
+      return NextResponse.json({ error: friendlyAiError(err) }, { status: 500 });
     }
   }
 
@@ -466,11 +473,7 @@ Write the reply now.`;
 
     return NextResponse.json({ draft });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error("Claude draft-reply error:", msg);
-    return NextResponse.json(
-      { error: `Draft failed: ${msg}` },
-      { status: 500 }
-    );
+    console.error("Claude draft-reply error:", err);
+    return NextResponse.json({ error: friendlyAiError(err) }, { status: 500 });
   }
 }
