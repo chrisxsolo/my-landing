@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { C } from "@/lib/colors";
 import { supabase } from "@/lib/supabase";
+import { C } from "@/lib/colors";
 
 type AuthMeResponse = {
   user?: { id: string; email: string | null };
@@ -82,402 +82,382 @@ export default function LoginPanel() {
   return (
     <main className="lp-root relative flex min-h-screen items-center justify-center overflow-hidden px-5 py-10">
       <style>{`
-        /* ── Page background ── */
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,400&family=DM+Mono:wght@300;400;500&display=swap');
+
         .lp-root {
-          background: #f5f5f7;
+          background: #f8f7f5;
+          font-family: ui-sans-serif, system-ui, sans-serif;
         }
 
-        /* ── Soft gradient orbs ── */
-        .lp-orb {
-          border-radius: 999px;
-          filter: blur(80px);
-          position: absolute;
-          pointer-events: none;
-          animation: lp-drift 18s ease-in-out infinite;
-        }
-        .lp-orb-1 {
-          width: 560px; height: 560px;
-          top: -180px; left: -140px;
-          background: rgba(157,111,232,0.10);
-          animation-duration: 20s;
-        }
-        .lp-orb-2 {
-          width: 420px; height: 420px;
-          top: 10%; right: -120px;
-          background: rgba(232,121,160,0.08);
-          animation-duration: 16s;
-          animation-delay: -6s;
-        }
-        .lp-orb-3 {
-          width: 500px; height: 500px;
-          bottom: -160px; left: 30%;
-          background: rgba(157,111,232,0.07);
-          animation-duration: 22s;
-          animation-delay: -11s;
-        }
 
-        @keyframes lp-drift {
-          0%, 100% { transform: translate(0, 0) scale(1); }
-          33%       { transform: translate(30px, -24px) scale(1.06); }
-          66%       { transform: translate(-18px, 18px) scale(0.97); }
-        }
-
-        /* ── Subtle grid ── */
-        .lp-grid {
-          position: absolute;
-          inset: 0;
-          pointer-events: none;
-          background-image:
-            linear-gradient(rgba(157,111,232,0.045) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(157,111,232,0.045) 1px, transparent 1px);
-          background-size: 48px 48px;
-          mask-image: radial-gradient(ellipse 70% 70% at 50% 40%, black, transparent);
-        }
-
-        /* ── Light sweep ── */
-        .lp-sweep {
-          position: absolute;
-          inset: 0;
-          pointer-events: none;
-          background: linear-gradient(
-            115deg,
-            transparent 0%,
-            rgba(255,255,255,0.38) 48%,
-            rgba(255,255,255,0.55) 50%,
-            rgba(255,255,255,0.38) 52%,
-            transparent 100%
-          );
-          background-size: 200% 100%;
-          animation: lp-sweep 8s ease-in-out infinite;
-          opacity: 0;
-          animation-fill-mode: forwards;
-        }
-        @keyframes lp-sweep {
-          0%   { background-position: 200% 0; opacity: 0; }
-          10%  { opacity: 1; }
-          50%  { background-position: -40% 0; }
-          60%  { opacity: 0; }
-          100% { background-position: -40% 0; opacity: 0; }
-        }
-
-        /* ── Glass panel ── */
-        .lp-panel {
+        /* ── Main card ── */
+        .lp-card {
           position: relative;
-          background: rgba(255,255,255,0.72);
-          backdrop-filter: blur(40px) saturate(180%);
-          -webkit-backdrop-filter: blur(40px) saturate(180%);
-          border: 1px solid rgba(255,255,255,0.9);
-          border-radius: 28px;
+          z-index: 1;
+          width: 100%;
+          max-width: 448px;
+          background: #ffffff;
+          border: 1px solid rgba(0,0,0,0.08);
+          border-radius: 20px;
           box-shadow:
-            0 2px 0 rgba(255,255,255,0.95) inset,
-            0 0 0 0.5px rgba(0,0,0,0.06),
-            0 24px 64px rgba(0,0,0,0.07),
-            0 4px 16px rgba(0,0,0,0.04);
+            0 0 0 0.5px rgba(0,0,0,0.04),
+            0 2px 4px rgba(0,0,0,0.04),
+            0 12px 40px rgba(0,0,0,0.08),
+            0 32px 80px rgba(0,0,0,0.05);
           overflow: hidden;
         }
 
-        /* Top specular line */
-        .lp-panel::before {
-          content: "";
-          position: absolute;
-          top: 0; left: 12%; right: 12%;
-          height: 1px;
-          background: linear-gradient(90deg, transparent, rgba(255,255,255,1) 40%, rgba(255,255,255,1) 60%, transparent);
-          pointer-events: none;
-        }
-
-        /* Gradient accent top edge */
-        .lp-panel::after {
+        /* Top warm edge line */
+        .lp-card::before {
           content: "";
           position: absolute;
           top: 0; left: 0; right: 0;
-          height: 2px;
-          background: linear-gradient(90deg, rgba(157,111,232,0.5), rgba(232,121,160,0.5), rgba(157,111,232,0.5));
+          height: 1px;
+          background: linear-gradient(90deg,
+            transparent 0%,
+            rgba(0,0,0,0.10) 30%,
+            rgba(0,0,0,0.16) 50%,
+            rgba(0,0,0,0.10) 70%,
+            transparent 100%
+          );
           pointer-events: none;
         }
 
-        /* ── Feature cards ── */
-        .lp-card {
-          background: rgba(255,255,255,0.60);
-          border: 1px solid rgba(0,0,0,0.055);
-          border-radius: 18px;
-          backdrop-filter: blur(20px);
-          -webkit-backdrop-filter: blur(20px);
-          transition: transform 200ms cubic-bezier(.25,.46,.45,.94),
-                      box-shadow 200ms cubic-bezier(.25,.46,.45,.94),
-                      border-color 200ms;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03);
-        }
-        .lp-card:hover {
-          transform: translateY(-3px);
-          box-shadow: 0 8px 28px rgba(0,0,0,0.09), 0 2px 6px rgba(0,0,0,0.05);
-          border-color: rgba(157,111,232,0.18);
-        }
-
-        /* ── CTA button ── */
-        .lp-cta {
+        .lp-card-inner {
           position: relative;
-          overflow: hidden;
-          background: linear-gradient(135deg, ${C.p1}, ${C.p2});
-          border-radius: 999px;
-          transition: transform 180ms cubic-bezier(.25,.46,.45,.94),
-                      box-shadow 180ms cubic-bezier(.25,.46,.45,.94),
-                      opacity 180ms;
-        }
-        .lp-cta::before {
-          content: "";
-          position: absolute;
-          inset: 0;
-          background: linear-gradient(180deg, rgba(255,255,255,0.18) 0%, transparent 60%);
-          border-radius: inherit;
-          pointer-events: none;
-        }
-        .lp-cta-sweep {
-          position: absolute;
-          top: 0; bottom: 0;
-          width: 48px;
-          background: linear-gradient(90deg, transparent, rgba(255,255,255,0.28), transparent);
-          animation: lp-cta-sweep 3.2s ease-in-out infinite;
-          pointer-events: none;
-        }
-        @keyframes lp-cta-sweep {
-          0%   { left: -60px; opacity: 0; }
-          10%  { opacity: 1; }
-          70%  { left: calc(100% + 60px); opacity: 1; }
-          71%  { opacity: 0; }
-          100% { left: calc(100% + 60px); opacity: 0; }
-        }
-        .lp-cta:hover {
-          transform: translateY(-2px) scale(1.015);
-          box-shadow: 0 12px 36px rgba(157,111,232,0.32), 0 4px 10px rgba(157,111,232,0.18);
-          opacity: 0.96;
-        }
-        .lp-cta:active {
-          transform: translateY(0) scale(0.99);
+          z-index: 1;
+          padding: 36px 36px 40px;
         }
 
-        /* ── Secondary actions ── */
-        .lp-action {
-          background: rgba(255,255,255,0.70);
-          border: 1px solid rgba(0,0,0,0.08);
-          border-radius: 999px;
-          transition: transform 180ms cubic-bezier(.25,.46,.45,.94),
-                      box-shadow 180ms cubic-bezier(.25,.46,.45,.94);
-          box-shadow: 0 1px 4px rgba(0,0,0,0.05);
-        }
-        .lp-action:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 6px 20px rgba(0,0,0,0.09);
-        }
-
-        /* ── Staggered entrance ── */
-        .lp-in {
-          animation: lp-rise 600ms cubic-bezier(.22,.68,0,1.2) both;
-        }
-        .lp-in-1 { animation-delay: 40ms; }
-        .lp-in-2 { animation-delay: 100ms; }
-        .lp-in-3 { animation-delay: 160ms; }
-        .lp-in-4 { animation-delay: 220ms; }
-        .lp-in-5 { animation-delay: 280ms; }
-        .lp-in-6 { animation-delay: 340ms; }
-
-        @keyframes lp-rise {
-          from { opacity: 0; transform: translateY(16px) scale(0.98); }
-          to   { opacity: 1; transform: translateY(0) scale(1); }
-        }
-
-        /* ── Kicker badge ── */
-        .lp-badge {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          background: rgba(255,255,255,0.80);
-          border: 1px solid rgba(0,0,0,0.07);
-          border-radius: 999px;
-          padding: 4px 12px;
-          font-size: 11px;
-          font-weight: 800;
-          letter-spacing: 0.14em;
+        /* ── Wordmark / brand ── */
+        .lp-wordmark {
+          font-family: 'DM Mono', monospace;
+          font-size: 10px;
+          font-weight: 400;
+          letter-spacing: 0.28em;
           text-transform: uppercase;
-          color: #6b7280;
-          backdrop-filter: blur(12px);
+          color: rgba(0,0,0,0.55);
         }
-        .lp-badge-dot {
-          width: 7px; height: 7px;
-          border-radius: 999px;
-          background: linear-gradient(135deg, ${C.p1}, ${C.p2});
-          animation: lp-pulse 2.4s ease-in-out infinite;
+
+        /* ── Divider ── */
+        .lp-divider {
+          height: 1px;
+          background: linear-gradient(90deg, transparent, rgba(0,0,0,0.08) 30%, rgba(0,0,0,0.08) 70%, transparent);
+          margin: 28px 0;
+        }
+
+        /* ── Status dot ── */
+        .lp-dot {
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          background: #4caf7d;
+          box-shadow: 0 0 0 2px rgba(76,175,125,0.20);
+          flex-shrink: 0;
+        }
+
+        /* ── Feature list ── */
+        .lp-feature {
+          display: flex;
+          align-items: flex-start;
+          gap: 12px;
+          padding: 14px 0;
+          border-bottom: 1px solid rgba(0,0,0,0.055);
+        }
+        .lp-feature:last-child { border-bottom: none; }
+        .lp-feature-num {
+          font-family: 'DM Mono', monospace;
+          font-size: 10px;
+          font-weight: 400;
+          letter-spacing: 0.1em;
+          color: rgba(0,0,0,0.45);
+          padding-top: 1px;
+          min-width: 20px;
+        }
+        .lp-feature-label {
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+          color: rgba(0,0,0,0.55);
+          margin-bottom: 2px;
+        }
+        .lp-feature-body {
+          font-size: 13px;
+          font-weight: 500;
+          color: rgba(0,0,0,0.68);
+          line-height: 1.5;
+        }
+
+        /* ── Google CTA ── */
+        .lp-google-btn {
+          position: relative;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 10px;
+          width: 100%;
+          min-height: 52px;
+          border-radius: 12px;
+          border: 1px solid rgba(0,0,0,0.12);
+          background: rgba(0,0,0,0.04);
+          color: rgba(0,0,0,0.80);
+          font-size: 14px;
+          font-weight: 600;
+          letter-spacing: 0.01em;
+          cursor: pointer;
+          transition:
+            background 180ms ease,
+            border-color 180ms ease,
+            transform 160ms ease;
+        }
+        .lp-google-btn:hover {
+          background: rgba(0,0,0,0.07);
+          border-color: rgba(0,0,0,0.18);
+          transform: translateY(-1px);
+        }
+        .lp-google-btn:active {
+          transform: translateY(0);
+          background: rgba(0,0,0,0.05);
+        }
+
+        /* ── Dashboard link ── */
+        .lp-dash-btn {
+          position: relative;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 100%;
+          min-height: 52px;
+          border-radius: 12px;
+          background: #111110;
+          color: #ffffff;
+          font-size: 14px;
+          font-weight: 700;
+          letter-spacing: 0.01em;
+          cursor: pointer;
+          text-decoration: none;
+          transition:
+            background 180ms ease,
+            transform 160ms ease;
+        }
+        .lp-dash-btn:hover {
+          background: #1e1d1b;
+          transform: translateY(-1px);
+        }
+        .lp-dash-btn:active {
+          transform: translateY(0);
+        }
+
+        /* ── Ghost btn ── */
+        .lp-ghost-btn {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 100%;
+          min-height: 40px;
+          border-radius: 10px;
+          border: 1px solid rgba(0,0,0,0.12);
+          background: transparent;
+          color: rgba(0,0,0,0.55);
+          font-size: 12px;
+          font-weight: 500;
+          letter-spacing: 0.02em;
+          cursor: pointer;
+          text-decoration: none;
+          transition: color 160ms ease, border-color 160ms ease, background 160ms ease;
+        }
+        .lp-ghost-btn:hover {
+          color: rgba(0,0,0,0.75);
+          border-color: rgba(0,0,0,0.20);
+          background: rgba(0,0,0,0.03);
+        }
+
+        /* ── Signed-in email block ── */
+        .lp-email-block {
+          background: rgba(0,0,0,0.03);
+          border: 1px solid rgba(0,0,0,0.07);
+          border-radius: 10px;
+          padding: 14px 16px;
+        }
+
+        /* ── Hint text ── */
+        .lp-hint {
+          font-family: 'DM Mono', monospace;
+          font-size: 10px;
+          font-weight: 400;
+          letter-spacing: 0.08em;
+          color: rgba(0,0,0,0.50);
+          line-height: 1.7;
+          text-align: center;
+        }
+
+        /* ── Skeleton ── */
+        .lp-skeleton {
+          border-radius: 12px;
+          background: rgba(0,0,0,0.06);
+          animation: lp-pulse 1.8s ease-in-out infinite;
         }
         @keyframes lp-pulse {
-          0%, 100% { opacity: 1; transform: scale(1); }
-          50%       { opacity: 0.6; transform: scale(0.8); }
+          0%, 100% { opacity: 0.5; }
+          50% { opacity: 1; }
         }
 
-        /* ── Signed-in card ── */
-        .lp-signed-card {
-          background: rgba(255,255,255,0.65);
-          border: 1px solid rgba(0,0,0,0.06);
-          border-radius: 20px;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        /* ── Entrance ── */
+        .lp-fade {
+          animation: lp-up 500ms cubic-bezier(0.22, 0.68, 0, 1.1) both;
         }
-
-        /* ── Hint box ── */
-        .lp-hint {
-          background: rgba(255,255,255,0.52);
-          border: 1px solid rgba(0,0,0,0.055);
-          border-radius: 16px;
-          backdrop-filter: blur(12px);
-        }
-
-        /* ── Pulse skeleton ── */
-        .lp-skeleton {
-          background: linear-gradient(90deg, #e5e7eb 0%, #f3f4f6 50%, #e5e7eb 100%);
-          background-size: 200% 100%;
-          animation: lp-shimmer 1.4s ease-in-out infinite;
-          border-radius: 999px;
-        }
-        @keyframes lp-shimmer {
-          0%   { background-position: 200% 0; }
-          100% { background-position: -200% 0; }
+        .lp-fade-1 { animation-delay: 0ms; }
+        .lp-fade-2 { animation-delay: 60ms; }
+        .lp-fade-3 { animation-delay: 120ms; }
+        .lp-fade-4 { animation-delay: 180ms; }
+        @keyframes lp-up {
+          from { opacity: 0; transform: translateY(12px); }
+          to   { opacity: 1; transform: translateY(0); }
         }
 
         @media (prefers-reduced-motion: reduce) {
-          .lp-orb, .lp-sweep, .lp-cta-sweep, .lp-badge-dot,
-          .lp-skeleton, .lp-in {
-            animation: none !important;
-          }
-          .lp-cta:hover, .lp-action:hover, .lp-card:hover { transform: none; }
+          .lp-fade, .lp-skeleton { animation: none; }
+          .lp-google-btn:hover, .lp-dash-btn:hover { transform: none; }
+        }
+
+        @media (max-width: 480px) {
+          .lp-card-inner { padding: 28px 24px 32px; }
         }
       `}</style>
 
-      {/* Background layers */}
-      <div className="lp-grid" />
-      <div className="lp-orb lp-orb-1" />
-      <div className="lp-orb lp-orb-2" />
-      <div className="lp-orb lp-orb-3" />
+      <div className="lp-card lp-fade lp-fade-1">
+        <div className="lp-card-inner">
 
-      <section className="lp-panel relative w-full max-w-xl p-7 md:p-10">
-        <div className="lp-sweep" />
-
-        {/* Kicker row */}
-        <div className="lp-in lp-in-1 flex flex-wrap items-center gap-3">
-          <Link href="/" className="text-sm font-black" style={{ color: C.p1 }}>
-            SoloXSnaps
-          </Link>
-          <div className="lp-badge">
-            <span className="lp-badge-dot" />
-            Secure portal
-          </div>
-        </div>
-
-        {/* Heading */}
-        <h1
-          className="lp-in lp-in-2 mt-6 text-[2.6rem] font-black leading-[0.92] tracking-[-0.03em] md:text-6xl"
-          style={{ color: "#1a1a1a" }}
-        >
-          Client{" "}
-          <span style={C.text12}>portal</span>
-        </h1>
-
-        <p
-          className="lp-in lp-in-3 mt-4 max-w-md text-[0.94rem] leading-7 font-medium"
-          style={{ color: "#6b7280" }}
-        >
-          Sign in with the Google account tied to your inquiry to unlock your session timeline and delivery updates.
-        </p>
-
-        {/* Feature cards */}
-        <div className="lp-in lp-in-4 mt-7 grid gap-3 sm:grid-cols-3">
-          {[
-            { label: "Timeline", body: "Inquiry to delivery in one view" },
-            { label: "Login",    body: "Google email match keeps it simple" },
-            { label: "Updates",  body: "Progress stays visible as your session moves forward" },
-          ].map(({ label, body }) => (
-            <div key={label} className="lp-card p-4">
-              <p
-                className="text-[10px] font-black uppercase tracking-[0.16em]"
-                style={{ color: C.p1 }}
-              >
-                {label}
-              </p>
-              <p className="mt-2 text-sm font-semibold leading-5" style={{ color: "#1a1a1a" }}>
-                {body}
-              </p>
-            </div>
-          ))}
-        </div>
-
-        {/* Auth area */}
-        {loading ? (
-          <div className="lp-skeleton mt-7 h-12 w-full" />
-        ) : email ? (
-          <div className="lp-in lp-in-5 mt-7 grid gap-3">
-            <div className="lp-signed-card p-4">
-              <div className="text-[11px] font-black uppercase tracking-[0.14em]" style={{ color: C.p1 }}>
-                Signed in
-              </div>
-              <div className="mt-1 break-words text-sm font-bold" style={{ color: "#1a1a1a" }}>
-                {email}
-              </div>
-              <div
-                className="lp-badge mt-3"
-                style={{ fontSize: "10px" }}
-              >
-                <span className="lp-badge-dot" />
-                Authenticated on this device
-              </div>
-            </div>
-
-            <Link
-              href="/dashboard"
-              className="lp-cta inline-flex min-h-12 items-center justify-center px-5 text-sm font-black text-white"
-            >
-              <span className="lp-cta-sweep" />
-              <span className="relative">Go to dashboard</span>
+          {/* Brand row */}
+          <div className="lp-fade lp-fade-1 flex items-center justify-between">
+            <Link href="/" className="lp-wordmark hover:opacity-50 transition-opacity">
+              SoloXSnaps
             </Link>
-
-            {isAdmin && (
-              <Link
-                href="/admin/sessions"
-                className="lp-action inline-flex min-h-12 items-center justify-center px-5 text-sm font-black"
-                style={{ color: "#374151" }}
-              >
-                Open Portal Sessions
-              </Link>
-            )}
-
-            <button
-              type="button"
-              onClick={signOut}
-              className="lp-action min-h-11 px-5 text-sm font-bold"
-              style={{ color: "#9ca3af" }}
-            >
-              Sign out
-            </button>
-          </div>
-        ) : (
-          <div className="lp-in lp-in-5 mt-7 grid gap-3">
-            <button
-              type="button"
-              onClick={continueWithGoogle}
-              className="lp-cta min-h-[52px] w-full px-5 text-sm font-black text-white"
-            >
-              <span className="lp-cta-sweep" />
-              <span className="relative">Continue with Google</span>
-            </button>
-
-            <div className="lp-hint px-4 py-3 text-[11px] font-medium leading-5" style={{ color: "#9ca3af" }}>
-              Access follows your Google email match, so your session details stay tied to the right inquiry.
+            <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
+              <div className="lp-dot" />
+              <span className="lp-wordmark" style={{ color: "rgba(0,0,0,0.45)" }}>
+                Secure
+              </span>
             </div>
+          </div>
 
-            {error && (
-              <p className="text-sm font-bold" style={{ color: C.danger }}>
-                {error}
-              </p>
+          {/* Heading */}
+          <div className="lp-fade lp-fade-2" style={{ marginTop: "32px" }}>
+            <h1 style={{
+              fontFamily: "'Playfair Display', Georgia, serif",
+              fontSize: "clamp(2rem, 5vw, 2.75rem)",
+              fontWeight: 400,
+              lineHeight: 1.08,
+              letterSpacing: "-0.01em",
+              color: "rgba(0,0,0,0.88)",
+              margin: 0,
+            }}>
+              Client<br />
+              <em style={{ fontStyle: "italic", color: "rgba(0,0,0,0.52)" }}>portal</em>
+            </h1>
+            <p style={{
+              marginTop: "14px",
+              fontSize: "13px",
+              fontWeight: 400,
+              lineHeight: 1.7,
+              color: "rgba(0,0,0,0.60)",
+              maxWidth: "320px",
+            }}>
+              Sign in with the Google account tied to your inquiry to access your session timeline.
+            </p>
+          </div>
+
+          <div className="lp-divider" />
+
+          {/* Feature list */}
+          <div className="lp-fade lp-fade-3">
+            {[
+              { num: "01", label: "Timeline", body: "Inquiry through delivery in one view" },
+              { num: "02", label: "Access", body: "Matched to your Google email automatically" },
+              { num: "03", label: "Updates", body: "Progress syncs as your session moves forward" },
+            ].map(({ num, label, body }) => (
+              <div key={num} className="lp-feature">
+                <span className="lp-feature-num">{num}</span>
+                <div>
+                  <div className="lp-feature-label">{label}</div>
+                  <div className="lp-feature-body">{body}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="lp-divider" />
+
+          {/* Auth area */}
+          <div className="lp-fade lp-fade-4">
+            {loading ? (
+              <div className="lp-skeleton" style={{ height: "52px", width: "100%" }} />
+            ) : email ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                <div className="lp-email-block">
+                  <div style={{
+                    fontFamily: "'DM Mono', monospace",
+                    fontSize: "10px",
+                    fontWeight: 400,
+                    letterSpacing: "0.18em",
+                    textTransform: "uppercase",
+                    color: "rgba(0,0,0,0.52)",
+                    marginBottom: "6px",
+                  }}>
+                    Signed in as
+                  </div>
+                  <div style={{
+                    fontSize: "13px",
+                    fontWeight: 600,
+                    color: "rgba(0,0,0,0.72)",
+                    wordBreak: "break-all",
+                  }}>
+                    {email}
+                  </div>
+                </div>
+
+                <Link href="/dashboard" className="lp-dash-btn">
+                  Go to dashboard
+                </Link>
+
+                {isAdmin && (
+                  <Link href="/admin/sessions" className="lp-ghost-btn">
+                    Open Portal Sessions
+                  </Link>
+                )}
+
+                <button type="button" onClick={signOut} className="lp-ghost-btn">
+                  Sign out
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                <button type="button" onClick={continueWithGoogle} className="lp-google-btn">
+                  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="rgba(0,0,0,0.55)"/>
+                    <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="rgba(0,0,0,0.45)"/>
+                    <path d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="rgba(0,0,0,0.38)"/>
+                    <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" fill="rgba(0,0,0,0.50)"/>
+                  </svg>
+                  Continue with Google
+                </button>
+
+                {error && (
+                  <p style={{ fontSize: "12px", fontWeight: 600, color: C.danger, margin: 0 }}>
+                    {error}
+                  </p>
+                )}
+
+                <p className="lp-hint" style={{ marginTop: "4px" }}>
+                  Access is matched to your Google email — no password needed.
+                </p>
+              </div>
             )}
           </div>
-        )}
-      </section>
+
+        </div>
+      </div>
     </main>
   );
 }

@@ -1,4 +1,3 @@
-import { C } from "@/lib/colors";
 import {
   CLIENT_SESSION_STATUS_LABELS,
   getClientSessionProgress,
@@ -9,189 +8,218 @@ type SessionProgressTrackerProps = {
   status: ClientSessionStatus;
 };
 
-function getStateLabel(state: "completed" | "current" | "upcoming") {
-  if (state === "completed") return "Complete";
-  if (state === "current") return "Current";
-  return "Upcoming";
-}
+const TRACKER_STYLES = `
+  .spt-rail {
+    height: 2px;
+    background: rgba(0,0,0,0.07);
+    border-radius: 999px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .spt-fill {
+    height: 100%;
+    border-radius: inherit;
+    background: rgba(0,0,0,0.40);
+    transition: width 600ms cubic-bezier(0.22, 0.68, 0, 1.05);
+  }
+
+  .spt-step {
+    flex: 1;
+    min-width: 0;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: 1px solid transparent;
+    position: relative;
+    transition: border-color 180ms ease, background 180ms ease;
+  }
+
+  .spt-step[data-state="completed"] {
+    background: rgba(0,0,0,0.03);
+    border-color: rgba(0,0,0,0.07);
+  }
+
+  .spt-step[data-state="current"] {
+    background: rgba(0,0,0,0.05);
+    border-color: rgba(0,0,0,0.12);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+
+  .spt-step[data-state="upcoming"] {
+    background: transparent;
+    border-color: rgba(0,0,0,0.04);
+  }
+
+  .spt-mono {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    font-weight: 400;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .spt-fill { transition: none; }
+  }
+`;
 
 export default function SessionProgressTracker({ status }: SessionProgressTrackerProps) {
   const steps = getClientSessionProgress(status);
   const activeIndex = Math.max(0, steps.findIndex((step) => step.state === "current"));
   const currentStep = steps[activeIndex] ?? steps[0];
   const nextStep = steps[activeIndex + 1] ?? null;
-  const completedCount = steps.filter((step) => step.state === "completed").length;
+  const completedCount = steps.filter((s) => s.state === "completed").length;
   const progressPercent = steps.length > 1 ? (activeIndex / (steps.length - 1)) * 100 : 0;
 
   return (
     <div aria-label={`Current status: ${CLIENT_SESSION_STATUS_LABELS[status]}`}>
-      <style>{`
-        .session-progress-rail {
-          border-radius: 999px;
-          height: 6px;
-          overflow: hidden;
-        }
+      <style>{TRACKER_STYLES}</style>
 
-        .session-progress-fill {
-          animation: tracker-fill 700ms cubic-bezier(.2,.8,.2,1) both;
-          border-radius: inherit;
-          height: 100%;
-        }
-
-        .session-step-card {
-          animation: tracker-step 520ms cubic-bezier(.2,.8,.2,1) both;
-          transition: border-color 180ms ease, transform 180ms ease, box-shadow 180ms ease;
-        }
-
-        .session-step-card:hover {
-          transform: translateY(-3px);
-        }
-
-        .session-step-card[data-state="current"] {
-          transform: translateY(-4px);
-        }
-
-        .session-step-chip {
-          transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
-        }
-
-        .session-step-chip:hover {
-          transform: translateY(-2px);
-        }
-
-        @keyframes tracker-step {
-          from { opacity: 0; transform: translateY(12px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-
-        @keyframes tracker-fill {
-          from { width: 0%; }
-        }
-
-        @media (max-width: 767px) {
-          .session-step-card:hover {
-            transform: none;
-          }
-        }
-
-        @media (prefers-reduced-motion: reduce) {
-          .session-progress-fill,
-          .session-step-card,
-          .session-step-chip {
-            animation: none;
-            transition: none;
-          }
-
-          .session-step-chip:hover,
-          .session-step-card:hover,
-          .session-step-card[data-state="current"] {
-            transform: none;
-          }
-        }
-      `}</style>
-
-      <div className="rounded-[1.5rem] border p-4 md:hidden" style={{ background: "rgba(255,255,255,0.66)", borderColor: C.borderSubtle, boxShadow: C.shadowWarmSm }}>
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="text-[11px] font-black uppercase tracking-[0.16em]" style={{ color: C.p1 }}>
-              Current step
+      {/* Mobile: compact summary */}
+      <div className="md:hidden">
+        <div style={{
+          background: "rgba(0,0,0,0.03)",
+          border: "1px solid rgba(0,0,0,0.07)",
+          borderRadius: "12px",
+          padding: "16px",
+        }}>
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px", marginBottom: "14px" }}>
+            <div>
+              <div className="spt-mono" style={{ color: "rgba(0,0,0,0.50)", marginBottom: "6px" }}>
+                Current step
+              </div>
+              <div style={{
+                fontSize: "16px",
+                fontWeight: 700,
+                color: "rgba(0,0,0,0.82)",
+                lineHeight: 1.2,
+              }}>
+                {currentStep.label}
+              </div>
+              {nextStep && (
+                <div style={{
+                  marginTop: "4px",
+                  fontSize: "12px",
+                  color: "rgba(0,0,0,0.55)",
+                }}>
+                  Next: {nextStep.label}
+                </div>
+              )}
             </div>
-            <div className="mt-2 text-2xl font-black leading-tight" style={{ color: C.ink }}>
-              {currentStep.label}
-            </div>
-            <div className="mt-2 text-sm font-semibold" style={{ color: C.muted }}>
-              {nextStep ? `Next: ${nextStep.label}` : "Final step reached"}
+            <div className="spt-mono" style={{
+              color: "rgba(0,0,0,0.52)",
+              background: "rgba(0,0,0,0.04)",
+              border: "1px solid rgba(0,0,0,0.08)",
+              borderRadius: "6px",
+              padding: "5px 9px",
+              flexShrink: 0,
+            }}>
+              {activeIndex + 1} / {steps.length}
             </div>
           </div>
 
-          <div className="shrink-0 rounded-full px-3 py-2 text-xs font-black" style={{ background: C.p1_08, color: C.p1 }}>
-            {activeIndex + 1} / {steps.length}
+          {/* Rail */}
+          <div className="spt-rail">
+            <div className="spt-fill" style={{ width: `${progressPercent}%` }} />
           </div>
-        </div>
 
-        <div className="mt-4 rounded-full p-1" style={{ background: C.page }}>
-          <div className="session-progress-rail" style={{ background: C.p1_08 }}>
-            <div
-              className="session-progress-fill"
-              style={{ width: `${progressPercent}%`, background: C.grad90 }}
-            />
+          <div style={{
+            marginTop: "12px",
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "6px",
+          }}>
+            {steps.map((step, index) => (
+              <span
+                key={step.value}
+                style={{
+                  fontFamily: "'DM Mono', monospace",
+                  fontSize: "10px",
+                  fontWeight: step.state === "current" ? 500 : 400,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  color: step.state === "current"
+                    ? "rgba(0,0,0,0.82)"
+                    : step.state === "completed"
+                    ? "rgba(0,0,0,0.55)"
+                    : "rgba(0,0,0,0.32)",
+                  background: step.state === "current"
+                    ? "rgba(0,0,0,0.06)"
+                    : "transparent",
+                  border: `1px solid ${step.state === "current" ? "rgba(0,0,0,0.10)" : "transparent"}`,
+                  borderRadius: "5px",
+                  padding: step.state === "current" ? "3px 7px" : "3px 4px",
+                }}
+              >
+                {index + 1}. {step.label}
+              </span>
+            ))}
           </div>
-        </div>
 
-        <div className="mt-4 flex flex-wrap gap-2">
-          {steps.map((step, index) => (
-            <span
-              key={step.value}
-              className="session-step-chip rounded-full border px-3 py-2 text-[11px] font-black uppercase tracking-[0.1em]"
-              style={{
-                background: step.state === "current" ? C.grad12 : step.state === "completed" ? C.p1_08 : C.surfaceSoft,
-                borderColor: step.state === "current" ? C.p1_30 : C.borderSubtle,
-                boxShadow: step.state === "current" ? C.shadowWarmSm : "none",
-                color: step.state === "current" ? C.white : step.state === "completed" ? C.p1 : C.mutedSoft,
-              }}
-            >
-              {index + 1}. {step.label}
-            </span>
-          ))}
-        </div>
-
-        <div className="mt-4 text-xs font-bold" style={{ color: C.muted }}>
-          {completedCount} completed · {steps.length - activeIndex - 1} remaining
+          <div className="spt-mono" style={{ color: "rgba(0,0,0,0.48)", marginTop: "12px" }}>
+            {completedCount} completed · {steps.length - activeIndex - 1} remaining
+          </div>
         </div>
       </div>
 
+      {/* Desktop: step grid */}
       <div className="hidden md:block">
-        <div className="mb-5 rounded-full p-1" style={{ background: C.surfaceStrong }}>
-          <div className="session-progress-rail" style={{ background: C.p1_08 }}>
-            <div
-              className="session-progress-fill"
-              style={{ width: `${progressPercent}%`, background: C.grad90 }}
-            />
-          </div>
+        {/* Rail */}
+        <div className="spt-rail" style={{ marginBottom: "14px" }}>
+          <div className="spt-fill" style={{ width: `${progressPercent}%` }} />
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-9">
-          {steps.map((step, index) => {
-            const isCompleted = step.state === "completed";
-            const isCurrent = step.state === "current";
-            const stepBg = isCurrent ? C.grad12 : isCompleted ? C.surfaceWarm : C.surfaceStrong;
-            const border = isCurrent ? C.p1_35 : isCompleted ? C.p2_20 : C.borderSubtle;
-            const textColor = isCurrent ? C.white : isCompleted ? C.p1 : C.muted;
-
-            return (
-              <div key={step.value} className="relative">
-                <div
-                  className="session-step-card min-h-[96px] rounded-2xl border p-3 md:min-h-[128px]"
-                  data-state={step.state}
-                  style={{
-                    background: stepBg,
-                    borderColor: border,
-                    boxShadow: isCurrent ? C.shadowWarm : "none",
-                    animationDelay: `${index * 55}ms`,
-                  }}
-                >
-                  <div
-                    className="mb-3 flex h-7 w-7 items-center justify-center rounded-full text-xs font-black"
-                    style={{
-                      background: isCurrent ? C.white_22 : C.p1_08,
-                      color: textColor,
-                    }}
-                  >
-                    {index + 1}
-                  </div>
-                  <div className="text-sm font-black leading-tight" style={{ color: textColor }}>
-                    {step.label}
-                  </div>
-                  <div
-                    className="mt-2 text-[11px] font-bold uppercase tracking-[0.12em]"
-                    style={{ color: isCurrent ? C.white_82 : C.mutedSoft }}
-                  >
-                    {getStateLabel(step.state)}
-                  </div>
-                </div>
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: `repeat(${steps.length}, 1fr)`,
+          gap: "6px",
+        }}>
+          {steps.map((step, index) => (
+            <div
+              key={step.value}
+              className="spt-step"
+              data-state={step.state}
+            >
+              <div className="spt-mono" style={{
+                color: step.state === "current"
+                  ? "rgba(0,0,0,0.55)"
+                  : step.state === "completed"
+                  ? "rgba(0,0,0,0.42)"
+                  : "rgba(0,0,0,0.28)",
+                marginBottom: "6px",
+              }}>
+                {String(index + 1).padStart(2, "0")}
               </div>
-            );
-          })}
+              <div style={{
+                fontSize: "11px",
+                fontWeight: step.state === "current" ? 700 : 500,
+                lineHeight: 1.3,
+                color: step.state === "current"
+                  ? "rgba(0,0,0,0.85)"
+                  : step.state === "completed"
+                  ? "rgba(0,0,0,0.60)"
+                  : "rgba(0,0,0,0.38)",
+              }}>
+                {step.label}
+              </div>
+              {step.state === "current" && (
+                <div className="spt-mono" style={{
+                  color: "rgba(0,0,0,0.50)",
+                  marginTop: "6px",
+                }}>
+                  Active
+                </div>
+              )}
+              {step.state === "completed" && (
+                <div className="spt-mono" style={{
+                  color: "rgba(0,0,0,0.38)",
+                  marginTop: "6px",
+                }}>
+                  Done
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       </div>
     </div>
