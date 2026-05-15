@@ -546,7 +546,7 @@ export default function ConversationPage() {
           if (inquiry) {
             const recentText = messages
               .slice(-6)
-              .map(m => stripQuotes(m.body ?? "").slice(0, 120))
+              .map(m => stripQuotes(m.snippet ?? "").slice(0, 120))
               .join(" ");
             const ctx = [inquiry.name, inquiry.session_type, recentText].filter(Boolean).join(", ");
             fd.append("context", ctx);
