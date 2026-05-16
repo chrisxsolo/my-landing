@@ -1099,8 +1099,9 @@ function AdminDashboard() {
     if(aiDropFiles.length<1){showToast("Drop at least 1 photo",false);return;}
     setAiGenerating(true);
     try{
-      // Compress to ≤1600px before uploading to stay under Vercel's 4.5MB body limit
-      const compressedBlobs=await Promise.all(aiDropFiles.map(f=>compressImage(f,1600)));
+      // Compress to ≤900px / 0.75q — Claude only needs to see the image, not print it.
+      // 24 photos × ~80KB = ~2MB, well under Vercel's 4.5MB body limit.
+      const compressedBlobs=await Promise.all(aiDropFiles.map(f=>compressImage(f,900,0.75)));
       const fd=new FormData();
       compressedBlobs.forEach((blob,i)=>{
         const name=aiDropFiles[i].name.replace(/\.[^.]+$/,".jpg");
@@ -1109,8 +1110,9 @@ function AdminDashboard() {
       // AI-generated posts go to professional by default; user can edit after
       fd.append("sites","professional");
       const res=await fetch("/api/ai-blog-from-photos",{method:"POST",body:fd});
-      const json=await res.json();
-      if(!res.ok){showToast(json.error||"AI generation failed",false);return;}
+      let json:Record<string,unknown>={};
+      try{json=await res.json();}catch{/* non-JSON body (e.g. 413 from Vercel) */}
+      if(!res.ok){showToast((json.error as string)||`AI generation failed (${res.status})`,false);return;}
       showToast(`Published: "${json.title}" — ${json.photo_count} photos`);
       setAiDropFiles([]);setAiDropPreviews([]);setBlogCategory("professional");fetchPosts();
     }catch(err){

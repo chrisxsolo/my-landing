@@ -260,12 +260,25 @@ export default function ProNav() {
             -webkit-backdrop-filter: blur(20px);
             box-shadow: 0 16px 34px rgba(16, 24, 22, 0.12);
           }
-          .pro-mobile-panel .pro-nav-link,
-          .pro-mobile-panel .pro-nav-button,
-          .pro-mobile-panel .pro-nav-cta {
+          .pro-mobile-panel > .pro-nav-link,
+          .pro-mobile-panel > .pro-nav-button,
+          .pro-mobile-panel > .pro-nav-cta {
             width: 100%; min-height: 46px; justify-content: space-between; padding: 0 14px;
           }
-          .pro-mobile-panel .pro-nav-cta { justify-content: center; margin-top: 6px; }
+          .pro-mobile-panel > .pro-nav-cta { justify-content: center; margin-top: 6px; }
+          .pro-mobile-split {
+            display: flex; width: 100%; min-height: 46px;
+            border: 1px solid rgba(18,24,22,0.1); border-radius: 8px; overflow: hidden;
+          }
+          .pro-mobile-split .pro-nav-link {
+            flex: 1; min-height: 46px; border-radius: 0; border: none;
+            justify-content: flex-start; padding: 0 14px;
+          }
+          .pro-mobile-split .pro-nav-button {
+            min-height: 46px; border-radius: 0; border: none;
+            border-left: 1px solid rgba(18,24,22,0.1);
+            padding: 0 14px; min-width: 0;
+          }
           .pro-mobile-submenu { display: grid; gap: 4px; padding: 4px 0 8px 12px; }
           .pro-mobile-submenu .pro-nav-dropdown-link { min-height: 40px; background: rgba(245, 249, 247, 0.82); }
         }
@@ -284,12 +297,21 @@ export default function ProNav() {
               </Link>
             ))}
 
-            <div className="pro-dropdown-wrap">
-              <button className="pro-nav-button" type="button"
+            <div className="pro-dropdown-wrap" style={{ display: "flex" }}>
+              <Link
+                href="/portfolio"
+                className="pro-nav-link"
+                style={{ borderRadius: "8px 0 0 8px", paddingRight: 8 }}
                 aria-current={isPortfolioActive ? "page" : undefined}
+                onClick={closeMenus}
+              >
+                Work
+              </Link>
+              <button className="pro-nav-button" type="button"
+                style={{ borderRadius: "0 8px 8px 0", paddingLeft: 6, paddingRight: 8, minWidth: 0 }}
                 aria-expanded={portfolioOpen}
                 onClick={() => setPortfolioOpen((o) => !o)}>
-                Work <span className="pro-nav-caret">{portfolioOpen ? "▲" : "▼"}</span>
+                <span className="pro-nav-caret">{portfolioOpen ? "▲" : "▼"}</span>
               </button>
               {portfolioOpen && <div className="pro-nav-dropdown">{portfolioLinks.map(renderDropdownLink)}</div>}
             </div>
@@ -341,20 +363,26 @@ export default function ProNav() {
                   {link.label}
                 </Link>
               ))}
-              <button className="pro-nav-button" type="button" aria-expanded={portfolioOpen}
-                onClick={() => setPortfolioOpen((o) => !o)}>
-                Work <span className="pro-nav-caret">{portfolioOpen ? "▲" : "▼"}</span>
-              </button>
+              <div className="pro-mobile-split">
+                <Link href="/portfolio" className="pro-nav-link"
+                  aria-current={isPortfolioActive ? "page" : undefined}
+                  onClick={closeMenus}>
+                  Work
+                </Link>
+                <button className="pro-nav-button" type="button"
+                  aria-expanded={portfolioOpen}
+                  onClick={() => setPortfolioOpen((o) => !o)}>
+                  <span className="pro-nav-caret">{portfolioOpen ? "▲" : "▼"}</span>
+                </button>
+              </div>
               {portfolioOpen && <div className="pro-mobile-submenu">{portfolioLinks.map(renderDropdownLink)}</div>}
-              <div style={{ display: "flex", width: "100%" }}>
+              <div className="pro-mobile-split">
                 <Link href="/pricing" className="pro-nav-link"
-                  style={{ flex: 1, borderRadius: "8px 0 0 8px", justifyContent: "flex-start" }}
                   aria-current={isPricingActive ? "page" : undefined}
                   onClick={closeMenus}>
                   Rates
                 </Link>
                 <button className="pro-nav-button" type="button"
-                  style={{ borderRadius: "0 8px 8px 0", paddingLeft: 10, paddingRight: 10, minWidth: 0 }}
                   aria-expanded={pricingOpen}
                   onClick={() => setPricingOpen((o) => !o)}>
                   <span className="pro-nav-caret">{pricingOpen ? "▲" : "▼"}</span>
