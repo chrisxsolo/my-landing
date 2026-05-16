@@ -294,12 +294,21 @@ export default function ProNav() {
               {portfolioOpen && <div className="pro-nav-dropdown">{portfolioLinks.map(renderDropdownLink)}</div>}
             </div>
 
-            <div className="pro-dropdown-wrap">
-              <button className="pro-nav-button" type="button"
+            <div className="pro-dropdown-wrap" style={{ display: "flex" }}>
+              <Link
+                href="/pricing"
+                className="pro-nav-link"
+                style={{ borderRadius: "8px 0 0 8px", paddingRight: 8 }}
                 aria-current={isPricingActive ? "page" : undefined}
+                onClick={closeMenus}
+              >
+                Rates
+              </Link>
+              <button className="pro-nav-button" type="button"
+                style={{ borderRadius: "0 8px 8px 0", paddingLeft: 6, paddingRight: 8, minWidth: 0 }}
                 aria-expanded={pricingOpen}
                 onClick={() => setPricingOpen((o) => !o)}>
-                Rates <span className="pro-nav-caret">{pricingOpen ? "▲" : "▼"}</span>
+                <span className="pro-nav-caret">{pricingOpen ? "▲" : "▼"}</span>
               </button>
               {pricingOpen && <div className="pro-nav-dropdown">{pricingLinks.map(renderDropdownLink)}</div>}
             </div>
@@ -337,10 +346,20 @@ export default function ProNav() {
                 Work <span className="pro-nav-caret">{portfolioOpen ? "▲" : "▼"}</span>
               </button>
               {portfolioOpen && <div className="pro-mobile-submenu">{portfolioLinks.map(renderDropdownLink)}</div>}
-              <button className="pro-nav-button" type="button" aria-expanded={pricingOpen}
-                onClick={() => setPricingOpen((o) => !o)}>
-                Rates <span className="pro-nav-caret">{pricingOpen ? "▲" : "▼"}</span>
-              </button>
+              <div style={{ display: "flex", width: "100%" }}>
+                <Link href="/pricing" className="pro-nav-link"
+                  style={{ flex: 1, borderRadius: "8px 0 0 8px", justifyContent: "flex-start" }}
+                  aria-current={isPricingActive ? "page" : undefined}
+                  onClick={closeMenus}>
+                  Rates
+                </Link>
+                <button className="pro-nav-button" type="button"
+                  style={{ borderRadius: "0 8px 8px 0", paddingLeft: 10, paddingRight: 10, minWidth: 0 }}
+                  aria-expanded={pricingOpen}
+                  onClick={() => setPricingOpen((o) => !o)}>
+                  <span className="pro-nav-caret">{pricingOpen ? "▲" : "▼"}</span>
+                </button>
+              </div>
               {pricingOpen && <div className="pro-mobile-submenu">{pricingLinks.map(renderDropdownLink)}</div>}
               <Link
                 href={CLIENT_PORTAL_HREF}
