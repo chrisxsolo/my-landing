@@ -100,9 +100,10 @@ function buildSubject(inq:{session_type:string|null;message:string;date_in_mind:
   const school=detectSchool(haystack);
   return school?`${school} Graduation Inquiry`:"Graduation Inquiry";
 }
-function matchesPortfolioGroup(image:PortfolioImage,group:"grads"|"families"){
+function matchesPortfolioGroup(image:PortfolioImage,group:"grads"|"families"|"couples"){
   const slug=image.category_slug;
   if(group==="grads")return slug==="grads"||slug==="graduation";
+  if(group==="couples")return slug==="couples"||slug==="engagement";
   return slug==="families"||slug==="family"||slug==="portraits";
 }
 
@@ -2006,14 +2007,17 @@ function AdminDashboard() {
               <div className="h-[3px]" style={{background:"#111827"}}/>
               <div className="p-6">
                 <h2 className="text-base font-black text-slate-900 mb-1">Pricing Page Photos</h2>
-                <p className="text-xs text-slate-400 mb-5">Pick which portfolio images appear on the grad and family pricing pages.</p>
+                <p className="text-xs text-slate-400 mb-5">Pick which portfolio images appear on the grad, family, and couples pricing pages.</p>
                 <div className="space-y-4">
                   {([
                     {key:"pricing_grad_standard_image",label:"Grad package photo",helper:"Shown beside the standard graduation package.",category:"grads"},
                     {key:"pricing_grad_group_image",label:"Group grad photo",helper:"Shown in the group grad package section.",category:"grads"},
                     {key:"pricing_family_session_image",label:"Family session photo",helper:"Shown beside the family session package.",category:"families"},
                     {key:"pricing_family_extended_image",label:"Extended family photo",helper:"Shown beside the extended family package.",category:"families"},
-                  ] as {key:string;label:string;helper:string;category:"grads"|"families"}[]).map(({key,label,helper,category})=>{
+                    {key:"pricing_couples_standard_image",label:"Couples session photo",helper:"Shown beside the standard couples package.",category:"couples"},
+                    {key:"pricing_couples_engagement_image",label:"Engagement session photo",helper:"Shown beside the engagement package.",category:"couples"},
+                    {key:"pricing_couples_proposal_image",label:"Proposal coverage photo",helper:"Shown beside the proposal coverage package.",category:"couples"},
+                  ] as {key:string;label:string;helper:string;category:"grads"|"families"|"couples"}[]).map(({key,label,helper,category})=>{
                     const categoryImages=portfolioImages.filter(img=>matchesPortfolioGroup(img,category));
                     const pickerImages=categoryImages.length>0?categoryImages:portfolioImages;
 

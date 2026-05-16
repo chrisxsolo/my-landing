@@ -47,6 +47,7 @@ export default function ProNav() {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen]           = useState(false);
   const [portfolioOpen, setPortfolioOpen] = useState(false);
+  const [pricingOpen, setPricingOpen]     = useState(false);
   const navRef = useRef<HTMLElement>(null);
 
   const isPortfolioActive = portfolioLinks.some((link) => isActive(pathname, link.href));
@@ -56,16 +57,17 @@ export default function ProNav() {
   const closeMenus = () => {
     setMenuOpen(false);
     setPortfolioOpen(false);
+    setPricingOpen(false);
   };
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (navRef.current && !navRef.current.contains(e.target as Node)) {
-        setMenuOpen(false); setPortfolioOpen(false);
+        setMenuOpen(false); setPortfolioOpen(false); setPricingOpen(false);
       }
     }
     function handleKeydown(e: KeyboardEvent) {
-      if (e.key === "Escape") { setMenuOpen(false); setPortfolioOpen(false); }
+      if (e.key === "Escape") { setMenuOpen(false); setPortfolioOpen(false); setPricingOpen(false); }
     }
     document.addEventListener("mousedown", handleClick);
     document.addEventListener("keydown", handleKeydown);
@@ -292,14 +294,15 @@ export default function ProNav() {
               {portfolioOpen && <div className="pro-nav-dropdown">{portfolioLinks.map(renderDropdownLink)}</div>}
             </div>
 
-            <Link
-              href="/pricing"
-              className="pro-nav-link"
-              aria-current={isPricingActive ? "page" : undefined}
-              onClick={closeMenus}
-            >
-              Rates
-            </Link>
+            <div className="pro-dropdown-wrap">
+              <button className="pro-nav-button" type="button"
+                aria-current={isPricingActive ? "page" : undefined}
+                aria-expanded={pricingOpen}
+                onClick={() => setPricingOpen((o) => !o)}>
+                Rates <span className="pro-nav-caret">{pricingOpen ? "▲" : "▼"}</span>
+              </button>
+              {pricingOpen && <div className="pro-nav-dropdown">{pricingLinks.map(renderDropdownLink)}</div>}
+            </div>
           </nav>
 
           <div className="pro-nav-actions">
@@ -334,14 +337,11 @@ export default function ProNav() {
                 Work <span className="pro-nav-caret">{portfolioOpen ? "▲" : "▼"}</span>
               </button>
               {portfolioOpen && <div className="pro-mobile-submenu">{portfolioLinks.map(renderDropdownLink)}</div>}
-              <Link
-                href="/pricing"
-                className="pro-nav-link"
-                aria-current={isPricingActive ? "page" : undefined}
-                onClick={closeMenus}
-              >
-                Rates
-              </Link>
+              <button className="pro-nav-button" type="button" aria-expanded={pricingOpen}
+                onClick={() => setPricingOpen((o) => !o)}>
+                Rates <span className="pro-nav-caret">{pricingOpen ? "▲" : "▼"}</span>
+              </button>
+              {pricingOpen && <div className="pro-mobile-submenu">{pricingLinks.map(renderDropdownLink)}</div>}
               <Link
                 href={CLIENT_PORTAL_HREF}
                 className="pro-nav-link"

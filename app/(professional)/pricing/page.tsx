@@ -37,9 +37,10 @@ const RATES = [
 export default async function RatesPage() {
   const { images } = await getPortfolioData();
 
-  const gradBg   = images.find((i) => i.category_slug === "grads")?.image_url   ?? null;
-  const familyBg = images.find((i) => i.category_slug === "families")?.image_url ?? null;
-  const bgMap: Record<string, string | null> = { grads: gradBg, families: familyBg };
+  const gradBg    = images.find((i) => i.category_slug === "grads")?.image_url    ?? null;
+  const familyBg  = images.find((i) => i.category_slug === "families")?.image_url ?? null;
+  const couplesBg = images.find((i) => i.category_slug === "couples")?.image_url  ?? null;
+  const bgMap: Record<string, string | null> = { grads: gradBg, families: familyBg, couples: couplesBg };
 
   return (
     <main className="rates-root">
