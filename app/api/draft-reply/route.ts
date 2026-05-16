@@ -73,13 +73,22 @@ async function getAllVaultNotes(): Promise<VaultRow[]> {
 const VAULT_ALWAYS_INCLUDE = new Set(["03 Client Communication", "01 SOPs", "09 AI Instructions"]);
 
 const VAULT_KEYWORD_MAP: Record<string, string[]> = {
-  grad:       ["02 Pricing", "07 Client Experience", "10 Templates"],
-  family:     ["02 Pricing", "07 Client Experience"],
-  couple:     ["02 Pricing", "07 Client Experience"],
-  pricing:    ["02 Pricing"],
-  reschedule: ["10 Templates"],
-  cancel:     ["10 Templates"],
-  confirm:    ["10 Templates"],
+  grad:        ["02 Pricing", "07 Client Experience", "10 Templates"],
+  family:      ["02 Pricing", "07 Client Experience"],
+  couple:      ["02 Pricing", "07 Client Experience"],
+  pricing:     ["02 Pricing"],
+  reschedule:  ["10 Templates"],
+  cancel:      ["10 Templates"],
+  confirm:     ["10 Templates"],
+  // Event keywords — load event pricing note
+  event:       ["02 Pricing"],
+  reunion:     ["02 Pricing"],
+  party:       ["02 Pricing"],
+  networking:  ["02 Pricing"],
+  corporate:   ["02 Pricing"],
+  celebration: ["02 Pricing"],
+  candid:      ["02 Pricing"],
+  coverage:    ["02 Pricing"],
 };
 
 // Maps keywords → specific location note title (in "06 Locations" folder)
@@ -323,19 +332,19 @@ export async function POST(req: NextRequest) {
     ]);
 
     const vaultSection = vaultContext
-      ? `\n\n---\nBUSINESS KNOWLEDGE BASE (Obsidian vault — single source of truth for all pricing, policies, tone rules, and templates. Use this and only this for business facts):\n\n${vaultContext}\n---`
+      ? `\n\n---\nBUSINESS KNOWLEDGE BASE (single source of truth — use this and only this for pricing, policies, and facts):\n\n${vaultContext}\n---`
       : "";
 
-    const systemPrompt = `You are Chris Solorzano, a Bay Area photography business owner. You run soloxsnaps.com.
+    const systemPrompt = `You are Chris Solorzano, a Bay Area photographer. You're writing a real email to a real client.
 
-All business knowledge — pricing, policies, tone, communication rules — comes exclusively from the Obsidian vault below. Do not invent facts not in the vault.
+Write exactly like a friendly, confident photographer who genuinely loves their work and cares about their clients. Sound like a person, not a business. Conversational, warm, direct.
 
-Format rules (always apply):
-- Plain text only — no markdown, no bold, no asterisks, no bullet points in the output
-- Start directly with "Hi [Name]," — no subject line
-- Do NOT add a sign-off or name at the end — end the email with the last line of content only
-- Never include email headers, timestamps, or "to:" lines
-- No em dashes (—) — use commas or rewrite the sentence instead` + vaultSection;
+Hard rules (non-negotiable):
+- Plain text only — no markdown, bold, asterisks, or bullet points
+- Start with "Hi [Name]," — nothing before it, no subject line
+- No sign-off or name at the end — stop after the last sentence of content
+- No email headers, timestamps, or "To:" lines
+- No em dashes — use commas instead` + vaultSection;
 
     const examples = Array.isArray(gmail_examples) ? gmail_examples as string[] : [];
     const examplesSection = examples.length
@@ -347,6 +356,7 @@ Format rules (always apply):
       const response = await client.messages.create({
         model: "claude-sonnet-4-6",
         max_tokens: 600,
+        temperature: 0.9,
         system: systemPrompt + examplesSection,
         messages: [{
           role: "user",
@@ -392,17 +402,18 @@ Output only the polished email body, nothing else.`,
     Promise.resolve(buildVaultContext(allNotes, session_type, message)),
   ]);
 
-  const baseInstructions = `You are Chris Solorzano, a Bay Area photography business owner. You run soloxsnaps.com.
+  const baseInstructions = `You are Chris Solorzano, a Bay Area photographer. You're writing a real email to a real client.
 
-All business knowledge — pricing, add-ons, travel fees, policies, tone rules, communication structure — comes exclusively from the Obsidian vault below. Do not invent or assume any facts not present in the vault.
+Write exactly like a friendly, confident photographer who genuinely loves their work and cares about their clients. Sound like a person, not a business. Conversational, warm, direct. Use contractions naturally. Don't over-explain. Get to the point and keep it human.
 
-Format rules (always apply, non-negotiable):
-- Plain text only — no markdown, no bold, no asterisks, no bullet points in the output
-- Start directly with "Hi [Name]," — no subject line, no "Dear"
-- Do NOT add a sign-off or name at the end — end the email with the last line of content only
-- NEVER include email headers, timestamps, sender lines, or "to:" lines
-- Output only the reply body itself, starting with "Hi [Name],"
-- No em dashes (—) — use commas or rewrite the sentence instead`;
+All pricing, policies, and facts come exclusively from the vault below. Never invent anything not in the vault.
+
+Hard rules (non-negotiable):
+- Plain text only — no markdown, bold, asterisks, or bullet points
+- Start with "Hi [Name]," — nothing before it, no subject line
+- No sign-off or name at the end — stop after the last sentence of content
+- No email headers, timestamps, or "To:" lines
+- No em dashes — use commas instead`;
 
   const vaultSection = vaultContext
     ? `\n\n---\nBUSINESS KNOWLEDGE BASE (Obsidian vault — single source of truth. Use this and only this for all business facts, pricing, policies, and tone):\n\n${vaultContext}\n---`
@@ -456,6 +467,7 @@ Write the reply now.`;
     const response = await client.messages.create({
       model: "claude-sonnet-4-6",
       max_tokens: 600,
+      temperature: 0.9,
       messages: [{ role: "user", content: userPrompt }],
       system: systemPrompt,
     });

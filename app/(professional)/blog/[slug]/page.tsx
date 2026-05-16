@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import Image from "next/image";
 import { notFound } from "next/navigation";
 import { getBlogPostBySlug } from "@/lib/professionalData";
 
@@ -111,11 +112,15 @@ export default async function ProfessionalBlogPostPage({ params }: Props) {
       {/* ── COVER IMAGE ── */}
       {post.cover_image_url && (
         <div style={{ padding: "0 20px 80px", maxWidth: 1400, margin: "0 auto" }}>
-          <div style={{ overflow: "hidden", maxHeight: 780 }}>
-            <img
+          <div style={{ position: "relative", overflow: "hidden", maxHeight: 780, aspectRatio: "4/3" }}>
+            <Image
               src={post.cover_image_url}
               alt={post.title}
-              style={{ width: "100%", maxHeight: 780, objectFit: "cover", display: "block" }}
+              fill
+              sizes="(max-width: 1400px) 100vw, 1400px"
+              style={{ objectFit: "cover" }}
+              priority
+              quality={90}
             />
           </div>
         </div>
@@ -203,12 +208,16 @@ export default async function ProfessionalBlogPostPage({ params }: Props) {
                   marginBottom: 8,
                   breakInside: "avoid",
                   aspectRatio: i % 2 === 0 ? "4/5" : "5/4",
+                  position: "relative",
                 }}>
-                  <img
+                  <Image
                     src={url}
                     alt={`${post.title} — image ${i + 1}`}
                     className="slug-extra-img"
-                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                    fill
+                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                    style={{ objectFit: "cover" }}
+                    quality={85}
                   />
                 </div>
               ))}

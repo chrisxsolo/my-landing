@@ -898,7 +898,7 @@ function AdminDashboard() {
   useEffect(()=>{if(authed)fetchPosts();},[authed,blogCategory]);
   useEffect(()=>{if(authed&&(tab==="inquiries"||tab==="clients")){fetchInquiries();fetchPortalSessions();fetchGmailStatus();fetchBlockedSenders();}},[authed,tab]);
 
-  async function compressImage(file:File, maxPx=2400, quality=0.82):Promise<Blob>{
+  async function compressForAI(file:File, maxPx=900, quality=0.75):Promise<Blob>{
     return new Promise(resolve=>{
       const img=new Image();
       const url=URL.createObjectURL(file);
@@ -911,8 +911,7 @@ function AdminDashboard() {
         }
         const canvas=document.createElement('canvas');
         canvas.width=width; canvas.height=height;
-        const ctx=canvas.getContext('2d')!;
-        ctx.drawImage(img,0,0,width,height);
+        canvas.getContext('2d')!.drawImage(img,0,0,width,height);
         canvas.toBlob(blob=>resolve(blob??file),'image/jpeg',quality);
       };
       img.onerror=()=>{URL.revokeObjectURL(url);resolve(file);};
@@ -921,9 +920,9 @@ function AdminDashboard() {
   }
 
   async function uploadImage(file:File,folder:string):Promise<string|null>{
-    const compressed = await compressImage(file);
-    const name=`${folder}/${Date.now()}.jpg`;
-    const{error}=await supabase.storage.from('grad-photos').upload(name,compressed,{upsert:true,contentType:'image/jpeg'});
+    const ext=file.name.split('.').pop()?.toLowerCase()||'jpg';
+    const name=`${folder}/${Date.now()}.${ext}`;
+    const{error}=await supabase.storage.from('grad-photos').upload(name,file,{upsert:true,contentType:file.type});
     if(error){
       console.error("Upload error:", error);
       showToast(`Image upload failed: ${error.message}`,false);
@@ -1101,7 +1100,7 @@ function AdminDashboard() {
     try{
       // Compress to ≤900px / 0.75q — Claude only needs to see the image, not print it.
       // 24 photos × ~80KB = ~2MB, well under Vercel's 4.5MB body limit.
-      const compressedBlobs=await Promise.all(aiDropFiles.map(f=>compressImage(f,900,0.75)));
+      const compressedBlobs=await Promise.all(aiDropFiles.map(f=>compressForAI(f,900,0.75)));
       const fd=new FormData();
       compressedBlobs.forEach((blob,i)=>{
         const name=aiDropFiles[i].name.replace(/\.[^.]+$/,".jpg");

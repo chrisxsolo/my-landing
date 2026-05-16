@@ -1,6 +1,7 @@
 "use client";
 import { supabase } from '@/lib/supabase'
 import Link from "next/link";
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { GUIDE_STYLES } from "@/lib/guidestyles";
 import { C } from "@/lib/colors";
@@ -173,10 +174,14 @@ export default function BlogPostPage({ params }: { params: Promise<{ slug: strin
                 style={{ height: "clamp(280px, 55vh, 600px)" }}
                 onClick={() => setLightbox(post.cover_image_url!)}
               >
-                <img
+                <Image
                   src={post.cover_image_url}
                   alt={post.title}
-                  className="w-full h-full object-cover"
+                  fill
+                  sizes="100vw"
+                  className="object-cover"
+                  priority
+                  quality={90}
                 />
                 {/* Gradient scrim */}
                 <div
@@ -299,10 +304,13 @@ export default function BlogPostPage({ params }: { params: Promise<{ slug: strin
                           style={{ border: `1px solid ${C.borderWarm}`, boxShadow: C.shadowWarmSm }}
                           onClick={() => setLightbox(url)}
                         >
-                          <img
+                          <Image
                             src={url}
                             alt={`Photo ${i + 1}`}
-                            className="w-full h-full object-cover"
+                            fill
+                            sizes="(max-width: 640px) 50vw, 33vw"
+                            className="object-cover"
+                            quality={85}
                           />
                         </div>
                       );
