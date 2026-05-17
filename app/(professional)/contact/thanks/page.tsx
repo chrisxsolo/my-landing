@@ -121,9 +121,9 @@ const CSS = `
   }
   .thanks-portal-card {
     padding: 20px;
-    border: 1px solid rgba(157, 111, 232, 0.18);
+    border: 1px solid rgba(18, 24, 22, 0.1);
     border-radius: 8px;
-    background: rgba(157, 111, 232, 0.04);
+    background: rgba(247, 250, 248, 0.82);
     display: flex;
     align-items: flex-start;
     gap: 14px;
@@ -132,7 +132,7 @@ const CSS = `
     flex-shrink: 0;
     width: 36px; height: 36px;
     border-radius: 8px;
-    background: linear-gradient(135deg, #9d6fe8, #e879a0);
+    background: rgba(112, 139, 133, 0.16);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -157,16 +157,20 @@ const CSS = `
     min-height: 36px;
     padding: 0 14px;
     border-radius: 6px;
-    background: linear-gradient(135deg, #9d6fe8, #e879a0);
-    color: #ffffff;
+    border: 1px solid rgba(112, 139, 133, 0.22);
+    background: rgba(246, 250, 248, 0.94);
+    color: #4f6d67;
     font-size: 13px;
     font-weight: 820;
     text-decoration: none;
-    transition: opacity 0.18s ease, transform 0.18s ease;
+    box-shadow: 0 10px 24px rgba(112, 139, 133, 0.05);
+    transition: background 0.18s ease, transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
   }
   .thanks-portal-btn:hover {
-    opacity: 0.88;
     transform: translateY(-1px);
+    border-color: rgba(112, 139, 133, 0.32);
+    background: rgba(239, 246, 244, 0.98);
+    box-shadow: 0 14px 28px rgba(112, 139, 133, 0.07);
   }
   .thanks-card h2 {
     margin: 0 0 10px;
@@ -310,8 +314,8 @@ export default function ThanksPage() {
             <div className="thanks-portal-card" style={{ marginTop: 12 }}>
               <div className="thanks-portal-icon" aria-hidden="true">
                 <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                  <path d="M2.25 5.25A1.5 1.5 0 013.75 3.75h10.5A1.5 1.5 0 0115.75 5.25v7.5a1.5 1.5 0 01-1.5 1.5H3.75a1.5 1.5 0 01-1.5-1.5v-7.5z" stroke="#fff" strokeWidth="1.25"/>
-                  <path d="M2.25 5.25l6.75 5.25 6.75-5.25" stroke="#fff" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M2.25 5.25A1.5 1.5 0 013.75 3.75h10.5A1.5 1.5 0 0115.75 5.25v7.5a1.5 1.5 0 01-1.5 1.5H3.75a1.5 1.5 0 01-1.5-1.5v-7.5z" stroke="#4f6d67" strokeWidth="1.25"/>
+                  <path d="M2.25 5.25l6.75 5.25 6.75-5.25" stroke="#4f6d67" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               </div>
               <div className="thanks-portal-body">

@@ -1281,7 +1281,7 @@ function AdminDashboard() {
 
           const dayLabel=(d:string)=>{
             const dt=new Date(d+"T12:00:00");
-            const diff=Math.round((dt.getTime()-today.getTime())/(1000*60*60*24));
+            const diff=Math.floor((dt.getTime()-today.getTime())/(1000*60*60*24));
             if(diff===0)return"TODAY";
             if(diff===1)return"TOMORROW";
             return dt.toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"}).toUpperCase();
@@ -1353,7 +1353,7 @@ function AdminDashboard() {
                   ):(
                     <div className="flex flex-col gap-2">
                       {upcoming.map(inq=>{
-                        const diff=Math.round((new Date(inq.session_date!+"T12:00:00").getTime()-today.getTime())/(1000*60*60*24));
+                        const diff=Math.floor((new Date(inq.session_date!+"T12:00:00").getTime()-today.getTime())/(1000*60*60*24));
                         const isToday=diff===0;const isTomorrow=diff===1;
                         const remOpen=quickRemindersOpen[inq.id];
                         const remLoading=quickRemindersLoading[inq.id];

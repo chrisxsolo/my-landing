@@ -1,24 +1,42 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/requireAdmin";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
-import fs from "fs";
-import path from "path";
 
 export const dynamic = "force-dynamic";
 
-const VAULT_PATH =
-  process.env.OBSIDIAN_VAULT_PATH ??
-  "/Users/chrissolo/Documents/Photography Business Soloxsnaps";
+const DEFAULT_VAULT_PATH = "/Users/chrissolo/Documents/Photography Business Soloxsnaps";
 
 const SKIP_DIRS = new Set([".obsidian", ".trash", "99 Archive", "Inbox"]);
 
 type NoteRow = { id: string; title: string; folder: string; content: string; synced_at: string };
 
+type NodeFs = typeof import("node:fs");
+type NodePath = typeof import("node:path");
+
+function getVaultPath() {
+  return process.env.OBSIDIAN_VAULT_PATH ?? DEFAULT_VAULT_PATH;
+}
+
+function getNodeFs(): NodeFs {
+  // Load builtins at runtime so Turbopack does not trace the external vault path into the build.
+  return require(/* turbopackIgnore: true */ "node:fs");
+}
+
+function getNodePath(): NodePath {
+  return require(/* turbopackIgnore: true */ "node:path");
+}
+
 function readAllNotes(): NoteRow[] {
+  const fs = getNodeFs();
+  const path = getNodePath();
+  const vaultPath = getVaultPath();
+  const readDir = fs.readdirSync.bind(fs);
+  const readFile = fs.readFileSync.bind(fs);
+  const joinPath = path.join.bind(path);
   const rows: NoteRow[] = [];
   const now = new Date().toISOString();
 
-  const entries = fs.readdirSync(VAULT_PATH, { withFileTypes: true });
+  const entries = readDir(vaultPath, { withFileTypes: true });
 
   for (const entry of entries) {
     if (entry.isFile() && entry.name.endsWith(".md")) {
@@ -26,7 +44,7 @@ function readAllNotes(): NoteRow[] {
         id: entry.name,
         title: entry.name.replace(".md", ""),
         folder: "Root",
-        content: fs.readFileSync(path.join(VAULT_PATH, entry.name), "utf-8"),
+        content: readFile(joinPath(vaultPath, entry.name), "utf-8"),
         synced_at: now,
       });
     }
@@ -37,14 +55,14 @@ function readAllNotes(): NoteRow[] {
     .sort((a, b) => a.name.localeCompare(b.name));
 
   for (const dir of subdirs) {
-    const dirPath = path.join(VAULT_PATH, dir.name);
-    const files = fs.readdirSync(dirPath).filter(f => f.endsWith(".md"));
+    const dirPath = joinPath(vaultPath, dir.name);
+    const files = readDir(dirPath).filter(f => f.endsWith(".md"));
     for (const f of files) {
       rows.push({
         id: `${dir.name}/${f}`,
         title: f.replace(".md", ""),
         folder: dir.name,
-        content: fs.readFileSync(path.join(dirPath, f), "utf-8"),
+        content: readFile(joinPath(dirPath, f), "utf-8"),
         synced_at: now,
       });
     }

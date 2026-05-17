@@ -1580,7 +1580,17 @@ export default function ConversationPage() {
                           </button>
                         </div>
                         <div className="px-4 py-3 bg-white">
-                          <p className="text-[11px] font-bold text-slate-400 mb-1">Subject: {r.subject}</p>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Subject</p>
+                          <input
+                            type="text"
+                            value={r.subject}
+                            onChange={e => {
+                              const updated = e.target.value;
+                              setReminders(prev => prev.map((x, j) => j === i ? { ...x, subject: updated } : x));
+                            }}
+                            className="w-full text-xs font-semibold text-slate-700 rounded-lg px-2 py-1.5 mb-2 outline-none"
+                            style={{ border: "1px solid rgba(245,158,11,0.2)", background: "rgba(245,158,11,0.03)", fontFamily: "inherit" }}
+                          />
                           <textarea
                             value={r.body}
                             onChange={e => {
