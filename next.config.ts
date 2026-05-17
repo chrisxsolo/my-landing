@@ -5,6 +5,7 @@ const nextConfig: NextConfig = {
   // which has been getting into a corrupted state on this machine.
   distDir: process.env.NODE_ENV === "development" ? ".next-dev" : ".next",
   images: {
+    qualities: [75, 85, 90],
     remotePatterns: [
       {
         protocol: "https",
