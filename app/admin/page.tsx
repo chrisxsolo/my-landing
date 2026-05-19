@@ -47,7 +47,7 @@ export const dynamic = 'force-dynamic'
 
 type Tab = "home"|"poses"|"locations"|"bayGuide"|"portfolio"|"categories"|"blog"|"library"|"analytics"|"payments"|"inquiries"|"clients"|"funnel"|"vault";
 type ImageLibraryRow = { id:number; title:string; alt:string|null; image_url:string; source_type:string; source_post_id:number|null; source_post_slug:string|null; source_role:string; in_portfolio:boolean; created_at:string; };
-type Inquiry = { id:number; name:string; email:string; phone:string|null; session_type:string|null; date_in_mind:string|null; message:string; status:string; created_at:string; payment_status:string|null; payment_note:string|null; payment_detected_at:string|null; session_date:string|null; booking_confirmed:boolean|null; reply_sent_at:string|null; invoice_sent_at:string|null; contract_sent_at:string|null; deposit_paid_at:string|null; gallery_delivered_at:string|null; confirmation_sent_at:string|null; preferred_time:string|null; location:string|null; };
+type Inquiry = { id:number; name:string; email:string; phone:string|null; session_type:string|null; date_in_mind:string|null; message:string; status:string; created_at:string; payment_status:string|null; payment_note:string|null; payment_detected_at:string|null; session_date:string|null; booking_confirmed:boolean|null; reply_sent_at:string|null; invoice_sent_at:string|null; contract_sent_at:string|null; deposit_paid_at:string|null; gallery_delivered_at:string|null; confirmation_sent_at:string|null; preferred_time:string|null; location:string|null; school:string|null; instagram:string|null; people:string|null; };
 type AdminSessionsResponse = { sessions?: AdminClientSessionDTO[]; session?: AdminClientSessionDTO; error?: string; };
 type BlogCategory = "journal"|"professional";
 type Pose = { id:number; title:string; image_url:string; instructions:string; order:number; };
@@ -380,7 +380,7 @@ function AdminDashboard() {
   async function generateDraft(inq:Inquiry, feedback?:string){
     setDraftLoading(inq.id);
     try{
-      const payload:Record<string,string|null>={name:inq.name,email:inq.email,phone:inq.phone,session_type:inq.session_type,date_in_mind:inq.date_in_mind,message:inq.message};
+      const payload:Record<string,string|null>={name:inq.name,email:inq.email,phone:inq.phone,session_type:inq.session_type,date_in_mind:inq.date_in_mind,message:inq.message,school:inq.school,people:inq.people,preferred_time:inq.preferred_time,location:inq.location,instagram:inq.instagram};
       if(feedback&&drafts[inq.id]){payload.previous_draft=drafts[inq.id];payload.feedback=feedback;}
       const res=await fetch("/api/draft-reply",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
       const json=await res.json();
@@ -2748,6 +2748,7 @@ function AdminDashboard() {
                               </button>
                             )}
                             {inq.date_in_mind&&<><span className="text-slate-300">·</span><span className="text-slate-600">{inq.date_in_mind}</span></>}
+                            {inq.school&&<><span className="text-slate-300">·</span><span className="text-slate-600">{inq.school}</span></>}
                           </div>
                           {/* Payment / confirmation status pills */}
                           {(inq.deposit_paid_at||inq.invoice_sent_at||inq.contract_sent_at||inq.confirmation_sent_at||inq.gallery_delivered_at)&&(
@@ -2849,8 +2850,22 @@ function AdminDashboard() {
                       {isOpen&&(
                         <div className="border-t border-slate-100">
 
+                          {/* Session details */}
+                          {(inq.school||inq.instagram||inq.people||inq.preferred_time||inq.location)&&(
+                            <div className="p-4 sm:p-5" style={{background:"rgba(248,250,252,0.6)"}}>
+                              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Session Details</p>
+                              <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-xs">
+                                {inq.school&&<div><span className="font-bold text-slate-400 uppercase tracking-wide text-[10px]">School / Campus </span><span className="text-slate-700 font-medium">{inq.school}</span></div>}
+                                {inq.people&&<div><span className="font-bold text-slate-400 uppercase tracking-wide text-[10px]">People </span><span className="text-slate-700 font-medium">{inq.people}</span></div>}
+                                {inq.preferred_time&&<div><span className="font-bold text-slate-400 uppercase tracking-wide text-[10px]">Preferred time </span><span className="text-slate-700 font-medium">{inq.preferred_time}</span></div>}
+                                {inq.location&&<div><span className="font-bold text-slate-400 uppercase tracking-wide text-[10px]">Desired location </span><span className="text-slate-700 font-medium">{inq.location}</span></div>}
+                                {inq.instagram&&<div><span className="font-bold text-slate-400 uppercase tracking-wide text-[10px]">Instagram </span><span className="text-slate-700 font-medium">@{inq.instagram.replace(/^@/,"")}</span></div>}
+                              </div>
+                            </div>
+                          )}
+
                           {/* Full message */}
-                          <div className="p-4 sm:p-5" style={{background:"rgba(248,250,252,0.6)"}}>
+                          <div className="p-4 sm:p-5 border-t border-slate-100" style={{background:"rgba(248,250,252,0.6)"}}>
                             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Message</p>
                             <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{inq.message}</p>
                           </div>

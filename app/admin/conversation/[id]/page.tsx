@@ -15,6 +15,8 @@ type Inquiry = {
   payment_status: string | null; payment_note: string | null;
   payment_detected_at: string | null; booking_confirmed: boolean | null;
   session_date: string | null;
+  school: string | null; instagram: string | null; people: string | null;
+  preferred_time: string | null; location: string | null;
 };
 
 function fmtDate(ts: number) {
@@ -361,6 +363,11 @@ export default function ConversationPage() {
         session_type:        inquiry.session_type,
         date_in_mind:        inquiry.date_in_mind,
         message:             inquiry.message,
+        school:              inquiry.school,
+        people:              inquiry.people,
+        preferred_time:      inquiry.preferred_time,
+        location:            inquiry.location,
+        instagram:           inquiry.instagram,
         thread_context:      threadContext ?? null,
         latest_message_body: latestBody ?? null,
         latest_message_from: lastMsg ? (lastMsg.isMe ? "me" : "client") : null,
@@ -1048,8 +1055,13 @@ export default function ConversationPage() {
                     {copiedField === "Email-header" ? "Copied ✓" : inquiry.email}
                   </button>
                   {inquiry.phone && <span className="text-slate-500">{inquiry.phone}</span>}
+                  {inquiry.instagram && <span className="text-slate-500">@{inquiry.instagram.replace(/^@/, "")}</span>}
                   {inquiry.session_type && <span className="font-semibold text-slate-600">{inquiry.session_type}</span>}
+                  {inquiry.school && <span className="text-slate-500">{inquiry.school}</span>}
+                  {inquiry.people && <span className="text-slate-500">{inquiry.people}</span>}
                   {inquiry.date_in_mind && <span className="text-slate-500">{inquiry.date_in_mind}</span>}
+                  {inquiry.preferred_time && <span className="text-slate-500">{inquiry.preferred_time}</span>}
+                  {inquiry.location && <span className="text-slate-500">{inquiry.location}</span>}
                 </div>
               </div>
               <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{inquiry.message}</p>
@@ -1147,8 +1159,13 @@ export default function ConversationPage() {
                   {copiedField === "Phone" ? "Copied ✓" : inquiry.phone}
                 </button>
               )},
-              inquiry.session_type && { label: "Session", value: inquiry.session_type },
+              inquiry.instagram && { label: "Instagram", value: `@${inquiry.instagram.replace(/^@/, "")}` },
+              inquiry.session_type && { label: "Session",  value: inquiry.session_type },
+              inquiry.school      && { label: "School",   value: inquiry.school },
+              inquiry.people      && { label: "People",   value: inquiry.people },
               inquiry.date_in_mind && { label: "Date",    value: inquiry.date_in_mind },
+              inquiry.preferred_time && { label: "Time",  value: inquiry.preferred_time },
+              inquiry.location    && { label: "Location", value: inquiry.location },
               inquiry.session_date && { label: "Booked",  value: new Date(inquiry.session_date + "T12:00:00").toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) },
             ].filter(Boolean).map((row, i) => {
               const r = row as { label: string; value: ReactNode };
