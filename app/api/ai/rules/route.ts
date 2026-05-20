@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
   const supabase = createSupabaseServerClient();
   const { data, error } = await supabase
     .from("vault_notes")
-    .select("id, content, updated_at")
+    .select("id, content, synced_at")
     .eq("folder", RULES_FOLDER)
     .eq("title", RULES_TITLE)
     .single();
@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     content: data.content as string,
-    updated_at: (data as Record<string, unknown>).updated_at as string | null ?? null,
+    updated_at: data.synced_at ?? null,
     rule_count: lines.length,
   });
 }
