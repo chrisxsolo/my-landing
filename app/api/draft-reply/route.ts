@@ -357,7 +357,13 @@ Hard rules (non-negotiable):
         model: "claude-sonnet-4-6",
         max_tokens: 600,
         temperature: 0.9,
-        system: systemPrompt + examplesSection,
+        system: [
+          {
+            type: "text",
+            text: systemPrompt + examplesSection,
+            cache_control: { type: "ephemeral" },
+          },
+        ],
         messages: [{
           role: "user",
           content: `Polish the following rough email draft into a proper, well-formatted email in your voice.
@@ -469,7 +475,13 @@ Write the reply now.`;
       max_tokens: 600,
       temperature: 0.9,
       messages: [{ role: "user", content: userPrompt }],
-      system: systemPrompt,
+      system: [
+        {
+          type: "text",
+          text: systemPrompt,
+          cache_control: { type: "ephemeral" },
+        },
+      ],
     });
 
     let draft = response.content
