@@ -25,7 +25,7 @@ export default function AiTab() {
 
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  // Load most recent training session on mount
+  // Load most recent training session AND rules count on mount
   useEffect(() => {
     fetch("/api/ai/session/latest", { credentials: "include" })
       .then(r => r.json())
@@ -37,6 +37,12 @@ export default function AiTab() {
       })
       .catch(() => {/* no prior session */})
       .finally(() => setSessionLoading(false));
+
+    // Pre-load rules so the count is always visible in the header
+    fetch("/api/ai/rules", { credentials: "include" })
+      .then(r => r.json())
+      .then(d => setRulesData(d as RulesData))
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -134,6 +140,30 @@ export default function AiTab() {
           </button>
         </div>
       </div>
+
+      {/* Rules summary bar — always visible */}
+      {rulesData && (
+        <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl"
+          style={{ background: "rgba(99,102,241,0.06)", border: "1px solid rgba(99,102,241,0.15)" }}>
+          <div className="flex items-center gap-2 text-xs">
+            <span style={{ color: "#6366f1" }}>⚡</span>
+            <span className="font-semibold" style={{ color: "#4338ca" }}>
+              Claude knows {rulesData.rule_count} rule{rulesData.rule_count !== 1 ? "s" : ""}
+            </span>
+            {rulesData.updated_at && (
+              <span className="text-slate-400">
+                · last updated {new Date(rulesData.updated_at).toLocaleDateString()}
+              </span>
+            )}
+          </div>
+          <button
+            onClick={toggleRules}
+            className="text-xs font-bold px-2.5 py-1 rounded-lg border"
+            style={{ borderColor: "rgba(99,102,241,0.25)", color: "#6366f1", background: "#fff" }}>
+            {showRules ? "Hide" : "See all"}
+          </button>
+        </div>
+      )}
 
       {/* Rules Inspector */}
       {showRules && (

@@ -277,15 +277,21 @@ export async function POST(req: NextRequest) {
 
       const systemPrompt = perfect_draft
         ? `You are a writing-style analyst. An AI-generated email draft was sent to a client without any edits — meaning it was perfect. Your job is to extract concrete style rules from this email that describe what made it good and should be preserved in future drafts. Each rule should be a single actionable instruction (e.g. "keep replies to 3 sentences or fewer for pricing questions", "open with a direct answer before adding context", "use a warm but efficient tone — no filler phrases"). No fluff, no praise, no explanation — just the rules, one per line, starting with a dash.`
-        : `You are a writing-style analyst. Your job is to compare two email drafts and produce a short, concrete list of style rules that capture how the final version differs from the draft. Each rule should be a single actionable instruction (e.g. "skip the opening weather comment", "be more direct — cut the warm-up sentences", "always mention the turnaround time"). No fluff, no praise, no explanation — just the rules, one per line, starting with a dash. If the two drafts are substantively identical with no meaningful differences, output only the single word NONE on its own line and nothing else.`;
+        : `You are a writing-style analyst. Your job is to compare two email drafts and extract concrete style rules from every difference you find — even small ones. Any change Chris made, no matter how minor, is intentional and worth capturing as a rule.
+
+Rules must be actionable instructions for the AI writer (e.g. "skip the opening weather comment", "be more direct — cut the warm-up sentences", "always mention the turnaround time", "use 'Hey' not 'Hi'", "drop the second paragraph entirely for short confirmations").
+
+IMPORTANT: Do not dismiss differences as insignificant. If Chris changed even one word, one sentence, one paragraph, extract a rule from it. If the drafts differ in any way — word choice, length, tone, structure, what was included or omitted — there are rules to extract.
+
+No fluff, no praise, no explanation — just the rules, one per line, starting with a dash.`;
 
       const userContent = perfect_draft
         ? `This AI-generated draft was sent to a client exactly as written — no edits were made. Extract concrete style rules from it that should be preserved in future drafts.\n\n---\n${ai_draft}\n---\n\nList the style rules, one per line starting with a dash, nothing else.`
-        : `Here is the AI-generated draft:\n\n---\n${ai_draft}\n---\n\nHere is what Chris actually sent instead:\n\n---\n${actual_sent}\n---\n\nList the concrete style rules Claude should follow in future drafts based on the differences. Output only the rules, one per line starting with a dash, nothing else. If the drafts are substantively identical, output only NONE.`;
+        : `Here is the AI-generated draft:\n\n---\n${ai_draft}\n---\n\nHere is what Chris actually sent instead:\n\n---\n${actual_sent}\n---\n\nExtract every style rule from the differences between these two versions. Every change Chris made is intentional. List the rules, one per line starting with a dash, nothing else.`;
 
       const response = await client.messages.create({
         model: "claude-sonnet-4-6",
-        max_tokens: 500,
+        max_tokens: 600,
         system: systemPrompt,
         messages: [{ role: "user", content: userContent }],
       });
@@ -296,16 +302,10 @@ export async function POST(req: NextRequest) {
         .join("")
         .trim();
 
-      if (raw.trim().toUpperCase() === "NONE") {
-        return NextResponse.json({ rules: [], written: 0 });
-      }
-
-      const EXPLANATION_PATTERN = /identical|no (?:meaningful |significant |style |real )?diff|no changes|same email|essentially the same|no differences/i;
-
       const rules = raw
         .split("\n")
         .map(line => line.replace(/^[-–•*]\s*/, "").trim())
-        .filter(line => line.length > 0 && !EXPLANATION_PATTERN.test(line));
+        .filter(line => line.length > 10);
 
       const written = await mergeRulesToVault(rules, apiKey);
 
