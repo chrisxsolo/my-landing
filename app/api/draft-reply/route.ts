@@ -353,17 +353,21 @@ Hard rules (non-negotiable):
 
     try {
       const client = new Anthropic({ apiKey });
+      const systemBlocks: Array<{ type: "text"; text: string; cache_control?: { type: "ephemeral" } }> = [
+        {
+          type: "text",
+          text: systemPrompt,
+          cache_control: { type: "ephemeral" },
+        },
+      ];
+      if (examplesSection) {
+        systemBlocks.push({ type: "text", text: examplesSection });
+      }
       const response = await client.messages.create({
         model: "claude-sonnet-4-6",
         max_tokens: 600,
         temperature: 0.9,
-        system: [
-          {
-            type: "text",
-            text: systemPrompt + examplesSection,
-            cache_control: { type: "ephemeral" },
-          },
-        ],
+        system: systemBlocks,
         messages: [{
           role: "user",
           content: `Polish the following rough email draft into a proper, well-formatted email in your voice.

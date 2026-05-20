@@ -70,7 +70,8 @@ export default function AiTab() {
         setTimeout(() => setSavedRules([]), 5000);
         if (showRules) loadRules();
       }
-    } catch {
+    } catch (err) {
+      console.error("[AiTab] send error", err);
       setMessages(p => [...p, { role: "assistant", content: "Sorry, something went wrong. Try again." }]);
     } finally {
       setLoading(false);
@@ -83,7 +84,8 @@ export default function AiTab() {
       const res = await fetch("/api/ai/rules", { credentials: "include" });
       const d = await res.json() as RulesData;
       setRulesData(d);
-    } catch {
+    } catch (err) {
+      console.error("[AiTab] loadRules error", err);
       setRulesData(null);
     } finally {
       setRulesLoading(false);

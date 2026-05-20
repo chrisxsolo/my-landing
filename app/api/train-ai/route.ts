@@ -26,7 +26,8 @@ async function readCurrentRules(): Promise<{ id: string | null; content: string 
       .eq("title", RULES_TITLE)
       .single();
     return { id: data?.id ?? null, content: data?.content ?? "" };
-  } catch {
+  } catch (err) {
+    console.error("[train-ai] readCurrentRules error", err);
     return { id: null, content: "" };
   }
 }
@@ -34,13 +35,15 @@ async function readCurrentRules(): Promise<{ id: string | null; content: string 
 async function writeRules(id: string | null, content: string): Promise<void> {
   const supabase = createSupabaseServerClient();
   if (id) {
-    await supabase.from("vault_notes").update({ content }).eq("id", id);
+    const { error } = await supabase.from("vault_notes").update({ content }).eq("id", id);
+    if (error) console.error("[train-ai] writeRules update error", error);
   } else {
-    await supabase.from("vault_notes").insert({
+    const { error } = await supabase.from("vault_notes").insert({
       folder: RULES_FOLDER,
       title: RULES_TITLE,
       content,
     });
+    if (error) console.error("[train-ai] writeRules insert error", error);
   }
 }
 
@@ -118,6 +121,10 @@ export async function POST(req: NextRequest) {
     session_id?: string;
   };
 
+  if (!Array.isArray(messages) || messages.length === 0) {
+    return NextResponse.json({ error: "messages array required" }, { status: 400 });
+  }
+
   const client = new Anthropic({ apiKey });
   const { id: rulesId, content: currentRules } = await readCurrentRules();
 
@@ -144,7 +151,7 @@ export async function POST(req: NextRequest) {
   const rulesMatch = raw.match(/<rules>\s*(\[[\s\S]*?\])\s*<\/rules>/);
   let newRules: string[] = [];
   if (rulesMatch) {
-    try { newRules = JSON.parse(rulesMatch[1]) as string[]; } catch { /* ignore */ }
+    try { newRules = JSON.parse(rulesMatch[1]) as string[]; } catch (err) { console.error("[train-ai] failed to parse rules JSON", rulesMatch[1], err); }
   }
 
   const reply = raw.replace(/<rules>[\s\S]*?<\/rules>/, "").trim();
