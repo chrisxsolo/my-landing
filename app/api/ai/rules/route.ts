@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
 
   const lines = (data.content as string)
     .split("\n")
-    .filter(l => l.trim().startsWith("- ["));
+    .filter(l => l.trim().startsWith("- "));
 
   return NextResponse.json({
     content: data.content as string,
