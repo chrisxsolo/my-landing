@@ -34,6 +34,7 @@ import PaymentAnalyticsTab from "@/app/admin/PaymentAnalyticsTab";
 import ClientTimeline from "@/app/admin/ClientTimeline";
 import InquiryAnalyticsTab from "@/app/admin/InquiryAnalyticsTab";
 import VaultTab from "@/app/admin/VaultTab";
+import AiTab from "@/app/admin/AiTab";
 import SessionCalendar from "@/app/admin/SessionCalendar";
 import {
   findMatchingClientSession,
@@ -45,7 +46,7 @@ import {
 
 export const dynamic = 'force-dynamic'
 
-type Tab = "home"|"poses"|"locations"|"bayGuide"|"portfolio"|"categories"|"blog"|"library"|"analytics"|"payments"|"inquiries"|"clients"|"funnel"|"vault";
+type Tab = "home"|"poses"|"locations"|"bayGuide"|"portfolio"|"categories"|"blog"|"library"|"analytics"|"payments"|"inquiries"|"clients"|"funnel"|"vault"|"ai";
 type ImageLibraryRow = { id:number; title:string; alt:string|null; image_url:string; source_type:string; source_post_id:number|null; source_post_slug:string|null; source_role:string; in_portfolio:boolean; created_at:string; };
 type Inquiry = { id:number; name:string; email:string; phone:string|null; session_type:string|null; date_in_mind:string|null; message:string; status:string; created_at:string; payment_status:string|null; payment_note:string|null; payment_detected_at:string|null; session_date:string|null; booking_confirmed:boolean|null; reply_sent_at:string|null; invoice_sent_at:string|null; contract_sent_at:string|null; deposit_paid_at:string|null; gallery_delivered_at:string|null; confirmation_sent_at:string|null; preferred_time:string|null; location:string|null; school:string|null; instagram:string|null; people:string|null; };
 type AdminSessionsResponse = { sessions?: AdminClientSessionDTO[]; session?: AdminClientSessionDTO; error?: string; };
@@ -74,9 +75,9 @@ const BLOG_CATEGORIES:{value:BlogCategory;label:string;helper:string}[]=[
   {value:"professional",label:"Professional",helper:"Case studies at /blog"},
 ];
 const WEBSITE_TABS:Tab[]=["poses","locations","bayGuide","portfolio","categories","blog","library"];
-const CLIENT_TABS:Tab[]=["inquiries","clients","analytics","payments","funnel"];
+const CLIENT_TABS:Tab[]=["inquiries","clients","analytics","payments","funnel","ai"];
 const VAULT_TABS:Tab[]=["vault"];
-const TAB_LABELS:Record<Tab,string>={home:"🏠 Home",poses:"📸 Grad Poses",locations:"📍 Campus Spots",bayGuide:"🗺️ Bay Guide",portfolio:"🖼️ Portfolio",categories:"🏷️ Categories",blog:"✍️ Blog",library:"🗄️ Image Library",analytics:"📊 Analytics",payments:"💵 Revenue",funnel:"📈 Funnel",inquiries:"📬 Inquiries",clients:"👥 Clients",vault:"📓 Vault"};
+const TAB_LABELS:Record<Tab,string>={home:"🏠 Home",poses:"📸 Grad Poses",locations:"📍 Campus Spots",bayGuide:"🗺️ Bay Guide",portfolio:"🖼️ Portfolio",categories:"🏷️ Categories",blog:"✍️ Blog",library:"🗄️ Image Library",analytics:"📊 Analytics",payments:"💵 Revenue",funnel:"📈 Funnel",inquiries:"📬 Inquiries",clients:"👥 Clients",vault:"📓 Vault",ai:"🤖 AI Training"};
 
 function detectSchool(text:string):string|null{
   // Normalize accents (e.g. "José" → "Jose") so accented names still match
@@ -204,44 +205,6 @@ function AdminDashboard() {
   const [coverPickerKey, setCoverPickerKey] = useState<string|null>(null);
 
   // ── Reply style ───────────────────────────────────────────────────────
-
-  // ── Train AI chat ─────────────────────────────────────────────────────
-  const [trainOpen, setTrainOpen] = useState(false);
-  const [trainMessages, setTrainMessages] = useState<{role:"user"|"assistant";content:string}[]>([]);
-  const [trainInput, setTrainInput] = useState("");
-  const [trainLoading, setTrainLoading] = useState(false);
-  const [trainSavedRules, setTrainSavedRules] = useState<string[]>([]);
-  const trainBottomRef = useRef<HTMLDivElement>(null);
-
-  useEffect(()=>{
-    if(trainOpen) trainBottomRef.current?.scrollIntoView({behavior:"smooth"});
-  },[trainMessages, trainOpen]);
-
-  async function sendTrainMessage(){
-    if(!trainInput.trim()||trainLoading) return;
-    const userMsg = {role:"user" as const, content:trainInput.trim()};
-    const next = [...trainMessages, userMsg];
-    setTrainMessages(next);
-    setTrainInput("");
-    setTrainLoading(true);
-    try {
-      const res = await fetch("/api/train-ai",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({messages:next}),
-      });
-      const json = await res.json() as {reply:string; new_rules:string[]; saved_to_vault:boolean};
-      setTrainMessages(p=>[...p,{role:"assistant",content:json.reply}]);
-      if(json.new_rules?.length){
-        setTrainSavedRules(json.new_rules);
-        setTimeout(()=>setTrainSavedRules([]),4000);
-      }
-    } catch {
-      setTrainMessages(p=>[...p,{role:"assistant",content:"Sorry, something went wrong. Try again."}]);
-    } finally {
-      setTrainLoading(false);
-    }
-  }
 
   // ── Blog ──────────────────────────────────────────────────────────────
   const [posts,setPosts]=useState<BlogPost[]>([]);
@@ -2465,75 +2428,6 @@ function AdminDashboard() {
         {tab==="inquiries"&&(
           <div className="space-y-6">
 
-            {/* ── Train AI Chat (collapsible) ── */}
-            <div className={card}>
-              <div className="h-[3px]" style={{background:"linear-gradient(90deg,#6366f1,#8b5cf6)"}}/>
-              <button className="w-full p-5 flex items-center justify-between gap-4 text-left" onClick={()=>setTrainOpen(p=>!p)}>
-                <div className="flex items-center gap-3">
-                  <div className="w-7 h-7 rounded-lg flex items-center justify-center text-sm" style={{background:"rgba(99,102,241,0.1)"}}>💬</div>
-                  <div>
-                    <p className="text-sm font-black text-slate-900">Train AI</p>
-                    <p className="text-xs text-slate-400 mt-0.5">Chat to teach Claude what to say — rules save automatically</p>
-                  </div>
-                </div>
-                <span className="text-slate-400 text-sm transition-transform" style={{transform:trainOpen?"rotate(180deg)":"rotate(0deg)"}}>▾</span>
-              </button>
-              {trainOpen&&(
-                <div className="border-t border-slate-100">
-                  {/* Chat history */}
-                  <div className="p-4 space-y-3 max-h-80 overflow-y-auto">
-                    {trainMessages.length===0&&(
-                      <p className="text-xs text-slate-400 text-center py-4">
-                        Tell me how you want Claude to write your emails.<br/>
-                        <span className="text-slate-300">e.g. "Never add a travel fee for Santa Clara" or "Don't mention pricing unless they ask"</span>
-                      </p>
-                    )}
-                    {trainMessages.map((m,i)=>(
-                      <div key={i} className={`flex ${m.role==="user"?"justify-end":"justify-start"}`}>
-                        <div className="max-w-[80%] px-3 py-2 rounded-xl text-sm leading-relaxed"
-                          style={m.role==="user"
-                            ?{background:C.grad12,color:"#fff"}
-                            :{background:"rgba(99,102,241,0.08)",color:"#3730a3",border:"1px solid rgba(99,102,241,0.15)"}}>
-                          {m.content}
-                        </div>
-                      </div>
-                    ))}
-                    {trainLoading&&(
-                      <div className="flex justify-start">
-                        <div className="px-3 py-2 rounded-xl text-sm" style={{background:"rgba(99,102,241,0.08)",color:"#6366f1"}}>
-                          <span className="animate-spin inline-block mr-1">◌</span> Thinking…
-                        </div>
-                      </div>
-                    )}
-                    {trainSavedRules.length>0&&(
-                      <div className="px-3 py-2 rounded-xl text-xs" style={{background:"rgba(16,185,129,0.08)",color:"#059669",border:"1px solid rgba(16,185,129,0.2)"}}>
-                        ✓ Saved {trainSavedRules.length} rule{trainSavedRules.length>1?"s":""} to Obsidian vault
-                      </div>
-                    )}
-                    <div ref={trainBottomRef}/>
-                  </div>
-                  {/* Input */}
-                  <div className="p-4 border-t border-slate-100 flex gap-2">
-                    <input
-                      type="text"
-                      value={trainInput}
-                      onChange={e=>setTrainInput(e.target.value)}
-                      onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendTrainMessage();}}}
-                      placeholder="e.g. Don't add travel fees for South Bay shoots…"
-                      disabled={trainLoading}
-                      className="flex-1 text-sm px-3 py-2 rounded-xl outline-none disabled:opacity-50"
-                      style={{border:`1px solid ${C.p1_20}`,background:"#fff",fontFamily:"inherit"}}
-                    />
-                    <button onClick={sendTrainMessage} disabled={!trainInput.trim()||trainLoading}
-                      className="text-xs font-bold px-3 py-2 rounded-xl disabled:opacity-30 flex-shrink-0"
-                      style={{background:"linear-gradient(135deg,#6366f1,#8b5cf6)",color:"#fff"}}>
-                      Send
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
             {/* ── Gmail connection card ── */}
             <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
               <div className="h-[3px]" style={{background:gmailConnected?"linear-gradient(90deg,#34d399,#10b981)":C.grad90_12}}/>
@@ -3636,6 +3530,7 @@ function AdminDashboard() {
 
         {/* ── VAULT ── */}
         {tab==="vault"&&<VaultTab />}
+        {tab==="ai"&&<AiTab />}
       </div>
     </div>
   );
