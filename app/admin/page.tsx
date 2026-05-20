@@ -40,6 +40,7 @@ import {
   findMatchingClientSession,
   getClientSessionEmailMatches,
   CLIENT_SESSION_STATUS_LABELS,
+  CLIENT_SESSION_STATUS_VALUES,
   type AdminClientSessionDTO,
   type ClientSessionStatus,
 } from "@/lib/clientSessions";
@@ -666,6 +667,16 @@ function AdminDashboard() {
   function isPortalMatchAmbiguous(inquiry:Inquiry){
     const matches=getClientSessionEmailMatches(portalSessions,inquiry.email);
     return matches.length>1&&!getPortalSessionForInquiry(inquiry);
+  }
+
+  function getEffectivePortalStatus(inquiry:Inquiry,portalSession:AdminClientSessionDTO|null):ClientSessionStatus{
+    const stored=portalSession?.currentStatus??"inquiry_received";
+    const paid=inquiry.payment_status==="paid";
+    const statusIndex=CLIENT_SESSION_STATUS_VALUES.indexOf(stored);
+    const bookedIndex=CLIENT_SESSION_STATUS_VALUES.indexOf("booked");
+    if(paid&&statusIndex<bookedIndex)return"booked";
+    if(!paid&&statusIndex===bookedIndex)return"booking_in_progress";
+    return stored;
   }
 
   async function updatePortalStatusFromInquiry(inquiry:Inquiry,status:ClientSessionStatus){
@@ -3262,8 +3273,9 @@ function AdminDashboard() {
                               const portalSavingStatus=portalStatusSavingKey?.startsWith(`${s.id}:`)
                                 ? portalStatusSavingKey.split(":")[1] as ClientSessionStatus
                                 : null;
+                              const effectivePortalStatus=getEffectivePortalStatus(s,portalSession);
                               const portalStatusLabel=portalSession
-                                ? CLIENT_SESSION_STATUS_LABELS[portalSession.currentStatus as ClientSessionStatus]
+                                ? CLIENT_SESSION_STATUS_LABELS[effectivePortalStatus]
                                 : null;
 
                               return(
@@ -3380,7 +3392,7 @@ function AdminDashboard() {
                                     <div className="mt-3">
                                       <AdminSessionStatusStrip
                                         compact
-                                        currentStatus={portalSession?.currentStatus??"inquiry_received"}
+                                        currentStatus={effectivePortalStatus}
                                         savingStatus={portalSavingStatus}
                                         onSelect={status=>updatePortalStatusFromInquiry(s,status)}
                                       />
