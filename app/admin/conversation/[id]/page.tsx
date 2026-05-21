@@ -1136,7 +1136,7 @@ export default function ConversationPage() {
                           <span className="text-xs">Loading message…</span>
                         </div>
                       ) : (
-                        <pre className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap font-sans">
+                        <pre className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap font-sans" style={{ overflowWrap: "anywhere" }}>
                           {body ? stripQuotes(body) : msg.snippet}
                         </pre>
                       )}
