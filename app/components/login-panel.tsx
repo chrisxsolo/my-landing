@@ -65,10 +65,10 @@ export default function LoginPanel() {
 
   async function continueWithGoogle() {
     setError(null);
-    const redirectTo = `${getOAuthOrigin()}${nextPath}`;
+    const callbackUrl = `${getOAuthOrigin()}/auth/callback?next=${encodeURIComponent(nextPath)}`;
     const { error: signInError } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo },
+      options: { redirectTo: callbackUrl },
     });
     if (signInError) setError(signInError.message);
   }
