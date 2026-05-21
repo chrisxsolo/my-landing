@@ -227,6 +227,8 @@ function AdminDashboard() {
   const [aiDropPreviews,setAiDropPreviews]=useState<string[]>([]);
   const [aiDropDragging,setAiDropDragging]=useState(false);
   const [aiGenerating,setAiGenerating]=useState(false);
+  const [coverDragging,setCoverDragging]=useState(false);
+  const [extraDragging,setExtraDragging]=useState(false);
 
   // ── Clients ───────────────────────────────────────────────────────────────
   const [clientSearch,setClientSearch]=useState("");
@@ -1105,7 +1107,24 @@ function AdminDashboard() {
 
   function onCoverImg(e:React.ChangeEvent<HTMLInputElement>){const f=e.target.files?.[0];if(!f)return;setCoverImg(f);setCoverImgPreview(URL.createObjectURL(f));}
   function onExtraImgs(e:React.ChangeEvent<HTMLInputElement>){const files=Array.from(e.target.files??[]);if(!files.length)return;setExtraImgs(prev=>[...prev,...files]);setExtraPreviews(prev=>[...prev,...files.map(f=>URL.createObjectURL(f))]);}
-  function removeExtraPreview(i:number){setExtraPreviews(p=>p.filter((_,j)=>j!==i));setExtraImgs(p=>p.filter((_,j)=>j!==i));}
+  function removeExtraPreview(i:number){
+    const url=extraPreviews[i];
+    setExtraPreviews(p=>p.filter((_,j)=>j!==i));
+    // Only remove from new-file queue if it's a blob URL (not a saved URL)
+    if(url.startsWith("blob:")){setExtraImgs(p=>p.filter((_,j)=>j!==i));}
+  }
+  function onCoverDrop(e:React.DragEvent){
+    e.preventDefault();setCoverDragging(false);
+    const f=Array.from(e.dataTransfer.files).find(f=>f.type.startsWith("image/"));
+    if(!f)return;setCoverImg(f);setCoverImgPreview(URL.createObjectURL(f));
+  }
+  function onExtraDrop(e:React.DragEvent){
+    e.preventDefault();setExtraDragging(false);
+    const files=Array.from(e.dataTransfer.files).filter(f=>f.type.startsWith("image/"));
+    if(!files.length)return;
+    setExtraImgs(prev=>[...prev,...files]);
+    setExtraPreviews(prev=>[...prev,...files.map(f=>URL.createObjectURL(f))]);
+  }
 
   async function syncImagesToLibrary(postId:number, postSlug:string, postTitle:string, cover_image_url:string|null, extra_image_urls:string[]){
     const rows = buildJournalImageLibraryRows({postId, postSlug, postTitle, coverImageUrl: cover_image_url, extraImageUrls: extra_image_urls});
@@ -1117,8 +1136,9 @@ function AdminDashboard() {
     if(!postForm.title||!postForm.body){showToast("Title and body required",false);return;}
     setPostSaving(true);
     const slug=postForm.slug||slugify(postForm.title);
-    let cover_image_url=editingPost?.cover_image_url??null;
+    let cover_image_url=coverImgPreview??(editingPost?.cover_image_url??null);
     if(coverImg){const url=await uploadImage(coverImg,"blog");if(!url){setPostSaving(false);return;}cover_image_url=url;}
+    else if(!coverImgPreview){cover_image_url=null;}
     const existingExtras=editingPost?.extra_image_urls??[];
     const newExtraUrls:string[]=[];
     for(const f of extraImgs){const url=await uploadImage(f,"blog");if(url)newExtraUrls.push(url);}
@@ -2329,17 +2349,30 @@ function AdminDashboard() {
                 <div className="mb-4">
                   <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Cover Photo</label>
                   {coverImgPreview?(
-                    <div className="relative w-full h-52 rounded-xl overflow-hidden mb-2">
+                    <div
+                      className="relative w-full h-52 rounded-xl overflow-hidden mb-2"
+                      onDragOver={e=>{e.preventDefault();setCoverDragging(true);}}
+                      onDragLeave={()=>setCoverDragging(false)}
+                      onDrop={onCoverDrop}
+                      style={coverDragging?{outline:`2px solid ${C.p1}`}:{}}
+                    >
                       <img src={coverImgPreview} className="w-full h-full object-cover"/>
-                      <button onClick={()=>{setCoverImg(null);setCoverImgPreview(editingPost?.cover_image_url||null);if(coverFileRef.current)coverFileRef.current.value="";}} className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/50 text-white text-sm font-bold flex items-center justify-center">✕</button>
+                      <button onClick={()=>{setCoverImg(null);setCoverImgPreview(null);if(coverFileRef.current)coverFileRef.current.value="";}} className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/50 text-white text-sm font-bold flex items-center justify-center">✕</button>
                       <button onClick={()=>coverFileRef.current?.click()} className="absolute bottom-2 right-2 text-xs font-bold text-white px-3 py-1.5 rounded-full" style={{background:C.p1_20}}>Change</button>
                     </div>
                   ):(
-                    <button onClick={()=>coverFileRef.current?.click()} className="w-full h-40 rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-2" style={{borderColor:C.p1_20,background:C.p1_04}}>
+                    <div
+                      onClick={()=>coverFileRef.current?.click()}
+                      onDragOver={e=>{e.preventDefault();setCoverDragging(true);}}
+                      onDragLeave={()=>setCoverDragging(false)}
+                      onDrop={onCoverDrop}
+                      className="w-full h-40 rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-2 cursor-pointer"
+                      style={{borderColor:coverDragging?C.p1:C.p1_20,background:coverDragging?C.p1_08:C.p1_04}}
+                    >
                       <span className="text-3xl">🖼️</span>
-                      <span className="text-xs font-bold" style={{color:C.p1}}>Tap to upload cover photo</span>
+                      <span className="text-xs font-bold" style={{color:C.p1}}>{coverDragging?"Drop it":"Tap or drag cover photo"}</span>
                       <span className="text-xs text-slate-400">JPG, PNG, HEIC</span>
-                    </button>
+                    </div>
                   )}
                   <input ref={coverFileRef} type="file" accept="image/*" className="hidden" onChange={onCoverImg}/>
                 </div>
@@ -2357,20 +2390,30 @@ function AdminDashboard() {
                   {/* Extra photos */}
                   <div>
                     <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Extra Photos ({extraPreviews.length})</label>
-                    <div className="grid grid-cols-3 gap-2 mb-2">
+                    <div
+                      className="grid grid-cols-3 gap-2 mb-2 rounded-xl transition-all"
+                      onDragOver={e=>{e.preventDefault();setExtraDragging(true);}}
+                      onDragLeave={e=>{if(!e.currentTarget.contains(e.relatedTarget as Node))setExtraDragging(false);}}
+                      onDrop={onExtraDrop}
+                      style={extraDragging?{outline:`2px dashed ${C.p2}`,outlineOffset:"4px",background:C.p2_06}:{}}
+                    >
                       {extraPreviews.map((url,i)=>(
                         <div key={i} className="relative aspect-square rounded-xl overflow-hidden">
                           <img src={url} className="w-full h-full object-cover"/>
                           <button onClick={()=>removeExtraPreview(i)} className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/50 text-white text-xs font-bold flex items-center justify-center">✕</button>
                         </div>
                       ))}
-                      <button onClick={()=>extraFileRef.current?.click()} className="aspect-square rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-1" style={{borderColor:C.p2_18,background:C.p2_06}}>
+                      <div
+                        onClick={()=>extraFileRef.current?.click()}
+                        className="aspect-square rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-1 cursor-pointer"
+                        style={{borderColor:extraDragging?C.p2:C.p2_18,background:extraDragging?C.p2_06:"transparent"}}
+                      >
                         <span className="text-xl">+</span>
-                        <span className="text-[10px] font-bold" style={{color:C.p2}}>Add photos</span>
-                      </button>
+                        <span className="text-[10px] font-bold" style={{color:C.p2}}>{extraDragging?"Drop":"Add photos"}</span>
+                      </div>
                     </div>
                     <input ref={extraFileRef} type="file" accept="image/*" multiple className="hidden" onChange={onExtraImgs}/>
-                    <p className="text-xs text-slate-400">Add as many as you want. They'll show in a grid below the post body.</p>
+                    <p className="text-xs text-slate-400">Drag & drop photos here, or tap + to pick. Hit ✕ on any photo to remove it.</p>
                   </div>
 
                   <button onClick={savePost} disabled={postSaving} className="w-full py-3 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90 active:scale-95 mt-2" style={{background:C.grad,opacity:postSaving?0.7:1}}>
