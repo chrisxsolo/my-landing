@@ -11,7 +11,7 @@ type Session = {
   booking_confirmed: boolean | null;
 };
 
-type Props = { sessions: Session[]; onClientClick: () => void; onRemindersClick?: (id: number) => void; remindersLoading?: Record<number,boolean>; remindersOpen?: Record<number,boolean> };
+type Props = { sessions: Session[]; onClientClick: () => void; onReschedule?: (id: number, newDate: string) => Promise<void>; onRemindersClick?: (id: number) => void; remindersLoading?: Record<number,boolean>; remindersOpen?: Record<number,boolean> };
 
 const GRAD_COLOR  = { grad: "linear-gradient(135deg,#34d399,#059669)", text: "#059669", bg: "rgba(52,211,153,0.13)" };
 const TODAY_COLOR = { grad: "linear-gradient(135deg,#a78bfa,#7c3aed)", text: "#7c3aed", bg: "rgba(167,139,250,0.13)" };
@@ -33,13 +33,16 @@ function colorFor(s: Session): typeof GRAD_COLOR {
   return OTHER_COLORS[s.id % OTHER_COLORS.length];
 }
 
-export default function SessionCalendar({ sessions, onClientClick, onRemindersClick, remindersLoading = {}, remindersOpen = {} }: Props) {
+export default function SessionCalendar({ sessions, onClientClick, onReschedule, onRemindersClick, remindersLoading = {}, remindersOpen = {} }: Props) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
   const [viewYear, setViewYear]   = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
   const [selected, setSelected]   = useState<string | null>(null);
+  const [reschedulingId, setReschedulingId] = useState<number | null>(null);
+  const [rescheduleValue, setRescheduleValue] = useState("");
+  const [rescheduleLoading, setRescheduleLoading] = useState(false);
 
   const monthStart  = new Date(viewYear, viewMonth, 1);
   const monthEnd    = new Date(viewYear, viewMonth + 1, 0);
@@ -211,38 +214,101 @@ export default function SessionCalendar({ sessions, onClientClick, onRemindersCl
             {selectedSessions.map(s => {
               const col = colorFor(s);
               const isPaid = s.payment_status === "paid";
+              const isRescheduling = reschedulingId === s.id;
+
+              function startReschedule() {
+                // Pre-fill with the existing date+time (datetime-local format)
+                const existing = s.session_date ? (() => {
+                  const d = new Date(s.session_date + "T12:00:00");
+                  const pad = (n: number) => String(n).padStart(2, "0");
+                  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T12:00`;
+                })() : "";
+                setRescheduleValue(existing);
+                setReschedulingId(s.id);
+              }
+
+              async function confirmReschedule() {
+                if (!rescheduleValue || !onReschedule) return;
+                setRescheduleLoading(true);
+                await onReschedule(s.id, rescheduleValue);
+                setRescheduleLoading(false);
+                setReschedulingId(null);
+              }
+
               return (
                 <div
                   key={s.id}
-                  className="flex items-center gap-3 p-3 rounded-2xl"
+                  className="rounded-2xl overflow-hidden"
                   style={{
                     background: "rgba(255,255,255,0.9)",
                     border: "1px solid rgba(167,139,250,0.15)",
                     boxShadow: "0 2px 8px rgba(124,58,237,0.06)",
                   }}>
-                  <div
-                    className="w-9 h-9 rounded-xl flex items-center justify-center text-base flex-shrink-0"
-                    style={{ background: col.grad }}>
-                    📸
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-black text-slate-900 truncate">{s.name}</p>
-                    <p className="text-xs text-slate-400 truncate">{s.session_type || "Session"}</p>
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    {isPaid && (
-                      <span className="text-[10px] font-black px-2 py-0.5 rounded-lg"
-                        style={{ background: "rgba(16,185,129,0.1)", color: "#059669" }}>
-                        Paid ✓
-                      </span>
-                    )}
-                    <button
-                      onClick={onClientClick}
-                      className="text-[11px] font-bold px-2.5 py-1 rounded-lg text-white"
+                  <div className="flex items-center gap-3 p-3">
+                    <div
+                      className="w-9 h-9 rounded-xl flex items-center justify-center text-base flex-shrink-0"
                       style={{ background: col.grad }}>
-                      View →
-                    </button>
+                      📸
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-black text-slate-900 truncate">{s.name}</p>
+                      <p className="text-xs text-slate-400 truncate">{s.session_type || "Session"}</p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {isPaid && (
+                        <span className="text-[10px] font-black px-2 py-0.5 rounded-lg"
+                          style={{ background: "rgba(16,185,129,0.1)", color: "#059669" }}>
+                          Paid ✓
+                        </span>
+                      )}
+                      {onReschedule && !isRescheduling && (
+                        <button
+                          onClick={startReschedule}
+                          className="text-[11px] font-bold px-2.5 py-1 rounded-lg"
+                          style={{ background: "rgba(124,58,237,0.08)", color: "#7c3aed" }}>
+                          Reschedule
+                        </button>
+                      )}
+                      <button
+                        onClick={onClientClick}
+                        className="text-[11px] font-bold px-2.5 py-1 rounded-lg text-white"
+                        style={{ background: col.grad }}>
+                        View →
+                      </button>
+                    </div>
                   </div>
+
+                  {isRescheduling && (
+                    <div className="px-3 pb-3 pt-0">
+                      <div className="rounded-xl p-3" style={{ background: "rgba(124,58,237,0.06)", border: "1px solid rgba(124,58,237,0.15)" }}>
+                        <p className="text-[10px] font-black uppercase tracking-widest mb-2" style={{ color: "#7c3aed" }}>
+                          New date &amp; time
+                        </p>
+                        <input
+                          type="datetime-local"
+                          value={rescheduleValue}
+                          onChange={e => setRescheduleValue(e.target.value)}
+                          className="w-full rounded-lg border px-2.5 py-1.5 text-sm font-semibold outline-none mb-2"
+                          style={{ borderColor: "rgba(124,58,237,0.25)", background: "white", color: "#1e293b" }}
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            onClick={confirmReschedule}
+                            disabled={!rescheduleValue || rescheduleLoading}
+                            className="flex-1 rounded-lg py-1.5 text-xs font-black text-white disabled:opacity-50"
+                            style={{ background: "linear-gradient(135deg,#a78bfa,#7c3aed)" }}>
+                            {rescheduleLoading ? "Saving…" : "Save date"}
+                          </button>
+                          <button
+                            onClick={() => setReschedulingId(null)}
+                            className="px-3 rounded-lg py-1.5 text-xs font-bold"
+                            style={{ background: "rgba(0,0,0,0.05)", color: "#64748b" }}>
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}

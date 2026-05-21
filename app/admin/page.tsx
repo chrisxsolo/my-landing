@@ -630,6 +630,15 @@ function AdminDashboard() {
   async function deleteInquiry(id:number){const{error}=await supabase.from('inquiries').delete().eq('id',id);if(error){showToast("Delete failed",false);}else{setInquiries(p=>p.filter(x=>x.id!==id));setInquiryDeleteConfirm(null);showToast("Inquiry deleted");}}
   async function updateInquiryStatus(id:number,status:string){const{error}=await supabase.from('inquiries').update({status}).eq('id',id);if(error){showToast("Update failed",false);}else{setInquiries(p=>p.map(x=>x.id===id?{...x,status}:x));showToast("Status updated");}}
   async function saveSessionType(id:number,value:string){const{error}=await supabase.from('inquiries').update({session_type:value.trim()||null}).eq('id',id);if(error){showToast("Update failed",false);}else{setInquiries(p=>p.map(x=>x.id===id?{...x,session_type:value.trim()||null}:x));setEditingSessionType(null);showToast("Session type updated ✓");}}
+  async function rescheduleSession(id:number,datetimeLocal:string){
+    // datetimeLocal is "YYYY-MM-DDTHH:mm" from datetime-local input
+    const date=new Date(datetimeLocal);
+    if(isNaN(date.getTime())){showToast("Invalid date",false);return;}
+    const sessionDate=`${datetimeLocal.slice(0,10)}`;
+    const preferredTime=new Intl.DateTimeFormat("en-US",{hour:"numeric",minute:"2-digit"}).format(date);
+    const{error}=await supabase.from('inquiries').update({session_date:sessionDate,preferred_time:preferredTime}).eq('id',id);
+    if(error){showToast("Could not reschedule",false);}else{setInquiries(p=>p.map(x=>x.id===id?{...x,session_date:sessionDate,preferred_time:preferredTime}:x));showToast("Session rescheduled ✓");}
+  }
   async function saveManualClient(){
     const{name,email,session_type,session_date,phone,message}=addClientForm;
     if(!name.trim()||!email.trim()){showToast("Name and email are required",false);return;}
@@ -1301,6 +1310,7 @@ function AdminDashboard() {
                   .filter(i=>i.session_date&&i.booking_confirmed)
                   .map(i=>({id:i.id,name:i.name,session_type:i.session_type,session_date:i.session_date!,payment_status:i.payment_status,booking_confirmed:i.booking_confirmed}))}
                 onClientClick={()=>setTab("clients")}
+                onReschedule={rescheduleSession}
                 onRemindersClick={(id)=>loadQuickReminders(id)}
                 remindersLoading={quickRemindersLoading}
                 remindersOpen={quickRemindersOpen}
