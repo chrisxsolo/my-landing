@@ -5,6 +5,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { C } from "@/lib/colors";
 import { checkAuth } from "@/lib/adminAuth";
 import { Suspense } from "react";
+import { buildReminderEmail, type ReminderEmailType } from "@/lib/reminderEmail";
 
 type ReminderDraft = {
   id: string;
@@ -78,12 +79,20 @@ function RemindersContent() {
   }, [loading, focusId]);
 
   function updateReminder(index: number, field: "subject" | "body", value: string) {
-    setReminders(prev => prev.map((r, i) => i === index ? { ...r, [field]: value } : r));
+    setReminders(prev => prev.map((r, i) => {
+      if (i !== index) return r;
+      const updated = { ...r, [field]: value };
+      // Rebuild HTML whenever body changes so preview stays in sync
+      if (field === "body") {
+        updated.html = buildReminderEmail(updated.id as ReminderEmailType, clientName.split(" ")[0] || "there", value);
+      }
+      return updated;
+    }));
   }
 
   function previewEmail(r: ReminderDraft) {
-    if (!r.html) return;
-    try { localStorage.setItem("email_preview_html", r.html); } catch { /* ignore */ }
+    const html = r.html ?? buildReminderEmail(r.id as ReminderEmailType, clientName.split(" ")[0] || "there", r.body);
+    try { localStorage.setItem("email_preview_html", html); } catch { /* ignore */ }
     window.open("/admin/email-preview", "_blank", "noopener");
   }
 
@@ -97,7 +106,7 @@ function RemindersContent() {
           to: clientEmail,
           subject: r.subject,
           body: r.body,
-          ...(r.html ? { html: r.html } : {}),
+          html: r.html ?? buildReminderEmail(r.id as ReminderEmailType, clientName.split(" ")[0] || "there", r.body),
         }),
       });
       const json = await res.json();

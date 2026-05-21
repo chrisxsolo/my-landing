@@ -8,14 +8,23 @@ import { requireAdmin } from "@/lib/requireAdmin";
 
 export const dynamic = "force-dynamic";
 
+// RFC 2047 encoded-word encoding for non-ASCII subject lines
+function encodeSubject(subject: string): string {
+  // If it's pure ASCII, no encoding needed
+  if (/^[\x20-\x7E]*$/.test(subject)) return subject;
+  const b64 = btoa(unescape(encodeURIComponent(subject)));
+  return `=?UTF-8?B?${b64}?=`;
+}
+
 function buildRawMessage(to: string, subject: string, body: string, fromEmail: string, html?: string): string {
+  const encodedSubject = encodeSubject(subject);
   let lines: string[];
   if (html) {
     const boundary = `boundary_${Date.now().toString(36)}`;
     lines = [
       `From: Chris Solorzano <${fromEmail}>`,
       `To: ${to}`,
-      `Subject: ${subject}`,
+      `Subject: ${encodedSubject}`,
       `MIME-Version: 1.0`,
       `Content-Type: multipart/alternative; boundary="${boundary}"`,
       ``,
@@ -35,7 +44,7 @@ function buildRawMessage(to: string, subject: string, body: string, fromEmail: s
     lines = [
       `From: Chris Solorzano <${fromEmail}>`,
       `To: ${to}`,
-      `Subject: ${subject}`,
+      `Subject: ${encodedSubject}`,
       `MIME-Version: 1.0`,
       `Content-Type: text/plain; charset=UTF-8`,
       ``,

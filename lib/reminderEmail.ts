@@ -5,21 +5,22 @@ export type ReminderEmailType =
   | "thank-you"
   | "gallery-delivery";
 
-// Site palette — matches lib/colors.ts
-const P1   = "#9d6fe8";   // violet
-const P2   = "#e879a0";   // pink
-const P3   = "#fbbf24";   // amber
-const DARK = "#0e1412";
-const INK  = "#2f3835";
-const MUTED = "#687571";
-const PAGE  = "#fffaf5";
+// Palette — pulled from the live site
+const P1    = "#9d6fe8";  // violet accent
+const P2    = "#e879a0";  // pink accent
+const P3    = "#fbbf24";  // amber accent
+const DARK  = "#111827";
+const BODY  = "#374151";
+const MUTED = "#6b7280";
+const BG    = "#f4f5f2";  // sage/off-white — matches the site's page bg
+const CARD  = "#ffffff";
+const RULE  = "#e5e7eb";
 
 const IG_HANDLE = "@soloxsnaps";
 const PHONE     = "(408) 722-7680";
 const WEBSITE   = "soloxsnaps.com";
 
-// ── Per-type accent gradients ─────────────────────────────────────────────────
-const BARS: Record<ReminderEmailType, string> = {
+const TOP_BARS: Record<ReminderEmailType, string> = {
   "48hr":             `linear-gradient(90deg, ${P1}, ${P2})`,
   "day-before":       `linear-gradient(90deg, ${P2}, ${P3})`,
   "morning-of":       `linear-gradient(90deg, ${P3}, ${P2})`,
@@ -27,231 +28,200 @@ const BARS: Record<ReminderEmailType, string> = {
   "gallery-delivery": `linear-gradient(90deg, ${P3}, ${P2}, ${P1})`,
 };
 
-// ── Base shell ────────────────────────────────────────────────────────────────
 function base(type: ReminderEmailType, content: string): string {
-  const bar = BARS[type];
+  const topBar = TOP_BARS[type];
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="color-scheme" content="light">
 <title>From Chris @ soloxsnaps</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
   body {
-    background: ${PAGE};
+    background: ${BG};
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     -webkit-font-smoothing: antialiased;
-    color: ${INK};
+    color: ${BODY};
   }
 
   .wrap {
     max-width: 560px;
     margin: 0 auto;
-    padding: 44px 16px 64px;
+    padding: 48px 20px 72px;
   }
 
-  /* Wordmark */
+  /* Wordmark — mimics the nav logo */
   .brand {
-    text-align: center;
     margin-bottom: 32px;
   }
   .brand-name {
-    font-size: 20px;
+    font-size: 17px;
     font-weight: 800;
-    letter-spacing: -0.3px;
-    background: linear-gradient(135deg, ${P1}, ${P2}, ${P3});
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-  .brand-sub {
-    display: block;
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: #a8b4b1;
-    margin-top: 4px;
-  }
-
-  /* Outer glass card */
-  .glass-card {
-    border-radius: 22px;
-    overflow: hidden;
-    background: rgba(255,255,255,0.82);
-    border: 1px solid rgba(255,255,255,0.9);
-    box-shadow:
-      0 2px 1px rgba(255,255,255,0.8) inset,
-      0 4px 24px rgba(157,111,232,0.09),
-      0 1px 4px rgba(0,0,0,0.05);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-  }
-
-  /* Gradient top bar */
-  .top-bar {
-    height: 3px;
-    background: ${bar};
-  }
-
-  /* Card content area */
-  .body {
-    padding: 36px 40px 32px;
-  }
-
-  /* Section label / eyebrow */
-  .eyebrow {
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.13em;
-    text-transform: uppercase;
-    background: linear-gradient(135deg, ${P1}, ${P2});
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    margin-bottom: 10px;
-    display: block;
-  }
-
-  /* Headline */
-  .headline {
-    font-size: 26px;
-    font-weight: 800;
+    letter-spacing: -0.2px;
     color: ${DARK};
-    letter-spacing: -0.5px;
-    line-height: 1.18;
-    margin-bottom: 18px;
+  }
+
+  /* Card */
+  .card {
+    background: ${CARD};
+    border-radius: 4px;
+    overflow: hidden;
+    border: 1px solid ${RULE};
+  }
+
+  /* Thin gradient bar — only decorative accent */
+  .bar {
+    height: 3px;
+    background: ${topBar};
+  }
+
+  /* Content */
+  .content {
+    padding: 44px 48px 40px;
+  }
+
+  /* Eyebrow */
+  .eyebrow {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: ${MUTED};
+    display: block;
+    margin-bottom: 14px;
+  }
+
+  /* Headline — big and bold like the site's h1s */
+  .headline {
+    font-size: 30px;
+    font-weight: 900;
+    color: ${DARK};
+    letter-spacing: -0.6px;
+    line-height: 1.15;
+    margin-bottom: 24px;
   }
 
   /* Body copy */
   .copy {
-    font-size: 15px;
-    line-height: 1.78;
-    color: ${INK};
-    margin-bottom: 28px;
+    font-size: 15.5px;
+    line-height: 1.75;
+    color: ${BODY};
   }
-  .copy p { margin-bottom: 14px; }
+  .copy p { margin-bottom: 16px; }
   .copy p:last-child { margin-bottom: 0; }
 
-  /* Hairline rule */
+  /* Rule */
   .rule {
     height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(157,111,232,0.15), transparent);
-    margin: 28px 0;
+    background: ${RULE};
+    margin: 32px 0;
   }
 
-  /* Frosted info block */
-  .frosted {
-    background: rgba(157,111,232,0.05);
-    border: 1px solid rgba(157,111,232,0.12);
-    border-radius: 14px;
-    padding: 20px 22px;
-    margin-top: 4px;
-  }
-  .frosted-amber {
-    background: rgba(251,191,36,0.06);
-    border: 1px solid rgba(251,191,36,0.18);
-    border-radius: 14px;
-    padding: 20px 22px;
-    margin-top: 4px;
-  }
-
-  .block-label {
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: ${P1};
-    margin-bottom: 10px;
-    display: block;
-  }
-  .frosted-amber .block-label { color: #b45309; }
-
-  .block-text {
-    font-size: 14px;
-    font-weight: 500;
-    color: ${INK};
-    line-height: 1.65;
-  }
-  .block-text strong { font-weight: 700; color: ${DARK}; }
-
-  /* Checklist */
-  .checklist { list-style: none; margin-top: 0; }
-  .checklist li {
-    font-size: 14px;
-    font-weight: 500;
-    color: ${INK};
-    line-height: 1.6;
-    padding: 5px 0;
+  /* Detail rows — like the site's clean key/value pairs */
+  .detail {
     display: flex;
-    align-items: flex-start;
-    gap: 10px;
+    gap: 0;
+    margin-bottom: 14px;
+    align-items: baseline;
   }
-  .check {
-    flex-shrink: 0;
+  .detail:last-of-type { margin-bottom: 0; }
+  .detail-label {
     font-size: 11px;
-    font-weight: 800;
-    color: ${P1};
-    margin-top: 3px;
-    letter-spacing: 0;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: ${MUTED};
+    min-width: 110px;
+    flex-shrink: 0;
+    padding-top: 1px;
+  }
+  .detail-value {
+    font-size: 14.5px;
+    font-weight: 500;
+    color: ${DARK};
+    line-height: 1.5;
   }
 
-  /* Info rows */
-  .info-grid { display: table; width: 100%; }
-  .info-row {
-    display: table-row;
+  /* Callout block — minimal, just a left border */
+  .callout {
+    border-left: 3px solid ${P1};
+    padding: 4px 0 4px 18px;
+    margin-top: 32px;
   }
-  .info-cell-label {
-    display: table-cell;
+  .callout-amber {
+    border-left: 3px solid ${P3};
+    padding: 4px 0 4px 18px;
+    margin-top: 32px;
+  }
+  .callout-label {
     font-size: 10.5px;
     font-weight: 700;
+    letter-spacing: 0.10em;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: #a8b4b1;
-    padding: 6px 16px 6px 0;
-    white-space: nowrap;
-    vertical-align: top;
+    color: ${P1};
+    margin-bottom: 6px;
+    display: block;
   }
-  .info-cell-value {
-    display: table-cell;
-    font-size: 14px;
-    font-weight: 600;
-    color: ${DARK};
-    padding: 6px 0;
-    line-height: 1.45;
+  .callout-amber .callout-label { color: #92400e; }
+  .callout-text {
+    font-size: 14.5px;
+    font-weight: 400;
+    color: ${BODY};
+    line-height: 1.65;
+  }
+  .callout-text strong { font-weight: 700; color: ${DARK}; }
+
+  /* Checklist */
+  .checklist { margin-top: 12px; }
+  .checklist-item {
+    font-size: 14.5px;
+    color: ${BODY};
+    line-height: 1.6;
+    padding: 4px 0;
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  .check {
+    color: ${P1};
+    font-weight: 800;
+    flex-shrink: 0;
+    font-size: 12px;
+    margin-top: 3px;
   }
 
   /* Footer */
   .footer {
-    padding: 20px 40px 26px;
-    border-top: 1px solid rgba(157,111,232,0.08);
-    background: rgba(255,250,245,0.6);
+    padding: 22px 48px 26px;
+    border-top: 1px solid ${RULE};
+    background: #fafafa;
   }
   .footer-name {
-    font-size: 13.5px;
-    font-weight: 700;
+    font-size: 13px;
+    font-weight: 800;
     color: ${DARK};
-    margin-bottom: 4px;
+    margin-bottom: 3px;
+    letter-spacing: -0.1px;
   }
-  .footer-line {
+  .footer-meta {
     font-size: 12px;
     color: ${MUTED};
     line-height: 1.7;
   }
-  .footer-line a {
+  .footer-meta a {
     color: ${P1};
     text-decoration: none;
     font-weight: 600;
   }
 
   @media (max-width: 480px) {
-    .body, .footer { padding-left: 22px; padding-right: 22px; }
-    .headline { font-size: 22px; }
+    .content, .footer { padding-left: 24px; padding-right: 24px; }
+    .headline { font-size: 25px; }
+    .detail-label { min-width: 90px; }
   }
 </style>
 </head>
@@ -259,16 +229,15 @@ function base(type: ReminderEmailType, content: string): string {
 <div class="wrap">
 
   <div class="brand">
-    <span class="brand-name">Chris.</span>
-    <span class="brand-sub">soloxsnaps photography</span>
+    <span class="brand-name">soloxsnaps</span>
   </div>
 
-  <div class="glass-card">
-    <div class="top-bar"></div>
+  <div class="card">
+    <div class="bar"></div>
     ${content}
     <div class="footer">
       <div class="footer-name">Chris Solorzano</div>
-      <div class="footer-line">
+      <div class="footer-meta">
         <a href="https://${WEBSITE}">${WEBSITE}</a>&nbsp;&nbsp;·&nbsp;&nbsp;${PHONE}&nbsp;&nbsp;·&nbsp;&nbsp;${IG_HANDLE}
       </div>
     </div>
@@ -283,17 +252,17 @@ function base(type: ReminderEmailType, content: string): string {
 
 export function build48hrEmail(firstName: string, body: string): string {
   const content = `
-  <div class="body">
+  <div class="content">
     <span class="eyebrow">2 days out</span>
-    <div class="headline">See you in 48 hours</div>
+    <div class="headline">See you in 48 hours.</div>
     <div class="copy">${bodyToParagraphs(body)}</div>
-    <div class="frosted">
-      <span class="block-label">Quick checklist</span>
-      <ul class="checklist">
-        <li><span class="check">✓</span> Outfits picked and wrinkle-free</li>
-        <li><span class="check">✓</span> Plan to arrive 5–10 min early</li>
-        <li><span class="check">✓</span> Text me if anything comes up — <strong>${PHONE}</strong></li>
-      </ul>
+    <div class="callout">
+      <span class="callout-label">Quick checklist</span>
+      <div class="checklist">
+        <div class="checklist-item"><span class="check">—</span> Outfits picked and wrinkle-free</div>
+        <div class="checklist-item"><span class="check">—</span> Plan to arrive 5–10 min early</div>
+        <div class="checklist-item"><span class="check">—</span> Text me if anything comes up: <strong>${PHONE}</strong></div>
+      </div>
     </div>
   </div>`;
   return base("48hr", content);
@@ -301,20 +270,18 @@ export function build48hrEmail(firstName: string, body: string): string {
 
 export function buildDayBeforeEmail(firstName: string, body: string): string {
   const content = `
-  <div class="body">
+  <div class="content">
     <span class="eyebrow">Tomorrow</span>
-    <div class="headline">See you tomorrow</div>
+    <div class="headline">See you tomorrow.</div>
     <div class="copy">${bodyToParagraphs(body)}</div>
     <div class="rule"></div>
-    <div class="info-grid">
-      <div class="info-row">
-        <span class="info-cell-label">Meeting spot</span>
-        <span class="info-cell-value">Confirmed in this email — or I'll text you</span>
-      </div>
-      <div class="info-row">
-        <span class="info-cell-label">Reach me</span>
-        <span class="info-cell-value">${PHONE}</span>
-      </div>
+    <div class="detail">
+      <span class="detail-label">Meeting spot</span>
+      <span class="detail-value">Confirmed in this email — or I'll text you</span>
+    </div>
+    <div class="detail">
+      <span class="detail-label">Reach me</span>
+      <span class="detail-value">${PHONE}</span>
     </div>
   </div>`;
   return base("day-before", content);
@@ -322,13 +289,13 @@ export function buildDayBeforeEmail(firstName: string, body: string): string {
 
 export function buildMorningOfEmail(firstName: string, body: string): string {
   const content = `
-  <div class="body">
+  <div class="content">
     <span class="eyebrow">Shoot day</span>
-    <div class="headline">Today's the day</div>
+    <div class="headline">Today's the day.</div>
     <div class="copy">${bodyToParagraphs(body)}</div>
-    <div class="frosted">
-      <span class="block-label">Need me?</span>
-      <p class="block-text">Text or call anytime — <strong>${PHONE}</strong></p>
+    <div class="callout">
+      <span class="callout-label">Need me?</span>
+      <p class="callout-text">Text or call anytime — <strong>${PHONE}</strong></p>
     </div>
   </div>`;
   return base("morning-of", content);
@@ -336,13 +303,13 @@ export function buildMorningOfEmail(firstName: string, body: string): string {
 
 export function buildThankYouEmail(firstName: string, body: string): string {
   const content = `
-  <div class="body">
+  <div class="content">
     <span class="eyebrow">After your session</span>
-    <div class="headline">That was so fun — thank you</div>
+    <div class="headline">That was so fun.</div>
     <div class="copy">${bodyToParagraphs(body)}</div>
-    <div class="frosted">
-      <span class="block-label">What happens next</span>
-      <p class="block-text">I'm editing your photos now. You'll get a private gallery link as soon as they're ready. Tag me when you post — <strong>${IG_HANDLE}</strong></p>
+    <div class="callout">
+      <span class="callout-label">What's next</span>
+      <p class="callout-text">I'm editing your photos now. You'll get a private gallery link as soon as they're ready. Tag me when you post — <strong>${IG_HANDLE}</strong></p>
     </div>
   </div>`;
   return base("thank-you", content);
@@ -350,13 +317,13 @@ export function buildThankYouEmail(firstName: string, body: string): string {
 
 export function buildGalleryDeliveryEmail(firstName: string, body: string): string {
   const content = `
-  <div class="body">
+  <div class="content">
     <span class="eyebrow">Gallery ready</span>
-    <div class="headline">Your photos are ready</div>
+    <div class="headline">Your photos are ready.</div>
     <div class="copy">${bodyToParagraphs(body)}</div>
-    <div class="frosted-amber">
-      <span class="block-label">Tag me when you post</span>
-      <p class="block-text"><strong>${IG_HANDLE}</strong> — I love seeing these go live. It means a lot.</p>
+    <div class="callout-amber">
+      <span class="callout-label">Tag me when you post</span>
+      <p class="callout-text"><strong>${IG_HANDLE}</strong> — I love seeing these go live. It means a lot.</p>
     </div>
   </div>`;
   return base("gallery-delivery", content);
