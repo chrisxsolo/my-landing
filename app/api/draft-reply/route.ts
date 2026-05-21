@@ -283,6 +283,8 @@ Rules must be actionable instructions for the AI writer (e.g. "skip the opening 
 
 IMPORTANT: Do not dismiss differences as insignificant. If Chris changed even one word, one sentence, one paragraph, extract a rule from it. If the drafts differ in any way — word choice, length, tone, structure, what was included or omitted — there are rules to extract.
 
+If the drafts are truly identical with no differences whatsoever, output exactly one line: "- drafts are identical — no differences to extract" and nothing else.
+
 No fluff, no praise, no explanation — just the rules, one per line, starting with a dash.`;
 
       const userContent = perfect_draft
@@ -304,6 +306,7 @@ No fluff, no praise, no explanation — just the rules, one per line, starting w
 
       const rules = raw
         .split("\n")
+        .filter(line => /^[-–•*]\s/.test(line.trimStart()))
         .map(line => line.replace(/^[-–•*]\s*/, "").trim())
         .filter(line => line.length > 10);
 

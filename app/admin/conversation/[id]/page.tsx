@@ -933,26 +933,41 @@ export default function ConversationPage() {
     const aiDraftToUse = lastAiDraft || manualAiDraft.trim();
     if (!inquiry || !aiDraftToUse || !actualSent.trim()) return;
     setLearnLoading(true);
+    const isPerfect = aiDraftToUse.trim() === actualSent.trim();
     try {
       const analyzeRes = await fetch("/api/draft-reply", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name:        inquiry.name,
-          email:       inquiry.email,
-          message:     inquiry.message,
-          ai_draft:    aiDraftToUse,
-          actual_sent: actualSent.trim(),
+          name:          inquiry.name,
+          email:         inquiry.email,
+          message:       inquiry.message,
+          ai_draft:      aiDraftToUse,
+          actual_sent:   actualSent.trim(),
+          perfect_draft: isPerfect,
         }),
       });
       const analyzeJson = await analyzeRes.json() as { rules?: string[]; written?: number; error?: string };
 
-      if (!analyzeJson.rules?.length) {
-        showToast(analyzeJson.error ?? "Replies look similar — nothing new to learn", false);
+      const rawRules = analyzeJson.rules ?? [];
+      const identicalSentinel = rawRules.length === 1 && rawRules[0].toLowerCase().includes("identical");
+      const rules = identicalSentinel ? [] : rawRules;
+      const written = identicalSentinel ? 0 : (analyzeJson.written ?? 0);
+
+      if (analyzeJson.error) {
+        showToast(analyzeJson.error, false);
         return;
       }
 
-      const { rules, written = 0 } = analyzeJson;
+      if (!rules.length) {
+        showToast(
+          identicalSentinel
+            ? "Drafts are identical — no differences to extract"
+            : "No extractable rules found — try with a more edited reply",
+          false
+        );
+        return;
+      }
       setLearnedRules(rules);
       setActualSent("");
       setManualAiDraft("");
