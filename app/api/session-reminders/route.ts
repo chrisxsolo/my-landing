@@ -8,6 +8,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { getValidTokens } from "@/lib/gmailTokens";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { requireAdmin } from "@/lib/requireAdmin";
+import { buildReminderEmail, type ReminderEmailType } from "@/lib/reminderEmail";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,7 @@ export type ReminderDraft = {
   emoji: string;
   subject: string;
   body: string;
+  html: string;
 };
 
 type MimePart = { mimeType?: string; body?: { data?: string }; parts?: MimePart[] };
@@ -106,6 +108,12 @@ export async function POST(req: NextRequest) {
   const { data: inq } = await supabase.from("inquiries").select("*").eq("id", inquiry_id).single();
   if (!inq) return NextResponse.json({ error: "Inquiry not found" }, { status: 404 });
 
+  // Load any saved custom templates from site_settings
+  const templateKeys = ["48hr","day-before","morning-of","thank-you","gallery-delivery"]
+    .flatMap(id => [`reminder_subject_${id}`, `reminder_instructions_${id}`]);
+  const { data: settingsRows } = await supabase.from("site_settings").select("key,value").in("key", templateKeys);
+  const settings: Record<string, string> = Object.fromEntries((settingsRows ?? []).map(r => [r.key, r.value ?? ""]));
+
   const firstName = inq.name.split(" ")[0];
   const sessionDateReadable = inq.session_date
     ? new Date(inq.session_date + "T12:00:00").toLocaleDateString("en-US", {
@@ -169,11 +177,18 @@ Phone: (408) 722-7680. Do not include any sign-off or signature — the email cl
 
   const reminders = await Promise.all(
     specs.map(async (spec): Promise<ReminderDraft> => {
-      const system = `${sharedSystem}\n\n${spec.systemAddition}`;
+      const customInstr = settings[`reminder_instructions_${spec.id}`];
+      const customSubject = settings[`reminder_subject_${spec.id}`];
+      const instructions = customInstr
+        ? `${spec.systemAddition}\n\nAdditional style notes from Chris (follow these closely):\n${customInstr}`
+        : spec.systemAddition;
+      const subject = customSubject || spec.subject;
+      const system = `${sharedSystem}\n\n${instructions}`;
       const body = await generateOne(anthropic, system, contextBlock);
-      return { id: spec.id, label: spec.label, emoji: spec.emoji, subject: spec.subject, body };
+      const html = buildReminderEmail(spec.id as ReminderEmailType, firstName, body);
+      return { id: spec.id, label: spec.label, emoji: spec.emoji, subject, body, html };
     })
   );
 
-  return NextResponse.json({ reminders });
+  return NextResponse.json({ reminders, client_name: inq.name, client_email: inq.email });
 }

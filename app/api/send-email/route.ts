@@ -8,16 +8,40 @@ import { requireAdmin } from "@/lib/requireAdmin";
 
 export const dynamic = "force-dynamic";
 
-function buildRawMessage(to: string, subject: string, body: string, fromEmail: string): string {
-  const lines = [
-    `From: Chris Solorzano <${fromEmail}>`,
-    `To: ${to}`,
-    `Subject: ${subject}`,
-    `MIME-Version: 1.0`,
-    `Content-Type: text/plain; charset=UTF-8`,
-    ``,
-    body,
-  ];
+function buildRawMessage(to: string, subject: string, body: string, fromEmail: string, html?: string): string {
+  let lines: string[];
+  if (html) {
+    const boundary = `boundary_${Date.now().toString(36)}`;
+    lines = [
+      `From: Chris Solorzano <${fromEmail}>`,
+      `To: ${to}`,
+      `Subject: ${subject}`,
+      `MIME-Version: 1.0`,
+      `Content-Type: multipart/alternative; boundary="${boundary}"`,
+      ``,
+      `--${boundary}`,
+      `Content-Type: text/plain; charset=UTF-8`,
+      ``,
+      body,
+      ``,
+      `--${boundary}`,
+      `Content-Type: text/html; charset=UTF-8`,
+      ``,
+      html,
+      ``,
+      `--${boundary}--`,
+    ];
+  } else {
+    lines = [
+      `From: Chris Solorzano <${fromEmail}>`,
+      `To: ${to}`,
+      `Subject: ${subject}`,
+      `MIME-Version: 1.0`,
+      `Content-Type: text/plain; charset=UTF-8`,
+      ``,
+      body,
+    ];
+  }
   const raw = lines.join("\r\n");
   return btoa(unescape(encodeURIComponent(raw)))
     .replace(/\+/g, "-")
@@ -29,11 +53,11 @@ export async function POST(req: NextRequest) {
   const deny = requireAdmin(req);
   if (deny) return deny;
 
-  let body: { to: string; subject: string; body: string };
+  let body: { to: string; subject: string; body: string; html?: string };
   try { body = await req.json(); }
   catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
 
-  const { to, subject, body: emailBody } = body;
+  const { to, subject, body: emailBody, html } = body;
   if (!to || !subject || !emailBody) {
     return NextResponse.json({ error: "to, subject, and body are required" }, { status: 400 });
   }
@@ -43,7 +67,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Gmail not connected" }, { status: 401 });
   }
 
-  const raw = buildRawMessage(to, subject, emailBody, tokens.email);
+  const raw = buildRawMessage(to, subject, emailBody, tokens.email, html);
 
   const res = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
     method: "POST",

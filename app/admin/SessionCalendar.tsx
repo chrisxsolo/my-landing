@@ -11,7 +11,15 @@ type Session = {
   booking_confirmed: boolean | null;
 };
 
-type Props = { sessions: Session[]; onClientClick: () => void; onReschedule?: (id: number, newDate: string) => Promise<void>; onRemindersClick?: (id: number) => void; remindersLoading?: Record<number,boolean>; remindersOpen?: Record<number,boolean> };
+type Props = {
+  sessions: Session[];
+  onClientClick: (id: number) => void;
+  onReschedule?: (id: number, newDate: string) => Promise<void>;
+  onRemindersClick?: (id: number) => void;
+  onThankYouClick?: (id: number) => void;
+  remindersLoading?: Record<number, boolean>;
+  remindersOpen?: Record<number, boolean>;
+};
 
 const GRAD_COLOR  = { grad: "linear-gradient(135deg,#34d399,#059669)", text: "#059669", bg: "rgba(52,211,153,0.13)" };
 const TODAY_COLOR = { grad: "linear-gradient(135deg,#a78bfa,#7c3aed)", text: "#7c3aed", bg: "rgba(167,139,250,0.13)" };
@@ -33,7 +41,11 @@ function colorFor(s: Session): typeof GRAD_COLOR {
   return OTHER_COLORS[s.id % OTHER_COLORS.length];
 }
 
-export default function SessionCalendar({ sessions, onClientClick, onReschedule, onRemindersClick, remindersLoading = {}, remindersOpen = {} }: Props) {
+export default function SessionCalendar({
+  sessions, onClientClick, onReschedule,
+  onRemindersClick, onThankYouClick,
+  remindersLoading = {}, remindersOpen = {},
+}: Props) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -46,10 +58,9 @@ export default function SessionCalendar({ sessions, onClientClick, onReschedule,
 
   const monthStart  = new Date(viewYear, viewMonth, 1);
   const monthEnd    = new Date(viewYear, viewMonth + 1, 0);
-  const startPad    = monthStart.getDay(); // 0=Sun
+  const startPad    = monthStart.getDay();
   const totalCells  = Math.ceil((startPad + monthEnd.getDate()) / 7) * 7;
 
-  // Map session_date → sessions
   const byDate = new Map<string, Session[]>();
   for (const s of sessions) {
     if (!byDate.has(s.session_date)) byDate.set(s.session_date, []);
@@ -72,7 +83,6 @@ export default function SessionCalendar({ sessions, onClientClick, onReschedule,
   const selectedSessions = selected ? (byDate.get(selected) ?? []) : [];
   const monthName = monthStart.toLocaleDateString("en-US", { month: "long", year: "numeric" });
 
-  // Sessions this month for the mini legend
   const thisMonthSessions = sessions.filter(s => {
     const d = new Date(s.session_date + "T12:00:00");
     return d.getMonth() === viewMonth && d.getFullYear() === viewYear;
@@ -88,7 +98,6 @@ export default function SessionCalendar({ sessions, onClientClick, onReschedule,
         boxShadow: "0 8px 32px rgba(124,58,237,0.08), 0 1px 0 rgba(255,255,255,0.8) inset",
       }}>
 
-      {/* Top gradient bar */}
       <div className="h-[3px]" style={{ background: "linear-gradient(90deg,#a78bfa,#7c3aed,#6366f1)" }} />
 
       <div className="p-5">
@@ -102,29 +111,21 @@ export default function SessionCalendar({ sessions, onClientClick, onReschedule,
           </div>
           <div className="flex items-center gap-1">
             <span className="text-xs font-bold text-slate-400 mr-1">{thisMonthSessions.length} session{thisMonthSessions.length !== 1 ? "s" : ""}</span>
-            <button onClick={prevMonth}
-              className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-500 hover:bg-violet-50 transition-colors font-bold">
-              ‹
-            </button>
+            <button onClick={prevMonth} className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-500 hover:bg-violet-50 transition-colors font-bold">‹</button>
             <button
               onClick={() => { setViewYear(today.getFullYear()); setViewMonth(today.getMonth()); setSelected(null); }}
               className="text-[10px] font-black px-2.5 py-1 rounded-lg transition-colors"
               style={{ background: "rgba(124,58,237,0.08)", color: "#7c3aed" }}>
               Today
             </button>
-            <button onClick={nextMonth}
-              className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-500 hover:bg-violet-50 transition-colors font-bold">
-              ›
-            </button>
+            <button onClick={nextMonth} className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-500 hover:bg-violet-50 transition-colors font-bold">›</button>
           </div>
         </div>
 
         {/* Day-of-week header */}
         <div className="grid grid-cols-7 mb-2">
           {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d => (
-            <div key={d} className="text-center text-[10px] font-black uppercase tracking-widest text-slate-400 py-1">
-              {d}
-            </div>
+            <div key={d} className="text-center text-[10px] font-black uppercase tracking-widest text-slate-400 py-1">{d}</div>
           ))}
         </div>
 
@@ -132,9 +133,7 @@ export default function SessionCalendar({ sessions, onClientClick, onReschedule,
         <div className="grid grid-cols-7 gap-1">
           {Array.from({ length: totalCells }).map((_, i) => {
             const dayNum = i - startPad + 1;
-            if (dayNum < 1 || dayNum > monthEnd.getDate()) {
-              return <div key={i} className="aspect-square" />;
-            }
+            if (dayNum < 1 || dayNum > monthEnd.getDate()) return <div key={i} className="aspect-square" />;
 
             const dateStr = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`;
             const daySessions = byDate.get(dateStr) ?? [];
@@ -152,53 +151,28 @@ export default function SessionCalendar({ sessions, onClientClick, onReschedule,
                 style={{
                   background: isSelected
                     ? (isToday ? TODAY_COLOR.grad : firstColor?.grad ?? TODAY_COLOR.grad)
-                    : isToday
-                      ? TODAY_COLOR.bg
-                      : hasSessions
-                        ? firstColor!.bg
-                        : "transparent",
-                  border: isToday && !isSelected
-                    ? `2px solid ${TODAY_COLOR.text}`
-                    : "1.5px solid transparent",
+                    : isToday ? TODAY_COLOR.bg : hasSessions ? firstColor!.bg : "transparent",
+                  border: isToday && !isSelected ? `2px solid ${TODAY_COLOR.text}` : "1.5px solid transparent",
                   cursor: hasSessions ? "pointer" : "default",
                   boxShadow: isSelected ? "0 4px 12px rgba(124,58,237,0.25)" : isToday ? "0 0 0 3px rgba(124,58,237,0.12)" : "none",
-                }}
-              >
+                }}>
                 <span
                   className="text-xs font-bold leading-none"
                   style={{
-                    color: isSelected
-                      ? "#fff"
-                      : isToday
-                        ? TODAY_COLOR.text
-                        : hasSessions
-                          ? firstColor!.text
-                          : isPast
-                            ? "#cbd5e1"
-                            : "#475569",
+                    color: isSelected ? "#fff" : isToday ? TODAY_COLOR.text : hasSessions ? firstColor!.text : isPast ? "#cbd5e1" : "#475569",
                     fontWeight: isToday || hasSessions ? 900 : 600,
                   }}>
                   {dayNum}
                 </span>
-
-                {/* Session dots */}
                 {hasSessions && !isSelected && (
                   <div className="flex gap-0.5 mt-0.5">
                     {daySessions.slice(0, 3).map((s, di) => (
-                      <div
-                        key={di}
-                        className="w-1 h-1 rounded-full"
-                        style={{ background: colorFor(s).text }}
-                      />
+                      <div key={di} className="w-1 h-1 rounded-full" style={{ background: colorFor(s).text }} />
                     ))}
                   </div>
                 )}
-
-                {/* Multiple sessions badge */}
                 {isSelected && daySessions.length > 1 && (
-                  <span className="text-[8px] font-black text-white/80 leading-none mt-0.5">
-                    ×{daySessions.length}
-                  </span>
+                  <span className="text-[8px] font-black text-white/80 leading-none mt-0.5">×{daySessions.length}</span>
                 )}
               </button>
             );
@@ -215,9 +189,9 @@ export default function SessionCalendar({ sessions, onClientClick, onReschedule,
               const col = colorFor(s);
               const isPaid = s.payment_status === "paid";
               const isRescheduling = reschedulingId === s.id;
+              const isPast = selected < todayStr;
 
               function startReschedule() {
-                // Pre-fill with the existing date+time (datetime-local format)
                 const existing = s.session_date ? (() => {
                   const d = new Date(s.session_date + "T12:00:00");
                   const pad = (n: number) => String(n).padStart(2, "0");
@@ -236,41 +210,38 @@ export default function SessionCalendar({ sessions, onClientClick, onReschedule,
               }
 
               return (
-                <div
-                  key={s.id}
-                  className="rounded-2xl overflow-hidden"
-                  style={{
-                    background: "rgba(255,255,255,0.9)",
-                    border: "1px solid rgba(167,139,250,0.15)",
-                    boxShadow: "0 2px 8px rgba(124,58,237,0.06)",
-                  }}>
+                <div key={s.id} className="rounded-2xl overflow-hidden"
+                  style={{ background: "rgba(255,255,255,0.9)", border: "1px solid rgba(167,139,250,0.15)", boxShadow: "0 2px 8px rgba(124,58,237,0.06)" }}>
                   <div className="flex items-center gap-3 p-3">
-                    <div
-                      className="w-9 h-9 rounded-xl flex items-center justify-center text-base flex-shrink-0"
-                      style={{ background: col.grad }}>
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center text-base flex-shrink-0" style={{ background: col.grad }}>
                       📸
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-black text-slate-900 truncate">{s.name}</p>
                       <p className="text-xs text-slate-400 truncate">{s.session_type || "Session"}</p>
                     </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
+                    <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap justify-end">
                       {isPaid && (
-                        <span className="text-[10px] font-black px-2 py-0.5 rounded-lg"
-                          style={{ background: "rgba(16,185,129,0.1)", color: "#059669" }}>
+                        <span className="text-[10px] font-black px-2 py-0.5 rounded-lg" style={{ background: "rgba(16,185,129,0.1)", color: "#059669" }}>
                           Paid ✓
                         </span>
                       )}
-                      {onReschedule && !isRescheduling && (
+                      {/* Thank You button — shown for past sessions */}
+                      {isPast && onThankYouClick && (
                         <button
-                          onClick={startReschedule}
-                          className="text-[11px] font-bold px-2.5 py-1 rounded-lg"
-                          style={{ background: "rgba(124,58,237,0.08)", color: "#7c3aed" }}>
+                          onClick={() => onThankYouClick(s.id)}
+                          className="text-[11px] font-bold px-2.5 py-1 rounded-lg text-white"
+                          style={{ background: "linear-gradient(135deg,#9d6fe8,#e879a0)" }}>
+                          🙏 Thank You
+                        </button>
+                      )}
+                      {onReschedule && !isRescheduling && (
+                        <button onClick={startReschedule} className="text-[11px] font-bold px-2.5 py-1 rounded-lg" style={{ background: "rgba(124,58,237,0.08)", color: "#7c3aed" }}>
                           Reschedule
                         </button>
                       )}
                       <button
-                        onClick={onClientClick}
+                        onClick={() => onClientClick(s.id)}
                         className="text-[11px] font-bold px-2.5 py-1 rounded-lg text-white"
                         style={{ background: col.grad }}>
                         View →
@@ -281,9 +252,7 @@ export default function SessionCalendar({ sessions, onClientClick, onReschedule,
                   {isRescheduling && (
                     <div className="px-3 pb-3 pt-0">
                       <div className="rounded-xl p-3" style={{ background: "rgba(124,58,237,0.06)", border: "1px solid rgba(124,58,237,0.15)" }}>
-                        <p className="text-[10px] font-black uppercase tracking-widest mb-2" style={{ color: "#7c3aed" }}>
-                          New date &amp; time
-                        </p>
+                        <p className="text-[10px] font-black uppercase tracking-widest mb-2" style={{ color: "#7c3aed" }}>New date &amp; time</p>
                         <input
                           type="datetime-local"
                           value={rescheduleValue}
@@ -292,15 +261,12 @@ export default function SessionCalendar({ sessions, onClientClick, onReschedule,
                           style={{ borderColor: "rgba(124,58,237,0.25)", background: "white", color: "#1e293b" }}
                         />
                         <div className="flex gap-2">
-                          <button
-                            onClick={confirmReschedule}
-                            disabled={!rescheduleValue || rescheduleLoading}
+                          <button onClick={confirmReschedule} disabled={!rescheduleValue || rescheduleLoading}
                             className="flex-1 rounded-lg py-1.5 text-xs font-black text-white disabled:opacity-50"
                             style={{ background: "linear-gradient(135deg,#a78bfa,#7c3aed)" }}>
                             {rescheduleLoading ? "Saving…" : "Save date"}
                           </button>
-                          <button
-                            onClick={() => setReschedulingId(null)}
+                          <button onClick={() => setReschedulingId(null)}
                             className="px-3 rounded-lg py-1.5 text-xs font-bold"
                             style={{ background: "rgba(0,0,0,0.05)", color: "#64748b" }}>
                             Cancel
@@ -335,15 +301,14 @@ export default function SessionCalendar({ sessions, onClientClick, onReschedule,
                 const label = s.session_date === todayStr ? "TODAY" : s.session_date === tomorrowStr ? "TOMORROW" : dt.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }).toUpperCase();
                 const isRescheduling = reschedulingId === s.id;
                 return (
-                  <div key={s.id} className="rounded-xl overflow-hidden"
-                    style={{ background: col.bg, border: `1px solid ${col.bg}` }}>
+                  <div key={s.id} className="rounded-xl overflow-hidden" style={{ background: col.bg, border: `1px solid ${col.bg}` }}>
                     <div className="flex items-center gap-3 px-3 py-2">
                       <div className="w-1.5 h-8 rounded-full flex-shrink-0" style={{ background: col.grad }} />
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-black text-slate-900 truncate">{s.name}</p>
                         <p className="text-[11px] text-slate-400 truncate">{s.session_type || "Session"}</p>
                       </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
                         <span className="text-[10px] font-black" style={{ color: col.text }}>{label}</span>
                         {onReschedule && (
                           <button
@@ -364,6 +329,12 @@ export default function SessionCalendar({ sessions, onClientClick, onReschedule,
                             {remindersLoading[s.id] ? "…" : "🔔"}
                           </button>
                         )}
+                        <button
+                          onClick={() => onClientClick(s.id)}
+                          className="text-[11px] font-bold px-2 py-1 rounded-lg transition-all hover:opacity-80 text-white"
+                          style={{ background: col.grad }}>
+                          →
+                        </button>
                       </div>
                     </div>
                     {isRescheduling && onReschedule && (

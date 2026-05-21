@@ -128,8 +128,11 @@ export default function ConversationPage() {
   // Day-before reminder
   const [reminderLoading,   setReminderLoading]   = useState(false);
 
+  // Email thread collapse — show first + last by default
+  const [threadExpanded, setThreadExpanded] = useState(false);
+
   // Session reminders panel
-  type ReminderDraft = { id: string; label: string; emoji: string; subject: string; body: string };
+  type ReminderDraft = { id: string; label: string; emoji: string; subject: string; body: string; html?: string };
   const [remindersOpen,    setRemindersOpen]    = useState(false);
   const [remindersLoading, setRemindersLoading] = useState(false);
   const [reminders,        setReminders]        = useState<ReminderDraft[]>([]);
@@ -856,6 +859,13 @@ export default function ConversationPage() {
     }
   }
 
+  // ── Open styled email preview in a new tab ───────────────────────────────
+  function previewReminderEmail(r: ReminderDraft) {
+    if (!r.html) return;
+    try { localStorage.setItem("email_preview_html", r.html); } catch { /* ignore */ }
+    window.open("/admin/email-preview", "_blank", "noopener");
+  }
+
   // ── Send a reminder email directly via Gmail ─────────────────────────────
   async function sendReminderViaGmail(r: ReminderDraft) {
     if (!inquiry) return;
@@ -864,7 +874,7 @@ export default function ConversationPage() {
       const res = await fetch("/api/send-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ to: inquiry.email, subject: r.subject, body: r.body }),
+        body: JSON.stringify({ to: inquiry.email, subject: r.subject, body: r.body, ...(r.html ? { html: r.html } : {}) }),
       });
       const json = await res.json();
       if (!res.ok) { showToast(json.error ?? "Send failed", false); return; }
@@ -1095,16 +1105,22 @@ export default function ConversationPage() {
               <p className="text-sm font-semibold text-slate-500">No emails found yet</p>
               <p className="text-xs text-slate-400 mt-1">Emails to/from {inquiry.email} will appear here</p>
             </div>
-          ) : (
-            messages.map((msg) => {
-              const isOpen   = expanded[msg.id] ?? false;
-              const body     = bodies[msg.id];
-              const loading  = bodyLoading[msg.id];
+          ) : ((() => {
+            const hidden = messages.length > 2 && !threadExpanded
+              ? messages.slice(1, messages.length - 1)
+              : [];
+            const visibleIndices = messages.length > 2 && !threadExpanded
+              ? [0, messages.length - 1]
+              : messages.map((_, i) => i);
+
+            function renderMsg(msg: typeof messages[0]) {
+              const isOpen  = expanded[msg.id] ?? false;
+              const body    = bodies[msg.id];
+              const loading = bodyLoading[msg.id];
               return (
                 <div key={msg.id}
                   className="bg-white rounded-2xl border overflow-hidden transition-shadow hover:shadow-sm"
                   style={{ borderColor: msg.isMe ? C.p1_20 : "#e2e8f0" }}>
-                  {/* Header — click to expand + lazy-load body */}
                   <button
                     onClick={() => toggleExpand(msg.id)}
                     className="w-full flex items-start gap-3 p-4 text-left hover:bg-slate-50/60 transition-colors">
@@ -1116,18 +1132,14 @@ export default function ConversationPage() {
                       <div className="flex items-baseline justify-between gap-2 flex-wrap">
                         <p className="text-sm font-bold text-slate-900">
                           {msg.isMe ? "You" : msg.fromName}
-                          {msg.isMe && <span className="text-xs font-normal text-slate-400 ml-1">→ {inquiry.name}</span>}
+                          {msg.isMe && <span className="text-xs font-normal text-slate-400 ml-1">→ {inquiry!.name}</span>}
                         </p>
                         <p className="text-xs text-slate-400 flex-shrink-0">{fmtDate(msg.timestamp)}</p>
                       </div>
-                      {!isOpen && (
-                        <p className="text-xs text-slate-500 mt-0.5 truncate">{msg.snippet}</p>
-                      )}
+                      {!isOpen && <p className="text-xs text-slate-500 mt-0.5 truncate">{msg.snippet}</p>}
                     </div>
                     <span className="text-slate-300 text-xs flex-shrink-0 mt-1">{isOpen ? "▲" : "▼"}</span>
                   </button>
-
-                  {/* Full body — loaded on demand */}
                   {isOpen && (
                     <div className="px-4 pb-4 pt-1 border-t border-slate-100">
                       {loading ? (
@@ -1145,7 +1157,42 @@ export default function ConversationPage() {
                   )}
                 </div>
               );
-            })
+            }
+
+            return (
+              <>
+                {/* First message */}
+                {renderMsg(messages[0])}
+
+                {/* Collapsed middle messages */}
+                {hidden.length > 0 && (
+                  <button
+                    onClick={() => setThreadExpanded(true)}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-2xl border border-dashed text-xs font-bold transition-all hover:opacity-80"
+                    style={{ borderColor: C.p1_20, color: C.p1, background: C.p1_04 }}>
+                    <span style={{ background: C.p1_20, borderRadius: "999px", padding: "1px 8px" }}>{hidden.length}</span>
+                    more {hidden.length === 1 ? "message" : "messages"} — tap to expand
+                  </button>
+                )}
+
+                {/* All middle messages when expanded */}
+                {threadExpanded && hidden.map(msg => renderMsg(msg))}
+
+                {/* Collapse button */}
+                {threadExpanded && hidden.length > 0 && (
+                  <button
+                    onClick={() => setThreadExpanded(false)}
+                    className="w-full flex items-center justify-center gap-2 py-2 rounded-2xl text-xs font-bold transition-all hover:opacity-80"
+                    style={{ color: "#687571" }}>
+                    ▲ Collapse thread
+                  </button>
+                )}
+
+                {/* Last message (only if more than 1 total) */}
+                {messages.length > 1 && renderMsg(messages[messages.length - 1])}
+              </>
+            );
+          })()
           )}
           <div ref={bottomRef} />
         </div>
@@ -1603,13 +1650,23 @@ export default function ConversationPage() {
                             <span className="text-sm">{r.emoji}</span>
                             <p className="text-xs font-black text-slate-800">{i + 1}. {r.label}</p>
                           </div>
-                          <button
-                            onClick={() => sendReminderViaGmail(r)}
-                            disabled={sendingReminder === r.id}
-                            className="text-[11px] font-black px-2.5 py-1 rounded-lg text-white transition-all hover:opacity-80 disabled:opacity-60"
-                            style={{ background: "linear-gradient(135deg,#f59e0b,#d97706)" }}>
-                            {sendingReminder === r.id ? "Sending…" : "Send via Gmail →"}
-                          </button>
+                          <div className="flex items-center gap-1.5">
+                            {r.html && (
+                              <button
+                                onClick={() => previewReminderEmail(r)}
+                                className="text-[11px] font-bold px-2.5 py-1 rounded-lg transition-all hover:opacity-80"
+                                style={{ background: "rgba(157,111,232,0.10)", color: "#7c3aed" }}>
+                                👁 Preview
+                              </button>
+                            )}
+                            <button
+                              onClick={() => sendReminderViaGmail(r)}
+                              disabled={sendingReminder === r.id}
+                              className="text-[11px] font-black px-2.5 py-1 rounded-lg text-white transition-all hover:opacity-80 disabled:opacity-60"
+                              style={{ background: "linear-gradient(135deg,#f59e0b,#d97706)" }}>
+                              {sendingReminder === r.id ? "Sending…" : "Send via Gmail →"}
+                            </button>
+                          </div>
                         </div>
                         <div className="px-4 py-3 bg-white">
                           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Subject</p>
