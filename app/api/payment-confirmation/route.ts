@@ -22,11 +22,19 @@ const CHRIS_PHONE = "(408) 722-7680";
 function escapeHtml(v: string) {
   return v
     .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+    .replace(/"/g, "&quot;");
 }
 
 function sanitizeHeader(v: string) {
   return v.replace(/[\r\n]+/g, " ").trim();
+}
+
+/** RFC 2047 encoded-word for non-ASCII header values (e.g. subjects with emoji). */
+function encodeHeader(v: string): string {
+  const cleaned = v.replace(/[\r\n]+/g, " ").trim();
+  if (!/[^\x20-\x7E]/.test(cleaned)) return cleaned;
+  const b64 = btoa(unescape(encodeURIComponent(cleaned)));
+  return `=?UTF-8?B?${b64}?=`;
 }
 
 /** Parse amount / method / invoice out of the stored payment_note string */
@@ -302,7 +310,7 @@ function buildRawMimeMessage(opts: {
   const headers = [
     `From: Chris Solorzano <${sanitizeHeader(from)}>`,
     `To: ${sanitizeHeader(to)}`,
-    `Subject: ${sanitizeHeader(subject)}`,
+    `Subject: ${encodeHeader(subject)}`,
     `MIME-Version: 1.0`,
     `Content-Type: text/html; charset=UTF-8`,
     `Content-Transfer-Encoding: base64`,

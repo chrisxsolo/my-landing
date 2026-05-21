@@ -328,27 +328,67 @@ export default function SessionCalendar({ sessions, onClientClick, onReschedule,
               {next3.map(s => {
                 const col = colorFor(s);
                 const dt  = new Date(s.session_date + "T12:00:00");
-                const diff = Math.round((dt.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-                const label = diff === 0 ? "TODAY" : diff === 1 ? "TOMORROW" : dt.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }).toUpperCase();
+                const tomorrowStr = (() => {
+                  const d = new Date(today); d.setDate(d.getDate() + 1);
+                  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+                })();
+                const label = s.session_date === todayStr ? "TODAY" : s.session_date === tomorrowStr ? "TOMORROW" : dt.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }).toUpperCase();
+                const isRescheduling = reschedulingId === s.id;
                 return (
-                  <div key={s.id} className="flex items-center gap-3 px-3 py-2 rounded-xl"
+                  <div key={s.id} className="rounded-xl overflow-hidden"
                     style={{ background: col.bg, border: `1px solid ${col.bg}` }}>
-                    <div className="w-1.5 h-8 rounded-full flex-shrink-0" style={{ background: col.grad }} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-black text-slate-900 truncate">{s.name}</p>
-                      <p className="text-[11px] text-slate-400 truncate">{s.session_type || "Session"}</p>
+                    <div className="flex items-center gap-3 px-3 py-2">
+                      <div className="w-1.5 h-8 rounded-full flex-shrink-0" style={{ background: col.grad }} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-black text-slate-900 truncate">{s.name}</p>
+                        <p className="text-[11px] text-slate-400 truncate">{s.session_type || "Session"}</p>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="text-[10px] font-black" style={{ color: col.text }}>{label}</span>
+                        {onReschedule && (
+                          <button
+                            onClick={() => {
+                              if (isRescheduling) { setReschedulingId(null); setRescheduleValue(""); }
+                              else { setReschedulingId(s.id); setRescheduleValue(s.session_date); }
+                            }}
+                            className="text-[11px] font-bold px-2 py-1 rounded-lg transition-all hover:opacity-80"
+                            style={{ background: isRescheduling ? "rgba(99,102,241,0.25)" : "rgba(99,102,241,0.15)", color: "#6366f1" }}>
+                            {isRescheduling ? "✕" : "📅"}
+                          </button>
+                        )}
+                        {onRemindersClick && (
+                          <button
+                            onClick={() => onRemindersClick(s.id)}
+                            className="text-[11px] font-bold px-2 py-1 rounded-lg transition-all hover:opacity-80"
+                            style={{ background: remindersOpen[s.id] ? "rgba(245,158,11,0.25)" : "rgba(245,158,11,0.15)", color: "#d97706" }}>
+                            {remindersLoading[s.id] ? "…" : "🔔"}
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className="text-[10px] font-black" style={{ color: col.text }}>{label}</span>
-                      {onRemindersClick && (
+                    {isRescheduling && onReschedule && (
+                      <div className="flex items-center gap-2 px-3 pb-2.5">
+                        <input
+                          type="date"
+                          value={rescheduleValue}
+                          onChange={e => setRescheduleValue(e.target.value)}
+                          className="flex-1 text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                        />
                         <button
-                          onClick={() => onRemindersClick(s.id)}
-                          className="text-[11px] font-bold px-2 py-1 rounded-lg transition-all hover:opacity-80"
-                          style={{ background: remindersOpen[s.id] ? "rgba(245,158,11,0.25)" : "rgba(245,158,11,0.15)", color: "#d97706" }}>
-                          {remindersLoading[s.id] ? "…" : "🔔"}
+                          onClick={async () => {
+                            if (!rescheduleValue) return;
+                            setRescheduleLoading(true);
+                            await onReschedule(s.id, rescheduleValue + "T12:00");
+                            setRescheduleLoading(false);
+                            setReschedulingId(null);
+                            setRescheduleValue("");
+                          }}
+                          disabled={!rescheduleValue || rescheduleLoading}
+                          className="text-[11px] font-bold px-2.5 py-1.5 rounded-lg bg-indigo-500 text-white disabled:opacity-40 hover:bg-indigo-600 transition-colors">
+                          {rescheduleLoading ? "…" : "Save"}
                         </button>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}
