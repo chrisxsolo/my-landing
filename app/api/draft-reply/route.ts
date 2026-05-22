@@ -447,7 +447,10 @@ ${previous_draft}
 
 Chris reviewed it and wants this changed: "${feedback}"
 
-Rewrite the reply incorporating that feedback. Keep everything else the same unless it conflicts with the requested change. Output only the revised reply, nothing else.`
+Rewrite the reply incorporating that feedback. Keep everything else the same unless it conflicts with the requested change. Output only the revised reply, nothing else.
+
+After the revised reply, on a new line output exactly:
+<rule>one concrete actionable writing rule extracted from this feedback, phrased as an instruction for future drafts</rule>`
     : latest_message_body && latest_message_from !== "me"
       ? `Draft a reply to the most recent email from ${name}.
 
@@ -479,7 +482,7 @@ Write the reply now.`;
     const client = new Anthropic({ apiKey });
     const response = await client.messages.create({
       model: "claude-sonnet-4-6",
-      max_tokens: 600,
+      max_tokens: isRefinement ? 800 : 600,
       temperature: 0.9,
       messages: [{ role: "user", content: userPrompt }],
       system: [
@@ -491,18 +494,32 @@ Write the reply now.`;
       ],
     });
 
-    let draft = response.content
+    let raw = response.content
       .filter(b => b.type === "text")
       .map(b => (b as { type: "text"; text: string }).text)
       .join("")
       .trim();
 
+    // Extract and save rule for refinement mode
+    let savedRule: string | null = null;
+    if (isRefinement) {
+      const ruleMatch = raw.match(/<rule>([\s\S]*?)<\/rule>/);
+      if (ruleMatch) {
+        savedRule = ruleMatch[1].trim();
+        raw = raw.replace(/<rule>[\s\S]*?<\/rule>/, "").trim();
+        mergeRulesToVault([savedRule], apiKey).catch(err =>
+          console.error("[draft-reply] refinement rule save failed:", err)
+        );
+      }
+    }
+
+    let draft = raw;
     draft = draft.replace(
       /^(?:[^\n]*<[^\n@>]+@[^\n>]+>[^\n]*\n[^\n]+at\s+\d+:\d+[^\n]*\n(?:to\s+[^\n]+\n)?[\s\n]*)/, ""
     ).trimStart();
     draft = stripSignoff(draft);
 
-    return NextResponse.json({ draft });
+    return NextResponse.json({ draft, ...(savedRule ? { saved_rule: savedRule } : {}) });
   } catch (err) {
     console.error("Claude draft-reply error:", err);
     return NextResponse.json({ error: friendlyAiError(err) }, { status: 500 });

@@ -101,7 +101,8 @@ export default function ConversationPage() {
   const [bodyLoading,   setBodyLoading]   = useState<Record<string, boolean>>({});
 
   const [draft,         setDraft]         = useState("");
-  const [lastAiDraft,   setLastAiDraft]   = useState("");   // snapshot of the AI-generated text for teaching
+  const [lastAiDraft,     setLastAiDraft]     = useState("");   // latest AI draft (updated on every generate/refine)
+  const [originalAiDraft, setOriginalAiDraft] = useState("");   // first AI draft this session — never overwritten
   const [draftLoading,  setDraftLoading]  = useState(false);
   const [polishLoading, setPolishLoading] = useState(false);
   const [draftSaving,   setDraftSaving]   = useState(false);
@@ -110,6 +111,8 @@ export default function ConversationPage() {
   const [voiceError,    setVoiceError]    = useState<string | null>(null);
   const [subject,       setSubject]       = useState("");
   const [feedback,      setFeedback]      = useState("");
+  const [refineSaved,      setRefineSaved]      = useState<string | null>(null);
+  const [aiDraftExpanded,  setAiDraftExpanded]  = useState(false);
   const [sendLoading,   setSendLoading]   = useState(false);
   const [toast,         setToast]         = useState<{ msg: string; ok: boolean } | null>(null);
   const [status,        setStatus]        = useState("new");
@@ -253,15 +256,17 @@ export default function ConversationPage() {
   // Load saved drafts — localStorage first (fast), fall back to Supabase (cross-device)
   useEffect(() => {
     if (!inquiryId) return;
-    const localDraft = localStorage.getItem(`draft_${inquiryId}`);
-    const localAi    = localStorage.getItem(`ai_draft_${inquiryId}`);
-    if (localDraft) setDraft(localDraft);
-    if (localAi)    setLastAiDraft(localAi);
+    const localDraft    = localStorage.getItem(`draft_${inquiryId}`);
+    const localAi       = localStorage.getItem(`ai_draft_${inquiryId}`);
+    const localOriginal = localStorage.getItem(`original_ai_draft_${inquiryId}`);
+    if (localDraft)    setDraft(localDraft);
+    if (localAi)       setLastAiDraft(localAi);
+    if (localOriginal) setOriginalAiDraft(localOriginal);
 
     // Only hit Supabase if localStorage was empty (other device may have saved)
-    if (!localDraft || !localAi) {
+    if (!localDraft || !localAi || !localOriginal) {
       supabase.from("site_settings").select("key,value")
-        .in("key", [`draft_${inquiryId}`, `ai_draft_${inquiryId}`])
+        .in("key", [`draft_${inquiryId}`, `ai_draft_${inquiryId}`, `original_ai_draft_${inquiryId}`])
         .then(({ data }) => {
           if (!data) return;
           for (const row of data) {
@@ -272,6 +277,10 @@ export default function ConversationPage() {
             if (row.key === `ai_draft_${inquiryId}` && !localAi && row.value) {
               setLastAiDraft(row.value);
               localStorage.setItem(`ai_draft_${inquiryId}`, row.value);
+            }
+            if (row.key === `original_ai_draft_${inquiryId}` && !localOriginal && row.value) {
+              setOriginalAiDraft(row.value);
+              localStorage.setItem(`original_ai_draft_${inquiryId}`, row.value);
             }
           }
         });
@@ -291,6 +300,12 @@ export default function ConversationPage() {
     if (lastAiDraft) localStorage.setItem(`ai_draft_${inquiryId}`, lastAiDraft);
     else localStorage.removeItem(`ai_draft_${inquiryId}`);
   }, [lastAiDraft, inquiryId]);
+
+  // Persist original AI draft — written once, never cleared until session reset
+  useEffect(() => {
+    if (!inquiryId || !originalAiDraft) return;
+    localStorage.setItem(`original_ai_draft_${inquiryId}`, originalAiDraft);
+  }, [originalAiDraft, inquiryId]);
 
   // Auto-scroll to bottom when thread loads
   useEffect(() => {
@@ -392,11 +407,22 @@ export default function ConversationPage() {
         setLastAiDraft(json.draft);
         setLearnedRules(null);
         setFeedback("");
-        // Persist to Supabase so draft is accessible on any device
-        await supabase.from("site_settings").upsert([
+        if (json.saved_rule) {
+          setRefineSaved(json.saved_rule);
+          setTimeout(() => setRefineSaved(null), 6000);
+        }
+        // Lock in the original draft on first generate only (not refinements)
+        const isRefine = Boolean(refeedback);
+        const upsertRows: { key: string; value: string }[] = [
           { key: `draft_${inquiryId}`,    value: json.draft },
           { key: `ai_draft_${inquiryId}`, value: json.draft },
-        ], { onConflict: "key" });
+        ];
+        if (!isRefine && !originalAiDraft) {
+          setOriginalAiDraft(json.draft);
+          upsertRows.push({ key: `original_ai_draft_${inquiryId}`, value: json.draft });
+        }
+        // Persist to Supabase so draft is accessible on any device
+        await supabase.from("site_settings").upsert(upsertRows, { onConflict: "key" });
       }
       else showToast(json.error ?? "Draft failed", false);
     } catch {
@@ -940,7 +966,7 @@ export default function ConversationPage() {
 
   // ── Teach AI: compare AI draft vs actual sent, write new rules to Obsidian vault ──
   async function learnFromReply() {
-    const aiDraftToUse = lastAiDraft || manualAiDraft.trim();
+    const aiDraftToUse = originalAiDraft || lastAiDraft || manualAiDraft.trim();
     if (!inquiry || !aiDraftToUse || !actualSent.trim()) return;
     setLearnLoading(true);
     const isPerfect = aiDraftToUse.trim() === actualSent.trim();
@@ -1369,6 +1395,11 @@ export default function ConversationPage() {
                     Refine
                   </button>
                 </div>
+                {refineSaved && (
+                  <div className="text-[11px] text-emerald-700 bg-emerald-50 rounded-lg px-3 py-2 leading-snug">
+                    ✓ Rule saved: &ldquo;{refineSaved}&rdquo;
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -1740,11 +1771,18 @@ export default function ConversationPage() {
                   </p>
 
                   {/* If an AI draft was generated this session, show it dimmed — otherwise let them paste it */}
-                  {lastAiDraft ? (
+                  {(originalAiDraft || lastAiDraft) ? (
                     <div className="rounded-xl p-3 space-y-1"
                          style={{ background: "rgba(148,163,184,0.07)", border: "1px solid rgba(148,163,184,0.15)" }}>
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-slate-300">AI draft (this session)</p>
-                      <p className="text-xs text-slate-400 leading-relaxed line-clamp-3 whitespace-pre-wrap">{lastAiDraft}</p>
+                      <div className="flex items-center justify-between">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-300">Original AI draft</p>
+                        <button
+                          onClick={() => setAiDraftExpanded(e => !e)}
+                          className="text-[10px] text-slate-400 underline underline-offset-2 hover:text-slate-600">
+                          {aiDraftExpanded ? "Collapse" : "Show full"}
+                        </button>
+                      </div>
+                      <p className={`text-xs text-slate-400 leading-relaxed whitespace-pre-wrap${aiDraftExpanded ? "" : " line-clamp-3"}`}>{originalAiDraft || lastAiDraft}</p>
                     </div>
                   ) : (
                     <div>
@@ -1776,7 +1814,7 @@ export default function ConversationPage() {
 
                   <button
                     onClick={learnFromReply}
-                    disabled={(!lastAiDraft && !manualAiDraft.trim()) || !actualSent.trim() || learnLoading}
+                    disabled={(!originalAiDraft && !lastAiDraft && !manualAiDraft.trim()) || !actualSent.trim() || learnLoading}
                     className="w-full text-sm font-black py-2.5 rounded-xl transition-all hover:opacity-90 disabled:opacity-40 flex items-center justify-center gap-2"
                     style={{ background: "linear-gradient(135deg,#f59e0b,#d97706)", color: "#fff" }}>
                     {learnLoading
