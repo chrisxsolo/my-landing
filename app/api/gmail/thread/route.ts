@@ -75,6 +75,7 @@ export async function GET(req: NextRequest) {
           id: string;
           messages: {
             id: string; threadId: string; internalDate?: string; snippet?: string;
+            labelIds?: string[];
             payload?: { headers?: { name: string; value: string }[] };
           }[];
         };
@@ -92,10 +93,16 @@ export async function GET(req: NextRequest) {
       if (seen.has(msg.id)) continue;
       seen.add(msg.id);
 
+      // Skip drafts — they haven't been sent and shouldn't appear in the thread view
+      if (msg.labelIds?.includes("DRAFT")) continue;
+
       const headers  = msg.payload?.headers ?? [];
       const h = (n: string) =>
         headers.find(x => x.name.toLowerCase() === n.toLowerCase())?.value ?? "";
       const from = h("From");
+
+      // Only mark as "me" if we have a valid email to compare against
+      const isMe = !!tokens.email && from.toLowerCase().includes(tokens.email.toLowerCase());
 
       messages.push({
         id:        msg.id,
@@ -107,7 +114,7 @@ export async function GET(req: NextRequest) {
         date:      h("Date"),
         timestamp: parseInt(msg.internalDate ?? "0"),
         snippet:   msg.snippet ?? "",
-        isMe:      from.toLowerCase().includes(tokens.email.toLowerCase()),
+        isMe,
       });
     }
   }

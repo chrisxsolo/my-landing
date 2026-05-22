@@ -47,7 +47,7 @@ import {
 
 export const dynamic = 'force-dynamic'
 
-type Tab = "home"|"poses"|"locations"|"bayGuide"|"portfolio"|"categories"|"blog"|"library"|"analytics"|"payments"|"inquiries"|"clients"|"funnel"|"vault"|"ai";
+type Tab = "home"|"poses"|"locations"|"bayGuide"|"portfolio"|"categories"|"blog"|"library"|"analytics"|"payments"|"inquiries"|"clients"|"funnel"|"vault"|"ai"|"format";
 type ImageLibraryRow = { id:number; title:string; alt:string|null; image_url:string; source_type:string; source_post_id:number|null; source_post_slug:string|null; source_role:string; in_portfolio:boolean; created_at:string; };
 type Inquiry = { id:number; name:string; email:string; phone:string|null; session_type:string|null; date_in_mind:string|null; message:string; status:string; created_at:string; payment_status:string|null; payment_note:string|null; payment_detected_at:string|null; session_date:string|null; booking_confirmed:boolean|null; reply_sent_at:string|null; invoice_sent_at:string|null; contract_sent_at:string|null; deposit_paid_at:string|null; gallery_delivered_at:string|null; confirmation_sent_at:string|null; preferred_time:string|null; location:string|null; school:string|null; instagram:string|null; people:string|null; };
 type AdminSessionsResponse = { sessions?: AdminClientSessionDTO[]; session?: AdminClientSessionDTO; error?: string; };
@@ -76,9 +76,9 @@ const BLOG_CATEGORIES:{value:BlogCategory;label:string;helper:string}[]=[
   {value:"professional",label:"Professional",helper:"Case studies at /blog"},
 ];
 const WEBSITE_TABS:Tab[]=["poses","locations","bayGuide","portfolio","categories","blog","library"];
-const CLIENT_TABS:Tab[]=["inquiries","clients","analytics","payments","funnel","ai"];
+const CLIENT_TABS:Tab[]=["inquiries","clients","analytics","payments","funnel","ai","format"];
 const VAULT_TABS:Tab[]=["vault"];
-const TAB_LABELS:Record<Tab,string>={home:"🏠 Home",poses:"📸 Grad Poses",locations:"📍 Campus Spots",bayGuide:"🗺️ Bay Guide",portfolio:"🖼️ Portfolio",categories:"🏷️ Categories",blog:"✍️ Blog",library:"🗄️ Image Library",analytics:"📊 Analytics",payments:"💵 Revenue",funnel:"📈 Funnel",inquiries:"📬 Inquiries",clients:"👥 Clients",vault:"📓 Vault",ai:"🤖 AI Training"};
+const TAB_LABELS:Record<Tab,string>={home:"🏠 Home",poses:"📸 Grad Poses",locations:"📍 Campus Spots",bayGuide:"🗺️ Bay Guide",portfolio:"🖼️ Portfolio",categories:"🏷️ Categories",blog:"✍️ Blog",library:"🗄️ Image Library",analytics:"📊 Analytics",payments:"💵 Revenue",funnel:"📈 Funnel",inquiries:"📬 Inquiries",clients:"👥 Clients",vault:"📓 Vault",ai:"🤖 AI Training",format:"✨ Quick Format"};
 
 function detectSchool(text:string):string|null{
   // Normalize accents (e.g. "José" → "Jose") so accented names still match
@@ -2595,17 +2595,18 @@ function AdminDashboard() {
                   const hasDraft=!!drafts[inq.id];
                   const unreadThread=inboxThreads.find(t=>t.fromEmail.toLowerCase()===inq.email.toLowerCase()&&t.isUnread);
 
+                  const highlighted=!!unreadThread||needsReply(inq);
                   return(
                     <div key={inq.id}
-                         className={`rounded-2xl overflow-hidden transition-shadow hover:shadow-md ${unreadThread?"border-2 shadow-md shadow-amber-100":"bg-white border border-slate-100"}`}
-                         style={unreadThread?{background:"#fffbeb"}:{borderLeftWidth:"3px",borderLeftStyle:"solid",borderLeftColor:statusColor,background:"#fff"}}>
+                         className={`rounded-2xl overflow-hidden transition-shadow hover:shadow-md ${highlighted?"border-2 shadow-md shadow-amber-100":"bg-white border border-slate-100"}`}
+                         style={highlighted?{background:"#fffbeb"}:{borderLeftWidth:"3px",borderLeftStyle:"solid",borderLeftColor:statusColor,background:"#fff"}}>
 
                       {/* ── Card header (always visible) ── */}
                       <div className="flex items-stretch">
                         {/* Clickable info area — div so links inside remain functional */}
                         <div
                           onClick={()=>setEditingInquiry(isOpen?null:inq)}
-                          className={`flex-1 min-w-0 p-4 sm:p-5 transition-colors duration-150 cursor-pointer ${unreadThread?"hover:bg-amber-50/70":"hover:bg-slate-50/70"}`}>
+                          className={`flex-1 min-w-0 p-4 sm:p-5 transition-colors duration-150 cursor-pointer ${highlighted?"hover:bg-amber-50/70":"hover:bg-slate-50/70"}`}>
                           <div className="flex items-center gap-2 flex-wrap mb-1">
                             <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full"
                                   style={{background:statusBg,color:statusColor}}>
@@ -3078,11 +3079,8 @@ function AdminDashboard() {
             if(h<1)return"just now";if(h===1)return"1h ago";if(h<24)return`${h}h ago`;
             const d=Math.round(h/24);return d===1?"1d ago":`${d}d ago`;
           };
-          const quickFormatClients=Array.from(clientMap.values()).map(c=>({name:c.name,email:c.email}));
           return(
             <div className="space-y-6">
-              {/* Quick Format Tool */}
-              <QuickFormatTool clients={quickFormatClients}/>
               {/* New inquiries section */}
               {pendingOnClients.length>0&&(
                 <div className="rounded-2xl overflow-hidden border" style={{borderColor:"rgba(245,158,11,0.3)",background:"white"}}>
@@ -3548,6 +3546,15 @@ function AdminDashboard() {
         {/* ── VAULT ── */}
         {tab==="vault"&&<VaultTab />}
         {tab==="ai"&&<AiTab />}
+        {tab==="format"&&(()=>{
+          const seenEmails=new Set<string>();
+          const quickFormatClients=inquiries.reduce<{name:string;email:string}[]>((acc,inq)=>{
+            const key=inq.email.toLowerCase();
+            if(!seenEmails.has(key)){seenEmails.add(key);acc.push({name:inq.name,email:inq.email});}
+            return acc;
+          },[]);
+          return <QuickFormatTool clients={quickFormatClients}/>;
+        })()}
       </div>
     </div>
   );
