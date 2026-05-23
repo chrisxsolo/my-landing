@@ -5,16 +5,15 @@ export type ReminderEmailType =
   | "thank-you"
   | "gallery-delivery";
 
-// Palette — pulled from the live site
-const P1    = "#9d6fe8";  // violet accent
-const P2    = "#e879a0";  // pink accent
-const P3    = "#fbbf24";  // amber accent
-const DARK  = "#111827";
-const BODY  = "#374151";
-const MUTED = "#6b7280";
-const BG    = "#f4f5f2";  // sage/off-white — matches the site's page bg
+// Brand palette — matches lib/colors.ts exactly
+const P1    = "#9d6fe8";   // violet
+const P2    = "#e879a0";   // pink
+const P3    = "#fbbf24";   // amber
+const DARK  = "#0e1412";   // ink
+const BODY  = "#2f3835";   // inkSoft
+const MUTED = "#687571";   // muted
+const BG    = "#fffaf5";   // warm cream — matches site page bg
 const CARD  = "#ffffff";
-const RULE  = "#e5e7eb";
 
 const IG_HANDLE = "@soloxsnaps";
 const PHONE     = "(408) 722-7680";
@@ -43,7 +42,7 @@ function base(type: ReminderEmailType, content: string): string {
 
   body {
     background: ${BG};
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     -webkit-font-smoothing: antialiased;
     color: ${BODY};
   }
@@ -51,77 +50,75 @@ function base(type: ReminderEmailType, content: string): string {
   .wrap {
     max-width: 560px;
     margin: 0 auto;
-    padding: 48px 20px 72px;
+    padding: 48px 20px 80px;
   }
 
-  /* Wordmark — mimics the nav logo */
   .brand {
-    margin-bottom: 32px;
-  }
-  .brand-name {
-    font-size: 17px;
-    font-weight: 800;
-    letter-spacing: -0.2px;
-    color: ${DARK};
+    margin-bottom: 28px;
+    padding-left: 2px;
   }
 
-  /* Card */
+  .brand-name {
+    font-size: 18px;
+    font-weight: 900;
+    letter-spacing: -0.3px;
+    background: linear-gradient(135deg, ${P1}, ${P2}, ${P3});
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    display: inline-block;
+    color: ${P1};
+  }
+
   .card {
     background: ${CARD};
-    border-radius: 4px;
+    border-radius: 16px;
     overflow: hidden;
-    border: 1px solid ${RULE};
+    border: 1px solid rgba(157,111,232,0.12);
+    box-shadow: 0 2px 4px rgba(157,118,86,0.04), 0 24px 60px rgba(157,118,86,0.12);
   }
 
-  /* Thin gradient bar — only decorative accent */
   .bar {
-    height: 3px;
+    height: 4px;
     background: ${topBar};
   }
 
-  /* Content */
   .content {
     padding: 44px 48px 40px;
   }
 
-  /* Eyebrow */
   .eyebrow {
-    font-size: 10.5px;
+    font-size: 10px;
     font-weight: 700;
-    letter-spacing: 0.12em;
+    letter-spacing: 0.14em;
     text-transform: uppercase;
-    color: ${MUTED};
     display: block;
     margin-bottom: 14px;
   }
 
-  /* Headline — big and bold like the site's h1s */
   .headline {
-    font-size: 30px;
+    font-size: 32px;
     font-weight: 900;
     color: ${DARK};
-    letter-spacing: -0.6px;
-    line-height: 1.15;
+    letter-spacing: -0.8px;
+    line-height: 1.12;
     margin-bottom: 24px;
   }
 
-  /* Body copy */
   .copy {
     font-size: 15.5px;
-    line-height: 1.75;
+    line-height: 1.78;
     color: ${BODY};
   }
   .copy p { margin-bottom: 16px; }
   .copy p:last-child { margin-bottom: 0; }
 
-  /* Rule */
   .rule {
     height: 1px;
-    background: ${RULE};
+    background: rgba(157,111,232,0.10);
     margin: 32px 0;
   }
 
-  /* Detail rows — like the site's clean key/value pairs */
   .detail {
     display: flex;
     gap: 0;
@@ -130,9 +127,9 @@ function base(type: ReminderEmailType, content: string): string {
   }
   .detail:last-of-type { margin-bottom: 0; }
   .detail-label {
-    font-size: 11px;
+    font-size: 10.5px;
     font-weight: 700;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.09em;
     text-transform: uppercase;
     color: ${MUTED};
     min-width: 110px;
@@ -146,65 +143,73 @@ function base(type: ReminderEmailType, content: string): string {
     line-height: 1.5;
   }
 
-  /* Callout block — minimal, just a left border */
   .callout {
     border-left: 3px solid ${P1};
-    padding: 4px 0 4px 18px;
+    background: rgba(157,111,232,0.05);
+    border-radius: 0 10px 10px 0;
+    padding: 16px 20px;
+    margin-top: 32px;
+  }
+  .callout-pink {
+    border-left: 3px solid ${P2};
+    background: rgba(232,121,160,0.05);
+    border-radius: 0 10px 10px 0;
+    padding: 16px 20px;
     margin-top: 32px;
   }
   .callout-amber {
     border-left: 3px solid ${P3};
-    padding: 4px 0 4px 18px;
+    background: rgba(251,191,36,0.07);
+    border-radius: 0 10px 10px 0;
+    padding: 16px 20px;
     margin-top: 32px;
   }
   .callout-label {
-    font-size: 10.5px;
+    font-size: 10px;
     font-weight: 700;
-    letter-spacing: 0.10em;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
     color: ${P1};
-    margin-bottom: 6px;
+    margin-bottom: 8px;
     display: block;
   }
+  .callout-pink .callout-label { color: ${P2}; }
   .callout-amber .callout-label { color: #92400e; }
   .callout-text {
     font-size: 14.5px;
-    font-weight: 400;
     color: ${BODY};
     line-height: 1.65;
   }
   .callout-text strong { font-weight: 700; color: ${DARK}; }
 
-  /* Checklist */
   .checklist { margin-top: 12px; }
   .checklist-item {
     font-size: 14.5px;
     color: ${BODY};
     line-height: 1.6;
-    padding: 4px 0;
+    padding: 5px 0;
     display: flex;
-    gap: 10px;
+    gap: 12px;
     align-items: flex-start;
   }
   .check {
     color: ${P1};
-    font-weight: 800;
+    font-size: 9px;
     flex-shrink: 0;
-    font-size: 12px;
-    margin-top: 3px;
+    margin-top: 5px;
   }
 
-  /* Footer */
   .footer {
     padding: 22px 48px 26px;
-    border-top: 1px solid ${RULE};
-    background: #fafafa;
+    border-top: 1px solid rgba(157,111,232,0.08);
+    background-color: #fffbf7;
+    background: linear-gradient(135deg, #fffbf7, rgba(232,121,160,0.04), rgba(251,191,36,0.04));
   }
   .footer-name {
     font-size: 13px;
     font-weight: 800;
     color: ${DARK};
-    margin-bottom: 3px;
+    margin-bottom: 4px;
     letter-spacing: -0.1px;
   }
   .footer-meta {
@@ -220,7 +225,7 @@ function base(type: ReminderEmailType, content: string): string {
 
   @media (max-width: 480px) {
     .content, .footer { padding-left: 24px; padding-right: 24px; }
-    .headline { font-size: 25px; }
+    .headline { font-size: 26px; }
     .detail-label { min-width: 90px; }
   }
 </style>
@@ -253,15 +258,15 @@ function base(type: ReminderEmailType, content: string): string {
 export function build48hrEmail(firstName: string, body: string): string {
   const content = `
   <div class="content">
-    <span class="eyebrow">2 days out</span>
+    <span class="eyebrow" style="color: ${P1};">2 days out</span>
     <div class="headline">See you in 48 hours.</div>
     <div class="copy">${bodyToParagraphs(body)}</div>
     <div class="callout">
       <span class="callout-label">Quick checklist</span>
       <div class="checklist">
-        <div class="checklist-item"><span class="check">—</span> Outfits picked and wrinkle-free</div>
-        <div class="checklist-item"><span class="check">—</span> Plan to arrive 5–10 min early</div>
-        <div class="checklist-item"><span class="check">—</span> Text me if anything comes up: <strong>${PHONE}</strong></div>
+        <div class="checklist-item"><span class="check">✦</span> Outfits picked and wrinkle-free</div>
+        <div class="checklist-item"><span class="check">✦</span> Plan to arrive 5–10 min early</div>
+        <div class="checklist-item"><span class="check">✦</span> Text me if anything comes up: <strong>${PHONE}</strong></div>
       </div>
     </div>
   </div>`;
@@ -271,7 +276,7 @@ export function build48hrEmail(firstName: string, body: string): string {
 export function buildDayBeforeEmail(firstName: string, body: string): string {
   const content = `
   <div class="content">
-    <span class="eyebrow">Tomorrow</span>
+    <span class="eyebrow" style="color: ${P2};">Tomorrow</span>
     <div class="headline">See you tomorrow.</div>
     <div class="copy">${bodyToParagraphs(body)}</div>
     <div class="rule"></div>
@@ -290,10 +295,10 @@ export function buildDayBeforeEmail(firstName: string, body: string): string {
 export function buildMorningOfEmail(firstName: string, body: string): string {
   const content = `
   <div class="content">
-    <span class="eyebrow">Shoot day</span>
+    <span class="eyebrow" style="color: ${P2};">Shoot day</span>
     <div class="headline">Today's the day.</div>
     <div class="copy">${bodyToParagraphs(body)}</div>
-    <div class="callout">
+    <div class="callout-pink">
       <span class="callout-label">Need me?</span>
       <p class="callout-text">Text or call anytime — <strong>${PHONE}</strong></p>
     </div>
@@ -304,7 +309,7 @@ export function buildMorningOfEmail(firstName: string, body: string): string {
 export function buildThankYouEmail(firstName: string, body: string): string {
   const content = `
   <div class="content">
-    <span class="eyebrow">After your session</span>
+    <span class="eyebrow" style="color: ${P1};">After your session</span>
     <div class="headline">That was so fun.</div>
     <div class="copy">${bodyToParagraphs(body)}</div>
     <div class="callout">
@@ -318,7 +323,7 @@ export function buildThankYouEmail(firstName: string, body: string): string {
 export function buildGalleryDeliveryEmail(firstName: string, body: string): string {
   const content = `
   <div class="content">
-    <span class="eyebrow">Gallery ready</span>
+    <span class="eyebrow" style="color: #92400e;">Gallery ready</span>
     <div class="headline">Your photos are ready.</div>
     <div class="copy">${bodyToParagraphs(body)}</div>
     <div class="callout-amber">
