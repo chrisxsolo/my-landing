@@ -302,39 +302,43 @@ export default function SessionCalendar({
                 const isRescheduling = reschedulingId === s.id;
                 return (
                   <div key={s.id} className="rounded-xl overflow-hidden" style={{ background: col.bg, border: `1px solid ${col.bg}` }}>
-                    <div className="flex items-center gap-3 px-3 py-2">
-                      <div className="w-1.5 h-8 rounded-full flex-shrink-0" style={{ background: col.grad }} />
+                    <div className="flex items-start gap-3 px-3 py-2">
+                      <div className="w-1.5 h-8 rounded-full flex-shrink-0 mt-0.5" style={{ background: col.grad }} />
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs font-black text-slate-900 truncate">{s.name}</p>
-                        <p className="text-[11px] text-slate-400 truncate">{s.session_type || "Session"}</p>
-                      </div>
-                      <div className="flex items-center gap-1.5 flex-shrink-0">
-                        <span className="text-[10px] font-black" style={{ color: col.text }}>{label}</span>
-                        {onReschedule && (
-                          <button
-                            onClick={() => {
-                              if (isRescheduling) { setReschedulingId(null); setRescheduleValue(""); }
-                              else { setReschedulingId(s.id); setRescheduleValue(s.session_date); }
-                            }}
-                            className="text-[11px] font-bold px-2 py-1 rounded-lg transition-all hover:opacity-80"
-                            style={{ background: isRescheduling ? "rgba(99,102,241,0.25)" : "rgba(99,102,241,0.15)", color: "#6366f1" }}>
-                            {isRescheduling ? "✕" : "📅"}
-                          </button>
-                        )}
-                        {onRemindersClick && (
-                          <button
-                            onClick={() => onRemindersClick(s.id)}
-                            className="text-[11px] font-bold px-2 py-1 rounded-lg transition-all hover:opacity-80"
-                            style={{ background: remindersOpen[s.id] ? "rgba(245,158,11,0.25)" : "rgba(245,158,11,0.15)", color: "#d97706" }}>
-                            {remindersLoading[s.id] ? "…" : "🔔"}
-                          </button>
-                        )}
-                        <button
-                          onClick={() => onClientClick(s.id)}
-                          className="text-[11px] font-bold px-2 py-1 rounded-lg transition-all hover:opacity-80 text-white"
-                          style={{ background: col.grad }}>
-                          →
-                        </button>
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <div className="min-w-0">
+                            <p className="text-xs font-black text-slate-900 truncate">{s.name}</p>
+                            <p className="text-[11px] text-slate-400 truncate">{s.session_type || "Session"}</p>
+                          </div>
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                            <span className="text-[10px] font-black" style={{ color: col.text }}>{label}</span>
+                            {onReschedule && (
+                              <button
+                                onClick={() => {
+                                  if (isRescheduling) { setReschedulingId(null); setRescheduleValue(""); }
+                                  else { setReschedulingId(s.id); setRescheduleValue(s.session_date); }
+                                }}
+                                className="text-[11px] font-bold px-2 py-1 rounded-lg transition-all hover:opacity-80"
+                                style={{ background: isRescheduling ? "rgba(99,102,241,0.25)" : "rgba(99,102,241,0.15)", color: "#6366f1" }}>
+                                {isRescheduling ? "✕" : "📅"}
+                              </button>
+                            )}
+                            {onRemindersClick && (
+                              <button
+                                onClick={() => onRemindersClick(s.id)}
+                                className="text-[11px] font-bold px-2 py-1 rounded-lg transition-all hover:opacity-80"
+                                style={{ background: remindersOpen[s.id] ? "rgba(245,158,11,0.25)" : "rgba(245,158,11,0.15)", color: "#d97706" }}>
+                                {remindersLoading[s.id] ? "…" : "🔔"}
+                              </button>
+                            )}
+                            <button
+                              onClick={() => onClientClick(s.id)}
+                              className="text-[11px] font-bold px-2 py-1 rounded-lg transition-all hover:opacity-80 text-white"
+                              style={{ background: col.grad }}>
+                              →
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     </div>
                     {isRescheduling && onReschedule && (
