@@ -16,6 +16,7 @@ import {
   type ClientSessionStatus,
 } from "@/lib/clientSessions";
 import type { ClientSessionContactOption } from "@/lib/clientSessionContacts";
+import { checkAuth } from "@/lib/adminAuth";
 import { supabase } from "@/lib/supabase";
 
 type AdminSessionsResponse = {
@@ -66,15 +67,15 @@ export default function AdminSessionsDashboard() {
     async function loadSessions() {
       const { data } = await supabase.auth.getSession();
       const token = data.session?.access_token;
-      if (!token) {
+      if (!token && !checkAuth()) {
         router.replace("/login?next=/admin/sessions");
         return;
       }
 
-      const headers = { Authorization: `Bearer ${token}` };
+      const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
       const [sessionsRes, contactsRes] = await Promise.all([
-        fetch("/api/admin/sessions", { headers }),
-        fetch("/api/admin/session-contacts", { headers }),
+        fetch("/api/admin/sessions", { headers: authHeaders }),
+        fetch("/api/admin/session-contacts", { headers: authHeaders }),
       ]);
       const json = await sessionsRes.json() as AdminSessionsResponse;
       const contactsJson = await contactsRes.json() as AdminSessionContactsResponse;
@@ -128,8 +129,9 @@ export default function AdminSessionsDashboard() {
   async function getAuthHeaders() {
     const { data } = await supabase.auth.getSession();
     const token = data.session?.access_token;
-    if (!token) throw new Error("You are not signed in.");
-    return { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+    if (!token && !checkAuth()) throw new Error("You are not signed in.");
+    const base = token ? { Authorization: `Bearer ${token}` } : {};
+    return { ...base, "Content-Type": "application/json" };
   }
 
   async function saveSession(payload: AdminSessionFormPayload) {

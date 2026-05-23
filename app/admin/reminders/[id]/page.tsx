@@ -92,7 +92,11 @@ function RemindersContent() {
 
   function previewEmail(r: ReminderDraft) {
     const html = r.html ?? buildReminderEmail(r.id as ReminderEmailType, clientName.split(" ")[0] || "there", r.body);
-    try { localStorage.setItem("email_preview_html", html); } catch { /* ignore */ }
+    try {
+      localStorage.setItem("email_preview_html", html);
+      localStorage.setItem("email_preview_subject", r.subject);
+      localStorage.setItem("email_preview_body", r.body);
+    } catch { /* ignore */ }
     window.open("/admin/email-preview", "_blank", "noopener");
   }
 

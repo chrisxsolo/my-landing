@@ -3,15 +3,52 @@
 import { useEffect, useState } from "react";
 import { C } from "@/lib/colors";
 
+const TEST_EMAIL = "soloxsnaps@gmail.com";
+
 export default function EmailPreviewPage() {
-  const [html, setHtml] = useState<string | null>(null);
+  const [html, setHtml]       = useState<string | null>(null);
+  const [subject, setSubject] = useState<string>("");
+  const [body, setBody]       = useState<string>("");
+  const [sending, setSending] = useState(false);
+  const [sent, setSent]       = useState(false);
+  const [error, setError]     = useState<string | null>(null);
 
   useEffect(() => {
     try {
-      const stored = localStorage.getItem("email_preview_html");
-      if (stored) setHtml(stored);
+      setHtml(localStorage.getItem("email_preview_html"));
+      setSubject(localStorage.getItem("email_preview_subject") ?? "");
+      setBody(localStorage.getItem("email_preview_body") ?? "");
     } catch { /* ignore */ }
   }, []);
+
+  async function sendTest() {
+    if (!html || sending) return;
+    setSending(true);
+    setError(null);
+    setSent(false);
+    try {
+      const res = await fetch("/api/send-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: TEST_EMAIL,
+          subject: `[TEST] ${subject}`,
+          body: body || "(no plain text)",
+          html,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(data.error ?? "Send failed");
+      }
+      setSent(true);
+      setTimeout(() => setSent(false), 4000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Send failed");
+    } finally {
+      setSending(false);
+    }
+  }
 
   return (
     <div style={{ minHeight: "100vh", background: "#f0f0f0", fontFamily: "inherit" }}>
@@ -46,8 +83,27 @@ export default function EmailPreviewPage() {
             style={{ background: C.p1_08, color: C.p1 }}>
             Plain-text fallback included
           </span>
+          {html && (
+            <button
+              onClick={sendTest}
+              disabled={sending || sent}
+              className="text-xs font-bold px-3 py-1.5 rounded-lg transition-all hover:opacity-80 disabled:opacity-60"
+              style={{
+                background: sent ? "rgba(16,185,129,0.12)" : C.p1_12,
+                color: sent ? "#059669" : C.p1,
+                minWidth: 130,
+              }}>
+              {sent ? "✓ Sent to inbox" : sending ? "Sending…" : `Send test email`}
+            </button>
+          )}
         </div>
       </div>
+
+      {error && (
+        <div className="text-xs font-semibold text-center py-2" style={{ background: "rgba(180,35,24,0.08)", color: "#b42318" }}>
+          {error}
+        </div>
+      )}
 
       {/* Preview area — simulates an email client */}
       <div style={{ maxWidth: 640, margin: "32px auto", padding: "0 16px 64px" }}>
@@ -89,6 +145,11 @@ export default function EmailPreviewPage() {
           )}
         </div>
 
+        {sent && (
+          <p className="text-center text-xs font-semibold mt-4" style={{ color: "#059669" }}>
+            Test email sent to {TEST_EMAIL}
+          </p>
+        )}
       </div>
     </div>
   );

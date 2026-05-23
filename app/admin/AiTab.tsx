@@ -31,6 +31,10 @@ export default function AiTab() {
   const [rulesLoading, setRulesLoading] = useState(false);
   const [showRules, setShowRules] = useState(false);
 
+  // Tone sync state
+  const [toneLoading, setToneLoading] = useState(false);
+  const [toneResult, setToneResult] = useState<{ rules: string[]; written: number; emails_analyzed: number; message?: string } | null>(null);
+
   // Batch drafts state
   const [batchLoading, setBatchLoading] = useState(false);
   const [batchStatus, setBatchStatus] = useState<BatchStatus | null>(null);
@@ -185,6 +189,30 @@ export default function AiTab() {
       if (json.batch) setBatchStatus(json.batch);
       if (json.results?.length) setBatchResults(json.results);
     } catch { /* no batch running */ }
+  }
+
+  async function syncToneFromSent() {
+    setToneLoading(true);
+    setToneResult(null);
+    try {
+      const res = await fetch("/api/admin/sync-tone-from-sent", { method: "POST" });
+      const json = await res.json() as { rules?: string[]; written?: number; emails_analyzed?: number; message?: string; error?: string };
+      if (!res.ok || json.error) {
+        setToneResult({ rules: [], written: 0, emails_analyzed: 0, message: json.error ?? "Sync failed" });
+        return;
+      }
+      setToneResult({
+        rules: json.rules ?? [],
+        written: json.written ?? 0,
+        emails_analyzed: json.emails_analyzed ?? 0,
+        message: json.message,
+      });
+      if ((json.written ?? 0) > 0 && showRules) loadRules();
+    } catch {
+      setToneResult({ rules: [], written: 0, emails_analyzed: 0, message: "Sync failed — try again" });
+    } finally {
+      setToneLoading(false);
+    }
   }
 
   async function startBatch() {
@@ -382,6 +410,58 @@ export default function AiTab() {
             style={{ background: "linear-gradient(135deg,#6366f1,#8b5cf6)", color: "#fff" }}>
             Send
           </button>
+        </div>
+      </div>
+
+      {/* Sync Tone from Sent Emails */}
+      <div className={card}>
+        <div className="h-[3px]" style={{ background: "linear-gradient(90deg,#06b6d4,#3b82f6)" }} />
+        <div className="p-4">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div>
+              <p className="text-sm font-black text-slate-900">Sync Tone from Sent Mail</p>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Reads your last 7 days of sent emails, extracts style rules, and saves them to the vault automatically.
+              </p>
+            </div>
+            <button
+              onClick={syncToneFromSent}
+              disabled={toneLoading}
+              className="text-xs font-bold px-3 py-1.5 rounded-xl disabled:opacity-40 flex-shrink-0"
+              style={{ background: "linear-gradient(135deg,#06b6d4,#3b82f6)", color: "#fff" }}>
+              {toneLoading ? "Analyzing…" : "Sync Now"}
+            </button>
+          </div>
+
+          {toneLoading && (
+            <div className="mt-3 flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs"
+              style={{ background: "rgba(6,182,212,0.06)", border: "1px solid rgba(6,182,212,0.2)", color: "#0891b2" }}>
+              <span className="animate-spin inline-block">◌</span>
+              Fetching sent emails and analyzing your writing style…
+            </div>
+          )}
+
+          {toneResult && !toneLoading && (
+            <div className="mt-3 space-y-2">
+              {toneResult.message && !toneResult.rules.length ? (
+                <p className="text-xs text-slate-400 px-1">{toneResult.message}</p>
+              ) : (
+                <div className="px-3 py-2.5 rounded-xl text-xs space-y-1"
+                  style={{ background: toneResult.written > 0 ? "rgba(16,185,129,0.06)" : "rgba(99,102,241,0.06)", border: `1px solid ${toneResult.written > 0 ? "rgba(16,185,129,0.2)" : "rgba(99,102,241,0.15)"}` }}>
+                  <p className="font-semibold" style={{ color: toneResult.written > 0 ? "#059669" : "#4338ca" }}>
+                    {toneResult.written > 0
+                      ? `✓ ${toneResult.written} new rule${toneResult.written !== 1 ? "s" : ""} saved from ${toneResult.emails_analyzed} emails`
+                      : `Analyzed ${toneResult.emails_analyzed} emails — all rules already in vault`}
+                  </p>
+                  {toneResult.rules.length > 0 && (
+                    <ul className="mt-1 space-y-0.5 text-slate-500">
+                      {toneResult.rules.map((r, i) => <li key={i}>· {r}</li>)}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

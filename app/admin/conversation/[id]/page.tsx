@@ -374,7 +374,15 @@ export default function ConversationPage() {
         ? (bodies[lastMsg.id] ? stripQuotes(bodies[lastMsg.id]) : lastMsg.snippet)
         : null;
 
-      const payload: Record<string, string | null> = {
+      // Fetch similar sent emails for tone matching (same as polishDraft does)
+      const gmailQuery = buildGmailQuery(inquiry.message, inquiry.session_type);
+      const gmailRes = await fetch(
+        `/api/gmail/similar-sent?query=${encodeURIComponent(gmailQuery)}`
+      ).catch(() => null);
+      const gmailJson = gmailRes?.ok ? await gmailRes.json().catch(() => null) : null;
+      const gmailExamples: string[] = gmailJson?.examples ?? [];
+
+      const payload: Record<string, string | string[] | null> = {
         name:                inquiry.name,
         email:               inquiry.email,
         phone:               inquiry.phone,
@@ -389,6 +397,7 @@ export default function ConversationPage() {
         thread_context:      threadContext ?? null,
         latest_message_body: latestBody ?? null,
         latest_message_from: lastMsg ? (lastMsg.isMe ? "me" : "client") : null,
+        ...(gmailExamples.length ? { gmail_examples: gmailExamples } : {}),
       };
 
       if (refeedback && draft) {
@@ -888,7 +897,11 @@ export default function ConversationPage() {
   // ── Open styled email preview in a new tab ───────────────────────────────
   function previewReminderEmail(r: ReminderDraft) {
     if (!r.html) return;
-    try { localStorage.setItem("email_preview_html", r.html); } catch { /* ignore */ }
+    try {
+      localStorage.setItem("email_preview_html", r.html);
+      localStorage.setItem("email_preview_subject", r.subject);
+      localStorage.setItem("email_preview_body", r.body);
+    } catch { /* ignore */ }
     window.open("/admin/email-preview", "_blank", "noopener");
   }
 

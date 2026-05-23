@@ -5,30 +5,16 @@ export type ReminderEmailType =
   | "thank-you"
   | "gallery-delivery";
 
-// Brand palette — matches lib/colors.ts exactly
-const P1    = "#9d6fe8";   // violet
-const P2    = "#e879a0";   // pink
-const P3    = "#fbbf24";   // amber
-const DARK  = "#0e1412";   // ink
-const BODY  = "#2f3835";   // inkSoft
-const MUTED = "#687571";   // muted
-const BG    = "#fffaf5";   // warm cream — matches site page bg
-const CARD  = "#ffffff";
+const DARK  = "#0e1412";
+const BODY  = "#2f3835";
+const MUTED = "#687571";
+const BG    = "#fffaf5";
 
 const IG_HANDLE = "@soloxsnaps";
 const PHONE     = "(408) 722-7680";
 const WEBSITE   = "soloxsnaps.com";
 
-const TOP_BARS: Record<ReminderEmailType, string> = {
-  "48hr":             `linear-gradient(90deg, ${P1}, ${P2})`,
-  "day-before":       `linear-gradient(90deg, ${P2}, ${P3})`,
-  "morning-of":       `linear-gradient(90deg, ${P3}, ${P2})`,
-  "thank-you":        `linear-gradient(90deg, ${P1}, ${P2}, ${P3})`,
-  "gallery-delivery": `linear-gradient(90deg, ${P3}, ${P2}, ${P1})`,
-};
-
 function base(type: ReminderEmailType, content: string): string {
-  const topBar = TOP_BARS[type];
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -53,34 +39,12 @@ function base(type: ReminderEmailType, content: string): string {
     padding: 48px 20px 80px;
   }
 
-  .brand {
-    margin-bottom: 28px;
-    padding-left: 2px;
-  }
-
-  .brand-name {
-    font-size: 18px;
-    font-weight: 900;
-    letter-spacing: -0.3px;
-    background: linear-gradient(135deg, ${P1}, ${P2}, ${P3});
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    display: inline-block;
-    color: ${P1};
-  }
-
   .card {
-    background: ${CARD};
-    border-radius: 16px;
+    background: #ffffff;
+    border-radius: 12px;
     overflow: hidden;
-    border: 1px solid rgba(157,111,232,0.12);
-    box-shadow: 0 2px 4px rgba(157,118,86,0.04), 0 24px 60px rgba(157,118,86,0.12);
-  }
-
-  .bar {
-    height: 4px;
-    background: ${topBar};
+    border: 1px solid rgba(0,0,0,0.07);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 16px 40px rgba(0,0,0,0.06);
   }
 
   .content {
@@ -92,6 +56,7 @@ function base(type: ReminderEmailType, content: string): string {
     font-weight: 700;
     letter-spacing: 0.14em;
     text-transform: uppercase;
+    color: ${MUTED};
     display: block;
     margin-bottom: 14px;
   }
@@ -115,7 +80,7 @@ function base(type: ReminderEmailType, content: string): string {
 
   .rule {
     height: 1px;
-    background: rgba(157,111,232,0.10);
+    background: rgba(0,0,0,0.08);
     margin: 32px 0;
   }
 
@@ -144,24 +109,8 @@ function base(type: ReminderEmailType, content: string): string {
   }
 
   .callout {
-    border-left: 3px solid ${P1};
-    background: rgba(157,111,232,0.05);
-    border-radius: 0 10px 10px 0;
-    padding: 16px 20px;
-    margin-top: 32px;
-  }
-  .callout-pink {
-    border-left: 3px solid ${P2};
-    background: rgba(232,121,160,0.05);
-    border-radius: 0 10px 10px 0;
-    padding: 16px 20px;
-    margin-top: 32px;
-  }
-  .callout-amber {
-    border-left: 3px solid ${P3};
-    background: rgba(251,191,36,0.07);
-    border-radius: 0 10px 10px 0;
-    padding: 16px 20px;
+    border-left: 2px solid rgba(0,0,0,0.15);
+    padding: 4px 0 4px 18px;
     margin-top: 32px;
   }
   .callout-label {
@@ -169,12 +118,10 @@ function base(type: ReminderEmailType, content: string): string {
     font-weight: 700;
     letter-spacing: 0.12em;
     text-transform: uppercase;
-    color: ${P1};
+    color: ${MUTED};
     margin-bottom: 8px;
     display: block;
   }
-  .callout-pink .callout-label { color: ${P2}; }
-  .callout-amber .callout-label { color: #92400e; }
   .callout-text {
     font-size: 14.5px;
     color: ${BODY};
@@ -193,17 +140,16 @@ function base(type: ReminderEmailType, content: string): string {
     align-items: flex-start;
   }
   .check {
-    color: ${P1};
-    font-size: 9px;
+    color: ${MUTED};
+    font-size: 13px;
     flex-shrink: 0;
-    margin-top: 5px;
+    margin-top: 2px;
   }
 
   .footer {
     padding: 22px 48px 26px;
-    border-top: 1px solid rgba(157,111,232,0.08);
-    background-color: #fffbf7;
-    background: linear-gradient(135deg, #fffbf7, rgba(232,121,160,0.04), rgba(251,191,36,0.04));
+    border-top: 1px solid rgba(0,0,0,0.06);
+    background: #f9f8f6;
   }
   .footer-name {
     font-size: 13px;
@@ -218,7 +164,7 @@ function base(type: ReminderEmailType, content: string): string {
     line-height: 1.7;
   }
   .footer-meta a {
-    color: ${P1};
+    color: ${DARK};
     text-decoration: none;
     font-weight: 600;
   }
@@ -233,12 +179,7 @@ function base(type: ReminderEmailType, content: string): string {
 <body>
 <div class="wrap">
 
-  <div class="brand">
-    <span class="brand-name">soloxsnaps</span>
-  </div>
-
   <div class="card">
-    <div class="bar"></div>
     ${content}
     <div class="footer">
       <div class="footer-name">Chris Solorzano</div>
@@ -258,15 +199,15 @@ function base(type: ReminderEmailType, content: string): string {
 export function build48hrEmail(firstName: string, body: string): string {
   const content = `
   <div class="content">
-    <span class="eyebrow" style="color: ${P1};">2 days out</span>
+    <span class="eyebrow">2 days out</span>
     <div class="headline">See you in 48 hours.</div>
     <div class="copy">${bodyToParagraphs(body)}</div>
     <div class="callout">
       <span class="callout-label">Quick checklist</span>
       <div class="checklist">
-        <div class="checklist-item"><span class="check">✦</span> Outfits picked and wrinkle-free</div>
-        <div class="checklist-item"><span class="check">✦</span> Plan to arrive 5–10 min early</div>
-        <div class="checklist-item"><span class="check">✦</span> Text me if anything comes up: <strong>${PHONE}</strong></div>
+        <div class="checklist-item"><span class="check">→</span> Outfits picked and wrinkle-free</div>
+        <div class="checklist-item"><span class="check">→</span> Plan to arrive 5–10 min early</div>
+        <div class="checklist-item"><span class="check">→</span> Text me if anything comes up: <strong>${PHONE}</strong></div>
       </div>
     </div>
   </div>`;
@@ -276,7 +217,7 @@ export function build48hrEmail(firstName: string, body: string): string {
 export function buildDayBeforeEmail(firstName: string, body: string): string {
   const content = `
   <div class="content">
-    <span class="eyebrow" style="color: ${P2};">Tomorrow</span>
+    <span class="eyebrow">Tomorrow</span>
     <div class="headline">See you tomorrow.</div>
     <div class="copy">${bodyToParagraphs(body)}</div>
     <div class="rule"></div>
@@ -295,10 +236,10 @@ export function buildDayBeforeEmail(firstName: string, body: string): string {
 export function buildMorningOfEmail(firstName: string, body: string): string {
   const content = `
   <div class="content">
-    <span class="eyebrow" style="color: ${P2};">Shoot day</span>
+    <span class="eyebrow">Shoot day</span>
     <div class="headline">Today's the day.</div>
     <div class="copy">${bodyToParagraphs(body)}</div>
-    <div class="callout-pink">
+    <div class="callout">
       <span class="callout-label">Need me?</span>
       <p class="callout-text">Text or call anytime — <strong>${PHONE}</strong></p>
     </div>
@@ -309,7 +250,7 @@ export function buildMorningOfEmail(firstName: string, body: string): string {
 export function buildThankYouEmail(firstName: string, body: string): string {
   const content = `
   <div class="content">
-    <span class="eyebrow" style="color: ${P1};">After your session</span>
+    <span class="eyebrow">After your session</span>
     <div class="headline">That was so fun.</div>
     <div class="copy">${bodyToParagraphs(body)}</div>
     <div class="callout">
@@ -323,10 +264,10 @@ export function buildThankYouEmail(firstName: string, body: string): string {
 export function buildGalleryDeliveryEmail(firstName: string, body: string): string {
   const content = `
   <div class="content">
-    <span class="eyebrow" style="color: #92400e;">Gallery ready</span>
+    <span class="eyebrow">Gallery ready</span>
     <div class="headline">Your photos are ready.</div>
     <div class="copy">${bodyToParagraphs(body)}</div>
-    <div class="callout-amber">
+    <div class="callout">
       <span class="callout-label">Tag me when you post</span>
       <p class="callout-text"><strong>${IG_HANDLE}</strong> — I love seeing these go live. It means a lot.</p>
     </div>
