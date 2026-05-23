@@ -72,7 +72,7 @@ export default function AdminSessionsDashboard() {
         return;
       }
 
-      const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
+      const authHeaders: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
       const [sessionsRes, contactsRes] = await Promise.all([
         fetch("/api/admin/sessions", { headers: authHeaders }),
         fetch("/api/admin/session-contacts", { headers: authHeaders }),
