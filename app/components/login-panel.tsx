@@ -12,12 +12,7 @@ type AuthMeResponse = {
   error?: string;
 };
 
-function getOAuthOrigin() {
-  const configuredSiteUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "");
-  const browserOrigin = window.location.origin;
-  const isLocal = browserOrigin.includes("localhost") || browserOrigin.includes("127.0.0.1");
-  return isLocal ? browserOrigin : configuredSiteUrl || browserOrigin;
-}
+type EmailAuthMode = "signin" | "signup";
 
 function getSafeNext(value: string | null) {
   if (!value || !value.startsWith("/") || value.startsWith("//")) return "/dashboard";
@@ -31,6 +26,14 @@ export default function LoginPanel() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [emailAuthMode, setEmailAuthMode] = useState<EmailAuthMode>("signin");
+  const [emailInput, setEmailInput] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -63,20 +66,43 @@ export default function LoginPanel() {
     return () => { alive = false; };
   }, []);
 
-  async function continueWithGoogle() {
-    setError(null);
-    const callbackUrl = `${getOAuthOrigin()}/auth/callback?next=${encodeURIComponent(nextPath)}`;
-    const { error: signInError } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo: callbackUrl },
-    });
-    if (signInError) setError(signInError.message);
-  }
-
   async function signOut() {
     await supabase.auth.signOut();
     setEmail(null);
     setIsAdmin(false);
+  }
+
+  async function handleEmailAuth(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSuccessMsg(null);
+    if (emailAuthMode === "signup" && password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      if (emailAuthMode === "signup") {
+        const { error: signUpError, data: signUpData } = await supabase.auth.signUp({ email: emailInput, password });
+        if (signUpError) { setError(signUpError.message); return; }
+        if (signUpData.session) {
+          window.location.href = nextPath;
+          return;
+        }
+        setSuccessMsg("Check your email to confirm your account, then sign in.");
+        setEmailAuthMode("signin");
+      } else {
+        const { error: signInError } = await supabase.auth.signInWithPassword({ email: emailInput, password });
+        if (signInError) { setError(signInError.message); return; }
+        window.location.href = nextPath;
+      }
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -88,7 +114,6 @@ export default function LoginPanel() {
           background: #f8f7f5;
           font-family: ui-sans-serif, system-ui, sans-serif;
         }
-
 
         /* ── Main card ── */
         .lp-card {
@@ -112,7 +137,6 @@ export default function LoginPanel() {
           to   { opacity: 1; transform: translateY(0) scale(1); }
         }
 
-        /* Top accent line — draws itself in */
         .lp-card::before {
           content: "";
           position: absolute;
@@ -140,7 +164,6 @@ export default function LoginPanel() {
           padding: 36px 36px 40px;
         }
 
-        /* ── Wordmark / brand ── */
         .lp-wordmark {
           font-family: 'DM Mono', monospace;
           font-size: 10px;
@@ -150,14 +173,12 @@ export default function LoginPanel() {
           color: rgba(0,0,0,0.55);
         }
 
-        /* ── Divider ── */
         .lp-divider {
           height: 1px;
           background: linear-gradient(90deg, transparent, rgba(0,0,0,0.08) 30%, rgba(0,0,0,0.08) 70%, transparent);
           margin: 28px 0;
         }
 
-        /* ── Status dot — single pulse on load ── */
         .lp-dot {
           width: 6px;
           height: 6px;
@@ -173,7 +194,6 @@ export default function LoginPanel() {
           100% { transform: scale(1); opacity: 1; box-shadow: 0 0 0 2px rgba(76,175,125,0.20); }
         }
 
-        /* ── Feature list ── */
         .lp-feature {
           display: flex;
           align-items: flex-start;
@@ -214,52 +234,6 @@ export default function LoginPanel() {
           line-height: 1.5;
         }
 
-        /* ── Google CTA ── */
-        .lp-google-btn {
-          position: relative;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 10px;
-          width: 100%;
-          min-height: 52px;
-          border-radius: 12px;
-          border: 1px solid rgba(0,0,0,0.12);
-          background: rgba(0,0,0,0.04);
-          color: rgba(0,0,0,0.80);
-          font-size: 14px;
-          font-weight: 600;
-          letter-spacing: 0.01em;
-          cursor: pointer;
-          overflow: hidden;
-          transition:
-            background 180ms ease,
-            border-color 180ms ease,
-            box-shadow 180ms ease,
-            transform 160ms ease;
-        }
-        .lp-google-btn::after {
-          content: "";
-          position: absolute;
-          inset: 0;
-          background: linear-gradient(105deg, transparent 40%, rgba(0,0,0,0.04) 50%, transparent 60%);
-          transform: translateX(-100%);
-          transition: transform 500ms ease;
-        }
-        .lp-google-btn:hover {
-          background: rgba(0,0,0,0.07);
-          border-color: rgba(0,0,0,0.18);
-          box-shadow: 0 4px 16px rgba(0,0,0,0.08);
-          transform: translateY(-1px);
-        }
-        .lp-google-btn:hover::after {
-          transform: translateX(100%);
-        }
-        .lp-google-btn:active {
-          transform: translateY(0);
-          background: rgba(0,0,0,0.05);
-        }
-
         /* ── Dashboard link ── */
         .lp-dash-btn {
           position: relative;
@@ -277,10 +251,7 @@ export default function LoginPanel() {
           cursor: pointer;
           text-decoration: none;
           overflow: hidden;
-          transition:
-            background 180ms ease,
-            box-shadow 180ms ease,
-            transform 160ms ease;
+          transition: background 180ms ease, box-shadow 180ms ease, transform 160ms ease;
         }
         .lp-dash-btn::after {
           content: "";
@@ -295,12 +266,8 @@ export default function LoginPanel() {
           box-shadow: 0 6px 20px rgba(0,0,0,0.20);
           transform: translateY(-1px);
         }
-        .lp-dash-btn:hover::after {
-          transform: translateX(100%);
-        }
-        .lp-dash-btn:active {
-          transform: translateY(0);
-        }
+        .lp-dash-btn:hover::after { transform: translateX(100%); }
+        .lp-dash-btn:active { transform: translateY(0); }
 
         /* ── Ghost btn ── */
         .lp-ghost-btn {
@@ -334,17 +301,6 @@ export default function LoginPanel() {
           padding: 14px 16px;
         }
 
-        /* ── Hint text ── */
-        .lp-hint {
-          font-family: 'DM Mono', monospace;
-          font-size: 10px;
-          font-weight: 400;
-          letter-spacing: 0.08em;
-          color: rgba(0,0,0,0.50);
-          line-height: 1.7;
-          text-align: center;
-        }
-
         /* ── Skeleton ── */
         .lp-skeleton {
           border-radius: 12px;
@@ -369,7 +325,6 @@ export default function LoginPanel() {
           to   { opacity: 1; transform: translateY(0); }
         }
 
-        /* ── Divider draws in ── */
         .lp-divider-animated {
           transform-origin: left;
           animation: lp-line-draw 600ms cubic-bezier(0.4, 0, 0.2, 1) both;
@@ -381,12 +336,81 @@ export default function LoginPanel() {
           to   { transform: scaleX(1); opacity: 1; }
         }
 
+        /* ── Form inputs ── */
+        .lp-input {
+          width: 100%;
+          padding: 12px 14px;
+          border-radius: 10px;
+          border: 1px solid rgba(0,0,0,0.12);
+          background: rgba(0,0,0,0.02);
+          font-size: 13px;
+          font-weight: 500;
+          color: rgba(0,0,0,0.80);
+          outline: none;
+          transition: border-color 160ms ease, box-shadow 160ms ease;
+          box-sizing: border-box;
+        }
+        .lp-input::placeholder { color: rgba(0,0,0,0.35); }
+        .lp-input:focus {
+          border-color: rgba(0,0,0,0.28);
+          box-shadow: 0 0 0 3px rgba(0,0,0,0.06);
+        }
+
+        /* ── Password wrapper ── */
+        .lp-pw-wrap {
+          position: relative;
+          width: 100%;
+        }
+        .lp-pw-wrap .lp-input {
+          padding-right: 44px;
+        }
+        .lp-pw-toggle {
+          position: absolute;
+          right: 12px;
+          top: 50%;
+          transform: translateY(-50%);
+          background: none;
+          border: none;
+          padding: 4px;
+          cursor: pointer;
+          color: rgba(0,0,0,0.35);
+          display: flex;
+          align-items: center;
+          transition: color 160ms ease;
+        }
+        .lp-pw-toggle:hover { color: rgba(0,0,0,0.60); }
+
+        /* ── Submit btn ── */
+        .lp-submit-btn {
+          position: relative;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 100%;
+          min-height: 52px;
+          border-radius: 12px;
+          border: none;
+          background: #111110;
+          color: #ffffff;
+          font-size: 14px;
+          font-weight: 700;
+          letter-spacing: 0.01em;
+          cursor: pointer;
+          transition: background 180ms ease, box-shadow 180ms ease, transform 160ms ease;
+        }
+        .lp-submit-btn:hover:not(:disabled) {
+          background: #1e1d1b;
+          box-shadow: 0 6px 20px rgba(0,0,0,0.20);
+          transform: translateY(-1px);
+        }
+        .lp-submit-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
         @media (prefers-reduced-motion: reduce) {
           .lp-fade, .lp-skeleton, .lp-card,
           .lp-card::before, .lp-dot, .lp-feature,
           .lp-divider-animated { animation: none !important; }
-          .lp-google-btn:hover, .lp-dash-btn:hover { transform: none; }
-          .lp-google-btn::after, .lp-dash-btn::after { display: none; }
+          .lp-dash-btn:hover { transform: none; }
+          .lp-dash-btn::after { display: none; }
         }
 
         @media (max-width: 480px) {
@@ -432,7 +456,7 @@ export default function LoginPanel() {
               color: "rgba(0,0,0,0.60)",
               maxWidth: "320px",
             }}>
-              Sign in with the Google account tied to your inquiry to access your session timeline.
+              Sign in with your email and password to access your session timeline.
             </p>
           </div>
 
@@ -442,7 +466,7 @@ export default function LoginPanel() {
           <div className="lp-fade lp-fade-3">
             {[
               { num: "01", label: "Timeline", body: "Inquiry through delivery in one view" },
-              { num: "02", label: "Access", body: "Matched to your Google email automatically" },
+              { num: "02", label: "Access", body: "Secured to your account" },
               { num: "03", label: "Updates", body: "Progress syncs as your session moves forward" },
             ].map(({ num, label, body }) => (
               <div key={num} className="lp-feature">
@@ -500,27 +524,94 @@ export default function LoginPanel() {
                 </button>
               </div>
             ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                <button type="button" onClick={continueWithGoogle} className="lp-google-btn">
-                  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="rgba(0,0,0,0.55)"/>
-                    <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="rgba(0,0,0,0.45)"/>
-                    <path d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="rgba(0,0,0,0.38)"/>
-                    <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" fill="rgba(0,0,0,0.50)"/>
-                  </svg>
-                  Continue with Google
+              <form onSubmit={handleEmailAuth} style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                <input
+                  className="lp-input"
+                  type="email"
+                  placeholder="your@email.com"
+                  value={emailInput}
+                  onChange={e => setEmailInput(e.target.value)}
+                  required
+                  autoComplete="email"
+                />
+                <div className="lp-pw-wrap">
+                  <input
+                    className="lp-input"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Password (min 8 characters)"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    required
+                    autoComplete={emailAuthMode === "signup" ? "new-password" : "current-password"}
+                  />
+                  <button type="button" className="lp-pw-toggle" onClick={() => setShowPassword(v => !v)} aria-label={showPassword ? "Hide password" : "Show password"}>
+                    {showPassword ? (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                        <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                        <line x1="1" y1="1" x2="23" y2="23"/>
+                      </svg>
+                    ) : (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                        <circle cx="12" cy="12" r="3"/>
+                      </svg>
+                    )}
+                  </button>
+                </div>
+                {emailAuthMode === "signup" && (
+                  <div className="lp-pw-wrap">
+                    <input
+                      className="lp-input"
+                      type={showConfirmPassword ? "text" : "password"}
+                      placeholder="Confirm password"
+                      value={confirmPassword}
+                      onChange={e => setConfirmPassword(e.target.value)}
+                      required
+                      autoComplete="new-password"
+                    />
+                    <button type="button" className="lp-pw-toggle" onClick={() => setShowConfirmPassword(v => !v)} aria-label={showConfirmPassword ? "Hide password" : "Show password"}>
+                      {showConfirmPassword ? (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                          <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                          <line x1="1" y1="1" x2="23" y2="23"/>
+                        </svg>
+                      ) : (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                          <circle cx="12" cy="12" r="3"/>
+                        </svg>
+                      )}
+                    </button>
+                  </div>
+                )}
+                <button type="submit" className="lp-submit-btn" disabled={submitting}>
+                  {submitting ? "Please wait…" : emailAuthMode === "signup" ? "Create account" : "Sign in"}
                 </button>
-
+                <button
+                  type="button"
+                  className="lp-ghost-btn"
+                  onClick={() => {
+                    setEmailAuthMode(emailAuthMode === "signin" ? "signup" : "signin");
+                    setError(null);
+                    setSuccessMsg(null);
+                    setConfirmPassword("");
+                  }}
+                >
+                  {emailAuthMode === "signin" ? "No account? Create one" : "Already have an account? Sign in"}
+                </button>
+                {successMsg && (
+                  <p style={{ fontSize: "12px", fontWeight: 600, color: "#4caf7d", margin: 0, textAlign: "center" }}>
+                    {successMsg}
+                  </p>
+                )}
                 {error && (
                   <p style={{ fontSize: "12px", fontWeight: 600, color: C.danger, margin: 0 }}>
                     {error}
                   </p>
                 )}
-
-                <p className="lp-hint" style={{ marginTop: "4px" }}>
-                  Access is matched to your Google email — no password needed.
-                </p>
-              </div>
+              </form>
             )}
           </div>
 
