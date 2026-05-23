@@ -126,12 +126,13 @@ export default function AdminSessionsDashboard() {
     });
   }, [query, sessions, statusFilter]);
 
-  async function getAuthHeaders() {
+  async function getAuthHeaders(): Promise<HeadersInit> {
     const { data } = await supabase.auth.getSession();
     const token = data.session?.access_token;
     if (!token && !checkAuth()) throw new Error("You are not signed in.");
-    const base = token ? { Authorization: `Bearer ${token}` } : {};
-    return { ...base, "Content-Type": "application/json" };
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    return headers;
   }
 
   async function saveSession(payload: AdminSessionFormPayload) {
