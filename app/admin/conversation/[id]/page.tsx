@@ -964,12 +964,36 @@ export default function ConversationPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: next }),
       });
-      const json = await res.json() as { reply: string; new_rules: string[]; saved_to_vault: boolean };
-      setTrainMessages(p => [...p, { role: "assistant", content: json.reply }]);
-      if (json.new_rules?.length) {
-        setTrainSaved(json.new_rules);
-        setTimeout(() => setTrainSaved([]), 5000);
+      if (!res.body) throw new Error("No response body");
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let replyText = "";
+      let buf = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split("\n");
+        buf = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          try {
+            const event = JSON.parse(line.slice(6)) as { type: string; text?: string; new_rules?: string[]; saved_to_vault?: boolean };
+            if (event.type === "text" && event.text) {
+              replyText += event.text;
+            } else if (event.type === "done") {
+              if (event.new_rules?.length) {
+                setTrainSaved(event.new_rules);
+                setTimeout(() => setTrainSaved([]), 5000);
+              }
+            }
+          } catch { /* malformed event */ }
+        }
       }
+
+      setTrainMessages(p => [...p, { role: "assistant", content: replyText || "Got it!" }]);
     } catch {
       setTrainMessages(p => [...p, { role: "assistant", content: "Something went wrong — try again." }]);
     } finally {
