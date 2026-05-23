@@ -72,6 +72,13 @@ export default function LoginPanel() {
     setIsAdmin(false);
   }
 
+  async function provisionSession(token: string) {
+    await fetch("/api/auth/provision-session", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  }
+
   async function handleEmailAuth(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -90,14 +97,18 @@ export default function LoginPanel() {
         const { error: signUpError, data: signUpData } = await supabase.auth.signUp({ email: emailInput, password });
         if (signUpError) { setError(signUpError.message); return; }
         if (signUpData.session) {
+          await provisionSession(signUpData.session.access_token);
           window.location.href = nextPath;
           return;
         }
         setSuccessMsg("Check your email to confirm your account, then sign in.");
         setEmailAuthMode("signin");
       } else {
-        const { error: signInError } = await supabase.auth.signInWithPassword({ email: emailInput, password });
+        const { error: signInError, data: signInData } = await supabase.auth.signInWithPassword({ email: emailInput, password });
         if (signInError) { setError(signInError.message); return; }
+        if (signInData.session) {
+          await provisionSession(signInData.session.access_token);
+        }
         window.location.href = nextPath;
       }
     } finally {

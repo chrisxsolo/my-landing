@@ -37,6 +37,7 @@ import VaultTab from "@/app/admin/VaultTab";
 import AiTab from "@/app/admin/AiTab";
 import ChatTab from "@/app/admin/ChatTab";
 import SessionCalendar from "@/app/admin/SessionCalendar";
+import AccountsTab from "@/app/admin/AccountsTab";
 import {
   findMatchingClientSession,
   getClientSessionEmailMatches,
@@ -48,7 +49,7 @@ import {
 
 export const dynamic = 'force-dynamic'
 
-type Tab = "home"|"poses"|"locations"|"bayGuide"|"portfolio"|"categories"|"blog"|"library"|"analytics"|"payments"|"inquiries"|"clients"|"funnel"|"vault"|"ai"|"chat"|"format";
+type Tab = "home"|"poses"|"locations"|"bayGuide"|"portfolio"|"categories"|"blog"|"library"|"analytics"|"payments"|"inquiries"|"clients"|"funnel"|"vault"|"ai"|"chat"|"format"|"accounts";
 type ImageLibraryRow = { id:number; title:string; alt:string|null; image_url:string; source_type:string; source_post_id:number|null; source_post_slug:string|null; source_role:string; in_portfolio:boolean; created_at:string; };
 type Inquiry = { id:number; name:string; email:string; phone:string|null; session_type:string|null; date_in_mind:string|null; message:string; status:string; created_at:string; payment_status:string|null; payment_note:string|null; payment_detected_at:string|null; session_date:string|null; booking_confirmed:boolean|null; reply_sent_at:string|null; invoice_sent_at:string|null; contract_sent_at:string|null; deposit_paid_at:string|null; gallery_delivered_at:string|null; confirmation_sent_at:string|null; preferred_time:string|null; location:string|null; school:string|null; instagram:string|null; people:string|null; };
 type AdminSessionsResponse = { sessions?: AdminClientSessionDTO[]; session?: AdminClientSessionDTO; error?: string; };
@@ -79,7 +80,7 @@ const BLOG_CATEGORIES:{value:BlogCategory;label:string;helper:string}[]=[
 const WEBSITE_TABS:Tab[]=["poses","locations","bayGuide","portfolio","categories","blog","library"];
 const CLIENT_TABS:Tab[]=["inquiries","clients","analytics","payments","funnel","ai","chat","format"];
 const VAULT_TABS:Tab[]=["vault"];
-const TAB_LABELS:Record<Tab,string>={home:"🏠 Home",poses:"📸 Grad Poses",locations:"📍 Campus Spots",bayGuide:"🗺️ Bay Guide",portfolio:"🖼️ Portfolio",categories:"🏷️ Categories",blog:"✍️ Blog",library:"🗄️ Image Library",analytics:"📊 Analytics",payments:"💵 Revenue",funnel:"📈 Funnel",inquiries:"📬 Inquiries",clients:"👥 Clients",vault:"📓 Vault",ai:"🤖 AI Training",chat:"💬 AI Chat",format:"✨ Quick Format"};
+const TAB_LABELS:Record<Tab,string>={home:"🏠 Home",poses:"📸 Grad Poses",locations:"📍 Campus Spots",bayGuide:"🗺️ Bay Guide",portfolio:"🖼️ Portfolio",categories:"🏷️ Categories",blog:"✍️ Blog",library:"🗄️ Image Library",analytics:"📊 Analytics",payments:"💵 Revenue",funnel:"📈 Funnel",inquiries:"📬 Inquiries",clients:"👥 Clients",vault:"📓 Vault",ai:"🤖 AI Training",chat:"💬 AI Chat",format:"✨ Quick Format",accounts:"👤 Accounts"};
 
 function detectSchool(text:string):string|null{
   // Normalize accents (e.g. "José" → "Jose") so accented names still match
@@ -1195,16 +1196,16 @@ function AdminDashboard() {
         </div>
         {/* ── NAV ── */}
         {(()=>{
-          const tabSection=tab==="home"?"home":VAULT_TABS.includes(tab)?"vault":WEBSITE_TABS.includes(tab)?"website":"clients";
+          const tabSection=tab==="home"?"home":VAULT_TABS.includes(tab)?"vault":tab==="accounts"?"accounts":WEBSITE_TABS.includes(tab)?"website":"clients";
           const cancelAll=()=>{cancelEditPose();cancelEditSpot();cancelEditPortfolioImage();cancelEditCategory();cancelEditPost();setEditingInquiry(null);setInquiryDeleteConfirm(null);};
           return(
             <div className="mb-8 space-y-2">
               <div className="flex gap-2 flex-wrap">
-                {(["home","clients","website","vault"] as const).map(s=>(
-                  <button key={s} onClick={()=>{cancelAll();setTab(s==="home"?"home":s==="website"?WEBSITE_TABS[0]:s==="clients"?CLIENT_TABS[0]:"vault");}}
+                {(["home","clients","website","vault","accounts"] as const).map(s=>(
+                  <button key={s} onClick={()=>{cancelAll();setTab(s==="home"?"home":s==="website"?WEBSITE_TABS[0]:s==="clients"?CLIENT_TABS[0]:s==="accounts"?"accounts":"vault");}}
                     className="px-5 py-2.5 rounded-xl text-sm font-bold transition-all"
                     style={tabSection===s?{background:C.grad12,color:"#fff",boxShadow:"0 2px 8px rgba(157,111,232,0.25)"}:{color:"#64748b",background:"white",border:"1px solid #e2e8f0"}}>
-                    {s==="home"?"🏠 Home":s==="website"?"✏️ Edit Website":s==="clients"?"👤 Clients":"📓 Vault"}
+                    {s==="home"?"🏠 Home":s==="website"?"✏️ Edit Website":s==="clients"?"👤 Clients":s==="accounts"?"👤 Accounts":"📓 Vault"}
                   </button>
                 ))}
               </div>
@@ -3543,6 +3544,9 @@ function AdminDashboard() {
             </div>
           );
         })()}
+
+        {/* ── ACCOUNTS ── */}
+        {tab==="accounts"&&<AccountsTab showToast={showToast} />}
 
         {/* ── VAULT ── */}
         {tab==="vault"&&<VaultTab />}
