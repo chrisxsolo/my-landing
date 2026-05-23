@@ -12,6 +12,24 @@ function icsEscape(str: string): string {
   return str.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\n/g, "\\n");
 }
 
+// RFC 5545 §3.1: fold lines longer than 75 octets with CRLF + single space
+function icsFold(prop: string): string {
+  const enc = new TextEncoder();
+  const dec = new TextDecoder();
+  const bytes = enc.encode(prop);
+  if (bytes.length <= 75) return prop;
+  const chunks: string[] = [];
+  let offset = 0;
+  while (offset < bytes.length) {
+    const limit = chunks.length === 0 ? 75 : 74;
+    let end = Math.min(offset + limit, bytes.length);
+    while (end < bytes.length && (bytes[end]! & 0xc0) === 0x80) end--;
+    chunks.push(dec.decode(bytes.slice(offset, end)));
+    offset = end;
+  }
+  return chunks.join("\r\n ");
+}
+
 function stamp(): string {
   return new Date().toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
 }
@@ -27,8 +45,23 @@ type CalEvent = {
   summary: string;
   dateStr: string;
   location: string | null;
+  meetingPoint: string | null;
   preferredTime: string | null;
+  email: string | null;
+  phone: string | null;
 };
+
+function buildDescription(ev: CalEvent): string | null {
+  const parts: string[] = [];
+  if (ev.email) parts.push(`Email: ${ev.email}`);
+  if (ev.phone) parts.push(`Phone: ${ev.phone}`);
+  if (ev.preferredTime) parts.push(`Time: ${ev.preferredTime}`);
+  if (ev.location) parts.push(`Location: ${ev.location}`);
+  if (ev.meetingPoint) parts.push(`Meeting point: ${ev.meetingPoint}`);
+  if (!parts.length) return null;
+  // icsEscape each part, then join with iCal's \n sequence for line breaks
+  return parts.map(p => icsEscape(p)).join("\\n");
+}
 
 export async function GET(req: NextRequest) {
   const secret = process.env.ICS_SECRET;
@@ -49,12 +82,12 @@ export async function GET(req: NextRequest) {
   const [portalRes, inquiryRes] = await Promise.all([
     supabase
       .from(CLIENT_SESSION_TABLE)
-      .select("id, client_name, session_type, session_date, location, meeting_point")
+      .select("id, client_name, client_email, session_type, session_date, location, meeting_point")
       .not("session_date", "is", null)
       .order("session_date", { ascending: true }),
     supabase
       .from("inquiries")
-      .select("id, name, session_type, session_date, location, preferred_time")
+      .select("id, name, email, phone, session_type, session_date, location, preferred_time")
       .eq("booking_confirmed", true)
       .not("session_date", "is", null)
       .order("session_date", { ascending: true }),
@@ -70,7 +103,7 @@ export async function GET(req: NextRequest) {
   const events: CalEvent[] = [];
 
   // Portal sessions (client_sessions table)
-  const portalRows = (portalRes.data ?? []) as Pick<ClientSessionRow, "id" | "client_name" | "session_type" | "session_date" | "location">[];
+  const portalRows = (portalRes.data ?? []) as Pick<ClientSessionRow, "id" | "client_name" | "client_email" | "session_type" | "session_date" | "location" | "meeting_point">[];
   for (const row of portalRows) {
     const summary = [row.session_type, row.client_name].filter(Boolean).join(" — ");
     events.push({
@@ -78,7 +111,10 @@ export async function GET(req: NextRequest) {
       summary: summary || "Photography Session",
       dateStr: row.session_date!,
       location: row.location ?? null,
+      meetingPoint: row.meeting_point ?? null,
       preferredTime: null,
+      email: row.client_email ?? null,
+      phone: null,
     });
   }
 
@@ -96,7 +132,10 @@ export async function GET(req: NextRequest) {
       summary: summary || "Photography Session",
       dateStr: row.session_date,
       location: row.location ?? null,
+      meetingPoint: null,
       preferredTime: row.preferred_time ?? null,
+      email: row.email ?? null,
+      phone: row.phone ?? null,
     });
   }
 
@@ -108,6 +147,7 @@ export async function GET(req: NextRequest) {
     const dateVal = icsDate(ev.dateStr);
     const nextDay = nextDayStr(ev.dateStr);
     const summaryWithTime = ev.preferredTime ? `${ev.summary} @ ${ev.preferredTime}` : ev.summary;
+    const description = buildDescription(ev);
 
     return [
       "BEGIN:VEVENT",
@@ -115,8 +155,9 @@ export async function GET(req: NextRequest) {
       `DTSTAMP:${now}`,
       `DTSTART;VALUE=DATE:${dateVal}`,
       `DTEND;VALUE=DATE:${nextDay}`,
-      `SUMMARY:${icsEscape(summaryWithTime)}`,
-      ev.location ? `LOCATION:${icsEscape(ev.location)}` : null,
+      icsFold(`SUMMARY:${icsEscape(summaryWithTime)}`),
+      ev.location ? icsFold(`LOCATION:${icsEscape(ev.location)}`) : null,
+      description ? icsFold(`DESCRIPTION:${description}`) : null,
       "END:VEVENT",
     ].filter(Boolean).join("\r\n");
   });
