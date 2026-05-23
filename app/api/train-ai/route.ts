@@ -4,9 +4,11 @@
 // concrete style rules and writes them to vault_notes ("09 AI Instructions" / "Email Rules").
 //
 // Body: { messages: {role:"user"|"assistant", content:string}[], session_id?: string }
-// Response: { reply: string, saved_to_vault: boolean, new_rules: string[], session_id: string }
+// Response: SSE stream of:
+//   { type:"text", text: string }        — reply tokens as they arrive
+//   { type:"done", new_rules, saved_to_vault, session_id }
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { requireAdmin } from "@/lib/requireAdmin";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
@@ -109,12 +111,25 @@ Editing rules:
 - If a new rule doesn't fit any existing section, add it under ## Learned Rules
 - Output ONLY the updated markdown note — no explanation, no preamble`;
 
+// Buffer to safely stream text without accidentally emitting a partial <rules> tag.
+// Keeps the last TAIL chars buffered; emits the safe prefix each iteration.
+const TAIL_BUFFER = 400;
+
 export async function POST(req: NextRequest) {
   const deny = requireAdmin(req);
   if (deny) return deny;
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return NextResponse.json({ error: "No API key" }, { status: 500 });
+  if (!apiKey) {
+    const encoder = new TextEncoder();
+    const errStream = new ReadableStream({
+      start(c) {
+        c.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "error", message: "No API key" })}\n\n`));
+        c.close();
+      },
+    });
+    return new Response(errStream, { headers: { "Content-Type": "text/event-stream" } });
+  }
 
   const { messages, session_id } = await req.json() as {
     messages: { role: "user" | "assistant"; content: string }[];
@@ -122,75 +137,116 @@ export async function POST(req: NextRequest) {
   };
 
   if (!Array.isArray(messages) || messages.length === 0) {
-    return NextResponse.json({ error: "messages array required" }, { status: 400 });
+    const encoder = new TextEncoder();
+    const errStream = new ReadableStream({
+      start(c) {
+        c.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "error", message: "messages array required" })}\n\n`));
+        c.close();
+      },
+    });
+    return new Response(errStream, { headers: { "Content-Type": "text/event-stream" } });
   }
 
   const client = new Anthropic({ apiKey });
   const { id: rulesId, content: currentRules } = await readCurrentRules();
+  const encoder = new TextEncoder();
 
-  // Step 1: Conversation + rule extraction (with prompt caching on the rules block)
-  const extractRes = await client.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 800,
-    system: [
-      {
-        type: "text",
-        text: buildExtractSystem(currentRules),
-        cache_control: { type: "ephemeral" },
-      },
-    ],
-    messages,
+  const stream = new ReadableStream({
+    async start(controller) {
+      function emit(data: unknown) {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+      }
+
+      try {
+        const claudeStream = client.messages.stream({
+          model: "claude-sonnet-4-6",
+          max_tokens: 800,
+          system: [
+            {
+              type: "text",
+              text: buildExtractSystem(currentRules),
+              cache_control: { type: "ephemeral" },
+            },
+          ],
+          messages,
+        });
+
+        let fullText = "";
+        let sentUpTo = 0;
+
+        for await (const event of claudeStream) {
+          if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+            fullText += event.delta.text;
+            // Emit the safe prefix — keep TAIL_BUFFER chars buffered to avoid
+            // splitting a <rules> tag across two emit calls.
+            const safeEnd = fullText.length - TAIL_BUFFER;
+            if (safeEnd > sentUpTo) {
+              emit({ type: "text", text: fullText.slice(sentUpTo, safeEnd) });
+              sentUpTo = safeEnd;
+            }
+          }
+        }
+
+        // Stream done — emit buffered tail with <rules> block stripped
+        const tail = fullText.slice(sentUpTo);
+        const cleanTail = tail.split("<rules>")[0];
+        if (cleanTail) emit({ type: "text", text: cleanTail });
+
+        // Parse rules
+        const rulesMatch = fullText.match(/<rules>\s*(\[[\s\S]*?\])\s*<\/rules>/);
+        let newRules: string[] = [];
+        if (rulesMatch) {
+          try { newRules = JSON.parse(rulesMatch[1]) as string[]; } catch { /* ignore */ }
+        }
+
+        const reply = fullText.replace(/<rules>[\s\S]*?<\/rules>/, "").trim();
+
+        // Persist session
+        const allMessages = [...messages, { role: "assistant", content: reply }];
+        const savedSessionId = await persistSession(session_id ?? null, allMessages).catch(() => "");
+
+        // Merge rules into vault (second Claude call — non-streaming)
+        let savedToVault = false;
+        if (newRules.length > 0) {
+          try {
+            const mergeRes = await client.messages.create({
+              model: "claude-sonnet-4-6",
+              max_tokens: 1600,
+              system: MERGE_SYSTEM,
+              messages: [{
+                role: "user",
+                content: `Current Email Writer Rules note:\n\n---\n${currentRules || "(empty)"}\n---\n\nNew rules to integrate (replace conflicts, add new, remove outdated):\n\n${newRules.map(r => `- ${r}`).join("\n")}\n\nOutput the updated note only.`,
+              }],
+            });
+
+            const updatedNote = mergeRes.content
+              .filter(b => b.type === "text")
+              .map(b => (b as { type: "text"; text: string }).text)
+              .join("")
+              .trim();
+
+            await writeRules(rulesId, updatedNote);
+            savedToVault = true;
+          } catch (err) {
+            console.error("[train-ai] vault write error", err);
+          }
+        }
+
+        emit({ type: "done", new_rules: newRules, saved_to_vault: savedToVault, session_id: savedSessionId });
+      } catch (err) {
+        console.error("[train-ai] stream error", err);
+        emit({ type: "error", message: "Something went wrong. Try again." });
+      } finally {
+        controller.close();
+      }
+    },
   });
 
-  const raw = extractRes.content
-    .filter(b => b.type === "text")
-    .map(b => (b as { type: "text"; text: string }).text)
-    .join("")
-    .trim();
-
-  const rulesMatch = raw.match(/<rules>\s*(\[[\s\S]*?\])\s*<\/rules>/);
-  let newRules: string[] = [];
-  if (rulesMatch) {
-    try { newRules = JSON.parse(rulesMatch[1]) as string[]; } catch (err) { console.error("[train-ai] failed to parse rules JSON", rulesMatch[1], err); }
-  }
-
-  const reply = raw.replace(/<rules>[\s\S]*?<\/rules>/, "").trim();
-
-  // Step 2: Persist updated conversation to Supabase
-  const allMessages = [...messages, { role: "assistant", content: reply }];
-  const savedSessionId = await persistSession(session_id ?? null, allMessages).catch(() => "");
-
-  // Step 3: If there are new rules, merge them into the vault note
-  let savedToVault = false;
-  if (newRules.length > 0) {
-    try {
-      const mergeRes = await client.messages.create({
-        model: "claude-sonnet-4-6",
-        max_tokens: 1600,
-        system: MERGE_SYSTEM,
-        messages: [{
-          role: "user",
-          content: `Current Email Writer Rules note:\n\n---\n${currentRules || "(empty)"}\n---\n\nNew rules to integrate (replace conflicts, add new, remove outdated):\n\n${newRules.map(r => `- ${r}`).join("\n")}\n\nOutput the updated note only.`,
-        }],
-      });
-
-      const updatedNote = mergeRes.content
-        .filter(b => b.type === "text")
-        .map(b => (b as { type: "text"; text: string }).text)
-        .join("")
-        .trim();
-
-      await writeRules(rulesId, updatedNote);
-      savedToVault = true;
-    } catch (err) {
-      console.error("[train-ai] vault write error", err);
-    }
-  }
-
-  return NextResponse.json({
-    reply,
-    new_rules: newRules,
-    saved_to_vault: savedToVault,
-    session_id: savedSessionId,
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      "Connection": "keep-alive",
+    },
   });
 }

@@ -35,6 +35,7 @@ import ClientTimeline from "@/app/admin/ClientTimeline";
 import InquiryAnalyticsTab from "@/app/admin/InquiryAnalyticsTab";
 import VaultTab from "@/app/admin/VaultTab";
 import AiTab from "@/app/admin/AiTab";
+import ChatTab from "@/app/admin/ChatTab";
 import SessionCalendar from "@/app/admin/SessionCalendar";
 import {
   findMatchingClientSession,
@@ -47,7 +48,7 @@ import {
 
 export const dynamic = 'force-dynamic'
 
-type Tab = "home"|"poses"|"locations"|"bayGuide"|"portfolio"|"categories"|"blog"|"library"|"analytics"|"payments"|"inquiries"|"clients"|"funnel"|"vault"|"ai"|"format";
+type Tab = "home"|"poses"|"locations"|"bayGuide"|"portfolio"|"categories"|"blog"|"library"|"analytics"|"payments"|"inquiries"|"clients"|"funnel"|"vault"|"ai"|"chat"|"format";
 type ImageLibraryRow = { id:number; title:string; alt:string|null; image_url:string; source_type:string; source_post_id:number|null; source_post_slug:string|null; source_role:string; in_portfolio:boolean; created_at:string; };
 type Inquiry = { id:number; name:string; email:string; phone:string|null; session_type:string|null; date_in_mind:string|null; message:string; status:string; created_at:string; payment_status:string|null; payment_note:string|null; payment_detected_at:string|null; session_date:string|null; booking_confirmed:boolean|null; reply_sent_at:string|null; invoice_sent_at:string|null; contract_sent_at:string|null; deposit_paid_at:string|null; gallery_delivered_at:string|null; confirmation_sent_at:string|null; preferred_time:string|null; location:string|null; school:string|null; instagram:string|null; people:string|null; };
 type AdminSessionsResponse = { sessions?: AdminClientSessionDTO[]; session?: AdminClientSessionDTO; error?: string; };
@@ -76,9 +77,9 @@ const BLOG_CATEGORIES:{value:BlogCategory;label:string;helper:string}[]=[
   {value:"professional",label:"Professional",helper:"Case studies at /blog"},
 ];
 const WEBSITE_TABS:Tab[]=["poses","locations","bayGuide","portfolio","categories","blog","library"];
-const CLIENT_TABS:Tab[]=["inquiries","clients","analytics","payments","funnel","ai","format"];
+const CLIENT_TABS:Tab[]=["inquiries","clients","analytics","payments","funnel","ai","chat","format"];
 const VAULT_TABS:Tab[]=["vault"];
-const TAB_LABELS:Record<Tab,string>={home:"🏠 Home",poses:"📸 Grad Poses",locations:"📍 Campus Spots",bayGuide:"🗺️ Bay Guide",portfolio:"🖼️ Portfolio",categories:"🏷️ Categories",blog:"✍️ Blog",library:"🗄️ Image Library",analytics:"📊 Analytics",payments:"💵 Revenue",funnel:"📈 Funnel",inquiries:"📬 Inquiries",clients:"👥 Clients",vault:"📓 Vault",ai:"🤖 AI Training",format:"✨ Quick Format"};
+const TAB_LABELS:Record<Tab,string>={home:"🏠 Home",poses:"📸 Grad Poses",locations:"📍 Campus Spots",bayGuide:"🗺️ Bay Guide",portfolio:"🖼️ Portfolio",categories:"🏷️ Categories",blog:"✍️ Blog",library:"🗄️ Image Library",analytics:"📊 Analytics",payments:"💵 Revenue",funnel:"📈 Funnel",inquiries:"📬 Inquiries",clients:"👥 Clients",vault:"📓 Vault",ai:"🤖 AI Training",chat:"💬 AI Chat",format:"✨ Quick Format"};
 
 function detectSchool(text:string):string|null{
   // Normalize accents (e.g. "José" → "Jose") so accented names still match
@@ -3546,6 +3547,7 @@ function AdminDashboard() {
         {/* ── VAULT ── */}
         {tab==="vault"&&<VaultTab />}
         {tab==="ai"&&<AiTab />}
+        {tab==="chat"&&<ChatTab />}
         {tab==="format"&&(()=>{
           const seenEmails=new Set<string>();
           const quickFormatClients=inquiries.reduce<{name:string;email:string}[]>((acc,inq)=>{

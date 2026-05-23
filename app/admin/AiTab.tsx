@@ -11,6 +11,14 @@ type RulesData = {
   rule_count: number;
 };
 
+type BatchStatus = {
+  batch_id: string;
+  processing_status: string;
+  request_counts: { processing: number; succeeded: number; errored: number; expired: number; canceled: number };
+};
+
+type DraftResult = { inquiry_id: number; inquiry_name: string; draft: string };
+
 export default function AiTab() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -23,9 +31,15 @@ export default function AiTab() {
   const [rulesLoading, setRulesLoading] = useState(false);
   const [showRules, setShowRules] = useState(false);
 
+  // Batch drafts state
+  const [batchLoading, setBatchLoading] = useState(false);
+  const [batchStatus, setBatchStatus] = useState<BatchStatus | null>(null);
+  const [batchResults, setBatchResults] = useState<DraftResult[]>([]);
+  const [batchMsg, setBatchMsg] = useState<string | null>(null);
+  const [batchSaved, setBatchSaved] = useState(false);
+
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  // Load most recent training session AND rules count on mount
   useEffect(() => {
     fetch("/api/ai/session/latest", { credentials: "include" })
       .then(r => r.json())
@@ -38,11 +52,14 @@ export default function AiTab() {
       .catch(() => {/* no prior session */})
       .finally(() => setSessionLoading(false));
 
-    // Pre-load rules so the count is always visible in the header
     fetch("/api/ai/rules", { credentials: "include" })
       .then(r => r.json())
       .then(d => setRulesData(d as RulesData))
       .catch(() => {});
+
+    // Check if a batch job is already running
+    checkBatchStatus();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -57,28 +74,77 @@ export default function AiTab() {
     setMessages(next);
     setInput("");
     setLoading(true);
+
+    // Add a placeholder assistant message that we'll fill via streaming
+    setMessages(p => [...p, { role: "assistant", content: "" }]);
+
     try {
       const res = await fetch("/api/train-ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: next, session_id: sessionId }),
       });
-      const json = await res.json() as {
-        reply: string;
-        new_rules: string[];
-        saved_to_vault: boolean;
-        session_id: string;
-      };
-      setMessages(p => [...p, { role: "assistant", content: json.reply }]);
-      if (json.session_id) setSessionId(json.session_id);
-      if (json.new_rules?.length) {
-        setSavedRules(json.new_rules);
-        setTimeout(() => setSavedRules([]), 5000);
-        if (showRules) loadRules();
+
+      if (!res.body) throw new Error("No response body");
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let sseBuffer = "";
+      let streamText = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        sseBuffer += decoder.decode(value, { stream: true });
+        const lines = sseBuffer.split("\n");
+        sseBuffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          try {
+            const event = JSON.parse(line.slice(6)) as {
+              type: "text" | "done" | "error";
+              text?: string;
+              new_rules?: string[];
+              saved_to_vault?: boolean;
+              session_id?: string;
+              message?: string;
+            };
+
+            if (event.type === "text" && event.text) {
+              streamText += event.text;
+              const captured = streamText;
+              setMessages(p => {
+                const updated = [...p];
+                updated[updated.length - 1] = { role: "assistant", content: captured };
+                return updated;
+              });
+            } else if (event.type === "done") {
+              if (event.session_id) setSessionId(event.session_id);
+              if (event.new_rules?.length) {
+                setSavedRules(event.new_rules);
+                setTimeout(() => setSavedRules([]), 5000);
+                if (showRules) loadRules();
+              }
+            } else if (event.type === "error") {
+              const errMsg = event.message ?? "Something went wrong. Try again.";
+              setMessages(p => {
+                const updated = [...p];
+                updated[updated.length - 1] = { role: "assistant", content: errMsg };
+                return updated;
+              });
+            }
+          } catch { /* ignore malformed SSE lines */ }
+        }
       }
     } catch (err) {
       console.error("[AiTab] send error", err);
-      setMessages(p => [...p, { role: "assistant", content: "Sorry, something went wrong. Try again." }]);
+      setMessages(p => {
+        const updated = [...p];
+        updated[updated.length - 1] = { role: "assistant", content: "Sorry, something went wrong. Try again." };
+        return updated;
+      });
     } finally {
       setLoading(false);
     }
@@ -109,7 +175,50 @@ export default function AiTab() {
     setSavedRules([]);
   }
 
+  // ── Batch drafts ──────────────────────────────────────────────────────────
+
+  async function checkBatchStatus() {
+    try {
+      const res = await fetch("/api/admin/batch-drafts");
+      if (!res.ok) return;
+      const json = await res.json() as { batch?: BatchStatus; results?: DraftResult[]; message?: string };
+      if (json.batch) setBatchStatus(json.batch);
+      if (json.results?.length) setBatchResults(json.results);
+    } catch { /* no batch running */ }
+  }
+
+  async function startBatch() {
+    setBatchLoading(true);
+    setBatchMsg(null);
+    setBatchResults([]);
+    setBatchSaved(false);
+    try {
+      const res = await fetch("/api/admin/batch-drafts", { method: "POST" });
+      const json = await res.json() as { batch_id?: string; request_count?: number; error?: string; message?: string };
+      if (!res.ok || json.error) {
+        setBatchMsg(json.error ?? json.message ?? "Failed to start batch");
+        return;
+      }
+      setBatchMsg(`Batch started for ${json.request_count} inquiries. Check back in ~1 hour for results.`);
+      await checkBatchStatus();
+    } catch {
+      setBatchMsg("Failed to start batch job");
+    } finally {
+      setBatchLoading(false);
+    }
+  }
+
+  function saveDraftsToLocalStorage() {
+    for (const r of batchResults) {
+      localStorage.setItem(`draft_${r.inquiry_id}`, r.draft);
+      localStorage.setItem(`ai_draft_${r.inquiry_id}`, r.draft);
+    }
+    setBatchSaved(true);
+    setBatchMsg(`${batchResults.length} drafts saved — open the Inquiries tab to use them.`);
+  }
+
   const card = "bg-white rounded-2xl border border-slate-100 overflow-hidden";
+  const batchDone = batchStatus?.processing_status === "ended";
 
   return (
     <div className="space-y-5">
@@ -141,7 +250,7 @@ export default function AiTab() {
         </div>
       </div>
 
-      {/* Rules summary bar — always visible */}
+      {/* Rules summary bar */}
       {rulesData && (
         <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl"
           style={{ background: "rgba(99,102,241,0.06)", border: "1px solid rgba(99,102,241,0.15)" }}>
@@ -210,7 +319,6 @@ export default function AiTab() {
       <div className={card}>
         <div className="h-[3px]" style={{ background: "linear-gradient(90deg,#6366f1,#8b5cf6)" }} />
 
-        {/* Chat history */}
         <div className="p-4 space-y-3 min-h-[200px] max-h-[480px] overflow-y-auto">
           {sessionLoading ? (
             <div className="flex items-center justify-center h-24 text-slate-400 text-sm animate-pulse">
@@ -229,7 +337,7 @@ export default function AiTab() {
             messages.map((m, i) => (
               <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
                 <div
-                  className="max-w-[82%] px-3 py-2 rounded-xl text-sm leading-relaxed"
+                  className="max-w-[82%] px-3 py-2 rounded-xl text-sm leading-relaxed whitespace-pre-wrap"
                   style={m.role === "user"
                     ? { background: C.grad12, color: "#fff" }
                     : { background: "rgba(99,102,241,0.08)", color: "#3730a3", border: "1px solid rgba(99,102,241,0.15)" }}>
@@ -238,7 +346,7 @@ export default function AiTab() {
               </div>
             ))
           )}
-          {loading && (
+          {loading && messages[messages.length - 1]?.role === "user" && (
             <div className="flex justify-start">
               <div className="px-3 py-2 rounded-xl text-sm" style={{ background: "rgba(99,102,241,0.08)", color: "#6366f1" }}>
                 <span className="animate-spin inline-block mr-1">◌</span> Thinking…
@@ -256,7 +364,6 @@ export default function AiTab() {
           <div ref={bottomRef} />
         </div>
 
-        {/* Input */}
         <div className="p-4 border-t border-slate-100 flex gap-2">
           <input
             type="text"
@@ -275,6 +382,85 @@ export default function AiTab() {
             style={{ background: "linear-gradient(135deg,#6366f1,#8b5cf6)", color: "#fff" }}>
             Send
           </button>
+        </div>
+      </div>
+
+      {/* Batch Draft Generation */}
+      <div className={card}>
+        <div className="h-[3px]" style={{ background: "linear-gradient(90deg,#f59e0b,#f97316)" }} />
+        <div className="p-4">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div>
+              <p className="text-sm font-black text-slate-900">Batch Draft All Inquiries</p>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Generates reply drafts for every unanswered inquiry at 50% cost. Results ready in ~1 hour.
+              </p>
+            </div>
+            <div className="flex gap-2 flex-shrink-0">
+              {batchStatus && (
+                <button
+                  onClick={checkBatchStatus}
+                  className="text-xs font-bold px-3 py-1.5 rounded-xl border"
+                  style={{ borderColor: "rgba(0,0,0,0.1)", color: "#64748b", background: "#fff" }}>
+                  Refresh
+                </button>
+              )}
+              <button
+                onClick={startBatch}
+                disabled={batchLoading || (!!batchStatus && !batchDone)}
+                className="text-xs font-bold px-3 py-1.5 rounded-xl disabled:opacity-40"
+                style={{ background: "linear-gradient(135deg,#f59e0b,#f97316)", color: "#fff" }}>
+                {batchLoading ? "Starting…" : batchStatus && !batchDone ? "Running…" : "Start Batch"}
+              </button>
+            </div>
+          </div>
+
+          {/* Status */}
+          {batchStatus && (
+            <div className="mt-3 px-3 py-2.5 rounded-xl text-xs"
+              style={{ background: batchDone ? "rgba(16,185,129,0.06)" : "rgba(245,158,11,0.06)", border: `1px solid ${batchDone ? "rgba(16,185,129,0.2)" : "rgba(245,158,11,0.2)"}` }}>
+              <div className="flex items-center gap-2">
+                <span>{batchDone ? "✓ Done" : "⏳ Processing"}</span>
+                <span className="text-slate-400">·</span>
+                <span className="text-slate-500">
+                  {batchStatus.request_counts.succeeded} succeeded
+                  {batchStatus.request_counts.processing > 0 && ` · ${batchStatus.request_counts.processing} processing`}
+                  {batchStatus.request_counts.errored > 0 && ` · ${batchStatus.request_counts.errored} errored`}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Results */}
+          {batchDone && batchResults.length > 0 && (
+            <div className="mt-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold text-slate-600">{batchResults.length} drafts ready</p>
+                <button
+                  onClick={saveDraftsToLocalStorage}
+                  disabled={batchSaved}
+                  className="text-xs font-bold px-3 py-1 rounded-lg disabled:opacity-50"
+                  style={{ background: "rgba(16,185,129,0.1)", color: "#059669", border: "1px solid rgba(16,185,129,0.2)" }}>
+                  {batchSaved ? "Saved to Inquiries ✓" : "Load into Inquiries tab"}
+                </button>
+              </div>
+              <div className="max-h-48 overflow-y-auto space-y-2">
+                {batchResults.map(r => (
+                  <div key={r.inquiry_id} className="px-3 py-2 rounded-lg bg-slate-50 border border-slate-100">
+                    <p className="text-xs font-semibold text-slate-700 mb-1">{r.inquiry_name}</p>
+                    <p className="text-xs text-slate-500 line-clamp-2">{r.draft}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Feedback message */}
+          {batchMsg && (
+            <p className="mt-2 text-xs" style={{ color: batchMsg.includes("Failed") ? "#ef4444" : "#64748b" }}>
+              {batchMsg}
+            </p>
+          )}
         </div>
       </div>
 
