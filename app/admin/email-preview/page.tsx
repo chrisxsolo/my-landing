@@ -14,11 +14,21 @@ export default function EmailPreviewPage() {
   const [error, setError]     = useState<string | null>(null);
 
   useEffect(() => {
-    try {
-      setHtml(localStorage.getItem("email_preview_html"));
-      setSubject(localStorage.getItem("email_preview_subject") ?? "");
-      setBody(localStorage.getItem("email_preview_body") ?? "");
-    } catch { /* ignore */ }
+    function readFromStorage() {
+      try {
+        setHtml(localStorage.getItem("email_preview_html"));
+        setSubject(localStorage.getItem("email_preview_subject") ?? "");
+        setBody(localStorage.getItem("email_preview_body") ?? "");
+      } catch { /* ignore */ }
+    }
+    readFromStorage();
+    function onStorage(e: StorageEvent) {
+      if (e.key === "email_preview_html" || e.key === "email_preview_subject" || e.key === "email_preview_body") {
+        readFromStorage();
+      }
+    }
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
   }, []);
 
   async function sendTest() {

@@ -97,7 +97,7 @@ function RemindersContent() {
       localStorage.setItem("email_preview_subject", r.subject);
       localStorage.setItem("email_preview_body", r.body);
     } catch { /* ignore */ }
-    window.open("/admin/email-preview", "_blank", "noopener");
+    window.open("/admin/email-preview", "email_preview");
   }
 
   async function sendReminder(r: ReminderDraft) {
