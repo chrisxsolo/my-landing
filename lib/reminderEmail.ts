@@ -255,7 +255,7 @@ export function buildThankYouEmail(firstName: string, body: string): string {
     <div class="copy">${bodyToParagraphs(body)}</div>
     <div class="callout">
       <span class="callout-label">What's next</span>
-      <p class="callout-text">I'm editing your photos now. You'll get a private gallery link as soon as they're ready. Tag me when you post — <strong>${IG_HANDLE}</strong></p>
+      <p class="callout-text">I'm editing your photos now. You'll get a private gallery link as soon as they're ready.</p>
     </div>
   </div>`;
   return base("thank-you", content);

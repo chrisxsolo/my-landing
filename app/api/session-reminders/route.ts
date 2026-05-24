@@ -164,7 +164,7 @@ Phone: (408) 722-7680. Do not include any sign-off or signature — the email cl
       label: "Post-Session Thank-You",
       emoji: "🙏",
       subject: `Thank you — it was so fun`,
-      systemAddition: `Write a post-session thank-you. Cover: (1) genuinely loved shooting with them, (2) briefly mention something authentic about the session type or location if you know it, (3) let them know you'll be editing and will send a gallery link soon, (4) ask them to tag you on IG @soloxsnaps when they post. Keep it real, not generic.`,
+      systemAddition: `Write a post-session thank-you. Cover: (1) genuinely loved shooting with them, (2) briefly mention something authentic about the session type or location if you know it, (3) let them know you'll be editing and will send a gallery link soon, (4) ask them to tag you on IG @soloxsnaps when they post. Keep it real, not generic. Do NOT mention any time reference to when the shoot happened — no "this morning", "today", "yesterday", "last week", or any similar phrase.`,
     },
     {
       id: "gallery-delivery",

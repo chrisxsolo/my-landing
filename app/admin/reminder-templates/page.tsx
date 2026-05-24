@@ -57,7 +57,7 @@ const TEMPLATES: TemplateConfig[] = [
     label: "Post-Session Thank-You",
     emoji: "🙏",
     defaultSubject: "Thank you — it was so fun",
-    defaultInstructions: "Write a post-session thank-you. Cover: (1) genuinely loved shooting with them, (2) briefly mention something authentic about the session type or location if you know it, (3) let them know you'll be editing and will send a gallery link soon, (4) ask them to tag you on IG @soloxsnaps when they post. Keep it real, not generic.",
+    defaultInstructions: "Write a post-session thank-you. Cover: (1) genuinely loved shooting with them, (2) briefly mention something authentic about the session type or location if you know it, (3) let them know you'll be editing and will send a gallery link soon, (4) ask them to tag you on IG @soloxsnaps when they post. Keep it real, not generic. Do NOT mention any time reference to when the shoot happened — no \"this morning\", \"today\", \"yesterday\", \"last week\", or any similar phrase.",
     tip: "Sent right after the shoot. This is where you set the timeline expectation for gallery delivery.",
   },
   {
