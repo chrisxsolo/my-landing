@@ -332,5 +332,6 @@ Output ONLY the JSON object — no markdown, no preamble.`,
     title: copy.title,
     cover_image_url,
     photo_count: allUploadedUrls.length,
+    selectedIndices,
   });
 }

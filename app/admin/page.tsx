@@ -1052,35 +1052,49 @@ function AdminDashboard() {
     if(aiDropFiles.length<1){showToast("Drop at least 1 photo",false);return;}
     setAiGenerating(true);
     try{
-      // Upload originals to Supabase first so full-quality images are stored.
-      // Compress separately for Claude (keeps API body small, avoids Vercel 4.5MB limit).
       const ts=Date.now();
-      const [compressedBlobs, originalUrlResults]=await Promise.all([
+      // Compress for AI (900px/75%) and for storage (2000px/90%) in parallel.
+      // Storage versions are much smaller than raw originals so uploads are fast.
+      const [compressedForAi, compressedForStorage]=await Promise.all([
         Promise.all(aiDropFiles.map(f=>compressForAI(f,900,0.75))),
-        Promise.all(aiDropFiles.map((f,i)=>{
-          const ext=f.name.split('.').pop()?.toLowerCase()||'jpg';
-          const path=`blog/${ts}_${i}.${ext}`;
+        Promise.all(aiDropFiles.map(f=>compressForAI(f,2000,0.90))),
+      ]);
+      // Build AI request fd (no originalUrls — API uses compressed images as fallback)
+      const fd=new FormData();
+      compressedForAi.forEach((blob,i)=>{
+        fd.append("images",new File([blob],aiDropFiles[i].name.replace(/\.[^.]+$/,".jpg"),{type:"image/jpeg"}));
+      });
+      fd.append("sites","professional");
+      // Run AI call and storage uploads in parallel — the big speed win
+      const [res, storageUrlResults]=await Promise.all([
+        fetch("/api/ai-blog-from-photos",{method:"POST",body:fd}),
+        Promise.all(compressedForStorage.map((blob,i)=>{
+          const path=`blog/${ts}_${i}.jpg`;
           return supabase.storage.from('grad-photos')
-            .upload(path,f,{upsert:true,contentType:f.type})
+            .upload(path,blob,{upsert:true,contentType:'image/jpeg'})
             .then(({error})=>{
               if(error){console.error("[ai-blog] upload:",error);return null;}
               return supabase.storage.from('grad-photos').getPublicUrl(path).data.publicUrl;
             });
         })),
       ]);
-      // Pair compressed+url; drop files where upload failed
-      const pairs=aiDropFiles
-        .map((_,i)=>({blob:compressedBlobs[i],url:originalUrlResults[i],file:aiDropFiles[i]}))
-        .filter(p=>p.url!==null);
-      if(!pairs.length){showToast("Photo uploads failed",false);return;}
-      const fd=new FormData();
-      pairs.forEach(p=>{fd.append("images",new File([p.blob],p.file.name.replace(/\.[^.]+$/,".jpg"),{type:"image/jpeg"}));});
-      fd.append("originalUrls",JSON.stringify(pairs.map(p=>p.url)));
-      fd.append("sites","professional");
-      const res=await fetch("/api/ai-blog-from-photos",{method:"POST",body:fd});
       let json:Record<string,unknown>={};
       try{json=await res.json();}catch{/* non-JSON body (e.g. 413 from Vercel) */}
       if(!res.ok){showToast((json.error as string)||`AI generation failed (${res.status})`,false);return;}
+      // Patch the post with the full-quality storage URLs now that uploads are done
+      const validUrls=storageUrlResults.filter((u):u is string=>u!==null);
+      if(validUrls.length>0&&Array.isArray(json.selectedIndices)){
+        const indices=json.selectedIndices as number[];
+        const selectedUrls=indices.filter(i=>i<validUrls.length).map(i=>validUrls[i]);
+        const remainingUrls=validUrls.filter((_,i)=>!indices.includes(i));
+        if(selectedUrls.length>0){
+          fetch("/api/update-blog-images",{
+            method:"POST",
+            headers:{"Content-Type":"application/json"},
+            body:JSON.stringify({id:json.id,cover_image_url:selectedUrls[0],extra_image_urls:selectedUrls.slice(1),all_image_urls:[...selectedUrls,...remainingUrls]}),
+          }).catch(err=>console.error("[ai-blog] image patch error:",err));
+        }
+      }
       showToast(`Published: "${json.title}" — ${json.photo_count} photos`);
       setAiDropFiles([]);setAiDropPreviews([]);setBlogCategory("professional");fetchPosts();
     }catch(err){
