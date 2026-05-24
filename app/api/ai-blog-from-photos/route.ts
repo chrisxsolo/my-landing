@@ -216,45 +216,68 @@ Output ONLY the JSON object — no markdown, no preamble.`,
     return NextResponse.json({ error: "Claude returned incomplete blog copy" }, { status: 500 });
   }
 
-  // ── Step 3: Upload selected images to Supabase Storage ───────────────────
+  // ── Step 3: Resolve image URLs ────────────────────────────────────────────
   const supabase = createSupabaseServerClient();
-  const ts = Date.now();
 
-  async function uploadToStorage(file: File, index: number): Promise<string | null> {
-    const ext = file.name.split(".").pop()?.toLowerCase() ?? "jpg";
-    const path = `blog/${ts}_${index}.${ext}`;
-    const buf = await file.arrayBuffer();
-    const { error } = await supabase.storage
-      .from("grad-photos")
-      .upload(path, buf, { upsert: true, contentType: file.type || "image/jpeg" });
-    if (error) {
-      console.error("[ai-blog] upload error:", error);
-      return null;
+  // If the client pre-uploaded originals, use those full-quality URLs directly.
+  // Otherwise fall back to uploading the compressed images from the API.
+  const originalUrlsRaw = formData.get("originalUrls") as string | null;
+  let originalUrls: string[] | null = null;
+  if (originalUrlsRaw) {
+    try { originalUrls = JSON.parse(originalUrlsRaw); } catch {}
+  }
+
+  let cover_image_url: string;
+  let extra_image_urls: string[];
+  let allUploadedUrls: string[];
+
+  if (originalUrls && originalUrls.length > 0) {
+    const validSelected = selectedIndices
+      .filter(i => i < originalUrls!.length)
+      .map(i => originalUrls![i]);
+    const remainingUrls = originalUrls.filter((_, i) => !selectedIndices.includes(i));
+    if (!validSelected.length) {
+      return NextResponse.json({ error: "No valid image URLs after AI selection" }, { status: 500 });
     }
-    const { data } = supabase.storage.from("grad-photos").getPublicUrl(path);
-    return data.publicUrl;
+    cover_image_url = validSelected[0];
+    extra_image_urls = validSelected.slice(1);
+    allUploadedUrls = [...validSelected, ...remainingUrls];
+  } else {
+    // Legacy path: upload compressed images from the API
+    const ts = Date.now();
+    const uploadToStorage = async (file: File, index: number): Promise<string | null> => {
+      const ext = file.name.split(".").pop()?.toLowerCase() ?? "jpg";
+      const path = `blog/${ts}_${index}.${ext}`;
+      const buf = await file.arrayBuffer();
+      const { error } = await supabase.storage
+        .from("grad-photos")
+        .upload(path, buf, { upsert: true, contentType: file.type || "image/jpeg" });
+      if (error) {
+        console.error("[ai-blog] upload error:", error);
+        return null;
+      }
+      const { data } = supabase.storage.from("grad-photos").getPublicUrl(path);
+      return data.publicUrl;
+    };
+
+    const remainingFiles = files.filter((_, i) => !selectedIndices.includes(i));
+    const [selectedUploadResults, remainingUploadResults] = await Promise.all([
+      Promise.all(selectedFiles.map((file, i) => uploadToStorage(file, i))),
+      Promise.all(remainingFiles.map((file, i) => uploadToStorage(file, selectedFiles.length + i))),
+    ]);
+
+    const successUrls = selectedUploadResults.filter((u): u is string => u !== null);
+    if (successUrls.length === 0) {
+      return NextResponse.json({ error: "All image uploads failed" }, { status: 500 });
+    }
+
+    cover_image_url = successUrls[0];
+    extra_image_urls = successUrls.slice(1);
+    allUploadedUrls = [
+      ...successUrls,
+      ...remainingUploadResults.filter((u): u is string => u !== null),
+    ];
   }
-
-  // Upload AI-selected images first (they become the post cover + gallery),
-  // then upload the remaining user-selected images so they all land in the library.
-  const remainingFiles = files.filter((_, i) => !selectedIndices.includes(i));
-
-  const [selectedUploadResults, remainingUploadResults] = await Promise.all([
-    Promise.all(selectedFiles.map((file, i) => uploadToStorage(file, i))),
-    Promise.all(remainingFiles.map((file, i) => uploadToStorage(file, selectedFiles.length + i))),
-  ]);
-
-  const successUrls = selectedUploadResults.filter((u): u is string => u !== null);
-  if (successUrls.length === 0) {
-    return NextResponse.json({ error: "All image uploads failed" }, { status: 500 });
-  }
-
-  const cover_image_url = successUrls[0];
-  const extra_image_urls = successUrls.slice(1);
-  const allUploadedUrls = [
-    ...successUrls,
-    ...remainingUploadResults.filter((u): u is string => u !== null),
-  ];
 
   // ── Step 4: Insert blog post ──────────────────────────────────────────────
   const slug = slugify(copy.title);

@@ -378,13 +378,12 @@ export async function POST(req: NextRequest) {
   const tokens = await getValidTokens();
   if (!tokens) return NextResponse.json({ error: "Gmail not connected" }, { status: 401 });
 
-  const subject = `Your ${inq.session_type ?? "session"} is confirmed! 🎓`;
+  const subject = `Payment Confirmed`;
   const raw = buildRawMimeMessage({
-    from:     tokens.email,
-    to:       inq.email,
+    from:    tokens.email,
+    to:      inq.email,
     subject,
     html,
-    threadId: thread_id,
   });
 
   const gmailRes = await fetch(
@@ -392,7 +391,7 @@ export async function POST(req: NextRequest) {
     {
       method:  "POST",
       headers: { Authorization: `Bearer ${tokens.access_token}`, "Content-Type": "application/json" },
-      body:    JSON.stringify({ raw, ...(thread_id ? { threadId: thread_id } : {}) }),
+      body:    JSON.stringify({ raw }),
     }
   );
 

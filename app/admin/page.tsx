@@ -1052,15 +1052,30 @@ function AdminDashboard() {
     if(aiDropFiles.length<1){showToast("Drop at least 1 photo",false);return;}
     setAiGenerating(true);
     try{
-      // Compress to ≤900px / 0.75q — Claude only needs to see the image, not print it.
-      // 24 photos × ~80KB = ~2MB, well under Vercel's 4.5MB body limit.
-      const compressedBlobs=await Promise.all(aiDropFiles.map(f=>compressForAI(f,900,0.75)));
+      // Upload originals to Supabase first so full-quality images are stored.
+      // Compress separately for Claude (keeps API body small, avoids Vercel 4.5MB limit).
+      const ts=Date.now();
+      const [compressedBlobs, originalUrlResults]=await Promise.all([
+        Promise.all(aiDropFiles.map(f=>compressForAI(f,900,0.75))),
+        Promise.all(aiDropFiles.map((f,i)=>{
+          const ext=f.name.split('.').pop()?.toLowerCase()||'jpg';
+          const path=`blog/${ts}_${i}.${ext}`;
+          return supabase.storage.from('grad-photos')
+            .upload(path,f,{upsert:true,contentType:f.type})
+            .then(({error})=>{
+              if(error){console.error("[ai-blog] upload:",error);return null;}
+              return supabase.storage.from('grad-photos').getPublicUrl(path).data.publicUrl;
+            });
+        })),
+      ]);
+      // Pair compressed+url; drop files where upload failed
+      const pairs=aiDropFiles
+        .map((_,i)=>({blob:compressedBlobs[i],url:originalUrlResults[i],file:aiDropFiles[i]}))
+        .filter(p=>p.url!==null);
+      if(!pairs.length){showToast("Photo uploads failed",false);return;}
       const fd=new FormData();
-      compressedBlobs.forEach((blob,i)=>{
-        const name=aiDropFiles[i].name.replace(/\.[^.]+$/,".jpg");
-        fd.append("images",new File([blob],name,{type:"image/jpeg"}));
-      });
-      // AI-generated posts go to professional by default; user can edit after
+      pairs.forEach(p=>{fd.append("images",new File([p.blob],p.file.name.replace(/\.[^.]+$/,".jpg"),{type:"image/jpeg"}));});
+      fd.append("originalUrls",JSON.stringify(pairs.map(p=>p.url)));
       fd.append("sites","professional");
       const res=await fetch("/api/ai-blog-from-photos",{method:"POST",body:fd});
       let json:Record<string,unknown>={};
@@ -1252,12 +1267,14 @@ function AdminDashboard() {
           const paidSessions=inquiries.filter(i=>i.payment_status==="paid").length;
           const pendingInquiries=inquiries.filter(i=>!i.reply_sent_at&&i.status!=="archived"&&i.status!=="not_interested"&&i.status!=="responded"&&i.status!=="manual").length;
 
+          const pad2=(n:number)=>String(n).padStart(2,"0");
+          const todayStr=`${today.getFullYear()}-${pad2(today.getMonth()+1)}-${pad2(today.getDate())}`;
+          const tom=new Date(today);tom.setDate(tom.getDate()+1);
+          const tomorrowStr=`${tom.getFullYear()}-${pad2(tom.getMonth()+1)}-${pad2(tom.getDate())}`;
           const dayLabel=(d:string)=>{
-            const dt=new Date(d+"T12:00:00");
-            const diff=Math.floor((dt.getTime()-today.getTime())/(1000*60*60*24));
-            if(diff===0)return"TODAY";
-            if(diff===1)return"TOMORROW";
-            return dt.toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"}).toUpperCase();
+            if(d===todayStr)return"TODAY";
+            if(d===tomorrowStr)return"TOMORROW";
+            return new Date(d+"T12:00:00").toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"}).toUpperCase();
           };
 
           return(
@@ -1334,8 +1351,7 @@ function AdminDashboard() {
                   ):(
                     <div className="flex flex-col gap-2">
                       {upcoming.map(inq=>{
-                        const diff=Math.floor((new Date(inq.session_date!+"T12:00:00").getTime()-today.getTime())/(1000*60*60*24));
-                        const isToday=diff===0;const isTomorrow=diff===1;
+                        const isToday=inq.session_date===todayStr;const isTomorrow=inq.session_date===tomorrowStr;
                         return(
                           <div key={inq.id} className="rounded-xl border" style={{borderColor:"#f1f5f9",background:"#fafafa"}}>
                             <div className="flex items-center gap-3 p-2.5">
