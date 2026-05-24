@@ -212,40 +212,39 @@ export default function SessionCalendar({
               return (
                 <div key={s.id} className="rounded-2xl overflow-hidden"
                   style={{ background: "rgba(255,255,255,0.9)", border: "1px solid rgba(167,139,250,0.15)", boxShadow: "0 2px 8px rgba(124,58,237,0.06)" }}>
-                  <div className="flex items-center gap-3 p-3">
-                    <div className="w-9 h-9 rounded-xl flex items-center justify-center text-base flex-shrink-0" style={{ background: col.grad }}>
+                  <div className="flex items-start gap-3 p-3">
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center text-base flex-shrink-0 mt-0.5" style={{ background: col.grad }}>
                       📸
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-black text-slate-900 truncate">{s.name}</p>
                       <p className="text-xs text-slate-400 truncate">{s.session_type || "Session"}</p>
-                    </div>
-                    <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap justify-end">
-                      {isPaid && (
-                        <span className="text-[10px] font-black px-2 py-0.5 rounded-lg" style={{ background: "rgba(16,185,129,0.1)", color: "#059669" }}>
-                          Paid ✓
-                        </span>
-                      )}
-                      {/* Thank You button — shown for past sessions */}
-                      {isPast && onThankYouClick && (
+                      <div className="flex items-center gap-1.5 flex-wrap mt-2">
+                        {isPaid && (
+                          <span className="text-[10px] font-black px-2 py-0.5 rounded-lg" style={{ background: "rgba(16,185,129,0.1)", color: "#059669" }}>
+                            Paid ✓
+                          </span>
+                        )}
+                        {isPast && onThankYouClick && (
+                          <button
+                            onClick={() => onThankYouClick(s.id)}
+                            className="text-[11px] font-bold px-2.5 py-1 rounded-lg text-white"
+                            style={{ background: "linear-gradient(135deg,#9d6fe8,#e879a0)" }}>
+                            🙏 Thank You
+                          </button>
+                        )}
+                        {onReschedule && !isRescheduling && (
+                          <button onClick={startReschedule} className="text-[11px] font-bold px-2.5 py-1 rounded-lg" style={{ background: "rgba(124,58,237,0.08)", color: "#7c3aed" }}>
+                            Reschedule
+                          </button>
+                        )}
                         <button
-                          onClick={() => onThankYouClick(s.id)}
+                          onClick={() => onClientClick(s.id)}
                           className="text-[11px] font-bold px-2.5 py-1 rounded-lg text-white"
-                          style={{ background: "linear-gradient(135deg,#9d6fe8,#e879a0)" }}>
-                          🙏 Thank You
+                          style={{ background: col.grad }}>
+                          View →
                         </button>
-                      )}
-                      {onReschedule && !isRescheduling && (
-                        <button onClick={startReschedule} className="text-[11px] font-bold px-2.5 py-1 rounded-lg" style={{ background: "rgba(124,58,237,0.08)", color: "#7c3aed" }}>
-                          Reschedule
-                        </button>
-                      )}
-                      <button
-                        onClick={() => onClientClick(s.id)}
-                        className="text-[11px] font-bold px-2.5 py-1 rounded-lg text-white"
-                        style={{ background: col.grad }}>
-                        View →
-                      </button>
+                      </div>
                     </div>
                   </div>
 
