@@ -33,7 +33,8 @@ function RemindersContent() {
   const [error,       setError]       = useState<string | null>(null);
   const [sending,     setSending]     = useState<string | null>(null);
   const [toast,       setToast]       = useState<{ msg: string; ok: boolean } | null>(null);
-  const focusRef = useRef<HTMLDivElement>(null);
+  const focusRef        = useRef<HTMLDivElement>(null);
+  const previewWindowRef = useRef<Window | null>(null);
 
   function showToast(msg: string, ok = true) {
     setToast({ msg, ok });
@@ -97,7 +98,14 @@ function RemindersContent() {
       localStorage.setItem("email_preview_subject", r.subject);
       localStorage.setItem("email_preview_body", r.body);
     } catch { /* ignore */ }
-    window.open("/admin/email-preview", "email_preview");
+
+    const win = previewWindowRef.current;
+    if (win && !win.closed) {
+      win.postMessage({ type: "email-preview-update", html, subject: r.subject, body: r.body }, window.location.origin);
+      win.focus();
+    } else {
+      previewWindowRef.current = window.open("/admin/email-preview", "email_preview");
+    }
   }
 
   async function sendReminder(r: ReminderDraft) {

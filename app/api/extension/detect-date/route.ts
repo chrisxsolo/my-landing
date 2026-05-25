@@ -100,7 +100,7 @@ export async function POST(req: NextRequest) {
   if (emailContext) {
     const anthropic = new Anthropic();
     const res = await anthropic.messages.create({
-      model: "claude-haiku-4-5-20251001",
+      model: "claude-haiku-4-5",
       max_tokens: 350,
       system: `You extract confirmed photography session details from email conversations. Today is ${today}. Current year is ${currentYear}.
 

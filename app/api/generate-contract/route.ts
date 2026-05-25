@@ -286,7 +286,7 @@ export async function POST(req: NextRequest) {
   const today = new Date().toISOString().split("T")[0];
 
   const extractRes = await anthropic.messages.create({
-    model:      "claude-haiku-4-5-20251001",
+    model:      "claude-haiku-4-5",
     max_tokens: 300,
     system: `Extract photography booking details from emails. Today is ${today}.
 Respond ONLY with valid JSON (no markdown):

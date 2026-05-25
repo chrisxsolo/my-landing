@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { C } from "@/lib/colors";
+import ClientPortalPreview from "@/app/admin/ClientPortalPreview";
 
 type AuthUser = {
   id: string;
@@ -15,11 +16,22 @@ type Props = {
   showToast: (msg: string, ok?: boolean) => void;
 };
 
+function formatJoinedAt(isoString: string): string {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(isoString));
+}
+
 export default function AccountsTab({ showToast }: Props) {
   const [users, setUsers] = useState<AuthUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [previewEmail, setPreviewEmail] = useState<string | null>(null);
 
   async function fetchUsers() {
     setLoading(true);
@@ -109,7 +121,7 @@ export default function AccountsTab({ showToast }: Props) {
                     {user.provider}
                   </span>
                   <span style={{ fontSize: 11, color: "#94a3b8" }}>
-                    Joined {new Date(user.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                    Joined {formatJoinedAt(user.created_at)}
                   </span>
                   {!user.confirmed_at && (
                     <span style={{
@@ -123,7 +135,19 @@ export default function AccountsTab({ showToast }: Props) {
                 </div>
               </div>
 
-              <div style={{ flexShrink: 0 }}>
+              <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 8 }}>
+                {user.email && (
+                  <button
+                    onClick={() => setPreviewEmail(user.email)}
+                    style={{
+                      fontSize: 12, fontWeight: 600, color: "#0369a1",
+                      background: "#f0f9ff", border: "1px solid #bae6fd",
+                      borderRadius: 8, padding: "6px 12px", cursor: "pointer",
+                    }}
+                  >
+                    Preview
+                  </button>
+                )}
                 {deleteConfirm === user.id ? (
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <span style={{ fontSize: 12, color: "#64748b" }}>Delete?</span>
@@ -161,6 +185,13 @@ export default function AccountsTab({ showToast }: Props) {
             </div>
           ))}
         </div>
+      )}
+
+      {previewEmail && (
+        <ClientPortalPreview
+          email={previewEmail}
+          onClose={() => setPreviewEmail(null)}
+        />
       )}
     </div>
   );

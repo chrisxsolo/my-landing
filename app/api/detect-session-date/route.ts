@@ -125,7 +125,7 @@ export async function POST(req: NextRequest) {
   // ── Pass 1: find any date mentioned in the email thread ───────────────────
   if (emailContext) {
     const res = await anthropic.messages.create({
-      model:      "claude-haiku-4-5-20251001",
+      model:      "claude-haiku-4-5",
       max_tokens: 200,
       system: `You extract photography session dates from email conversations. Today is ${today}. Current year is ${currentYear}.
 
@@ -165,7 +165,7 @@ ${emailContext}`,
   // ── Pass 2: parse date_in_mind from the inquiry form ─────────────────────
   if (inq.date_in_mind) {
     const res2 = await anthropic.messages.create({
-      model:      "claude-haiku-4-5-20251001",
+      model:      "claude-haiku-4-5",
       max_tokens: 150,
       system: `Parse a free-form date string into a structured date. Today is ${today}. Current year is ${currentYear}.
 If only month+day given, use ${currentYear}. Only use ${currentYear + 1} if that date has already passed.

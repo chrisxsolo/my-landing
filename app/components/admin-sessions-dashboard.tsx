@@ -8,6 +8,7 @@ import AdminSessionForm, {
   type AdminSessionFormPayload,
 } from "@/app/components/admin-session-form";
 import AdminSessionTable from "@/app/components/admin-session-table";
+import ClientPortalPreview from "@/app/admin/ClientPortalPreview";
 import { C } from "@/lib/colors";
 import {
   CLIENT_SESSION_STATUS_LABELS,
@@ -60,6 +61,7 @@ export default function AdminSessionsDashboard() {
   const [gmailSyncing, setGmailSyncing] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [previewEmail, setPreviewEmail] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -396,6 +398,7 @@ export default function AdminSessionsDashboard() {
             <AdminSessionTable
               sessions={filteredSessions}
               onEdit={setEditing}
+              onPreview={setPreviewEmail}
               onUpdateStatus={updateSessionStatus}
               statusSaving={statusSaving}
               gmailSyncing={gmailSyncing}
@@ -404,6 +407,13 @@ export default function AdminSessionsDashboard() {
           </section>
         </div>
       </div>
+
+      {previewEmail && (
+        <ClientPortalPreview
+          email={previewEmail}
+          onClose={() => setPreviewEmail(null)}
+        />
+      )}
     </main>
   );
 }

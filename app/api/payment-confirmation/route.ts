@@ -143,7 +143,7 @@ async function detectConfirmedDate(
   const anthropic = new Anthropic();
 
   const res = await anthropic.messages.create({
-    model:      "claude-haiku-4-5-20251001",
+    model:      "claude-haiku-4-5",
     max_tokens: 150,
     system: `You extract the single confirmed photography session date from an email thread. Today is ${today}. Current year is ${currentYear}.
 

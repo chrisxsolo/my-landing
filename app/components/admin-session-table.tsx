@@ -11,6 +11,7 @@ import {
 type AdminSessionTableProps = {
   sessions: AdminClientSessionDTO[];
   onEdit: (session: AdminClientSessionDTO) => void;
+  onPreview: (email: string) => void;
   onUpdateStatus: (session: AdminClientSessionDTO, status: ClientSessionStatus) => void;
   statusSaving: { id: string; status: ClientSessionStatus } | null;
   gmailSyncing: string | null;
@@ -45,6 +46,7 @@ function getLinkStatus(session: AdminClientSessionDTO) {
 export default function AdminSessionTable({
   sessions,
   onEdit,
+  onPreview,
   onUpdateStatus,
   statusSaving,
   gmailSyncing,
@@ -104,6 +106,14 @@ export default function AdminSessionTable({
                 style={{ background: C.p1_08, borderColor: C.p1_20, color: C.p1, opacity: gmailSyncing === session.id ? 0.6 : 1 }}
               >
                 {gmailSyncing === session.id ? "Syncing…" : "Sync Gmail"}
+              </button>
+              <button
+                type="button"
+                onClick={() => onPreview(session.clientEmail)}
+                className="min-h-10 flex-1 rounded-lg border px-3 text-sm font-black md:flex-none"
+                style={{ background: "#f0f9ff", borderColor: "#bae6fd", color: "#0369a1" }}
+              >
+                Preview
               </button>
               <button
                 type="button"

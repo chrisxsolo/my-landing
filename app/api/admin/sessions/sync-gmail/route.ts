@@ -110,7 +110,7 @@ async function extractDetailsFromEmails(
   const today = new Date().toISOString().split("T")[0];
 
   const res = await anthropic.messages.create({
-    model: "claude-haiku-4-5-20251001",
+    model: "claude-haiku-4-5",
     max_tokens: 400,
     system: `You are helping extract photography session booking details from an email thread between a photographer and their client. Today is ${today}.
 

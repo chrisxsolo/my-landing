@@ -148,7 +148,7 @@ async function extractPaymentFromNotification(
 ): Promise<PaymentInfo | null> {
   try {
     const res = await anthropic.messages.create({
-      model:      "claude-haiku-4-5-20251001",
+      model:      "claude-haiku-4-5",
       max_tokens: 300,
       system: `Extract payment info from this payment notification email (Pixieset, Venmo, Zelle, PayPal, or Cash App).
 Respond ONLY with valid JSON, no markdown:
@@ -177,7 +177,7 @@ async function detectPaymentForClient(
 ): Promise<{ paid: boolean; amount: string; method: string; note: string; paymentType: string } | null> {
   try {
     const res = await anthropic.messages.create({
-      model:      "claude-haiku-4-5-20251001",
+      model:      "claude-haiku-4-5",
       max_tokens: 300,
       system: `You are a payment detection assistant for a photographer named Chris.
 Analyze these emails and determine if client "${clientName}" has paid a deposit or session fee.
@@ -249,7 +249,7 @@ async function detectSessionDate(
     const currentYear = new Date().getFullYear();
 
     const res = await anthropic.messages.create({
-      model:      "claude-haiku-4-5-20251001",
+      model:      "claude-haiku-4-5",
       max_tokens: 150,
       system: `Extract the confirmed or agreed photography session date from these emails. Today is ${today}. Current year is ${currentYear}.
 Rules:

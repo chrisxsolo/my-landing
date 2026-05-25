@@ -27,8 +27,20 @@ export default function EmailPreviewPage() {
         readFromStorage();
       }
     }
+    function onMessage(e: MessageEvent) {
+      if (e.origin !== window.location.origin) return;
+      if (e.data?.type !== "email-preview-update") return;
+      const { html: newHtml, subject: newSubject, body: newBody } = e.data as { type: string; html: string; subject: string; body: string };
+      setHtml(newHtml ?? null);
+      setSubject(newSubject ?? "");
+      setBody(newBody ?? "");
+    }
     window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
+    window.addEventListener("message", onMessage);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("message", onMessage);
+    };
   }, []);
 
   async function sendTest() {

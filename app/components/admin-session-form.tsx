@@ -98,10 +98,12 @@ export default function AdminSessionForm({
   onCancelEdit,
 }: AdminSessionFormProps) {
   const [form, setForm] = useState<AdminSessionFormPayload>(toForm(initialSession));
+  const [open, setOpen] = useState(false);
   const editing = Boolean(initialSession);
 
   useEffect(() => {
     setForm(toForm(initialSession));
+    if (initialSession) setOpen(true);
   }, [initialSession]);
 
   function update<K extends keyof AdminSessionFormPayload>(key: K, value: AdminSessionFormPayload[K]) {
@@ -132,30 +134,52 @@ export default function AdminSessionForm({
     <form
       id={ADMIN_SESSION_FORM_ID}
       onSubmit={handleSubmit}
-      className="w-full overflow-hidden rounded-xl border p-5"
+      className="w-full overflow-hidden rounded-xl border"
       style={{ background: C.surfaceSoft, borderColor: C.borderWarm, boxShadow: C.shadowWarmSm }}
     >
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h2 className="text-xl font-black" style={{ color: C.ink }}>
-            {editing ? "Edit session" : "Create session"}
-          </h2>
-          <p className="mt-1 text-sm font-semibold" style={{ color: C.muted }}>
-            Use the client&apos;s Google email so their dashboard links automatically.
-          </p>
+      {/* Header — always visible, click to toggle when not editing */}
+      <button
+        type="button"
+        onClick={() => { if (!editing) setOpen((o) => !o); }}
+        className="w-full p-5 text-left"
+        style={{ cursor: editing ? "default" : "pointer" }}
+      >
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-black" style={{ color: C.ink }}>
+              {editing ? "Edit session" : "Create session"}
+            </h2>
+            {!open && !editing && (
+              <p className="mt-0.5 text-xs font-semibold" style={{ color: C.muted }}>
+                Tap to expand
+              </p>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {editing && onCancelEdit && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onCancelEdit(); }}
+                className="min-h-10 rounded-lg border px-3 py-2 text-xs font-black"
+                style={{ background: C.surfaceStrong, borderColor: C.borderSubtle, color: C.muted }}
+              >
+                Cancel
+              </button>
+            )}
+            {!editing && (
+              <span
+                className="text-lg font-black transition-transform"
+                style={{ color: C.p1, display: "inline-block", transform: open ? "rotate(45deg)" : "rotate(0deg)" }}
+              >
+                +
+              </span>
+            )}
+          </div>
         </div>
+      </button>
 
-        {editing && onCancelEdit && (
-          <button
-            type="button"
-            onClick={onCancelEdit}
-            className="min-h-10 w-full rounded-lg border px-3 py-2 text-xs font-black sm:w-auto"
-            style={{ background: C.surfaceStrong, borderColor: C.borderSubtle, color: C.muted }}
-          >
-            Cancel
-          </button>
-        )}
-      </div>
+      {(open || editing) && (
+      <div className="px-5 pb-5">
 
       {editing && (
         <div className="mt-4 rounded-lg border p-4" style={{ background: C.surfaceStrong, borderColor: C.borderSubtle }}>
@@ -356,6 +380,8 @@ export default function AdminSessionForm({
       >
         {saving ? "Saving..." : editing ? "Save session" : "Create session"}
       </button>
+      </div>
+      )}
     </form>
   );
 }

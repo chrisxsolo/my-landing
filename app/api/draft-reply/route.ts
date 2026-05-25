@@ -408,7 +408,67 @@ Output only the polished email body, nothing else.`,
     }
   }
 
-  // ── Modes 1 & 2: Fresh draft or refinement ───────────────────────────────
+  // ── Mode 2: Refinement — surgical edit only, no learned rules ───────────
+  if (isRefinement) {
+    const refinementSystem = `You are a text editor making a precise, surgical edit to an email draft.
+
+Your ONLY job is to apply the specific change requested. Do not improve the draft in any other way. Do not apply any style rules you know. Do not rewrite anything the user didn't ask you to change. Treat the existing draft as correct — only touch what the feedback targets.
+
+Hard rules:
+- Plain text only — no markdown, bold, asterisks, or bullet points
+- Start with "Hi [Name]," — nothing before it
+- No sign-off or name at the end
+- No em dashes — use commas instead`;
+
+    const refinementPrompt = `Here is the current email draft:
+
+---
+${previous_draft}
+---
+
+Apply this change and nothing else: "${feedback}"
+
+Output only the revised draft. Change only what the feedback requires.
+
+After the revised draft, on a new line output exactly:
+<rule>one concrete actionable writing rule extracted from this feedback, phrased as an instruction for future drafts</rule>`;
+
+    try {
+      const client = new Anthropic({ apiKey });
+      const response = await client.messages.create({
+        model: "claude-sonnet-4-6",
+        max_tokens: 800,
+        temperature: 0.3,
+        system: refinementSystem,
+        messages: [{ role: "user", content: refinementPrompt }],
+      });
+
+      let raw = response.content
+        .filter(b => b.type === "text")
+        .map(b => (b as { type: "text"; text: string }).text)
+        .join("")
+        .trim();
+
+      const ruleMatch = raw.match(/<rule>([\s\S]*?)<\/rule>/);
+      const savedRule = ruleMatch ? ruleMatch[1].trim() : null;
+      if (ruleMatch) {
+        raw = raw.replace(/<rule>[\s\S]*?<\/rule>/, "").trim();
+        if (savedRule) {
+          mergeRulesToVault([savedRule], apiKey).catch(err =>
+            console.error("[draft-reply] refinement rule save failed:", err)
+          );
+        }
+      }
+
+      let draft = stripSignoff(raw);
+      return NextResponse.json({ draft, ...(savedRule ? { saved_rule: savedRule } : {}) });
+    } catch (err) {
+      console.error("Claude refinement error:", err);
+      return NextResponse.json({ error: friendlyAiError(err) }, { status: 500 });
+    }
+  }
+
+  // ── Mode 1: Fresh draft ──────────────────────────────────────────────────
 
   const [availability, vaultContext] = await Promise.all([
     fetchAvailability(),
@@ -438,20 +498,7 @@ Hard rules (non-negotiable):
     ? `\n\nFull email conversation history with this client (oldest first — use this for context, don't repeat what's already been said):\n\n${thread_context}`
     : "";
 
-  const userPrompt = isRefinement
-    ? `You wrote this draft reply for a client inquiry:
-
----
-${previous_draft}
----
-
-Chris reviewed it and wants this changed: "${feedback}"
-
-Rewrite the reply incorporating that feedback. Keep everything else the same unless it conflicts with the requested change. Output only the revised reply, nothing else.
-
-After the revised reply, on a new line output exactly:
-<rule>one concrete actionable writing rule extracted from this feedback, phrased as an instruction for future drafts</rule>`
-    : latest_message_body && latest_message_from !== "me"
+  const userPrompt = latest_message_body && latest_message_from !== "me"
       ? `Draft a reply to the most recent email from ${name}.
 
 Client info:
@@ -482,7 +529,7 @@ Write the reply now.`;
     const client = new Anthropic({ apiKey });
     const response = await client.messages.create({
       model: "claude-sonnet-4-6",
-      max_tokens: isRefinement ? 800 : 600,
+      max_tokens: 600,
       temperature: 0.9,
       messages: [{ role: "user", content: userPrompt }],
       system: [
@@ -500,26 +547,13 @@ Write the reply now.`;
       .join("")
       .trim();
 
-    // Extract and save rule for refinement mode
-    let savedRule: string | null = null;
-    if (isRefinement) {
-      const ruleMatch = raw.match(/<rule>([\s\S]*?)<\/rule>/);
-      if (ruleMatch) {
-        savedRule = ruleMatch[1].trim();
-        raw = raw.replace(/<rule>[\s\S]*?<\/rule>/, "").trim();
-        mergeRulesToVault([savedRule], apiKey).catch(err =>
-          console.error("[draft-reply] refinement rule save failed:", err)
-        );
-      }
-    }
-
     let draft = raw;
     draft = draft.replace(
       /^(?:[^\n]*<[^\n@>]+@[^\n>]+>[^\n]*\n[^\n]+at\s+\d+:\d+[^\n]*\n(?:to\s+[^\n]+\n)?[\s\n]*)/, ""
     ).trimStart();
     draft = stripSignoff(draft);
 
-    return NextResponse.json({ draft, ...(savedRule ? { saved_rule: savedRule } : {}) });
+    return NextResponse.json({ draft });
   } catch (err) {
     console.error("Claude draft-reply error:", err);
     return NextResponse.json({ error: friendlyAiError(err) }, { status: 500 });
