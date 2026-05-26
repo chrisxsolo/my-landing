@@ -64,7 +64,20 @@ function RemindersContent() {
           (a: ReminderDraft, b: ReminderDraft) =>
             REMINDER_ORDER.indexOf(a.id) - REMINDER_ORDER.indexOf(b.id)
         );
-        setReminders(sorted);
+        // Restore any edits the user saved before navigating away
+        let savedEdits: Record<string, { subject: string; body: string }> = {};
+        try {
+          const raw = localStorage.getItem(`reminders_${inquiryId}`);
+          if (raw) savedEdits = JSON.parse(raw) as Record<string, { subject: string; body: string }>;
+        } catch { /* ignore */ }
+        const firstName = (json.client_name ?? "").split(" ")[0] || "there";
+        const merged = sorted.map((r: ReminderDraft) => {
+          const saved = savedEdits[r.id];
+          if (!saved) return r;
+          const html = buildReminderEmail(r.id as ReminderEmailType, firstName, saved.body);
+          return { ...r, subject: saved.subject, body: saved.body, html };
+        });
+        setReminders(merged);
         setClientName(json.client_name ?? "");
         setClientEmail(json.client_email ?? "");
       })
@@ -80,15 +93,23 @@ function RemindersContent() {
   }, [loading, focusId]);
 
   function updateReminder(index: number, field: "subject" | "body", value: string) {
-    setReminders(prev => prev.map((r, i) => {
-      if (i !== index) return r;
-      const updated = { ...r, [field]: value };
-      // Rebuild HTML whenever body changes so preview stays in sync
-      if (field === "body") {
-        updated.html = buildReminderEmail(updated.id as ReminderEmailType, clientName.split(" ")[0] || "there", value);
-      }
-      return updated;
-    }));
+    setReminders(prev => {
+      const next = prev.map((r, i) => {
+        if (i !== index) return r;
+        const updated = { ...r, [field]: value };
+        if (field === "body") {
+          updated.html = buildReminderEmail(updated.id as ReminderEmailType, clientName.split(" ")[0] || "there", value);
+        }
+        return updated;
+      });
+      // Auto-save edits so they survive page reloads / navigation
+      try {
+        const edits: Record<string, { subject: string; body: string }> = {};
+        for (const r of next) edits[r.id] = { subject: r.subject, body: r.body };
+        localStorage.setItem(`reminders_${inquiryId}`, JSON.stringify(edits));
+      } catch { /* ignore */ }
+      return next;
+    });
   }
 
   function previewEmail(r: ReminderDraft) {

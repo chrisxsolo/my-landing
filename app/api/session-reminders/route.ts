@@ -121,10 +121,28 @@ export async function POST(req: NextRequest) {
       })
     : inq.date_in_mind ?? "your session date";
 
+  // Compute how far away (or past) the session is relative to today
+  const todayNoon = new Date();
+  todayNoon.setHours(12, 0, 0, 0);
+  const todayReadable = todayNoon.toLocaleDateString("en-US", {
+    weekday: "long", month: "long", day: "numeric", year: "numeric",
+  });
+  let sessionTiming = "unknown";
+  if (inq.session_date) {
+    const sessionNoon = new Date(inq.session_date + "T12:00:00");
+    const diffDays = Math.round((sessionNoon.getTime() - todayNoon.getTime()) / 86_400_000);
+    if      (diffDays === 0)  sessionTiming = "today";
+    else if (diffDays === 1)  sessionTiming = "tomorrow";
+    else if (diffDays === -1) sessionTiming = "yesterday";
+    else if (diffDays > 1)   sessionTiming = `in ${diffDays} days`;
+    else                     sessionTiming = `${Math.abs(diffDays)} days ago`;
+  }
+
   const emailContext = await fetchEmailContext(inq.email);
   const contextBlock = [
     `Client first name: ${firstName}`,
-    `Session date: ${sessionDateReadable}`,
+    `Today's date: ${todayReadable}`,
+    `Session date: ${sessionDateReadable} (${sessionTiming})`,
     `Session type: ${inq.session_type ?? "photography"}`,
     `Original inquiry: ${inq.message}`,
     emailContext ? `\nEmail thread:\n${emailContext}` : "",
@@ -133,7 +151,8 @@ export async function POST(req: NextRequest) {
   const sharedSystem = `You are writing short, direct messages from Chris (photographer at soloxsnaps) to a photography client.
 Tone: genuine, warm but direct — not flowery, not salesy, not corporate.
 Length: 3–5 sentences max. Plain text only, no bullet points, no markdown.
-Phone: (408) 722-7680. Do not include any sign-off or signature — the email client adds that automatically.`;
+Phone: (408) 722-7680. Do not include any sign-off or signature — the email client adds that automatically.
+TIMING: The context tells you today's date and exactly how far away the session is. Always use the actual timing — never assume "yesterday" or "tomorrow" if the numbers say otherwise.`;
 
   const anthropic = new Anthropic();
 
@@ -143,35 +162,35 @@ Phone: (408) 722-7680. Do not include any sign-off or signature — the email cl
       label: "48-Hour Reminder",
       emoji: "⏰",
       subject: `2 days until your shoot`,
-      systemAddition: `Write a 48-hour heads-up. Cover: (1) excitement for the shoot in 2 days, (2) any prep tips you know from the email thread (what to wear, arrive a bit early, etc.), (3) tell them to text you if anything comes up. Keep it short and easy to read.`,
+      systemAddition: `Write a 48-hour pre-session heads-up. The context tells you the exact days until the session — use that number naturally (e.g. "in 2 days", "in 3 days"). Cover: (1) excitement for the upcoming shoot, (2) any prep tips from the email thread (what to wear, arrive a bit early, etc.), (3) tell them to text you if anything comes up. Keep it short and easy to read. Always write the message — even if the session is in the past, write it as the 48-hour reminder for that shoot.`,
     },
     {
       id: "day-before",
       label: "Day-Before Check-In",
       emoji: "🌅",
       subject: `See you tomorrow`,
-      systemAddition: `Write a day-before reminder. Cover: (1) excited for tomorrow, (2) confirm meeting time and location if found in email thread — if not found, say you'll send details shortly, (3) your number if they need anything. 3–4 sentences max.`,
+      systemAddition: `Write a day-before reminder. Use the actual session timing from context to confirm the timeframe (e.g. "tomorrow" or "in X days"). Cover: (1) excitement for the upcoming shoot, (2) confirm meeting time and location if found in email thread — if not, say you'll send details shortly, (3) your number if they need anything. 3–4 sentences max.`,
     },
     {
       id: "morning-of",
       label: "Morning-Of Text",
       emoji: "☀️",
       subject: `Morning of your shoot`,
-      systemAddition: `Write a brief morning-of message. Super short — 2–3 sentences. Just: hyped for today, confirm meeting spot/time if known from thread, your number. This reads like a text message, not an email. Casual and real.`,
+      systemAddition: `Write a brief morning-of message. Super short — 2–3 sentences. Just: hyped for the shoot, confirm meeting spot/time if known from thread, your number. Reads like a text message, not an email. Casual and real. Always write the message — even if the session is in the past, write it as though it applies to that day.`,
     },
     {
       id: "thank-you",
       label: "Post-Session Thank-You",
       emoji: "🙏",
       subject: `Thank you — it was so fun`,
-      systemAddition: `Write a post-session thank-you. Cover: (1) genuinely loved shooting with them, (2) briefly mention something authentic about the session type or location if you know it, (3) let them know you'll be editing and will send a gallery link soon, (4) ask them to tag you on IG @soloxsnaps when they post. Keep it real, not generic. Do NOT mention any time reference to when the shoot happened — no "this morning", "today", "yesterday", "last week", or any similar phrase.`,
+      systemAddition: `Write a post-session thank-you. The context tells you exactly when the session was relative to today — use that timing naturally (e.g. "yesterday", "a few days ago", "earlier this week"). Cover: (1) genuinely loved shooting with them and reference when it was, (2) briefly mention something authentic about the session type or location, (3) let them know you'll be editing and will send a gallery link soon, (4) ask them to tag you on IG @soloxsnaps when they post. Keep it real, not generic.`,
     },
     {
       id: "gallery-delivery",
       label: "Gallery Delivery",
       emoji: "🖼️",
       subject: `Your photos are ready`,
-      systemAddition: `Write a gallery delivery message. DO NOT include any gallery link or download instructions — Chris will paste the link separately. Cover: (1) just sent your gallery, (2) loved how they turned out / a genuine compliment about the session, (3) ask them to tag @soloxsnaps on IG when they post. 3 sentences max. Super short and real.`,
+      systemAddition: `Write a gallery delivery message. DO NOT include any gallery link or download instructions — Chris will paste the link separately. Use the session timing from context to naturally reference how long ago the shoot was (e.g. "from your shoot last week", "from a few days ago"). Cover: (1) gallery is ready, (2) a genuine compliment about how the photos turned out, (3) ask them to tag @soloxsnaps on IG when they post. 3 sentences max. Super short and real.`,
     },
   ];
 

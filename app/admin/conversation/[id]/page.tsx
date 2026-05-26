@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { C } from "@/lib/colors";
 import { checkAuth } from "@/lib/adminAuth";
 import type { GmailMessage } from "@/app/api/gmail/thread/route";
+import { buildReminderEmail, type ReminderEmailType } from "@/lib/reminderEmail";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -886,7 +887,20 @@ export default function ConversationPage() {
       });
       const json = await res.json();
       if (!res.ok || !json.reminders) { showToast(json.error ?? "Failed to generate reminders", false); return; }
-      setReminders(json.reminders);
+      // Restore any previously saved edits for this inquiry
+      let savedEdits: Record<string, { subject: string; body: string }> = {};
+      try {
+        const raw = localStorage.getItem(`reminders_${inquiryId}`);
+        if (raw) savedEdits = JSON.parse(raw) as Record<string, { subject: string; body: string }>;
+      } catch { /* ignore */ }
+      const firstName = inquiry.name.split(" ")[0] || "there";
+      const merged = (json.reminders as ReminderDraft[]).map(r => {
+        const saved = savedEdits[r.id];
+        if (!saved) return r;
+        const html = buildReminderEmail(r.id as ReminderEmailType, firstName, saved.body);
+        return { ...r, subject: saved.subject, body: saved.body, html };
+      });
+      setReminders(merged);
     } catch {
       showToast("Reminder generation failed", false);
     } finally {
@@ -896,9 +910,10 @@ export default function ConversationPage() {
 
   // ── Open styled email preview in a new tab ───────────────────────────────
   function previewReminderEmail(r: ReminderDraft) {
-    if (!r.html) return;
+    const firstName = inquiry?.name.split(" ")[0] || "there";
+    const html = r.html ?? buildReminderEmail(r.id as ReminderEmailType, firstName, r.body);
     try {
-      localStorage.setItem("email_preview_html", r.html);
+      localStorage.setItem("email_preview_html", html);
       localStorage.setItem("email_preview_subject", r.subject);
       localStorage.setItem("email_preview_body", r.body);
     } catch { /* ignore */ }
@@ -910,10 +925,12 @@ export default function ConversationPage() {
     if (!inquiry) return;
     setSendingReminder(r.id);
     try {
+      const firstName = inquiry.name.split(" ")[0] || "there";
+      const html = r.html ?? buildReminderEmail(r.id as ReminderEmailType, firstName, r.body);
       const res = await fetch("/api/send-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ to: inquiry.email, subject: r.subject, body: r.body, ...(r.html ? { html: r.html } : {}) }),
+        body: JSON.stringify({ to: inquiry.email, subject: r.subject, body: r.body, html }),
       });
       const json = await res.json();
       if (!res.ok) { showToast(json.error ?? "Send failed", false); return; }
@@ -922,6 +939,18 @@ export default function ConversationPage() {
       showToast("Send failed", false);
     } finally {
       setSendingReminder(null);
+    }
+  }
+
+  // ── Save reminder edits to localStorage ──────────────────────────────────
+  function saveReminderEdits() {
+    try {
+      const edits: Record<string, { subject: string; body: string }> = {};
+      for (const r of reminders) edits[r.id] = { subject: r.subject, body: r.body };
+      localStorage.setItem(`reminders_${inquiryId}`, JSON.stringify(edits));
+      showToast("Reminder drafts saved ✓");
+    } catch {
+      showToast("Could not save reminders", false);
     }
   }
 
@@ -1752,7 +1781,9 @@ export default function ConversationPage() {
                             value={r.body}
                             onChange={e => {
                               const updated = e.target.value;
-                              setReminders(prev => prev.map((x, j) => j === i ? { ...x, body: updated } : x));
+                              const firstName = inquiry?.name.split(" ")[0] || "there";
+                              const newHtml = buildReminderEmail(r.id as ReminderEmailType, firstName, updated);
+                              setReminders(prev => prev.map((x, j) => j === i ? { ...x, body: updated, html: newHtml } : x));
                             }}
                             rows={4}
                             className="w-full text-xs text-slate-700 leading-relaxed rounded-lg p-2 resize-none outline-none"
@@ -1761,9 +1792,17 @@ export default function ConversationPage() {
                         </div>
                       </div>
                     ))}
-                    <p className="text-[11px] text-slate-400 text-center pt-1">
-                      Edit any draft above — "Open in Mail" always uses the current text.
-                    </p>
+                    <div className="flex items-center justify-between pt-1">
+                      <p className="text-[11px] text-slate-400">
+                        Edits here are used for Preview and Send.
+                      </p>
+                      <button
+                        onClick={saveReminderEdits}
+                        className="text-[11px] font-black px-3 py-1.5 rounded-lg text-white transition-all hover:opacity-80"
+                        style={{ background: "linear-gradient(135deg,#f59e0b,#d97706)" }}>
+                        Save drafts ✓
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
