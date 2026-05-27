@@ -216,6 +216,9 @@ export async function PATCH(req: NextRequest) {
     if (nextEmail && nextEmail !== currentEmail) {
       result.data.client_user_id = null;
     }
+    if (body.unlinkAccount === true) {
+      result.data.client_user_id = null;
+    }
 
     const { data, error } = await supabase
       .from(CLIENT_SESSION_TABLE)
@@ -229,5 +232,29 @@ export async function PATCH(req: NextRequest) {
   } catch (err) {
     console.error("[admin/sessions] PATCH", err);
     return NextResponse.json({ error: "Failed to update session" }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const admin = await requireSupabaseAdmin(req);
+    if (admin.response) return admin.response;
+
+    const body = await req.json() as Record<string, unknown>;
+    if (typeof body.id !== "string" || !body.id) {
+      return NextResponse.json({ error: "Session id is required." }, { status: 400 });
+    }
+
+    const supabase = createSupabaseAdminClient();
+    const { error } = await supabase
+      .from(CLIENT_SESSION_TABLE)
+      .delete()
+      .eq("id", body.id);
+
+    if (error) throw error;
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    console.error("[admin/sessions] DELETE", err);
+    return NextResponse.json({ error: "Failed to delete session" }, { status: 500 });
   }
 }

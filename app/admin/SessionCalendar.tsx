@@ -19,6 +19,7 @@ type Props = {
   onThankYouClick?: (id: number) => void;
   remindersLoading?: Record<number, boolean>;
   remindersOpen?: Record<number, boolean>;
+  onAddEvent?: (date?: string) => void;
 };
 
 const GRAD_COLOR  = { grad: "linear-gradient(135deg,#34d399,#059669)", text: "#059669", bg: "rgba(52,211,153,0.13)" };
@@ -45,6 +46,7 @@ export default function SessionCalendar({
   sessions, onClientClick, onReschedule,
   onRemindersClick, onThankYouClick,
   remindersLoading = {}, remindersOpen = {},
+  onAddEvent,
 }: Props) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -111,6 +113,15 @@ export default function SessionCalendar({
           </div>
           <div className="flex items-center gap-1">
             <span className="text-xs font-bold text-slate-400 mr-1">{thisMonthSessions.length} session{thisMonthSessions.length !== 1 ? "s" : ""}</span>
+            {onAddEvent && (
+              <button
+                onClick={() => onAddEvent()}
+                className="text-[10px] font-black px-2.5 py-1 rounded-lg transition-colors text-white mr-1"
+                style={{ background: "linear-gradient(135deg,#a78bfa,#7c3aed)" }}
+                title="Add event">
+                + Add
+              </button>
+            )}
             <button onClick={prevMonth} className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-500 hover:bg-violet-50 transition-colors font-bold">‹</button>
             <button
               onClick={() => { setViewYear(today.getFullYear()); setViewMonth(today.getMonth()); setSelected(null); }}
@@ -143,17 +154,21 @@ export default function SessionCalendar({
             const isPast     = dateStr < todayStr;
             const firstColor = hasSessions ? colorFor(daySessions[0]) : null;
 
+            const canAdd = onAddEvent && !isPast && !hasSessions;
             return (
               <button
                 key={i}
-                onClick={() => setSelected(isSelected ? null : hasSessions ? dateStr : null)}
-                className="aspect-square rounded-xl flex flex-col items-center justify-center relative transition-all"
+                onClick={() => {
+                  if (hasSessions) setSelected(isSelected ? null : dateStr);
+                  else if (canAdd) onAddEvent(dateStr);
+                }}
+                className="aspect-square rounded-xl flex flex-col items-center justify-center relative transition-all group"
                 style={{
                   background: isSelected
                     ? (isToday ? TODAY_COLOR.grad : firstColor?.grad ?? TODAY_COLOR.grad)
                     : isToday ? TODAY_COLOR.bg : hasSessions ? firstColor!.bg : "transparent",
                   border: isToday && !isSelected ? `2px solid ${TODAY_COLOR.text}` : "1.5px solid transparent",
-                  cursor: hasSessions ? "pointer" : "default",
+                  cursor: hasSessions || canAdd ? "pointer" : "default",
                   boxShadow: isSelected ? "0 4px 12px rgba(124,58,237,0.25)" : isToday ? "0 0 0 3px rgba(124,58,237,0.12)" : "none",
                 }}>
                 <span
@@ -170,6 +185,9 @@ export default function SessionCalendar({
                       <div key={di} className="w-1 h-1 rounded-full" style={{ background: colorFor(s).text }} />
                     ))}
                   </div>
+                )}
+                {canAdd && (
+                  <span className="text-[8px] font-black opacity-0 group-hover:opacity-40 transition-opacity leading-none mt-0.5" style={{ color: "#7c3aed" }}>+</span>
                 )}
                 {isSelected && daySessions.length > 1 && (
                   <span className="text-[8px] font-black text-white/80 leading-none mt-0.5">×{daySessions.length}</span>

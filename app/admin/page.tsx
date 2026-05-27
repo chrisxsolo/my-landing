@@ -239,9 +239,13 @@ function AdminDashboard() {
   const [inquirySort,setInquirySort]=useState<"needs_reply"|"newest"|"oldest"|"session_date"|"alpha"|"paid_recently">("needs_reply");
   const [editingSessionType,setEditingSessionType]=useState<number|null>(null);
   const EMPTY_CLIENT={name:"",email:"",phone:"",session_type:"",session_date:"",message:""};
+  const EMPTY_EVENT={name:"",email:"",phone:"",session_type:"",session_date:"",session_time:"",location:"",notes:"",payment_received:false};
   const [addClientOpen,setAddClientOpen]=useState(false);
   const [addClientForm,setAddClientForm]=useState(EMPTY_CLIENT);
   const [addClientSaving,setAddClientSaving]=useState(false);
+  const [addEventOpen,setAddEventOpen]=useState(false);
+  const [addEventForm,setAddEventForm]=useState(EMPTY_EVENT);
+  const [addEventSaving,setAddEventSaving]=useState(false);
   const [portalSessions,setPortalSessions]=useState<AdminClientSessionDTO[]>([]);
   const [portalSessionsLoading,setPortalSessionsLoading]=useState(false);
   const [portalStatusSavingKey,setPortalStatusSavingKey]=useState<string|null>(null);
@@ -622,6 +626,21 @@ function AdminDashboard() {
     setAddClientForm(EMPTY_CLIENT);
     setAddClientOpen(false);
     showToast(`${name} added ✓`);
+  }
+
+  async function saveCalendarEvent(){
+    const{name,email,session_type,session_date,session_time,location,phone,notes}=addEventForm;
+    if(!name.trim()||!email.trim()){showToast("Name and email are required",false);return;}
+    if(!session_date){showToast("Session date is required",false);return;}
+    setAddEventSaving(true);
+    const row={name:name.trim(),email:email.trim().toLowerCase(),phone:phone.trim()||null,session_type:session_type.trim()||null,session_date,preferred_time:session_time||null,location:location.trim()||null,message:notes.trim()||"Added manually from calendar",status:"manual",payment_status:addEventForm.payment_received?"paid":null,booking_confirmed:addEventForm.payment_received,date_in_mind:session_date};
+    const{data,error}=await supabase.from('inquiries').insert(row).select().single();
+    setAddEventSaving(false);
+    if(error){showToast("Failed to add event",false);return;}
+    setInquiries(p=>[data,...p]);
+    setAddEventForm(EMPTY_EVENT);
+    setAddEventOpen(false);
+    showToast(`${name} added to calendar ✓`);
   }
 
   function replacePortalSession(next:AdminClientSessionDTO){
@@ -1196,6 +1215,48 @@ function AdminDashboard() {
     <div className="min-h-screen font-sans" style={{background:"#f8f7ff"}}>
       {toast&&<div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 rounded-full text-white text-sm font-bold shadow-xl" style={{background:toast.ok?C.grad12:"#be123c"}}>{toast.msg}</div>}
 
+      {addEventOpen&&(
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{background:"rgba(0,0,0,0.45)",backdropFilter:"blur(6px)"}} onClick={e=>{if(e.target===e.currentTarget){setAddEventOpen(false);setAddEventForm(EMPTY_EVENT);}}}>
+          <div className="w-full max-w-md rounded-3xl overflow-hidden" style={{background:"white",boxShadow:"0 24px 64px rgba(124,58,237,0.2)"}}>
+            <div className="h-[3px]" style={{background:"linear-gradient(90deg,#a78bfa,#7c3aed,#6366f1)"}}/>
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-5">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest mb-0.5" style={{color:"#7c3aed"}}>📸 Add to Calendar</p>
+                  <p className="text-base font-black text-slate-900">New Session</p>
+                </div>
+                <button onClick={()=>{setAddEventOpen(false);setAddEventForm(EMPTY_EVENT);}} className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-100 transition-colors text-lg font-bold">×</button>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2"><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Name *</label><input className="w-full px-3 py-2.5 rounded-xl text-sm font-medium text-slate-800 outline-none border border-slate-200 focus:border-violet-300 bg-white transition-colors" placeholder="e.g. Maria Lopez" value={addEventForm.name} onChange={e=>setAddEventForm(f=>({...f,name:e.target.value}))}/></div>
+                <div className="col-span-2"><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Email *</label><input className="w-full px-3 py-2.5 rounded-xl text-sm font-medium text-slate-800 outline-none border border-slate-200 focus:border-violet-300 bg-white transition-colors" type="email" placeholder="e.g. maria@gmail.com" value={addEventForm.email} onChange={e=>setAddEventForm(f=>({...f,email:e.target.value}))}/></div>
+                <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Phone</label><input className="w-full px-3 py-2.5 rounded-xl text-sm font-medium text-slate-800 outline-none border border-slate-200 focus:border-violet-300 bg-white transition-colors" type="tel" placeholder="(408) 555-1234" value={addEventForm.phone} onChange={e=>setAddEventForm(f=>({...f,phone:e.target.value}))}/></div>
+                <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Session Type</label><input className="w-full px-3 py-2.5 rounded-xl text-sm font-medium text-slate-800 outline-none border border-slate-200 focus:border-violet-300 bg-white transition-colors" placeholder="e.g. Grad Portraits" value={addEventForm.session_type} onChange={e=>setAddEventForm(f=>({...f,session_type:e.target.value}))}/></div>
+                <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Date *</label><input className="w-full px-3 py-2.5 rounded-xl text-sm font-medium text-slate-800 outline-none border border-slate-200 focus:border-violet-300 bg-white transition-colors" type="date" value={addEventForm.session_date} onChange={e=>setAddEventForm(f=>({...f,session_date:e.target.value}))}/></div>
+                <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Time</label><input className="w-full px-3 py-2.5 rounded-xl text-sm font-medium text-slate-800 outline-none border border-slate-200 focus:border-violet-300 bg-white transition-colors" type="time" value={addEventForm.session_time} onChange={e=>setAddEventForm(f=>({...f,session_time:e.target.value}))}/></div>
+                <div className="col-span-2"><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Location</label><input className="w-full px-3 py-2.5 rounded-xl text-sm font-medium text-slate-800 outline-none border border-slate-200 focus:border-violet-300 bg-white transition-colors" placeholder="e.g. UC Berkeley" value={addEventForm.location} onChange={e=>setAddEventForm(f=>({...f,location:e.target.value}))}/></div>
+                <div className="col-span-2"><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Notes</label><textarea className="w-full px-3 py-2.5 rounded-xl text-sm font-medium text-slate-800 outline-none border border-slate-200 focus:border-violet-300 bg-white transition-colors resize-none" rows={2} placeholder="Anything relevant from the conversation…" value={addEventForm.notes} onChange={e=>setAddEventForm(f=>({...f,notes:e.target.value}))}/></div>
+                <div className="col-span-2">
+                  <label className="flex items-center gap-3 cursor-pointer select-none p-3 rounded-xl transition-colors" style={{background:addEventForm.payment_received?"rgba(16,185,129,0.08)":"rgba(0,0,0,0.03)",border:`1px solid ${addEventForm.payment_received?"rgba(16,185,129,0.25)":"rgba(0,0,0,0.08)"}`}}>
+                    <input type="checkbox" className="w-4 h-4 rounded accent-emerald-500 cursor-pointer" checked={addEventForm.payment_received} onChange={e=>setAddEventForm(f=>({...f,payment_received:e.target.checked}))}/>
+                    <div>
+                      <p className="text-xs font-black" style={{color:addEventForm.payment_received?"#059669":"#64748b"}}>Payment received ✓</p>
+                      <p className="text-[10px] text-slate-400 font-medium">Required to show on calendar</p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+              <div className="flex gap-2 mt-5">
+                <button onClick={()=>{setAddEventOpen(false);setAddEventForm(EMPTY_EVENT);}} className="px-4 py-2.5 rounded-xl text-sm font-bold text-slate-500 hover:bg-slate-100 transition-colors">Cancel</button>
+                <button onClick={saveCalendarEvent} disabled={addEventSaving} className="flex-1 py-2.5 rounded-xl text-sm font-black text-white disabled:opacity-50 transition-opacity" style={{background:"linear-gradient(135deg,#a78bfa,#7c3aed)"}}>
+                  {addEventSaving?"Saving…":"Add to Calendar ✓"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
 
       <div className="sticky top-0 z-40 border-b border-black/[0.06] px-6 h-14 flex items-center justify-between" style={{background:"rgba(255,255,255,0.95)",backdropFilter:"blur(20px)"}}>
         <span className="font-black text-lg" style={C.text}>Chris. Studio Admin</span>
@@ -1334,6 +1395,7 @@ function AdminDashboard() {
                 onReschedule={rescheduleSession}
                 onRemindersClick={(id)=>router.push(`/admin/reminders/${id}`)}
                 onThankYouClick={(id)=>router.push(`/admin/reminders/${id}?focus=thank-you`)}
+                onAddEvent={(date)=>{setAddEventForm(f=>({...EMPTY_EVENT,session_date:date??f.session_date}));setAddEventOpen(true);}}
               />
 
               {/* Apple Calendar subscribe */}

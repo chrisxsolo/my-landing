@@ -59,6 +59,8 @@ export default function AdminSessionsDashboard() {
     status: ClientSessionStatus;
   } | null>(null);
   const [gmailSyncing, setGmailSyncing] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [unlinkingId, setUnlinkingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [previewEmail, setPreviewEmail] = useState<string | null>(null);
@@ -239,6 +241,82 @@ export default function AdminSessionsDashboard() {
     }
   }
 
+  async function deleteSession(session: AdminClientSessionDTO) {
+    setDeletingId(session.id);
+    setError(null);
+    setMessage(null);
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch("/api/admin/sessions", {
+        method: "DELETE",
+        headers,
+        body: JSON.stringify({ id: session.id }),
+      });
+      const json = await res.json() as { ok?: boolean; error?: string };
+      if (!res.ok) { setError(json.error ?? "Could not delete session."); return; }
+      setSessions((prev) => prev.filter((s) => s.id !== session.id));
+      setMessage(`Deleted session for ${session.clientName || session.clientEmail}.`);
+    } catch (err) {
+      console.error("[admin-sessions-dashboard] delete", err);
+      setError("Could not delete session.");
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  async function unlinkAccount(session: AdminClientSessionDTO) {
+    setUnlinkingId(session.id);
+    setError(null);
+    setMessage(null);
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch("/api/admin/sessions", {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ id: session.id, clientEmail: session.clientEmail, unlinkAccount: true }),
+      });
+      const json = await res.json() as AdminSessionsResponse;
+      if (!res.ok || !json.session) { setError(json.error ?? "Could not unlink account."); return; }
+      setSessions((prev) => prev.map((s) => s.id === json.session!.id ? json.session! : s));
+      setMessage(`Google account unlinked from ${session.clientName || session.clientEmail}.`);
+    } catch (err) {
+      console.error("[admin-sessions-dashboard] unlink", err);
+      setError("Could not unlink account.");
+    } finally {
+      setUnlinkingId(null);
+    }
+  }
+
+  async function updateSessionField(session: AdminClientSessionDTO, fields: Record<string, unknown>) {
+    setError(null);
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch("/api/admin/sessions", {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ id: session.id, clientEmail: session.clientEmail, ...fields }),
+      });
+      const json = await res.json() as AdminSessionsResponse;
+      if (!res.ok || !json.session) { setError(json.error ?? "Could not update session."); return; }
+      setSessions((prev) => prev.map((s) => s.id === json.session!.id ? json.session! : s));
+    } catch (err) {
+      console.error("[admin-sessions-dashboard] updateField", err);
+      setError("Could not update session.");
+    }
+  }
+
+  function moveSession(id: string, direction: "up" | "down") {
+    setSessions((prev) => {
+      const index = prev.findIndex((s) => s.id === id);
+      if (index === -1) return prev;
+      const next = [...prev];
+      const swapIndex = direction === "up" ? index - 1 : index + 1;
+      if (swapIndex < 0 || swapIndex >= next.length) return prev;
+      [next[index], next[swapIndex]] = [next[swapIndex], next[index]];
+      return next;
+    });
+  }
+
   async function signOut() {
     await supabase.auth.signOut();
     router.replace("/login");
@@ -403,6 +481,14 @@ export default function AdminSessionsDashboard() {
               statusSaving={statusSaving}
               gmailSyncing={gmailSyncing}
               onSyncFromGmail={syncFromGmail}
+              onDelete={deleteSession}
+              onUnlinkAccount={unlinkAccount}
+              onUpdateInvoice={(session, status) => updateSessionField(session, { invoiceStatus: status ?? "" })}
+              onUpdateContract={(session, status) => updateSessionField(session, { contractStatus: status ?? "" })}
+              onMoveUp={(id) => moveSession(id, "up")}
+              onMoveDown={(id) => moveSession(id, "down")}
+              deletingId={deletingId}
+              unlinkingId={unlinkingId}
             />
           </section>
         </div>
