@@ -54,6 +54,10 @@ const BLANK_FORM: AdminSessionFormPayload = {
   clientNotes: "",
 };
 
+const INVOICE_OPTS = ["Not Sent", "Sent", "Paid", "Overdue"];
+const CONTRACT_OPTS = ["Not Sent", "Sent", "Signed"];
+const BACKUP_OPTS = ["Not Started", "In Progress", "Done"];
+
 function toDateTimeInput(value: string | null) {
   if (!value) return "";
   const date = new Date(value);
@@ -90,6 +94,20 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
+function StatusBtns({ value, onChange, opts }: { value: string; onChange: (v: string) => void; opts: string[] }) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {opts.map((opt) => (
+        <button key={opt} type="button" onClick={() => onChange(value === opt ? "" : opt)}
+          className="rounded-lg border px-3 py-1.5 text-xs font-black transition-colors"
+          style={{ background: value === opt ? C.p1 : C.surfaceStrong, borderColor: value === opt ? C.p1 : C.borderSubtle, color: value === opt ? C.white : C.muted }}>
+          {opt}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function AdminSessionForm({
   initialSession,
   contacts,
@@ -99,6 +117,7 @@ export default function AdminSessionForm({
 }: AdminSessionFormProps) {
   const [form, setForm] = useState<AdminSessionFormPayload>(toForm(initialSession));
   const [open, setOpen] = useState(false);
+  const [notesLoading, setNotesLoading] = useState(false);
   const editing = Boolean(initialSession);
 
   useEffect(() => {
@@ -122,6 +141,21 @@ export default function AdminSessionForm({
       sessionDate: contact.sessionDate ? toDateTimeInput(contact.sessionDate) : prev.sessionDate,
       location: contact.location ?? prev.location,
     }));
+  }
+
+  async function fetchNotes() {
+    if (!form.clientEmail) return;
+    setNotesLoading(true);
+    try {
+      const res = await fetch(`/api/admin/client-notes?email=${encodeURIComponent(form.clientEmail)}`);
+      const json = await res.json();
+      if (!res.ok) { console.error("[client-notes]", json.error); return; }
+      if (json.notes) update("clientNotes", json.notes);
+    } catch (err) {
+      console.error("[client-notes]", err);
+    } finally {
+      setNotesLoading(false);
+    }
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -321,36 +355,34 @@ export default function AdminSessionForm({
 
         <div className="grid gap-2">
           <FieldLabel>Invoice status</FieldLabel>
-          <input
-            value={form.invoiceStatus}
-            onChange={(event) => update("invoiceStatus", event.target.value)}
-            className="min-h-11 w-full min-w-0 rounded-lg border px-3 text-sm font-semibold outline-none"
-            style={{ background: C.surfaceStrong, borderColor: C.borderSubtle, color: C.ink }}
-          />
+          <StatusBtns value={form.invoiceStatus} onChange={(v) => update("invoiceStatus", v)} opts={INVOICE_OPTS} />
         </div>
 
         <div className="grid gap-2">
           <FieldLabel>Contract status</FieldLabel>
-          <input
-            value={form.contractStatus}
-            onChange={(event) => update("contractStatus", event.target.value)}
-            className="min-h-11 w-full min-w-0 rounded-lg border px-3 text-sm font-semibold outline-none"
-            style={{ background: C.surfaceStrong, borderColor: C.borderSubtle, color: C.ink }}
-          />
+          <StatusBtns value={form.contractStatus} onChange={(v) => update("contractStatus", v)} opts={CONTRACT_OPTS} />
         </div>
 
         <div className="grid gap-2 md:col-span-2">
           <FieldLabel>Backup status</FieldLabel>
-          <input
-            value={form.backupStatus}
-            onChange={(event) => update("backupStatus", event.target.value)}
-            className="min-h-11 w-full min-w-0 rounded-lg border px-3 text-sm font-semibold outline-none"
-            style={{ background: C.surfaceStrong, borderColor: C.borderSubtle, color: C.ink }}
-          />
+          <StatusBtns value={form.backupStatus} onChange={(v) => update("backupStatus", v)} opts={BACKUP_OPTS} />
         </div>
 
         <div className="grid gap-2 md:col-span-2">
-          <FieldLabel>Client notes</FieldLabel>
+          <div className="flex items-center justify-between">
+            <FieldLabel>Client notes</FieldLabel>
+            {form.clientEmail && (
+              <button
+                type="button"
+                onClick={fetchNotes}
+                disabled={notesLoading}
+                className="rounded-lg border px-2 py-1 text-[10px] font-black disabled:opacity-50"
+                style={{ background: C.p1_08, borderColor: C.p1_20, color: C.p1 }}
+              >
+                {notesLoading ? "Pulling..." : "Pull from Gmail"}
+              </button>
+            )}
+          </div>
           <textarea
             value={form.clientNotes}
             onChange={(event) => update("clientNotes", event.target.value)}

@@ -236,7 +236,7 @@ export default function ClientPortalPreview({ email, onClose }: Props) {
 
             {/* Top nav (read-only replica) */}
             <header className="pd-in mb-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between" style={{ animationDelay: "0ms" }}>
-              <span className="pd-pill" style={{ cursor: "default", opacity: 0.6 }}>← Back to soloxsnaps.com</span>
+              <button type="button" onClick={onClose} className="pd-pill" style={{ cursor: "pointer" }}>← Back to accounts</button>
               <div className="flex flex-wrap items-center gap-2">
                 <span className="pd-mono" style={{ marginRight: 4 }}>{email}</span>
                 <span className="pd-pill" style={{ cursor: "default", opacity: 0.6 }}>Email Chris</span>

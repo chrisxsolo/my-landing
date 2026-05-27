@@ -513,6 +513,13 @@ function AdminDashboard() {
     finally{setInboxSendLoading(p=>({...p,[t.threadId]:false}));}
   }
 
+  async function dismissUnreadThread(threadId:string){
+    setInboxThreads(p=>p.map(t=>t.threadId===threadId?{...t,isUnread:false}:t));
+    try{
+      await fetch("/api/gmail/mark-read",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({threadId})});
+    }catch{/* best-effort */}
+  }
+
   async function polishFreeCompose(){
     if(!freeComposeBody.trim())return;
     setFreeComposePolishing(true);
@@ -2707,12 +2714,21 @@ function AdminDashboard() {
                               {inq.status==="new"?"● New":inq.status==="responded"?"✓ Responded":inq.status==="not_interested"?"✕ Not Interested":"○ Archived"}
                             </span>
                             {unreadThread&&(
-                              <button
-                                onClick={e=>{e.stopPropagation();router.push(`/admin/conversation/${inq.id}`);}}
-                                className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full animate-pulse"
-                                style={{background:"#f59e0b",color:"#fff"}}>
-                                ✉ New Reply
-                              </button>
+                              <span className="flex items-center gap-0.5">
+                                <button
+                                  onClick={e=>{e.stopPropagation();router.push(`/admin/conversation/${inq.id}`);}}
+                                  className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-l-full animate-pulse"
+                                  style={{background:"#f59e0b",color:"#fff"}}>
+                                  ✉ New Reply
+                                </button>
+                                <button
+                                  onClick={e=>{e.stopPropagation();dismissUnreadThread(unreadThread.threadId);}}
+                                  className="flex items-center justify-center text-[10px] font-black px-1.5 py-0.5 rounded-r-full leading-none"
+                                  title="Dismiss new reply"
+                                  style={{background:"#ef4444",color:"#fff"}}>
+                                  ✕
+                                </button>
+                              </span>
                             )}
                             <p className="text-sm font-black text-slate-900">{inq.name}</p>
                             <p className="text-xs text-slate-400">
