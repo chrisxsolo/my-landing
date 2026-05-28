@@ -485,6 +485,7 @@ export default function AdminSessionsDashboard() {
               onUnlinkAccount={unlinkAccount}
               onUpdateInvoice={(session, status) => updateSessionField(session, { invoiceStatus: status ?? "" })}
               onUpdateContract={(session, status) => updateSessionField(session, { contractStatus: status ?? "" })}
+              onUpdateField={updateSessionField}
               onMoveUp={(id) => moveSession(id, "up")}
               onMoveDown={(id) => moveSession(id, "down")}
               deletingId={deletingId}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { C } from "@/lib/colors";
 import AdminSessionStatusStrip from "@/app/components/admin-session-status-strip";
 import {
@@ -21,6 +21,7 @@ type AdminSessionTableProps = {
   onUnlinkAccount: (session: AdminClientSessionDTO) => void;
   onUpdateInvoice: (session: AdminClientSessionDTO, status: string | null) => void;
   onUpdateContract: (session: AdminClientSessionDTO, status: string | null) => void;
+  onUpdateField: (session: AdminClientSessionDTO, fields: Record<string, unknown>) => void;
   onMoveUp: (id: string) => void;
   onMoveDown: (id: string) => void;
   deletingId?: string | null;
@@ -48,6 +49,14 @@ function contractLabel(status: string | null) {
   if (s === "signed") return { label: "Contract Signed", bg: "rgba(16,185,129,0.12)", color: "#059669" };
   if (s === "sent")   return { label: "Contract Sent",   bg: "rgba(245,158,11,0.12)", color: "#d97706" };
   return { label: "No Contract", bg: "rgba(0,0,0,0.05)", color: "#94a3b8" };
+}
+
+function toDatetimeLocalString(value: string | null): string {
+  if (!value) return "";
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 function formatDate(value: string | null) {
@@ -79,12 +88,57 @@ export default function AdminSessionTable({
   onUnlinkAccount,
   onUpdateInvoice,
   onUpdateContract,
+  onUpdateField,
   onMoveUp,
   onMoveDown,
   deletingId,
   unlinkingId,
 }: AdminSessionTableProps) {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [inlineEdit, setInlineEdit] = useState<{ sessionId: string; field: string; value: string } | null>(null);
+
+  function commitEdit(session: AdminClientSessionDTO) {
+    if (!inlineEdit) return;
+    onUpdateField(session, { [inlineEdit.field]: inlineEdit.value.trim() || null });
+    setInlineEdit(null);
+  }
+
+  function renderInlineField(
+    session: AdminClientSessionDTO,
+    field: string,
+    currentValue: string | null,
+    display: ReactNode,
+    inputType: string,
+  ) {
+    const isEditing = inlineEdit?.sessionId === session.id && inlineEdit.field === field;
+    if (isEditing) {
+      return (
+        <input
+          autoFocus
+          type={inputType}
+          value={inlineEdit.value}
+          onChange={(e) => setInlineEdit({ ...inlineEdit, value: e.target.value })}
+          onBlur={() => commitEdit(session)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") commitEdit(session);
+            if (e.key === "Escape") setInlineEdit(null);
+          }}
+          className="w-full rounded border px-1 py-0.5 text-sm font-semibold outline-none"
+          style={{ borderColor: C.p1_20, color: C.inkSoft, background: C.surfaceStrong }}
+        />
+      );
+    }
+    return (
+      <div
+        className="cursor-pointer rounded font-semibold transition-colors hover:bg-black/5"
+        style={{ color: currentValue ? C.muted : "#94a3b8" }}
+        onClick={() => setInlineEdit({ sessionId: session.id, field, value: currentValue ?? "" })}
+        title="Click to edit"
+      >
+        {display}
+      </div>
+    );
+  }
 
   if (sessions.length === 0) {
     return (
@@ -237,33 +291,57 @@ export default function AdminSessionTable({
               </div>
             </div>
 
-            {/* Session details */}
+            {/* Session details — click any value to edit inline */}
             <div className="mt-4 grid gap-2 text-sm md:grid-cols-4">
               <div className="min-w-0">
                 <span className="font-black" style={{ color: C.ink }}>Type</span>
-                <div className="break-words font-semibold" style={{ color: C.muted }}>{session.sessionType || "Not set"}</div>
+                {renderInlineField(
+                  session,
+                  "sessionType",
+                  session.sessionType,
+                  <span className="break-words">{session.sessionType || "Not set"}</span>,
+                  "text",
+                )}
               </div>
               <div className="min-w-0">
                 <span className="font-black" style={{ color: C.ink }}>Date &amp; Time</span>
-                <div className="font-semibold" style={{ color: C.muted }}>
-                  {formatDate(session.sessionDate)}
-                  {session.sessionDate && formatDateTime(session.sessionDate) !== formatDate(session.sessionDate) && (
-                    <span className="ml-1 text-[11px]" style={{ color: C.p1 }}>
-                      {new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(new Date(session.sessionDate))}
-                    </span>
-                  )}
-                </div>
+                {renderInlineField(
+                  session,
+                  "sessionDate",
+                  toDatetimeLocalString(session.sessionDate),
+                  <>
+                    {formatDate(session.sessionDate)}
+                    {session.sessionDate && formatDateTime(session.sessionDate) !== formatDate(session.sessionDate) && (
+                      <span className="ml-1 text-[11px]" style={{ color: C.p1 }}>
+                        {new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(new Date(session.sessionDate))}
+                      </span>
+                    )}
+                  </>,
+                  "datetime-local",
+                )}
               </div>
               <div className="min-w-0">
                 <span className="font-black" style={{ color: C.ink }}>Location</span>
-                <div className="break-words font-semibold" style={{ color: C.muted }}>{session.location || "Not set"}</div>
-                {session.meetingPoint && (
+                {renderInlineField(
+                  session,
+                  "location",
+                  session.location,
+                  <span className="break-words">{session.location || "Not set"}</span>,
+                  "text",
+                )}
+                {session.meetingPoint && !(inlineEdit?.sessionId === session.id && inlineEdit.field === "location") && (
                   <div className="mt-0.5 break-words text-xs font-semibold" style={{ color: C.p1 }}>{session.meetingPoint}</div>
                 )}
               </div>
               <div className="min-w-0">
                 <span className="font-black" style={{ color: C.ink }}>Delivery</span>
-                <div className="break-words font-semibold" style={{ color: C.muted }}>{session.estimatedDeliveryDate || "Not set"}</div>
+                {renderInlineField(
+                  session,
+                  "estimatedDeliveryDate",
+                  session.estimatedDeliveryDate,
+                  <span className="break-words">{session.estimatedDeliveryDate || "Not set"}</span>,
+                  "date",
+                )}
               </div>
             </div>
 
