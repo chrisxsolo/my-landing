@@ -100,9 +100,9 @@ function buildWriteData(body: Record<string, unknown>, requireEmail: boolean) {
   const deliveryDate = readDate(body.estimatedDeliveryDate);
   const galleryUrl = readUrl(body.galleryUrl);
 
-  if (sessionDate === undefined) return { error: "Invalid session date." };
-  if (deliveryDate === undefined) return { error: "Invalid estimated delivery date." };
-  if (galleryUrl === undefined) return { error: "Gallery URL must start with http:// or https://." };
+  if ("sessionDate" in body && sessionDate === undefined) return { error: "Invalid session date." };
+  if ("estimatedDeliveryDate" in body && deliveryDate === undefined) return { error: "Invalid estimated delivery date." };
+  if ("galleryUrl" in body && galleryUrl === undefined) return { error: "Gallery URL must start with http:// or https://." };
 
   if ("sessionDate" in body) data.session_date = sessionDate;
   if ("estimatedDeliveryDate" in body) data.estimated_delivery_date = deliveryDate;
