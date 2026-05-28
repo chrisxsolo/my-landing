@@ -1290,45 +1290,54 @@ function AdminDashboard() {
         </div>
       </div>
 
-      <div className="max-w-3xl mx-auto px-6 py-8">
-        {/* Top utility row */}
-        <div className="flex items-center justify-between mb-4">
-          <span className="text-xs font-bold text-slate-400">Studio Dashboard</span>
-          <button
-            onClick={() => { adminLogout().then(() => { setAuthed(false); setPw(""); }); }}
-            className="text-xs font-bold px-3 py-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
-            Sign out
-          </button>
-        </div>
-        {/* ── NAV ── */}
+      <div className="flex">
+        {/* ── SIDEBAR NAV ── */}
         {(()=>{
-          const tabSection=tab==="home"?"home":VAULT_TABS.includes(tab)?"vault":tab==="accounts"?"accounts":WEBSITE_TABS.includes(tab)?"website":"clients";
           const cancelAll=()=>{cancelEditPose();cancelEditSpot();cancelEditPortfolioImage();cancelEditCategory();cancelEditPost();setEditingInquiry(null);setInquiryDeleteConfirm(null);};
+          const go=(t:Tab)=>{cancelAll();setTab(t);};
+          const NavBtn=({t,icon,label}:{t:Tab;icon:string;label:string})=>(
+            <button onClick={()=>go(t)}
+              className="w-full flex items-center gap-2.5 px-3 py-[7px] rounded-xl text-[13px] font-semibold transition-all text-left group"
+              style={tab===t
+                ?{background:C.grad12,color:"#fff",boxShadow:"0 2px 10px rgba(157,111,232,0.25)"}
+                :{color:"#4b5563",background:"transparent"}}>
+              <span className="w-5 flex-shrink-0 text-center text-base leading-none">{icon}</span>
+              <span className="truncate">{label}</span>
+            </button>
+          );
           return(
-            <div className="mb-8 space-y-2">
-              <div className="flex gap-2 flex-wrap">
-                {(["home","clients","website","vault","accounts"] as const).map(s=>(
-                  <button key={s} onClick={()=>{cancelAll();setTab(s==="home"?"home":s==="website"?WEBSITE_TABS[0]:s==="clients"?CLIENT_TABS[0]:s==="accounts"?"accounts":"vault");}}
-                    className="px-5 py-2.5 rounded-xl text-sm font-bold transition-all"
-                    style={tabSection===s?{background:C.grad12,color:"#fff",boxShadow:"0 2px 8px rgba(157,111,232,0.25)"}:{color:"#64748b",background:"white",border:"1px solid #e2e8f0"}}>
-                    {s==="home"?"🏠 Home":s==="website"?"✏️ Edit Website":s==="clients"?"👤 Clients":s==="accounts"?"👤 Accounts":"📓 Vault"}
-                  </button>
+            <div className="sticky top-14 flex-shrink-0 w-[200px] h-[calc(100vh-56px)] overflow-y-auto flex flex-col border-r py-3 px-2"
+                 style={{background:"white",borderColor:"rgba(0,0,0,0.07)"}}>
+              <div className="flex-1 space-y-0.5 pb-3">
+                <NavBtn t="home" icon="🏠" label="Home"/>
+                <div className="h-px my-2 mx-1" style={{background:"rgba(0,0,0,0.06)"}}/>
+                <p className="text-[10px] font-black uppercase tracking-[0.13em] px-3 pt-0.5 pb-1" style={{color:C.mutedSoft}}>Client Work</p>
+                {(["inquiries","clients","analytics","payments","funnel"] as Tab[]).map(t=>(
+                  <NavBtn key={t} t={t} icon={t==="inquiries"?"📬":t==="clients"?"👥":t==="analytics"?"📊":t==="payments"?"💵":"📈"} label={TAB_LABELS[t].replace(/^[^\s]+\s/,"")}/>
+                ))}
+                <div className="h-px my-2 mx-1" style={{background:"rgba(0,0,0,0.06)"}}/>
+                <p className="text-[10px] font-black uppercase tracking-[0.13em] px-3 pt-0.5 pb-1" style={{color:C.mutedSoft}}>Website</p>
+                {(["poses","locations","bayGuide","portfolio","categories","blog","library"] as Tab[]).map(t=>(
+                  <NavBtn key={t} t={t} icon={t==="poses"?"📸":t==="locations"?"📍":t==="bayGuide"?"🗺️":t==="portfolio"?"🖼️":t==="categories"?"🏷️":t==="blog"?"✍️":"🗄️"} label={TAB_LABELS[t].replace(/^[^\s]+\s/,"")}/>
+                ))}
+                <div className="h-px my-2 mx-1" style={{background:"rgba(0,0,0,0.06)"}}/>
+                <p className="text-[10px] font-black uppercase tracking-[0.13em] px-3 pt-0.5 pb-1" style={{color:C.mutedSoft}}>Tools</p>
+                {(["ai","chat","format","vault","accounts"] as Tab[]).map(t=>(
+                  <NavBtn key={t} t={t} icon={t==="ai"?"🤖":t==="chat"?"💬":t==="format"?"✨":t==="vault"?"📓":"👤"} label={TAB_LABELS[t].replace(/^[^\s]+\s/,"")}/>
                 ))}
               </div>
-              {(tabSection==="website"||tabSection==="clients")&&(
-                <div className="flex gap-1.5 p-1 rounded-2xl bg-white border border-slate-100 w-fit flex-wrap">
-                  {(tabSection==="website"?WEBSITE_TABS:CLIENT_TABS).map(t=>(
-                    <button key={t} onClick={()=>{setTab(t);cancelAll();}}
-                      className="px-4 py-2 rounded-xl text-sm font-bold transition-all"
-                      style={tab===t?{background:C.grad12,color:"#fff"}:{color:"#94a3b8"}}>
-                      {TAB_LABELS[t]}
-                    </button>
-                  ))}
-                </div>
-              )}
+              <div className="border-t pt-2.5 px-1" style={{borderColor:"rgba(0,0,0,0.06)"}}>
+                <button onClick={()=>adminLogout().then(()=>{setAuthed(false);setPw("");})}
+                  className="w-full flex items-center gap-2 px-3 py-[7px] rounded-xl text-[13px] font-semibold text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors">
+                  ← Sign out
+                </button>
+              </div>
             </div>
           );
         })()}
+
+        {/* ── MAIN CONTENT ── */}
+        <div className="flex-1 min-w-0 px-8 py-8">
 
         {/* ── HOME ── */}
         {tab==="home"&&(()=>{
@@ -1369,25 +1378,44 @@ function AdminDashboard() {
           };
 
           return(
-            <div className="space-y-5">
+            <div>
               {/* Greeting */}
-              <div className="flex items-start justify-between gap-4 flex-wrap">
-                <div>
-                  <h1 className="text-2xl font-black text-slate-900">Hey Chris 👋</h1>
-                  <p className="text-sm text-slate-400 mt-0.5">{now.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})}</p>
-                </div>
-                <Link
-                  href="/admin/sessions"
-                  className="inline-flex items-center gap-2 rounded-2xl border px-4 py-3 text-sm font-black transition-all hover:-translate-y-0.5"
-                  style={{background:"white",borderColor:C.p1_20,color:C.p1,boxShadow:"0 8px 24px rgba(157,111,232,0.08)"}}
-                >
-                  <span className="text-base">🗂️</span>
-                  Portal Sessions →
-                </Link>
+              <div className="mb-5">
+                <h1 className="text-2xl font-black text-slate-900">Hey Chris 👋</h1>
+                <p className="text-sm text-slate-400 mt-0.5">{now.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})}</p>
               </div>
 
-              {/* Quick stats row */}
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {/* Quick actions bar */}
+              <div className="flex flex-wrap gap-2 mb-5 p-3 rounded-2xl border bg-white" style={{borderColor:"rgba(0,0,0,0.07)"}}>
+                <button onClick={()=>{setTab("clients");setAddClientOpen(true);}}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-white transition-all hover:opacity-90 active:scale-[0.98]"
+                  style={{background:C.grad12}}>
+                  + New Client
+                </button>
+                <button onClick={()=>router.push("/admin/reminder-templates")}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all hover:opacity-80"
+                  style={{background:"rgba(245,158,11,0.08)",color:"#d97706",border:"1px solid rgba(245,158,11,0.2)"}}>
+                  🔔 Reminder Templates
+                </button>
+                <Link href="/admin/sessions"
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all hover:opacity-80"
+                  style={{background:"rgba(99,102,241,0.08)",color:"#6366f1",border:"1px solid rgba(99,102,241,0.15)"}}>
+                  🗂️ Portal Sessions
+                </Link>
+                <a href={`webcal://soloxsnaps.com/api/calendar/sessions?token=${process.env.NEXT_PUBLIC_ICS_TOKEN??""}`}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all hover:opacity-80"
+                  style={{background:"rgba(16,185,129,0.08)",color:"#059669",border:"1px solid rgba(16,185,129,0.2)"}}>
+                  📅 Subscribe Calendar
+                </a>
+                <a href="/admin/availability"
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all hover:opacity-80"
+                  style={{background:"rgba(148,163,184,0.08)",color:"#64748b",border:"1px solid rgba(148,163,184,0.15)"}}>
+                  📆 Availability
+                </a>
+              </div>
+
+              {/* Stats */}
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 mb-5">
                 {[
                   {label:"This Month",value:monthRevenue>0?`$${monthRevenue.toLocaleString("en-US",{minimumFractionDigits:0})}`:pendingInquiries>0?"—":"$0",sub:"revenue",accent:"#10b981",bg:"rgba(16,185,129,0.06)",border:"rgba(16,185,129,0.2)"},
                   {label:"Confirmed",value:String(confirmedSessions),sub:"sessions booked",accent:C.p1,bg:C.p1_04,border:C.p1_20},
@@ -1402,128 +1430,112 @@ function AdminDashboard() {
                 ))}
               </div>
 
-              {/* Session calendar */}
-              <SessionCalendar
-                sessions={inquiries
-                  .filter(i=>i.session_date&&i.booking_confirmed)
-                  .map(i=>({id:i.id,name:i.name,session_type:i.session_type,session_date:i.session_date!,payment_status:i.payment_status,booking_confirmed:i.booking_confirmed}))}
-                onClientClick={(id)=>router.push(`/admin/conversation/${id}`)}
-                onReschedule={rescheduleSession}
-                onRemindersClick={(id)=>router.push(`/admin/reminders/${id}`)}
-                onThankYouClick={(id)=>router.push(`/admin/reminders/${id}?focus=thank-you`)}
-                onAddEvent={(date)=>{setAddEventForm(f=>({...EMPTY_EVENT,session_date:date??f.session_date}));setAddEventOpen(true);}}
-              />
+              {/* Calendar + right column */}
+              <div className="grid grid-cols-1 lg:grid-cols-[1fr_290px] gap-5 mb-5 items-start">
+                {/* Calendar — untouched */}
+                <SessionCalendar
+                  sessions={inquiries
+                    .filter(i=>i.session_date&&i.booking_confirmed)
+                    .map(i=>({id:i.id,name:i.name,session_type:i.session_type,session_date:i.session_date!,payment_status:i.payment_status,booking_confirmed:i.booking_confirmed}))}
+                  onClientClick={(id)=>router.push(`/admin/conversation/${id}`)}
+                  onReschedule={rescheduleSession}
+                  onRemindersClick={(id)=>router.push(`/admin/reminders/${id}`)}
+                  onThankYouClick={(id)=>router.push(`/admin/reminders/${id}?focus=thank-you`)}
+                  onAddEvent={(date)=>{setAddEventForm(f=>({...EMPTY_EVENT,session_date:date??f.session_date}));setAddEventOpen(true);}}
+                />
 
-              {/* Apple Calendar subscribe */}
-              <a
-                href={`webcal://soloxsnaps.com/api/calendar/sessions?token=${process.env.NEXT_PUBLIC_ICS_TOKEN??""}`}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all hover:opacity-80"
-                style={{background:"rgba(16,185,129,0.08)",color:"#059669",border:"1px solid rgba(16,185,129,0.2)"}}>
-                <span>📅</span> Subscribe in Apple Calendar
-              </a>
-
-              {/* Reminder templates link */}
-              <button
-                onClick={()=>router.push("/admin/reminder-templates")}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all hover:opacity-80"
-                style={{background:C.p1_06,color:C.p1,border:`1px solid ${C.p1_15}`}}>
-                <span>✉️</span> Edit Reminder Templates
-              </button>
-
-              {/* Upcoming sessions */}
-              <div className="rounded-2xl overflow-hidden border" style={{borderColor:"rgba(16,185,129,0.2)",background:"white"}}>
-                <div className="h-[3px]" style={{background:"linear-gradient(90deg,#10b981,#059669)"}}/>
-                <div className="p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <p className="text-xs font-black uppercase tracking-widest text-emerald-600">📅 Upcoming Sessions</p>
-                    <button onClick={()=>setTab("clients")} className="text-[11px] font-bold text-slate-400 hover:text-slate-600">All clients →</button>
-                  </div>
-                  {upcoming.length===0?(
-                    <p className="text-sm text-slate-400 py-2">No confirmed sessions yet.</p>
-                  ):(
-                    <div className="flex flex-col gap-2">
-                      {upcoming.map(inq=>{
-                        const isToday=inq.session_date===todayStr;const isTomorrow=inq.session_date===tomorrowStr;
-                        return(
-                          <div key={inq.id} className="rounded-xl border" style={{borderColor:"#f1f5f9",background:"#fafafa"}}>
-                            <div className="flex items-center gap-3 p-2.5">
-                              <div className="flex-shrink-0 w-16 text-center">
-                                <span className={`text-[10px] font-black tracking-wide block ${isToday?"text-rose-500":isTomorrow?"text-amber-500":"text-emerald-600"}`}>{dayLabel(inq.session_date!)}</span>
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-bold text-slate-900 truncate">{inq.name}</p>
-                                <p className="text-xs text-slate-400 truncate">{inq.session_type||"Session"}</p>
-                              </div>
-                              <div className="flex-shrink-0 flex items-center gap-2">
-                                {inq.payment_status==="paid"&&<span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">PAID</span>}
-                                <button
-                                  onClick={()=>router.push(`/admin/reminders/${inq.id}`)}
-                                  className="text-[11px] font-bold px-2.5 py-1 rounded-lg transition-all hover:opacity-80"
-                                  style={{background:"rgba(245,158,11,0.08)",color:"#d97706"}}>
-                                  🔔
-                                </button>
-                                <button
-                                  onClick={()=>router.push(`/admin/reminders/${inq.id}?focus=thank-you`)}
-                                  className="text-[11px] font-bold px-2.5 py-1 rounded-lg text-white transition-all hover:opacity-80"
-                                  style={{background:"linear-gradient(135deg,#9d6fe8,#e879a0)"}}>
-                                  🙏
-                                </button>
-                                <button onClick={()=>router.push(`/admin/conversation/${inq.id}`)} className="text-[11px] font-bold px-2.5 py-1 rounded-lg" style={{background:C.p1_08,color:C.p1}}>View →</button>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* New inquiries card */}
-              {pendingInquiries>0&&(()=>{
-                const newInqs=inquiries
-                  .filter(i=>!i.reply_sent_at&&i.status!=="archived"&&i.status!=="not_interested"&&i.status!=="responded"&&i.status!=="manual")
-                  .sort((a,b)=>new Date(b.created_at).getTime()-new Date(a.created_at).getTime())
-                  .slice(0,3);
-                const hoursAgo=(iso:string)=>{
-                  const h=Math.round((Date.now()-new Date(iso).getTime())/(1000*60*60));
-                  if(h<1)return"just now";if(h===1)return"1h ago";if(h<24)return`${h}h ago`;
-                  const d=Math.round(h/24);return d===1?"1d ago":`${d}d ago`;
-                };
-                return(
-                  <div className="rounded-2xl overflow-hidden border" style={{borderColor:"rgba(245,158,11,0.3)",background:"white"}}>
-                    <div className="h-[3px]" style={{background:"linear-gradient(90deg,#f59e0b,#d97706)"}}/>
+                {/* Right column: upcoming + needs reply */}
+                <div className="space-y-4">
+                  {/* Upcoming sessions */}
+                  <div className="rounded-2xl overflow-hidden border" style={{borderColor:"rgba(16,185,129,0.2)",background:"white"}}>
+                    <div className="h-[3px]" style={{background:"linear-gradient(90deg,#10b981,#059669)"}}/>
                     <div className="p-4">
                       <div className="flex items-center justify-between mb-3">
-                        <p className="text-xs font-black uppercase tracking-widest text-amber-600">📬 New Inquiries</p>
-                        <button onClick={()=>setTab("inquiries")} className="text-[11px] font-bold text-slate-400 hover:text-slate-600">
-                          {pendingInquiries>3?`+${pendingInquiries-3} more — view all →`:"View all →"}
-                        </button>
+                        <p className="text-xs font-black uppercase tracking-widest text-emerald-600">📅 Upcoming</p>
+                        <button onClick={()=>setTab("clients")} className="text-[11px] font-bold text-slate-400 hover:text-slate-600">All →</button>
                       </div>
-                      <div className="flex flex-col gap-2">
-                        {newInqs.map(inq=>(
-                          <div key={inq.id} className="flex items-center gap-3 p-2.5 rounded-xl border" style={{borderColor:"#fef3c7",background:"#fffbeb"}}>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <p className="text-sm font-bold text-slate-900">{inq.name}</p>
-                                <span className="text-[10px] text-amber-600 font-bold">{hoursAgo(inq.created_at)}</span>
+                      {upcoming.length===0?(
+                        <p className="text-sm text-slate-400 py-1">No confirmed sessions yet.</p>
+                      ):(
+                        <div className="flex flex-col gap-1.5">
+                          {upcoming.map(inq=>{
+                            const isToday=inq.session_date===todayStr;const isTomorrow=inq.session_date===tomorrowStr;
+                            return(
+                              <div key={inq.id} className="flex items-center gap-2 p-2.5 rounded-xl" style={{background:"rgba(16,185,129,0.04)",border:"1px solid rgba(16,185,129,0.1)"}}>
+                                <div className="flex-shrink-0 w-[52px] text-center">
+                                  <span className={`text-[9px] font-black tracking-wide block leading-tight ${isToday?"text-rose-500":isTomorrow?"text-amber-500":"text-emerald-600"}`}>{dayLabel(inq.session_date!)}</span>
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs font-bold text-slate-900 truncate">{inq.name}</p>
+                                  <p className="text-[10px] text-slate-400 truncate">{inq.session_type||"Session"}</p>
+                                </div>
+                                <div className="flex items-center gap-1 flex-shrink-0">
+                                  {inq.payment_status==="paid"&&<span className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full">✓</span>}
+                                  <button onClick={()=>router.push(`/admin/reminders/${inq.id}`)}
+                                    className="px-1.5 py-0.5 rounded-lg transition-all hover:opacity-80 text-[11px]"
+                                    style={{background:"rgba(245,158,11,0.08)",color:"#d97706"}} title="Send reminder">🔔</button>
+                                  <button onClick={()=>router.push(`/admin/reminders/${inq.id}?focus=thank-you`)}
+                                    className="px-1.5 py-0.5 rounded-lg text-white transition-all hover:opacity-80 text-[11px]"
+                                    style={{background:"linear-gradient(135deg,#9d6fe8,#e879a0)"}} title="Thank you">🙏</button>
+                                  <button onClick={()=>router.push(`/admin/conversation/${inq.id}`)}
+                                    className="text-[10px] px-2 py-0.5 rounded-lg transition-all hover:opacity-80 font-bold"
+                                    style={{background:C.p1_08,color:C.p1}}>→</button>
+                                </div>
                               </div>
-                              <p className="text-xs text-slate-500 truncate">
-                                {inq.session_type||"Session"}{inq.date_in_mind?` · ${inq.date_in_mind}`:""}
-                              </p>
-                            </div>
-                            <button onClick={()=>setTab("inquiries")}
-                              className="flex-shrink-0 text-[11px] font-bold px-2.5 py-1 rounded-lg text-white"
-                              style={{background:"linear-gradient(135deg,#f59e0b,#d97706)"}}>
-                              Reply →
-                            </button>
-                          </div>
-                        ))}
-                      </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   </div>
-                );
-              })()}
+
+                  {/* Needs reply */}
+                  {pendingInquiries>0&&(()=>{
+                    const newInqs=inquiries
+                      .filter(i=>!i.reply_sent_at&&i.status!=="archived"&&i.status!=="not_interested"&&i.status!=="responded"&&i.status!=="manual")
+                      .sort((a,b)=>new Date(b.created_at).getTime()-new Date(a.created_at).getTime())
+                      .slice(0,4);
+                    const hoursAgo=(iso:string)=>{
+                      const h=Math.round((Date.now()-new Date(iso).getTime())/(1000*60*60));
+                      if(h<1)return"just now";if(h===1)return"1h ago";if(h<24)return`${h}h ago`;
+                      const d=Math.round(h/24);return d===1?"1d ago":`${d}d ago`;
+                    };
+                    return(
+                      <div className="rounded-2xl overflow-hidden border" style={{borderColor:"rgba(245,158,11,0.3)",background:"white"}}>
+                        <div className="h-[3px]" style={{background:"linear-gradient(90deg,#f59e0b,#d97706)"}}/>
+                        <div className="p-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <p className="text-xs font-black uppercase tracking-widest text-amber-600">📬 Needs Reply</p>
+                            <button onClick={()=>setTab("inquiries")} className="text-[11px] font-bold text-slate-400 hover:text-slate-600">
+                              {pendingInquiries>4?`+${pendingInquiries-4} more →`:"All →"}
+                            </button>
+                          </div>
+                          <div className="flex flex-col gap-1.5">
+                            {newInqs.map(inq=>(
+                              <div key={inq.id} className="flex items-center gap-2 p-2 rounded-xl border" style={{borderColor:"#fef3c7",background:"#fffbeb"}}>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <p className="text-xs font-bold text-slate-900">{inq.name}</p>
+                                    <span className="text-[9px] text-amber-600 font-bold">{hoursAgo(inq.created_at)}</span>
+                                  </div>
+                                  <p className="text-[10px] text-slate-500 truncate">
+                                    {inq.session_type||"Session"}{inq.date_in_mind?` · ${inq.date_in_mind}`:""}
+                                  </p>
+                                </div>
+                                <button onClick={()=>setTab("inquiries")}
+                                  className="flex-shrink-0 text-[10px] font-bold px-2 py-1 rounded-lg text-white"
+                                  style={{background:"linear-gradient(135deg,#f59e0b,#d97706)"}}>
+                                  Reply →
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
 
               {/* Client email replies */}
               {gmailConnected&&(()=>{
@@ -1720,25 +1732,6 @@ function AdminDashboard() {
                   </div>
                 );
               })()}
-
-              {/* Nav cards */}
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                {[
-                  {label:"Clients",sub:`${paidSessions} paid · ${confirmedSessions} confirmed`,icon:"👥",action:()=>setTab("clients"),grad:"linear-gradient(135deg,#10b981,#059669)"},
-                  {label:"Edit Website",sub:"Poses, portfolio, blog",icon:"✏️",action:()=>setTab("poses"),grad:C.grad12},
-                  {label:"Vault",sub:"Notes & AI context",icon:"📓",action:()=>setTab("vault"),grad:"linear-gradient(135deg,#6366f1,#4f46e5)"},
-                ].map(n=>(
-                  <button key={n.label} onClick={n.action}
-                    className="flex items-center gap-3 p-4 rounded-2xl text-left text-white transition-all hover:opacity-90 active:scale-[0.98]"
-                    style={{background:n.grad}}>
-                    <span className="text-2xl">{n.icon}</span>
-                    <div>
-                      <p className="font-black text-sm">{n.label}</p>
-                      <p className="text-[11px] opacity-80">{n.sub}</p>
-                    </div>
-                  </button>
-                ))}
-              </div>
             </div>
           );
         })()}
@@ -3678,7 +3671,8 @@ function AdminDashboard() {
           },[]);
           return <QuickFormatTool clients={quickFormatClients}/>;
         })()}
-      </div>
+        </div>{/* end flex-1 content */}
+      </div>{/* end flex */}
     </div>
   );
 }
