@@ -1,7 +1,7 @@
 // POST /api/admin/chat
 //
 // Admin-only general-purpose Claude chat with streaming.
-// Body: { messages: {role:"user"|"assistant", content:string}[] }
+// Body: { conversationId: string, messages: {role:"user"|"assistant", content:string}[] }
 // Response: SSE stream of:
 //   { type:"text", text: string }
 //   { type:"done" }
@@ -10,6 +10,7 @@
 import { NextRequest } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { requireAdmin } from "@/lib/requireAdmin";
+import { createSupabaseServerClient } from "@/lib/supabaseServer";
 
 export const dynamic = "force-dynamic";
 
@@ -31,12 +32,13 @@ export async function POST(req: NextRequest) {
   if (deny) return deny;
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    const encoder = new TextEncoder();
+  const encoder = new TextEncoder();
+
+  function errorStream(message: string) {
     return new Response(
       new ReadableStream({
         start(c) {
-          c.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "error", message: "No API key configured" })}\n\n`));
+          c.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "error", message })}\n\n`));
           c.close();
         },
       }),
@@ -44,31 +46,48 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { messages } = await req.json() as {
+  if (!apiKey) return errorStream("No API key configured");
+
+  const { conversationId, messages } = await req.json() as {
+    conversationId?: string;
     messages: { role: "user" | "assistant"; content: string }[];
   };
 
   if (!Array.isArray(messages) || messages.length === 0) {
-    const encoder = new TextEncoder();
-    return new Response(
-      new ReadableStream({
-        start(c) {
-          c.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "error", message: "messages required" })}\n\n`));
-          c.close();
-        },
-      }),
-      { headers: { "Content-Type": "text/event-stream" } }
-    );
+    return errorStream("messages required");
+  }
+
+  const sb = createSupabaseServerClient();
+
+  // Persist the latest user message
+  const lastUserMsg = [...messages].reverse().find(m => m.role === "user");
+  if (conversationId && lastUserMsg) {
+    await sb.from("chat_messages").insert({
+      conversation_id: conversationId,
+      role: "user",
+      content: lastUserMsg.content,
+    });
+
+    // Set conversation title from first user message if still default
+    if (messages.filter(m => m.role === "user").length === 1) {
+      const title = lastUserMsg.content.slice(0, 60);
+      await sb
+        .from("chat_conversations")
+        .update({ title })
+        .eq("id", conversationId)
+        .eq("title", "New Chat");
+    }
   }
 
   const client = new Anthropic({ apiKey });
-  const encoder = new TextEncoder();
 
   const stream = new ReadableStream({
     async start(controller) {
       function emit(data: unknown) {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
       }
+
+      let fullResponse = "";
 
       try {
         const claudeStream = client.messages.stream({
@@ -84,8 +103,18 @@ export async function POST(req: NextRequest) {
             event.type === "content_block_delta" &&
             event.delta.type === "text_delta"
           ) {
+            fullResponse += event.delta.text;
             emit({ type: "text", text: event.delta.text });
           }
+        }
+
+        // Persist the assistant response
+        if (conversationId && fullResponse) {
+          await sb.from("chat_messages").insert({
+            conversation_id: conversationId,
+            role: "assistant",
+            content: fullResponse,
+          });
         }
 
         emit({ type: "done" });
