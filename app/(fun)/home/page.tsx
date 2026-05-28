@@ -60,7 +60,7 @@ export default function Home() {
 
 
       {/* HERO */}
-      <section className="relative overflow-hidden pt-20 pb-24 px-6 border-b" style={{ borderColor: C.borderSubtle }}>
+      <section className="relative overflow-hidden pt-10 pb-16 sm:pt-20 sm:pb-24 px-6 border-b" style={{ borderColor: C.borderSubtle }}>
         <div className="absolute inset-0 pointer-events-none" style={C.gridBg(0.045)}/>
         <div className="absolute inset-0 pointer-events-none" style={C.vignette}/>
         {/* Corner brackets */}
@@ -92,17 +92,17 @@ export default function Home() {
         </div>
 
         <div className="relative z-10 max-w-3xl mx-auto">
-          <div className="afu1 inline-flex items-center gap-2.5 px-4 py-2 rounded-full mb-8" style={{ background: C.surfaceStrong, border: `1px solid ${C.borderSubtle}`, boxShadow: C.shadowWarmSm }}>
+          <div className="afu1 inline-flex items-center gap-2.5 px-4 py-2 rounded-full mb-5 sm:mb-8" style={{ background: C.surfaceStrong, border: `1px solid ${C.borderSubtle}`, boxShadow: C.shadowWarmSm }}>
             <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0" style={{background:C.grad12}}>CS</div>
             <span className="text-sm font-semibold text-slate-700">Chris Solorzano</span>
             <span className="text-slate-300">·</span>
             <span className="text-sm font-medium text-slate-500">San Francisco</span>
           </div>
-          <h1 className="afu2 text-5xl sm:text-6xl md:text-7xl font-black tracking-tight leading-[1.05] text-slate-900 mb-2">
+          <h1 className="afu2 text-4xl sm:text-5xl md:text-7xl font-black tracking-tight leading-[1.05] text-slate-900 mb-2">
             Capturing <span style={C.text}>moments,</span>
-            <span className="cblink inline-block w-[3px] h-[48px] sm:h-[56px] md:h-[68px] ml-1.5 rounded-sm align-middle" style={{background:C.grad12}}/>
+            <span className="cblink inline-block w-[3px] h-[38px] sm:h-[48px] md:h-[68px] ml-1.5 rounded-sm align-middle" style={{background:C.grad12}}/>
           </h1>
-          <p className="afu3 text-5xl sm:text-6xl md:text-7xl font-light italic tracking-tight leading-[1.05] text-slate-900 mb-7">one frame at a time.</p>
+          <p className="afu3 text-4xl sm:text-5xl md:text-7xl font-light italic tracking-tight leading-[1.05] text-slate-900 mb-5 sm:mb-7">one frame at a time.</p>
           <p className="afu4 text-lg text-slate-500 font-light leading-relaxed max-w-xl mb-10">
             Bay Area photographer based in San Francisco. Specializing in graduation portraits, events, and creative shoots.
           </p>
@@ -157,11 +157,11 @@ export default function Home() {
             })}
           </div>
           {/* Stats */}
-          <div className="grid grid-cols-3 gap-3 mt-6">
+          <div className="grid grid-cols-3 gap-2 sm:gap-3 mt-6">
             {[{n:"200+",l:"Grads shot"},{n:"12+",l:"Bay Area spots"},{n:"48hr",l:"Turnaround"}].map(s=>(
-              <div key={s.l} className="rounded-2xl p-5 text-center" style={{background:C.surfaceWarm,border:`1px solid ${C.borderSubtle}`, boxShadow: C.shadowWarmSm}}>
-                <span className="block text-2xl font-black tracking-tight mb-0.5" style={C.text12}>{s.n}</span>
-                <span className="block text-xs font-semibold text-slate-500">{s.l}</span>
+              <div key={s.l} className="rounded-2xl p-3 sm:p-5 text-center" style={{background:C.surfaceWarm,border:`1px solid ${C.borderSubtle}`, boxShadow: C.shadowWarmSm}}>
+                <span className="block text-lg sm:text-2xl font-black tracking-tight mb-0.5" style={C.text12}>{s.n}</span>
+                <span className="block text-[10px] sm:text-xs font-semibold text-slate-500 leading-tight">{s.l}</span>
               </div>
             ))}
           </div>

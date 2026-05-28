@@ -68,7 +68,7 @@ export default function AboutPage() {
 
       <div className="relative z-10">
         {/* Hero Section */}
-        <section className="relative overflow-hidden pt-20 pb-24 px-6 border-b" style={{borderColor:C.borderSubtle}}>
+        <section className="relative overflow-hidden pt-10 pb-16 sm:pt-20 sm:pb-24 px-6 border-b" style={{borderColor:C.borderSubtle}}>
           {/* Grid + vignette */}
           <div className="absolute inset-0 pointer-events-none" style={C.gridBg(0.045)}/>
           <div className="absolute inset-0 pointer-events-none" style={C.vignette}/>
@@ -111,10 +111,10 @@ export default function AboutPage() {
                 <span className="text-sm font-medium text-slate-500">San Francisco</span>
               </div>
 
-              <h1 className="afu2 text-5xl md:text-6xl lg:text-7xl font-black tracking-tight leading-[1.05] text-slate-900 mb-3">
+              <h1 className="afu2 text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black tracking-tight leading-[1.05] text-slate-900 mb-3">
                 Behind the <span style={C.text}>camera.</span>
               </h1>
-              <p className="afu3 text-4xl md:text-5xl font-light italic tracking-tight leading-[1.1] text-slate-900 mb-7">
+              <p className="afu3 text-3xl sm:text-4xl md:text-5xl font-light italic tracking-tight leading-[1.1] text-slate-900 mb-5 sm:mb-7">
                 the person behind it.
               </p>
 
@@ -320,16 +320,16 @@ export default function AboutPage() {
             <div className="absolute -top-12 -left-12 w-48 h-48 rounded-full opacity-30" style={{background:`radial-gradient(circle, ${C.p1_25}, transparent 70%)`}}/>
             <div className="absolute -bottom-12 -right-12 w-48 h-48 rounded-full opacity-30" style={{background:`radial-gradient(circle, ${C.p2_25}, transparent 70%)`}}/>
 
-            <div className="relative z-10 px-12 py-16 text-center">
+            <div className="relative z-10 px-6 py-10 sm:px-12 sm:py-16 text-center">
               <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-6" style={{background:C.surfaceStrong,border:`1px solid ${C.borderSubtle}`,boxShadow:C.shadowWarmSm}}>
                 <div className="w-2 h-2 rounded-full" style={{background:C.p1}}/>
                 <span className="text-xs font-bold tracking-wider uppercase" style={{color:C.p1}}>Let's Connect</span>
               </div>
 
-              <h2 className="text-4xl md:text-5xl font-black mb-6" style={C.text}>
+              <h2 className="text-2xl sm:text-4xl md:text-5xl font-black mb-4 sm:mb-6" style={C.text}>
                 Ready to work together?
               </h2>
-              <p className="text-xl text-slate-600 mb-10 max-w-xl mx-auto leading-relaxed">
+              <p className="text-base sm:text-xl text-slate-600 mb-7 sm:mb-10 max-w-xl mx-auto leading-relaxed">
                 Let's capture your graduation, portrait session, or creative project — in a way that actually feels like you.
               </p>
 
