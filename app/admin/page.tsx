@@ -290,6 +290,9 @@ function AdminDashboard() {
   const [gmailLoading,setGmailLoading]=useState(false);
   type InboxThread={threadId:string;fromName:string;fromEmail:string;subject:string;snippet:string;timestamp:number;messageCount:number;isUnread:boolean};
   const [inboxThreads,setInboxThreads]=useState<InboxThread[]>([]);
+  const [dismissedThreadIds,setDismissedThreadIds]=useState<Set<string>>(()=>{
+    try{const s=localStorage.getItem("dismissed_inbox_threads");return new Set(s?JSON.parse(s):[]);}catch{return new Set();}
+  });
   const [inboxLoading,setInboxLoading]=useState(false);
   const [blockedSenders,setBlockedSenders]=useState<string[]>([]);
   const [blockedSendersLoading,setBlockedSendersLoading]=useState(false);
@@ -514,6 +517,12 @@ function AdminDashboard() {
   }
 
   async function dismissUnreadThread(threadId:string){
+    setDismissedThreadIds(prev=>{
+      const next=new Set(prev);
+      next.add(threadId);
+      try{localStorage.setItem("dismissed_inbox_threads",JSON.stringify([...next]));}catch{}
+      return next;
+    });
     setInboxThreads(p=>p.map(t=>t.threadId===threadId?{...t,isUnread:false}:t));
     try{
       await fetch("/api/gmail/mark-read",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({threadId})});
@@ -2694,7 +2703,7 @@ function AdminDashboard() {
                   const statusColor=inq.status==="new"?"#10b981":inq.status==="responded"?"#3b82f6":inq.status==="not_interested"?"#ef4444":"#94a3b8";
                   const statusBg=inq.status==="new"?"rgba(16,185,129,0.08)":inq.status==="responded"?"rgba(59,130,246,0.08)":inq.status==="not_interested"?"rgba(239,68,68,0.08)":"rgba(148,163,184,0.08)";
                   const hasDraft=!!drafts[inq.id];
-                  const unreadThread=inboxThreads.find(t=>t.fromEmail.toLowerCase()===inq.email.toLowerCase()&&t.isUnread);
+                  const unreadThread=inboxThreads.find(t=>t.fromEmail.toLowerCase()===inq.email.toLowerCase()&&t.isUnread&&!dismissedThreadIds.has(t.threadId));
 
                   const highlighted=!!unreadThread||needsReply(inq);
                   return(
