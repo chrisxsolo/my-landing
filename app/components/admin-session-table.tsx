@@ -339,7 +339,9 @@ export default function AdminSessionTable({
                   session,
                   "estimatedDeliveryDate",
                   session.estimatedDeliveryDate,
-                  <span className="break-words">{session.estimatedDeliveryDate || "Not set"}</span>,
+                  <span className="break-words" style={{ color: session.estimatedDeliveryDate ? C.muted : "#94a3b8" }}>
+                    {session.estimatedDeliveryDate ? formatDate(session.estimatedDeliveryDate) : "Not set"}
+                  </span>,
                   "date",
                 )}
               </div>

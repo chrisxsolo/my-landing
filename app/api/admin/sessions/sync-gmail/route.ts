@@ -203,6 +203,16 @@ export async function POST(req: NextRequest) {
     }
     updates.session_date = isoDate;
     filled.push(extracted.sessionTime ? "date & time" : "date");
+
+    // Auto-set delivery to 14 days after shoot if not already set
+    if (!session.estimated_delivery_date) {
+      const shootDate = new Date(isoDate.includes("T") ? isoDate : isoDate + "T12:00:00");
+      if (!isNaN(shootDate.getTime())) {
+        const deliveryDate = new Date(shootDate.getTime() + 14 * 24 * 60 * 60 * 1000);
+        updates.estimated_delivery_date = deliveryDate.toISOString().slice(0, 10);
+        filled.push("delivery date (14 days after shoot)");
+      }
+    }
   }
 
   if (extracted.location) {

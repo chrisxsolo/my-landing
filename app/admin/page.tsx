@@ -1274,19 +1274,19 @@ function AdminDashboard() {
       )}
 
 
-      <div className="sticky top-0 z-40 border-b border-black/[0.06] px-6 h-14 flex items-center justify-between" style={{background:"rgba(255,255,255,0.95)",backdropFilter:"blur(20px)"}}>
-        <span className="font-black text-lg" style={C.text}>Chris. Studio Admin</span>
-        <div className="flex items-center gap-3">
+      <div className="sticky top-0 z-40 border-b border-black/[0.06] px-3 md:px-6 h-14 flex items-center justify-between" style={{background:"rgba(255,255,255,0.95)",backdropFilter:"blur(20px)"}}>
+        <span className="font-black text-sm md:text-lg shrink-0" style={C.text}>Chris. Studio Admin</span>
+        <div className="flex items-center gap-2 md:gap-3">
           <Link
             href="/admin/sessions"
-            className="inline-flex items-center rounded-full px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.12em] transition-all hover:opacity-90"
+            className="inline-flex items-center rounded-full px-2 md:px-3 py-1.5 text-[10px] md:text-[11px] font-black uppercase tracking-[0.12em] transition-all hover:opacity-90 whitespace-nowrap"
             style={{background:C.p1_08,color:C.p1,border:`1px solid ${C.p1_20}`}}
           >
             Portal Sessions
           </Link>
-          <a href="/bay-area-locations" className="text-xs font-bold text-slate-400 hover:text-slate-700 transition-colors">🗺️ Bay Guide</a>
-          <a href="/admin/availability" className="text-xs font-bold text-slate-400 hover:text-slate-700 transition-colors">📅 Availability</a>
-          <a href="/" className="text-xs font-bold text-slate-400 hover:text-slate-700 transition-colors">← Site</a>
+          <a href="/bay-area-locations" className="hidden md:block text-xs font-bold text-slate-400 hover:text-slate-700 transition-colors">🗺️ Bay Guide</a>
+          <a href="/admin/availability" className="hidden md:block text-xs font-bold text-slate-400 hover:text-slate-700 transition-colors">📅 Availability</a>
+          <a href="/" className="hidden md:block text-xs font-bold text-slate-400 hover:text-slate-700 transition-colors">← Site</a>
         </div>
       </div>
 
@@ -1306,7 +1306,7 @@ function AdminDashboard() {
             </button>
           );
           return(
-            <div className="sticky top-14 flex-shrink-0 w-[200px] h-[calc(100vh-56px)] overflow-y-auto flex flex-col border-r py-3 px-2"
+            <div className="hidden md:flex sticky top-14 flex-shrink-0 w-[200px] h-[calc(100vh-56px)] overflow-y-auto flex-col border-r py-3 px-2"
                  style={{background:"white",borderColor:"rgba(0,0,0,0.07)"}}>
               <div className="flex-1 space-y-0.5 pb-3">
                 <NavBtn t="home" icon="🏠" label="Home"/>
@@ -1336,8 +1336,35 @@ function AdminDashboard() {
           );
         })()}
 
+        {/* ── MAIN CONTENT COLUMN (mobile nav + content) ── */}
+        <div className="flex-1 min-w-0 flex flex-col">
+
+        {/* Mobile tab nav — only visible on mobile */}
+        {(()=>{
+          const cancelAll=()=>{cancelEditPose();cancelEditSpot();cancelEditPortfolioImage();cancelEditCategory();cancelEditPost();setEditingInquiry(null);setInquiryDeleteConfirm(null);};
+          const go=(t:Tab)=>{cancelAll();setTab(t);};
+          type MobileNavItem={t:Tab;icon:string;label:string};
+          const all:MobileNavItem[]=[
+            {t:"home",icon:"🏠",label:"Home"},{t:"inquiries",icon:"📬",label:"Inquiries"},{t:"clients",icon:"👥",label:"Clients"},{t:"analytics",icon:"📊",label:"Analytics"},{t:"payments",icon:"💵",label:"Revenue"},{t:"funnel",icon:"📈",label:"Funnel"},
+            {t:"poses",icon:"📸",label:"Poses"},{t:"locations",icon:"📍",label:"Spots"},{t:"bayGuide",icon:"🗺️",label:"Bay Guide"},{t:"portfolio",icon:"🖼️",label:"Portfolio"},{t:"categories",icon:"🏷️",label:"Categories"},{t:"blog",icon:"✍️",label:"Blog"},{t:"library",icon:"🗄️",label:"Library"},
+            {t:"ai",icon:"🤖",label:"AI Training"},{t:"chat",icon:"💬",label:"AI Chat"},{t:"format",icon:"✨",label:"Format"},{t:"vault",icon:"📓",label:"Vault"},{t:"accounts",icon:"👤",label:"Accounts"},
+          ];
+          return(
+            <div className="md:hidden sticky top-14 z-30 border-b overflow-x-auto flex items-center gap-1.5 px-3 py-2 [&::-webkit-scrollbar]:hidden" style={{background:"white",borderColor:"rgba(0,0,0,0.06)"}}>
+              {all.map(({t,icon,label})=>(
+                <button key={t} onClick={()=>go(t)}
+                  className="flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[12px] font-semibold whitespace-nowrap transition-all"
+                  style={tab===t?{background:C.grad12,color:"#fff",boxShadow:"0 2px 8px rgba(157,111,232,0.25)"}:{color:"#6b7280",background:"rgba(0,0,0,0.04)"}}>
+                  <span className="text-sm leading-none">{icon}</span>
+                  <span>{label}</span>
+                </button>
+              ))}
+            </div>
+          );
+        })()}
+
         {/* ── MAIN CONTENT ── */}
-        <div className="flex-1 min-w-0 px-8 py-8">
+        <div className="flex-1 px-4 py-4 md:px-8 md:py-8">
 
         {/* ── HOME ── */}
         {tab==="home"&&(()=>{
@@ -3671,7 +3698,8 @@ function AdminDashboard() {
           },[]);
           return <QuickFormatTool clients={quickFormatClients}/>;
         })()}
-        </div>{/* end flex-1 content */}
+        </div>{/* end inner content */}
+        </div>{/* end main column */}
       </div>{/* end flex */}
     </div>
   );

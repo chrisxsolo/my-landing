@@ -59,6 +59,7 @@ export default function AdminSessionsDashboard() {
     status: ClientSessionStatus;
   } | null>(null);
   const [gmailSyncing, setGmailSyncing] = useState<string | null>(null);
+  const [scanningInvoices, setScanningInvoices] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [unlinkingId, setUnlinkingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -241,6 +242,41 @@ export default function AdminSessionsDashboard() {
     }
   }
 
+  async function scanSentEmails() {
+    setScanningInvoices(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch("/api/admin/sessions/sync-sent-invoices", {
+        method: "POST",
+        headers,
+      });
+      const json = await res.json() as { updated?: string[]; message?: string; error?: string };
+      if (!res.ok) {
+        setError(json.error ?? "Scan failed.");
+        return;
+      }
+      setMessage(json.message ?? "Scan complete.");
+      if (json.updated?.length) {
+        // Reload sessions to reflect the new statuses
+        const { data } = await supabase.auth.getSession();
+        const token = data.session?.access_token;
+        const authHeaders: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
+        const sessionsRes = await fetch("/api/admin/sessions", { headers: authHeaders });
+        if (sessionsRes.ok) {
+          const sessionsJson = await sessionsRes.json() as AdminSessionsResponse;
+          setSessions(sessionsJson.sessions ?? []);
+        }
+      }
+    } catch (err) {
+      console.error("[admin-sessions-dashboard] scanSentEmails", err);
+      setError("Scan failed.");
+    } finally {
+      setScanningInvoices(false);
+    }
+  }
+
   async function deleteSession(session: AdminClientSessionDTO) {
     setDeletingId(session.id);
     setError(null);
@@ -414,6 +450,35 @@ export default function AdminSessionsDashboard() {
             </button>
           </div>
         </header>
+
+        {/* Prominent scan banner */}
+        <div
+          className="mb-6 rounded-xl border p-4 md:p-5"
+          style={{ background: C.p1_08, borderColor: C.p1_20 }}
+        >
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="text-[11px] font-black uppercase tracking-[0.14em]" style={{ color: C.p1 }}>
+                Gmail sync
+              </div>
+              <p className="mt-1 text-sm font-bold" style={{ color: C.ink }}>
+                Scan your Gmail to auto-fill session dates, delivery dates, invoice/contract statuses, and deposit payments.
+              </p>
+              <p className="mt-0.5 text-xs font-semibold" style={{ color: C.muted }}>
+                Run any time to catch missed updates or double-check everything is current.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={scanSentEmails}
+              disabled={scanningInvoices}
+              className="flex-shrink-0 min-h-11 rounded-xl px-6 text-sm font-black disabled:opacity-60"
+              style={{ background: C.p1, color: "#fff" }}
+            >
+              {scanningInvoices ? "Scanning…" : "Scan Gmail Now"}
+            </button>
+          </div>
+        </div>
 
         {error && (
           <div className="mb-5 rounded-lg border p-4 text-sm font-bold" style={{ background: C.surfaceStrong, borderColor: C.borderWarm, color: C.danger }}>

@@ -144,6 +144,15 @@ export async function POST(req: NextRequest) {
     const result = buildWriteData(body, true);
     if ("error" in result) return NextResponse.json({ error: result.error }, { status: 400 });
 
+    // Auto-set delivery to 14 days after shoot for new sessions
+    if (result.data.session_date && !result.data.estimated_delivery_date) {
+      const shoot = new Date(result.data.session_date as string);
+      if (!isNaN(shoot.getTime())) {
+        const delivery = new Date(shoot.getTime() + 14 * 24 * 60 * 60 * 1000);
+        result.data.estimated_delivery_date = delivery.toISOString().slice(0, 10);
+      }
+    }
+
     const supabase = createSupabaseAdminClient();
     const { data, error } = await supabase
       .from(CLIENT_SESSION_TABLE)
@@ -202,14 +211,23 @@ export async function PATCH(req: NextRequest) {
 
     const { data: existingSession, error: existingError } = await supabase
       .from(CLIENT_SESSION_TABLE)
-      .select("client_email,client_user_id")
+      .select("client_email,client_user_id,estimated_delivery_date")
       .eq("id", body.id)
-      .single<Pick<ClientSessionRow, "client_email" | "client_user_id">>();
+      .single<Pick<ClientSessionRow, "client_email" | "client_user_id" | "estimated_delivery_date">>();
 
     if (existingError) throw existingError;
 
     const result = buildWriteData(body, false);
     if ("error" in result) return NextResponse.json({ error: result.error }, { status: 400 });
+
+    // Auto-set delivery to 14 days after shoot only if no delivery date exists yet
+    if (result.data.session_date && !result.data.estimated_delivery_date && !existingSession.estimated_delivery_date) {
+      const shoot = new Date(result.data.session_date as string);
+      if (!isNaN(shoot.getTime())) {
+        const delivery = new Date(shoot.getTime() + 14 * 24 * 60 * 60 * 1000);
+        result.data.estimated_delivery_date = delivery.toISOString().slice(0, 10);
+      }
+    }
 
     const nextEmail = readText(body.clientEmail)?.toLowerCase();
     const currentEmail = existingSession.client_email.toLowerCase();
