@@ -63,6 +63,12 @@ function isContractSignedSubject(subject: string, from: string): boolean {
   return false;
 }
 
+function msgDate(internalDate?: string): string {
+  return internalDate
+    ? new Date(parseInt(internalDate, 10)).toISOString()
+    : new Date().toISOString();
+}
+
 function extractClientEmailFromSubject(subject: string, clientEmails: Set<string>): string | null {
   const lower = subject.toLowerCase();
   for (const email of clientEmails) {
@@ -149,14 +155,35 @@ export async function POST(req: NextRequest) {
     const recipientEmail = extractEmail(to);
     if (!recipientEmail.includes("@")) continue;
 
-    const sentAt = msg.internalDate
-      ? new Date(parseInt(msg.internalDate, 10)).toISOString()
-      : new Date().toISOString();
+    const sentAt = msgDate(msg.internalDate);
 
     const existing = sentByEmail.get(recipientEmail) ?? { invoiceSentAt: null, contractSentAt: null };
     if (isInvoiceSubject(subject) && !existing.invoiceSentAt) existing.invoiceSentAt = sentAt;
     if (isContractSubject(subject) && !existing.contractSentAt) existing.contractSentAt = sentAt;
     sentByEmail.set(recipientEmail, existing);
+  }
+
+  // ── 2b. Scan sent folder: all recent emails (to detect first reply) ────────
+  const allRecentSentMessages = await fetchMessages(
+    auth,
+    `in:sent newer_than:365d`,
+    200,
+  );
+
+  const firstReplySentByEmail = new Map<string, string>(); // email → ISO timestamp of earliest sent email
+
+  for (const msg of allRecentSentMessages) {
+    if (!msg.payload?.headers) continue;
+    const to = getHeader(msg.payload.headers, "To");
+    const recipientEmail = extractEmail(to);
+    if (!recipientEmail.includes("@")) continue;
+
+    const sentAt = msgDate(msg.internalDate);
+
+    const existing = firstReplySentByEmail.get(recipientEmail);
+    if (!existing || sentAt < existing) {
+      firstReplySentByEmail.set(recipientEmail, sentAt);
+    }
   }
 
   // ── 3. Scan inbox: payment received ───────────────────────────────────────
@@ -175,9 +202,7 @@ export async function POST(req: NextRequest) {
     const from = getHeader(msg.payload.headers, "From");
     if (!isPaymentReceivedSubject(subject, from)) continue;
 
-    const sentAt = msg.internalDate
-      ? new Date(parseInt(msg.internalDate, 10)).toISOString()
-      : new Date().toISOString();
+    const sentAt = msgDate(msg.internalDate);
 
     // Try to match by client email in subject first
     let matchedEmail = extractClientEmailFromSubject(subject, allEmails);
@@ -206,9 +231,7 @@ export async function POST(req: NextRequest) {
     const from = getHeader(msg.payload.headers, "From");
     if (!isContractSignedSubject(subject, from)) continue;
 
-    const sentAt = msg.internalDate
-      ? new Date(parseInt(msg.internalDate, 10)).toISOString()
-      : new Date().toISOString();
+    const sentAt = msgDate(msg.internalDate);
 
     // Try to match by client email in To header
     const to = getHeader(msg.payload.headers, "To");
@@ -281,12 +304,15 @@ export async function POST(req: NextRequest) {
     ...sentByEmail.keys(),
     ...paidEmails,
     ...signedEmails,
+    ...firstReplySentByEmail.keys(),
   ])];
+
+  let timelineUpdated = 0;
 
   if (allInquiryEmails.length) {
     const { data: inquiries } = await supabase
       .from("inquiries")
-      .select("id, email, invoice_sent_at, contract_sent_at, deposit_paid_at")
+      .select("id, email, reply_sent_at, invoice_sent_at, contract_sent_at, deposit_paid_at")
       .in("email", allInquiryEmails);
 
     for (const inq of inquiries ?? []) {
@@ -294,6 +320,9 @@ export async function POST(req: NextRequest) {
       const info = sentByEmail.get(email);
       const inqUpdates: Record<string, string> = {};
 
+      if (firstReplySentByEmail.has(email) && !inq.reply_sent_at) {
+        inqUpdates.reply_sent_at = firstReplySentByEmail.get(email)!;
+      }
       if (info?.invoiceSentAt && !inq.invoice_sent_at) inqUpdates.invoice_sent_at = info.invoiceSentAt;
       if (info?.contractSentAt && !inq.contract_sent_at) inqUpdates.contract_sent_at = info.contractSentAt;
       if (paidEmails.has(email) && !inq.deposit_paid_at) {
@@ -302,13 +331,17 @@ export async function POST(req: NextRequest) {
 
       if (Object.keys(inqUpdates).length) {
         await supabase.from("inquiries").update(inqUpdates).eq("id", inq.id);
+        timelineUpdated++;
       }
     }
   }
 
+  const timelinePart = timelineUpdated > 0 ? ` + ${timelineUpdated} timeline field${timelineUpdated !== 1 ? "s" : ""} updated` : "";
   const message = updated.length
-    ? `Updated ${updated.length} client${updated.length !== 1 ? "s" : ""}: ${updated.join("; ")}`
-    : "Everything is already up to date — no new invoice, contract, payment, or delivery date changes found.";
+    ? `Updated ${updated.length} client${updated.length !== 1 ? "s" : ""}: ${updated.join("; ")}${timelinePart}`
+    : timelineUpdated > 0
+    ? `Timeline synced — ${timelineUpdated} inquiry timeline field${timelineUpdated !== 1 ? "s" : ""} updated from Gmail.`
+    : "Everything is already up to date — no new invoice, contract, payment, reply, or delivery date changes found.";
 
   return NextResponse.json({ updated, message });
 }

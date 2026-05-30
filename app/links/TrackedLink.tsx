@@ -46,21 +46,11 @@ function detectDevice(): "mobile" | "tablet" | "desktop" {
 
 function sendAnalytics(path: string, payload: object) {
   const body = JSON.stringify(payload);
-
-  if (typeof navigator !== "undefined" && "sendBeacon" in navigator) {
-    const blob = new Blob([body], { type: "application/json" });
-    navigator.sendBeacon(path, blob);
+  if ("sendBeacon" in navigator) {
+    navigator.sendBeacon(path, new Blob([body], { type: "application/json" }));
     return;
   }
-
-  fetch(path, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body,
-    keepalive: true,
-  }).catch(() => {
-    // Analytics should never block navigation.
-  });
+  fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body, keepalive: true }).catch(() => {});
 }
 
 export default function TrackedLink({
@@ -86,7 +76,7 @@ export default function TrackedLink({
       device: detectDevice(),
     });
 
-    window.location.assign(url);
+    window.open(url, "_blank", "noopener,noreferrer");
   }
 
   return (

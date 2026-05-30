@@ -61,7 +61,7 @@ export default function AdminSessionStatusStrip({
   const progress = getClientSessionProgress(currentStatus);
 
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
       {progress.map((step, index) => {
         const buttonDisabled = disabled || savingStatus !== null;
         const isSaving = savingStatus === step.value;
@@ -73,8 +73,8 @@ export default function AdminSessionStatusStrip({
             onClick={() => onSelect(step.value)}
             disabled={buttonDisabled}
             className={[
-              "inline-flex items-center gap-2 rounded-full border font-black uppercase tracking-[0.12em] transition-transform duration-200",
-              compact ? "min-h-9 px-3 py-2 text-[10px]" : "min-h-10 px-3.5 py-2 text-[10px]",
+              "inline-flex w-full items-center gap-2 rounded-full border font-black uppercase tracking-[0.12em] transition-transform duration-200",
+              compact ? "min-h-9 px-3 py-2 text-[11px]" : "min-h-10 px-3.5 py-2 text-[11px]",
               buttonDisabled ? "cursor-wait opacity-80" : "hover:-translate-y-0.5",
             ].join(" ")}
             style={getStepStyles(step.state, buttonDisabled && !isSaving)}

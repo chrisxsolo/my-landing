@@ -20,6 +20,15 @@ type Inquiry = {
   preferred_time: string | null; location: string | null;
 };
 
+function fmt12h(t: string | null): string {
+  if (!t) return "";
+  const [h, m] = t.split(":").map(Number);
+  if (isNaN(h) || isNaN(m)) return t;
+  const ampm = h >= 12 ? "PM" : "AM";
+  const h12 = h % 12 || 12;
+  return `${h12}:${String(m).padStart(2, "0")} ${ampm}`;
+}
+
 function fmtDate(ts: number) {
   const d = new Date(ts);
   const now = new Date();
@@ -132,8 +141,8 @@ export default function ConversationPage() {
   // Day-before reminder
   const [reminderLoading,   setReminderLoading]   = useState(false);
 
-  // Email thread collapse — show first + last by default
-  const [threadExpanded, setThreadExpanded] = useState(false);
+  // Email thread — show all messages by default
+  const [threadExpanded, setThreadExpanded] = useState(true);
 
   // Session reminders panel
   type ReminderDraft = { id: string; label: string; emoji: string; subject: string; body: string; html?: string };
@@ -1177,7 +1186,7 @@ export default function ConversationPage() {
                   {inquiry.school && <span className="text-slate-500">{inquiry.school}</span>}
                   {inquiry.people && <span className="text-slate-500">{inquiry.people}</span>}
                   {inquiry.date_in_mind && <span className="text-slate-500">{inquiry.date_in_mind}</span>}
-                  {inquiry.preferred_time && <span className="text-slate-500">{inquiry.preferred_time}</span>}
+                  {inquiry.preferred_time && <span className="text-slate-500">{fmt12h(inquiry.preferred_time)}</span>}
                   {inquiry.location && <span className="text-slate-500">{inquiry.location}</span>}
                 </div>
               </div>
@@ -1198,12 +1207,8 @@ export default function ConversationPage() {
               <p className="text-xs text-slate-400 mt-1">Emails to/from {inquiry.email} will appear here</p>
             </div>
           ) : ((() => {
-            const hidden = messages.length > 2 && !threadExpanded
-              ? messages.slice(1, messages.length - 1)
-              : [];
-            const visibleIndices = messages.length > 2 && !threadExpanded
-              ? [0, messages.length - 1]
-              : messages.map((_, i) => i);
+            const middleMessages = messages.length > 2 ? messages.slice(1, messages.length - 1) : [];
+            const hidden = !threadExpanded ? middleMessages : [];
 
             function renderMsg(msg: typeof messages[0]) {
               const isOpen  = expanded[msg.id] ?? false;
@@ -1268,10 +1273,10 @@ export default function ConversationPage() {
                 )}
 
                 {/* All middle messages when expanded */}
-                {threadExpanded && hidden.map(msg => renderMsg(msg))}
+                {threadExpanded && middleMessages.map(msg => renderMsg(msg))}
 
                 {/* Collapse button */}
-                {threadExpanded && hidden.length > 0 && (
+                {threadExpanded && middleMessages.length > 0 && (
                   <button
                     onClick={() => setThreadExpanded(false)}
                     className="w-full flex items-center justify-center gap-2 py-2 rounded-2xl text-xs font-bold transition-all hover:opacity-80"
@@ -1318,7 +1323,7 @@ export default function ConversationPage() {
               inquiry.school      && { label: "School",   value: inquiry.school },
               inquiry.people      && { label: "People",   value: inquiry.people },
               inquiry.date_in_mind && { label: "Date",    value: inquiry.date_in_mind },
-              inquiry.preferred_time && { label: "Time",  value: inquiry.preferred_time },
+              inquiry.preferred_time && { label: "Time",  value: fmt12h(inquiry.preferred_time) },
               inquiry.location    && { label: "Location", value: inquiry.location },
               inquiry.session_date && { label: "Booked",  value: new Date(inquiry.session_date + "T12:00:00").toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) },
             ].filter(Boolean).map((row, i) => {

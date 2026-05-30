@@ -245,7 +245,7 @@ export default function AnalyticsTab() {
       {/* ── Header ─────────────────────────────────────────────────────── */}
       <div className={card}>
         <div className="h-[3px]" style={{ background: C.grad90 }} />
-        <div className="p-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div className="p-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <p className="text-xs font-black uppercase tracking-widest mb-1.5" style={{ color: C.p1 }}>Linktree Analytics</p>
             <h2 className="text-2xl font-black text-slate-900 leading-tight">Views, clicks, and where people come from.</h2>
@@ -255,16 +255,23 @@ export default function AnalyticsTab() {
           </div>
 
           {/* Time controls */}
-          <div className="flex flex-col gap-2 md:items-end">
-            {/* Mode picker */}
-            <div className="flex gap-1 p-1 rounded-xl bg-slate-50 border border-slate-100">
-              {(["today", "7d", "30d", "week"] as ViewMode[]).map(m => (
-                <button key={m} onClick={() => { setViewMode(m); if (m !== "week") setWeeksBack(0); }}
-                  className="px-4 py-1.5 rounded-lg text-xs font-bold transition-all"
-                  style={viewMode === m ? { background: C.p1_10, color: C.p1 } : { color: "#94a3b8" }}>
-                  {m === "today" ? "Today" : m === "7d" ? "7 days" : m === "30d" ? "30 days" : "Week"}
-                </button>
-              ))}
+          <div className="flex flex-col gap-2 lg:items-end">
+            {/* Mode picker + Refresh on same row */}
+            <div className="flex items-center gap-2">
+              <div className="flex gap-1 p-1 rounded-xl bg-slate-50 border border-slate-100">
+                {(["today", "7d", "30d", "week"] as ViewMode[]).map(m => (
+                  <button key={m} onClick={() => { setViewMode(m); if (m !== "week") setWeeksBack(0); }}
+                    className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
+                    style={viewMode === m ? { background: C.p1_10, color: C.p1 } : { color: "#94a3b8" }}>
+                    {m === "today" ? "Today" : m === "7d" ? "7d" : m === "30d" ? "30d" : "Week"}
+                  </button>
+                ))}
+              </div>
+              <button onClick={load} disabled={loading}
+                className="text-xs font-bold px-3 py-2 rounded-lg transition-all hover:opacity-80 disabled:opacity-50"
+                style={{ background: C.p2_08, color: C.p2 }}>
+                {loading ? "…" : "Refresh"}
+              </button>
             </div>
 
             {/* Week navigator */}
@@ -283,12 +290,6 @@ export default function AnalyticsTab() {
                   style={{ background: C.p1_10, color: C.p1 }}>›</button>
               </div>
             )}
-
-            <button onClick={load} disabled={loading}
-              className="text-xs font-bold px-4 py-2 rounded-lg transition-all hover:opacity-80 disabled:opacity-50"
-              style={{ background: C.p2_08, color: C.p2 }}>
-              {loading ? "Loading…" : "Refresh"}
-            </button>
           </div>
         </div>
       </div>
@@ -525,31 +526,33 @@ export default function AnalyticsTab() {
                 </div>
                 {/* Bars */}
                 <div className="flex items-end justify-between gap-1.5 px-2" style={{ height: 200 }}>
-                  {dailyStats.map((stat, i) => {
+                  {(() => {
                     const maxVal = Math.max(...dailyStats.map(s => Math.max(s.clicks, s.views)), 1);
-                    const ch = (stat.clicks / maxVal) * 100;
-                    const vh = (stat.views / maxVal) * 100;
-                    const date = dateFromKey(stat.date);
-                    const isHov = hoverIdx === i;
-                    return (
-                      <div key={i} className="flex-1 flex flex-col items-center gap-1.5 cursor-pointer"
-                        onMouseEnter={() => setHoverIdx(i)} onMouseLeave={() => setHoverIdx(null)}>
-                        <div className="w-full flex gap-0.5 items-end"
-                          style={{ height: 168, transform: isHov ? "scaleY(1.04)" : "scaleY(1)", transformOrigin: "bottom", transition: "transform 0.15s" }}>
-                          <div className="flex-1 rounded-t-md transition-all duration-300"
-                            style={{ height: `${vh}%`, minHeight: vh > 0 ? 4 : 0, background: isHov ? `linear-gradient(180deg,${C.p1},${C.p1}88)` : `linear-gradient(180deg,${C.p1}50,${C.p1}28)` }} />
-                          <div className="flex-1 rounded-t-md transition-all duration-300"
-                            style={{ height: `${ch}%`, minHeight: ch > 0 ? 4 : 0, background: isHov ? `linear-gradient(180deg,${C.p2},${C.p2}88)` : `linear-gradient(180deg,${C.p2}50,${C.p2}28)` }} />
+                    return dailyStats.map((stat, i) => {
+                      const ch = (stat.clicks / maxVal) * 100;
+                      const vh = (stat.views / maxVal) * 100;
+                      const date = dateFromKey(stat.date);
+                      const isHov = hoverIdx === i;
+                      return (
+                        <div key={i} className="flex-1 flex flex-col items-center gap-1.5 cursor-pointer"
+                          onMouseEnter={() => setHoverIdx(i)} onMouseLeave={() => setHoverIdx(null)}>
+                          <div className="w-full flex gap-0.5 items-end"
+                            style={{ height: 168, transform: isHov ? "scaleY(1.04)" : "scaleY(1)", transformOrigin: "bottom", transition: "transform 0.15s" }}>
+                            <div className="flex-1 rounded-t-md transition-all duration-300"
+                              style={{ height: `${vh}%`, minHeight: vh > 0 ? 4 : 0, background: isHov ? `linear-gradient(180deg,${C.p1},${C.p1}88)` : `linear-gradient(180deg,${C.p1}50,${C.p1}28)` }} />
+                            <div className="flex-1 rounded-t-md transition-all duration-300"
+                              style={{ height: `${ch}%`, minHeight: ch > 0 ? 4 : 0, background: isHov ? `linear-gradient(180deg,${C.p2},${C.p2}88)` : `linear-gradient(180deg,${C.p2}50,${C.p2}28)` }} />
+                          </div>
+                          <div className="text-center">
+                            <p className="text-[9px] font-black" style={{ color: isHov ? C.p1 : "#1e293b" }}>{date.getDate()}</p>
+                            <p className="text-[8px] font-bold uppercase" style={{ color: isHov ? C.p1 : "#cbd5e1" }}>
+                              {date.toLocaleDateString("en-US", { weekday: "short" })}
+                            </p>
+                          </div>
                         </div>
-                        <div className="text-center">
-                          <p className="text-[9px] font-black" style={{ color: isHov ? C.p1 : "#1e293b" }}>{date.getDate()}</p>
-                          <p className="text-[8px] font-bold uppercase" style={{ color: isHov ? C.p1 : "#cbd5e1" }}>
-                            {date.toLocaleDateString("en-US", { weekday: "short" })}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    });
+                  })()}
                 </div>
                 {/* Grid lines */}
                 <div className="absolute pointer-events-none flex flex-col justify-between px-2"

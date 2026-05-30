@@ -1,7 +1,6 @@
 "use client";
 import { supabase } from '@/lib/supabase'
 import Link from "next/link";
-import { buildJournalImageLibraryRows } from '@/lib/imageLibraryShared';
 import { useEffect, useRef, useState, useCallback, Suspense } from "react";
 import { useRouter } from "next/navigation";
 import { C } from "@/lib/colors";
@@ -38,6 +37,10 @@ import AiTab from "@/app/admin/AiTab";
 import ChatTab from "@/app/admin/ChatTab";
 import SessionCalendar from "@/app/admin/SessionCalendar";
 import AccountsTab from "@/app/admin/AccountsTab";
+import PosesTab from "@/app/admin/PosesTab";
+import LocationsTab from "@/app/admin/LocationsTab";
+import BlogTab from "@/app/admin/BlogTab";
+import { uploadImage } from "@/lib/uploadImage";
 import {
   findMatchingClientSession,
   getClientSessionEmailMatches,
@@ -53,30 +56,20 @@ type Tab = "home"|"poses"|"locations"|"bayGuide"|"portfolio"|"categories"|"blog"
 type ImageLibraryRow = { id:number; title:string; alt:string|null; image_url:string; source_type:string; source_post_id:number|null; source_post_slug:string|null; source_role:string; in_portfolio:boolean; created_at:string; };
 type Inquiry = { id:number; name:string; email:string; phone:string|null; session_type:string|null; date_in_mind:string|null; message:string; status:string; created_at:string; payment_status:string|null; payment_note:string|null; payment_detected_at:string|null; session_date:string|null; booking_confirmed:boolean|null; reply_sent_at:string|null; invoice_sent_at:string|null; contract_sent_at:string|null; deposit_paid_at:string|null; gallery_delivered_at:string|null; confirmation_sent_at:string|null; preferred_time:string|null; location:string|null; school:string|null; instagram:string|null; people:string|null; };
 type AdminSessionsResponse = { sessions?: AdminClientSessionDTO[]; session?: AdminClientSessionDTO; error?: string; };
-type BlogCategory = "journal"|"professional";
-type Pose = { id:number; title:string; image_url:string; instructions:string; order:number; };
-type Spot = { id:number; school_id:string; school_name:string; school_short:string; name:string; description:string; tip:string; icon:string; image_url:string|null; order:number; };
-type BlogPost = { id:number; title:string; body:string; published_at:string; slug:string; cover_image_url:string|null; extra_image_urls:string[]; category?:BlogCategory|string|null; sites?:string[]|null; };
+
+function fmt12h(t:string|null):string{
+  if(!t)return"";
+  const[h,m]=t.split(":").map(Number);
+  if(isNaN(h)||isNaN(m))return t;
+  const ampm=h>=12?"PM":"AM";
+  const h12=h%12||12;
+  return `${h12}:${String(m).padStart(2,"0")} ${ampm}`;
+}
 type PortfolioCategory = { id:number; name:string; slug:string; description:string|null; sort_order:number; active:boolean; };
 type PortfolioImage = { id:number; title:string; alt:string|null; image_url:string; category_id:number|null; category_slug:string; featured:boolean; hero_carousel:boolean; sort_order:number; created_at:string|null; };
 
-const SCHOOLS = [
-  {id:"sjsu",    name:"San Jose State University",      short:"SJSU"},
-  {id:"berkeley",name:"UC Berkeley",                    short:"UC Berkeley"},
-  {id:"sfsu",    name:"San Francisco State University", short:"SF State"},
-  {id:"csueb",   name:"Cal State East Bay",             short:"CSUEB"},
-  {id:"usf",     name:"University of San Francisco",    short:"USF"},
-];
-
-const ICONS = ["🏫","🏛️","🌴","📚","🌸","🚪","🌳","🗼","🌿","🌊","🏢","🌅","🌁","🏔️","⛪","🌉","🦅","🔵","🐻"];
-const EMPTY_POSE = {title:"",instructions:"",order:""};
-const EMPTY_SPOT = {school_id:"sjsu",name:"",description:"",tip:"",icon:"🏫",order:""};
 const EMPTY_CATEGORY = {name:"",slug:"",description:"",sort_order:"1",active:true};
 const EMPTY_PORTFOLIO = {title:"",alt:"",category_slug:"graduation",featured:false,sort_order:""};
-const BLOG_CATEGORIES:{value:BlogCategory;label:string;helper:string}[]=[
-  {value:"journal",label:"Journal",helper:"Fun shoot stories at /journal"},
-  {value:"professional",label:"Professional",helper:"Case studies at /blog"},
-];
 const WEBSITE_TABS:Tab[]=["poses","locations","bayGuide","portfolio","categories","blog","library"];
 const CLIENT_TABS:Tab[]=["inquiries","clients","analytics","payments","funnel","ai","chat","format"];
 const VAULT_TABS:Tab[]=["vault"];
@@ -147,25 +140,6 @@ function AdminDashboard() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const [poses,setPoses]=useState<Pose[]>([]);
-  const [posesLoading,setPosesLoading]=useState(false);
-  const [poseForm,setPoseForm]=useState(EMPTY_POSE);
-  const [poseImg,setPoseImg]=useState<File|null>(null);
-  const [poseImgPreview,setPoseImgPreview]=useState<string|null>(null);
-  const [poseSaving,setPoseSaving]=useState(false);
-  const [editingPose,setEditingPose]=useState<Pose|null>(null);
-  const [deleteConfirm,setDeleteConfirm]=useState<number|null>(null);
-  const poseFileRef=useRef<HTMLInputElement>(null);
-
-  const [spots,setSpots]=useState<Spot[]>([]);
-  const [spotsLoading,setSpotsLoading]=useState(false);
-  const [spotForm,setSpotForm]=useState(EMPTY_SPOT);
-  const [spotImg,setSpotImg]=useState<File|null>(null);
-  const [spotImgPreview,setSpotImgPreview]=useState<string|null>(null);
-  const [spotSaving,setSpotSaving]=useState(false);
-  const [editingSpot,setEditingSpot]=useState<Spot|null>(null);
-  const [spotDeleteConfirm,setSpotDeleteConfirm]=useState<number|null>(null);
-  const spotFileRef=useRef<HTMLInputElement>(null);
 
   // ── Image library ────────────────────────────────────────────────────
   const [libraryImages,setLibraryImages]=useState<ImageLibraryRow[]>([]);
@@ -209,28 +183,6 @@ function AdminDashboard() {
 
   // ── Reply style ───────────────────────────────────────────────────────
 
-  // ── Blog ──────────────────────────────────────────────────────────────
-  const [posts,setPosts]=useState<BlogPost[]>([]);
-  const [postsLoading,setPostsLoading]=useState(false);
-  const [blogCategory,setBlogCategory]=useState<BlogCategory>("journal");
-  const EMPTY_POST={title:"",body:"",slug:"",category:"journal" as BlogCategory,sites:["journal"] as string[],published_at:new Date().toISOString().slice(0,16)};
-  const [postForm,setPostForm]=useState(EMPTY_POST);
-  const [coverImg,setCoverImg]=useState<File|null>(null);
-  const [coverImgPreview,setCoverImgPreview]=useState<string|null>(null);
-  const [extraImgs,setExtraImgs]=useState<File[]>([]);
-  const [extraPreviews,setExtraPreviews]=useState<string[]>([]);
-  const [postSaving,setPostSaving]=useState(false);
-  const [editingPost,setEditingPost]=useState<BlogPost|null>(null);
-  const [postDeleteConfirm,setPostDeleteConfirm]=useState<number|null>(null);
-  const coverFileRef=useRef<HTMLInputElement>(null);
-  const extraFileRef=useRef<HTMLInputElement>(null);
-  const aiDropRef=useRef<HTMLInputElement>(null);
-  const [aiDropFiles,setAiDropFiles]=useState<File[]>([]);
-  const [aiDropPreviews,setAiDropPreviews]=useState<string[]>([]);
-  const [aiDropDragging,setAiDropDragging]=useState(false);
-  const [aiGenerating,setAiGenerating]=useState(false);
-  const [coverDragging,setCoverDragging]=useState(false);
-  const [extraDragging,setExtraDragging]=useState(false);
 
   // ── Clients ───────────────────────────────────────────────────────────────
   const [clientSearch,setClientSearch]=useState("");
@@ -253,6 +205,11 @@ function AdminDashboard() {
   // ── Inquiries ─────────────────────────────────────────────────────────
   const [inquiries,setInquiries]=useState<Inquiry[]>([]);
   const [inquiriesLoading,setInquiriesLoading]=useState(false);
+  const [finalPaymentIds,setFinalPaymentIds]=useState<Set<number>>(new Set());
+  const [cardPaymentId,setCardPaymentId]=useState<number|null>(null);
+  const [cardPaymentAmount,setCardPaymentAmount]=useState("");
+  const [cardPaymentMethod,setCardPaymentMethod]=useState("Venmo");
+  const [cardPaymentSaving,setCardPaymentSaving]=useState(false);
   const [inquiryDeleteConfirm,setInquiryDeleteConfirm]=useState<number|null>(null);
   const [editingInquiry,setEditingInquiry]=useState<Inquiry|null>(null);
   const [draftLoading,setDraftLoading]=useState<number|null>(null);
@@ -270,6 +227,19 @@ function AdminDashboard() {
   const [syncLoading,setSyncLoading]=useState(false);
   const [syncResult,setSyncResult]=useState<{name:string;email:string;amount:string;method:string;paymentType:string;paidAt:string;alreadyPaid:boolean;dateBooked?:string;orphan:boolean;pass:number}[]|null>(null);
   const [syncMsg,setSyncMsg]=useState<string|null>(null);
+  const [timelineSyncLoading,setTimelineSyncLoading]=useState(false);
+
+  async function syncTimeline(){
+    setTimelineSyncLoading(true);
+    try{
+      const res=await fetch("/api/admin/sessions/sync-sent-invoices",{method:"POST"});
+      const json=await res.json();
+      if(!res.ok){showToast(json.error??"Gmail sync failed",false);return;}
+      showToast(json.message??"Timeline synced from Gmail ✓");
+      fetchInquiries();
+    }catch{showToast("Gmail sync failed",false);}
+    finally{setTimelineSyncLoading(false);}
+  }
 
   async function syncPayments(){
     setSyncLoading(true);setSyncResult(null);setSyncMsg(null);
@@ -603,7 +573,24 @@ function AdminDashboard() {
     return Object.keys(headers).length?{headers}:undefined;
   }
 
-  async function fetchInquiries(){setInquiriesLoading(true);const{data}=await supabase.from('inquiries').select('*').order('created_at',{ascending:false});setInquiries(data??[]);setInquiriesLoading(false);}
+  async function fetchInquiries(){setInquiriesLoading(true);const[{data},{data:dep2}]=await Promise.all([supabase.from('inquiries').select('*').order('created_at',{ascending:false}),supabase.from('payments').select('inquiry_id').eq('payment_type','deposit_2').not('inquiry_id','is',null)]);setInquiries(data??[]);setFinalPaymentIds(new Set((dep2??[]).map((p:{inquiry_id:number})=>p.inquiry_id)));setInquiriesLoading(false);}
+
+  async function handleFinalPayment(id:number,amount:string,method:string){
+    const inq=inquiries.find(i=>i.id===id);
+    const res=await fetch("/api/admin/record-final-payment",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({inquiry_id:id,client_name:inq?.name??'',client_email:inq?.email??'',amount,method})});
+    const json=await res.json() as {ok?:boolean;error?:string};
+    if(!res.ok){showToast(json.error??"Failed to record payment",false);return;}
+    setFinalPaymentIds(prev=>new Set([...prev,id]));
+    showToast(`Final payment recorded for ${inq?.name??'client'} ✓`);
+  }
+  async function recordCardPayment(id:number){
+    setCardPaymentSaving(true);
+    await handleFinalPayment(id,cardPaymentAmount,cardPaymentMethod);
+    setCardPaymentSaving(false);
+    setCardPaymentId(null);
+    setCardPaymentAmount("");
+    setCardPaymentMethod("Venmo");
+  }
   async function fetchPortalSessions(){
     setPortalSessionsLoading(true);
     try{
@@ -756,7 +743,7 @@ function AdminDashboard() {
     setBatchSaving(true);
     let saved=0;
     for(const item of batchItems){
-      const url=await uploadImage(item.file,"portfolio");
+      const url=await uploadImage(item.file,"portfolio",showToast);
       if(!url)continue;
       const cat=categories.find(c=>c.slug===item.category_slug);
       const{error}=await supabase.from('portfolio_images').insert({title:item.title||"Portfolio image",alt:item.title||"Portfolio image",image_url:url,category_id:cat?.id??null,category_slug:item.category_slug,featured:false,sort_order:portfolioImages.length+saved+1});
@@ -797,8 +784,6 @@ function AdminDashboard() {
     showToast("Photo selection updated");
   }
 
-  async function fetchPoses(){setPosesLoading(true);const{data}=await supabase.from('grad_poses').select('*').order('order',{ascending:true});if(data)setPoses(data);setPosesLoading(false);}
-  async function fetchSpots(){setSpotsLoading(true);const{data}=await supabase.from('location_spots').select('*').order('school_id').order('order',{ascending:true});if(data)setSpots(data);setSpotsLoading(false);}
   async function fetchCategories(){
     setCategoriesLoading(true);
     const{data,error}=await supabase.from('portfolio_categories').select('*').order('sort_order',{ascending:true});
@@ -820,7 +805,7 @@ function AdminDashboard() {
     setLibraryUploading(true);
     let saved=0;
     for(const{file}of libraryUploadPreviews){
-      const url=await uploadImage(file,"library");
+      const url=await uploadImage(file,"library",showToast);
       if(!url)continue;
       const title=file.name.replace(/\.[^.]+$/,"").replace(/[-_]/g," ")||"Library photo";
       const{error}=await supabase.from('image_library').insert({
@@ -869,100 +854,8 @@ function AdminDashboard() {
     if(data)setPortfolioImages(data);
     setPortfolioLoading(false);
   }
-  async function fetchPosts(){
-    setPostsLoading(true);
-    let{data,error}=await supabase.from('blog_posts').select('*').contains('sites',[blogCategory]).order('published_at',{ascending:false});
-    if(error){
-      // Fall back to legacy category column
-      const fallback=await supabase.from('blog_posts').select('*').eq('category',blogCategory).order('published_at',{ascending:false});
-      data=fallback.data;
-      error=fallback.error;
-    }
-    if(error&&!isSetupMissing(error))console.error(error);
-    if(data)setPosts(data);
-    setPostsLoading(false);
-  }
-  
-  useEffect(()=>{if(authed){fetchPoses();fetchSpots();fetchCategories();fetchPortfolioImages();fetchLibraryImages();fetchPosts();fetchSiteSettings();fetchInquiries();fetchPortalSessions();fetchGmailStatus();fetchInbox();fetchBlockedSenders();}},[authed]);
-  useEffect(()=>{if(authed)fetchPosts();},[authed,blogCategory]);
+  useEffect(()=>{if(authed){fetchCategories();fetchPortfolioImages();fetchLibraryImages();fetchSiteSettings();fetchInquiries();fetchPortalSessions();fetchGmailStatus();fetchInbox();fetchBlockedSenders();}},[authed]);
   useEffect(()=>{if(authed&&(tab==="inquiries"||tab==="clients")){fetchInquiries();fetchPortalSessions();fetchGmailStatus();fetchBlockedSenders();}},[authed,tab]);
-
-  async function compressForAI(file:File, maxPx=900, quality=0.75):Promise<Blob>{
-    return new Promise(resolve=>{
-      const img=new Image();
-      const url=URL.createObjectURL(file);
-      img.onload=()=>{
-        URL.revokeObjectURL(url);
-        let {width,height}=img;
-        if(width>maxPx||height>maxPx){
-          if(width>height){height=Math.round(height*(maxPx/width));width=maxPx;}
-          else{width=Math.round(width*(maxPx/height));height=maxPx;}
-        }
-        const canvas=document.createElement('canvas');
-        canvas.width=width; canvas.height=height;
-        canvas.getContext('2d')!.drawImage(img,0,0,width,height);
-        canvas.toBlob(blob=>resolve(blob??file),'image/jpeg',quality);
-      };
-      img.onerror=()=>{URL.revokeObjectURL(url);resolve(file);};
-      img.src=url;
-    });
-  }
-
-  async function uploadImage(file:File,folder:string):Promise<string|null>{
-    const ext=file.name.split('.').pop()?.toLowerCase()||'jpg';
-    const name=`${folder}/${Date.now()}.${ext}`;
-    const{error}=await supabase.storage.from('grad-photos').upload(name,file,{upsert:true,contentType:file.type});
-    if(error){
-      console.error("Upload error:", error);
-      showToast(`Image upload failed: ${error.message}`,false);
-      return null;
-    }
-    const{data}=supabase.storage.from('grad-photos').getPublicUrl(name);
-    return data.publicUrl;
-  }
-
-  function startEditPose(pose:Pose){setEditingPose(pose);setPoseForm({title:pose.title,instructions:pose.instructions,order:String(pose.order)});setPoseImg(null);setPoseImgPreview(pose.image_url||null);window.scrollTo({top:0,behavior:"smooth"});}
-  function cancelEditPose(){setEditingPose(null);setPoseForm(EMPTY_POSE);setPoseImg(null);setPoseImgPreview(null);if(poseFileRef.current)poseFileRef.current.value="";}
-  function onPoseImg(e:React.ChangeEvent<HTMLInputElement>){const f=e.target.files?.[0];if(!f)return;setPoseImg(f);setPoseImgPreview(URL.createObjectURL(f));}
-
-  async function savePose(){
-    if(!poseForm.title||!poseForm.instructions){showToast("Title and instructions required",false);return;}
-    setPoseSaving(true);
-    let image_url=editingPose?.image_url??"";
-    if(poseImg){const url=await uploadImage(poseImg,"poses");if(!url){setPoseSaving(false);return;}image_url=url;}
-    if(editingPose){
-      const{error}=await supabase.from('grad_poses').update({title:poseForm.title,instructions:poseForm.instructions,image_url,order:parseInt(poseForm.order)||editingPose.order}).eq('id',editingPose.id);
-      if(error)showToast("Update failed",false);else{showToast("Pose updated!");cancelEditPose();fetchPoses();}
-    }else{
-      const{error}=await supabase.from('grad_poses').insert({title:poseForm.title,instructions:poseForm.instructions,image_url,order:parseInt(poseForm.order)||poses.length+1});
-      if(error)showToast("Save failed",false);else{showToast("Pose added!");setPoseForm(EMPTY_POSE);setPoseImg(null);setPoseImgPreview(null);if(poseFileRef.current)poseFileRef.current.value="";fetchPoses();}
-    }
-    setPoseSaving(false);
-  }
-
-  async function deletePose(id:number){await supabase.from('grad_poses').delete().eq('id',id);setPoses(p=>p.filter(x=>x.id!==id));setDeleteConfirm(null);if(editingPose?.id===id)cancelEditPose();showToast("Pose deleted");}
-
-  function startEditSpot(spot:Spot){setEditingSpot(spot);setSpotForm({school_id:spot.school_id,name:spot.name,description:spot.description,tip:spot.tip,icon:spot.icon,order:String(spot.order)});setSpotImg(null);setSpotImgPreview(spot.image_url||null);window.scrollTo({top:0,behavior:"smooth"});}
-  function cancelEditSpot(){setEditingSpot(null);setSpotForm(EMPTY_SPOT);setSpotImg(null);setSpotImgPreview(null);if(spotFileRef.current)spotFileRef.current.value="";}
-  function onSpotImg(e:React.ChangeEvent<HTMLInputElement>){const f=e.target.files?.[0];if(!f)return;setSpotImg(f);setSpotImgPreview(URL.createObjectURL(f));}
-
-  async function saveSpot(){
-    if(!spotForm.name||!spotForm.description||!spotForm.tip){showToast("Name, description and tip required",false);return;}
-    setSpotSaving(true);
-    let image_url:string|null=editingSpot?.image_url??null;
-    if(spotImg){const url=await uploadImage(spotImg,"locations");if(!url){setSpotSaving(false);return;}image_url=url;}
-    const school=SCHOOLS.find(s=>s.id===spotForm.school_id)!;
-    if(editingSpot){
-      const{error}=await supabase.from('location_spots').update({school_id:school.id,school_name:school.name,school_short:school.short,name:spotForm.name,description:spotForm.description,tip:spotForm.tip,icon:spotForm.icon,image_url,order:parseInt(spotForm.order)||editingSpot.order}).eq('id',editingSpot.id);
-      if(error)showToast("Update failed",false);else{showToast("Location updated!");cancelEditSpot();fetchSpots();}
-    }else{
-      const{error}=await supabase.from('location_spots').insert({school_id:school.id,school_name:school.name,school_short:school.short,name:spotForm.name,description:spotForm.description,tip:spotForm.tip,icon:spotForm.icon,image_url,order:parseInt(spotForm.order)||spots.filter(s=>s.school_id===school.id).length+1});
-      if(error)showToast("Save failed",false);else{showToast("Location added!");setSpotForm(EMPTY_SPOT);setSpotImg(null);setSpotImgPreview(null);if(spotFileRef.current)spotFileRef.current.value="";fetchSpots();}
-    }
-    setSpotSaving(false);
-  }
-
-  async function deleteSpot(id:number){await supabase.from('location_spots').delete().eq('id',id);setSpots(p=>p.filter(x=>x.id!==id));setSpotDeleteConfirm(null);if(editingSpot?.id===id)cancelEditSpot();showToast("Spot deleted");}
 
   // ── Professional portfolio handlers ──────────────────────────────────
   function categoryName(slug:string){return categories.find(c=>c.slug===slug)?.name??slug;}
@@ -991,7 +884,7 @@ function AdminDashboard() {
     if(!portfolioFile&&!editingPortfolioImage){showToast("Upload a portfolio image",false);return;}
     setPortfolioSaving(true);
     let image_url=editingPortfolioImage?.image_url??"";
-    if(portfolioFile){const url=await uploadImage(portfolioFile,"portfolio");if(!url){setPortfolioSaving(false);return;}image_url=url;}
+    if(portfolioFile){const url=await uploadImage(portfolioFile,"portfolio",showToast);if(!url){setPortfolioSaving(false);return;}image_url=url;}
     const category=categories.find(c=>c.slug===portfolioForm.category_slug);
     const payload={title:portfolioForm.title,alt:portfolioForm.alt||portfolioForm.title,image_url,category_id:category?.id??null,category_slug:portfolioForm.category_slug,featured:portfolioForm.featured,sort_order:parseInt(portfolioForm.sort_order)||editingPortfolioImage?.sort_order||portfolioImages.length+1};
     if(editingPortfolioImage){
@@ -1013,190 +906,7 @@ function AdminDashboard() {
     showToast(!current?"Added to carousel":"Removed from carousel");
   }
 
-  // ── Blog handlers ──────────────────────────────────────────────────────
   function slugify(s:string){return s.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");}
-
-  function parseJournalEntry(raw:string){
-    const lines=raw.split("\n");
-    const title=lines.find(l=>l.trim())?.trim()??"";
-
-    // Look for a date pattern like "May 7, 2025", "5/7/25", "May 7, 2025 · 3:45 PM", "May 7th, 2025"
-    const dateRe=/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{2,4}/i;
-    const numericDateRe=/\b\d{1,2}\/\d{1,2}\/\d{2,4}\b/;
-    const timeRe=/\b(\d{1,2}:\d{2}\s*(?:am|pm)?)/i;
-
-    let dateStr="";
-    let timeStr="";
-    let dateLine=-1;
-    for(let i=0;i<lines.length;i++){
-      const line=lines[i];
-      const dMatch=line.match(dateRe)||line.match(numericDateRe);
-      if(dMatch){
-        dateStr=dMatch[0];
-        const tMatch=line.match(timeRe);
-        if(tMatch)timeStr=tMatch[1];
-        dateLine=i;
-        break;
-      }
-    }
-
-    // Parse into datetime-local value (yyyy-MM-ddTHH:mm)
-    let published_at=new Date().toISOString().slice(0,16);
-    if(dateStr){
-      const parsed=new Date(dateStr+(timeStr?" "+timeStr:""));
-      if(!isNaN(parsed.getTime())){
-        const offset=parsed.getTimezoneOffset();
-        const local=new Date(parsed.getTime()-offset*60000);
-        published_at=local.toISOString().slice(0,16);
-      }
-    }
-
-    // Body = everything after title line and date line
-    const skipLines=new Set([lines.findIndex(l=>l.trim()===title)]);
-    if(dateLine>=0)skipLines.add(dateLine);
-    const body=lines.filter((_,i)=>!skipLines.has(i)).join("\n").replace(/^\n+/,"").trim();
-
-    return {title,slug:slugify(title),published_at,body};
-  }
-
-  const [journalDraft,setJournalDraft]=useState("");
-  function onJournalDraftChange(raw:string){
-    setJournalDraft(raw);
-    if(!raw.trim())return;
-    const parsed=parseJournalEntry(raw);
-    setPostForm(f=>({...f,...parsed}));
-  }
-
-  function startEditPost(post:BlogPost){
-    const sites=post.sites&&post.sites.length>0?post.sites:[post.category==="professional"?"professional":"journal"];
-    const primaryCat=(sites.includes("professional")?"professional":"journal") as BlogCategory;
-    setEditingPost(post);setPostForm({title:post.title,body:post.body,slug:post.slug,category:primaryCat,sites,published_at:post.published_at.slice(0,16)});
-    setBlogCategory(primaryCat);setCoverImg(null);setCoverImgPreview(post.cover_image_url||null);setExtraImgs([]);setExtraPreviews(post.extra_image_urls??[]);window.scrollTo({top:0,behavior:"smooth"});
-  }
-  function cancelEditPost(){setEditingPost(null);setPostForm({...EMPTY_POST,category:blogCategory,sites:[blogCategory]});setCoverImg(null);setCoverImgPreview(null);setExtraImgs([]);setExtraPreviews([]);setJournalDraft("");setAiDropFiles([]);setAiDropPreviews([]);if(coverFileRef.current)coverFileRef.current.value="";if(extraFileRef.current)extraFileRef.current.value="";}
-
-  function onAiDropFiles(incoming:File[]){
-    const valid=incoming.filter(f=>f.type.startsWith("image/"));
-    if(!valid.length)return;
-    setAiDropFiles(prev=>[...prev,...valid].slice(0,30));
-    setAiDropPreviews(prev=>[...prev,...valid.map(f=>URL.createObjectURL(f))].slice(0,30));
-  }
-  function removeAiDropFile(i:number){setAiDropFiles(p=>p.filter((_,j)=>j!==i));setAiDropPreviews(p=>p.filter((_,j)=>j!==i));}
-
-  async function generateBlogFromPhotos(){
-    if(aiDropFiles.length<1){showToast("Drop at least 1 photo",false);return;}
-    setAiGenerating(true);
-    try{
-      const ts=Date.now();
-      // Compress for AI (900px/75%) and for storage (2000px/90%) in parallel.
-      // Storage versions are much smaller than raw originals so uploads are fast.
-      const [compressedForAi, compressedForStorage]=await Promise.all([
-        Promise.all(aiDropFiles.map(f=>compressForAI(f,900,0.75))),
-        Promise.all(aiDropFiles.map(f=>compressForAI(f,2000,0.90))),
-      ]);
-      // Build AI request fd (no originalUrls — API uses compressed images as fallback)
-      const fd=new FormData();
-      compressedForAi.forEach((blob,i)=>{
-        fd.append("images",new File([blob],aiDropFiles[i].name.replace(/\.[^.]+$/,".jpg"),{type:"image/jpeg"}));
-      });
-      fd.append("sites","professional");
-      // Run AI call and storage uploads in parallel — the big speed win
-      const [res, storageUrlResults]=await Promise.all([
-        fetch("/api/ai-blog-from-photos",{method:"POST",body:fd}),
-        Promise.all(compressedForStorage.map((blob,i)=>{
-          const path=`blog/${ts}_${i}.jpg`;
-          return supabase.storage.from('grad-photos')
-            .upload(path,blob,{upsert:true,contentType:'image/jpeg'})
-            .then(({error})=>{
-              if(error){console.error("[ai-blog] upload:",error);return null;}
-              return supabase.storage.from('grad-photos').getPublicUrl(path).data.publicUrl;
-            });
-        })),
-      ]);
-      let json:Record<string,unknown>={};
-      try{json=await res.json();}catch{/* non-JSON body (e.g. 413 from Vercel) */}
-      if(!res.ok){showToast((json.error as string)||`AI generation failed (${res.status})`,false);return;}
-      // Patch the post with the full-quality storage URLs now that uploads are done
-      const validUrls=storageUrlResults.filter((u):u is string=>u!==null);
-      if(validUrls.length>0&&Array.isArray(json.selectedIndices)){
-        const indices=json.selectedIndices as number[];
-        const selectedUrls=indices.filter(i=>i<validUrls.length).map(i=>validUrls[i]);
-        const remainingUrls=validUrls.filter((_,i)=>!indices.includes(i));
-        if(selectedUrls.length>0){
-          fetch("/api/update-blog-images",{
-            method:"POST",
-            headers:{"Content-Type":"application/json"},
-            body:JSON.stringify({id:json.id,cover_image_url:selectedUrls[0],extra_image_urls:selectedUrls.slice(1),all_image_urls:[...selectedUrls,...remainingUrls]}),
-          }).catch(err=>console.error("[ai-blog] image patch error:",err));
-        }
-      }
-      showToast(`Published: "${json.title}" — ${json.photo_count} photos`);
-      setAiDropFiles([]);setAiDropPreviews([]);setBlogCategory("professional");fetchPosts();
-    }catch(err){
-      console.error("[ai-blog]",err);
-      showToast("AI generation failed",false);
-    }finally{setAiGenerating(false);}
-  }
-
-  function onCoverImg(e:React.ChangeEvent<HTMLInputElement>){const f=e.target.files?.[0];if(!f)return;setCoverImg(f);setCoverImgPreview(URL.createObjectURL(f));}
-  function onExtraImgs(e:React.ChangeEvent<HTMLInputElement>){const files=Array.from(e.target.files??[]);if(!files.length)return;setExtraImgs(prev=>[...prev,...files]);setExtraPreviews(prev=>[...prev,...files.map(f=>URL.createObjectURL(f))]);}
-  function removeExtraPreview(i:number){
-    const url=extraPreviews[i];
-    setExtraPreviews(p=>p.filter((_,j)=>j!==i));
-    // Only remove from new-file queue if it's a blob URL (not a saved URL)
-    if(url.startsWith("blob:")){setExtraImgs(p=>p.filter((_,j)=>j!==i));}
-  }
-  function onCoverDrop(e:React.DragEvent){
-    e.preventDefault();setCoverDragging(false);
-    const f=Array.from(e.dataTransfer.files).find(f=>f.type.startsWith("image/"));
-    if(!f)return;setCoverImg(f);setCoverImgPreview(URL.createObjectURL(f));
-  }
-  function onExtraDrop(e:React.DragEvent){
-    e.preventDefault();setExtraDragging(false);
-    const files=Array.from(e.dataTransfer.files).filter(f=>f.type.startsWith("image/"));
-    if(!files.length)return;
-    setExtraImgs(prev=>[...prev,...files]);
-    setExtraPreviews(prev=>[...prev,...files.map(f=>URL.createObjectURL(f))]);
-  }
-
-  async function syncImagesToLibrary(postId:number, postSlug:string, postTitle:string, cover_image_url:string|null, extra_image_urls:string[]){
-    const rows = buildJournalImageLibraryRows({postId, postSlug, postTitle, coverImageUrl: cover_image_url, extraImageUrls: extra_image_urls});
-    if(!rows.length) return;
-    await supabase.from('image_library').upsert(rows, {onConflict:'source_post_id,source_role,image_url', ignoreDuplicates:true});
-  }
-
-  async function savePost(){
-    if(!postForm.title||!postForm.body){showToast("Title and body required",false);return;}
-    setPostSaving(true);
-    const slug=postForm.slug||slugify(postForm.title);
-    let cover_image_url=coverImgPreview??(editingPost?.cover_image_url??null);
-    if(coverImg){const url=await uploadImage(coverImg,"blog");if(!url){setPostSaving(false);return;}cover_image_url=url;}
-    else if(!coverImgPreview){cover_image_url=null;}
-    const existingExtras=editingPost?.extra_image_urls??[];
-    const newExtraUrls:string[]=[];
-    for(const f of extraImgs){const url=await uploadImage(f,"blog");if(url)newExtraUrls.push(url);}
-    const existingKept=existingExtras.filter(url=>extraPreviews.includes(url));
-    const extra_image_urls=[...existingKept,...newExtraUrls];
-    const sites=postForm.sites&&postForm.sites.length>0?postForm.sites:[postForm.category];
-    const primaryCategory=(sites.includes("professional")?"professional":"journal") as BlogCategory;
-    const payload={title:postForm.title,body:postForm.body,slug,category:primaryCategory,sites,cover_image_url,extra_image_urls,published_at:new Date(postForm.published_at).toISOString()};
-    if(editingPost){
-      const{error}=await supabase.from('blog_posts').update(payload).eq('id',editingPost.id);
-      if(error){showToast("Update failed",false);}else{
-        await syncImagesToLibrary(editingPost.id, slug, postForm.title, cover_image_url, extra_image_urls);
-        showToast("Post updated!");cancelEditPost();fetchPosts();
-      }
-    }else{
-      const{data:inserted,error}=await supabase.from('blog_posts').insert(payload).select('id').single();
-      if(error||!inserted){showToast("Save failed — "+(error?.message??""),false);}else{
-        await syncImagesToLibrary(inserted.id, slug, postForm.title, cover_image_url, extra_image_urls);
-        showToast("Post published!");cancelEditPost();fetchPosts();
-      }
-    }
-    setPostSaving(false);
-  }
-
-  async function deletePost(id:number){await supabase.from('blog_posts').delete().eq('id',id);setPosts(p=>p.filter(x=>x.id!==id));setPostDeleteConfirm(null);if(editingPost?.id===id)cancelEditPost();showToast("Post deleted");}
 
   const inp="w-full px-3 py-2.5 rounded-xl text-sm font-medium text-slate-800 outline-none border border-slate-200 focus:border-violet-300 bg-white transition-colors";
   const ta=`${inp} resize-none`;
@@ -1248,8 +958,8 @@ function AdminDashboard() {
                 <div className="col-span-2"><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Email *</label><input className="w-full px-3 py-2.5 rounded-xl text-sm font-medium text-slate-800 outline-none border border-slate-200 focus:border-violet-300 bg-white transition-colors" type="email" placeholder="e.g. maria@gmail.com" value={addEventForm.email} onChange={e=>setAddEventForm(f=>({...f,email:e.target.value}))}/></div>
                 <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Phone</label><input className="w-full px-3 py-2.5 rounded-xl text-sm font-medium text-slate-800 outline-none border border-slate-200 focus:border-violet-300 bg-white transition-colors" type="tel" placeholder="(408) 555-1234" value={addEventForm.phone} onChange={e=>setAddEventForm(f=>({...f,phone:e.target.value}))}/></div>
                 <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Session Type</label><input className="w-full px-3 py-2.5 rounded-xl text-sm font-medium text-slate-800 outline-none border border-slate-200 focus:border-violet-300 bg-white transition-colors" placeholder="e.g. Grad Portraits" value={addEventForm.session_type} onChange={e=>setAddEventForm(f=>({...f,session_type:e.target.value}))}/></div>
-                <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Date *</label><input className="w-full px-3 py-2.5 rounded-xl text-sm font-medium text-slate-800 outline-none border border-slate-200 focus:border-violet-300 bg-white transition-colors" type="date" value={addEventForm.session_date} onChange={e=>setAddEventForm(f=>({...f,session_date:e.target.value}))}/></div>
-                <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Time</label><input className="w-full px-3 py-2.5 rounded-xl text-sm font-medium text-slate-800 outline-none border border-slate-200 focus:border-violet-300 bg-white transition-colors" type="time" value={addEventForm.session_time} onChange={e=>setAddEventForm(f=>({...f,session_time:e.target.value}))}/></div>
+                <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Date *</label><input className="w-full px-3 py-2.5 rounded-xl text-sm font-medium text-slate-800 outline-none border border-slate-200 focus:border-violet-300 bg-white transition-colors" type="text" placeholder="YYYY-MM-DD" value={addEventForm.session_date} onChange={e=>setAddEventForm(f=>({...f,session_date:e.target.value}))}/></div>
+                <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Time</label><input className="w-full px-3 py-2.5 rounded-xl text-sm font-medium text-slate-800 outline-none border border-slate-200 focus:border-violet-300 bg-white transition-colors" type="text" placeholder="HH:MM" value={addEventForm.session_time} onChange={e=>setAddEventForm(f=>({...f,session_time:e.target.value}))}/></div>
                 <div className="col-span-2"><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Location</label><input className="w-full px-3 py-2.5 rounded-xl text-sm font-medium text-slate-800 outline-none border border-slate-200 focus:border-violet-300 bg-white transition-colors" placeholder="e.g. UC Berkeley" value={addEventForm.location} onChange={e=>setAddEventForm(f=>({...f,location:e.target.value}))}/></div>
                 <div className="col-span-2"><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Notes</label><textarea className="w-full px-3 py-2.5 rounded-xl text-sm font-medium text-slate-800 outline-none border border-slate-200 focus:border-violet-300 bg-white transition-colors resize-none" rows={2} placeholder="Anything relevant from the conversation…" value={addEventForm.notes} onChange={e=>setAddEventForm(f=>({...f,notes:e.target.value}))}/></div>
                 <div className="col-span-2">
@@ -1293,7 +1003,7 @@ function AdminDashboard() {
       <div className="flex">
         {/* ── SIDEBAR NAV ── */}
         {(()=>{
-          const cancelAll=()=>{cancelEditPose();cancelEditSpot();cancelEditPortfolioImage();cancelEditCategory();cancelEditPost();setEditingInquiry(null);setInquiryDeleteConfirm(null);};
+          const cancelAll=()=>{cancelEditPortfolioImage();cancelEditCategory();setEditingInquiry(null);setInquiryDeleteConfirm(null);};
           const go=(t:Tab)=>{cancelAll();setTab(t);};
           const NavBtn=({t,icon,label}:{t:Tab;icon:string;label:string})=>(
             <button onClick={()=>go(t)}
@@ -1341,7 +1051,7 @@ function AdminDashboard() {
 
         {/* Mobile tab nav — only visible on mobile */}
         {(()=>{
-          const cancelAll=()=>{cancelEditPose();cancelEditSpot();cancelEditPortfolioImage();cancelEditCategory();cancelEditPost();setEditingInquiry(null);setInquiryDeleteConfirm(null);};
+          const cancelAll=()=>{cancelEditPortfolioImage();cancelEditCategory();setEditingInquiry(null);setInquiryDeleteConfirm(null);};
           const go=(t:Tab)=>{cancelAll();setTab(t);};
           type MobileNavItem={t:Tab;icon:string;label:string};
           const all:MobileNavItem[]=[
@@ -1463,12 +1173,13 @@ function AdminDashboard() {
                 <SessionCalendar
                   sessions={inquiries
                     .filter(i=>i.session_date&&i.booking_confirmed)
-                    .map(i=>({id:i.id,name:i.name,session_type:i.session_type,session_date:i.session_date!,payment_status:i.payment_status,booking_confirmed:i.booking_confirmed}))}
+                    .map(i=>({id:i.id,name:i.name,session_type:i.session_type,session_date:i.session_date!,payment_status:i.payment_status,booking_confirmed:i.booking_confirmed,deposit2Received:finalPaymentIds.has(i.id)}))}
                   onClientClick={(id)=>router.push(`/admin/conversation/${id}`)}
                   onReschedule={rescheduleSession}
                   onRemindersClick={(id)=>router.push(`/admin/reminders/${id}`)}
                   onThankYouClick={(id)=>router.push(`/admin/reminders/${id}?focus=thank-you`)}
                   onAddEvent={(date)=>{setAddEventForm(f=>({...EMPTY_EVENT,session_date:date??f.session_date}));setAddEventOpen(true);}}
+                  onFinalPayment={handleFinalPayment}
                 />
 
                 {/* Right column: upcoming + needs reply */}
@@ -1764,180 +1475,9 @@ function AdminDashboard() {
         })()}
 
         {/* ── POSES ── */}
-        {tab==="poses"&&(
-          <div className="space-y-6">
-            <div className={card}>
-              <div className="h-[3px]" style={{background:C.grad90_12}}/>
-              <div className="p-6">
-                <div className="flex items-center justify-between mb-5">
-                  <h2 className="text-base font-black text-slate-900">{editingPose?`Editing: ${editingPose.title}`:"Add New Pose"}</h2>
-                  {editingPose&&<button onClick={cancelEditPose} className="text-xs font-bold text-slate-400 px-3 py-1.5 rounded-lg bg-slate-100">Cancel edit</button>}
-                </div>
-                {editingPose&&<div className="mb-4 px-3 py-2 rounded-xl text-xs font-bold" style={{background:C.p1_08,color:C.p1,border:`1px solid ${C.p1_20}`}}>✏️ Editing existing pose — changes will overwrite.</div>}
+        {tab==="poses"&&<PosesTab showToast={showToast}/>}
 
-                <div className="mb-4">
-                  <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Photo</label>
-                  {poseImgPreview?(
-                    <div className="relative w-full h-52 rounded-xl overflow-hidden mb-2">
-                      <img src={poseImgPreview} className="w-full h-full object-cover"/>
-                      <button onClick={()=>{setPoseImg(null);setPoseImgPreview(editingPose?.image_url||null);if(poseFileRef.current)poseFileRef.current.value="";}} className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/50 text-white text-sm font-bold flex items-center justify-center">✕</button>
-                      <button onClick={()=>poseFileRef.current?.click()} className="absolute bottom-2 right-2 text-xs font-bold text-white px-3 py-1.5 rounded-full" style={{background:`rgba(${C.p1},0.8)`}}>Change photo</button>
-                    </div>
-                  ):(
-                    <button onClick={()=>poseFileRef.current?.click()} className="w-full h-44 rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-2 transition-colors hover:border-violet-300" style={{borderColor:C.p1_20,background:C.p1_04}}>
-                      <span className="text-3xl">📷</span>
-                      <span className="text-xs font-bold" style={{color:C.p1}}>Tap to upload photo</span>
-                      <span className="text-xs text-slate-400">JPG, PNG, HEIC — works from phone camera roll</span>
-                    </button>
-                  )}
-                  <input ref={poseFileRef} type="file" accept="image/*" className="hidden" onChange={onPoseImg}/>
-                </div>
-
-                <div className="space-y-3">
-                  <div><label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1.5">Pose Title</label><input className={inp} placeholder="e.g. Over the Shoulder" value={poseForm.title} onChange={e=>setPoseForm(f=>({...f,title:e.target.value}))}/></div>
-                  <div><label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1.5">Instructions</label><textarea className={ta} rows={4} placeholder="Describe how to do this pose..." value={poseForm.instructions} onChange={e=>setPoseForm(f=>({...f,instructions:e.target.value}))}/></div>
-                  <div><label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1.5">Order #</label><input className={inp} type="number" placeholder="e.g. 5" value={poseForm.order} onChange={e=>setPoseForm(f=>({...f,order:e.target.value}))}/></div>
-                  <button onClick={savePose} disabled={poseSaving} className="w-full py-3 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90 active:scale-95 mt-2" style={{background:C.grad12,opacity:poseSaving?0.7:1}}>
-                    {poseSaving?"Saving…":editingPose?"Update Pose ✓":"Save Pose →"}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <div className="flex items-center gap-2 mb-3">
-                <p className="text-xs font-black uppercase tracking-widest" style={{color:C.p1}}>Current Poses</p>
-                <span className="text-xs font-bold text-slate-400">({poses.length})</span>
-              </div>
-              {posesLoading?[...Array(3)].map((_,i)=><div key={i} className="rounded-2xl animate-pulse h-20 mb-3" style={{background:`linear-gradient(135deg,${C.p1_08},${C.p2_06})`}}/>):(
-                <div className="space-y-3">
-                  {poses.map(pose=>(
-                    <div key={pose.id} className={card+(editingPose?.id===pose.id?` ring-2`:"")+(editingPose?.id===pose.id?" ring-violet-300":"")} style={editingPose?.id===pose.id?{outline:`2px solid ${C.p1}`}:{}}>
-                      <div className="flex">
-                        {pose.image_url?<div className="w-20 h-20 flex-shrink-0 overflow-hidden"><img src={pose.image_url} className="w-full h-full object-cover"/></div>:<div className="w-20 h-20 flex-shrink-0 flex items-center justify-center text-2xl" style={{background:C.p1_06}}>📷</div>}
-                        <div className="flex-1 p-4 min-w-0">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2 mb-0.5">
-                                <span className="text-[10px] font-black px-1.5 py-0.5 rounded-md flex-shrink-0" style={{background:C.p1_08,color:C.p1}}>#{pose.order}</span>
-                                <p className="text-sm font-black text-slate-900 truncate">{pose.title}</p>
-                              </div>
-                              <p className="text-xs text-slate-400 leading-relaxed line-clamp-2">{pose.instructions}</p>
-                            </div>
-                            <div className="flex gap-2 flex-shrink-0">
-                              {editingPose?.id!==pose.id&&<button onClick={()=>startEditPose(pose)} className="text-xs font-bold px-3 py-1.5 rounded-lg" style={{background:C.p1_08,color:C.p1}}>Edit</button>}
-                              {deleteConfirm===pose.id?(
-                                <div className="flex gap-1.5">
-                                  <button onClick={()=>deletePose(pose.id)} className="text-xs font-bold text-white px-2.5 py-1.5 rounded-lg" style={{background:"#be123c"}}>Delete</button>
-                                  <button onClick={()=>setDeleteConfirm(null)} className="text-xs font-bold text-slate-500 px-2.5 py-1.5 rounded-lg bg-slate-100">✕</button>
-                                </div>
-                              ):<button onClick={()=>setDeleteConfirm(pose.id)} className="text-xs font-bold text-slate-300 hover:text-red-400 transition-colors px-1">🗑</button>}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* ── LOCATIONS ── */}
-        {tab==="locations"&&(
-          <div className="space-y-6">
-            <div className={card}>
-              <div className="h-[3px]" style={{background:C.grad90_23}}/>
-              <div className="p-6">
-                <div className="flex items-center justify-between mb-5">
-                  <h2 className="text-base font-black text-slate-900">{editingSpot?`Editing: ${editingSpot.name}`:"Add New Location Spot"}</h2>
-                  {editingSpot&&<button onClick={cancelEditSpot} className="text-xs font-bold text-slate-400 px-3 py-1.5 rounded-lg bg-slate-100">Cancel edit</button>}
-                </div>
-                {editingSpot&&<div className="mb-4 px-3 py-2 rounded-xl text-xs font-bold" style={{background:C.p2_08,color:C.p2,border:`1px solid ${C.p2_18}`}}>✏️ Editing existing spot — changes will overwrite.</div>}
-
-                <div className="mb-4">
-                  <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Photo</label>
-                  {spotImgPreview?(
-                    <div className="relative w-full h-52 rounded-xl overflow-hidden mb-2">
-                      <img src={spotImgPreview} className="w-full h-full object-cover"/>
-                      <button onClick={()=>{setSpotImg(null);setSpotImgPreview(editingSpot?.image_url||null);if(spotFileRef.current)spotFileRef.current.value="";}} className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/50 text-white text-sm font-bold flex items-center justify-center">✕</button>
-                      <button onClick={()=>spotFileRef.current?.click()} className="absolute bottom-2 right-2 text-xs font-bold text-white px-3 py-1.5 rounded-full" style={{background:C.p2_20}}>Change photo</button>
-                    </div>
-                  ):(
-                    <button onClick={()=>spotFileRef.current?.click()} className="w-full h-44 rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-2 transition-colors" style={{borderColor:C.p2_18,background:C.p2_06}}>
-                      <span className="text-3xl">📷</span>
-                      <span className="text-xs font-bold" style={{color:C.p2}}>Tap to upload photo</span>
-                      <span className="text-xs text-slate-400">JPG, PNG, HEIC — works from phone camera roll</span>
-                    </button>
-                  )}
-                  <input ref={spotFileRef} type="file" accept="image/*" className="hidden" onChange={onSpotImg}/>
-                </div>
-
-                <div className="space-y-3">
-                  <div><label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1.5">School</label><select className={inp} value={spotForm.school_id} onChange={e=>setSpotForm(f=>({...f,school_id:e.target.value}))}>{SCHOOLS.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
-                  <div><label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1.5">Spot Name</label><input className={inp} placeholder="e.g. Sather Gate" value={spotForm.name} onChange={e=>setSpotForm(f=>({...f,name:e.target.value}))}/></div>
-                  <div><label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1.5">Description</label><textarea className={ta} rows={3} placeholder="Describe the spot..." value={spotForm.description} onChange={e=>setSpotForm(f=>({...f,description:e.target.value}))}/></div>
-                  <div><label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1.5">Pro Tip</label><input className={inp} placeholder="e.g. Arrive before 9am on weekdays" value={spotForm.tip} onChange={e=>setSpotForm(f=>({...f,tip:e.target.value}))}/></div>
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1.5">Icon</label>
-                    <div className="flex flex-wrap gap-2">
-                      {ICONS.map(icon=>(
-                        <button key={icon} onClick={()=>setSpotForm(f=>({...f,icon}))} className="w-9 h-9 rounded-xl text-lg flex items-center justify-center transition-all"
-                          style={{background:spotForm.icon===icon?C.grad23:"rgba(0,0,0,0.04)",transform:spotForm.icon===icon?"scale(1.15)":"scale(1)"}}>{icon}</button>
-                      ))}
-                    </div>
-                  </div>
-                  <div><label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1.5">Order #</label><input className={inp} type="number" placeholder="e.g. 3" value={spotForm.order} onChange={e=>setSpotForm(f=>({...f,order:e.target.value}))}/></div>
-                  <button onClick={saveSpot} disabled={spotSaving} className="w-full py-3 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90 active:scale-95 mt-2" style={{background:C.grad23,opacity:spotSaving?0.7:1}}>
-                    {spotSaving?"Saving…":editingSpot?"Update Location ✓":"Save Location →"}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {spotsLoading?[...Array(4)].map((_,i)=><div key={i} className="rounded-2xl animate-pulse h-20" style={{background:`linear-gradient(135deg,${C.p2_08},${C.p3_08})`}}/>):(
-              SCHOOLS.map(school=>{
-                const schoolSpots=spots.filter(s=>s.school_id===school.id);
-                if(schoolSpots.length===0)return null;
-                return(
-                  <div key={school.id}>
-                    <div className="flex items-center gap-2 mb-3">
-                      <p className="text-xs font-black uppercase tracking-widest" style={{color:C.p2}}>{school.short}</p>
-                      <span className="text-xs font-bold text-slate-400">({schoolSpots.length} spots)</span>
-                    </div>
-                    <div className="space-y-3">
-                      {schoolSpots.map(spot=>(
-                        <div key={spot.id} className={card} style={editingSpot?.id===spot.id?{outline:`2px solid ${C.p2}`}:{}}>
-                          <div className="flex">
-                            {spot.image_url?<div className="w-20 h-20 flex-shrink-0 overflow-hidden"><img src={spot.image_url} className="w-full h-full object-cover"/></div>:<div className="w-20 h-20 flex-shrink-0 flex items-center justify-center text-2xl" style={{background:C.p2_06}}>{spot.icon}</div>}
-                            <div className="flex-1 p-4 min-w-0">
-                              <div className="flex items-start justify-between gap-2">
-                                <div className="min-w-0">
-                                  <p className="text-sm font-black text-slate-900 truncate mb-0.5">{spot.name}</p>
-                                  <p className="text-xs text-slate-400 leading-relaxed line-clamp-2">{spot.description}</p>
-                                </div>
-                                <div className="flex gap-2 flex-shrink-0">
-                                  {editingSpot?.id!==spot.id&&<button onClick={()=>startEditSpot(spot)} className="text-xs font-bold px-3 py-1.5 rounded-lg" style={{background:C.p2_08,color:C.p2}}>Edit</button>}
-                                  {spotDeleteConfirm===spot.id?(
-                                    <div className="flex gap-1.5">
-                                      <button onClick={()=>deleteSpot(spot.id)} className="text-xs font-bold text-white px-2.5 py-1.5 rounded-lg" style={{background:"#be123c"}}>Delete</button>
-                                      <button onClick={()=>setSpotDeleteConfirm(null)} className="text-xs font-bold text-slate-500 px-2.5 py-1.5 rounded-lg bg-slate-100">✕</button>
-                                    </div>
-                                  ):<button onClick={()=>setSpotDeleteConfirm(spot.id)} className="text-xs font-bold text-slate-300 hover:text-red-400 transition-colors px-1">🗑</button>}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        )}
+        {tab==="locations"&&<LocationsTab showToast={showToast}/>}
 
         {tab==="bayGuide"&&<BayAreaLocationsManager />}
 
@@ -2297,267 +1837,9 @@ function AdminDashboard() {
           </div>
         )}
 
-        {/* ── BLOG ── */}
-        {tab==="blog"&&(
-          <div className="space-y-6">
-            <div className={card}>
-              <div className="h-[3px]" style={{background:C.grad}}/>
-              <div className="p-6">
-                <div className="flex items-center justify-between mb-5">
-                  <h2 className="text-base font-black text-slate-900">{editingPost?`Editing: ${editingPost.title}`:"New Blog Post"}</h2>
-                  {editingPost&&<button onClick={cancelEditPost} className="text-xs font-bold text-slate-400 px-3 py-1.5 rounded-lg bg-slate-100">Cancel edit</button>}
-                </div>
-                {editingPost&&<div className="mb-4 px-3 py-2 rounded-xl text-xs font-bold" style={{background:C.p1_08,color:C.p1,border:`1px solid ${C.p1_20}`}}>✏️ Editing existing post.</div>}
+        {tab==="blog"&&<BlogTab showToast={showToast}/>}
 
-                <div className="mb-5">
-                  <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Show On</label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {BLOG_CATEGORIES.map(cat=>(
-                      <label
-                        key={cat.value}
-                        className="flex items-start gap-3 rounded-xl border px-4 py-3 cursor-pointer transition-all"
-                        style={(postForm.sites??[]).includes(cat.value)?{borderColor:C.p1,background:C.p1_08}:{borderColor:"#e2e8f0",background:"#fff"}}
-                      >
-                        <input
-                          type="checkbox"
-                          className="mt-0.5 accent-violet-600"
-                          checked={(postForm.sites??[]).includes(cat.value)}
-                          onChange={e=>{
-                            const checked=e.target.checked;
-                            setPostForm(f=>{
-                              const cur=f.sites??[];
-                              const next=checked?[...cur,cat.value]:cur.filter(s=>s!==cat.value);
-                              const primary=(next.includes("professional")?"professional":"journal") as BlogCategory;
-                              return {...f,sites:next,category:primary};
-                            });
-                          }}
-                        />
-                        <div>
-                          <span className="block text-sm font-black text-slate-900">{cat.label}</span>
-                          <span className="block text-xs font-medium text-slate-400 mt-0.5">{cat.helper}</span>
-                        </div>
-                      </label>
-                    ))}
-                  </div>
-                  {(postForm.sites??[]).length===0&&<p className="text-xs font-bold mt-1.5" style={{color:"#be123c"}}>Select at least one site.</p>}
-                </div>
-
-                {/* ── AI Photo Drop ─────────────────────────────────── */}
-                <div className="mb-5 rounded-xl p-4" style={{background:"#f0fdf4",border:`1.5px dashed #22c55e`}}>
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <span className="text-base">✨</span>
-                    <label className="block text-xs font-bold uppercase tracking-widest" style={{color:"#16a34a"}}>AI: Drop Photos → Auto-Post</label>
-                  </div>
-                  <p className="text-xs text-slate-400 mb-3">Drop 10–30 photos. Claude picks the best 10, writes the post, and publishes it instantly.</p>
-
-                  {/* Drop zone */}
-                  <div
-                    className="w-full rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-2 cursor-pointer transition-all"
-                    style={{
-                      minHeight:"100px",
-                      borderColor:aiDropDragging?"#16a34a":"#86efac",
-                      background:aiDropDragging?"#dcfce7":"#f0fdf4",
-                    }}
-                    onClick={()=>aiDropRef.current?.click()}
-                    onDragOver={e=>{e.preventDefault();setAiDropDragging(true);}}
-                    onDragLeave={()=>setAiDropDragging(false)}
-                    onDrop={e=>{e.preventDefault();setAiDropDragging(false);onAiDropFiles(Array.from(e.dataTransfer.files));}}
-                  >
-                    {aiDropFiles.length===0?(
-                      <>
-                        <span className="text-2xl">📷</span>
-                        <span className="text-xs font-bold" style={{color:"#16a34a"}}>Drop photos here or tap to select</span>
-                        <span className="text-xs text-slate-400">Up to 30 photos · JPG, PNG, HEIC</span>
-                      </>
-                    ):(
-                      <div className="w-full p-2">
-                        <div className="grid grid-cols-5 gap-1.5 mb-2">
-                          {aiDropPreviews.map((url,i)=>(
-                            <div key={i} className="relative aspect-square rounded-lg overflow-hidden">
-                              <img src={url} className="w-full h-full object-cover"/>
-                              <button
-                                onClick={e=>{e.stopPropagation();removeAiDropFile(i);}}
-                                className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-black/60 text-white text-[9px] font-bold flex items-center justify-center"
-                              >✕</button>
-                            </div>
-                          ))}
-                          <div
-                            className="aspect-square rounded-lg border border-dashed flex items-center justify-center"
-                            style={{borderColor:"#86efac",background:"#dcfce7"}}
-                          >
-                            <span className="text-lg text-green-400">+</span>
-                          </div>
-                        </div>
-                        <p className="text-xs font-bold text-center" style={{color:"#16a34a"}}>{aiDropFiles.length} photo{aiDropFiles.length!==1?"s":""} selected — Claude picks the best 10</p>
-                      </div>
-                    )}
-                  </div>
-                  <input ref={aiDropRef} type="file" accept="image/*" multiple className="hidden" onChange={e=>onAiDropFiles(Array.from(e.target.files??[]))}/>
-
-                  {aiDropFiles.length>0&&(
-                    <div className="flex gap-2 mt-3">
-                      <button
-                        onClick={generateBlogFromPhotos}
-                        disabled={aiGenerating}
-                        className="flex-1 py-2.5 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90 active:scale-95"
-                        style={{background:aiGenerating?"#86efac":"#16a34a",opacity:aiGenerating?0.8:1}}
-                      >
-                        {aiGenerating?"✨ Analyzing & Publishing…":"✨ Generate & Publish with AI"}
-                      </button>
-                      <button
-                        onClick={()=>{setAiDropFiles([]);setAiDropPreviews([]);}}
-                        disabled={aiGenerating}
-                        className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-400 bg-slate-100 hover:bg-slate-200 transition-colors"
-                      >Clear</button>
-                    </div>
-                  )}
-                </div>
-
-                {/* Journal paste box */}
-                <div className="mb-4 rounded-xl p-4" style={{background:C.p1_04,border:`1.5px dashed ${C.p1_20}`}}>
-                  <label className="block text-xs font-bold uppercase tracking-widest mb-1.5" style={{color:C.p1}}>Paste Journal Entry</label>
-                  <p className="text-xs text-slate-400 mb-2">Paste your raw entry — first line becomes the title, date line sets the date, the rest becomes the body.</p>
-                  <textarea
-                    className={ta}
-                    rows={5}
-                    placeholder={"Golden Hour at SJSU — Mia's Grad Shoot\nMay 7, 2025 · 3:45 PM\n\nThe light was absolutely perfect that evening..."}
-                    value={journalDraft}
-                    onChange={e=>onJournalDraftChange(e.target.value)}
-                  />
-                  {journalDraft&&<button onClick={()=>{setJournalDraft("");}} className="mt-1.5 text-xs font-bold text-slate-400 underline">Clear</button>}
-                </div>
-
-                {/* Cover image */}
-                <div className="mb-4">
-                  <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Cover Photo</label>
-                  {coverImgPreview?(
-                    <div
-                      className="relative w-full h-52 rounded-xl overflow-hidden mb-2"
-                      onDragOver={e=>{e.preventDefault();setCoverDragging(true);}}
-                      onDragLeave={()=>setCoverDragging(false)}
-                      onDrop={onCoverDrop}
-                      style={coverDragging?{outline:`2px solid ${C.p1}`}:{}}
-                    >
-                      <img src={coverImgPreview} className="w-full h-full object-cover"/>
-                      <button onClick={()=>{setCoverImg(null);setCoverImgPreview(null);if(coverFileRef.current)coverFileRef.current.value="";}} className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/50 text-white text-sm font-bold flex items-center justify-center">✕</button>
-                      <button onClick={()=>coverFileRef.current?.click()} className="absolute bottom-2 right-2 text-xs font-bold text-white px-3 py-1.5 rounded-full" style={{background:C.p1_20}}>Change</button>
-                    </div>
-                  ):(
-                    <div
-                      onClick={()=>coverFileRef.current?.click()}
-                      onDragOver={e=>{e.preventDefault();setCoverDragging(true);}}
-                      onDragLeave={()=>setCoverDragging(false)}
-                      onDrop={onCoverDrop}
-                      className="w-full h-40 rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-2 cursor-pointer"
-                      style={{borderColor:coverDragging?C.p1:C.p1_20,background:coverDragging?C.p1_08:C.p1_04}}
-                    >
-                      <span className="text-3xl">🖼️</span>
-                      <span className="text-xs font-bold" style={{color:C.p1}}>{coverDragging?"Drop it":"Tap or drag cover photo"}</span>
-                      <span className="text-xs text-slate-400">JPG, PNG, HEIC</span>
-                    </div>
-                  )}
-                  <input ref={coverFileRef} type="file" accept="image/*" className="hidden" onChange={onCoverImg}/>
-                </div>
-
-                <div className="space-y-3">
-                  <div><label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1.5">Title</label><input className={inp} placeholder="e.g. Golden Hour at SJSU — Mia's Grad Shoot" value={postForm.title} onChange={e=>setPostForm(f=>({...f,title:e.target.value,slug:slugify(e.target.value)}))}/></div>
-                  <div><label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1.5">Slug (URL)</label><input className={inp} placeholder="auto-generated from title" value={postForm.slug} onChange={e=>setPostForm(f=>({...f,slug:slugify(e.target.value)}))}/></div>
-                  <div><label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1.5">Date & Time</label><input className={inp} type="datetime-local" value={postForm.published_at} onChange={e=>setPostForm(f=>({...f,published_at:e.target.value}))}/></div>
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1.5">Body</label>
-                    <textarea className={ta} rows={8} placeholder={"Write your shoot story here...\n\nUse blank lines between paragraphs — each one becomes its own paragraph on the post page."} value={postForm.body} onChange={e=>setPostForm(f=>({...f,body:e.target.value}))}/>
-                    <p className="text-xs text-slate-400 mt-1">Separate paragraphs with a blank line.</p>
-                  </div>
-
-                  {/* Extra photos */}
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Extra Photos ({extraPreviews.length})</label>
-                    <div
-                      className="grid grid-cols-3 gap-2 mb-2 rounded-xl transition-all"
-                      onDragOver={e=>{e.preventDefault();setExtraDragging(true);}}
-                      onDragLeave={e=>{if(!e.currentTarget.contains(e.relatedTarget as Node))setExtraDragging(false);}}
-                      onDrop={onExtraDrop}
-                      style={extraDragging?{outline:`2px dashed ${C.p2}`,outlineOffset:"4px",background:C.p2_06}:{}}
-                    >
-                      {extraPreviews.map((url,i)=>(
-                        <div key={i} className="relative aspect-square rounded-xl overflow-hidden">
-                          <img src={url} className="w-full h-full object-cover"/>
-                          <button onClick={()=>removeExtraPreview(i)} className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/50 text-white text-xs font-bold flex items-center justify-center">✕</button>
-                        </div>
-                      ))}
-                      <div
-                        onClick={()=>extraFileRef.current?.click()}
-                        className="aspect-square rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-1 cursor-pointer"
-                        style={{borderColor:extraDragging?C.p2:C.p2_18,background:extraDragging?C.p2_06:"transparent"}}
-                      >
-                        <span className="text-xl">+</span>
-                        <span className="text-[10px] font-bold" style={{color:C.p2}}>{extraDragging?"Drop":"Add photos"}</span>
-                      </div>
-                    </div>
-                    <input ref={extraFileRef} type="file" accept="image/*" multiple className="hidden" onChange={onExtraImgs}/>
-                    <p className="text-xs text-slate-400">Drag & drop photos here, or tap + to pick. Hit ✕ on any photo to remove it.</p>
-                  </div>
-
-                  <button onClick={savePost} disabled={postSaving} className="w-full py-3 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90 active:scale-95 mt-2" style={{background:C.grad,opacity:postSaving?0.7:1}}>
-                    {postSaving?"Publishing…":editingPost?"Update Post ✓":"Publish Post →"}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Existing posts */}
-            <div>
-              <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
-                <div className="flex items-center gap-2">
-                <p className="text-xs font-black uppercase tracking-widest" style={{color:C.p1}}>{blogCategory==="professional"?"Professional Case Studies":"Journal Posts"}</p>
-                <span className="text-xs font-bold text-slate-400">({posts.length})</span>
-                </div>
-                <div className="flex gap-2 p-1 rounded-xl bg-white border border-slate-100">
-                  {BLOG_CATEGORIES.map(category=>(
-                    <button key={category.value} onClick={()=>{setBlogCategory(category.value);setPostForm(f=>({...f,category:category.value}));}} className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all" style={blogCategory===category.value?{background:C.p1_10,color:C.p1}:{color:"#94a3b8"}}>
-                      {category.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              {postsLoading?[...Array(2)].map((_,i)=><div key={i} className="rounded-2xl animate-pulse h-20 mb-3" style={{background:`linear-gradient(135deg,${C.p1_08},${C.p2_06})`}}/>):(
-                posts.length===0?<p className="text-sm text-slate-400 font-medium">No posts yet — write your first one above.</p>:(
-                  <div className="space-y-3">
-                    {posts.map(post=>(
-                      <div key={post.id} className={card} style={editingPost?.id===post.id?{outline:`2px solid ${C.p1}`}:{}}>
-                        <div className="flex">
-                          {post.cover_image_url?<div className="w-20 h-20 flex-shrink-0 overflow-hidden"><img src={post.cover_image_url} className="w-full h-full object-cover"/></div>:<div className="w-20 h-20 flex-shrink-0 flex items-center justify-center text-2xl" style={{background:C.p1_06}}>✍️</div>}
-                          <div className="flex-1 p-4 min-w-0">
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="min-w-0">
-                                <p className="text-sm font-black text-slate-900 truncate mb-0.5">{post.title}</p>
-                                <p className="text-xs text-slate-400">{(post.sites&&post.sites.length>0?post.sites:[post.category==="professional"?"professional":"journal"]).map(s=>s==="professional"?"Professional":"Journal").join(" + ")} · {new Date(post.published_at).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})} · {(post.extra_image_urls?.length??0)+1} photo{(post.extra_image_urls?.length??0)>0?"s":""}</p>
-                              </div>
-                              <div className="flex gap-2 flex-shrink-0 flex-wrap">
-                                {(post.sites&&post.sites.length>0?post.sites:[post.category==="professional"?"professional":"journal"]).map(site=>(
-                                  <a key={site} href={`${site==="professional"?"/blog":"/journal"}/${post.slug}`} target="_blank" className="text-xs font-bold px-3 py-1.5 rounded-lg" style={{background:C.p1_08,color:C.p1}}>{site==="professional"?"Blog →":"Journal →"}</a>
-                                ))}
-                                {editingPost?.id!==post.id&&<button onClick={()=>startEditPost(post)} className="text-xs font-bold px-3 py-1.5 rounded-lg" style={{background:C.p2_08,color:C.p2}}>Edit</button>}
-                                {postDeleteConfirm===post.id?(
-                                  <div className="flex gap-1.5">
-                                    <button onClick={()=>deletePost(post.id)} className="text-xs font-bold text-white px-2.5 py-1.5 rounded-lg" style={{background:"#be123c"}}>Delete</button>
-                                    <button onClick={()=>setPostDeleteConfirm(null)} className="text-xs font-bold text-slate-500 px-2.5 py-1.5 rounded-lg bg-slate-100">✕</button>
-                                  </div>
-                                ):<button onClick={()=>setPostDeleteConfirm(post.id)} className="text-xs font-bold text-slate-300 hover:text-red-400 transition-colors px-1">🗑</button>}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* ── ANALYTICS ── */}
+                {/* ── ANALYTICS ── */}
         {tab==="analytics"&&(
           <AnalyticsTab/>
         )}
@@ -2639,6 +1921,11 @@ function AdminDashboard() {
                     className="text-xs font-bold px-3 py-1.5 rounded-lg transition-all hover:opacity-80 flex items-center gap-1.5 disabled:opacity-50"
                     style={{background:"linear-gradient(135deg,#10b981,#059669)",color:"#fff"}}>
                     {syncLoading?<><span className="animate-spin inline-block">◌</span> Scanning…</>:"💳 Sync Payments"}
+                  </button>
+                  <button onClick={syncTimeline} disabled={timelineSyncLoading}
+                    className="text-xs font-bold px-3 py-1.5 rounded-lg transition-all hover:opacity-80 flex items-center gap-1.5 disabled:opacity-50"
+                    style={{background:"linear-gradient(135deg,#7c3aed,#6d28d9)",color:"#fff"}}>
+                    {timelineSyncLoading?<><span className="animate-spin inline-block">◌</span> Syncing…</>:"📬 Sync Timeline"}
                   </button>
                   <button onClick={fetchInquiries} disabled={inquiriesLoading}
                     className="text-xs font-bold px-3 py-1.5 rounded-lg transition-all hover:opacity-80 flex items-center gap-1.5"
@@ -2832,6 +2119,47 @@ function AdminDashboard() {
                                   🖼 Gallery {new Date(inq.gallery_delivered_at).toLocaleDateString("en-US",{month:"short",day:"numeric"})}
                                 </span>
                               )}
+                              {inq.deposit_paid_at&&finalPaymentIds.has(inq.id)&&(
+                                <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full"
+                                      style={{background:"rgba(16,185,129,0.15)",color:"#047857"}}>
+                                  💳 Final Paid ✓
+                                </span>
+                              )}
+                              {inq.deposit_paid_at&&!finalPaymentIds.has(inq.id)&&(
+                                <button onClick={e=>{e.stopPropagation();setCardPaymentId(cardPaymentId===inq.id?null:inq.id);setCardPaymentAmount("");setCardPaymentMethod("Venmo");}}
+                                  className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full cursor-pointer"
+                                  style={{background:"rgba(99,102,241,0.12)",color:"#6366f1"}}>
+                                  💳 Record 2nd
+                                </button>
+                              )}
+                            </div>
+                          )}
+                          {cardPaymentId===inq.id&&(
+                            <div className="mt-2 rounded-xl p-3" style={{background:"rgba(16,185,129,0.05)",border:"1px solid rgba(16,185,129,0.2)"}} onClick={e=>e.stopPropagation()}>
+                              <p className="text-[10px] font-black uppercase tracking-widest mb-2" style={{color:"#059669"}}>Record Final Payment</p>
+                              <div className="flex gap-2 mb-2">
+                                <input type="text" placeholder="Amount (e.g. 150)" value={cardPaymentAmount}
+                                  onChange={e=>setCardPaymentAmount(e.target.value)}
+                                  className="flex-1 rounded-lg border px-2.5 py-1.5 text-sm font-semibold outline-none"
+                                  style={{borderColor:"rgba(16,185,129,0.3)",background:"white",color:"#1e293b"}}/>
+                                <select value={cardPaymentMethod} onChange={e=>setCardPaymentMethod(e.target.value)}
+                                  className="rounded-lg border px-2 py-1.5 text-xs font-bold outline-none"
+                                  style={{borderColor:"rgba(16,185,129,0.3)",background:"white",color:"#1e293b"}}>
+                                  <option>Venmo</option><option>Zelle</option><option>PayPal</option><option>Cash App</option><option>Cash</option><option>Other</option>
+                                </select>
+                              </div>
+                              <div className="flex gap-2">
+                                <button onClick={()=>recordCardPayment(inq.id)} disabled={!cardPaymentAmount||cardPaymentSaving}
+                                  className="flex-1 rounded-lg py-1.5 text-xs font-black text-white disabled:opacity-50"
+                                  style={{background:"linear-gradient(135deg,#10b981,#059669)"}}>
+                                  {cardPaymentSaving?"Saving…":"Record Payment ✓"}
+                                </button>
+                                <button onClick={e=>{e.stopPropagation();setCardPaymentId(null);setCardPaymentAmount("");}}
+                                  className="px-3 rounded-lg py-1.5 text-xs font-bold"
+                                  style={{background:"rgba(0,0,0,0.05)",color:"#64748b"}}>
+                                  Cancel
+                                </button>
+                              </div>
                             </div>
                           )}
                           {/* Message preview */}
@@ -2907,7 +2235,7 @@ function AdminDashboard() {
                               <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-xs">
                                 {inq.school&&<div><span className="font-bold text-slate-400 uppercase tracking-wide text-[10px]">School / Campus </span><span className="text-slate-700 font-medium">{inq.school}</span></div>}
                                 {inq.people&&<div><span className="font-bold text-slate-400 uppercase tracking-wide text-[10px]">People </span><span className="text-slate-700 font-medium">{inq.people}</span></div>}
-                                {inq.preferred_time&&<div><span className="font-bold text-slate-400 uppercase tracking-wide text-[10px]">Preferred time </span><span className="text-slate-700 font-medium">{inq.preferred_time}</span></div>}
+                                {inq.preferred_time&&<div><span className="font-bold text-slate-400 uppercase tracking-wide text-[10px]">Preferred time </span><span className="text-slate-700 font-medium">{fmt12h(inq.preferred_time)}</span></div>}
                                 {inq.location&&<div><span className="font-bold text-slate-400 uppercase tracking-wide text-[10px]">Desired location </span><span className="text-slate-700 font-medium">{inq.location}</span></div>}
                                 {inq.instagram&&<div><span className="font-bold text-slate-400 uppercase tracking-wide text-[10px]">Instagram </span><span className="text-slate-700 font-medium">@{inq.instagram.replace(/^@/,"")}</span></div>}
                               </div>
@@ -3307,6 +2635,11 @@ function AdminDashboard() {
                         style={{background:"linear-gradient(135deg,#10b981,#059669)",color:"#fff"}}>
                         {syncLoading?<><span className="animate-spin inline-block">◌</span> Scanning…</>:"💳 Sync Payments"}
                       </button>
+                      <button onClick={syncTimeline} disabled={timelineSyncLoading}
+                        className="text-xs font-bold px-3 py-1.5 rounded-lg transition-all hover:opacity-80 flex items-center gap-1.5 disabled:opacity-50 flex-shrink-0"
+                        style={{background:"linear-gradient(135deg,#7c3aed,#6d28d9)",color:"#fff"}}>
+                        {timelineSyncLoading?<><span className="animate-spin inline-block">◌</span> Syncing…</>:"📬 Sync Timeline"}
+                      </button>
                       <button onClick={()=>setAddClientOpen(o=>!o)}
                         className="text-xs font-bold px-3 py-1.5 rounded-lg transition-all hover:opacity-80 flex items-center gap-1.5 flex-shrink-0"
                         style={addClientOpen?{background:C.grad12,color:"#fff"}:{background:C.p1_04,color:C.p1,border:`1px solid ${C.p1_20}`}}>
@@ -3444,7 +2777,7 @@ function AdminDashboard() {
                                         </button>
                                       )}
                                       {s.date_in_mind&&!s.session_date&&<span className="text-xs text-slate-400">{s.date_in_mind}</span>}
-                                      {s.session_date&&<span className="text-xs font-bold text-emerald-600">{new Date(s.session_date+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}{s.preferred_time?` · ${s.preferred_time}`:""}</span>}
+                                      {s.session_date&&<span className="text-xs font-bold text-emerald-600">{new Date(s.session_date+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}{s.preferred_time?` · ${fmt12h(s.preferred_time)}`:""}</span>}
                                     </div>
                                     <p className="text-[11px] text-slate-400 mt-0.5 truncate">{s.message.slice(0,80)}{s.message.length>80?"…":""}</p>
                                     {(s.deposit_paid_at||s.invoice_sent_at||s.contract_sent_at||s.confirmation_sent_at||s.gallery_delivered_at)&&(

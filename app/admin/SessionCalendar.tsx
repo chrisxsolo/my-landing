@@ -9,6 +9,7 @@ type Session = {
   session_date: string;
   payment_status: string | null;
   booking_confirmed: boolean | null;
+  deposit2Received?: boolean;
 };
 
 type Props = {
@@ -20,6 +21,7 @@ type Props = {
   remindersLoading?: Record<number, boolean>;
   remindersOpen?: Record<number, boolean>;
   onAddEvent?: (date?: string) => void;
+  onFinalPayment?: (id: number, amount: string, method: string) => Promise<void>;
 };
 
 const GRAD_COLOR  = { grad: "linear-gradient(135deg,#34d399,#059669)", text: "#059669", bg: "rgba(52,211,153,0.13)" };
@@ -46,7 +48,7 @@ export default function SessionCalendar({
   sessions, onClientClick, onReschedule,
   onRemindersClick, onThankYouClick,
   remindersLoading = {}, remindersOpen = {},
-  onAddEvent,
+  onAddEvent, onFinalPayment,
 }: Props) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -57,6 +59,10 @@ export default function SessionCalendar({
   const [reschedulingId, setReschedulingId] = useState<number | null>(null);
   const [rescheduleValue, setRescheduleValue] = useState("");
   const [rescheduleLoading, setRescheduleLoading] = useState(false);
+  const [finalPaymentId, setFinalPaymentId] = useState<number | null>(null);
+  const [finalPaymentAmount, setFinalPaymentAmount] = useState("");
+  const [finalPaymentMethod, setFinalPaymentMethod] = useState("Venmo");
+  const [finalPaymentSaving, setFinalPaymentSaving] = useState(false);
 
   const monthStart  = new Date(viewYear, viewMonth, 1);
   const monthEnd    = new Date(viewYear, viewMonth + 1, 0);
@@ -70,6 +76,9 @@ export default function SessionCalendar({
   }
 
   const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,"0")}-${String(today.getDate()).padStart(2,"0")}`;
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth()+1).padStart(2,"0")}-${String(tomorrow.getDate()).padStart(2,"0")}`;
 
   const prevMonth = () => {
     if (viewMonth === 0) { setViewYear(y => y - 1); setViewMonth(11); }
@@ -227,6 +236,19 @@ export default function SessionCalendar({
                 setReschedulingId(null);
               }
 
+              const isRecordingFinalPayment = finalPaymentId === s.id;
+              const showFinalPaymentBtn = isPast && s.booking_confirmed && !s.deposit2Received && onFinalPayment && !isRecordingFinalPayment;
+
+              async function confirmFinalPayment() {
+                if (!onFinalPayment || !finalPaymentAmount) return;
+                setFinalPaymentSaving(true);
+                await onFinalPayment(s.id, finalPaymentAmount, finalPaymentMethod);
+                setFinalPaymentSaving(false);
+                setFinalPaymentId(null);
+                setFinalPaymentAmount("");
+                setFinalPaymentMethod("Venmo");
+              }
+
               return (
                 <div key={s.id} className="rounded-2xl overflow-hidden"
                   style={{ background: "rgba(255,255,255,0.9)", border: "1px solid rgba(167,139,250,0.15)", boxShadow: "0 2px 8px rgba(124,58,237,0.06)" }}>
@@ -240,8 +262,21 @@ export default function SessionCalendar({
                       <div className="flex items-center gap-1.5 flex-wrap mt-2">
                         {isPaid && (
                           <span className="text-[10px] font-black px-2 py-0.5 rounded-lg" style={{ background: "rgba(16,185,129,0.1)", color: "#059669" }}>
-                            Paid ✓
+                            Deposit ✓
                           </span>
+                        )}
+                        {s.deposit2Received && (
+                          <span className="text-[10px] font-black px-2 py-0.5 rounded-lg" style={{ background: "rgba(16,185,129,0.15)", color: "#047857" }}>
+                            Final Paid ✓
+                          </span>
+                        )}
+                        {showFinalPaymentBtn && (
+                          <button
+                            onClick={() => { setFinalPaymentId(s.id); setFinalPaymentAmount(""); setFinalPaymentMethod("Venmo"); }}
+                            className="text-[11px] font-bold px-2.5 py-1 rounded-lg"
+                            style={{ background: "rgba(16,185,129,0.12)", color: "#059669" }}>
+                            💳 Final Payment
+                          </button>
                         )}
                         {isPast && onThankYouClick && (
                           <button
@@ -292,6 +327,48 @@ export default function SessionCalendar({
                       </div>
                     </div>
                   )}
+
+                  {isRecordingFinalPayment && (
+                    <div className="px-3 pb-3 pt-0">
+                      <div className="rounded-xl p-3" style={{ background: "rgba(16,185,129,0.05)", border: "1px solid rgba(16,185,129,0.2)" }}>
+                        <p className="text-[10px] font-black uppercase tracking-widest mb-2" style={{ color: "#059669" }}>Record Final Payment</p>
+                        <div className="flex gap-2 mb-2">
+                          <input
+                            type="text"
+                            placeholder="Amount (e.g. 150)"
+                            value={finalPaymentAmount}
+                            onChange={e => setFinalPaymentAmount(e.target.value)}
+                            className="flex-1 rounded-lg border px-2.5 py-1.5 text-sm font-semibold outline-none"
+                            style={{ borderColor: "rgba(16,185,129,0.3)", background: "white", color: "#1e293b" }}
+                          />
+                          <select
+                            value={finalPaymentMethod}
+                            onChange={e => setFinalPaymentMethod(e.target.value)}
+                            className="rounded-lg border px-2 py-1.5 text-xs font-bold outline-none"
+                            style={{ borderColor: "rgba(16,185,129,0.3)", background: "white", color: "#1e293b" }}>
+                            <option>Venmo</option>
+                            <option>Zelle</option>
+                            <option>PayPal</option>
+                            <option>Cash App</option>
+                            <option>Cash</option>
+                            <option>Other</option>
+                          </select>
+                        </div>
+                        <div className="flex gap-2">
+                          <button onClick={confirmFinalPayment} disabled={!finalPaymentAmount || finalPaymentSaving}
+                            className="flex-1 rounded-lg py-1.5 text-xs font-black text-white disabled:opacity-50"
+                            style={{ background: "linear-gradient(135deg,#10b981,#059669)" }}>
+                            {finalPaymentSaving ? "Saving…" : "Record Payment ✓"}
+                          </button>
+                          <button onClick={() => { setFinalPaymentId(null); setFinalPaymentAmount(""); }}
+                            className="px-3 rounded-lg py-1.5 text-xs font-bold"
+                            style={{ background: "rgba(0,0,0,0.05)", color: "#64748b" }}>
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -311,10 +388,6 @@ export default function SessionCalendar({
               {next3.map(s => {
                 const col = colorFor(s);
                 const dt  = new Date(s.session_date + "T12:00:00");
-                const tomorrowStr = (() => {
-                  const d = new Date(today); d.setDate(d.getDate() + 1);
-                  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
-                })();
                 const label = s.session_date === todayStr ? "TODAY" : s.session_date === tomorrowStr ? "TOMORROW" : dt.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }).toUpperCase();
                 const isRescheduling = reschedulingId === s.id;
                 return (
