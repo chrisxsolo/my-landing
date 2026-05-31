@@ -5,7 +5,7 @@
 
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getPortfolioData } from "@/lib/professionalData";
+import { getPortfolioData, getSiteSettings } from "@/lib/professionalData";
 
 export const metadata: Metadata = {
   title: "Rates | soloxsnaps",
@@ -32,14 +32,26 @@ const RATES = [
     cta:     "See family pricing",
     chips:   ["From $350", "Guided session", "Family-friendly pacing"],
   },
+  {
+    slug:    "couples",
+    href:    "/pricing/couples",
+    kicker:  "Couples photography",
+    heading: "Couples rates",
+    copy:    "Anniversary photos, engagement sessions, lifestyle portraits, and proposal coverage. Sessions from 30 minutes to 90+ minutes across Bay Area locations.",
+    cta:     "See couples pricing",
+    chips:   ["From $350", "25+ edited images", "Guided posing"],
+  },
 ] as const;
 
 export default async function RatesPage() {
-  const { images } = await getPortfolioData();
+  const [{ images }, siteSettings] = await Promise.all([getPortfolioData(), getSiteSettings()]);
 
   const gradBg    = images.find((i) => i.category_slug === "grads")?.image_url    ?? null;
   const familyBg  = images.find((i) => i.category_slug === "families")?.image_url ?? null;
-  const couplesBg = images.find((i) => i.category_slug === "couples")?.image_url  ?? null;
+  const couplesBg =
+    images.find((i) => i.category_slug === "couples")?.image_url
+    ?? siteSettings.pricing_couples_standard_image
+    ?? null;
   const bgMap: Record<string, string | null> = { grads: gradBg, families: familyBg, couples: couplesBg };
 
   return (
@@ -182,7 +194,7 @@ const CSS = `
   /* ── CARDS GRID ───────────────────────────────────────────────────────────── */
   .rates-grid {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 14px;
     padding-bottom: 80px;
   }
@@ -374,7 +386,13 @@ const CSS = `
   }
 
   /* ── RESPONSIVE ───────────────────────────────────────────────────────────── */
-  @media (max-width: 860px) {
+  @media (max-width: 1060px) {
+    .rates-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 660px) {
     .rates-grid {
       grid-template-columns: 1fr;
       gap: 12px;
