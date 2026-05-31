@@ -1323,7 +1323,7 @@ export default function ConversationPage() {
               inquiry.school      && { label: "School",   value: inquiry.school },
               inquiry.people      && { label: "People",   value: inquiry.people },
               inquiry.date_in_mind && { label: "Date",    value: inquiry.date_in_mind },
-              inquiry.preferred_time && { label: "Time",  value: fmt12h(inquiry.preferred_time) },
+              inquiry.preferred_time && { label: "Time",  value: inquiry.preferred_time },
               inquiry.location    && { label: "Location", value: inquiry.location },
               inquiry.session_date && { label: "Booked",  value: new Date(inquiry.session_date + "T12:00:00").toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) },
             ].filter(Boolean).map((row, i) => {

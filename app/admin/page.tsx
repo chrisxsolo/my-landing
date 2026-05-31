@@ -206,6 +206,7 @@ function AdminDashboard() {
   const [inquiries,setInquiries]=useState<Inquiry[]>([]);
   const [inquiriesLoading,setInquiriesLoading]=useState(false);
   const [finalPaymentIds,setFinalPaymentIds]=useState<Set<number>>(new Set());
+  const [deposit1Amounts,setDeposit1Amounts]=useState<Map<number,string>>(new Map());
   const [cardPaymentId,setCardPaymentId]=useState<number|null>(null);
   const [cardPaymentAmount,setCardPaymentAmount]=useState("");
   const [cardPaymentMethod,setCardPaymentMethod]=useState("Venmo");
@@ -573,7 +574,7 @@ function AdminDashboard() {
     return Object.keys(headers).length?{headers}:undefined;
   }
 
-  async function fetchInquiries(){setInquiriesLoading(true);const[{data},{data:dep2}]=await Promise.all([supabase.from('inquiries').select('*').order('created_at',{ascending:false}),supabase.from('payments').select('inquiry_id').eq('payment_type','deposit_2').not('inquiry_id','is',null)]);setInquiries(data??[]);setFinalPaymentIds(new Set((dep2??[]).map((p:{inquiry_id:number})=>p.inquiry_id)));setInquiriesLoading(false);}
+  async function fetchInquiries(){setInquiriesLoading(true);const[{data},{data:dep2},{data:dep1}]=await Promise.all([supabase.from('inquiries').select('*').order('created_at',{ascending:false}),supabase.from('payments').select('inquiry_id').eq('payment_type','deposit_2').not('inquiry_id','is',null),supabase.from('payments').select('inquiry_id,amount,client_email').eq('payment_type','deposit_1')]);setInquiries(data??[]);setFinalPaymentIds(new Set((dep2??[]).map((p:{inquiry_id:number})=>p.inquiry_id)));const d1Map=new Map<number,string>();const emailAmt=new Map<string,string>();(dep1??[]).forEach((p:{inquiry_id:number|null;amount:string;client_email:string})=>{const a=p.amount?.replace(/[^0-9.]/g,"");if(!a)return;if(p.inquiry_id)d1Map.set(p.inquiry_id,a);if(p.client_email)emailAmt.set(p.client_email.toLowerCase(),a);});(data??[]).forEach((inq:{id:number;email:string;payment_note:string|null})=>{if(d1Map.has(inq.id))return;const byEmail=emailAmt.get(inq.email?.toLowerCase());if(byEmail){d1Map.set(inq.id,byEmail);return;}const m=inq.payment_note?.match(/\$?([\d,]+(?:\.\d{1,2})?)/);if(m)d1Map.set(inq.id,m[1].replace(/,/g,""));});setDeposit1Amounts(d1Map);setInquiriesLoading(false);}
 
   async function handleFinalPayment(id:number,amount:string,method:string){
     const inq=inquiries.find(i=>i.id===id);
@@ -1180,6 +1181,7 @@ function AdminDashboard() {
                   onThankYouClick={(id)=>router.push(`/admin/reminders/${id}?focus=thank-you`)}
                   onAddEvent={(date)=>{setAddEventForm(f=>({...EMPTY_EVENT,session_date:date??f.session_date}));setAddEventOpen(true);}}
                   onFinalPayment={handleFinalPayment}
+                  deposit1Amounts={deposit1Amounts}
                 />
 
                 {/* Right column: upcoming + needs reply */}
@@ -2126,7 +2128,7 @@ function AdminDashboard() {
                                 </span>
                               )}
                               {inq.deposit_paid_at&&!finalPaymentIds.has(inq.id)&&(
-                                <button onClick={e=>{e.stopPropagation();setCardPaymentId(cardPaymentId===inq.id?null:inq.id);setCardPaymentAmount("");setCardPaymentMethod("Venmo");}}
+                                <button onClick={e=>{e.stopPropagation();const isOpen=cardPaymentId===inq.id;setCardPaymentId(isOpen?null:inq.id);setCardPaymentAmount(isOpen?"":deposit1Amounts.get(inq.id)??"");setCardPaymentMethod("Venmo");}}
                                   className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full cursor-pointer"
                                   style={{background:"rgba(99,102,241,0.12)",color:"#6366f1"}}>
                                   💳 Record 2nd

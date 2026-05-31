@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
     payment_type: "deposit_2",
     invoice: "",
     note: "Final payment recorded manually",
-    source: "manual",
+    source: "auto",
     status: "active",
     paid_at: now,
     session_date: null,
@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
 
   if (error) {
     console.error("[record-final-payment]", error);
-    return NextResponse.json({ error: "Failed to record payment" }, { status: 500 });
+    return NextResponse.json({ error: error.message ?? "Failed to record payment" }, { status: 500 });
   }
 
   return NextResponse.json({ ok: true });

@@ -22,6 +22,7 @@ type Props = {
   remindersOpen?: Record<number, boolean>;
   onAddEvent?: (date?: string) => void;
   onFinalPayment?: (id: number, amount: string, method: string) => Promise<void>;
+  deposit1Amounts?: Map<number, string>;
 };
 
 const GRAD_COLOR  = { grad: "linear-gradient(135deg,#34d399,#059669)", text: "#059669", bg: "rgba(52,211,153,0.13)" };
@@ -48,7 +49,7 @@ export default function SessionCalendar({
   sessions, onClientClick, onReschedule,
   onRemindersClick, onThankYouClick,
   remindersLoading = {}, remindersOpen = {},
-  onAddEvent, onFinalPayment,
+  onAddEvent, onFinalPayment, deposit1Amounts = new Map(),
 }: Props) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -272,7 +273,7 @@ export default function SessionCalendar({
                         )}
                         {showFinalPaymentBtn && (
                           <button
-                            onClick={() => { setFinalPaymentId(s.id); setFinalPaymentAmount(""); setFinalPaymentMethod("Venmo"); }}
+                            onClick={() => { setFinalPaymentId(s.id); setFinalPaymentAmount(deposit1Amounts.get(s.id)??""); setFinalPaymentMethod("Venmo"); }}
                             className="text-[11px] font-bold px-2.5 py-1 rounded-lg"
                             style={{ background: "rgba(16,185,129,0.12)", color: "#059669" }}>
                             💳 Final Payment
