@@ -141,3 +141,71 @@ export function calculateGraduationEstimate(input: EstimateInput): EstimateResul
 export function formatCurrency(amount: number): string {
   return `$${amount.toLocaleString("en-US")}`
 }
+
+// ── COUPLES PACKAGES ─────────────────────────────────────────────────────────
+export const COUPLES_PACKAGES = {
+  mini:       { label: "30-Min Mini Session",    price: 350 },
+  "1hr":      { label: "1-Hour Session",         price: 450 },
+  signature:  { label: "Signature Session",      price: 575 },
+  engagement: { label: "Engagement Session",     price: 650 },
+  proposal:   { label: "Proposal Session",       price: 750 },
+} as const
+export type CouplesPackageKey = keyof typeof COUPLES_PACKAGES
+
+// ── COUPLES LOCATIONS ────────────────────────────────────────────────────────
+export const COUPLES_LOCATIONS = [
+  { value: "sf",          label: "San Francisco",           fee: null      },
+  { value: "oakland",     label: "Oakland / East Bay",      fee: 35        },
+  { value: "berkeley",    label: "Berkeley / UC Area",      fee: 35        },
+  { value: "peninsula",   label: "Peninsula / Palo Alto",   fee: 45        },
+  { value: "south-bay",   label: "South Bay / San Jose",    fee: 75        },
+  { value: "santa-clara", label: "Santa Clara",             fee: 70        },
+  { value: "other",       label: "Other Bay Area Location", fee: undefined },
+] as const
+export type CouplesLocationValue = typeof COUPLES_LOCATIONS[number]["value"]
+
+// ── COUPLES ADD-ON RATES ──────────────────────────────────────────────────────
+export const COUPLES_ADDON_EXTRA_LOCATION = 125
+export const COUPLES_ADDON_EXTRA_OUTFIT   = 75
+export const COUPLES_ADDON_EXTRA_30_MIN   = 175
+export const COUPLES_ADDON_PROOFING       = 75
+export const COUPLES_ADDON_RUSH_PREVIEW   = 75
+export const COUPLES_ADDON_EXPEDITED      = 150
+
+// ── COUPLES ESTIMATE ─────────────────────────────────────────────────────────
+export interface CouplesEstimateInput {
+  packageKey: CouplesPackageKey
+  location: CouplesLocationValue
+  extraLocation: boolean
+  extraOutfit: boolean
+  extra30Min: boolean
+  proofingGallery: boolean
+  rushPreview: boolean
+  expedited: boolean
+}
+
+export function calculateCouplesEstimate(input: CouplesEstimateInput): EstimateResult {
+  const pkg = COUPLES_PACKAGES[input.packageKey]
+
+  let addons = 0
+  if (input.extraLocation)  addons += COUPLES_ADDON_EXTRA_LOCATION
+  if (input.extraOutfit)    addons += COUPLES_ADDON_EXTRA_OUTFIT
+  if (input.extra30Min)     addons += COUPLES_ADDON_EXTRA_30_MIN
+  if (input.proofingGallery) addons += COUPLES_ADDON_PROOFING
+  if (input.rushPreview)    addons += COUPLES_ADDON_RUSH_PREVIEW
+  if (input.expedited)      addons += COUPLES_ADDON_EXPEDITED
+
+  const locationData = COUPLES_LOCATIONS.find(l => l.value === input.location)
+  const travelFee = locationData?.fee as number | null | undefined
+  const travelMethod: EstimateResult["travelMethod"] =
+    travelFee === null      ? "none" :
+    travelFee === undefined ? "tbd"  :
+    "flat"
+  const travelAmount = (travelFee ?? 0) as number
+
+  const subtotal = pkg.price + addons + travelAmount
+  const deposit  = subtotal / 2
+  const remainingBalance = subtotal / 2
+
+  return { sessionBase: pkg.price, travelFee, addons, subtotal, deposit, remainingBalance, travelMethod, groupNote: null }
+}

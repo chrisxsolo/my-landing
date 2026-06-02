@@ -328,6 +328,28 @@ function ContactForm() {
   const [status, setStatus] = useState<"idle" | "sending" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
 
+  const showSchoolField = !form.sessionType || form.sessionType === "Graduation Portrait";
+
+  const expectationItems = form.sessionType === "Graduation Portrait"
+    ? [
+        "Guided posing — no awkward standing around",
+        "Fast, clear communication",
+        "Private gallery delivered on time",
+        "Bay Area campus expertise",
+        "50% deposit to reserve your date",
+      ]
+    : [
+        "Guided posing — no awkward standing around",
+        "Fast, clear communication",
+        "Private gallery delivered on time",
+        "Bay Area location expertise",
+        "50% deposit to reserve your date",
+      ];
+
+  const responseTimeDesc = form.sessionType === "Graduation Portrait"
+    ? "Most inquiries are answered within 24 hours. You will also get a copy of your responses and the graduation guide after submitting."
+    : "Most inquiries are answered within 24 hours. You will also get a copy of your responses after submitting.";
+
   // Pre-fill fields from query params (availability calendar, estimator, etc.)
   useEffect(() => {
     const updates: Partial<typeof form> = {};
@@ -455,7 +477,7 @@ function ContactForm() {
               </div>
             </div>
 
-            <div className="form-row">
+            <div className={showSchoolField ? "form-row" : undefined}>
               <div className="contact-field">
                 <label htmlFor="sessionType" className="contact-label">Session type</label>
                 <select
@@ -471,18 +493,20 @@ function ContactForm() {
                   ))}
                 </select>
               </div>
-              <div className="contact-field">
-                <label htmlFor="school" className="contact-label">School / Campus</label>
-                <input
-                  id="school"
-                  name="school"
-                  type="text"
-                  placeholder="UC Berkeley, SF State, etc."
-                  className="contact-input"
-                  value={form.school}
-                  onChange={handleChange}
-                />
-              </div>
+              {showSchoolField && (
+                <div className="contact-field">
+                  <label htmlFor="school" className="contact-label">School / Campus</label>
+                  <input
+                    id="school"
+                    name="school"
+                    type="text"
+                    placeholder="UC Berkeley, SF State, etc."
+                    className="contact-input"
+                    value={form.school}
+                    onChange={handleChange}
+                  />
+                </div>
+              )}
             </div>
 
             <div className="form-row">
@@ -578,19 +602,13 @@ function ContactForm() {
           <div className="contact-side-panel">
             <p className="contact-kicker">Response time</p>
             <h2>Within 24 hours.</h2>
-            <p>Most inquiries are answered within 24 hours. You will also get a copy of your responses and the graduation guide after submitting.</p>
+            <p>{responseTimeDesc}</p>
           </div>
 
           <div className="contact-side-panel">
             <p className="contact-kicker">What to expect</p>
             <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 10, marginTop: 4 }}>
-              {[
-                "Guided posing — no awkward standing around",
-                "Fast, clear communication",
-                "Private gallery delivered on time",
-                "Bay Area campus expertise",
-                "50% deposit to reserve your date",
-              ].map((item) => (
+              {expectationItems.map((item) => (
                 <li key={item} style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: 14, color: "#56635e", lineHeight: 1.5 }}>
                   <span style={{ color: "#4f6d67", fontWeight: 700, flexShrink: 0 }}>✓</span>
                   {item}

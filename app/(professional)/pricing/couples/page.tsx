@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getPortfolioData, getSiteSettings } from "@/lib/professionalData";
 import { pricingCSS, anim } from "@/lib/proStyles";
+import CouplesRateEstimator from "@/app/components/CouplesRateEstimator";
 
 export const metadata: Metadata = {
   title: "Couples Photography Pricing | SoloXSnaps",
@@ -149,6 +150,10 @@ export default async function CouplesPricingPage() {
             </div>
           ))}
         </div>
+      </section>
+
+      <section className="pricing-shell" style={{ paddingTop: 0, paddingBottom: 64 }}>
+        <CouplesRateEstimator />
       </section>
 
       <section className="pricing-shell pricing-cta">
