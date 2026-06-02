@@ -26,9 +26,9 @@ import HeroCarousel from "@/app/components/HeroCarousel";
 
 export const dynamic = "force-dynamic";
 
-const title = "soloxsnaps | Bay Area Graduation and Family Photographer";
+const title = "soloxsnaps | Bay Area Couples, Family & Graduation Photographer";
 const description =
-  "Bay Area graduation and family photography by Chris Solorzano. Clean direction, warm portraits, and galleries built around real milestones.";
+  "Bay Area photography by Chris Solorzano — couples, families, and graduation sessions. Clean direction, warm portraits, and galleries built around real moments.";
 
 // ── FALLBACK IMAGE ────────────────────────────────────────────────────────────
 const profileImage =
@@ -44,9 +44,10 @@ export const metadata: Metadata = {
   description,
   alternates: { canonical: "/" },
   keywords: [
+    "Bay Area couples photographer",
     "Bay Area graduation photographer",
-    "San Francisco graduation photographer",
     "Bay Area family photographer",
+    "San Francisco photographer",
     "soloxsnaps",
     "Chris Solorzano photography",
   ],
@@ -687,7 +688,7 @@ export default async function ProfessionalHomePage() {
     image: heroImageUrl,
     founder: { "@type": "Person", name: "Chris Solorzano" },
     areaServed: ["San Francisco", "Bay Area", "San Jose", "Oakland", "Berkeley"],
-    serviceType: ["Graduation photography", "Family photography"],
+    serviceType: ["Couples photography", "Graduation photography", "Family photography"],
   };
 
   return (
@@ -773,7 +774,7 @@ export default async function ProfessionalHomePage() {
               </p>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
                 <Link href="/availability" className="home-link home-link--green">Check dates</Link>
-                <Link href="/pricing/grads"   className="home-link home-link--ghost">See grad rates</Link>
+                <Link href="/pricing"         className="home-link home-link--ghost">See sessions</Link>
               </div>
             </div>
             <div className="home-editorial-media" aria-label="Featured photography" data-reveal data-delay="2">
@@ -828,16 +829,17 @@ export default async function ProfessionalHomePage() {
           <div className="home-cta-panel glass-shimmer" data-reveal>
             <div className="home-cta-copy">
               {/* CTA heading — edit text here */}
-              <p className="home-kicker">Grad season moves quickly</p>
-              <h2 className="home-title">Lock the date before campus turns chaotic.</h2>
+              <p className="home-kicker">Dates book up fast</p>
+              <h2 className="home-title">Lock your date before it&rsquo;s gone.</h2>
               {/* CTA body copy — edit text here */}
               <p className="home-copy" style={{ marginTop: 20 }}>
-                Open dates change fast during spring. Send the date you have in mind and I will confirm
-                timing, location flow, and next steps.
+                Whether it&rsquo;s a couples session, a family portrait, or a graduation milestone —
+                open dates fill quickly. Send the date you have in mind and I&rsquo;ll confirm
+                timing, location, and next steps.
               </p>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 26 }}>
-                <Link href="/contact"    className="home-link home-link--green">Book a shoot</Link>
-                <Link href="/grad-guide" className="home-link home-link--ghost">Graduation guide</Link>
+                <Link href="/contact" className="home-link home-link--green">Book a shoot</Link>
+                <Link href="/pricing" className="home-link home-link--ghost">View sessions</Link>
               </div>
             </div>
             <div className="home-cta-media">

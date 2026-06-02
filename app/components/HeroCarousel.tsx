@@ -189,20 +189,20 @@ export default function HeroCarousel({ images }: { images: CarouselImage[] }) {
         />
 
         <div className="home-hero-inner">
-          <p className="home-hero-kicker">Bay Area graduation photography</p>
+          <p className="home-hero-kicker">Bay Area photography</p>
           <h1 className="home-hero-title">
-            Graduation photos that feel natural, not awkward.
+            Photos that feel real, not rehearsed.
           </h1>
           <p className="home-hero-copy">
-            Most clients tell me they feel awkward in front of the camera. That&rsquo;s completely normal.
-            I guide the entire session so you feel confident, natural, and actually enjoy the day.
+            Couples, families, and grads — I keep sessions calm, directed, and easy enough
+            that you actually enjoy the day. No stiff poses, just photos that look like you.
           </p>
           <div className="home-hero-actions">
             <Link href="/contact" className="home-hero-action" data-primary="true">
               Book a session
             </Link>
-            <Link href="/pricing/grads" className="home-hero-action">
-              See grad rates
+            <Link href="/pricing" className="home-hero-action">
+              See sessions
             </Link>
           </div>
         </div>
