@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/requireAdmin";
+import {
+  PAYMENT_SOURCE_MANUAL,
+  inferPaymentTotalCents,
+  parseLoosePaymentCents,
+} from "@/lib/paymentTotalInference";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 
 export const dynamic = "force-dynamic";
@@ -8,6 +13,7 @@ const INQUIRIES_TABLE = "inquiries";
 const PAYMENTS_TABLE = "payments";
 const PAYMENT_TYPES = new Set(["deposit_1", "deposit_2", "full", "other"]);
 const PAYMENT_SELECT = "id,inquiry_id,client_name,client_email,amount,amount_cents,method,payment_type,invoice,note,source,status,paid_at,session_date";
+const INQUIRY_SELECT = "id,name,email,session_type,session_date,date_in_mind,message,school,location,people,payment_status,payment_note,payment_detected_at,deposit_paid_at,created_at";
 
 type ManualPaymentInput = {
   inquiry_id?: number | null;
@@ -22,10 +28,21 @@ type ManualPaymentInput = {
   session_date?: string | null;
 };
 
+type PaymentPlanInput = {
+  action?: string;
+  inquiry_id?: number | null;
+  client_name?: string;
+  client_email?: string;
+  total_amount?: string;
+  method?: string;
+  paid_at?: string;
+  paid?: "deposit_1" | "deposit_2" | "full";
+};
+
+type SupabaseServerClient = ReturnType<typeof createSupabaseServerClient>;
+
 function parseCents(amount: string): number {
-  const match = amount.match(/[\d,]+(?:\.\d{1,2})?/);
-  if (!match) return 0;
-  return Math.round(parseFloat(match[0].replace(/,/g, "")) * 100);
+  return parseLoosePaymentCents(amount);
 }
 
 function normalizeDate(value: string): string | null {
@@ -53,11 +70,58 @@ function normalizeRow(row: ManualPaymentInput) {
     payment_type: paymentType,
     invoice: row.invoice?.trim() ?? "",
     note: row.note?.trim() || "Payment entered manually",
-    source: "manual",
+    source: PAYMENT_SOURCE_MANUAL,
     status: "active",
     paid_at: paidAt,
     session_date: row.session_date || null,
   };
+}
+
+function formatAmount(cents: number): string {
+  return (cents / 100).toFixed(2);
+}
+
+function buildPlanRows(input: PaymentPlanInput, existingTypes: Set<string>, totalCents: number) {
+  const paidAt = normalizeDate(input.paid_at?.trim() || new Date().toISOString().slice(0, 10));
+  if (!paidAt) return [];
+
+  const types = input.paid === "full" ? ["deposit_1", "deposit_2"] : [input.paid ?? "deposit_1"];
+  const halfCents = Math.round(totalCents / 2);
+  const amounts = {
+    deposit_1: halfCents,
+    deposit_2: totalCents - halfCents,
+  };
+
+  return types
+    .filter(type => !existingTypes.has(type))
+    .map(type => ({
+      inquiry_id: Number.isFinite(input.inquiry_id) ? input.inquiry_id : null,
+      client_name: input.client_name?.trim() ?? "",
+      client_email: input.client_email?.trim().toLowerCase() ?? "",
+      amount: formatAmount(amounts[type as "deposit_1" | "deposit_2"]),
+      amount_cents: amounts[type as "deposit_1" | "deposit_2"],
+      method: input.method?.trim() || "manual",
+      payment_type: type,
+      invoice: "",
+      note: `Manual ${type === "deposit_1" ? "first" : "second"} deposit from payment planner`,
+      source: PAYMENT_SOURCE_MANUAL,
+      status: "active",
+      paid_at: paidAt,
+      session_date: null,
+    }));
+}
+
+async function findBestInquiryByEmail(supabase: SupabaseServerClient, email: string) {
+  if (!email) return null;
+
+  const { data } = await supabase
+    .from(INQUIRIES_TABLE)
+    .select(INQUIRY_SELECT)
+    .eq("email", email)
+    .order("created_at", { ascending: false })
+    .limit(10);
+
+  return (data ?? []).find(row => inferPaymentTotalCents([], row) > 0) ?? data?.[0] ?? null;
 }
 
 export async function GET(req: NextRequest) {
@@ -68,14 +132,14 @@ export async function GET(req: NextRequest) {
   const [inquiries, payments] = await Promise.all([
     supabase
       .from(INQUIRIES_TABLE)
-      .select("id,name,email,session_type,session_date")
+      .select(INQUIRY_SELECT)
       .order("created_at", { ascending: false })
       .limit(500),
     supabase
       .from(PAYMENTS_TABLE)
       .select(PAYMENT_SELECT)
       .order("paid_at", { ascending: false })
-      .limit(50),
+      .limit(1000),
   ]);
 
   if (inquiries.error) {
@@ -92,8 +156,18 @@ export async function POST(req: NextRequest) {
   const deny = requireAdmin(req);
   if (deny) return deny;
 
-  const body = await req.json() as { rows?: ManualPaymentInput[] };
-  const rows = Array.isArray(body.rows) ? body.rows.slice(0, 50).map(normalizeRow).filter(row => row !== null) : [];
+  const body = await req.json() as { rows?: ManualPaymentInput[] } | PaymentPlanInput;
+
+  if ("action" in body && body.action === "mark-payment-state") {
+    return markPaymentState(body);
+  }
+
+  if ("action" in body && body.action === "void-client-payments") {
+    return voidClientPayments(body as PaymentPlanInput);
+  }
+
+  const inputRows = "rows" in body && Array.isArray(body.rows) ? body.rows : [];
+  const rows = inputRows.slice(0, 50).map(normalizeRow).filter(row => row !== null);
 
   if (!rows.length) {
     return NextResponse.json({ error: "Add at least one payment with a client name, amount, and paid date." }, { status: 400 });
@@ -117,4 +191,81 @@ export async function POST(req: NextRequest) {
   }).eq("id", row.inquiry_id)));
 
   return NextResponse.json({ ok: true, saved: data ?? [] });
+}
+
+async function markPaymentState(input: PaymentPlanInput) {
+  if (!input.client_name?.trim() || !input.client_email?.trim()) {
+    return NextResponse.json({ error: "Client name and email are required." }, { status: 400 });
+  }
+  if (!["deposit_1", "deposit_2", "full"].includes(input.paid ?? "")) {
+    return NextResponse.json({ error: "Choose first deposit, second deposit, or paid in full." }, { status: 400 });
+  }
+
+  const supabase = createSupabaseServerClient();
+  const email = input.client_email.trim().toLowerCase();
+  const query = supabase
+    .from(PAYMENTS_TABLE)
+    .select("id,payment_type,amount,amount_cents,status")
+    .eq("status", "active");
+  const paymentQuery = input.inquiry_id
+    ? query.or(`inquiry_id.eq.${input.inquiry_id},client_email.eq.${email}`)
+    : query.eq("client_email", email);
+
+  const [{ data: existingPayments, error: existingError }, { data: inquiry }] = await Promise.all([
+    paymentQuery,
+    input.inquiry_id
+      ? supabase.from(INQUIRIES_TABLE).select(INQUIRY_SELECT).eq("id", input.inquiry_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+
+  if (existingError) {
+    return NextResponse.json({ error: existingError.message }, { status: 500 });
+  }
+
+  const sameEmailInquiry = inquiry ?? await findBestInquiryByEmail(supabase, email);
+  const totalCents = parseCents(input.total_amount ?? "") || inferPaymentTotalCents(existingPayments ?? [], sameEmailInquiry);
+  if (totalCents <= 0) {
+    return NextResponse.json({ error: "Enter a total amount first." }, { status: 400 });
+  }
+
+  const existingTypes = new Set((existingPayments ?? []).map(payment => payment.payment_type).filter(Boolean) as string[]);
+  const rows = buildPlanRows(input, existingTypes, totalCents);
+
+  if (!rows.length) {
+    return NextResponse.json({ ok: true, saved: [], skipped: true });
+  }
+
+  const { data, error } = await supabase.from(PAYMENTS_TABLE).insert(rows).select(PAYMENT_SELECT);
+
+  if (error) {
+    console.error("[manual-payment-state]", error);
+    return NextResponse.json({ error: error.message ?? "Failed to update payment state" }, { status: 500 });
+  }
+
+  if (input.inquiry_id) {
+    await supabase.from(INQUIRIES_TABLE).update({
+      payment_status: "paid",
+      payment_note: `Manual total ${formatAmount(totalCents)} (${input.paid === "full" ? "paid in full" : input.paid})`,
+      payment_detected_at: rows[0].paid_at,
+      booking_confirmed: true,
+      deposit_paid_at: rows[0].paid_at,
+    }).eq("id", input.inquiry_id);
+  }
+
+  return NextResponse.json({ ok: true, saved: data ?? [] });
+}
+
+async function voidClientPayments(input: PaymentPlanInput) {
+  if (!input.inquiry_id && !input.client_email) {
+    return NextResponse.json({ error: "inquiry_id or client_email required." }, { status: 400 });
+  }
+  const supabase = createSupabaseServerClient();
+  const { error } = input.inquiry_id
+    ? await supabase.from(PAYMENTS_TABLE).update({ status: "voided" }).eq("status", "active").eq("inquiry_id", input.inquiry_id)
+    : await supabase.from(PAYMENTS_TABLE).update({ status: "voided" }).eq("status", "active").eq("client_email", input.client_email!.trim().toLowerCase());
+  if (error) {
+    console.error("[void-client-payments]", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+  return NextResponse.json({ ok: true });
 }

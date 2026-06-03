@@ -269,7 +269,7 @@ If no specific session date is mentioned: {"date":null}`,
   } catch { return null; }
 }
 
-export async function POST(req: NextRequest) {
+async function syncPayments(req: NextRequest) {
   const deny = requireAdmin(req);
   if (deny) return deny;
 
@@ -597,4 +597,14 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({ synced, total: synced.length });
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    return await syncPayments(req);
+  } catch (error) {
+    console.error("[sync-payments]", error);
+    const message = error instanceof Error ? error.message : "Claude payment audit failed.";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }

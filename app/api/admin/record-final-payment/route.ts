@@ -5,6 +5,7 @@
 // Idempotent — silently succeeds if deposit_2 already exists for this inquiry.
 
 import { NextRequest, NextResponse } from "next/server";
+import { PAYMENT_SOURCE_MANUAL } from "@/lib/paymentTotalInference";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { requireAdmin } from "@/lib/requireAdmin";
 
@@ -63,7 +64,7 @@ export async function POST(req: NextRequest) {
     payment_type: "deposit_2",
     invoice: "",
     note: "Final payment recorded manually",
-    source: "manual",
+    source: PAYMENT_SOURCE_MANUAL,
     status: "active",
     paid_at: now,
     session_date: null,
