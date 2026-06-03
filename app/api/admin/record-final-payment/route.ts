@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
     payment_type: "deposit_2",
     invoice: "",
     note: "Final payment recorded manually",
-    source: "auto",
+    source: "manual",
     status: "active",
     paid_at: now,
     session_date: null,

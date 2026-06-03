@@ -1,9 +1,20 @@
 "use client";
 import { useState, useEffect, useRef, useCallback } from "react";
+import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { C } from "@/lib/colors";
+import {
+  buildMonthPeriod,
+  buildRelativePeriod,
+  filterPaymentsByPeriod,
+  filterRevenuePayments,
+  isConfirmedRevenuePayment,
+  paymentMatchesPeriod,
+  type RevenuePeriod,
+} from "@/lib/paymentAnalytics";
 
 const card = "bg-white rounded-2xl border border-slate-100 overflow-hidden";
+const PAYMENT_SELECT = "id,inquiry_id,client_name,client_email,amount,amount_cents,method,payment_type,invoice,note,source,status,paid_at,session_date";
 
 type Payment = {
   id: number;
@@ -24,7 +35,6 @@ type Payment = {
   inquiry_session_type?: string | null;
 };
 
-type Period = "all" | "thisMonth" | "lastMonth" | "thisYear";
 type MethodFilter = "all" | "Venmo" | "Zelle" | "PayPal" | "Cash App" | "Pixieset" | "other";
 
 const METHOD_META: Record<string, { label: string; color: string; bg: string }> = {
@@ -56,31 +66,6 @@ function parseCents(amount: string): number {
 
 function fmtMoney(cents: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(cents / 100);
-}
-
-function periodBounds(p: Period): { start: Date | null; end: Date | null; label: string } {
-  const now = new Date();
-  if (p === "all") return { start: null, end: null, label: "All Time" };
-  if (p === "thisMonth") {
-    return {
-      start: new Date(now.getFullYear(), now.getMonth(), 1),
-      end:   new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59),
-      label: now.toLocaleDateString("en-US", { month: "long", year: "numeric" }),
-    };
-  }
-  if (p === "lastMonth") {
-    const s = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    return {
-      start: s,
-      end:   new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59),
-      label: s.toLocaleDateString("en-US", { month: "long", year: "numeric" }),
-    };
-  }
-  return {
-    start: new Date(now.getFullYear(), 0, 1),
-    end:   new Date(now.getFullYear(), 11, 31, 23, 59, 59),
-    label: `${now.getFullYear()}`,
-  };
 }
 
 function MoneyUp({ target, className, color }: { target: number; className?: string; color?: string }) {
@@ -216,36 +201,74 @@ function ActionMenu({
 export default function PaymentAnalyticsTab() {
   const [loading, setLoading]   = useState(true);
   const [payments, setPayments] = useState<Payment[]>([]);
-  const [period, setPeriod]     = useState<Period>("thisYear");
+  const [period, setPeriod]     = useState<RevenuePeriod>("thisYear");
+  const [selectedMonth, setSelectedMonth] = useState<{ year: number; month: number } | null>(null);
   const [method, setMethod]     = useState<MethodFilter>("all");
   const [hoverBar, setHoverBar] = useState<number | null>(null);
   const [showVoided, setShowVoided] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
     const { data } = await supabase
       .from("payments")
-      .select("id,inquiry_id,client_name,client_email,amount,amount_cents,method,payment_type,invoice,note,source,status,paid_at,session_date")
+      .select(PAYMENT_SELECT)
       .order("paid_at", { ascending: false });
     setPayments((data ?? []) as Payment[]);
     setLoading(false);
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    let cancelled = false;
+    async function loadInitialPayments() {
+      const { data } = await supabase
+        .from("payments")
+        .select(PAYMENT_SELECT)
+        .order("paid_at", { ascending: false });
+      if (cancelled) return;
+      setPayments((data ?? []) as Payment[]);
+      setLoading(false);
+    }
+    loadInitialPayments();
+    return () => { cancelled = true; };
+  }, []);
 
-  const { start, end, label: periodLabel } = periodBounds(period);
+  const activePeriod = selectedMonth
+    ? buildMonthPeriod(selectedMonth.year, selectedMonth.month)
+    : buildRelativePeriod(period);
+  const periodLabel = activePeriod.label;
 
-  // Only active payments count toward revenue; refunded show as negative in the list but excluded from totals
-  const activePayments = payments.filter(p => p.status === "active");
+  async function syncSelectedPayments() {
+    setSyncing(true);
+    setSyncMessage("");
+    try {
+      const body = selectedMonth
+        ? { year: selectedMonth.year, month: selectedMonth.month + 1 }
+        : {};
+      const res = await fetch("/api/sync-payments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const json = await res.json() as { total?: number; error?: string };
+      if (!res.ok) {
+        setSyncMessage(json.error ?? "Claude payment audit failed.");
+        return;
+      }
+      await load();
+      setSyncMessage(`Claude checked Gmail and found ${json.total ?? 0} payment${json.total === 1 ? "" : "s"}.`);
+    } catch {
+      setSyncMessage("Claude payment audit failed.");
+    } finally {
+      setSyncing(false);
+    }
+  }
 
-  const inPeriod = activePayments.filter(p => {
-    const ts = p.paid_at ?? p.session_date;
-    if (!ts) return period === "all";
-    const d = new Date(ts);
-    if (start && d < start) return false;
-    if (end && d > end)   return false;
-    return true;
-  });
+  // Only confirmed active payments count toward revenue; synthetic assumptions stay out of totals
+  const activePayments = filterRevenuePayments(payments);
+
+  const inPeriod = filterPaymentsByPeriod(activePayments, activePeriod);
 
   const filtered = method === "all"
     ? inPeriod
@@ -268,13 +291,7 @@ export default function PaymentAnalyticsTab() {
   const now = new Date();
   const monthlyData = Array.from({ length: 12 }, (_, i) => {
     const d      = new Date(now.getFullYear(), now.getMonth() - (11 - i), 1);
-    const mEnd   = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59);
-    const items  = activePayments.filter(p => {
-      const ts = p.paid_at ?? p.session_date;
-      if (!ts) return false;
-      const pd = new Date(ts);
-      return pd >= d && pd <= mEnd;
-    });
+    const items  = filterPaymentsByPeriod(activePayments, buildMonthPeriod(d.getFullYear(), d.getMonth()));
     const cents = items.reduce((s, p) => s + (p.amount_cents || parseCents(p.amount)), 0);
     return {
       label: d.toLocaleDateString("en-US", { month: "short" }),
@@ -295,18 +312,11 @@ export default function PaymentAnalyticsTab() {
 
   // All rows to display in transaction list (active + optionally voided/refunded)
   const listRows = payments.filter(p => {
-    if (p.status === "active") {
-      const ts = p.paid_at ?? p.session_date;
-      if (!ts && period !== "all") return false;
-      if (ts) {
-        const d = new Date(ts);
-        if (start && d < start) return false;
-        if (end && d > end) return false;
-      }
-      if (method !== "all" && normMethod(p.method) !== method) return false;
-      return true;
-    }
-    return showVoided; // show voided/refunded only when toggled
+    if (p.status !== "active" && !showVoided) return false;
+    if (p.status === "active" && !isConfirmedRevenuePayment(p)) return false;
+    if (!paymentMatchesPeriod(p, activePeriod)) return false;
+    if (method !== "all" && normMethod(p.method) !== method) return false;
+    return true;
   });
 
   return (
@@ -324,14 +334,14 @@ export default function PaymentAnalyticsTab() {
           <div className="flex flex-col gap-2 md:items-end">
             <div className="flex gap-1 p-1 rounded-xl bg-slate-50 border border-slate-100">
               {([
-                { v: "thisMonth" as Period, l: "This Mo." },
-                { v: "lastMonth" as Period, l: "Last Mo." },
-                { v: "thisYear"  as Period, l: "This Year" },
-                { v: "all"       as Period, l: "All Time" },
+                { v: "thisMonth" as RevenuePeriod, l: "This Mo." },
+                { v: "lastMonth" as RevenuePeriod, l: "Last Mo." },
+                { v: "thisYear"  as RevenuePeriod, l: "This Year" },
+                { v: "all"       as RevenuePeriod, l: "All Time" },
               ]).map(({ v, l }) => (
-                <button key={v} onClick={() => setPeriod(v)}
+                <button key={v} onClick={() => { setPeriod(v); setSelectedMonth(null); }}
                   className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap"
-                  style={period === v ? { background: "rgba(16,185,129,0.12)", color: "#10b981" } : { color: "#94a3b8" }}>
+                  style={!selectedMonth && period === v ? { background: "rgba(16,185,129,0.12)", color: "#10b981" } : { color: "#94a3b8" }}>
                   {l}
                 </button>
               ))}
@@ -341,6 +351,21 @@ export default function PaymentAnalyticsTab() {
               style={{ background: "rgba(16,185,129,0.08)", color: "#10b981" }}>
               {loading ? "Loading…" : "↻ Refresh"}
             </button>
+            <Link href="/admin/manual-payments" target="_blank" rel="noopener noreferrer"
+              className="text-xs font-bold px-4 py-2 rounded-lg transition-all hover:opacity-80 text-center"
+              style={{ background: C.p1_08, color: C.p1 }}>
+              Manual entry table
+            </Link>
+            <button onClick={syncSelectedPayments} disabled={syncing}
+              className="text-xs font-bold px-4 py-2 rounded-lg transition-all hover:opacity-80 disabled:opacity-50"
+              style={{ background: C.grad12, color: C.white }}>
+              {syncing ? "Claude checking…" : selectedMonth ? `Claude audit ${periodLabel}` : "Claude audit payments"}
+            </button>
+            {syncMessage && (
+              <p className="text-[10px] font-bold max-w-[260px] text-right" style={{ color: C.muted }}>
+                {syncMessage}
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -399,16 +424,23 @@ export default function PaymentAnalyticsTab() {
                   </div>
                 );
               })()}
-              {monthlyData.map((m, i) => (
-                <div key={i} className="flex-1 flex flex-col items-center gap-1 cursor-pointer"
-                  onMouseEnter={() => setHoverBar(i)} onMouseLeave={() => setHoverBar(null)}>
-                  <BarCol pct={(m.cents / maxMonthCents) * 100} isCurrent={m.isCurrentMonth} isHov={hoverBar === i} delay={i * 40} />
+              {monthlyData.map((m, i) => {
+                const isSelected = selectedMonth?.year === m.year && selectedMonth.month === m.month;
+                return (
+                <button key={`${m.year}-${m.month}`} type="button"
+                  className="flex-1 flex flex-col items-center gap-1 cursor-pointer bg-transparent border-0 p-0 rounded-lg"
+                  onClick={() => setSelectedMonth({ year: m.year, month: m.month })}
+                  onMouseEnter={() => setHoverBar(i)} onMouseLeave={() => setHoverBar(null)}
+                  aria-label={`Show ${m.label} ${m.year} payments`}
+                  style={isSelected ? { outline: "2px solid rgba(16,185,129,0.3)", outlineOffset: 4 } : undefined}>
+                  <BarCol pct={(m.cents / maxMonthCents) * 100} isCurrent={m.isCurrentMonth || isSelected} isHov={hoverBar === i || isSelected} delay={i * 40} />
                   <p className="text-[9px] font-black transition-colors"
-                    style={{ color: hoverBar === i ? "#10b981" : m.isCurrentMonth ? "#10b981" : "#94a3b8" }}>
+                    style={{ color: hoverBar === i || isSelected ? "#10b981" : m.isCurrentMonth ? "#10b981" : "#94a3b8" }}>
                     {m.label}
                   </p>
-                </div>
-              ))}
+                </button>
+                );
+              })}
             </div>
           )}
         </div>
@@ -524,7 +556,7 @@ export default function PaymentAnalyticsTab() {
             <div className="py-10 text-center">
               <p className="text-2xl mb-2">💳</p>
               <p className="text-sm text-slate-400">No payments found for this period.</p>
-              <p className="text-xs text-slate-300 mt-1">Try "All Time" or sync payments from the Clients tab.</p>
+              <p className="text-xs text-slate-300 mt-1">Try All Time or sync payments from the Clients tab.</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -556,7 +588,19 @@ export default function PaymentAnalyticsTab() {
 
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <p className={`text-sm font-black text-slate-900 ${isVoided ? "line-through" : ""}`}>{p.client_name}</p>
+                        {p.inquiry_id ? (
+                          <Link href={`/admin/conversation/${p.inquiry_id}`}
+                            className={`text-sm font-black text-slate-900 hover:underline ${isVoided ? "line-through" : ""}`}
+                            title="Open client card and email thread">
+                            {p.client_name}
+                          </Link>
+                        ) : (
+                          <Link href={`/admin?tab=clients&client=${encodeURIComponent(p.client_email || p.client_name)}`}
+                            className={`text-sm font-black text-slate-900 hover:underline ${isVoided ? "line-through" : ""}`}
+                            title="Find this client in Clients">
+                            {p.client_name}
+                          </Link>
+                        )}
                         {isOrphan && (
                           <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
                             style={{ background: "rgba(249,115,22,0.1)", color: "#f97316" }}>

@@ -202,6 +202,12 @@ function AdminDashboard() {
   const [portalSessionsLoading,setPortalSessionsLoading]=useState(false);
   const [portalStatusSavingKey,setPortalStatusSavingKey]=useState<string|null>(null);
 
+  useEffect(() => {
+    const searchParams=new URLSearchParams(window.location.search);
+    const clientParam=searchParams.get("client");
+    if(clientParam){setTab("clients");setClientSearch(clientParam);}
+  }, []);
+
   // ── Inquiries ─────────────────────────────────────────────────────────
   const [inquiries,setInquiries]=useState<Inquiry[]>([]);
   const [inquiriesLoading,setInquiriesLoading]=useState(false);
