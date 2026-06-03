@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { DM_Sans } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
 // DM Sans — clean geometric sans, modern and readable
@@ -32,6 +33,7 @@ export default function RootLayout({
     <html lang="en" className="scroll-smooth" data-scroll-behavior="smooth">
       <body className={`${dmSans.variable} font-sans antialiased`}>
         {children}
+        <Analytics />
       </body>
     </html>
   );
