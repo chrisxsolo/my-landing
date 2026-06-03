@@ -7,8 +7,8 @@ import "./globals.css";
 // This replaces the default Geist font from the boilerplate
 const dmSans = DM_Sans({
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700", "800", "900"],
   variable: "--font-dm-sans",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
