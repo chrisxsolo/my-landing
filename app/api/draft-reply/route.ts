@@ -24,7 +24,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import { requireAdmin } from "@/lib/requireAdmin";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 
@@ -197,22 +197,20 @@ async function mergeRulesToVault(newRules: string[], apiKey: string): Promise<nu
 
     const existing = data?.content ?? "";
 
-    const client = new Anthropic({ apiKey });
-    const res = await client.messages.create({
-      model: "claude-sonnet-4-6",
+    const client = new OpenAI({ apiKey });
+    const res = await client.chat.completions.create({
+      model: "gpt-4.1",
       max_tokens: 2000,
-      system: buildMergeSystem(today),
-      messages: [{
-        role: "user",
-        content: `Current Email Rules note:\n\n---\n${existing}\n---\n\nNew rules to integrate (dated ${today}):\n\n${newRules.map(r => `- [${today}] ${r}`).join("\n")}\n\nOutput the updated note only.`,
-      }],
+      messages: [
+        { role: "system", content: buildMergeSystem(today) },
+        {
+          role: "user",
+          content: `Current Email Rules note:\n\n---\n${existing}\n---\n\nNew rules to integrate (dated ${today}):\n\n${newRules.map(r => `- [${today}] ${r}`).join("\n")}\n\nOutput the updated note only.`,
+        },
+      ],
     });
 
-    const updated = res.content
-      .filter(b => b.type === "text")
-      .map(b => (b as { type: "text"; text: string }).text)
-      .join("")
-      .trim();
+    const updated = (res.choices[0]?.message?.content ?? "").trim();
 
     if (data?.id) {
       await supabase.from("vault_notes").update({ content: updated }).eq("id", data.id);
@@ -235,10 +233,10 @@ export async function POST(req: NextRequest) {
   const deny = requireAdmin(req);
   if (deny) return deny;
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     return NextResponse.json(
-      { error: "ANTHROPIC_API_KEY is not configured. Add it to your environment variables." },
+      { error: "OPENAI_API_KEY is not configured. Add it to your environment variables." },
       { status: 503 }
     );
   }
@@ -273,7 +271,7 @@ export async function POST(req: NextRequest) {
   // ── Mode 3: Analyze & learn ──────────────────────────────────────────────
   if (isAnalyze) {
     try {
-      const client = new Anthropic({ apiKey });
+      const client = new OpenAI({ apiKey });
 
       const systemPrompt = perfect_draft
         ? `You are a writing-style analyst. An AI-generated email draft was sent to a client without any edits — meaning it was perfect. Your job is to extract concrete style rules from this email that describe what made it good and should be preserved in future drafts. Each rule should be a single actionable instruction (e.g. "keep replies to 3 sentences or fewer for pricing questions", "open with a direct answer before adding context", "use a warm but efficient tone — no filler phrases"). No fluff, no praise, no explanation — just the rules, one per line, starting with a dash.`
@@ -291,18 +289,16 @@ No fluff, no praise, no explanation — just the rules, one per line, starting w
         ? `This AI-generated draft was sent to a client exactly as written — no edits were made. Extract concrete style rules from it that should be preserved in future drafts.\n\n---\n${ai_draft}\n---\n\nList the style rules, one per line starting with a dash, nothing else.`
         : `Here is the AI-generated draft:\n\n---\n${ai_draft}\n---\n\nHere is what Chris actually sent instead:\n\n---\n${actual_sent}\n---\n\nExtract every style rule from the differences between these two versions. Every change Chris made is intentional. List the rules, one per line starting with a dash, nothing else.`;
 
-      const response = await client.messages.create({
-        model: "claude-sonnet-4-6",
+      const response = await client.chat.completions.create({
+        model: "gpt-4.1",
         max_tokens: 600,
-        system: systemPrompt,
-        messages: [{ role: "user", content: userContent }],
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userContent },
+        ],
       });
 
-      const raw = response.content
-        .filter(b => b.type === "text")
-        .map(b => (b as { type: "text"; text: string }).text)
-        .join("")
-        .trim();
+      const raw = (response.choices[0]?.message?.content ?? "").trim();
 
       const rules = raw
         .split("\n")
@@ -355,23 +351,15 @@ Hard rules (non-negotiable):
       : "";
 
     try {
-      const client = new Anthropic({ apiKey });
-      const systemBlocks: Array<{ type: "text"; text: string; cache_control?: { type: "ephemeral" } }> = [
-        {
-          type: "text",
-          text: systemPrompt,
-          cache_control: { type: "ephemeral" },
-        },
-      ];
-      if (examplesSection) {
-        systemBlocks.push({ type: "text", text: examplesSection });
-      }
-      const response = await client.messages.create({
-        model: "claude-sonnet-4-6",
+      const client = new OpenAI({ apiKey });
+      const fullSystem = examplesSection ? systemPrompt + examplesSection : systemPrompt;
+      const response = await client.chat.completions.create({
+        model: "gpt-4.1",
         max_tokens: 600,
         temperature: 0.9,
-        system: systemBlocks,
-        messages: [{
+        messages: [
+          { role: "system", content: fullSystem },
+          {
           role: "user",
           content: `Polish the following rough email draft into a proper, well-formatted email in your voice.
 
@@ -387,14 +375,11 @@ ${raw_draft}
 ---
 
 Output only the polished email body, nothing else.`,
-        }],
+          },
+        ],
       });
 
-      let draft = response.content
-        .filter(b => b.type === "text")
-        .map(b => (b as { type: "text"; text: string }).text)
-        .join("")
-        .trim();
+      let draft = (response.choices[0]?.message?.content ?? "").trim();
 
       draft = draft.replace(
         /^(?:[^\n]*<[^\n@>]+@[^\n>]+>[^\n]*\n[^\n]+at\s+\d+:\d+[^\n]*\n(?:to\s+[^\n]+\n)?[\s\n]*)/, ""
@@ -434,20 +419,18 @@ After the revised draft, on a new line output exactly:
 <rule>one concrete actionable writing rule extracted from this feedback, phrased as an instruction for future drafts</rule>`;
 
     try {
-      const client = new Anthropic({ apiKey });
-      const response = await client.messages.create({
-        model: "claude-sonnet-4-6",
+      const client = new OpenAI({ apiKey });
+      const response = await client.chat.completions.create({
+        model: "gpt-4.1",
         max_tokens: 800,
         temperature: 0.3,
-        system: refinementSystem,
-        messages: [{ role: "user", content: refinementPrompt }],
+        messages: [
+          { role: "system", content: refinementSystem },
+          { role: "user", content: refinementPrompt },
+        ],
       });
 
-      let raw = response.content
-        .filter(b => b.type === "text")
-        .map(b => (b as { type: "text"; text: string }).text)
-        .join("")
-        .trim();
+      let raw = (response.choices[0]?.message?.content ?? "").trim();
 
       const ruleMatch = raw.match(/<rule>([\s\S]*?)<\/rule>/);
       const savedRule = ruleMatch ? ruleMatch[1].trim() : null;
@@ -526,26 +509,18 @@ ${availability}${threadSection}
 Write the reply now.`;
 
   try {
-    const client = new Anthropic({ apiKey });
-    const response = await client.messages.create({
-      model: "claude-sonnet-4-6",
+    const client = new OpenAI({ apiKey });
+    const response = await client.chat.completions.create({
+      model: "gpt-4.1",
       max_tokens: 600,
       temperature: 0.9,
-      messages: [{ role: "user", content: userPrompt }],
-      system: [
-        {
-          type: "text",
-          text: systemPrompt,
-          cache_control: { type: "ephemeral" },
-        },
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
       ],
     });
 
-    let raw = response.content
-      .filter(b => b.type === "text")
-      .map(b => (b as { type: "text"; text: string }).text)
-      .join("")
-      .trim();
+    let raw = (response.choices[0]?.message?.content ?? "").trim();
 
     let draft = raw;
     draft = draft.replace(
@@ -555,7 +530,7 @@ Write the reply now.`;
 
     return NextResponse.json({ draft });
   } catch (err) {
-    console.error("Claude draft-reply error:", err);
+    console.error("[draft-reply] error:", err);
     return NextResponse.json({ error: friendlyAiError(err) }, { status: 500 });
   }
 }

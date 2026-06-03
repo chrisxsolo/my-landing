@@ -7,74 +7,10 @@ import { C } from "@/lib/colors";
 import { inferSessionTotalCents } from "@/lib/paymentTotalInference";
 import PaymentStatusPanel from "./PaymentStatusPanel";
 import RowActions from "./RowActions";
+import { INPUT, TH, TD, METHODS, PAYMENT_TYPES, emptyRows, rowsFromInquiries, displayMoney, formatCents, parseToIsoDate } from "./helpers";
 import type { InquiryOption, PaymentRow, SavedPayment } from "./types";
 
-const INPUT = "h-9 w-full min-w-0 rounded-none border-0 bg-transparent px-2 text-xs font-semibold outline-none";
-const TH = "sticky top-0 z-10 border-b border-r px-2 py-2 text-left text-[10px] font-black uppercase tracking-widest";
-const TD = "border-b border-r align-middle";
-const METHODS = ["Venmo", "Zelle", "PayPal", "Cash App", "Pixieset", "Cash", "manual", "other"];
-const PAYMENT_TYPES = [
-  { value: "deposit_1", label: "Deposit" },
-  { value: "deposit_2", label: "Final" },
-  { value: "full", label: "Full" },
-  { value: "other", label: "Other" },
-];
-
-function today() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function parseToIsoDate(value: string | null | undefined): string {
-  if (!value) return "";
-  if (/^\d{4}-\d{2}-\d{2}/.test(value)) return value.slice(0, 10);
-  // Strip ordinal suffixes ("5th" → "5") then try native parse
-  const cleaned = value.replace(/(\d+)(st|nd|rd|th)\b/gi, "$1");
-  const d = new Date(cleaned);
-  return isNaN(d.getTime()) ? "" : d.toISOString().slice(0, 10);
-}
-
-function emptyRows(count: number): PaymentRow[] {
-  return Array.from({ length: count }, (_, index) => ({
-    key: `${Date.now()}-${index}`,
-    inquiry_id: null,
-    client_name: "",
-    client_email: "",
-    amount: "",
-    method: "Venmo",
-    payment_type: "deposit_1",
-    paid_at: today(),
-    session_date: "",
-    invoice: "",
-    note: "",
-  }));
-}
-
-function rowsFromInquiries(inquiries: InquiryOption[]): PaymentRow[] {
-  return inquiries.map((inquiry, index) => ({
-    key: `inquiry-${inquiry.id}-${index}`,
-    inquiry_id: inquiry.id,
-    client_name: inquiry.name,
-    client_email: inquiry.email,
-    amount: "",
-    method: "Venmo",
-    payment_type: "deposit_1",
-    paid_at: inquiry.deposit_paid_at?.slice(0, 10) ?? inquiry.payment_detected_at?.slice(0, 10) ?? today(),
-    session_date: parseToIsoDate(inquiry.session_date ?? inquiry.date_in_mind),
-    invoice: "",
-    note: "",
-  }));
-}
-
-function displayMoney(amount: string, cents?: number) {
-  if (cents && cents > 0) {
-    return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
-  }
-  return amount ? `$${amount.replace(/^\$/, "")}` : "$0";
-}
-
-function formatCents(cents: number) {
-  return (cents / 100).toFixed(2);
-}
+type StatusFilter = "all" | "full" | "partial" | "none";
 
 export default function ManualPaymentsPage() {
   const [authed, setAuthed] = useState(false);
@@ -84,50 +20,77 @@ export default function ManualPaymentsPage() {
   const [inquiries, setInquiries] = useState<InquiryOption[]>([]);
   const [payments, setPayments] = useState<SavedPayment[]>([]);
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
+  const [hiddenIds, setHiddenIds] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     const isAuthed = checkAuth();
     setAuthed(isAuthed);
-    if (!isAuthed) {
-      setLoading(false);
-      return;
-    }
-    void loadData(true);
+    if (!isAuthed) { setLoading(false); return; }
+    let hidden = new Set<number>();
+    try {
+      const s = localStorage.getItem("manual_payments_hidden");
+      if (s) hidden = new Set(JSON.parse(s) as number[]);
+    } catch {}
+    setHiddenIds(hidden);
+    void loadData(true, hidden);
   }, []);
 
-  const completeRows = useMemo(() => rows.filter(row => (
-    row.client_name.trim() && row.amount.trim() && row.paid_at
-  )), [rows]);
+  const completeRows = useMemo(() => rows.filter(r => r.client_name.trim() && r.amount.trim() && r.paid_at), [rows]);
 
   const paymentStatusMap = useMemo(() => {
     const map = new Map<number, "full" | "partial" | "none">();
     for (const inquiry of inquiries) {
-      const related = payments.filter(p =>
-        p.status === "active" &&
-        (p.inquiry_id === inquiry.id || p.client_email?.toLowerCase() === inquiry.email.toLowerCase())
-      );
-      const paid1 = related.some(p => p.payment_type === "deposit_1" || p.payment_type === "full");
-      const paid2 = related.some(p => p.payment_type === "deposit_2" || p.payment_type === "full");
-      map.set(inquiry.id, paid1 && paid2 ? "full" : paid1 ? "partial" : "none");
+      const rel = payments.filter(p => p.status === "active" && (p.inquiry_id === inquiry.id || p.client_email?.toLowerCase() === inquiry.email.toLowerCase()));
+      const p1 = rel.some(p => p.payment_type === "deposit_1" || p.payment_type === "full");
+      const p2 = rel.some(p => p.payment_type === "deposit_2" || p.payment_type === "full");
+      map.set(inquiry.id, p1 && p2 ? "full" : p1 ? "partial" : "none");
     }
     return map;
   }, [inquiries, payments]);
 
-  async function loadData(seedRows = false) {
+  const displayRows = useMemo(() => {
+    let result = rows;
+    if (search) result = result.filter(r => `${r.client_name} ${r.client_email}`.toLowerCase().includes(search.toLowerCase()));
+    if (statusFilter !== "all") result = result.filter(r => (r.inquiry_id ? (paymentStatusMap.get(r.inquiry_id) ?? "none") : "none") === statusFilter);
+    return result;
+  }, [rows, search, statusFilter, paymentStatusMap]);
+
+  const statusCounts = useMemo(() => {
+    const c = { full: 0, partial: 0, none: 0 };
+    for (const r of rows) { const s = r.inquiry_id ? (paymentStatusMap.get(r.inquiry_id) ?? "none") : "none"; c[s]++; }
+    return c;
+  }, [rows, paymentStatusMap]);
+
+  const allDisplayedSelected = displayRows.length > 0 && displayRows.every(r => selectedKeys.has(r.key));
+
+  function hideInquiries(ids: number[]) {
+    setHiddenIds(prev => {
+      const next = new Set([...prev, ...ids]);
+      localStorage.setItem("manual_payments_hidden", JSON.stringify([...next]));
+      return next;
+    });
+  }
+
+  function restoreAll() {
+    localStorage.removeItem("manual_payments_hidden");
+    const empty = new Set<number>();
+    setHiddenIds(empty);
+    void loadData(true, empty);
+  }
+
+  async function loadData(seedRows = false, hidden: Set<number> = hiddenIds) {
     setLoading(true);
     try {
       const res = await fetch("/api/admin/manual-payments");
       const json = await res.json() as { inquiries?: InquiryOption[]; payments?: SavedPayment[]; error?: string };
-      if (!res.ok) {
-        setMessage({ text: json.error ?? "Could not load manual payment data.", ok: false });
-        return;
-      }
-      const loadedInquiries = json.inquiries ?? [];
-      setInquiries(loadedInquiries);
+      if (!res.ok) { setMessage({ text: json.error ?? "Could not load manual payment data.", ok: false }); return; }
+      const loaded = (json.inquiries ?? []).filter(i => !hidden.has(i.id));
+      setInquiries(loaded);
       setPayments(json.payments ?? []);
-      if (seedRows && loadedInquiries.length > 0) {
-        setRows(rowsFromInquiries(loadedInquiries));
-      }
+      if (seedRows && loaded.length > 0) setRows(rowsFromInquiries(loaded));
     } catch {
       setMessage({ text: "Could not load manual payment data.", ok: false });
     } finally {
@@ -136,80 +99,81 @@ export default function ManualPaymentsPage() {
   }
 
   function patchRow(key: string, patch: Partial<PaymentRow>) {
-    setRows(prev => prev.map(row => row.key === key ? { ...row, ...patch } : row));
-  }
-
-  function inferDepositAmount(inquiry: InquiryOption, paymentType: string) {
-    const total = inferSessionTotalCents(inquiry);
-    if (total <= 0) return "";
-    if (paymentType === "full") return formatCents(total);
-    const first = Math.round(total / 2);
-    return formatCents(paymentType === "deposit_2" ? total - first : first);
+    setRows(prev => prev.map(r => r.key === key ? { ...r, ...patch } : r));
   }
 
   function applyInquiry(key: string, value: string) {
-    const current = rows.find(row => row.key === key);
-    const match = inquiries.find(item => (
-      item.name.toLowerCase() === value.toLowerCase()
-      || item.email.toLowerCase() === value.toLowerCase()
-      || String(item.id) === value
-    ));
-    if (!match) {
-      patchRow(key, { client_name: value, inquiry_id: null });
-      return;
-    }
+    const current = rows.find(r => r.key === key);
+    const match = inquiries.find(i => i.name.toLowerCase() === value.toLowerCase() || i.email.toLowerCase() === value.toLowerCase() || String(i.id) === value);
+    if (!match) { patchRow(key, { client_name: value, inquiry_id: null }); return; }
+    const total = inferSessionTotalCents(match);
+    const pt = current?.payment_type ?? "deposit_1";
+    const half = Math.round(total / 2);
+    const suggested = total > 0 ? formatCents(pt === "full" ? total : pt === "deposit_2" ? total - half : half) : "";
     patchRow(key, {
-      inquiry_id: match.id,
-      client_name: match.name,
-      client_email: match.email,
+      inquiry_id: match.id, client_name: match.name, client_email: match.email,
       session_date: parseToIsoDate(match.session_date ?? match.date_in_mind),
-      amount: current?.amount || inferDepositAmount(match, current?.payment_type ?? "deposit_1"),
+      amount: current?.amount || suggested,
     });
   }
 
   function autoFill() {
-    const METHOD_HINTS: [string, string][] = [
-      ["venmo", "Venmo"], ["zelle", "Zelle"], ["paypal", "PayPal"],
-      ["cash app", "Cash App"], ["pixieset", "Pixieset"], ["cash", "Cash"],
-    ];
+    const HINTS: [string, string][] = [["venmo","Venmo"],["zelle","Zelle"],["paypal","PayPal"],["cash app","Cash App"],["pixieset","Pixieset"],["cash","Cash"]];
     setRows(prev => prev.map(row => {
       if (!row.inquiry_id) return row;
-      const inquiry = inquiries.find(i => i.id === row.inquiry_id);
-      if (!inquiry) return row;
-      const totalCents = inferSessionTotalCents(inquiry);
-      const amount = row.amount.trim() || (totalCents > 0 ? formatCents(totalCents) : "");
-      const related = payments.filter(p =>
-        p.status === "active" &&
-        (p.inquiry_id === row.inquiry_id || p.client_email?.toLowerCase() === inquiry.email.toLowerCase())
-      );
-      const depositDate = inquiry.deposit_paid_at?.slice(0, 10) ?? inquiry.payment_detected_at?.slice(0, 10);
+      const inq = inquiries.find(i => i.id === row.inquiry_id);
+      if (!inq) return row;
+      const total = inferSessionTotalCents(inq);
+      const amount = row.amount.trim() || (total > 0 ? formatCents(total) : "");
+      const depositDate = inq.deposit_paid_at?.slice(0, 10) ?? inq.payment_detected_at?.slice(0, 10);
       const paid_at = depositDate ?? row.paid_at;
-      const noteText = (inquiry.payment_note ?? "").toLowerCase();
-      const noteMethod = METHOD_HINTS.find(([k]) => noteText.includes(k))?.[1];
-      const existingMethod = related.find(p => p.method && p.method !== "manual")?.method;
-      const method = noteMethod ?? existingMethod ?? row.method;
+      const noteText = (inq.payment_note ?? "").toLowerCase();
+      const noteMethod = HINTS.find(([k]) => noteText.includes(k))?.[1];
+      const rel = payments.filter(p => p.status === "active" && (p.inquiry_id === row.inquiry_id || p.client_email?.toLowerCase() === inq.email.toLowerCase()));
+      const method = noteMethod ?? rel.find(p => p.method && p.method !== "manual")?.method ?? row.method;
       return { ...row, amount, paid_at, method };
     }));
   }
 
-  function handleVoided(inquiryId: number) {
-    setPayments(prev => prev.filter(p => p.inquiry_id !== inquiryId));
+  function deleteRow(row: PaymentRow) {
+    setRows(p => p.filter(r => r.key !== row.key));
+    if (row.inquiry_id) {
+      setInquiries(p => p.filter(i => i.id !== row.inquiry_id));
+      hideInquiries([row.inquiry_id]);
+    }
+    setSelectedKeys(p => { const n = new Set(p); n.delete(row.key); return n; });
+  }
+
+  function deleteSelected() {
+    const toDelete = rows.filter(r => selectedKeys.has(r.key));
+    const idsToRemove = toDelete.map(r => r.inquiry_id).filter(Boolean) as number[];
+    setRows(p => p.filter(r => !selectedKeys.has(r.key)));
+    if (idsToRemove.length > 0) {
+      const idSet = new Set(idsToRemove);
+      setInquiries(p => p.filter(i => !idSet.has(i.id)));
+      hideInquiries(idsToRemove);
+    }
+    setSelectedKeys(new Set());
+  }
+
+  function toggleSelectAll() {
+    setSelectedKeys(prev => {
+      const n = new Set(prev);
+      allDisplayedSelected ? displayRows.forEach(r => n.delete(r.key)) : displayRows.forEach(r => n.add(r.key));
+      return n;
+    });
+  }
+
+  function toggleRow(key: string, checked: boolean) {
+    setSelectedKeys(prev => { const n = new Set(prev); checked ? n.add(key) : n.delete(key); return n; });
   }
 
   async function saveRows() {
-    setSaving(true);
-    setMessage(null);
+    setSaving(true); setMessage(null);
     try {
-      const res = await fetch("/api/admin/manual-payments", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rows: completeRows }),
-      });
+      const res = await fetch("/api/admin/manual-payments", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ rows: completeRows }) });
       const json = await res.json() as { saved?: SavedPayment[]; error?: string };
-      if (!res.ok) {
-        setMessage({ text: json.error ?? "Could not save payments.", ok: false });
-        return;
-      }
+      if (!res.ok) { setMessage({ text: json.error ?? "Could not save payments.", ok: false }); return; }
       const saved = json.saved ?? [];
       setPayments(prev => [...saved, ...prev]);
       setRows(rowsFromInquiries(inquiries));
@@ -227,13 +191,18 @@ export default function ManualPaymentsPage() {
         <div className="mx-auto max-w-md rounded-2xl border p-6" style={{ background: C.white, borderColor: C.borderSubtle }}>
           <p className="text-sm font-black" style={{ color: C.ink }}>Admin session required</p>
           <p className="mt-2 text-sm" style={{ color: C.muted }}>Sign in from the admin page, then reopen manual payments.</p>
-          <Link href="/admin" className="mt-4 inline-flex rounded-xl px-4 py-2 text-xs font-black" style={{ background: C.grad12, color: C.white }}>
-            Open Admin
-          </Link>
+          <Link href="/admin" className="mt-4 inline-flex rounded-xl px-4 py-2 text-xs font-black" style={{ background: C.grad12, color: C.white }}>Open Admin</Link>
         </div>
       </main>
     );
   }
+
+  const FILTERS: { key: StatusFilter; label: string; count: number; bg: string; active: string }[] = [
+    { key: "all", label: "All", count: rows.length, bg: C.surfaceSoft, active: C.p1_12 },
+    { key: "full", label: "Paid", count: statusCounts.full, bg: "rgba(18,128,92,0.08)", active: "rgba(18,128,92,0.18)" },
+    { key: "partial", label: "In Progress", count: statusCounts.partial, bg: C.p3_08, active: C.p3_15 },
+    { key: "none", label: "Unpaid", count: statusCounts.none, bg: "rgba(180,35,24,0.07)", active: "rgba(180,35,24,0.16)" },
+  ];
 
   return (
     <main className="min-h-screen px-3 py-4 sm:px-5" style={{ background: C.page }}>
@@ -245,37 +214,53 @@ export default function ManualPaymentsPage() {
             <p className="text-xs font-semibold" style={{ color: C.muted }}>{completeRows.length} ready to save</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <button onClick={autoFill} className="rounded-xl px-3 py-2 text-xs font-black" style={{ background: C.p3_10, color: C.ink }}>
-              Auto-fill amounts
-            </button>
-            <button onClick={() => setRows(prev => [...prev, ...emptyRows(6)])} className="rounded-xl px-3 py-2 text-xs font-black" style={{ background: C.p1_08, color: C.p1 }}>
-              Add rows
-            </button>
-            <button onClick={() => loadData(false)} disabled={loading} className="rounded-xl px-3 py-2 text-xs font-black disabled:opacity-50" style={{ background: C.p2_08, color: C.p2 }}>
-              {loading ? "Loading..." : "Refresh"}
-            </button>
-            <button onClick={saveRows} disabled={saving || completeRows.length === 0} className="rounded-xl px-4 py-2 text-xs font-black disabled:opacity-50" style={{ background: C.grad12, color: C.white }}>
-              {saving ? "Saving..." : "Save to database"}
-            </button>
+            <button onClick={autoFill} className="rounded-xl px-3 py-2 text-xs font-black" style={{ background: C.p3_10, color: C.ink }}>Auto-fill amounts</button>
+            <button onClick={() => setRows(prev => [...prev, ...emptyRows(6)])} className="rounded-xl px-3 py-2 text-xs font-black" style={{ background: C.p1_08, color: C.p1 }}>Add rows</button>
+            <button onClick={() => loadData(false)} disabled={loading} className="rounded-xl px-3 py-2 text-xs font-black disabled:opacity-50" style={{ background: C.p2_08, color: C.p2 }}>{loading ? "Loading..." : "Refresh"}</button>
+            <button onClick={saveRows} disabled={saving || completeRows.length === 0} className="rounded-xl px-4 py-2 text-xs font-black disabled:opacity-50" style={{ background: C.grad12, color: C.white }}>{saving ? "Saving..." : "Save to database"}</button>
           </div>
         </header>
 
         {message && (
-          <div className="rounded-xl border px-4 py-3 text-sm font-bold" style={{
-            background: message.ok ? C.p1_08 : C.p2_08,
-            borderColor: message.ok ? C.p1_20 : C.p2_20,
-            color: message.ok ? C.success : C.danger,
-          }}>
+          <div className="rounded-xl border px-4 py-3 text-sm font-bold" style={{ background: message.ok ? C.p1_08 : C.p2_08, borderColor: message.ok ? C.p1_20 : C.p2_20, color: message.ok ? C.success : C.danger }}>
             {message.text}
           </div>
         )}
 
         <section className="overflow-hidden rounded-2xl border" style={{ background: C.white, borderColor: C.borderSubtle }}>
-          <div className="overflow-auto">
+          <div className="flex flex-wrap items-center gap-2 px-3 pt-3">
+            <input type="search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search clients…"
+              className="h-9 w-full max-w-xs rounded-xl border px-3 text-xs font-bold outline-none"
+              style={{ borderColor: C.borderSubtle, background: C.surfaceSoft, color: C.ink }} />
+            <div className="flex gap-1">
+              {FILTERS.map(f => (
+                <button key={f.key} onClick={() => setStatusFilter(f.key)}
+                  className="rounded-lg px-2.5 py-1.5 text-[10px] font-black transition-colors"
+                  style={{ background: statusFilter === f.key ? f.active : f.bg, color: C.ink }}>
+                  {f.label} <span className="opacity-60">{f.count}</span>
+                </button>
+              ))}
+            </div>
+            <div className="ml-auto flex gap-2">
+              {hiddenIds.size > 0 && (
+                <button onClick={restoreAll} className="rounded-xl px-3 py-1.5 text-xs font-black" style={{ background: C.p1_08, color: C.p1 }}>
+                  Restore all ({hiddenIds.size})
+                </button>
+              )}
+              {selectedKeys.size > 0 && (
+                <button onClick={deleteSelected} className="rounded-xl px-3 py-1.5 text-xs font-black" style={{ background: "rgba(180,35,24,0.10)", color: C.danger }}>
+                  Delete selected ({selectedKeys.size})
+                </button>
+              )}
+            </div>
+          </div>
+          <div className="overflow-auto mt-2">
             <table className="w-full min-w-[1120px] border-collapse">
               <thead style={{ background: C.surfaceSoft }}>
                 <tr style={{ color: C.muted }}>
-                  <th className={`${TH} w-[36px]`} style={{ borderColor: C.borderSubtle }}></th>
+                  <th className={`${TH} w-[40px]`} style={{ borderColor: C.borderSubtle }}>
+                    <input type="checkbox" checked={allDisplayedSelected} onChange={toggleSelectAll} className="cursor-pointer" />
+                  </th>
                   <th className={`${TH} w-[48px]`} style={{ borderColor: C.borderSubtle }}>#</th>
                   <th className={`${TH} w-[190px]`} style={{ borderColor: C.borderSubtle }}>Client</th>
                   <th className={`${TH} w-[220px]`} style={{ borderColor: C.borderSubtle }}>Email</th>
@@ -288,78 +273,63 @@ export default function ManualPaymentsPage() {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row, index) => (
-                  <tr key={row.key} className="group" style={{ background: (() => {
-                    const s = row.inquiry_id ? (paymentStatusMap.get(row.inquiry_id) ?? "none") : null;
-                    if (s === "full") return "rgba(18,128,92,0.10)";
-                    if (s === "partial") return C.p3_08;
-                    if (s === "none") return "rgba(180,35,24,0.07)";
-                    return index % 2 ? C.surfaceStrong : C.white;
-                  })() }}>
-                    <td className={`${TD} px-1 text-center`} style={{ borderColor: C.borderSubtle }}>
-                      <button
-                        onClick={() => setRows(prev => prev.filter(r => r.key !== row.key))}
-                        className="rounded px-1.5 py-1 text-xs font-black opacity-0 transition-opacity group-hover:opacity-100"
-                        style={{ color: C.danger }}
-                        title="Remove row"
-                      >×</button>
-                    </td>
-                    <td className={`${TD} px-2 text-center text-xs font-black`} style={{ borderColor: C.borderSubtle, color: C.mutedSoft }}>{index + 1}</td>
-                    <td className={TD} style={{ borderColor: C.borderSubtle }}>
-                      <input list="manual-payment-clients" className={INPUT} value={row.client_name} onChange={event => applyInquiry(row.key, event.target.value)} />
-                    </td>
-                    <td className={TD} style={{ borderColor: C.borderSubtle }}>
-                      <input className={INPUT} type="email" value={row.client_email} onChange={event => patchRow(row.key, { client_email: event.target.value, inquiry_id: null })} />
-                    </td>
-                    <td className={TD} style={{ borderColor: C.borderSubtle }}>
-                      <input className={INPUT} inputMode="decimal" value={row.amount} onChange={event => patchRow(row.key, { amount: event.target.value })} />
-                    </td>
-                    <td className={TD} style={{ borderColor: C.borderSubtle }}>
-                      <select className={INPUT} value={row.method} onChange={event => patchRow(row.key, { method: event.target.value })}>
-                        {METHODS.map(method => <option key={method} value={method}>{method}</option>)}
-                      </select>
-                    </td>
-                    <td className={TD} style={{ borderColor: C.borderSubtle }}>
-                      <select className={INPUT} value={row.payment_type} onChange={event => patchRow(row.key, { payment_type: event.target.value })}>
-                        {PAYMENT_TYPES.map(type => <option key={type.value} value={type.value}>{type.label}</option>)}
-                      </select>
-                    </td>
-                    <td className={TD} style={{ borderColor: C.borderSubtle }}>
-                      <input className={INPUT} type="date" value={row.paid_at} onChange={event => patchRow(row.key, { paid_at: event.target.value })} />
-                    </td>
-                    <td className={TD} style={{ borderColor: C.borderSubtle }}>
-                      <input className={INPUT} type="date" value={row.session_date} onChange={event => patchRow(row.key, { session_date: event.target.value })} />
-                    </td>
-                    <td className={TD} style={{ borderColor: C.borderSubtle }}>
-                      <RowActions
-                        row={row}
-                        payments={payments}
-                        onSaved={(saved, text) => { setPayments(prev => [...saved, ...prev]); setMessage({ text, ok: true }); }}
-                        onError={text => setMessage({ text, ok: false })}
-                        onVoided={handleVoided}
-                      />
-                    </td>
-                  </tr>
-                ))}
+                {displayRows.map((row, index) => {
+                  const s = row.inquiry_id ? (paymentStatusMap.get(row.inquiry_id) ?? "none") : null;
+                  const bg = s === "full" ? "rgba(18,128,92,0.10)" : s === "partial" ? C.p3_08 : s === "none" ? "rgba(180,35,24,0.07)" : index % 2 ? C.surfaceStrong : C.white;
+                  return (
+                    <tr key={row.key} className="group" style={{ background: bg }}>
+                      <td className={`${TD} px-2 text-center`} style={{ borderColor: C.borderSubtle }}>
+                        <div className="flex items-center justify-center gap-1">
+                          <input type="checkbox" checked={selectedKeys.has(row.key)} onChange={e => toggleRow(row.key, e.target.checked)} className="cursor-pointer" />
+                          <button onClick={() => deleteRow(row)} className="text-xs font-black opacity-0 transition-opacity group-hover:opacity-70" style={{ color: C.danger }} title="Remove">×</button>
+                        </div>
+                      </td>
+                      <td className={`${TD} px-2 text-center text-xs font-black`} style={{ borderColor: C.borderSubtle, color: C.mutedSoft }}>{index + 1}</td>
+                      <td className={TD} style={{ borderColor: C.borderSubtle }}>
+                        <input list="manual-payment-clients" className={INPUT} value={row.client_name} onChange={e => applyInquiry(row.key, e.target.value)} />
+                      </td>
+                      <td className={TD} style={{ borderColor: C.borderSubtle }}>
+                        <input className={INPUT} type="email" value={row.client_email} onChange={e => patchRow(row.key, { client_email: e.target.value, inquiry_id: null })} />
+                      </td>
+                      <td className={TD} style={{ borderColor: C.borderSubtle }}>
+                        <input className={INPUT} inputMode="decimal" value={row.amount} onChange={e => patchRow(row.key, { amount: e.target.value })} />
+                      </td>
+                      <td className={TD} style={{ borderColor: C.borderSubtle }}>
+                        <select className={INPUT} value={row.method} onChange={e => patchRow(row.key, { method: e.target.value })}>
+                          {METHODS.map(m => <option key={m} value={m}>{m}</option>)}
+                        </select>
+                      </td>
+                      <td className={TD} style={{ borderColor: C.borderSubtle }}>
+                        <select className={INPUT} value={row.payment_type} onChange={e => patchRow(row.key, { payment_type: e.target.value })}>
+                          {PAYMENT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                        </select>
+                      </td>
+                      <td className={TD} style={{ borderColor: C.borderSubtle }}>
+                        <input className={INPUT} type="date" value={row.paid_at} onChange={e => patchRow(row.key, { paid_at: e.target.value })} />
+                      </td>
+                      <td className={TD} style={{ borderColor: C.borderSubtle }}>
+                        <input className={INPUT} type="date" value={row.session_date} onChange={e => patchRow(row.key, { session_date: e.target.value })} />
+                      </td>
+                      <td className={TD} style={{ borderColor: C.borderSubtle }}>
+                        <RowActions row={row} payments={payments}
+                          onSaved={(saved, text) => { setPayments(prev => [...saved, ...prev]); setMessage({ text, ok: true }); }}
+                          onError={text => setMessage({ text, ok: false })}
+                          onVoided={id => setPayments(p => p.filter(p2 => p2.inquiry_id !== id))} />
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
           <datalist id="manual-payment-clients">
-            {inquiries.map(inquiry => (
-              <option key={inquiry.id} value={inquiry.name}>{inquiry.email}</option>
-            ))}
+            {inquiries.map(i => <option key={i.id} value={i.name}>{i.email}</option>)}
           </datalist>
         </section>
 
-        <PaymentStatusPanel
-          inquiries={inquiries}
-          payments={payments}
-          onSaved={(saved, text) => {
-            setPayments(prev => [...saved, ...prev]);
-            setMessage({ text, ok: true });
-          }}
-          onError={text => setMessage({ text, ok: false })}
-        />
+        <PaymentStatusPanel inquiries={inquiries} payments={payments}
+          onSaved={(saved, text) => { setPayments(prev => [...saved, ...prev]); setMessage({ text, ok: true }); }}
+          onError={text => setMessage({ text, ok: false })} />
 
         <section className="rounded-2xl border p-4" style={{ background: C.white, borderColor: C.borderSubtle }}>
           <div className="mb-3 flex items-center justify-between gap-3">
@@ -371,13 +341,9 @@ export default function ManualPaymentsPage() {
               <div key={payment.id} className="rounded-xl border p-3" style={{ borderColor: C.borderSubtle, background: C.surfaceSoft }}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    {payment.inquiry_id ? (
-                      <Link href={`/admin/conversation/${payment.inquiry_id}`} className="block truncate text-sm font-black" style={{ color: C.ink }}>
-                        {payment.client_name}
-                      </Link>
-                    ) : (
-                      <p className="truncate text-sm font-black" style={{ color: C.ink }}>{payment.client_name}</p>
-                    )}
+                    {payment.inquiry_id
+                      ? <Link href={`/admin/conversation/${payment.inquiry_id}`} className="block truncate text-sm font-black" style={{ color: C.ink }}>{payment.client_name}</Link>
+                      : <p className="truncate text-sm font-black" style={{ color: C.ink }}>{payment.client_name}</p>}
                     <p className="truncate text-[11px] font-semibold" style={{ color: C.muted }}>{payment.client_email || "No email"}</p>
                   </div>
                   <p className="shrink-0 text-sm font-black" style={{ color: C.success }}>{displayMoney(payment.amount, payment.amount_cents)}</p>

@@ -9,7 +9,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import { getValidTokens } from "@/lib/gmailTokens";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { requireAdmin } from "@/lib/requireAdmin";
@@ -103,12 +103,15 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // ── Ask Claude to write the reminder ─────────────────────────────────────
-  const anthropic = new Anthropic();
-  const res = await anthropic.messages.create({
-    model:      "claude-sonnet-4-6",
+  // ── Ask GPT to write the reminder ────────────────────────────────────────
+  const openai = new OpenAI();
+  const res = await openai.chat.completions.create({
+    model: "gpt-4.1",
     max_tokens: 400,
-    system: `You are writing a short, direct day-before reminder from Chris (photographer at soloxsnaps) to a photography client.
+    messages: [
+      {
+        role: "system",
+        content: `You are writing a short, direct day-before reminder from Chris (photographer at soloxsnaps) to a photography client.
 
 Tone: direct, simple, genuine — not overly flowery or salesy.
 Length: 3–4 sentences max. Keep it tight.
@@ -125,18 +128,20 @@ Write the message in this exact structure:
 4. "Can't wait to capture this milestone for you!"
 
 Do NOT describe how beautiful the location is. Do NOT add extra filler sentences. Keep it short and real.`,
-    messages: [{
-      role: "user",
-      content: [
-        `Client first name: ${inq.name.split(" ")[0]}`,
-        `Session date: ${sessionDateReadable}`,
-        `Original inquiry: ${inq.message}`,
-        emailContext ? `\nEmail thread:\n${emailContext}` : "",
-      ].filter(Boolean).join("\n"),
-    }],
+      },
+      {
+        role: "user",
+        content: [
+          `Client first name: ${inq.name.split(" ")[0]}`,
+          `Session date: ${sessionDateReadable}`,
+          `Original inquiry: ${inq.message}`,
+          emailContext ? `\nEmail thread:\n${emailContext}` : "",
+        ].filter(Boolean).join("\n"),
+      },
+    ],
   });
 
-  const draft = stripSignoff(res.content[0].type === "text" ? res.content[0].text.trim() : "");
+  const draft = stripSignoff((res.choices[0]?.message?.content ?? "").trim());
   const subject = `See you tomorrow! 🎓`;
 
   return NextResponse.json({ subject, draft });

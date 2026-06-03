@@ -9,7 +9,7 @@
 //   { type:"done", new_rules, saved_to_vault, session_id }
 
 import { NextRequest } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import { requireAdmin } from "@/lib/requireAdmin";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 
@@ -119,7 +119,7 @@ export async function POST(req: NextRequest) {
   const deny = requireAdmin(req);
   if (deny) return deny;
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     const encoder = new TextEncoder();
     const errStream = new ReadableStream({
@@ -147,7 +147,7 @@ export async function POST(req: NextRequest) {
     return new Response(errStream, { headers: { "Content-Type": "text/event-stream" } });
   }
 
-  const client = new Anthropic({ apiKey });
+  const client = new OpenAI({ apiKey });
   const { id: rulesId, content: currentRules } = await readCurrentRules();
   const encoder = new TextEncoder();
 
@@ -158,25 +158,23 @@ export async function POST(req: NextRequest) {
       }
 
       try {
-        const claudeStream = client.messages.stream({
-          model: "claude-sonnet-4-6",
+        const openaiStream = await client.chat.completions.create({
+          model: "gpt-4.1",
           max_tokens: 800,
-          system: [
-            {
-              type: "text",
-              text: buildExtractSystem(currentRules),
-              cache_control: { type: "ephemeral" },
-            },
+          stream: true,
+          messages: [
+            { role: "system", content: buildExtractSystem(currentRules) },
+            ...messages,
           ],
-          messages,
         });
 
         let fullText = "";
         let sentUpTo = 0;
 
-        for await (const event of claudeStream) {
-          if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
-            fullText += event.delta.text;
+        for await (const chunk of openaiStream) {
+          const text = chunk.choices[0]?.delta?.content ?? "";
+          if (text) {
+            fullText += text;
             // Emit the safe prefix — keep TAIL_BUFFER chars buffered to avoid
             // splitting a <rules> tag across two emit calls.
             const safeEnd = fullText.length - TAIL_BUFFER;
@@ -209,21 +207,19 @@ export async function POST(req: NextRequest) {
         let savedToVault = false;
         if (newRules.length > 0) {
           try {
-            const mergeRes = await client.messages.create({
-              model: "claude-sonnet-4-6",
+            const mergeRes = await client.chat.completions.create({
+              model: "gpt-4.1",
               max_tokens: 1600,
-              system: MERGE_SYSTEM,
-              messages: [{
-                role: "user",
-                content: `Current Email Writer Rules note:\n\n---\n${currentRules || "(empty)"}\n---\n\nNew rules to integrate (replace conflicts, add new, remove outdated):\n\n${newRules.map(r => `- ${r}`).join("\n")}\n\nOutput the updated note only.`,
-              }],
+              messages: [
+                { role: "system", content: MERGE_SYSTEM },
+                {
+                  role: "user",
+                  content: `Current Email Writer Rules note:\n\n---\n${currentRules || "(empty)"}\n---\n\nNew rules to integrate (replace conflicts, add new, remove outdated):\n\n${newRules.map(r => `- ${r}`).join("\n")}\n\nOutput the updated note only.`,
+                },
+              ],
             });
 
-            const updatedNote = mergeRes.content
-              .filter(b => b.type === "text")
-              .map(b => (b as { type: "text"; text: string }).text)
-              .join("")
-              .trim();
+            const updatedNote = (mergeRes.choices[0]?.message?.content ?? "").trim();
 
             await writeRules(rulesId, updatedNote);
             savedToVault = true;

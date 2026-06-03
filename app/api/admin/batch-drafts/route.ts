@@ -1,20 +1,16 @@
 // POST /api/admin/batch-drafts
-//   Submits a Claude batch job for all unanswered inquiries (no reply_sent_at).
-//   Returns: { batch_id, request_count }
+//   Generates drafts for all unanswered inquiries (no reply_sent_at) in parallel.
+//   Returns: { results: [{inquiry_id, inquiry_name, draft}] }
 //
 // GET /api/admin/batch-drafts
-//   Returns current batch status.
-//   When ended: { batch, results: [{inquiry_id, inquiry_name, draft}] }
-//   Otherwise:  { batch }
+//   Legacy endpoint — returns 404 (batch polling no longer needed).
 
 import { NextRequest, NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import { requireAdmin } from "@/lib/requireAdmin";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 
 export const dynamic = "force-dynamic";
-
-const BATCH_ID_KEY = "batch_draft_job_id";
 
 type VaultRow = { id: string; title: string; folder: string; content: string };
 
@@ -86,82 +82,25 @@ function stripSignoff(text: string): string {
     .trimEnd();
 }
 
-// ── GET — check current batch status ─────────────────────────────────────────
+// ── GET — legacy polling endpoint ─────────────────────────────────────────────
 
 export async function GET(req: NextRequest) {
   const deny = requireAdmin(req);
   if (deny) return deny;
-
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return NextResponse.json({ error: "No API key" }, { status: 500 });
-
-  const supabase = createSupabaseServerClient();
-  const { data: setting } = await supabase
-    .from("site_settings")
-    .select("value")
-    .eq("key", BATCH_ID_KEY)
-    .single();
-
-  const batchId = setting?.value as string | null;
-  if (!batchId) return NextResponse.json({ message: "No batch job found" }, { status: 404 });
-
-  const client = new Anthropic({ apiKey });
-
-  try {
-    const batch = await client.messages.batches.retrieve(batchId);
-
-    if (batch.processing_status !== "ended") {
-      return NextResponse.json({ batch });
-    }
-
-    // Batch is done — fetch results
-    const results: { inquiry_id: number; inquiry_name: string; draft: string }[] = [];
-
-    // Fetch inquiry names for display
-    const { data: inquiries } = await supabase
-      .from("inquiries")
-      .select("id, name")
-      .is("reply_sent_at", null);
-    const nameMap = new Map((inquiries ?? []).map(i => [String(i.id), i.name as string]));
-
-    for await (const result of await client.messages.batches.results(batchId)) {
-      if (result.result.type !== "succeeded") continue;
-      const inquiryId = parseInt(result.custom_id, 10);
-      if (isNaN(inquiryId)) continue;
-
-      const raw = result.result.message.content
-        .filter((b): b is Anthropic.TextBlock => b.type === "text")
-        .map(b => b.text)
-        .join("")
-        .trim();
-
-      const draft = stripSignoff(raw);
-      results.push({
-        inquiry_id: inquiryId,
-        inquiry_name: nameMap.get(result.custom_id) ?? `Inquiry ${inquiryId}`,
-        draft,
-      });
-    }
-
-    return NextResponse.json({ batch, results });
-  } catch (err) {
-    console.error("[batch-drafts] GET error", err);
-    return NextResponse.json({ error: "Failed to fetch batch status" }, { status: 500 });
-  }
+  return NextResponse.json({ message: "No batch job found" }, { status: 404 });
 }
 
-// ── POST — create a new batch ─────────────────────────────────────────────────
+// ── POST — generate drafts for all unanswered inquiries ───────────────────────
 
 export async function POST(req: NextRequest) {
   const deny = requireAdmin(req);
   if (deny) return deny;
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return NextResponse.json({ error: "No API key" }, { status: 500 });
 
   const supabase = createSupabaseServerClient();
 
-  // Fetch unanswered inquiries (no reply sent yet)
   const { data: inquiries, error: inqErr } = await supabase
     .from("inquiries")
     .select("id, name, email, phone, session_type, date_in_mind, message")
@@ -178,7 +117,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ message: "No unanswered inquiries found" }, { status: 200 });
   }
 
-  // Build shared context (vault notes + availability)
   const [vaultRows, availability] = await Promise.all([
     supabase
       .from("vault_notes")
@@ -188,39 +126,39 @@ export async function POST(req: NextRequest) {
   ]);
 
   const systemPrompt = buildSystemPrompt(buildVaultContext(vaultRows), availability);
+  const client = new OpenAI({ apiKey });
 
-  const client = new Anthropic({ apiKey });
+  const settled = await Promise.allSettled(
+    inquiries.map(async inq => {
+      const res = await client.chat.completions.create({
+        model: "gpt-4.1",
+        max_tokens: 600,
+        temperature: 0.9,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: buildUserPrompt(inq as Parameters<typeof buildUserPrompt>[0]) },
+        ],
+      });
+      const raw = (res.choices[0]?.message?.content ?? "").trim();
+      return {
+        inquiry_id: inq.id as number,
+        inquiry_name: inq.name as string,
+        draft: stripSignoff(raw),
+      };
+    })
+  );
 
-  const requests: Anthropic.Messages.MessageCreateParamsNonStreaming[] = inquiries.map(inq => ({
-    model: "claude-sonnet-4-6",
-    max_tokens: 600,
-    temperature: 0.9,
-    system: [
-      {
-        type: "text" as const,
-        text: systemPrompt,
-        cache_control: { type: "ephemeral" as const },
-      },
-    ],
-    messages: [{ role: "user" as const, content: buildUserPrompt(inq as Parameters<typeof buildUserPrompt>[0]) }],
-  }));
+  const results = settled
+    .filter(
+      (r): r is PromiseFulfilledResult<{ inquiry_id: number; inquiry_name: string; draft: string }> =>
+        r.status === "fulfilled"
+    )
+    .map(r => r.value);
 
-  try {
-    const batch = await client.messages.batches.create({
-      requests: requests.map((params, i) => ({
-        custom_id: String(inquiries[i].id),
-        params,
-      })),
-    });
-
-    // Store batch ID so we can retrieve it later
-    await supabase
-      .from("site_settings")
-      .upsert({ key: BATCH_ID_KEY, value: batch.id, updated_at: new Date().toISOString() }, { onConflict: "key" });
-
-    return NextResponse.json({ batch_id: batch.id, request_count: inquiries.length });
-  } catch (err) {
-    console.error("[batch-drafts] create batch error", err);
-    return NextResponse.json({ error: "Failed to create batch job" }, { status: 500 });
+  const failed = settled.filter(r => r.status === "rejected").length;
+  if (failed > 0) {
+    console.error(`[batch-drafts] ${failed} draft(s) failed`);
   }
+
+  return NextResponse.json({ results, request_count: inquiries.length });
 }
