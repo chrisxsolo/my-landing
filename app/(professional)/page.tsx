@@ -23,6 +23,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getPortfolioData, getSiteSettings, type PortfolioCategory, type PortfolioImage } from "@/lib/professionalData";
 import HeroCarousel from "@/app/components/HeroCarousel";
+import Testimonials from "@/app/components/Testimonials";
 
 export const dynamic = "force-dynamic";
 
@@ -141,6 +142,58 @@ const CSS = `
     transform: translateY(-1px);
     background: #ffffff;
     box-shadow: 0 10px 22px rgba(18, 24, 22, 0.06);
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════════════
+     STATS BAND — credibility strip directly under the hero
+     ═══════════════════════════════════════════════════════════════════════════ */
+  .home-stats {
+    background:
+      radial-gradient(ellipse 60% 70% at 12% 20%, rgba(162, 210, 196, 0.16) 0%, transparent 60%),
+      radial-gradient(ellipse 55% 60% at 88% 80%, rgba(130, 185, 175, 0.12) 0%, transparent 55%),
+      #f5f6f4;
+    padding: 44px 0 48px;
+    border-bottom: 1px solid rgba(18, 24, 22, 0.06);
+  }
+  .home-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1px;
+    overflow: hidden;
+    border: 1px solid rgba(18, 24, 22, 0.08);
+    border-radius: 14px;
+    background: rgba(18, 24, 22, 0.08);
+    box-shadow: 0 8px 32px rgba(18, 24, 22, 0.05);
+  }
+  .home-stat {
+    display: grid;
+    gap: 8px;
+    align-content: center;
+    justify-items: center;
+    min-height: 126px;
+    padding: 24px 18px;
+    text-align: center;
+    background: #ffffff;
+    transition: background 0.18s ease;
+  }
+  .home-stat:hover { background: rgba(247, 250, 248, 0.92); }
+  .home-stat-num {
+    font-size: clamp(1.9rem, 4vw, 2.7rem);
+    font-weight: 880;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    background: linear-gradient(135deg, #3f5f58, #6fa093);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .home-stat-label {
+    max-width: 15ch;
+    color: #5f6c67;
+    font-size: 12.5px;
+    font-weight: 760;
+    line-height: 1.4;
+    text-wrap: balance;
   }
 
   /* ═══════════════════════════════════════════════════════════════════════════
@@ -616,6 +669,8 @@ const CSS = `
   }
   @media (max-width: 760px) {
     .home-shell { width: min(1180px, calc(100% - 36px)); }
+    .home-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .home-stat { min-height: 112px; }
     .home-services { padding: 44px 0 52px; }
     .home-proof { padding: 62px 0 70px; }
     .home-editorial { padding: 70px 0 76px; }
@@ -706,6 +761,32 @@ export default async function ProfessionalHomePage() {
 
       {/* ── HERO CAROUSEL — keep unchanged ────────────────────────────────────── */}
       <HeroCarousel images={heroImages} />
+
+      {/* ── STATS BAND ────────────────────────────────────────────────────────────
+           Credibility strip directly under the hero. Real business numbers only.
+           To edit: change the [number, label] pairs in the array below. */}
+      <section className="home-stats" aria-label="Photographer credibility">
+        <div className="home-shell">
+          <div className="home-stats-grid">
+            {[
+              ["300+",    "Bay Area graduates photographed"],
+              ["7",       "Bay Area campuses covered"],
+              ["3+",      "Years shooting the Bay Area"],
+              ["2 weeks", "Average gallery delivery"],
+            ].map(([num, label], i) => (
+              <div key={label} className="home-stat" data-reveal data-delay={String(i + 1)}>
+                <span className="home-stat-num">{num}</span>
+                <span className="home-stat-label">{label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── TESTIMONIALS ──────────────────────────────────────────────────────────
+           Social proof high on the page. Content lives in lib/testimonials.ts —
+           renders nothing until real client quotes are added there. */}
+      <Testimonials />
 
       {/* ── SERVICES SECTION ──────────────────────────────────────────────────────
            Light gray bg, frosted glass cards. 3 cards: Grads, Families, Contact.
