@@ -47,7 +47,10 @@ export default async function RatesPage() {
   const [{ images }, siteSettings] = await Promise.all([getPortfolioData(), getSiteSettings()]);
 
   const gradBg    = images.find((i) => i.category_slug === "grads")?.image_url    ?? null;
-  const familyBg  = images.find((i) => i.category_slug === "families")?.image_url ?? null;
+  const familyBg  =
+    siteSettings.pricing_card_families_image
+    ?? images.find((i) => i.category_slug === "families")?.image_url
+    ?? null;
   const couplesBg =
     images.find((i) => i.category_slug === "couples")?.image_url
     ?? siteSettings.pricing_couples_standard_image

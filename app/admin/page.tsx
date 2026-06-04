@@ -1647,6 +1647,7 @@ function AdminDashboard() {
                   {([
                     {key:"pricing_grad_standard_image",label:"Grad package photo",helper:"Shown beside the standard graduation package.",category:"grads"},
                     {key:"pricing_grad_group_image",label:"Group grad photo",helper:"Shown in the group grad package section.",category:"grads"},
+                    {key:"pricing_card_families_image",label:"Family rates card cover",helper:"Background photo for the Family rates card on the /pricing page.",category:"families"},
                     {key:"pricing_family_session_image",label:"Family session photo",helper:"Shown beside the family session package.",category:"families"},
                     {key:"pricing_family_extended_image",label:"Extended family photo",helper:"Shown beside the extended family package.",category:"families"},
                     {key:"pricing_couples_standard_image",label:"Couples session photo",helper:"Shown beside the standard couples package.",category:"couples"},
