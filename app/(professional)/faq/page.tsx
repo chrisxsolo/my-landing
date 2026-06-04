@@ -4,14 +4,16 @@
 import type { Metadata } from "next";
 import FAQClient from "./FAQClient";
 
+const FAQ_DESCRIPTION =
+  "Common questions about photography sessions — booking, outfits, delivery, locations, and more, for portraits, couples, family, maternity, and creative shoots.";
+
 export const metadata: Metadata = {
   title: "FAQ | soloxsnaps",
-  description:
-    "Common questions about graduation photography sessions — booking, outfits, delivery, locations, and more.",
+  description: FAQ_DESCRIPTION,
   alternates: { canonical: "/faq" },
   openGraph: {
     title: "FAQ | soloxsnaps",
-    description: "Common questions about graduation photography sessions — booking, outfits, delivery, locations, and more.",
+    description: FAQ_DESCRIPTION,
     type: "website",
     siteName: "soloxsnaps",
   },

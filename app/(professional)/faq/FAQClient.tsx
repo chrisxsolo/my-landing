@@ -1,72 +1,69 @@
 "use client";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// FAQClient — animated accordion FAQ page.
+// GENERAL FAQ  →  soloxsnaps.com/faq
+// Covers portraits, couples, family, maternity, and creative/lifestyle sessions
+// plus general booking. Graduation-specific questions live at /faq/graduation.
 // TO ADD/EDIT QUESTIONS: update the FAQS array below.
-// Each group: { topic, emoji, items: { q, a }[] }
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { AccordionItem, FAQ_CSS, type FAQGroup } from "./faqShared";
 
-const FAQS: { topic: string; emoji: string; items: { q: string; a: string }[] }[] = [
+const FAQS: FAQGroup[] = [
   {
     topic: "Booking & Logistics",
     emoji: "📅",
     items: [
       {
         q: "How do I book a session?",
-        a: "Send an inquiry through the contact page with your date, campus, and how many people. I'll reply within 24 hours with availability, pricing, and next steps. A 50% deposit reserves your date — the remaining balance is due on shoot day.",
+        a: "Send an inquiry through the contact page with the type of session you're after, your ideal date, location, and how many people will be in the photos. I'll reply within 24 hours with availability, pricing, and next steps. A 50% deposit reserves your date — the remaining balance is due on shoot day.",
       },
       {
         q: "How far in advance should I book?",
-        a: "As early as possible — especially for May graduation season. Spring dates at UC Berkeley, SJSU, SF State, USF, and CSUEB fill up fast. If you have a specific date near your ceremony, reach out at least 3–4 weeks ahead.",
+        a: "The sooner the better. Weekends and golden-hour slots fill up fastest, and seasonal sessions (spring graduations, fall family photos, holiday minis) book out weeks ahead. If you have a specific date in mind, reach out at least 3–4 weeks early so we can lock it in.",
       },
       {
         q: "What's the deposit and when is it due?",
-        a: "The deposit is 50% of the session total. It's due when you confirm your date and is non-refundable but transferable — it can be applied toward rescheduling or a future session with advance notice.",
+        a: "The deposit is 50% of the session total and is due when you confirm your date. It's non-refundable but transferable — it can be applied toward rescheduling or a future session with advance notice.",
       },
       {
         q: "What happens if I need to reschedule?",
-        a: "Life happens. If you need to reschedule, reach out as early as possible. Your deposit transfers to the new date as long as I have availability. Last-minute cancellations (same day or day before) are not eligible for rescheduling.",
+        a: "Life happens. If you need to move your session, reach out as early as possible and your deposit transfers to the new date as long as I have availability. Last-minute cancellations (same day or the day before) aren't eligible for rescheduling.",
       },
       {
         q: "What if the weather is bad?",
-        a: "Light overcast is actually great for portraits — it acts as a giant softbox and removes harsh shadows. Heavy rain or storms are the only reason to reschedule. We'll coordinate based on the forecast and both agree before moving anything.",
+        a: "Light overcast is actually great for portraits — it acts like a giant softbox and removes harsh shadows. Heavy rain or storms are the only real reason to reschedule. We'll watch the forecast together and both agree before moving anything.",
       },
     ],
   },
   {
-    topic: "The Session",
+    topic: "Your Session",
     emoji: "📸",
     items: [
       {
         q: "I'm not photogenic / I hate being on camera. Will that be a problem?",
-        a: "This is the most common thing I hear, and it's never actually a problem. I give clear, specific direction throughout — where to stand, where to look, how to hold yourself. You don't need to know how to pose. That's my job. Most clients are relaxed within the first 10 minutes.",
+        a: "This is the most common thing I hear, and it's never actually a problem. I give clear, specific direction the whole way through — where to stand, where to look, what to do with your hands. You don't need to know how to pose. That's my job. Most people are relaxed within the first 10 minutes.",
       },
       {
-        q: "How long is the session?",
-        a: "Standard sessions are 1 hour. Groups of 3 or more usually need at least 90 minutes to cover individual portraits plus group combinations. 2-hour sessions are available if you want more locations or more time.",
+        q: "How long is a session?",
+        a: "Standard portrait, couples, and maternity sessions run about an hour. Family or group sessions usually need 90 minutes or more to cover individuals plus the combinations. If you want multiple looks or locations, longer sessions are available — just ask.",
       },
       {
         q: "How many photos will I receive?",
         a: "You'll receive 50+ professionally edited images in your private gallery. The exact number depends on session length and group size — longer sessions and larger groups typically produce more deliverables.",
       },
       {
-        q: "Can family members join the session?",
-        a: "Yes. Family members are welcome to join for a portion of the session for group shots. Just let me know in advance so we can plan time for it. Note that family members don't count toward group pricing — group rates apply only to graduates shooting together.",
+        q: "What kinds of sessions do you shoot?",
+        a: "Individual portraits, couples, families, maternity, and creative/lifestyle shoots — plus graduation sessions, which have their own dedicated FAQ. If you have an idea that doesn't fit neatly into a category, reach out and we'll build something that works.",
+      },
+      {
+        q: "Can I come with a specific vision or shot list?",
+        a: "Absolutely, and it helps. Send me reference photos, a mood board, or a few must-have shots when you book and I'll plan the session around them. I'll also bring my own ideas — the best results usually come from blending both.",
       },
       {
         q: "Can I bring my pet?",
-        a: "Yes, as long as the campus allows it. Let me know in advance and we'll plan a few shots with them. Outdoor campus settings work well — just bring someone to hold the pet between shots so we can keep things moving.",
-      },
-      {
-        q: "What props work well?",
-        a: "Great options: all your stoles and honor cords, a bouquet of flowers, champagne (if you want that shot), or a custom calligraphy board. Skip the smoke bombs, sparklers, balloons, and confetti — they're messy on campus and distract from the portrait.",
-      },
-      {
-        q: "Can I do a champagne pop shot?",
-        a: "Yes — it's available as an add-on for $15. I'll plan it at the right moment in the session so it doesn't interrupt the flow. Just give me a heads-up when you book so we're both prepared.",
+        a: "Yes, as long as the location allows it. Let me know in advance and we'll plan a few shots with them. Bring someone to hold the pet between frames so we can keep things moving.",
       },
     ],
   },
@@ -75,24 +72,42 @@ const FAQS: { topic: string; emoji: string; items: { q: string; a: string }[] }[
     emoji: "👗",
     items: [
       {
-        q: "How many outfits can I wear?",
-        a: "Every session includes one outfit look. You can add a second outfit change for $75. If you do change, I'll build a short break into the session routing — just factor in 5–10 minutes for the swap.",
+        q: "What should I wear?",
+        a: "Go with solid colors and simple textures over busy prints, stripes, or large logos — they photograph cleaner and keep the focus on you. Coordinate rather than match exactly for couples and families: pick two or three colors and pull from that palette. When in doubt, dress for the mood you want the photos to feel like.",
       },
       {
-        q: "What should I wear under my gown?",
-        a: "Solid colors photograph far better than busy prints, stripes, or logos. Lighter colors under your gown create a nice contrast. Avoid all-black if you can — it can flatten in certain lighting conditions.",
+        q: "Can I bring more than one outfit?",
+        a: "Yes. Most sessions include one look, and you can add an outfit change so we get more variety. If you plan to change, factor in 5–10 minutes for the swap and I'll build a short break into the session routing.",
       },
       {
-        q: "Should I steam my gown?",
-        a: "Yes. Your gown comes folded and will have visible crease lines. Take it out the night before and hang it in the bathroom while you shower — steam will smooth most of it out. Iron stubborn creases if needed.",
+        q: "Any tips for hair and makeup?",
+        a: "Outdoor light tends to soften features slightly, so go a touch bolder than your everyday look — a little more contour, defined brows, and matte over glossy finishes. For hair, stick with a style you've worn before and feel confident in. Shoot day isn't the time to try something brand new.",
       },
       {
-        q: "Any tips for makeup and hair?",
-        a: "Outdoor light and camera settings tend to flatten features slightly. Go a little bolder than your everyday look — add more contour, define your brows slightly, and opt for matte finishes over glossy. For hair, stick with a style you've worn before and feel confident in. Don't try something new on shoot day.",
+        q: "How should we prepare as a couple or family?",
+        a: "Keep it low-pressure. Lay outfits out the night before, and if there are little ones, schedule around naps and snacks so everyone's in a good mood. Come ready to interact with each other rather than just face the camera — the candid, in-between moments are usually the keepers.",
+      },
+    ],
+  },
+  {
+    topic: "Maternity & Family",
+    emoji: "🤰",
+    items: [
+      {
+        q: "When should I schedule a maternity session?",
+        a: "Most people book between 28 and 34 weeks, when the bump is nicely rounded but you're still comfortable moving around. If you're expecting multiples or want a little extra cushion, lean toward the earlier end of that window.",
       },
       {
-        q: "What about glasses glare?",
-        a: "Glasses lenses will catch light and create glare in outdoor shots. If you can remove just the lenses beforehand, that's the cleanest fix. If you can't, I'll angle your head slightly to minimize the reflection — it's manageable, just let me know.",
+        q: "What should I wear for maternity photos?",
+        a: "Fitted pieces that follow your shape flatter the bump best — flowing gowns, a simple wrap, or even something form-fitting all work beautifully. Bring a couple of options and we'll choose on the day based on the location and light.",
+      },
+      {
+        q: "Any tips for photographing with young kids?",
+        a: "Keep expectations relaxed and let kids be kids — the genuine giggles and movement make the best frames. Snacks, a favorite toy, and timing the session around naps go a long way. I shoot patiently and let moments unfold rather than forcing stiff poses.",
+      },
+      {
+        q: "Can extended family or extra people join?",
+        a: "Yes. Just let me know the full headcount when you book so I can plan enough time for the group combinations. Larger groups generally need a longer session to cover everyone.",
       },
     ],
   },
@@ -102,477 +117,45 @@ const FAQS: { topic: string; emoji: string; items: { q: string; a: string }[] }[
     items: [
       {
         q: "How long until I receive my photos?",
-        a: "Standard turnaround is up to two weeks from shoot day. If you need your photos faster, 72-hour full gallery delivery is available as an add-on for $150.",
+        a: "Standard turnaround is up to two weeks from shoot day. If you need them sooner — for an announcement, gift, or deadline — expedited delivery is available as an add-on. Just flag it when you book.",
       },
       {
         q: "How are the photos delivered?",
-        a: "You'll receive a link to a private online gallery. From there you can download all images directly — high resolution, ready to print or share. The gallery link is shareable if you want family members to download as well.",
+        a: "You'll get a link to a private online gallery where you can download every image in high resolution, ready to print or share. The gallery link is shareable, so family members can download their favorites too.",
+      },
+      {
+        q: "Are all the photos edited?",
+        a: "Yes. Every image in your gallery is fully finished — color corrected, retouched, and export-ready. You won't get unedited selects or a contact sheet; what you see is the final work.",
       },
       {
         q: "Do you provide RAW files?",
-        a: "RAW files are not included in standard sessions. The edited gallery is the deliverable. RAW files can be licensed separately starting at $500 — reach out if that's something you need.",
-      },
-      {
-        q: "How many photos are edited?",
-        a: "All delivered images are fully edited — color corrected, retouched, and export-ready. You won't receive unedited selects or a contact sheet. Every image in the gallery is finished.",
+        a: "RAW files aren't included in standard sessions — the edited gallery is the deliverable. If you have a specific need for the originals, RAW files can be licensed separately. Reach out and we'll talk it through.",
       },
     ],
   },
   {
-    topic: "Locations & Travel",
+    topic: "Locations & Pricing",
     emoji: "📍",
     items: [
       {
-        q: "Which campuses do you shoot at?",
-        a: "I regularly shoot at UC Berkeley, SJSU, SF State, USF, CSU East Bay, and Santa Clara. I also cover other Bay Area locations — reach out with your campus or location and I'll confirm availability and any travel fees.",
+        q: "Where do you shoot?",
+        a: "I'm based in the Bay Area and shoot on location across San Francisco, the East Bay, and the Peninsula — parks, beaches, downtown spots, campuses, and more. Have a specific place in mind? Send it over and I'll confirm availability and any travel fee.",
       },
       {
         q: "Is there a travel fee?",
-        a: "San Francisco locations (SF State, USF, and anywhere within SF city limits) have no travel fee. Travel fees apply for campuses outside SF: UC Berkeley ($35), CSU East Bay ($30), Santa Clara ($70), SJSU ($75). Palo Alto / Stanford is TBD — reach out to confirm.",
+        a: "Sessions within San Francisco have no travel fee. Locations outside the city may have a modest travel fee depending on distance — I'll always confirm it up front when you inquire, so there are no surprises.",
       },
       {
-        q: "Can we shoot at multiple locations?",
-        a: "Yes. Multiple on-campus locations are included in every session as part of the planned route. If you want to add a second distinct location (a different campus or off-campus spot), that's available as an add-on for $125.",
+        q: "Can we shoot at more than one location?",
+        a: "Yes. Multiple spots within the same area are usually easy to include in the session route. Adding a distinctly separate location is available as an add-on — let me know what you're picturing and we'll map it out.",
+      },
+      {
+        q: "How much does a session cost?",
+        a: "Pricing depends on the session type, length, and group size. Head to the pricing pages for current rates on couples, families, and graduation sessions — or send an inquiry describing what you have in mind and I'll put together a quote.",
       },
     ],
   },
 ];
-
-// ── ANIMATED ACCORDION ITEM ───────────────────────────────────────────────────
-
-function AccordionItem({ q, a, index }: { q: string; a: string; index: number }) {
-  const [open, setOpen] = useState(false);
-  const bodyRef = useRef<HTMLDivElement>(null);
-  const [height, setHeight] = useState(0);
-
-  useEffect(() => {
-    if (!bodyRef.current) return;
-    setHeight(open ? bodyRef.current.scrollHeight : 0);
-  }, [open]);
-
-  return (
-    <div
-      className="faq-item"
-      style={{ animationDelay: `${index * 0.045}s` }}
-    >
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        className={`faq-item-btn${open ? " faq-item-btn--open" : ""}`}
-      >
-        <span className="faq-item-q">{q}</span>
-        <span className={`faq-item-icon${open ? " faq-item-icon--open" : ""}`} aria-hidden="true">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path d="M3 6l5 5 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </span>
-      </button>
-      <div
-        className="faq-item-body"
-        style={{ height, overflow: "hidden", transition: "height 0.32s cubic-bezier(0.4,0,0.2,1)" }}
-        aria-hidden={!open}
-      >
-        <div ref={bodyRef} className="faq-item-body-inner">
-          <p className="faq-item-a">{a}</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── CSS ───────────────────────────────────────────────────────────────────────
-
-const CSS = `
-  @keyframes faq-fade-up {
-    from { opacity: 0; transform: translateY(18px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-  @keyframes faq-item-in {
-    from { opacity: 0; transform: translateY(10px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-  @keyframes faq-float {
-    0%, 100% { transform: translateY(0px) rotate(0deg); }
-    50%       { transform: translateY(-12px) rotate(4deg); }
-  }
-  @keyframes faq-float2 {
-    0%, 100% { transform: translateY(0px) rotate(0deg); }
-    50%       { transform: translateY(-8px) rotate(-3deg); }
-  }
-  @keyframes faq-spin-slow {
-    from { transform: rotate(0deg); }
-    to   { transform: rotate(360deg); }
-  }
-
-  .faq-page {
-    background: #f5f6f4;
-    color: #101412;
-    font-family: var(--font-dm-sans), ui-sans-serif, system-ui, -apple-system, sans-serif;
-    overflow-x: hidden;
-  }
-  .faq-shell {
-    width: min(800px, calc(100% - 48px));
-    margin: 0 auto;
-  }
-
-  /* ── HERO ──────────────────────────────────────────────────────────────────── */
-  .faq-hero {
-    position: relative;
-    padding: 118px 0 72px;
-    background:
-      radial-gradient(ellipse 70% 65% at 8% 20%, rgba(162,210,196,0.22) 0%, transparent 58%),
-      radial-gradient(ellipse 55% 50% at 92% 80%, rgba(130,185,175,0.16) 0%, transparent 55%),
-      linear-gradient(to bottom, #e6efea 0%, #f5f6f4 100%);
-    border-bottom: 1px solid rgba(18,24,22,0.07);
-    overflow: hidden;
-  }
-
-  /* floating decorative blobs in hero */
-  .faq-hero-blob {
-    position: absolute;
-    border-radius: 50%;
-    pointer-events: none;
-  }
-  .faq-hero-blob--1 {
-    width: 340px; height: 340px;
-    top: -120px; right: -80px;
-    background: radial-gradient(circle, rgba(130,185,175,0.18) 0%, transparent 70%);
-    animation: faq-float 8s ease-in-out infinite;
-  }
-  .faq-hero-blob--2 {
-    width: 220px; height: 220px;
-    bottom: -60px; left: 10%;
-    background: radial-gradient(circle, rgba(162,210,196,0.14) 0%, transparent 70%);
-    animation: faq-float2 6s ease-in-out infinite;
-  }
-  /* spinning ring in hero top-right */
-  .faq-hero-ring {
-    position: absolute;
-    top: 40px; right: 60px;
-    width: 90px; height: 90px;
-    border: 1.5px dashed rgba(112,139,133,0.22);
-    border-radius: 50%;
-    animation: faq-spin-slow 18s linear infinite;
-    pointer-events: none;
-  }
-  /* small dot accent */
-  .faq-hero-dot {
-    position: absolute;
-    border-radius: 50%;
-    pointer-events: none;
-  }
-  .faq-hero-dot--a { width:8px; height:8px; background:#8fbdb5; opacity:0.5; top:72px; left:18%; animation: faq-float 5s ease-in-out infinite; }
-  .faq-hero-dot--b { width:5px; height:5px; background:#6fa89f; opacity:0.4; bottom:40px; right:22%; animation: faq-float2 7s ease-in-out infinite 1s; }
-
-  .faq-kicker {
-    margin: 0 0 14px;
-    color: #667f79;
-    font-size: 13px;
-    font-weight: 820;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    animation: faq-fade-up 0.5s cubic-bezier(0.22,1,0.36,1) both;
-  }
-  .faq-hero-title {
-    margin: 0;
-    color: #101412;
-    font-size: clamp(2.4rem, 5.5vw, 3.8rem);
-    font-weight: 900;
-    letter-spacing: -0.03em;
-    line-height: 0.94;
-    text-wrap: balance;
-    animation: faq-fade-up 0.6s 0.07s cubic-bezier(0.22,1,0.36,1) both;
-  }
-  .faq-hero-title em {
-    font-style: normal;
-    color: #4f8a7e;
-  }
-  .faq-hero-sub {
-    margin: 20px 0 0;
-    color: #4b5a55;
-    font-size: 17px;
-    line-height: 1.72;
-    max-width: 500px;
-    text-wrap: pretty;
-    animation: faq-fade-up 0.6s 0.14s cubic-bezier(0.22,1,0.36,1) both;
-  }
-
-  /* ── TOPIC PILLS ROW ───────────────────────────────────────────────────────── */
-  .faq-pills {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-top: 28px;
-    animation: faq-fade-up 0.6s 0.2s cubic-bezier(0.22,1,0.36,1) both;
-  }
-  .faq-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 7px 14px;
-    border: 1px solid rgba(112,139,133,0.2);
-    border-radius: 999px;
-    background: rgba(255,255,255,0.7);
-    backdrop-filter: blur(8px);
-    color: #4b5a55;
-    font-size: 13px;
-    font-weight: 700;
-    cursor: pointer;
-    transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease, color 0.18s ease;
-    text-decoration: none;
-    font-family: inherit;
-    border: none;
-  }
-  .faq-pill:hover {
-    background: rgba(255,255,255,0.95);
-    border: 1px solid rgba(112,139,133,0.35);
-    transform: translateY(-2px);
-    color: #101412;
-  }
-
-  /* ── COUNT BADGE ───────────────────────────────────────────────────────────── */
-  .faq-count {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    margin-top: 20px;
-    padding: 8px 16px;
-    border-radius: 999px;
-    background: rgba(18,24,22,0.05);
-    font-size: 13px;
-    font-weight: 700;
-    color: #667f79;
-    animation: faq-fade-up 0.6s 0.24s cubic-bezier(0.22,1,0.36,1) both;
-  }
-  .faq-count-dot {
-    width: 6px; height: 6px;
-    border-radius: 50%;
-    background: #8fbdb5;
-  }
-
-  /* ── BODY ──────────────────────────────────────────────────────────────────── */
-  .faq-body { padding: 72px 0 96px; }
-
-  /* ── GROUP ─────────────────────────────────────────────────────────────────── */
-  .faq-group { margin-bottom: 56px; }
-  .faq-group:last-child { margin-bottom: 0; }
-
-  .faq-group-header {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 16px;
-  }
-  .faq-group-emoji {
-    font-size: 20px;
-    line-height: 1;
-  }
-  .faq-group-label {
-    font-size: 12px;
-    font-weight: 820;
-    color: #667f79;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    flex: 1;
-  }
-  .faq-group-line {
-    flex: 1;
-    height: 1px;
-    background: linear-gradient(90deg, rgba(18,24,22,0.1), transparent);
-  }
-
-  /* ── ACCORDION ITEMS ───────────────────────────────────────────────────────── */
-  .faq-item {
-    border-radius: 10px;
-    margin-bottom: 4px;
-    border: 1px solid transparent;
-    transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
-    animation: faq-item-in 0.45s cubic-bezier(0.22,1,0.36,1) both;
-  }
-  .faq-item:hover {
-    background: rgba(255,255,255,0.72);
-    border-color: rgba(112,139,133,0.14);
-    box-shadow: 0 4px 16px rgba(18,24,22,0.05);
-  }
-
-  .faq-item-btn {
-    width: 100%;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 16px;
-    padding: 18px 16px;
-    background: none;
-    border: none;
-    cursor: pointer;
-    text-align: left;
-    font-family: inherit;
-    border-radius: 10px;
-  }
-  .faq-item-btn--open {
-    background: rgba(255,255,255,0.88);
-  }
-
-  .faq-item-q {
-    font-size: 15.5px;
-    font-weight: 720;
-    color: #101412;
-    line-height: 1.38;
-    flex: 1;
-    transition: color 0.18s ease;
-  }
-  .faq-item-btn:hover .faq-item-q,
-  .faq-item-btn--open .faq-item-q {
-    color: #0d1a17;
-  }
-
-  .faq-item-icon {
-    flex-shrink: 0;
-    width: 30px; height: 30px;
-    display: flex; align-items: center; justify-content: center;
-    border-radius: 50%;
-    border: 1px solid rgba(18,24,22,0.1);
-    background: rgba(247,250,248,0.9);
-    color: #667f79;
-    transition: background 0.22s ease, color 0.22s ease, border-color 0.22s ease, transform 0.32s cubic-bezier(0.4,0,0.2,1);
-  }
-  .faq-item-btn:hover .faq-item-icon {
-    background: #fff;
-    border-color: rgba(112,139,133,0.3);
-    color: #4f6d67;
-  }
-  .faq-item-icon--open {
-    background: #101412 !important;
-    border-color: #101412 !important;
-    color: #fff !important;
-    transform: rotate(180deg);
-  }
-
-  .faq-item-body-inner { padding: 0 16px 18px 16px; }
-  .faq-item-a {
-    margin: 0;
-    font-size: 15px;
-    color: #4b5a55;
-    line-height: 1.74;
-    padding-right: 46px;
-  }
-
-  /* ── CTA ───────────────────────────────────────────────────────────────────── */
-  .faq-cta {
-    position: relative;
-    background: #ffffff;
-    border-top: 1px solid rgba(18,24,22,0.06);
-    padding: 80px 0 100px;
-    overflow: hidden;
-  }
-  .faq-cta::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background:
-      radial-gradient(ellipse 60% 80% at 80% 50%, rgba(162,210,196,0.1) 0%, transparent 60%),
-      radial-gradient(ellipse 40% 60% at 20% 50%, rgba(130,185,175,0.08) 0%, transparent 55%);
-    pointer-events: none;
-  }
-  .faq-cta-inner {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-  }
-  .faq-cta-card {
-    position: relative;
-    padding: 52px 56px;
-    border: 1px solid rgba(18,24,22,0.09);
-    border-radius: 20px;
-    background: #f5f6f4;
-    box-shadow: 0 16px 48px rgba(18,24,22,0.08);
-    max-width: 540px;
-    width: 100%;
-    overflow: hidden;
-  }
-  /* shimmer sweep on cta card */
-  .faq-cta-card::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(115deg, transparent 30%, rgba(255,255,255,0.45) 50%, transparent 70%);
-    transform: translateX(-100%);
-    transition: transform 0.7s cubic-bezier(0.22,1,0.36,1);
-    pointer-events: none;
-  }
-  .faq-cta-card:hover::after { transform: translateX(100%); }
-
-  .faq-cta-title {
-    margin: 0 0 10px;
-    color: #101412;
-    font-size: clamp(1.6rem, 3.5vw, 2.2rem);
-    font-weight: 880;
-    letter-spacing: -0.02em;
-    line-height: 1.05;
-    text-wrap: balance;
-  }
-  .faq-cta-sub {
-    margin: 0 0 30px;
-    color: #4b5a55;
-    font-size: 16px;
-    line-height: 1.65;
-  }
-  .faq-cta-buttons {
-    display: flex;
-    gap: 10px;
-    justify-content: center;
-    flex-wrap: wrap;
-  }
-
-  .faq-link {
-    min-height: 46px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0 22px;
-    border-radius: 8px;
-    font-size: 14px;
-    font-weight: 820;
-    font-family: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
-    text-decoration: none;
-    transition: background 0.18s ease, transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
-  }
-  .faq-link--primary {
-    border: 1px solid rgba(112,139,133,0.22);
-    background: rgba(246,250,248,0.94);
-    color: #4f6d67;
-    box-shadow: 0 8px 24px rgba(112,139,133,0.05);
-  }
-  .faq-link--primary:hover {
-    transform: translateY(-2px);
-    background: rgba(239,246,244,0.98);
-    box-shadow: 0 14px 30px rgba(112,139,133,0.1);
-  }
-  .faq-link--ghost {
-    border: 1px solid rgba(18,24,22,0.12);
-    background: rgba(255,255,255,0.72);
-    color: #101412;
-  }
-  .faq-link--ghost:hover {
-    transform: translateY(-2px);
-    background: #ffffff;
-    box-shadow: 0 10px 22px rgba(18,24,22,0.06);
-  }
-
-  @media (max-width: 760px) {
-    .faq-shell  { width: min(800px, calc(100% - 36px)); }
-    .faq-hero   { padding: 100px 0 52px; }
-    .faq-hero-ring { display: none; }
-    .faq-hero-sub { font-size: 16px; }
-    .faq-body   { padding: 52px 0 72px; }
-    .faq-item-a { padding-right: 0; }
-    .faq-cta-card { padding: 36px 24px; }
-    .faq-pills { gap: 6px; }
-  }
-`;
 
 // ── TOTAL QUESTION COUNT ──────────────────────────────────────────────────────
 
@@ -589,7 +172,7 @@ export default function FAQClient() {
 
   return (
     <main className="faq-page">
-      <style>{CSS}</style>
+      <style>{FAQ_CSS}</style>
 
       {/* ── HERO ──────────────────────────────────────────────────────────────── */}
       <section className="faq-hero">
@@ -607,9 +190,27 @@ export default function FAQClient() {
             <em>probably wondered.</em>
           </h1>
           <p className="faq-hero-sub">
-            Booking, sessions, outfits, delivery, locations — answered.
-            Still have something? The contact page is one click away.
+            Booking, sessions, outfits, delivery, locations — answered, for every
+            kind of shoot. Still have something? The contact page is one click away.
           </p>
+
+          {/* graduation FAQ CTA */}
+          <div className="faq-grad-banner">
+            <div className="faq-grad-banner-text">
+              <p className="faq-grad-banner-title">
+                <span aria-hidden="true">🎓</span> Looking for graduation photo questions?
+              </p>
+              <p className="faq-grad-banner-sub">
+                Caps, gowns, campus shoots, and grad-season timing have their own page.
+              </p>
+            </div>
+            <Link href="/faq/graduation" className="faq-grad-banner-btn">
+              View Graduation FAQ
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </Link>
+          </div>
 
           {/* quick-jump pills */}
           <div className="faq-pills" role="navigation" aria-label="Jump to topic">
@@ -661,12 +262,12 @@ export default function FAQClient() {
           <div className="faq-cta-card">
             <h2 className="faq-cta-title">Still have a question?</h2>
             <p className="faq-cta-sub">
-              Send the date, campus, and anything you&rsquo;re not sure about.
-              I reply within 24 hours.
+              Tell me what kind of session you&rsquo;re after, your ideal date and
+              location, and anything you&rsquo;re unsure about. I reply within 24 hours.
             </p>
             <div className="faq-cta-buttons">
               <Link href="/contact" className="faq-link faq-link--primary">Send a message</Link>
-              <Link href="/pricing/grads" className="faq-link faq-link--ghost">See grad pricing</Link>
+              <Link href="/pricing" className="faq-link faq-link--ghost">See pricing</Link>
             </div>
           </div>
         </div>
