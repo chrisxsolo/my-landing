@@ -29,7 +29,9 @@ export default function BookingPage() {
   useEffect(() => {
     async function load() {
       try {
-        const { data } = await supabase.from("availability").select("*");
+        // Reads the sanitized public view (notes are already nulled for
+        // booked/hold dates). The anon key has no access to the base table.
+        const { data } = await supabase.from("availability_public").select("id, date, status, note");
         if (data) setDates(data);
       } catch (e) { console.error(e); }
       finally { setLoading(false); }

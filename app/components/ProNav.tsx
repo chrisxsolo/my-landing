@@ -29,13 +29,15 @@ const primaryLinks = [
 ];
 
 const portfolioLinks = [
-  { label: "Grad gallery",   href: "/portfolio?category=grads" },
-  { label: "Family gallery", href: "/portfolio?category=families" },
+  { label: "Couples gallery", href: "/portfolio?category=couples" },
+  { label: "Grad gallery",    href: "/portfolio?category=grads" },
+  { label: "Family gallery",  href: "/portfolio?category=families" },
 ];
 
 const pricingLinks = [
-  { label: "Grad rates",   href: "/pricing/grads" },
-  { label: "Family rates", href: "/pricing/families" },
+  { label: "Couples rates", href: "/pricing/couples" },
+  { label: "Grad rates",    href: "/pricing/grads" },
+  { label: "Family rates",  href: "/pricing/families" },
 ];
 
 function isActive(pathname: string, href: string) {

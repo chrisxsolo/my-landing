@@ -39,7 +39,7 @@ const CSS = pricingCSS({ mediaMinHeight: 560, mediaMinHeightMobile: 390 });
 // To add/remove items: edit this array. Format: { label, price }
 const addOns = [
   { label: "Additional nearby location",  price: "$125" },
-  { label: "72-hour expedited delivery",  price: "$75" },
+  { label: "72-hour full gallery delivery",  price: "$150" },
   { label: "Extended family members",     price: "$50-$75" },
   { label: "Additional time",             price: "$100 / 30 min" },
 ];
@@ -61,7 +61,7 @@ const infoCards = [
   },
   {
     heading: "Travel",
-    items: ["Bay Area locations covered.", "Locations outside San Francisco may include a $30–$75 travel fee."],
+    items: ["San Francisco locations are included.", "Locations outside San Francisco may include a travel fee based on distance."],
     delay: 0.52,
   },
 ];

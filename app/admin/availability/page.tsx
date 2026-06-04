@@ -1,5 +1,4 @@
 "use client";
-import { supabase } from '@/lib/supabase'
 import { useEffect, useState } from "react";
 import { C } from "@/lib/colors";
 import { checkAuth } from "@/lib/adminAuth";
@@ -44,7 +43,12 @@ export default function AdminAvailabilityPage() {
 
   async function fetchDates(){
     setLoading(true);
-    try{const{data}=await supabase.from(TABLE).select('*');if(data)setDates(data);}
+    try{
+      const res=await fetch('/api/admin/availability');
+      if(!res.ok)throw new Error('Failed to load');
+      const{dates:rows}=await res.json();
+      if(rows)setDates(rows);
+    }
     catch(err){console.error(err);}
     finally{setLoading(false);}
   }
@@ -60,23 +64,25 @@ export default function AdminAvailabilityPage() {
     const cur=existing?.status??"none";
     const next=STATUS_CYCLE[cur];
     setSaving(dateStr);
-    if(next==="none"){
-      if(existing?.id){await supabase.from(TABLE).delete().eq('id',existing.id);setDates(p=>p.filter(d=>d.date!==dateStr));showToast("Date cleared");}
-    }else if(existing?.id){
-      await supabase.from(TABLE).update({status:next}).eq('id',existing.id);
-      setDates(p=>p.map(d=>d.date===dateStr?{...d,status:next}:d));showToast(`Marked as ${next}`);
-    }else{
-      const{data}=await supabase.from(TABLE).insert({date:dateStr,status:next,note:null}).select().single();
-      if(data)setDates(p=>[...p,data]);showToast(`Marked as ${next}`);
-    }
-    setSaving(null);
+    try{
+      if(next==="none"){
+        const res=await fetch('/api/admin/availability',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({date:dateStr})});
+        if(res.ok){setDates(p=>p.filter(d=>d.date!==dateStr));showToast("Date cleared");}
+      }else{
+        const res=await fetch('/api/admin/availability',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({date:dateStr,status:next})});
+        if(res.ok){const{date:row}=await res.json();setDates(p=>{const others=p.filter(d=>d.date!==dateStr);return[...others,row];});showToast(`Marked as ${next}`);}
+      }
+    }catch(err){console.error(err);showToast("Save failed");}
+    finally{setSaving(null);}
   }
 
   async function updateNote(dateStr:string,note:string){
     const existing=dateMap[dateStr];
     if(!existing?.id)return;
-    await supabase.from(TABLE).update({note}).eq('id',existing.id);
-    setDates(p=>p.map(d=>d.date===dateStr?{...d,note}:d));showToast("Note saved");
+    try{
+      const res=await fetch('/api/admin/availability',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({date:dateStr,note})});
+      if(res.ok){setDates(p=>p.map(d=>d.date===dateStr?{...d,note}:d));showToast("Note saved");}
+    }catch(err){console.error(err);showToast("Save failed");}
   }
 
   if(!authed){

@@ -15,7 +15,7 @@ export const GROUP_RATE_6_PLUS = 200
 // ── ADD-ON RATES ──────────────────────────────────────────────────────────────
 export const ADDON_EXTRA_OUTFIT     = 75
 export const ADDON_SECOND_LOCATION  = 125
-export const ADDON_EXPEDITED        = 75
+export const ADDON_EXPEDITED        = 150
 export const ADDON_CHAMPAGNE        = 15
 export const ADDON_EXTRA_30_MIN     = 100
 

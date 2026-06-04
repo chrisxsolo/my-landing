@@ -33,6 +33,12 @@ function humanLabel(dateStr: string) {
   });
 }
 
+// Generic public-facing notes. Raw admin notes are never exposed for booked or
+// on-hold dates — they may contain private client/session details. Only the
+// intentional scheduling notes on *available* dates (e.g. "Morning only") are
+// surfaced publicly.
+const PUBLIC_NOTE = { booked: "Booked", hold: "On hold" } as const;
+
 function groupDates(rows: Row[], todayStr: string): Grouped {
   const future = rows
     .filter((r) => r.date >= todayStr)
@@ -40,10 +46,13 @@ function groupDates(rows: Row[], todayStr: string): Grouped {
 
   const out: Grouped = { available: [], on_hold: [], booked: [] };
   for (const r of future) {
-    const entry: DateEntry = { date: r.date, label: humanLabel(r.date), note: r.note };
-    if (r.status === "available") out.available.push(entry);
-    else if (r.status === "hold")  out.on_hold.push(entry);
-    else if (r.status === "booked") out.booked.push(entry);
+    if (r.status === "available") {
+      out.available.push({ date: r.date, label: humanLabel(r.date), note: r.note });
+    } else if (r.status === "hold") {
+      out.on_hold.push({ date: r.date, label: humanLabel(r.date), note: PUBLIC_NOTE.hold });
+    } else if (r.status === "booked") {
+      out.booked.push({ date: r.date, label: humanLabel(r.date), note: PUBLIC_NOTE.booked });
+    }
   }
   return out;
 }

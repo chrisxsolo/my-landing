@@ -181,7 +181,7 @@ export default function Home() {
 
       <footer className="py-10 px-6 border-t" style={{ borderColor: C.borderSubtle, background: C.surfaceStrong }}>
         <div className="max-w-3xl mx-auto flex items-center justify-between flex-wrap gap-4">
-          <span className="font-black text-lg" style={C.text}>Chris.</span>
+          <span className="font-black text-lg" style={C.text}>soloxsnaps</span>
           <span className="text-sm text-slate-400">© {new Date().getFullYear()} · San Francisco, CA</span>
         </div>
       </footer>

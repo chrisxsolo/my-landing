@@ -45,8 +45,8 @@ export default function HeroCarousel({ images }: { images: CarouselImage[] }) {
           inset: 0;
           z-index: 1;
           background:
-            linear-gradient(90deg, rgba(10, 14, 13, 0.72) 0%, rgba(10, 14, 13, 0.28) 46%, rgba(10, 14, 13, 0.1) 100%),
-            linear-gradient(180deg, rgba(10, 14, 13, 0.34) 0%, rgba(10, 14, 13, 0.04) 42%, rgba(10, 14, 13, 0.42) 100%);
+            linear-gradient(90deg, rgba(10, 14, 13, 0.6) 0%, rgba(10, 14, 13, 0.2) 46%, rgba(10, 14, 13, 0.04) 100%),
+            linear-gradient(180deg, rgba(10, 14, 13, 0.12) 0%, rgba(10, 14, 13, 0) 38%, rgba(10, 14, 13, 0.34) 100%);
           pointer-events: none;
         }
         .home-hero-inner {
@@ -189,20 +189,20 @@ export default function HeroCarousel({ images }: { images: CarouselImage[] }) {
         />
 
         <div className="home-hero-inner">
-          <p className="home-hero-kicker">Bay Area photography</p>
+          <p className="home-hero-kicker">Guided Bay Area photo sessions</p>
           <h1 className="home-hero-title">
             Photos that feel real, not rehearsed.
           </h1>
           <p className="home-hero-copy">
-            Couples, families, and grads — I keep sessions calm, directed, and easy enough
-            that you actually enjoy the day. No stiff poses, just photos that look like you.
+            Couples, families, and grads, guided through calm, natural sessions that actually
+            feel like you. No stiff posing, no awkward guessing, just photos you&rsquo;ll want to keep.
           </p>
           <div className="home-hero-actions">
             <Link href="/contact" className="home-hero-action" data-primary="true">
               Book a session
             </Link>
             <Link href="/pricing" className="home-hero-action">
-              See sessions
+              See session options
             </Link>
           </div>
         </div>

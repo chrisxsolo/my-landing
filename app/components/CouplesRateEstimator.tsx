@@ -132,7 +132,9 @@ export default function CouplesRateEstimator() {
             >
               {(Object.entries(COUPLES_PACKAGES) as [CouplesPackageKey, { label: string; price: number }][]).map(
                 ([key, pkg]) => (
-                  <option key={key} value={key}>{pkg.label} — {formatCurrency(pkg.price)}</option>
+                  <option key={key} value={key}>
+                    {pkg.label} — {key === "proposal" ? "starting at " : ""}{formatCurrency(pkg.price)}
+                  </option>
                 )
               )}
             </select>

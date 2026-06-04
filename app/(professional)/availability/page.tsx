@@ -35,11 +35,17 @@ export default async function AvailabilityPage() {
   const supabase = createSupabaseServerClient();
   const { data, error } = await supabase
     .from("availability")
-    .select("*")
+    .select("date, status, note")
     .order("date", { ascending: true });
 
   if (error) console.error("Failed to load availability:", error);
-  const dates = (data ?? []) as AvailDate[];
+
+  // Strip private admin notes from booked/hold dates before sending to the
+  // browser. Only intentional public notes on available dates are kept.
+  const dates = (data ?? []).map((d) => ({
+    ...d,
+    note: d.status === "available" ? d.note : null,
+  })) as AvailDate[];
 
   return (
     <main className="avail-page">

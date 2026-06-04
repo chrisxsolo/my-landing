@@ -102,7 +102,7 @@ const FAQS: { topic: string; emoji: string; items: { q: string; a: string }[] }[
     items: [
       {
         q: "How long until I receive my photos?",
-        a: "Standard turnaround is up to two weeks from shoot day. If you need your photos faster, 72-hour expedited delivery is available as an add-on for $75.",
+        a: "Standard turnaround is up to two weeks from shoot day. If you need your photos faster, 72-hour full gallery delivery is available as an add-on for $150.",
       },
       {
         q: "How are the photos delivered?",

@@ -176,7 +176,7 @@ export default function GraduationRateEstimator() {
               {secondLocation ? "✓ " : ""}Second location +$125
             </button>
             <button style={toggleStyle(expedited)}      onClick={() => setExpedited(v => !v)}>
-              {expedited ? "✓ " : ""}72-hr delivery +$75
+              {expedited ? "✓ " : ""}72-hr delivery +$150
             </button>
             <button style={toggleStyle(champagne)}      onClick={() => setChampagne(v => !v)}>
               {champagne ? "✓ " : ""}Champagne +$15

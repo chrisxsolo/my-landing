@@ -840,10 +840,13 @@ export default function ConversationPage() {
     setDateConfirming(true);
     try {
       await supabase.from("inquiries").update({ session_date: dateStr }).eq("id", inquiry.id);
-      await supabase.from("availability").upsert(
-        { date: dateStr, status: "booked", note: `Booked — ${inquiry.name}` },
-        { onConflict: "date" }
-      );
+      // Availability is locked down at the DB level — write through the admin
+      // server route (service role) rather than the public anon client.
+      await fetch("/api/admin/availability", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date: dateStr, status: "booked", note: `Booked — ${inquiry.name}` }),
+      });
       // Keep client_sessions in sync so the ICS calendar feed stays accurate
       await supabase.from("client_sessions")
         .update({ session_date: dateStr })

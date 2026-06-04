@@ -41,7 +41,7 @@ const CSS = pricingCSS({ mediaMinHeight: 620, mediaMinHeightMobile: 420, mediaOb
 const addOns = [
   { label: "Additional outfit",                  price: "$75" },
   { label: "Second nearby off-campus location",  price: "$125" },
-  { label: "72-hour expedited delivery",          price: "$75" },
+  { label: "72-hour full gallery delivery",       price: "$150" },
   { label: "Champagne setup (provided by photographer)", price: "$15" },
   { label: "Extended time",                      price: "$100 / 30 min" },
 ];
@@ -80,7 +80,7 @@ const infoCards = [
   },
   {
     heading: "Travel",
-    items: ["Bay Area campuses covered.", "Locations outside San Francisco may include a $30–$75 travel fee."],
+    items: ["San Francisco locations are included.", "Locations outside San Francisco may include a travel fee based on distance."],
     delay: 0.52,
   },
 ];

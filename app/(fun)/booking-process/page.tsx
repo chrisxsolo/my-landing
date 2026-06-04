@@ -22,113 +22,128 @@ const STEPS: Step[] = [
   {
     id: 1,
     phase: "START",
-    title: "Inquire & Book",
-    description: "Reach out through the contact form or Instagram DM. We'll discuss your vision, preferred locations, and available dates.",
+    title: "Inquire",
+    description: "Reach out through the contact form or Instagram DM. We'll talk through your vision, preferred locations, and the dates you have in mind.",
     emoji: "📧",
     duration: "Day 1",
     details: [
-      "Fill out contact form or send DM",
-      "We discuss dates, locations, vision",
-      "I send you pricing and package options",
+      "Fill out the contact form or send a DM",
+      "Share your session type, date, and location ideas",
+      "I send pricing and package options",
     ],
     color: C.p1,
     gradient: C.grad12,
   },
   {
     id: 2,
-    phase: "BOOKING",
-    title: "Lock It In",
-    description: "Once you're ready, I'll send over the invoice and contract. Sign digitally and pay the 50% deposit to secure your date.",
-    emoji: "✍️",
-    duration: "Day 1-3",
+    phase: "CONFIRM",
+    title: "Confirm the Details",
+    description: "We lock in the specifics together — the date, time, location, and the package that fits your session.",
+    emoji: "🗓️",
+    duration: "Before booking",
     details: [
-      "Receive invoice and contract via email",
-      "Sign contract digitally",
-      "Pay 50% deposit to lock your date",
+      "Choose your date and time",
+      "Settle on the location",
+      "Pick the package that fits",
     ],
     color: C.p2,
     gradient: C.grad23,
   },
   {
     id: 3,
-    phase: "PREP",
-    title: "Prepare for the Shoot",
-    description: "Study the grad guide, pick your outfit, and get ready. I'll send you a final reminder 2 days before with timing and location details.",
-    emoji: "✅",
-    duration: "Leading up to shoot",
+    phase: "BOOKING",
+    title: "Receive Invoice & Contract",
+    description: "Once everything is set, I send over the invoice and contract so you can review and sign digitally.",
+    emoji: "✍️",
+    duration: "After confirming",
     details: [
-      "Review poses and outfit tips from the grad guide",
-      "Confirm exact location and timing",
-      "Get your cap, gown, and stole ready",
+      "Receive invoice and contract via email",
+      "Review the session details",
+      "Sign the contract digitally",
     ],
     color: C.p3,
     gradient: C.grad321,
   },
   {
     id: 4,
-    phase: "SHOOT DAY",
-    title: "The Session",
-    description: "Show up on time, bring your energy, and we'll make it happen. Sessions typically run 45-60 minutes at 1-2 locations.",
-    emoji: "📸",
-    duration: "Shoot day",
+    phase: "DEPOSIT",
+    title: "Pay 50% Deposit",
+    description: "A 50% deposit reserves your date. Deposits are non-refundable but transferable.",
+    emoji: "🔒",
+    duration: "To reserve the date",
     details: [
-      "Meet at the agreed location",
-      "45-60 minute session across 1-2 spots",
-      "We nail all the poses you wanted",
+      "Pay the 50% deposit to lock your date",
+      "Your spot is officially reserved",
+      "Remaining balance is due on shoot day",
     ],
     color: C.p1,
     gradient: C.grad12,
   },
   {
     id: 5,
-    phase: "FINAL PAYMENT",
-    title: "Pay the Remaining 50%",
-    description: "After the shoot, I'll send the second invoice for the remaining balance. Once paid, I'll start editing your photos.",
-    emoji: "💳",
-    duration: "Within 24 hours after shoot",
+    phase: "PREP",
+    title: "Prepare for the Session",
+    description: "Pick your outfits and get ready. I'll send a reminder before the session with final timing and location details.",
+    emoji: "✅",
+    duration: "Leading up to the session",
     details: [
-      "Receive final invoice via email",
-      "Pay remaining 50% balance",
-      "Editing officially begins",
+      "Plan your outfits",
+      "Confirm exact location and timing",
+      "Get a reminder before shoot day",
     ],
     color: C.p2,
     gradient: C.grad23,
   },
   {
     id: 6,
-    phase: "EDITING",
-    title: "Wait for Your Photos",
-    description: "Standard turnaround is 2 weeks. Want them faster? Add expedited editing ($50) for 1-week delivery.",
-    emoji: "⏳",
-    duration: "2 weeks (or 1 week expedited)",
+    phase: "SHOOT DAY",
+    title: "Attend the Session",
+    description: "Show up, relax, and I'll guide the posing the whole way through. No experience needed — just be yourself.",
+    emoji: "📸",
+    duration: "Shoot day",
     details: [
-      "I edit, color grade, and perfect every shot",
-      "Standard: 2-week turnaround",
-      "Expedited: 1-week turnaround (+$50)",
+      "Meet at the agreed location",
+      "Guided posing from start to finish",
+      "We capture the variety you wanted",
     ],
     color: C.p3,
     gradient: C.grad321,
   },
   {
     id: 7,
-    phase: "DELIVERY",
-    title: "Receive Your Photos",
-    description: "You'll get a private online gallery with all your edited photos in high resolution. Download, share, post — they're yours.",
-    emoji: "🎁",
-    duration: "Final step",
+    phase: "FINAL PAYMENT",
+    title: "Pay Remaining Balance",
+    description: "The remaining 50% balance is due on shoot day. Once it's settled, editing begins.",
+    emoji: "💳",
+    duration: "On shoot day",
     details: [
-      "Private online gallery link sent via email",
-      "Download high-res images instantly",
-      "Share, print, post — no restrictions",
+      "Pay the remaining 50% balance",
+      "Balance is due the day of the session",
+      "Editing officially begins",
     ],
     color: C.p1,
+    gradient: C.grad12,
+  },
+  {
+    id: 8,
+    phase: "DELIVERY",
+    title: "Receive Your Gallery",
+    description: "You'll get a private online gallery with all your edited photos in high resolution within two weeks. Download, share, post — they're yours.",
+    emoji: "🎁",
+    duration: "Within two weeks",
+    details: [
+      "Standard turnaround is up to two weeks",
+      "Private gallery link sent via email",
+      "Download high-res images instantly",
+    ],
+    color: C.p2,
     gradient: C.grad,
   },
 ];
 
 const MARQUEE = [
-  "Professional Process","Clear Timeline","No Surprises","Bay Area Grads","Book With Confidence",
-  "Professional Process","Clear Timeline","No Surprises","Bay Area Grads","Book With Confidence",
+  "Professional Process","Clear Timeline","No Surprises","Bay Area Sessions","Book With Confidence",
+  "Professional Process","Clear Timeline","No Surprises","Bay Area Sessions","Book With Confidence",
 ];
 
 export default function BookingProcessPage() {
@@ -384,7 +399,7 @@ export default function BookingProcessPage() {
               <p className="text-xs font-bold tracking-[0.12em] uppercase" style={{color:C.p3}}>Optional Add-Ons</p>
             </div>
             <h2 className="text-3xl font-black text-slate-900 tracking-tight">Want it faster?</h2>
-            <p className="text-slate-500 mt-2 text-sm">Speed up delivery for an additional fee.</p>
+            <p className="text-slate-500 mt-2 text-sm">Standard turnaround is up to two weeks. Speed up delivery for an additional fee.</p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -393,9 +408,9 @@ export default function BookingProcessPage() {
               <div className="flex items-start gap-3 mb-3">
                 <span className="text-3xl">⚡</span>
                 <div>
-                  <h3 className="text-lg font-black text-slate-900 mb-1">Expedited Editing</h3>
-                  <p className="text-sm text-slate-600 mb-2">Get your photos in 1 week instead of 2.</p>
-                  <p className="text-2xl font-black" style={{color:C.p3}}>+$50</p>
+                  <h3 className="text-lg font-black text-slate-900 mb-1">72-Hour Full Gallery</h3>
+                  <p className="text-sm text-slate-600 mb-2">Get your full edited gallery delivered within 72 hours.</p>
+                  <p className="text-2xl font-black" style={{color:C.p3}}>+$150</p>
                 </div>
               </div>
             </div>
@@ -403,11 +418,11 @@ export default function BookingProcessPage() {
             <div className="rounded-2xl p-6 relative overflow-hidden" style={{background:`linear-gradient(135deg,${C.p2_08},${C.p1_06})`,border:`1.5px solid ${C.p2_20}`}}>
               <div className="absolute top-0 left-0 right-0 h-[3px]" style={{background:C.grad23}}/>
               <div className="flex items-start gap-3 mb-3">
-                <span className="text-3xl">🎨</span>
+                <span className="text-3xl">🖼️</span>
                 <div>
-                  <h3 className="text-lg font-black text-slate-900 mb-1">Extra Edits</h3>
-                  <p className="text-sm text-slate-600 mb-2">Need background swaps or heavy retouching? Ask first.</p>
-                  <p className="text-sm font-bold text-slate-500">Custom pricing</p>
+                  <h3 className="text-lg font-black text-slate-900 mb-1">Rush Preview</h3>
+                  <p className="text-sm text-slate-600 mb-2">A handful of edited previews delivered early, before the full gallery.</p>
+                  <p className="text-2xl font-black" style={{color:C.p2}}>+$75</p>
                 </div>
               </div>
             </div>
@@ -445,8 +460,8 @@ export default function BookingProcessPage() {
 
       <footer className="border-t py-8 px-6" style={{ borderColor: C.borderSubtle, background: C.surfaceStrong }}>
         <div className="max-w-4xl mx-auto flex items-center justify-between flex-wrap gap-4">
-          <span className="font-black text-lg" style={C.text}>Chris.</span>
-          <span className="text-sm text-slate-400">© 2026 · Bay Area Grad Photography</span>
+          <span className="font-black text-lg" style={C.text}>soloxsnaps</span>
+          <span className="text-sm text-slate-400">© 2026 · soloxsnaps · Bay Area photography</span>
         </div>
       </footer>
     </div>

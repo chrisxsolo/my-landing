@@ -37,7 +37,7 @@ const profileImage =
 // ── VISIBLE SERVICE CARDS ─────────────────────────────────────────────────────
 // Controls which portfolio categories appear as cards in the services section.
 // Values must match the `slug` column in Supabase portfolio_categories.
-const visiblePortfolioSlugs = ["grads", "families"];
+const visiblePortfolioSlugs = ["couples", "grads", "families"];
 
 export const metadata: Metadata = {
   title,
@@ -190,7 +190,7 @@ const CSS = `
     content: '';
     position: absolute;
     inset: 0;
-    background: linear-gradient(to top, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.22) 42%, transparent 68%);
+    background: linear-gradient(to top, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.14) 40%, transparent 64%);
     pointer-events: none;
     z-index: 1;
   }
@@ -623,11 +623,11 @@ const CSS = `
     .home-strip { padding: 56px 0 68px; }
     .home-title { font-size: clamp(1.8rem, 8vw, 2.6rem); }
     .home-copy  { font-size: 16px; }
-    .home-card-grid { gap: 6px; }
-    .home-card h3 { font-size: 15px; letter-spacing: 0.08em; }
-    .home-card-kicker { font-size: 9px; }
-    .home-card-footer { font-size: 9px; padding: 6px 10px 10px; }
-    .home-card-body { padding: 0 10px; bottom: 28px; }
+    .home-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .home-card h3 { font-size: 17px; letter-spacing: 0.08em; }
+    .home-card-kicker { font-size: 10px; }
+    .home-card-footer { font-size: 10px; padding: 7px 12px 12px; }
+    .home-card-body { padding: 0 12px; bottom: 30px; }
     .home-cta-copy { padding: 18px 8px 8px; }
     .home-cta-media { max-width: 380px; }
     .home-editorial-media { min-height: 430px; }
@@ -667,9 +667,14 @@ export default async function ProfessionalHomePage() {
   const portfolioSections = visibleCategories.map((category, index) => ({
     category,
     cover: resolveSettingsCover(`home_cover_${category.slug}`, getCoverForCategory(category, images, heroImage, index)),
-    subline: category.slug === "grads" ? "Graduation sessions" : "Family sessions",
+    subline:
+      category.slug === "couples" ? "Couples sessions" :
+      category.slug === "grads"   ? "Graduation sessions" :
+      "Family sessions",
     copy:
-      category.slug === "grads"
+      category.slug === "couples"
+        ? "Anniversaries, engagements, proposals, and lifestyle portraits with guided posing throughout."
+        : category.slug === "grads"
         ? "Campus portraits, cap-and-gown details, friend groups, and gallery-ready milestone images."
         : "Calm, warm family portraits with enough direction to keep everyone comfortable.",
   }));
@@ -714,7 +719,7 @@ export default async function ProfessionalHomePage() {
               <h2 className="home-title">Built for milestones, not stock-photo energy.</h2>
             </div>
             <p className="home-copy">
-              Graduation, family, and booking info — kept simple so you can pick a lane and move.
+              Couples, graduation, and family sessions — kept simple so you can pick a lane and move.
             </p>
           </div>
 

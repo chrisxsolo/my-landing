@@ -236,8 +236,8 @@ export default function LocationGuidePage() {
       <GuideNav />
       <footer className="border-t py-8 px-6" style={{ borderColor: C.borderSubtle, background: C.surfaceStrong }}>
         <div className="max-w-3xl mx-auto flex items-center justify-between flex-wrap gap-4">
-          <span className="font-black text-lg" style={C.text}>Chris.</span>
-          <span className="text-sm text-slate-400">© 2026 · Bay Area Grad Photography</span>
+          <span className="font-black text-lg" style={C.text}>soloxsnaps</span>
+          <span className="text-sm text-slate-400">© 2026 · soloxsnaps · Bay Area photography</span>
         </div>
       </footer>
     </div>

@@ -3,10 +3,10 @@ import ProNav from "@/app/components/ProNav";
 import ScrollReveal from "@/app/components/ScrollReveal";
 
 const footerLinks = [
-  { label: "Grad gallery", href: "/portfolio?category=grads" },
-  { label: "Family gallery", href: "/portfolio?category=families" },
+  { label: "Couples rates", href: "/pricing/couples" },
   { label: "Grad rates", href: "/pricing/grads" },
   { label: "Family rates", href: "/pricing/families" },
+  { label: "Portfolio", href: "/portfolio" },
   { label: "Dates", href: "/availability" },
   { label: "Contact", href: "/contact" },
 ];
@@ -232,7 +232,7 @@ export default function ProfessionalLayout({ children }: Readonly<{ children: Re
             <div>
               <p className="professional-footer-brand">soloxsnaps</p>
               <p className="professional-footer-copy">
-                Bay Area graduation and family photography with clean direction, real light, and galleries that feel ready to share.
+                Bay Area couples, graduation, and family photography with clean direction, real light, and galleries that feel ready to share.
               </p>
             </div>
 

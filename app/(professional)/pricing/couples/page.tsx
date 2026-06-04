@@ -25,7 +25,8 @@ const packages = [
     kicker: "Standard",
     name: "1-Hour Couples Session",
     price: "$450",
-    bestFor: "Couples who want more variety, more posing options, and a fuller gallery.",
+    badge: "Most popular",
+    bestFor: "The best all-around option — more variety, more posing options, and a fuller gallery.",
     items: ["1 hour session", "1 location", "1–2 outfits", "Posing guidance throughout", "More candid, romantic, and lifestyle image variety", "Private online gallery", "Minimum 40 professionally edited images", "Standard 2-week turnaround"],
   },
   {
@@ -45,8 +46,9 @@ const packages = [
   {
     kicker: "Proposals",
     name: "Proposal Session",
-    price: "$750+",
-    bestFor: "Surprise proposals and romantic portraits afterward — planning and coordination included.",
+    price: "$750",
+    startingAt: true,
+    bestFor: "Surprise proposals and romantic portraits afterward — planning and coordination included. Final pricing varies with location, timing, and complexity.",
     items: ["Planning and coordination before the session", "Location and timing guidance", "Surprise proposal coverage", "Portraits after the proposal", "Private online gallery", "Minimum 50 professionally edited images", "Standard 2-week turnaround"],
   },
 ] as const;
@@ -66,7 +68,7 @@ const addOns = [
 const infoCards = [
   { heading: "Booking",      items: ["50% deposit to reserve the date. Deposits are non-refundable but transferable.", "Contract completed before the session.", "Remaining balance due on shoot day."],                                                  delay: 0.28 },
   { heading: "Session flow", items: ["Guided posing throughout every session.", "Location and timing planned before shoot day.", "Proposal sessions include pre-shoot coordination."],                                                                   delay: 0.40 },
-  { heading: "Travel",       items: ["Bay Area locations covered.", "Locations outside San Francisco may include a travel fee based on distance."],                                                                                                      delay: 0.52 },
+  { heading: "Travel",       items: ["San Francisco locations are included.", "Locations outside San Francisco may include a travel fee based on distance."],                                                                                         delay: 0.52 },
 ] as const;
 
 export default async function CouplesPricingPage() {
@@ -82,23 +84,25 @@ export default async function CouplesPricingPage() {
       <section className="pricing-hero-dark" style={heroImage ? { backgroundImage: `url(${heroImage})` } : {}}>
         <div className="pricing-shell">
           <p className="pricing-kicker">Couples photography</p>
-          <h1 className="pricing-title">Real moments. Real locations. Photos that actually feel like you.</h1>
+          <h1 className="pricing-title">Couples photos that actually feel like you</h1>
           <p className="pricing-copy">
-            Bay Area couples photography for anniversaries, engagement sessions, lifestyle portraits, and proposal coverage. From a quick 30-minute session to a full engagement experience.
+            Bay Area couples photography for anniversaries, engagements, proposals, and lifestyle sessions. I&rsquo;ll guide the posing so everything feels natural, relaxed, and easy from start to finish.
           </p>
           <div className="pricing-hero-dark-footer">
             <div className="pricing-hero-price-block">
-              <span className="pricing-hero-price-label">from</span>
+              <span className="pricing-hero-price-label">starting at</span>
               <span className="pricing-hero-price-big">$350</span>
             </div>
             <span className="pricing-hero-divider" aria-hidden="true" />
             <div className="pricing-chip-row" style={{ marginTop: 0 }}>
+              <span className="pricing-chip">Starting at $350</span>
               <span className="pricing-chip">25+ edited images</span>
               <span className="pricing-chip">Guided posing</span>
               <span className="pricing-chip">2-week turnaround</span>
             </div>
             <Link href="/contact" className="pricing-link">Inquire About a Couples Session</Link>
           </div>
+          <p className="pricing-hero-fineprint">Starting at $350 for a 30-minute couples session.</p>
         </div>
       </section>
 
@@ -122,11 +126,17 @@ export default async function CouplesPricingPage() {
       </section>
 
       <section className="pricing-shell couples-grid" aria-label="Couples session packages">
-        {packages.map(({ kicker, name, price, bestFor, items }) => (
-          <div key={name} className="couples-card">
+        {packages.map((pkg) => {
+          const { kicker, name, price, bestFor, items } = pkg;
+          const badge = "badge" in pkg ? pkg.badge : undefined;
+          const startingAt = "startingAt" in pkg ? pkg.startingAt : false;
+          return (
+          <div key={name} className={`couples-card${badge ? " couples-card--featured" : ""}`}>
+            {badge && <span className="couples-card-badge">{badge}</span>}
             <div className="couples-card-header">
               <p className="pricing-kicker" style={{ marginBottom: 8 }}>{kicker}</p>
               <h3 className="couples-card-name">{name}</h3>
+              {startingAt && <span className="couples-card-price-prefix">Starting at</span>}
               <p className="couples-card-price">{price}</p>
             </div>
             <p className="couples-card-best-for"><strong>Best for:</strong> {bestFor}</p>
@@ -137,7 +147,42 @@ export default async function CouplesPricingPage() {
               <Link href="/contact" className="pricing-link couples-card-link">Inquire About a Couples Session</Link>
             </div>
           </div>
-        ))}
+          );
+        })}
+      </section>
+
+      <section className="pricing-shell couples-chooser" aria-label="Which couples session should I book?">
+        <h2 className="couples-chooser-heading">Which couples session should I book?</h2>
+        <div className="couples-chooser-table">
+          {[
+            ["30-Minute Couples Mini Session", "Quick anniversaries, casual portraits, and couples who want a short session."],
+            ["1-Hour Couples Session", "The best all-around option with more variety and a fuller gallery."],
+            ["Couples Signature Session", "Couples who want more time, more movement, and more creative direction."],
+            ["Engagement Session", "Save-the-dates, wedding websites, announcements, and more intentional planning."],
+            ["Proposal Session", "Surprise proposals, pre-shoot coordination, and portraits afterward."],
+          ].map(([session, bestFor]) => (
+            <div key={session} className="couples-chooser-row">
+              <span className="couples-chooser-session">{session}</span>
+              <span className="couples-chooser-best">{bestFor}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="pricing-shell couples-feel" aria-label="What the session feels like">
+        <h2 className="couples-feel-heading">What the session feels like</h2>
+        <div className="couples-feel-grid">
+          {[
+            ["No awkward posing", "I’ll guide you through natural prompts and simple direction so you’re never standing around wondering what to do."],
+            ["Real locations", "We’ll choose a Bay Area spot that fits your vibe, from city architecture to beach sunsets to quiet park trails."],
+            ["Easy from start to finish", "Once the date is confirmed, I’ll send the invoice and contract, help with planning, and deliver your final gallery within two weeks."],
+          ].map(([title, copy]) => (
+            <div key={title} className="couples-feel-card">
+              <h3>{title}</h3>
+              <p>{copy}</p>
+            </div>
+          ))}
+        </div>
       </section>
 
       <section className="pricing-shell couples-addons-section">
@@ -160,9 +205,12 @@ export default async function CouplesPricingPage() {
         <div className="pricing-cta-panel">
           <div>
             <p className="pricing-kicker">Ready for couples photos?</p>
-            <h2 className="pricing-title" style={{ fontSize: 38 }}>Send the date and location.</h2>
+            <h2 className="pricing-title" style={{ fontSize: 38 }}>Ready for couples photos?</h2>
+            <p className="couples-cta-copy">
+              Send your preferred date, location idea, and session type. I&rsquo;ll confirm availability and send the invoice and contract once everything is set.
+            </p>
           </div>
-          <Link href="/contact" className="pricing-link">Book Your Couples Session</Link>
+          <Link href="/contact" className="pricing-link">Inquire About a Couples Session</Link>
         </div>
       </section>
     </main>
@@ -170,6 +218,57 @@ export default async function CouplesPricingPage() {
 }
 
 const COUPLES_CSS = `
+  .pricing-hero-fineprint { margin: 14px 0 0; color: rgba(255,255,255,0.78); font-size: 13.5px; line-height: 1.5; font-family: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif; }
+
+  /* Featured package card + badge (P5) */
+  .couples-card { position: relative; }
+  .couples-card--featured { border-color: rgba(154,185,178,0.55); box-shadow: 0 18px 40px rgba(18,24,22,0.12); }
+  .couples-card-badge {
+    position: absolute; top: -11px; left: 28px;
+    padding: 5px 12px; border-radius: 999px;
+    background: #33403b; color: #fff;
+    font-size: 11px; font-weight: 820; letter-spacing: 0.04em; text-transform: uppercase;
+    box-shadow: 0 6px 16px rgba(18,24,22,0.18);
+    font-family: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
+  }
+  .couples-card-price-prefix { display: block; margin: 0 0 2px; color: #667f79; font-size: 12px; font-weight: 760; letter-spacing: 0.04em; text-transform: uppercase; font-family: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif; }
+
+  /* Which session should I book? (P8) */
+  .couples-chooser { padding: 8px 0 56px; }
+  .couples-chooser-heading { margin: 0 0 20px; color: #101412; font-size: 28px; font-weight: 860; line-height: 1.1; letter-spacing: 0; }
+  .couples-chooser-table {
+    border: 1px solid rgba(18,24,22,0.1); border-radius: 8px; overflow: hidden;
+    background: rgba(255,255,255,0.76); box-shadow: 0 14px 34px rgba(18,24,22,0.07);
+  }
+  .couples-chooser-row {
+    display: grid; grid-template-columns: minmax(180px, 0.8fr) 1.4fr; gap: 18px;
+    padding: 16px 20px; border-bottom: 1px solid rgba(18,24,22,0.08);
+    font-family: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
+  }
+  .couples-chooser-row:last-child { border-bottom: none; }
+  .couples-chooser-session { color: #101412; font-size: 14.5px; font-weight: 820; line-height: 1.4; }
+  .couples-chooser-best { color: #4b5a55; font-size: 14px; line-height: 1.55; }
+
+  /* What the session feels like (P9) */
+  .couples-feel { padding: 8px 0 56px; }
+  .couples-feel-heading { margin: 0 0 20px; color: #101412; font-size: 28px; font-weight: 860; line-height: 1.1; letter-spacing: 0; }
+  .couples-feel-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+  .couples-feel-card {
+    padding: 26px 24px; border: 1px solid rgba(18,24,22,0.1); border-radius: 8px;
+    background: rgba(255,255,255,0.76); box-shadow: 0 14px 34px rgba(18,24,22,0.07);
+    font-family: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
+  }
+  .couples-feel-card h3 { margin: 0 0 10px; color: #101412; font-size: 18px; font-weight: 860; line-height: 1.2; }
+  .couples-feel-card p { margin: 0; color: #4b5a55; font-size: 14.5px; line-height: 1.62; }
+
+  .couples-cta-copy { max-width: 520px; margin: 14px 0 0; color: #4b5a55; font-size: 15px; line-height: 1.65; font-family: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif; }
+
+  @media (max-width: 660px) {
+    .couples-chooser-row { grid-template-columns: 1fr; gap: 4px; }
+    .couples-feel-grid { grid-template-columns: 1fr; }
+    .couples-chooser-heading, .couples-feel-heading { font-size: 24px; }
+  }
+
   .couples-intro { padding: 56px 0 40px; }
   .couples-intro-heading { margin: 0 0 20px; color: #101412; font-size: 34px; font-weight: 880; line-height: 1.02; letter-spacing: 0; }
   .couples-intro-copy { max-width: 720px; margin: 0; color: #4b5a55; font-size: 17px; line-height: 1.72; text-wrap: pretty; font-family: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif; }
