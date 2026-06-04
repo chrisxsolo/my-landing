@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 
 export type AvailDate = {
-  id: number;
   date: string;
   status: "available" | "booked" | "hold";
   note: string | null;
@@ -102,9 +101,7 @@ const CSS = `
     display: inline-flex; align-items: center; padding: 0 13px;
     border: 1px solid rgba(160,130,90,0.18);
     border-radius: 99px;
-    background: rgba(255,255,255,0.62);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    background: rgba(255,255,255,0.78);
     color: rgba(70,52,32,0.68);
     font-size: 12px; font-weight: 700; letter-spacing: 0.01em;
   }
@@ -122,9 +119,7 @@ const CSS = `
   .avail-calendar, .avail-sidebar-panel {
     border: 1px solid rgba(255,255,255,0.88);
     border-radius: 20px;
-    background: rgba(255,255,255,0.68);
-    backdrop-filter: blur(28px);
-    -webkit-backdrop-filter: blur(28px);
+    background: rgba(255,255,255,0.92);
     box-shadow:
       inset 0 1px 0 rgba(255,255,255,0.95),
       0 2px 0 rgba(160,130,90,0.06),
@@ -309,8 +304,6 @@ const CSS = `
     border: 1px solid rgba(88,148,122,0.28);
     border-radius: 12px;
     background: linear-gradient(135deg, rgba(88,148,122,0.14) 0%, rgba(60,120,96,0.07) 100%);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
     color: #2a6448;
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.85), 0 4px 18px rgba(130,95,55,0.08);
     font-size: 14px; font-weight: 820; letter-spacing: 0.01em;
@@ -501,7 +494,7 @@ export default function AvailabilityCalendar({ initialDates }: { initialDates: A
               {upcomingDates.length > 0 ? (
                 <div className="avail-upcoming">
                   {upcomingDates.map((date) => (
-                    <button key={date.id} type="button"
+                    <button key={date.date} type="button"
                       onClick={() => { const [ny, nm] = date.date.split("-").map(Number); setYear(ny); setMonth(nm - 1); setSelected(date); }}>
                       <span>{formatDate(date.date)}</span>
                       <span>{date.status === "available" ? "Open" : "Hold"}</span>
