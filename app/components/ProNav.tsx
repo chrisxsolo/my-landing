@@ -35,7 +35,6 @@ const guideLinks = [
 ];
 
 const portfolioLinks = [
-  { label: "Couples gallery", href: "/portfolio?category=couples" },
   { label: "Grad gallery",    href: "/portfolio?category=grads" },
   { label: "Family gallery",  href: "/portfolio?category=families" },
 ];
