@@ -10,7 +10,7 @@ const sections = [
   { href: "/grad-guide/posing",        num: "01", title: "Posing Guide",   desc: "Natural, flattering poses that actually look good on camera.", emoji: "📸" },
   { href: "/grad-guide/what-to-wear",  num: "02", title: "What to Wear",    desc: "Colors and fits that photograph beautifully in any Bay Area location.", emoji: "👗" },
   { href: "/grad-guide/how-to-prepare", num: "03", title: "How to Prepare", desc: "Everything to do before your shoot so you show up confident and ready.", emoji: "✅" },
-  { href: "/grads",                    num: "04", title: "Campus Spots",    desc: "Where we shoot at SJSU, Berkeley, SF State, CSUEB, and USF.", emoji: "📍" },
+  { href: "/grad-guide/campus-spots",  num: "04", title: "Campus Spots",    desc: "Where we shoot at SJSU, Berkeley, SF State, CSUEB, and USF.", emoji: "📍" },
   { href: "/pricing/grads",            num: "05", title: "Grad Pricing",    desc: "Session lengths, rates, and exactly what every package includes.", emoji: "📋" },
   { href: "/availability",             num: "06", title: "My Availability", desc: "Check what dates are open and reach out to lock one in.", emoji: "📅" },
 ];

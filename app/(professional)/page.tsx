@@ -977,7 +977,7 @@ export default async function ProfessionalHomePage() {
 
           <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 24 }}>
             <Link href="/grad-guide" className="home-link home-link--green">Open the full guide</Link>
-            <Link href="/grads" className="home-link home-link--ghost">Browse campus spots</Link>
+            <Link href="/grad-guide/campus-spots" className="home-link home-link--ghost">Browse campus spots</Link>
           </div>
         </div>
       </section>

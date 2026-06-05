@@ -5,3 +5,4 @@
 - [Website Improvements Initiative](project_website_improvements.md) — 7-priority conversion/trust/SEO effort; P1 stats band done, testimonials pending content
 - [Homepage Green Palette](homepage-green-palette.md) — homepage uses its own green theme, NOT C violet
 - [Build Webpack Flag](build-webpack-flag.md) — local prod builds need `next build --webpack`; Turbopack fails on this Mac
+- [SEO Growth Initiative](project-seo-growth.md) — graduation SEO project; branch feat/technical-seo-foundation; foundation done, roadmap phases pending

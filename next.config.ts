@@ -14,6 +14,16 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async redirects() {
+    return [
+      // Campus spots moved into the professional graduation guide.
+      {
+        source: "/location-guide",
+        destination: "/grad-guide/campus-spots",
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

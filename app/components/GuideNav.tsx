@@ -42,7 +42,7 @@ const NAV_ITEMS: {
     emoji: "✅",
   },
   {
-    href:  "/location-guide",
+    href:  "/grad-guide/campus-spots",
     label: "Locations",
     emoji: "📍",
   },

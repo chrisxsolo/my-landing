@@ -37,7 +37,7 @@ const STATIC_ROUTES: Array<{
   { path: "/grad-guide/what-to-wear", changeFrequency: "monthly", priority: 0.7 },
   { path: "/grad-guide/how-to-prepare", changeFrequency: "monthly", priority: 0.7 },
   { path: "/grad-guide/posing", changeFrequency: "monthly", priority: 0.7 },
-  { path: "/location-guide", changeFrequency: "monthly", priority: 0.7 },
+  { path: "/grad-guide/campus-spots", changeFrequency: "monthly", priority: 0.7 },
   { path: "/bay-area-locations", changeFrequency: "monthly", priority: 0.7 },
   { path: "/booking-process", changeFrequency: "monthly", priority: 0.6 },
   { path: "/faq", changeFrequency: "monthly", priority: 0.6 },

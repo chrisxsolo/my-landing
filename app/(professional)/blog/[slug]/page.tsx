@@ -257,7 +257,7 @@ export default async function ProfessionalBlogPostPage({ params }: Props) {
             { label: "Graduation pricing", href: "/pricing/grads" },
             { label: "Check availability", href: "/availability" },
             { label: "Graduation photo guide", href: "/grad-guide" },
-            { label: "Bay Area location guide", href: "/location-guide" },
+            { label: "Bay Area campus spots", href: "/grad-guide/campus-spots" },
             { label: "Contact", href: "/contact" },
           ].map((l) => (
             <li key={l.href}>
