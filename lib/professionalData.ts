@@ -53,7 +53,7 @@ type RawPortfolioImage = Partial<PortfolioImage> & {
 };
 
 const FALLBACK_PROFILE_IMAGE =
-  "https://dmtslzwglpezympptqls.supabase.co/storage/v1/object/public/grad-photos/DSC02593_(2).jpg";
+  "https://dmtslzwglpezympptqls.supabase.co/storage/v1/object/public/grad-photos/chris-portrait.jpg";
 
 const VISIBLE_PORTFOLIO_SLUGS = ["grads", "families"];
 

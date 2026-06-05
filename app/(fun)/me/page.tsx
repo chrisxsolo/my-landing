@@ -6,7 +6,7 @@ const PROFILE = {
   name: "Chris Solorzano",
   title: "Bay Area Portrait Photographer",
   location: "San Francisco, CA",
-  avatar: "https://dmtslzwglpezympptqls.supabase.co/storage/v1/object/public/grad-photos/DSC02593_(2).jpg",
+  avatar: "https://dmtslzwglpezympptqls.supabase.co/storage/v1/object/public/grad-photos/chris-portrait.jpg",
   intro: "I create photos that feel current, clean, and alive — never overly posed, just the most confident version of you.",
 };
 

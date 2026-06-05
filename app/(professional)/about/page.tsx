@@ -34,7 +34,7 @@ export const metadata: Metadata = {
 // ── PORTRAIT PHOTO ────────────────────────────────────────────────────────────
 // To change: upload to Supabase Storage and paste the URL here.
 const portrait =
-  "https://dmtslzwglpezympptqls.supabase.co/storage/v1/object/public/grad-photos/DSC02593_(2).jpg";
+  "https://dmtslzwglpezympptqls.supabase.co/storage/v1/object/public/grad-photos/chris-portrait.jpg";
 
 // ── PROCESS STEPS ─────────────────────────────────────────────────────────────
 // Format: ["number", "Step name", "Description"]

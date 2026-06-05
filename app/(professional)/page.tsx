@@ -35,7 +35,7 @@ const description =
 
 // ── FALLBACK IMAGE ────────────────────────────────────────────────────────────
 const profileImage =
-  "https://dmtslzwglpezympptqls.supabase.co/storage/v1/object/public/grad-photos/DSC02593_(2).jpg";
+  "https://dmtslzwglpezympptqls.supabase.co/storage/v1/object/public/grad-photos/chris-portrait.jpg";
 
 // ── VISIBLE SERVICE CARDS ─────────────────────────────────────────────────────
 // Controls which portfolio categories appear as cards in the services section.

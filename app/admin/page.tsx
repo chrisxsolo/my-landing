@@ -42,6 +42,13 @@ import LocationsTab from "@/app/admin/LocationsTab";
 import BlogTab from "@/app/admin/BlogTab";
 import { uploadImage } from "@/lib/uploadImage";
 import {
+  GRAD_LOCATION_OPTIONS,
+  GRAD_SCHOOL_OPTIONS,
+  buildPortfolioSeoDescription,
+  type GradLocationOption,
+  type GradSchoolOption,
+} from "@/lib/portfolioSeoDescription";
+import {
   findMatchingClientSession,
   getClientSessionEmailMatches,
   CLIENT_SESSION_STATUS_LABELS,
@@ -67,9 +74,11 @@ function fmt12h(t:string|null):string{
 }
 type PortfolioCategory = { id:number; name:string; slug:string; description:string|null; sort_order:number; active:boolean; };
 type PortfolioImage = { id:number; title:string; alt:string|null; image_url:string; category_id:number|null; category_slug:string; featured:boolean; hero_carousel:boolean; sort_order:number; created_at:string|null; };
+type PortfolioSeoDraft = { school: GradSchoolOption|null; location: GradLocationOption|null; goldenHour: boolean; };
 
 const EMPTY_CATEGORY = {name:"",slug:"",description:"",sort_order:"1",active:true};
 const EMPTY_PORTFOLIO = {title:"",alt:"",category_slug:"graduation",featured:false,sort_order:""};
+const EMPTY_PORTFOLIO_SEO_DRAFT: PortfolioSeoDraft = {school:null,location:null,goldenHour:false};
 const WEBSITE_TABS:Tab[]=["poses","locations","bayGuide","portfolio","categories","blog","library"];
 const CLIENT_TABS:Tab[]=["inquiries","clients","analytics","payments","funnel","ai","chat","format"];
 const VAULT_TABS:Tab[]=["vault"];
@@ -160,6 +169,9 @@ function AdminDashboard() {
   const [portfolioSaving,setPortfolioSaving]=useState(false);
   const [editingPortfolioImage,setEditingPortfolioImage]=useState<PortfolioImage|null>(null);
   const [portfolioDeleteConfirm,setPortfolioDeleteConfirm]=useState<number|null>(null);
+  const [portfolioSeoEditorId,setPortfolioSeoEditorId]=useState<number|null>(null);
+  const [portfolioSeoDraft,setPortfolioSeoDraft]=useState<PortfolioSeoDraft>(EMPTY_PORTFOLIO_SEO_DRAFT);
+  const [portfolioSeoSavingId,setPortfolioSeoSavingId]=useState<number|null>(null);
   const portfolioFileRef=useRef<HTMLInputElement>(null);
 
   const [categories,setCategories]=useState<PortfolioCategory[]>([]);
@@ -886,6 +898,36 @@ function AdminDashboard() {
   function startEditPortfolioImage(image:PortfolioImage){setEditingPortfolioImage(image);setPortfolioForm({title:image.title,alt:image.alt??"",category_slug:image.category_slug,featured:image.featured,sort_order:String(image.sort_order)});setPortfolioFile(null);setPortfolioPreview(image.image_url);window.scrollTo({top:0,behavior:"smooth"});}
   function cancelEditPortfolioImage(){setEditingPortfolioImage(null);setPortfolioForm(EMPTY_PORTFOLIO);setPortfolioFile(null);setPortfolioPreview(null);if(portfolioFileRef.current)portfolioFileRef.current.value="";}
   function onPortfolioFile(e:React.ChangeEvent<HTMLInputElement>){const f=e.target.files?.[0];if(!f)return;setPortfolioFile(f);setPortfolioPreview(URL.createObjectURL(f));}
+  function startPortfolioSeo(image:PortfolioImage){setPortfolioSeoEditorId(image.id);setPortfolioSeoDraft(EMPTY_PORTFOLIO_SEO_DRAFT);}
+  function updatePortfolioImageState(image:PortfolioImage){
+    setPortfolioImages(prev=>prev.map(item=>item.id===image.id?image:item));
+    if(editingPortfolioImage?.id===image.id){
+      setEditingPortfolioImage(image);
+      setPortfolioForm(f=>({...f,title:image.title,alt:image.alt??""}));
+    }
+  }
+  async function savePortfolioSeoDescription(image:PortfolioImage){
+    if(!portfolioSeoDraft.school&&!portfolioSeoDraft.location){showToast("Pick a school or location first",false);return;}
+    setPortfolioSeoSavingId(image.id);
+    try{
+      const res=await fetch("/api/admin/portfolio-image-description",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({imageId:image.id,...portfolioSeoDraft}),
+      });
+      const json=await res.json();
+      if(!res.ok)throw new Error(json.error||"Description update failed");
+      updatePortfolioImageState(json.image as PortfolioImage);
+      setPortfolioSeoEditorId(null);
+      setPortfolioSeoDraft(EMPTY_PORTFOLIO_SEO_DRAFT);
+      showToast("SEO description saved");
+    }catch(err){
+      console.error("[admin] savePortfolioSeoDescription",err);
+      showToast(err instanceof Error?err.message:"Description update failed",false);
+    }finally{
+      setPortfolioSeoSavingId(null);
+    }
+  }
   async function savePortfolioImage(){
     if(!portfolioForm.title){showToast("Portfolio title required",false);return;}
     if(!portfolioFile&&!editingPortfolioImage){showToast("Upload a portfolio image",false);return;}
@@ -1743,7 +1785,10 @@ function AdminDashboard() {
               {portfolioLoading?[...Array(3)].map((_,i)=><div key={i} className="rounded-2xl animate-pulse h-20 mb-3 bg-slate-100"/>):(
                 portfolioImages.length===0?<p className="text-sm text-slate-400 font-medium">No portfolio images yet — upload the first one above.</p>:(
                   <div className="space-y-3">
-                    {portfolioImages.map(image=>(
+                    {portfolioImages.map(image=>{
+                      const isGradImage=matchesPortfolioGroup(image,"grads");
+                      const seoPreview=buildPortfolioSeoDescription(portfolioSeoDraft);
+                      return(
                       <div key={image.id} className={card} style={editingPortfolioImage?.id===image.id?{outline:"2px solid #111827"}:{}}>
                         <div className="flex">
                           <div className="w-24 h-24 flex-shrink-0 overflow-hidden bg-slate-100"><img src={image.image_url} className="w-full h-full object-cover"/></div>
@@ -1764,6 +1809,7 @@ function AdminDashboard() {
                                   style={image.hero_carousel?{background:"#111827",color:"#fff"}:{background:"#f1f5f9",color:"#64748b"}}>
                                   {image.hero_carousel?"★":"☆"}
                                 </button>
+                                {isGradImage&&<button onClick={()=>startPortfolioSeo(image)} className="text-xs font-bold px-3 py-1.5 rounded-lg" style={{background:C.p3_10,color:C.ink}}>SEO</button>}
                                 {editingPortfolioImage?.id!==image.id&&<button onClick={()=>startEditPortfolioImage(image)} className="text-xs font-bold px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700">Edit</button>}
                                 {portfolioDeleteConfirm===image.id?(
                                   <div className="flex gap-1.5">
@@ -1775,8 +1821,61 @@ function AdminDashboard() {
                             </div>
                           </div>
                         </div>
+                        {portfolioSeoEditorId===image.id&&(
+                          <div className="border-t border-slate-100 p-4 bg-slate-50">
+                            <div className="flex items-start justify-between gap-3 mb-3">
+                              <div>
+                                <p className="text-xs font-black uppercase tracking-widest text-slate-700">AI SEO description</p>
+                                <p className="text-xs text-slate-400 mt-1">Pick what is visible, then save the generated title and alt text to this photo.</p>
+                              </div>
+                              <button onClick={()=>setPortfolioSeoEditorId(null)} className="text-xs font-bold px-2.5 py-1 rounded-lg bg-white text-slate-500 border border-slate-200">Close</button>
+                            </div>
+                            <div className="space-y-3">
+                              <div>
+                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">School</p>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {GRAD_SCHOOL_OPTIONS.map(school=>(
+                                    <button key={school} onClick={()=>setPortfolioSeoDraft(d=>({...d,school:d.school===school?null:school}))}
+                                      className="text-xs font-bold px-2.5 py-1.5 rounded-lg border transition-colors"
+                                      style={portfolioSeoDraft.school===school?{background:C.ink,color:C.white,borderColor:C.ink}:{background:C.white,color:C.inkSoft,borderColor:C.borderSubtle}}>
+                                      {school}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                              <div>
+                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Location</p>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {GRAD_LOCATION_OPTIONS.map(location=>(
+                                    <button key={location} onClick={()=>setPortfolioSeoDraft(d=>({...d,location:d.location===location?null:location}))}
+                                      className="text-xs font-bold px-2.5 py-1.5 rounded-lg border transition-colors"
+                                      style={portfolioSeoDraft.location===location?{background:C.p1,color:C.white,borderColor:C.p1}:{background:C.white,color:C.inkSoft,borderColor:C.borderSubtle}}>
+                                      {location}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                              <div className="flex flex-wrap gap-2 items-center">
+                                <button onClick={()=>setPortfolioSeoDraft(d=>({...d,goldenHour:!d.goldenHour}))}
+                                  className="text-xs font-bold px-3 py-1.5 rounded-lg border transition-colors"
+                                  style={portfolioSeoDraft.goldenHour?{background:C.p3,color:C.ink,borderColor:C.p3}:{background:C.white,color:C.inkSoft,borderColor:C.borderSubtle}}>
+                                  {portfolioSeoDraft.goldenHour?"Golden hour ✓":"Golden hour"}
+                                </button>
+                                <div className="flex-1 min-w-[220px] rounded-xl bg-white border border-slate-100 px-3 py-2">
+                                  <p className="text-xs font-black text-slate-800 truncate">{seoPreview.title}</p>
+                                  <p className="text-xs text-slate-500 mt-0.5">{seoPreview.alt}</p>
+                                </div>
+                              </div>
+                              <button onClick={()=>savePortfolioSeoDescription(image)} disabled={portfolioSeoSavingId===image.id}
+                                className="w-full py-2.5 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90 active:scale-95"
+                                style={{background:C.grad12,opacity:portfolioSeoSavingId===image.id?0.7:1}}>
+                                {portfolioSeoSavingId===image.id?"Saving description…":"Generate with AI and save"}
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    ))}
+                    )})}
                   </div>
                 )
               )}
