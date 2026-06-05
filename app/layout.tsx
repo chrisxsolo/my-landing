@@ -12,7 +12,7 @@ const dmSans = DM_Sans({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://soloxsnaps.com"),
+  metadataBase: new URL("https://www.soloxsnaps.com"),
   title: "Chris Solorzano",
   description:
     "Photographer, developer, and curious person based in San Francisco, CA.",

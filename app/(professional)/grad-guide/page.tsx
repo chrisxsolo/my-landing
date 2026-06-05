@@ -8,7 +8,7 @@ import type { Metadata } from "next";
 import GradGuideContent from "./GradGuideContent";
 import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
 
-const SITE_URL = "https://soloxsnaps.com";
+const SITE_URL = "https://www.soloxsnaps.com";
 const PATH = "/grad-guide";
 const TITLE = "Bay Area Graduation Photo Guide — Posing, Outfits & Prep | soloxsnaps";
 const DESCRIPTION =

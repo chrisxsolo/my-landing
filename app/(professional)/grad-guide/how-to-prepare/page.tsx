@@ -6,7 +6,7 @@ import type { Metadata } from "next";
 import HowToPrepareClient from "./HowToPrepareClient";
 import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
 
-const SITE_URL = "https://soloxsnaps.com";
+const SITE_URL = "https://www.soloxsnaps.com";
 const PATH = "/grad-guide/how-to-prepare";
 const TITLE = "How to Prepare for Graduation Photos — Bay Area Guide";
 const DESCRIPTION =

@@ -8,7 +8,7 @@ import type { MetadataRoute } from "next";
 // sitemap so they can discover journal entries and landing pages.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const SITE_URL = "https://soloxsnaps.com";
+const SITE_URL = "https://www.soloxsnaps.com";
 
 export default function robots(): MetadataRoute.Robots {
   return {

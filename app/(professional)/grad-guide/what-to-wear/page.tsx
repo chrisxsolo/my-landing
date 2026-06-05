@@ -6,7 +6,7 @@ import type { Metadata } from "next";
 import WhatToWearClient from "./WhatToWearClient";
 import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
 
-const SITE_URL = "https://soloxsnaps.com";
+const SITE_URL = "https://www.soloxsnaps.com";
 const PATH = "/grad-guide/what-to-wear";
 const TITLE = "What to Wear for Graduation Photos — Bay Area Guide";
 const DESCRIPTION =

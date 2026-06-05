@@ -805,7 +805,7 @@ export default async function ProfessionalHomePage() {
     "@context": "https://schema.org",
     "@type": "ProfessionalService",
     name: "soloxsnaps",
-    url: "https://soloxsnaps.com",
+    url: "https://www.soloxsnaps.com",
     image: heroImageUrl,
     founder: { "@type": "Person", name: "Chris Solorzano" },
     areaServed: ["San Francisco", "Bay Area", "San Jose", "Oakland", "Berkeley"],

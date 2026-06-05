@@ -11,7 +11,7 @@ import { getBlogPostsByCategory } from "@/lib/professionalData";
 // Revalidates hourly so newly published journal entries appear without a redeploy.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const SITE_URL = "https://soloxsnaps.com";
+const SITE_URL = "https://www.soloxsnaps.com";
 
 export const revalidate = 3600;
 

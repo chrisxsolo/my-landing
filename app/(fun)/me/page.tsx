@@ -134,7 +134,7 @@ export default function AboutPage() {
 
               <div className="afu4 flex flex-wrap gap-3">
                 <a
-                  href="https://soloxsnaps.com/contact"
+                  href="/contact"
                   className="inline-flex items-center gap-2 px-6 py-3 rounded-full font-bold text-sm text-white transition-all hover:opacity-90 hover:scale-105"
                   style={{background:C.grad12,boxShadow:`0 8px 20px ${C.p1_20}`}}
                 >
@@ -335,7 +335,7 @@ export default function AboutPage() {
 
               <div className="mx-auto flex max-w-full flex-wrap items-center justify-center gap-4">
                 <a
-                  href="https://soloxsnaps.com/contact"
+                  href="/contact"
                   className="inline-flex items-center justify-center rounded-full font-bold text-white transition-all hover:scale-[1.02] hover:opacity-90"
                   style={{
                     minHeight: 50,

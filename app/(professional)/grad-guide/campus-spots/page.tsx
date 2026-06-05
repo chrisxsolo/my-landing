@@ -6,7 +6,7 @@ import type { Metadata } from "next";
 import CampusSpotsClient from "./CampusSpotsClient";
 import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
 
-const SITE_URL = "https://soloxsnaps.com";
+const SITE_URL = "https://www.soloxsnaps.com";
 const PATH = "/grad-guide/campus-spots";
 const TITLE = "Best Campus Spots for Graduation Photos — Bay Area Guide";
 const DESCRIPTION =

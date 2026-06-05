@@ -319,7 +319,7 @@ export default function SchoolLandingTemplate({ data }: { data: SchoolLandingDat
             "@context": "https://schema.org",
             "@type": "ProfessionalService",
             name: "soloxsnaps",
-            url: "https://soloxsnaps.com",
+            url: "https://www.soloxsnaps.com",
             founder: { "@type": "Person", name: "Chris Solorzano" },
             areaServed: [data.city, "Bay Area", "San Francisco"],
             serviceType: [`${data.school} graduation photography`],

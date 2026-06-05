@@ -6,7 +6,7 @@ import type { Metadata } from "next";
 import PosingClient from "./PosingClient";
 import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
 
-const SITE_URL = "https://soloxsnaps.com";
+const SITE_URL = "https://www.soloxsnaps.com";
 const PATH = "/grad-guide/posing";
 const TITLE = "How to Pose for Graduation Photos — Bay Area Guide";
 const DESCRIPTION =

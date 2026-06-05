@@ -6,7 +6,7 @@
 // below the homepage (school landing pages, blog posts, FAQ pages).
 // ─────────────────────────────────────────────────────────────────────────────
 
-const SITE_URL = "https://soloxsnaps.com";
+const SITE_URL = "https://www.soloxsnaps.com";
 
 export type Crumb = { name: string; path: string };
 
