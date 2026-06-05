@@ -749,6 +749,7 @@ export default async function ProfessionalHomePage() {
     founder: { "@type": "Person", name: "Chris Solorzano" },
     areaServed: ["San Francisco", "Bay Area", "San Jose", "Oakland", "Berkeley"],
     serviceType: ["Couples photography", "Graduation photography", "Family photography"],
+    sameAs: ["https://www.instagram.com/soloxsnaps"],
   };
 
   return (
