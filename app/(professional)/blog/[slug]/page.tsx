@@ -3,6 +3,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import { getBlogPostBySlug } from "@/lib/professionalData";
+import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
 
 export const dynamic = "force-dynamic";
 
@@ -63,12 +64,22 @@ export default async function ProfessionalBlogPostPage({ params }: Props) {
     publisher: { "@type": "Organization", name: "soloxsnaps" },
   };
 
+  const breadcrumbLd = buildBreadcrumbJsonLd([
+    { name: "Home", path: "/" },
+    { name: "Blog", path: "/blog" },
+    { name: post.title, path: `/blog/${post.slug}` },
+  ]);
+
   return (
     <main style={{ background: "#fff", color: "#1a1a1a", paddingTop: 80 }}>
       <style>{CSS}</style>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd).replace(/</g, "\\u003c") }}
       />
 
       {/* ── HEADER ── */}
