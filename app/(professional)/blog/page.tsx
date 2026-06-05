@@ -9,11 +9,11 @@ import { getBlogPostsByCategory } from "@/lib/professionalData";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Journal | soloxsnaps",
+  title: "Blog | soloxsnaps",
   description: "Session notes and case studies from soloxsnaps in San Francisco and the Bay Area.",
   alternates: { canonical: "/blog" },
   openGraph: {
-    title: "Journal | soloxsnaps",
+    title: "Blog | soloxsnaps",
     description: "Professional photography case studies and session notes from soloxsnaps.",
     type: "website",
   },
@@ -437,7 +437,7 @@ export default async function ProfessionalBlogPage() {
         <div className="blog-shell">
           <div className="blog-hero-kicker">
             <span className="blog-hero-kicker-dot" />
-            Journal
+            Blog
           </div>
 
           <h1 className="blog-hero-heading">

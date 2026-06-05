@@ -25,7 +25,7 @@ const primaryLinks = [
   { label: "Home",    href: "/" },
   { label: "Dates",   href: "/availability" },
   { label: "About",   href: "/about" },
-  { label: "Journal", href: "/blog" },
+  { label: "Blog", href: "/blog" },
 ];
 
 const guideLinks = [
