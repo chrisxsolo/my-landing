@@ -26,10 +26,23 @@
 //   → Sidebar locations:find the "Locations" sidebar panel in AvailabilityCalendar.tsx
 // ─────────────────────────────────────────────────────────────────────────────
 
+import type { Metadata } from "next";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import AvailabilityCalendar, { type AvailDate } from "./AvailabilityCalendar";
 
 export const revalidate = 300;
+
+const TITLE = "Bay Area Photography Availability | soloxsnaps";
+const DESCRIPTION =
+  "See open dates for Bay Area graduation, couples, family, and portrait photography sessions with Chris Solorzano. Check availability before you book.";
+
+export const metadata: Metadata = {
+  title: TITLE,
+  description: DESCRIPTION,
+  alternates: { canonical: "/availability" },
+  openGraph: { title: TITLE, description: DESCRIPTION, type: "website", siteName: "soloxsnaps" },
+  twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION },
+};
 
 export default async function AvailabilityPage() {
   const supabase = createSupabaseServerClient();

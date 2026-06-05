@@ -128,7 +128,7 @@ export default async function ProfessionalBlogPostPage({ params }: Props) {
           <div style={{ position: "relative", overflow: "hidden", maxHeight: 780, aspectRatio: "4/3" }}>
             <Image
               src={post.cover_image_url}
-              alt={post.title}
+              alt={post.cover_image_alt || post.title}
               fill
               sizes="(max-width: 1400px) 100vw, 1400px"
               style={{ objectFit: "cover" }}
@@ -212,7 +212,7 @@ export default async function ProfessionalBlogPostPage({ params }: Props) {
                 }}>
                   <Image
                     src={url}
-                    alt={`${post.title} — image ${i + 1}`}
+                    alt={post.extra_image_alts?.[i] || `${post.title} — image ${i + 1}`}
                     className="slug-extra-img"
                     fill
                     sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"

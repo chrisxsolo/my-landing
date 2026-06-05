@@ -41,6 +41,8 @@ export type BlogPost = {
   meta_description?: string | null;
   meta_keywords?: string | null;
   og_image_url?: string | null;
+  cover_image_alt?: string | null;
+  extra_image_alts?: string[] | null;
 };
 
 type RawCategory = Partial<PortfolioCategory> & {

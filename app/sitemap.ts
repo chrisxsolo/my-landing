@@ -39,11 +39,9 @@ const STATIC_ROUTES: Array<{
   { path: "/grad-guide/posing", changeFrequency: "monthly", priority: 0.7 },
   { path: "/grad-guide/campus-spots", changeFrequency: "monthly", priority: 0.7 },
   { path: "/bay-area-locations", changeFrequency: "monthly", priority: 0.7 },
-  { path: "/booking-process", changeFrequency: "monthly", priority: 0.6 },
   { path: "/faq", changeFrequency: "monthly", priority: 0.6 },
   { path: "/faq/graduation", changeFrequency: "monthly", priority: 0.7 },
   { path: "/portfolio", changeFrequency: "weekly", priority: 0.7 },
-  { path: "/journal", changeFrequency: "weekly", priority: 0.7 },
   { path: "/blog", changeFrequency: "weekly", priority: 0.7 },
   { path: "/about", changeFrequency: "monthly", priority: 0.6 },
   { path: "/availability", changeFrequency: "weekly", priority: 0.6 },
@@ -63,12 +61,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }));
 
   // Pull dynamic posts. /blog/[slug] is the server-rendered, canonical version
-  // of any cross-posted entry, so prefer it. Journal-only entries (not on the
-  // professional site) are surfaced under /journal/[slug].
-  const [professional, journal] = await Promise.all([
-    getBlogPostsByCategory("professional"),
-    getBlogPostsByCategory("journal"),
-  ]);
+  // of every published entry. (The former /journal section has been retired.)
+  const professional = await getBlogPostsByCategory("professional");
 
   const blogEntries: MetadataRoute.Sitemap = professional.map((post) => ({
     url: `${SITE_URL}/blog/${post.slug}`,
@@ -77,14 +71,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.6,
   }));
 
-  const journalOnlyEntries: MetadataRoute.Sitemap = journal
-    .filter((post) => !(post.sites ?? []).includes("professional"))
-    .map((post) => ({
-      url: `${SITE_URL}/journal/${post.slug}`,
-      lastModified: post.published_at ? new Date(post.published_at) : now,
-      changeFrequency: "yearly",
-      priority: 0.6,
-    }));
-
-  return [...staticEntries, ...blogEntries, ...journalOnlyEntries];
+  return [...staticEntries, ...blogEntries];
 }

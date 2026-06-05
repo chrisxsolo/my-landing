@@ -481,7 +481,7 @@ export default async function ProfessionalBlogPage() {
                     {featured.cover_image_url ? (
                       <OptimizedPhoto
                         src={featured.cover_image_url}
-                        alt={featured.title}
+                        alt={featured.cover_image_alt || featured.title}
                         sizes="(max-width: 860px) 100vw, 50vw"
                         priority
                         quality={90}
@@ -544,7 +544,7 @@ export default async function ProfessionalBlogPage() {
                         {post.cover_image_url ? (
                           <OptimizedPhoto
                             src={post.cover_image_url}
-                            alt={post.title}
+                            alt={post.cover_image_alt || post.title}
                             sizes="(max-width: 760px) 100vw, 33vw"
                           />
                         ) : (

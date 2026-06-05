@@ -24,9 +24,9 @@ export const GRAD_LOCATION_OPTIONS = [
 ] as const;
 
 export const GRAD_SESSION_OPTIONS = ["Solo", "Couple", "Friends", "Family"] as const;
-export const GRAD_DEGREE_OPTIONS = ["Bachelor's", "Master's", "PhD", "Law", "MBA"] as const;
+export const GRAD_DEGREE_OPTIONS = ["Bachelor's", "Master's", "PhD", "Law", "MBA", "Nursing"] as const;
 export const GRAD_YEAR_OPTIONS = ["2026", "2025"] as const;
-export const GRAD_ATTIRE_OPTIONS = ["Cap & gown", "Cultural attire", "Sash/stole", "Regalia"] as const;
+export const GRAD_ATTIRE_OPTIONS = ["Cap & gown", "Cultural attire", "Sash/stole", "Regalia", "Scrubs"] as const;
 
 export type GradSchoolOption = (typeof GRAD_SCHOOL_OPTIONS)[number];
 export type GradLocationOption = (typeof GRAD_LOCATION_OPTIONS)[number];
@@ -74,6 +74,7 @@ const DEGREE_WORD: Record<GradDegreeOption, string> = {
   PhD: "PhD ",
   Law: "law school ",
   MBA: "MBA ",
+  Nursing: "nursing ",
 };
 
 const ATTIRE_PHRASE: Record<GradAttireOption, string> = {
@@ -81,6 +82,7 @@ const ATTIRE_PHRASE: Record<GradAttireOption, string> = {
   "Cultural attire": "in cultural attire",
   "Sash/stole": "with sash and stole",
   Regalia: "in full regalia",
+  Scrubs: "in nursing scrubs",
 };
 
 function isAllowedValue<T extends readonly string[]>(options: T, value: unknown): value is T[number] {

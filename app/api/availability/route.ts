@@ -15,7 +15,7 @@
 //   "quick_read": "5 open dates in the next 90 days ..."   ← plain English for AI context
 // }
 //
-// Both /availability (professional) and /booking (fun) display these same dates.
+// The /availability page displays these same dates.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextResponse } from "next/server";

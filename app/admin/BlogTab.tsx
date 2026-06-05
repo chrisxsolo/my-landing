@@ -7,7 +7,7 @@ import { buildJournalImageLibraryRows } from "@/lib/imageLibraryShared";
 import { GRAD_SCHOOL_OPTIONS, GRAD_LOCATION_OPTIONS, GRAD_SESSION_OPTIONS } from "@/lib/portfolioSeoDescription";
 
 type BlogCategory = "journal" | "professional";
-type BlogPost = { id: number; title: string; body: string; published_at: string; slug: string; cover_image_url: string | null; extra_image_urls: string[]; category?: BlogCategory | string | null; sites?: string[] | null; meta_description?: string | null; meta_keywords?: string | null };
+type BlogPost = { id: number; title: string; body: string; published_at: string; slug: string; cover_image_url: string | null; extra_image_urls: string[]; category?: BlogCategory | string | null; sites?: string[] | null; meta_description?: string | null; meta_keywords?: string | null; cover_image_alt?: string | null; extra_image_alts?: string[] | null };
 
 // Clickable keyword chips for blog SEO — same vocabulary as the photo SEO tagger.
 const BLOG_KEYWORD_OPTIONS: readonly string[] = [...GRAD_SCHOOL_OPTIONS, ...GRAD_LOCATION_OPTIONS, ...GRAD_SESSION_OPTIONS];
@@ -89,6 +89,7 @@ export default function BlogTab({ showToast }: Props) {
   const [postSaving, setPostSaving] = useState(false);
   const [editingPost, setEditingPost] = useState<BlogPost | null>(null);
   const [postDeleteConfirm, setPostDeleteConfirm] = useState<number | null>(null);
+  const [seoGeneratingId, setSeoGeneratingId] = useState<number | null>(null);
   const [journalDraft, setJournalDraft] = useState("");
   const [aiDropFiles, setAiDropFiles] = useState<File[]>([]);
   const [aiDropPreviews, setAiDropPreviews] = useState<string[]>([]);
@@ -241,6 +242,28 @@ export default function BlogTab({ showToast }: Props) {
     setPostDeleteConfirm(null);
     if (editingPost?.id === id) cancelEditPost();
     showToast("Post deleted");
+  }
+
+  async function generateSeoForPost(post: BlogPost) {
+    setSeoGeneratingId(post.id);
+    try {
+      const res = await fetch("/api/admin/blog-seo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ postId: post.id }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "SEO generation failed");
+      const seo = json.seo as { meta_description: string; meta_keywords: string; cover_image_alt: string; extra_image_alts: string[] };
+      setPosts(prev => prev.map(p => p.id === post.id ? { ...p, meta_description: seo.meta_description, meta_keywords: seo.meta_keywords, cover_image_alt: seo.cover_image_alt, extra_image_alts: seo.extra_image_alts } : p));
+      if (editingPost?.id === post.id) setPostForm(f => ({ ...f, meta_description: seo.meta_description, meta_keywords: seo.meta_keywords }));
+      showToast("AI SEO generated & saved ✓");
+    } catch (err) {
+      console.error("[blog] generateSeoForPost", err);
+      showToast(err instanceof Error ? err.message : "SEO generation failed", false);
+    } finally {
+      setSeoGeneratingId(null);
+    }
   }
 
   const keywordList = postForm.meta_keywords.split(",").map(k => k.trim()).filter(Boolean);
@@ -431,6 +454,7 @@ export default function BlogTab({ showToast }: Props) {
                           {(post.sites && post.sites.length > 0 ? post.sites : [post.category === "professional" ? "professional" : "journal"]).map(site => (
                             <a key={site} href={`${site === "professional" ? "/blog" : "/journal"}/${post.slug}`} target="_blank" className="text-xs font-bold px-3 py-1.5 rounded-lg" style={{ background: C.p1_08, color: C.p1 }}>{site === "professional" ? "Blog →" : "Journal →"}</a>
                           ))}
+                          <button onClick={() => generateSeoForPost(post)} disabled={seoGeneratingId === post.id} title="Analyze photos + text and write SEO metadata" className="text-xs font-bold px-3 py-1.5 rounded-lg" style={{ background: C.p3_10, color: C.ink, opacity: seoGeneratingId === post.id ? 0.6 : 1 }}>{seoGeneratingId === post.id ? "✨ Generating…" : "✨ SEO"}</button>
                           {editingPost?.id !== post.id && <button onClick={() => startEditPost(post)} className="text-xs font-bold px-3 py-1.5 rounded-lg" style={{ background: C.p2_08, color: C.p2 }}>Edit</button>}
                           {postDeleteConfirm === post.id ? (
                             <div className="flex gap-1.5">

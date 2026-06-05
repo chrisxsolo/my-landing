@@ -3,6 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { buildPortfolioSeoDescription, normalizeAiPortfolioSeoDescription } from "@/lib/portfolioSeoDescription";
 import { requireAdmin } from "@/lib/requireAdmin";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
+import { fetchImageBlock } from "@/lib/visionImage";
 
 export const dynamic = "force-dynamic";
 
@@ -41,28 +42,36 @@ function parseAiJson(text: string) {
   }
 }
 
-async function polishWithAi(fallback: { title: string; alt: string }, body: RequestBody) {
+async function polishWithAi(fallback: { title: string; alt: string }, body: RequestBody, imageUrl: string | null) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return fallback;
+
+  const imageBlock = await fetchImageBlock(imageUrl);
+  const tags = JSON.stringify({
+    fallback,
+    school: body.school,
+    location: body.location,
+    session: body.session,
+    degree: body.degree,
+    year: body.year,
+    attire: body.attire,
+    goldenHour: body.goldenHour === true,
+  });
+  const instruction = imageBlock
+    ? `Look at the photo, then use these editor-selected tags to write SEO metadata. Describe what is actually visible (pose, setting, light, attire) so the alt text is unique to this image. Tags: ${tags}`
+    : tags;
 
   const anthropic = new Anthropic({ apiKey });
   const response = await anthropic.messages.create({
     model: "claude-opus-4-7",
-    max_tokens: 180,
-    system: "Write concise SEO image metadata for soloxsnaps, a Bay Area graduation photographer. Return only JSON with title and alt. Keep alt under 125 characters. Be descriptive and natural, never keyword-stuffed.",
+    max_tokens: 200,
+    system: "Write concise, unique SEO image metadata for soloxsnaps, a Bay Area graduation photographer. Return only JSON with title and alt. Title under 70 characters, alt under 125 characters. Base the description on what is visible in the photo. Be descriptive and natural, never keyword-stuffed.",
     messages: [
       {
         role: "user",
-        content: JSON.stringify({
-          fallback,
-          school: body.school,
-          location: body.location,
-          session: body.session,
-          degree: body.degree,
-          year: body.year,
-          attire: body.attire,
-          goldenHour: body.goldenHour === true,
-        }),
+        content: imageBlock
+          ? [imageBlock, { type: "text", text: instruction }]
+          : instruction,
       },
     ],
   });
@@ -85,13 +94,19 @@ export async function POST(req: NextRequest) {
     const fallback = buildPortfolioSeoDescription(body);
     let description = fallback;
 
+    const supabase = createSupabaseServerClient();
+    const { data: current } = await supabase
+      .from("portfolio_images")
+      .select("image_url")
+      .eq("id", imageId)
+      .single();
+
     try {
-      description = await polishWithAi(fallback, body);
+      description = await polishWithAi(fallback, body, current?.image_url ?? null);
     } catch (err) {
       console.error("[admin/portfolio-image-description] AI fallback", err);
     }
 
-    const supabase = createSupabaseServerClient();
     const { data, error } = await supabase
       .from("portfolio_images")
       .update({ title: description.title, alt: description.alt })
