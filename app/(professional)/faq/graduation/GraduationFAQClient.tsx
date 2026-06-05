@@ -108,6 +108,7 @@ export default function GraduationFAQClient() {
             </p>
             <div className="faq-cta-buttons">
               <Link href="/contact" className="faq-link faq-link--primary">Send a message</Link>
+              <Link href="/grad-guide" className="faq-link faq-link--ghost">Read the grad guide</Link>
               <Link href="/pricing/grads" className="faq-link faq-link--ghost">See grad pricing</Link>
             </div>
           </div>

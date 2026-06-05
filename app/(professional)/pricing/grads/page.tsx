@@ -329,6 +329,11 @@ export default async function GradPricingPage() {
           <div>
             <p className="pricing-kicker">Ready for grad photos?</p>
             <h2 className="pricing-title" style={{ fontSize: 38 }}>Send the date and campus.</h2>
+            <p className="pricing-copy" style={{ marginTop: 10 }}>
+              Still planning? The{" "}
+              <Link href="/grad-guide" style={{ color: "#3d6b5e", fontWeight: 700 }}>graduation photo guide</Link>{" "}
+              covers outfits, posing, prep, and the best campus spots.
+            </p>
           </div>
           <Link href="/contact" className="pricing-link">Inquire now</Link>
         </div>

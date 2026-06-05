@@ -406,6 +406,9 @@ function ContactForm() {
           <h1 className="contact-title">Tell me the date, location, and what this is for.</h1>
           <p className="contact-copy">
             Send the details and I will reply within 24 hours with availability, next steps, and anything useful for your session.
+            Photographing a graduation? The{" "}
+            <Link href="/grad-guide" style={{ color: "#3d6b5e", fontWeight: 700 }}>graduation photo guide</Link>{" "}
+            covers outfits, posing, and the best campus spots.
           </p>
           <div className="contact-chip-row">
             <span className="contact-chip">Graduation</span>

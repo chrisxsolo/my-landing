@@ -410,6 +410,13 @@ export default function SchoolLandingTemplate({ data }: { data: SchoolLandingDat
                 </div>
               ))}
             </div>
+            <p className="school-body-copy" style={{ marginTop: 22, color: "#667f79", fontSize: 15 }}>
+              New to grad photos? The{" "}
+              <Link href="/grad-guide" style={{ color: "#3d6b5e", fontWeight: 700 }}>
+                Bay Area graduation photo guide
+              </Link>{" "}
+              covers what to wear, posing, how to prepare, and the best campus spots before your session.
+            </p>
           </div>
         </section>
       )}

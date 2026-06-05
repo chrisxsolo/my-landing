@@ -193,6 +193,31 @@ export const GRAD_GUIDE_CSS = `
   .gg-tip-title { margin:0 0 5px; color:var(--ink, #101412); font-size:15px; font-weight:860; line-height:1.25; }
   .gg-tip-text { margin:0; color:var(--ink-muted, #4b5a55); font-size:14px; line-height:1.62; }
 
+  /* ── WRITTEN GUIDE (PROSE) ───────────────────────────────────────────────── */
+  .gg-prose { margin-top:28px; }
+  .gg-prose-lead { margin:0 0 30px; color:var(--ink-muted, #4b5a55); font-size:17px; line-height:1.74; max-width:680px; text-wrap:pretty; }
+  .gg-topic { padding-top:26px; margin-top:26px; border-top:1px solid rgba(18,24,22,0.07); }
+  .gg-topic:first-of-type { border-top:none; padding-top:0; margin-top:0; }
+  .gg-topic h2 { margin:0 0 10px; color:var(--ink, #101412); font-size:clamp(1.35rem, 2.6vw, 1.7rem); font-weight:870; letter-spacing:-0.018em; line-height:1.12; }
+  .gg-topic p { margin:0 0 12px; color:var(--ink-muted, #4b5a55); font-size:15.5px; line-height:1.72; max-width:680px; text-wrap:pretty; }
+  .gg-topic p:last-child { margin-bottom:0; }
+  .gg-inline-link { color:var(--accent, #3d6b5e); font-weight:760; text-decoration:none; border-bottom:1px solid rgba(112,139,133,0.34); transition:border-color .18s ease, color .18s ease; }
+  .gg-inline-link:hover { color:#345d52; border-bottom-color:var(--accent, #3d6b5e); }
+
+  /* ── BY-CAMPUS SECTIONS ──────────────────────────────────────────────────── */
+  .gg-schools { display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:16px; margin-top:30px; }
+  .gg-school {
+    display:flex; flex-direction:column; padding:24px; border-radius:14px;
+    background:var(--glass, rgba(255,255,255,0.86)); border:1px solid rgba(18,24,22,0.08);
+    box-shadow:0 6px 20px rgba(18,24,22,0.05);
+    transition:transform .22s ease, box-shadow .22s ease, border-color .22s ease;
+  }
+  .gg-school:hover { transform:translateY(-4px); box-shadow:0 16px 38px rgba(18,24,22,0.10); border-color:rgba(112,139,133,0.32); }
+  .gg-school h2 { margin:0 0 9px; color:var(--ink, #101412); font-size:18px; font-weight:860; letter-spacing:-0.01em; line-height:1.18; }
+  .gg-school p { margin:0 0 16px; color:var(--ink-muted, #4b5a55); font-size:14px; line-height:1.64; flex:1; }
+  .gg-school-link { align-self:flex-start; color:var(--accent, #3d6b5e); font-size:13.5px; font-weight:820; text-decoration:none; }
+  .gg-school-link:hover { color:#345d52; }
+
   /* ── CTA ─────────────────────────────────────────────────────────────────── */
   .gg-cta { padding:18px 0 84px; }
   .gg-cta-card {
