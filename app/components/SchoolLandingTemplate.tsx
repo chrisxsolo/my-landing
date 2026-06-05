@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
 
 // ── TYPES ─────────────────────────────────────────────────────────────────────
 
@@ -327,6 +328,19 @@ export default function SchoolLandingTemplate({ data }: { data: SchoolLandingDat
         }}
       />
 
+      {/* Breadcrumb JSON-LD */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(
+            buildBreadcrumbJsonLd([
+              { name: "Home", path: "/" },
+              { name: `${data.school} Graduation Photographer`, path: data.canonicalPath },
+            ])
+          ).replace(/</g, "\\u003c"),
+        }}
+      />
+
       {/* ── HERO ──────────────────────────────────────────────────────────────── */}
       <section className="school-hero">
         <div className="school-shell">
@@ -361,7 +375,7 @@ export default function SchoolLandingTemplate({ data }: { data: SchoolLandingDat
             )}
           </div>
           <div>
-            <p className="school-kicker">What's included</p>
+            <p className="school-kicker">What&apos;s included</p>
             <h2 className="school-section-title">Every grad session includes</h2>
             {[
               "Professionally guided posing and direction throughout",

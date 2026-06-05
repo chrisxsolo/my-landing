@@ -3,6 +3,9 @@
 
 import type { Metadata } from "next";
 import FAQClient from "./FAQClient";
+import { FAQS } from "./faqData";
+import { buildFaqJsonLd } from "./faqSchema";
+import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
 
 const FAQ_DESCRIPTION =
   "Common questions about photography sessions — booking, outfits, delivery, locations, and more, for portraits, couples, family, maternity, and creative shoots.";
@@ -20,5 +23,22 @@ export const metadata: Metadata = {
 };
 
 export default function FAQPage() {
-  return <FAQClient />;
+  const jsonLd = buildFaqJsonLd(FAQS);
+  const breadcrumbLd = buildBreadcrumbJsonLd([
+    { name: "Home", path: "/" },
+    { name: "FAQ", path: "/faq" },
+  ]);
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd).replace(/</g, "\\u003c") }}
+      />
+      <FAQClient />
+    </>
+  );
 }

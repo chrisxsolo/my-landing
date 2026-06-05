@@ -9,11 +9,6 @@ type BlogCategory = "journal" | "professional";
 type BlogPost = { id: number; title: string; body: string; published_at: string; slug: string; cover_image_url: string | null; extra_image_urls: string[]; category?: BlogCategory | string | null; sites?: string[] | null };
 type Props = { showToast: (msg: string, ok?: boolean) => void };
 
-const BLOG_CATEGORIES: { value: BlogCategory; label: string; helper: string }[] = [
-  { value: "journal",      label: "Journal",      helper: "Fun shoot stories at /journal" },
-  { value: "professional", label: "Professional", helper: "Case studies at /blog" },
-];
-
 const card = "bg-white rounded-2xl border border-slate-100 overflow-hidden";
 const inp = "w-full px-3 py-2.5 rounded-xl text-sm font-medium text-slate-800 outline-none border border-slate-200 focus:border-violet-300 bg-white transition-colors";
 const ta = `${inp} resize-none`;
@@ -77,11 +72,10 @@ async function compressForAI(file: File, maxPx = 900, quality = 0.75): Promise<B
 }
 
 export default function BlogTab({ showToast }: Props) {
-  const EMPTY_POST = { title: "", body: "", slug: "", category: "journal" as BlogCategory, sites: ["journal"] as string[], published_at: new Date().toISOString().slice(0, 16) };
+  const EMPTY_POST = { title: "", body: "", slug: "", category: "professional" as BlogCategory, sites: ["professional"] as string[], published_at: new Date().toISOString().slice(0, 16) };
 
   const [posts, setPosts] = useState<BlogPost[]>([]);
   const [postsLoading, setPostsLoading] = useState(false);
-  const [blogCategory, setBlogCategory] = useState<BlogCategory>("journal");
   const [postForm, setPostForm] = useState(EMPTY_POST);
   const [coverImg, setCoverImg] = useState<File | null>(null);
   const [coverImgPreview, setCoverImgPreview] = useState<string | null>(null);
@@ -101,13 +95,13 @@ export default function BlogTab({ showToast }: Props) {
   const extraFileRef = useRef<HTMLInputElement>(null);
   const aiDropRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { fetchPosts(); }, [blogCategory]);
+  useEffect(() => { fetchPosts(); }, []);
 
   async function fetchPosts() {
     setPostsLoading(true);
-    let { data, error } = await supabase.from("blog_posts").select("*").contains("sites", [blogCategory]).order("published_at", { ascending: false });
+    let { data, error } = await supabase.from("blog_posts").select("*").contains("sites", ["professional"]).order("published_at", { ascending: false });
     if (error) {
-      const fallback = await supabase.from("blog_posts").select("*").eq("category", blogCategory).order("published_at", { ascending: false });
+      const fallback = await supabase.from("blog_posts").select("*").eq("category", "professional").order("published_at", { ascending: false });
       data = fallback.data; error = fallback.error;
     }
     if (data) setPosts(data);
@@ -115,11 +109,8 @@ export default function BlogTab({ showToast }: Props) {
   }
 
   function startEditPost(post: BlogPost) {
-    const sites = post.sites && post.sites.length > 0 ? post.sites : [post.category === "professional" ? "professional" : "journal"];
-    const primaryCat = (sites.includes("professional") ? "professional" : "journal") as BlogCategory;
     setEditingPost(post);
-    setPostForm({ title: post.title, body: post.body, slug: post.slug, category: primaryCat, sites, published_at: post.published_at.slice(0, 16) });
-    setBlogCategory(primaryCat);
+    setPostForm({ title: post.title, body: post.body, slug: post.slug, category: "professional", sites: ["professional"], published_at: post.published_at.slice(0, 16) });
     setCoverImg(null); setCoverImgPreview(post.cover_image_url || null);
     setExtraImgs([]); setExtraPreviews(post.extra_image_urls ?? []);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -127,7 +118,7 @@ export default function BlogTab({ showToast }: Props) {
 
   function cancelEditPost() {
     setEditingPost(null);
-    setPostForm({ ...EMPTY_POST, category: blogCategory, sites: [blogCategory] });
+    setPostForm({ ...EMPTY_POST });
     setCoverImg(null); setCoverImgPreview(null);
     setExtraImgs([]); setExtraPreviews([]);
     setJournalDraft(""); setAiDropFiles([]); setAiDropPreviews([]);
@@ -206,7 +197,7 @@ export default function BlogTab({ showToast }: Props) {
         }
       }
       showToast(`Published: "${json.title}" — ${json.photo_count} photos`);
-      setAiDropFiles([]); setAiDropPreviews([]); setBlogCategory("professional"); fetchPosts();
+      setAiDropFiles([]); setAiDropPreviews([]); fetchPosts();
     } catch (err) {
       console.error("[ai-blog]", err);
       showToast("AI generation failed", false);
@@ -225,9 +216,8 @@ export default function BlogTab({ showToast }: Props) {
     for (const f of extraImgs) { const url = await uploadImage(f, "blog", showToast); if (url) newExtraUrls.push(url); }
     const existingKept = existingExtras.filter(url => extraPreviews.includes(url));
     const extra_image_urls = [...existingKept, ...newExtraUrls];
-    const sites = postForm.sites && postForm.sites.length > 0 ? postForm.sites : [postForm.category];
-    const primaryCategory = (sites.includes("professional") ? "professional" : "journal") as BlogCategory;
-    const payload = { title: postForm.title, body: postForm.body, slug, category: primaryCategory, sites, cover_image_url, extra_image_urls, published_at: new Date(postForm.published_at).toISOString() };
+    const sites = ["professional"];
+    const payload = { title: postForm.title, body: postForm.body, slug, category: "professional", sites, cover_image_url, extra_image_urls, published_at: new Date(postForm.published_at).toISOString() };
     if (editingPost) {
       const { error } = await supabase.from("blog_posts").update(payload).eq("id", editingPost.id);
       if (error) showToast("Update failed", false);
@@ -258,32 +248,6 @@ export default function BlogTab({ showToast }: Props) {
             {editingPost && <button onClick={cancelEditPost} className="text-xs font-bold text-slate-400 px-3 py-1.5 rounded-lg bg-slate-100">Cancel edit</button>}
           </div>
           {editingPost && <div className="mb-4 px-3 py-2 rounded-xl text-xs font-bold" style={{ background: C.p1_08, color: C.p1, border: `1px solid ${C.p1_20}` }}>✏️ Editing existing post.</div>}
-
-          <div className="mb-5">
-            <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Show On</label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {BLOG_CATEGORIES.map(cat => (
-                <label key={cat.value} className="flex items-start gap-3 rounded-xl border px-4 py-3 cursor-pointer transition-all"
-                  style={(postForm.sites ?? []).includes(cat.value) ? { borderColor: C.p1, background: C.p1_08 } : { borderColor: "#e2e8f0", background: "#fff" }}>
-                  <input type="checkbox" className="mt-0.5 accent-violet-600" checked={(postForm.sites ?? []).includes(cat.value)}
-                    onChange={e => {
-                      const checked = e.target.checked;
-                      setPostForm(f => {
-                        const cur = f.sites ?? [];
-                        const next = checked ? [...cur, cat.value] : cur.filter(s => s !== cat.value);
-                        const primary = (next.includes("professional") ? "professional" : "journal") as BlogCategory;
-                        return { ...f, sites: next, category: primary };
-                      });
-                    }} />
-                  <div>
-                    <span className="block text-sm font-black text-slate-900">{cat.label}</span>
-                    <span className="block text-xs font-medium text-slate-400 mt-0.5">{cat.helper}</span>
-                  </div>
-                </label>
-              ))}
-            </div>
-            {(postForm.sites ?? []).length === 0 && <p className="text-xs font-bold mt-1.5" style={{ color: "#be123c" }}>Select at least one site.</p>}
-          </div>
 
           {/* AI Photo Drop */}
           <div className="mb-5 rounded-xl p-4" style={{ background: "#f0fdf4", border: "1.5px dashed #22c55e" }}>
@@ -334,7 +298,7 @@ export default function BlogTab({ showToast }: Props) {
 
           {/* Journal paste */}
           <div className="mb-4 rounded-xl p-4" style={{ background: C.p1_04, border: `1.5px dashed ${C.p1_20}` }}>
-            <label className="block text-xs font-bold uppercase tracking-widest mb-1.5" style={{ color: C.p1 }}>Paste Journal Entry</label>
+            <label className="block text-xs font-bold uppercase tracking-widest mb-1.5" style={{ color: C.p1 }}>Paste Entry</label>
             <p className="text-xs text-slate-400 mb-2">Paste your raw entry — first line becomes the title, date line sets the date, the rest becomes the body.</p>
             <textarea className={ta} rows={5} placeholder={"Golden Hour at SJSU — Mia's Grad Shoot\nMay 7, 2025 · 3:45 PM\n\nThe light was absolutely perfect that evening..."} value={journalDraft} onChange={e => onJournalDraftChange(e.target.value)} />
             {journalDraft && <button onClick={() => setJournalDraft("")} className="mt-1.5 text-xs font-bold text-slate-400 underline">Clear</button>}
@@ -406,15 +370,8 @@ export default function BlogTab({ showToast }: Props) {
       <div>
         <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
           <div className="flex items-center gap-2">
-            <p className="text-xs font-black uppercase tracking-widest" style={{ color: C.p1 }}>{blogCategory === "professional" ? "Professional Case Studies" : "Journal Posts"}</p>
+            <p className="text-xs font-black uppercase tracking-widest" style={{ color: C.p1 }}>Professional Blog Posts</p>
             <span className="text-xs font-bold text-slate-400">({posts.length})</span>
-          </div>
-          <div className="flex gap-2 p-1 rounded-xl bg-white border border-slate-100">
-            {BLOG_CATEGORIES.map(category => (
-              <button key={category.value} onClick={() => { setBlogCategory(category.value); setPostForm(f => ({ ...f, category: category.value })); }} className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all" style={blogCategory === category.value ? { background: C.p1_10, color: C.p1 } : { color: "#94a3b8" }}>
-                {category.label}
-              </button>
-            ))}
           </div>
         </div>
         {postsLoading ? [...Array(2)].map((_, i) => <div key={i} className="rounded-2xl animate-pulse h-20 mb-3" style={{ background: `linear-gradient(135deg,${C.p1_08},${C.p2_06})` }} />) : (

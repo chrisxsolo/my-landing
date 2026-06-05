@@ -10,8 +10,6 @@ const CLIENT_PORTAL_HREF = "/login";
 const navLinks = [
   { label: "Home", href: "/home" },
   { label: "Me", href: "/me" },
-  { label: "Graduation Guide", href: "/grad-guide" },
-  { label: "Locations", href: "/bay-area-locations" },
   { label: "Availability", href: "/booking" },
   { label: "Journal", href: "/journal" },
   { label: "Client Portal", href: CLIENT_PORTAL_HREF },

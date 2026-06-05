@@ -3,6 +3,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // QUICK EDITS:
 //   → Add/remove primary links:   edit the primaryLinks array
+//   → Add/remove guide pages:     edit the guideLinks array (Guides dropdown)
 //   → Add/remove portfolio pages: edit the portfolioLinks array
 //   → Add/remove pricing pages:   edit the pricingLinks array
 //   → Client portal link:         edit CLIENT_PORTAL_HREF below
@@ -24,8 +25,13 @@ const primaryLinks = [
   { label: "Home",    href: "/" },
   { label: "Dates",   href: "/availability" },
   { label: "About",   href: "/about" },
-  { label: "FAQ",     href: "/faq" },
-  { label: "Journal", href: "/blog" },
+  { label: "Blog", href: "/blog" },
+];
+
+const guideLinks = [
+  { label: "Grad guide", href: "/grad-guide" },
+  { label: "Locations",  href: "/bay-area-locations" },
+  { label: "FAQ",        href: "/faq" },
 ];
 
 const portfolioLinks = [
@@ -50,26 +56,29 @@ export default function ProNav() {
   const [menuOpen, setMenuOpen]           = useState(false);
   const [portfolioOpen, setPortfolioOpen] = useState(false);
   const [pricingOpen, setPricingOpen]     = useState(false);
+  const [guidesOpen, setGuidesOpen]       = useState(false);
   const navRef = useRef<HTMLElement>(null);
 
   const isPortfolioActive = portfolioLinks.some((link) => isActive(pathname, link.href));
   const isPricingActive   = pathname === "/pricing" || pricingLinks.some((link) => isActive(pathname, link.href));
+  const isGuidesActive    = guideLinks.some((link) => isActive(pathname, link.href));
   const isPortalActive = isActive(pathname, CLIENT_PORTAL_HREF) || isActive(pathname, CLIENT_DASHBOARD_HREF);
 
   const closeMenus = () => {
     setMenuOpen(false);
     setPortfolioOpen(false);
     setPricingOpen(false);
+    setGuidesOpen(false);
   };
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (navRef.current && !navRef.current.contains(e.target as Node)) {
-        setMenuOpen(false); setPortfolioOpen(false); setPricingOpen(false);
+        setMenuOpen(false); setPortfolioOpen(false); setPricingOpen(false); setGuidesOpen(false);
       }
     }
     function handleKeydown(e: KeyboardEvent) {
-      if (e.key === "Escape") { setMenuOpen(false); setPortfolioOpen(false); setPricingOpen(false); }
+      if (e.key === "Escape") { setMenuOpen(false); setPortfolioOpen(false); setPricingOpen(false); setGuidesOpen(false); }
     }
     document.addEventListener("mousedown", handleClick);
     document.addEventListener("keydown", handleKeydown);
@@ -299,6 +308,16 @@ export default function ProNav() {
               </Link>
             ))}
 
+            <div className="pro-dropdown-wrap">
+              <button className="pro-nav-button" type="button"
+                aria-expanded={guidesOpen}
+                aria-current={isGuidesActive ? "page" : undefined}
+                onClick={() => setGuidesOpen((o) => !o)}>
+                Guides <span className="pro-nav-caret">{guidesOpen ? "▲" : "▼"}</span>
+              </button>
+              {guidesOpen && <div className="pro-nav-dropdown">{guideLinks.map(renderDropdownLink)}</div>}
+            </div>
+
             <div className="pro-dropdown-wrap" style={{ display: "flex" }}>
               <Link
                 href="/portfolio"
@@ -365,6 +384,13 @@ export default function ProNav() {
                   {link.label}
                 </Link>
               ))}
+              <button className="pro-nav-button" type="button"
+                aria-expanded={guidesOpen}
+                aria-current={isGuidesActive ? "page" : undefined}
+                onClick={() => setGuidesOpen((o) => !o)}>
+                Guides <span className="pro-nav-caret">{guidesOpen ? "▲" : "▼"}</span>
+              </button>
+              {guidesOpen && <div className="pro-mobile-submenu">{guideLinks.map(renderDropdownLink)}</div>}
               <div className="pro-mobile-split">
                 <Link href="/portfolio" className="pro-nav-link"
                   aria-current={isPortfolioActive ? "page" : undefined}
