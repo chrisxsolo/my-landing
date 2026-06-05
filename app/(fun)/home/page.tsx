@@ -6,7 +6,6 @@ import { C } from "@/lib/colors";
 export const dynamic = 'force-dynamic'
 
 const photographyCards = [
-  { href:"/bay-area-locations", emoji:"🗺️", tag:"Locations", title:"Bay Area Location Guide", desc:"My favorite portrait spots across SF, the South Bay, the Peninsula, beaches, and more.", featured:true },
   { href:"/booking-process", emoji:"📋", tag:"Process",     title:"Booking Process",         desc:"From inquiry to delivery — see exactly what happens at each step.", featured:false },
   { href:"/availability",    emoji:"📅", tag:"Availability",title:"Check My Schedule",       desc:"See what dates I have open for grad season and reach out to lock one in.", featured:false },
   { href:"/journal",            emoji:"✍️", tag:"Journal",     title:"Shoot Stories",            desc:"Behind-the-scenes from recent sessions — what worked and what didn't.", featured:false },
@@ -106,7 +105,6 @@ export default function Home() {
             Bay Area photographer based in San Francisco. Specializing in graduation portraits, events, and creative shoots.
           </p>
           <div className="afu5 flex flex-wrap gap-3">
-            <Link href="/bay-area-locations" className="btn-lift inline-flex items-center gap-2 px-6 py-3 rounded-full font-bold text-sm text-white shadow-md" style={{background:C.grad12}}>🗺️ Location Guide</Link>
             <a href="https://www.instagram.com/soloxsnaps" target="_blank" rel="noopener noreferrer" className="btn-lift inline-flex items-center gap-2 px-6 py-3 rounded-full font-bold text-sm text-white" style={{background:"#111827"}}>📸 Instagram</a>
             <a href="https://www.soloxsnaps.com/contact/" className="btn-lift inline-flex items-center gap-2 px-6 py-3 rounded-full font-bold text-sm" style={{background:C.surfaceStrong,color:"#111827",border:`1.5px solid ${C.borderWarm}`}}>✉️ Book a shoot</a>
           </div>
@@ -136,7 +134,7 @@ export default function Home() {
               const wrapperProps = isExternal ? {href:card.href,target:"_blank",rel:"noopener noreferrer"} : {href:card.href};
               const cs = card.featured
                 ? cardStyles[0]
-                : cardStyles[(i - 1) % cardStyles.length];
+                : cardStyles[i % cardStyles.length];
               return (
                 // @ts-ignore
                 <Wrapper key={card.title} {...wrapperProps}

@@ -1,25 +1,30 @@
+// BAY AREA LOCATIONS  →  soloxsnaps.com/bay-area-locations
+// Server component — exports metadata + CollectionPage/Breadcrumb JSON-LD.
+// Interactive content lives in LocationsExplorer.tsx, styled to match the
+// professional graduation guide (sage/green, frosted glass).
+
 import type { Metadata } from "next";
-import { C } from "@/lib/colors";
-import { GUIDE_STYLES } from "@/lib/guidestyles";
 import {
   DRAFT_BAY_AREA_LOCATIONS,
   slugifyLocation,
   type BayAreaLocationEntry,
 } from "@/lib/bayAreaLocations";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
+import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
 import LocationsExplorer from "./LocationsExplorer";
 
 export const dynamic = "force-dynamic";
 
-const PAGE_TITLE = "Bay Area Photo Location Guide | Chris Solorzano";
+const PATH = "/bay-area-locations";
+const PAGE_TITLE = "Bay Area Photo Location Guide";
 const PAGE_DESCRIPTION =
   "Explore Chris Solorzano's favorite Bay Area photo locations for portraits, couples, creative shoots, beaches, South Bay, San Francisco, East Bay, and Peninsula sessions.";
 
 export const metadata: Metadata = {
-  title: PAGE_TITLE,
+  title: `${PAGE_TITLE} | soloxsnaps`,
   description: PAGE_DESCRIPTION,
   alternates: {
-    canonical: "/bay-area-locations",
+    canonical: PATH,
   },
   keywords: [
     "Bay Area photo locations",
@@ -36,7 +41,7 @@ export const metadata: Metadata = {
     title: PAGE_TITLE,
     description: PAGE_DESCRIPTION,
     type: "website",
-    siteName: "Chris Solorzano",
+    siteName: "soloxsnaps",
   },
   twitter: {
     card: "summary",
@@ -92,7 +97,7 @@ function getLocationsJsonLd(locations: BayAreaLocationEntry[]) {
     description: PAGE_DESCRIPTION,
     isPartOf: {
       "@type": "WebSite",
-      name: "Chris Solorzano",
+      name: "soloxsnaps",
     },
     creator: {
       "@type": "Person",
@@ -179,30 +184,26 @@ function getLocationsJsonLd(locations: BayAreaLocationEntry[]) {
 export default async function BayAreaLocationsPage() {
   const locations = await getLocations();
   const locationsJsonLd = getLocationsJsonLd(locations);
+  const breadcrumbLd = buildBreadcrumbJsonLd([
+    { name: "Home", path: "/" },
+    { name: "Bay Area Locations", path: PATH },
+  ]);
 
   return (
-    <div className="min-h-screen overflow-x-hidden font-sans" style={{ background: C.page }}>
-      <style>{GUIDE_STYLES}</style>
+    <>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
           __html: JSON.stringify(locationsJsonLd).replace(/</g, "\\u003c"),
         }}
       />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(breadcrumbLd).replace(/</g, "\\u003c"),
+        }}
+      />
       <LocationsExplorer locations={locations} />
-      <footer
-        className="border-t px-6 py-8"
-        style={{ borderColor: C.borderSubtle, background: C.surfaceStrong }}
-      >
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4">
-          <span className="text-lg font-black" style={C.text}>
-            Chris.
-          </span>
-          <span className="text-sm text-slate-400">
-            © 2026 · Bay Area portraits, couples, and creative sessions
-          </span>
-        </div>
-      </footer>
-    </div>
+    </>
   );
 }
