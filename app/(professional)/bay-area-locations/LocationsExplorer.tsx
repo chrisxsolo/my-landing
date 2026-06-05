@@ -74,11 +74,12 @@ const LOC_CSS = `
   .loc-card-ph p { margin:0; font-size:12px; font-weight:720; }
   .loc-card-body { padding:24px; }
   .loc-card-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:14px; }
+  .loc-card-head-main { min-width:0; }
   .loc-card-place { margin:0 0 4px; color:var(--ink-dim, #667f79); font-size:11px; font-weight:820; letter-spacing:0.12em; text-transform:uppercase; }
   .loc-card-title { margin:0; color:var(--ink, #101412); font-size:21px; font-weight:870; letter-spacing:-0.01em; line-height:1.15; }
-  .loc-light { flex-shrink:0; text-align:right; border-radius:11px; padding:9px 13px; background:rgba(112,139,133,0.10); border:1px solid rgba(112,139,133,0.2); }
+  .loc-light { flex-shrink:0; max-width:46%; text-align:right; border-radius:11px; padding:9px 13px; background:rgba(112,139,133,0.10); border:1px solid rgba(112,139,133,0.2); }
   .loc-light-label { margin:0; color:var(--accent, #3d6b5e); font-size:10px; font-weight:820; letter-spacing:0.12em; text-transform:uppercase; }
-  .loc-light-val { margin:3px 0 0; color:var(--ink, #101412); font-size:13px; font-weight:700; }
+  .loc-light-val { margin:3px 0 0; color:var(--ink, #101412); font-size:13px; font-weight:700; line-height:1.35; overflow-wrap:anywhere; }
   .loc-desc { color:var(--ink-muted, #4b5a55); font-size:14px; line-height:1.66; }
   .loc-meta { display:grid; gap:12px; grid-template-columns:1fr 1fr; margin-top:18px; }
   @media (max-width:480px) { .loc-meta { grid-template-columns:1fr; } }
@@ -314,7 +315,7 @@ export default function LocationsExplorer({
 
                   <div className="loc-card-body">
                     <div className="loc-card-head">
-                      <div>
+                      <div className="loc-card-head-main">
                         <p className="loc-card-place">
                           {location.city}
                           {location.neighborhood ? ` — ${location.neighborhood}` : ""}
