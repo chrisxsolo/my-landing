@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useDeferredValue, useState } from "react";
 import ExpandableText from "@/app/components/ExpandableText";
+import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 import { GRAD_GUIDE_CSS, GG_SQUIGGLE_PATH } from "@/lib/gradGuide";
 import {
   BAY_AREA_FILTER_CHIPS,
@@ -298,7 +299,11 @@ export default function LocationsExplorer({
                   <div className="loc-card-media">
                     {location.image_url ? (
                       <>
-                        <img src={location.image_url} alt={location.title} loading="lazy" decoding="async" />
+                        <OptimizedPhoto
+                          src={location.image_url}
+                          alt={location.title}
+                          sizes="(max-width: 760px) 100vw, 50vw"
+                        />
                         <div className="loc-card-overlay" />
                         <div className="loc-card-toptags">
                           <span className="loc-pill loc-pill--region">{getLocationChipLabel(location.region)}</span>

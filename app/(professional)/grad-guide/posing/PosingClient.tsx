@@ -2,6 +2,7 @@
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 import { GRAD_GUIDE_CSS, GG_SQUIGGLE_PATH } from "@/lib/gradGuide";
 
 type Pose = { id: number; title: string; image_url: string; instructions: string; order: number };
@@ -75,7 +76,11 @@ export default function PosingClient() {
                 <div className="gg-pose-grid">
                   <div className="gg-pose-media">
                     {pose.image_url ? (
-                      <img src={pose.image_url} alt={pose.title} loading="lazy" decoding="async" />
+                      <OptimizedPhoto
+                        src={pose.image_url}
+                        alt={pose.title}
+                        sizes="(max-width: 760px) 100vw, 36vw"
+                      />
                     ) : (
                       <div className="gg-pose-placeholder"><span>📷</span><p>Photo via Supabase</p></div>
                     )}

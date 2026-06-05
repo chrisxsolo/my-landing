@@ -2,6 +2,7 @@
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 import { GRAD_GUIDE_CSS, GG_SQUIGGLE_PATH } from "@/lib/gradGuide";
 
 type LocationSpot = { id: number; school_id: string; school_name: string; school_short: string; name: string; description: string; tip: string; icon: string; image_url: string | null; order: number };
@@ -131,7 +132,11 @@ export default function CampusSpotsClient() {
                     <div className="gg-pose-grid">
                       <div className="gg-pose-media">
                         {spot.image_url ? (
-                          <img src={spot.image_url} alt={spot.name} loading="lazy" decoding="async" />
+                          <OptimizedPhoto
+                            src={spot.image_url}
+                            alt={spot.name}
+                            sizes="(max-width: 760px) 100vw, 36vw"
+                          />
                         ) : (
                           <div className="gg-pose-placeholder"><span>{spot.icon}</span><p>Photo via Supabase</p></div>
                         )}

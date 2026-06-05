@@ -19,6 +19,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 
 // ── SESSION TYPE DROPDOWN OPTIONS ─────────────────────────────────────────────
 // These appear in the "Session type" select dropdown on the form.
@@ -95,6 +96,7 @@ const CSS = `
     text-wrap: pretty;
   }
   .contact-hero-media {
+    position: relative;
     min-height: 360px;
     overflow: hidden;
     border: 1px solid rgba(18, 24, 22, 0.1);
@@ -417,7 +419,12 @@ function ContactForm() {
           </div>
         </div>
         <div className="contact-hero-media">
-          <img src={contactImage} alt="Chris Solorzano photography portrait" decoding="async" />
+          <OptimizedPhoto
+            src={contactImage}
+            alt="Chris Solorzano photography portrait"
+            sizes="(max-width: 860px) 90vw, 360px"
+            quality={90}
+          />
         </div>
       </section>
 

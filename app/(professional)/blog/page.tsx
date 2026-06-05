@@ -5,6 +5,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getBlogPostsByCategory } from "@/lib/professionalData";
+import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 
 export const dynamic = "force-dynamic";
 
@@ -179,6 +180,7 @@ const CSS = `
   }
 
   .blog-featured-media {
+    position: relative;
     overflow: hidden;
     background: #dfe8e4;
     min-height: 440px;
@@ -310,6 +312,7 @@ const CSS = `
   }
 
   .blog-card-media {
+    position: relative;
     overflow: hidden;
     background: #dfe8e4;
     aspect-ratio: 4 / 3;
@@ -476,11 +479,12 @@ export default async function ProfessionalBlogPage() {
                 >
                   <div className="blog-featured-media">
                     {featured.cover_image_url ? (
-                      <img
+                      <OptimizedPhoto
                         src={featured.cover_image_url}
                         alt={featured.title}
-                        loading="eager"
-                        decoding="async"
+                        sizes="(max-width: 860px) 100vw, 50vw"
+                        priority
+                        quality={90}
                       />
                     ) : (
                       <div className="blog-featured-media-empty">
@@ -538,11 +542,10 @@ export default async function ProfessionalBlogPage() {
                     >
                       <div className="blog-card-media">
                         {post.cover_image_url ? (
-                          <img
+                          <OptimizedPhoto
                             src={post.cover_image_url}
                             alt={post.title}
-                            loading="lazy"
-                            decoding="async"
+                            sizes="(max-width: 760px) 100vw, 33vw"
                           />
                         ) : (
                           <div className="blog-card-media-empty">

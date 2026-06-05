@@ -18,7 +18,9 @@
 
 import type { Metadata } from "next";
 import Link from "next/link";
+import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 import { getPortfolioData, getSiteSettings } from "@/lib/professionalData";
+import { selectDistinctImageUrl } from "@/lib/photoMetadata";
 import { pricingCSS, anim } from "@/lib/proStyles";
 import GraduationRateEstimator from "@/app/components/GraduationRateEstimator";
 
@@ -103,6 +105,7 @@ export default async function GradPricingPage() {
     gradImages.find((img) => `${img.title} ${img.alt}`.toLowerCase().includes("group"))?.image_url ||
     gradImages[6]?.image_url ||
     packageImage;
+  const heroImage = selectDistinctImageUrl(gradImages, [packageImage, groupImage], packageImage);
 
   return (
     <main className="pricing-modern">
@@ -123,8 +126,18 @@ export default async function GradPricingPage() {
              → Heading text:     edit the h1 below */}
       <section
         className="pricing-hero-dark"
-        style={packageImage ? { backgroundImage: `url(${packageImage})` } : {}}
       >
+        {heroImage && (
+          <div className="pricing-hero-photo" aria-hidden="true">
+            <OptimizedPhoto
+              src={heroImage}
+              alt=""
+              sizes="100vw"
+              priority
+              quality={90}
+            />
+          </div>
+        )}
         <div className="pricing-shell">
           {/* Small eyebrow label — change text here */}
           <p className="pricing-kicker">Graduation pricing</p>
@@ -228,7 +241,12 @@ export default async function GradPricingPage() {
         {/* Package photo — set via Supabase site_settings.pricing_grad_standard_image */}
         {packageImage && (
           <div className="pricing-package-media">
-            <img src={packageImage} alt="Graduation portrait" decoding="async" />
+            <OptimizedPhoto
+              src={packageImage}
+              alt="Graduation portrait by soloxsnaps"
+              sizes="(max-width: 940px) 90vw, 42vw"
+              objectPosition="center top"
+            />
           </div>
         )}
       </section>
@@ -241,7 +259,12 @@ export default async function GradPricingPage() {
         {/* Group photo — set via Supabase site_settings.pricing_grad_group_image */}
         {groupImage && (
           <div className="pricing-package-media">
-            <img src={groupImage} alt="Group graduation portraits" decoding="async" />
+            <OptimizedPhoto
+              src={groupImage}
+              alt="Group graduation portraits by soloxsnaps"
+              sizes="(max-width: 940px) 90vw, 38vw"
+              objectPosition="center top"
+            />
           </div>
         )}
 

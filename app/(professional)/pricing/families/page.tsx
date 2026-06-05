@@ -18,7 +18,9 @@
 
 import type { Metadata } from "next";
 import Link from "next/link";
+import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 import { getPortfolioData, getSiteSettings } from "@/lib/professionalData";
+import { selectDistinctImageUrl } from "@/lib/photoMetadata";
 import { pricingCSS, anim } from "@/lib/proStyles";
 
 // ── SEO metadata (tab title + Google description) ────────────────────────────
@@ -78,6 +80,7 @@ export default async function FamilyPricingPage() {
   const sessionImage  = siteSettings.pricing_family_session_image  || familyImages[1]?.image_url || familyImages[0]?.image_url || null;
   // extendedImage = photo in the "Extended Family Session" package (left column)
   const extendedImage = siteSettings.pricing_family_extended_image || familyImages[2]?.image_url || familyImages[0]?.image_url || null;
+  const heroImage = selectDistinctImageUrl(familyImages, [sessionImage, extendedImage], sessionImage);
 
   return (
     <main className="pricing-modern">
@@ -98,8 +101,18 @@ export default async function FamilyPricingPage() {
              → Heading text:     edit the h1 below */}
       <section
         className="pricing-hero-dark"
-        style={sessionImage ? { backgroundImage: `url(${sessionImage})` } : {}}
       >
+        {heroImage && (
+          <div className="pricing-hero-photo" aria-hidden="true">
+            <OptimizedPhoto
+              src={heroImage}
+              alt=""
+              sizes="100vw"
+              priority
+              quality={90}
+            />
+          </div>
+        )}
         <div className="pricing-shell">
           {/* Small eyebrow label — change text here */}
           <p className="pricing-kicker">Family pricing</p>
@@ -199,7 +212,11 @@ export default async function FamilyPricingPage() {
         {/* Session photo — set via Supabase site_settings.pricing_family_session_image */}
         {sessionImage && (
           <div className="pricing-package-media">
-            <img src={sessionImage} alt="Family portrait" decoding="async" />
+            <OptimizedPhoto
+              src={sessionImage}
+              alt="Bay Area family portrait by soloxsnaps"
+              sizes="(max-width: 940px) 90vw, 42vw"
+            />
           </div>
         )}
       </section>
@@ -212,7 +229,11 @@ export default async function FamilyPricingPage() {
         {/* Extended session photo — set via Supabase site_settings.pricing_family_extended_image */}
         {extendedImage && (
           <div className="pricing-package-media">
-            <img src={extendedImage} alt="Extended family portrait" decoding="async" />
+            <OptimizedPhoto
+              src={extendedImage}
+              alt="Extended family portrait by soloxsnaps"
+              sizes="(max-width: 940px) 90vw, 38vw"
+            />
           </div>
         )}
 

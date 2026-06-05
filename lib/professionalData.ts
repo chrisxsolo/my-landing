@@ -1,4 +1,9 @@
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
+import {
+  getPhotoAlt,
+  getPhotoTitle,
+  normalizePortfolioCategorySlug,
+} from "@/lib/photoMetadata";
 
 export type PortfolioCategory = {
   id: number;
@@ -52,12 +57,6 @@ const FALLBACK_PROFILE_IMAGE =
 
 const VISIBLE_PORTFOLIO_SLUGS = ["grads", "families"];
 
-const CATEGORY_SLUG_ALIASES: Record<string, string> = {
-  graduation: "grads",
-  portraits: "families",
-  family: "families",
-};
-
 export const FALLBACK_CATEGORIES: PortfolioCategory[] = [
   {
     id: 1,
@@ -106,7 +105,7 @@ function isMissingColumnError(error: { code?: string; message?: string } | null)
 }
 
 function normalizeCategory(raw: RawCategory, index: number): PortfolioCategory {
-  const slug = CATEGORY_SLUG_ALIASES[raw.slug ?? ""] ?? raw.slug ?? "portfolio";
+  const slug = normalizePortfolioCategorySlug(raw.slug);
   const fallback = FALLBACK_CATEGORIES.find((item) => item.slug === slug);
 
   return {
@@ -124,14 +123,21 @@ function normalizeImage(
   index: number,
   categories: PortfolioCategory[]
 ): PortfolioImage {
-  const categorySlug = CATEGORY_SLUG_ALIASES[raw.category_slug ?? ""] ?? raw.category_slug ?? categories[0]?.slug ?? "portfolio";
+  const categorySlug = normalizePortfolioCategorySlug(raw.category_slug ?? categories[0]?.slug);
   const category = categories.find((item) => item.slug === categorySlug);
-  const title = raw.title ?? raw.caption ?? "Portfolio image";
+  const title = getPhotoTitle({
+    title: raw.title ?? raw.caption,
+    categorySlug,
+  });
 
   return {
     id: Number(raw.id ?? index + 1),
     title,
-    alt: raw.alt || title,
+    alt: getPhotoAlt({
+      alt: raw.alt,
+      title,
+      categorySlug,
+    }),
     image_url: raw.image_url ?? "",
     category_id: raw.category_id ?? category?.id ?? null,
     category_slug: categorySlug,

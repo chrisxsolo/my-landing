@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 
 type CarouselImage = {
   id: string | number;
@@ -36,8 +37,14 @@ export default function HeroCarousel({ images }: { images: CarouselImage[] }) {
         .home-hero-slide {
           position: absolute;
           inset: 0;
-          background-size: cover;
-          background-position: center;
+          opacity: 0;
+          transition: opacity 0.7s ease;
+        }
+        .home-hero-slide[data-active="true"] {
+          opacity: 1;
+        }
+        .home-hero-slide img {
+          object-position: center 30%;
         }
         .home-hero::after {
           content: "";
@@ -155,8 +162,9 @@ export default function HeroCarousel({ images }: { images: CarouselImage[] }) {
             padding: 116px 0 44px;
           }
           .home-hero-title {
-            font-size: 46px;
+            font-size: 42px;
             line-height: 1;
+            max-width: 8.2ch;
           }
           .home-hero-copy {
             font-size: 16px;
@@ -172,6 +180,9 @@ export default function HeroCarousel({ images }: { images: CarouselImage[] }) {
             right: auto;
             bottom: 18px;
           }
+          .home-hero-slide img {
+            object-position: 18% top;
+          }
         }
         @media (max-width: 380px) {
           .home-hero-title {
@@ -181,12 +192,22 @@ export default function HeroCarousel({ images }: { images: CarouselImage[] }) {
       `}</style>
 
       <section className="home-hero" aria-label="Bay Area photography hero">
-        <div
-          className="home-hero-slide"
-          role="img"
-          aria-label={images[current].alt}
-          style={{ backgroundImage: `url(${images[current].image_url})` }}
-        />
+        {images.map((image, index) => (
+          <div
+            key={image.id}
+            className="home-hero-slide"
+            data-active={index === current}
+            aria-hidden={index !== current}
+          >
+            <OptimizedPhoto
+              src={image.image_url}
+              alt={image.alt}
+              sizes="100vw"
+              priority={index === 0}
+              quality={90}
+            />
+          </div>
+        ))}
 
         <div className="home-hero-inner">
           <p className="home-hero-kicker">Guided Bay Area photo sessions</p>

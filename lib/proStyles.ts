@@ -260,6 +260,7 @@ export function pricingCSS({
      min-height comes from the pricingCSS() options: mediaMinHeight
      To make image taller: increase mediaMinHeight in the page's pricingCSS() call */
   .pricing-package-media {
+    position: relative;
     min-height: ${mediaMinHeight}px;
     overflow: hidden;
     border-radius: 8px;
@@ -409,7 +410,7 @@ export function pricingCSS({
      DARK PHOTO HERO
      ═══════════════════════════════════════════════════════════════════════════
      Applied by adding class "pricing-hero-dark" to the section element.
-     Set the background photo inline: style={{ backgroundImage: \`url(\${img})\` }}
+     Add a .pricing-hero-photo child with an optimized fill image for the photo layer.
      Falls back to solid dark (#0c0d0c) if no image is passed.
 
      HOW TO CHANGE:
@@ -439,9 +440,15 @@ export function pricingCSS({
     justify-content: flex-end;
     padding-top: 78px; /* clears the fixed nav bar */
     background-color: #0c0d0c; /* shown as fallback when no photo */
-    background-size: cover;
-    background-position: center 25%; /* moves focal point up slightly so faces show */
     overflow: hidden;
+  }
+  .pricing-hero-photo {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+  }
+  .pricing-hero-photo img {
+    object-position: center 25%;
   }
 
   /* Dark gradient overlay — ensures text is readable over any photo.

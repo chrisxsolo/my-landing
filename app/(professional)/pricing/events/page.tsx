@@ -13,6 +13,7 @@
 
 import type { Metadata } from "next";
 import Link from "next/link";
+import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 import { getPortfolioData, getSiteSettings } from "@/lib/professionalData";
 import { pricingCSS, anim } from "@/lib/proStyles";
 
@@ -88,8 +89,18 @@ export default async function EventPricingPage() {
       {/* ── DARK PHOTO HERO ─────────────────────────────────────────────────── */}
       <section
         className="pricing-hero-dark"
-        style={primaryImage ? { backgroundImage: `url(${primaryImage})` } : {}}
       >
+        {primaryImage && (
+          <div className="pricing-hero-photo" aria-hidden="true">
+            <OptimizedPhoto
+              src={primaryImage}
+              alt=""
+              sizes="100vw"
+              priority
+              quality={90}
+            />
+          </div>
+        )}
         <div className="pricing-shell">
           <p className="pricing-kicker">Event pricing</p>
 
@@ -171,7 +182,11 @@ export default async function EventPricingPage() {
 
         {primaryImage && (
           <div className="pricing-package-media">
-            <img src={primaryImage} alt="Event photography" decoding="async" />
+            <OptimizedPhoto
+              src={primaryImage}
+              alt="Event photography by soloxsnaps"
+              sizes="(max-width: 940px) 90vw, 42vw"
+            />
           </div>
         )}
       </section>
@@ -180,7 +195,11 @@ export default async function EventPricingPage() {
       <section className="pricing-shell pricing-package" data-reverse="true">
         {secondaryImage && (
           <div className="pricing-package-media">
-            <img src={secondaryImage} alt="Full event coverage" decoding="async" />
+            <OptimizedPhoto
+              src={secondaryImage}
+              alt="Full event coverage by soloxsnaps"
+              sizes="(max-width: 940px) 90vw, 38vw"
+            />
           </div>
         )}
 

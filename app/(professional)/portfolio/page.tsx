@@ -24,6 +24,7 @@
 
 import type { Metadata } from "next";
 import Link from "next/link";
+import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 import { getPortfolioData } from "@/lib/professionalData";
 
 export const dynamic = "force-dynamic";
@@ -81,9 +82,15 @@ const CSS = `
     align-items: end;
     padding-top: 78px; /* clears the fixed nav */
     background-color: #0c0d0c;
-    background-size: cover;
-    background-position: center 30%;
     overflow: hidden;
+  }
+  .port-hero-photo {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+  }
+  .port-hero-photo img {
+    object-position: center 30%;
   }
 
   /* Dark gradient so text is always readable over any photo */
@@ -250,6 +257,9 @@ const CSS = `
     isolation: isolate;
     border-radius: 3px;
     animation: scaleIn 0.55s ease both;
+  }
+  .port-figure[data-category="families"] .port-img {
+    object-position: center 42%;
   }
 
   /* Stagger entrance by column — columns animate in left to right
@@ -424,6 +434,7 @@ export default async function PortfolioPage({
   // Hero background = first image of the current filtered set
   // This auto-updates when you switch categories — grads shows a grad photo, etc.
   const heroBg = filteredImages[0]?.image_url ?? null;
+  const heroImage = filteredImages[0] ?? null;
 
   return (
     <main className="portfolio-page">
@@ -435,9 +446,19 @@ export default async function PortfolioPage({
            To use a fixed image instead: replace heroBg with a hardcoded URL. */}
       <section
         className="port-hero"
-        style={heroBg ? { backgroundImage: `url(${heroBg})` } : {}}
         aria-labelledby="portfolio-title"
       >
+        {heroBg && heroImage && (
+          <div className="port-hero-photo" aria-hidden="true">
+            <OptimizedPhoto
+              src={heroBg}
+              alt=""
+              sizes="100vw"
+              priority
+              quality={90}
+            />
+          </div>
+        )}
         <div className="port-hero-inner">
           {/* Small eyebrow label — change text here */}
           <p className="port-eyebrow">Portfolio</p>
@@ -491,13 +512,13 @@ export default async function PortfolioPage({
         {filteredImages.length > 0 ? (
           <div className="port-image-wall">
             {filteredImages.map((image) => (
-              <figure key={image.id} className="port-figure">
-                <img
+              <figure key={image.id} className="port-figure" data-category={image.category_slug}>
+                <OptimizedPhoto
                   src={image.image_url}
                   alt={image.alt}
                   className="port-img"
-                  loading="lazy"
-                  decoding="async"
+                  sizes="(max-width: 760px) 50vw, (max-width: 980px) 33vw, 25vw"
+                  quality={75}
                 />
               </figure>
             ))}

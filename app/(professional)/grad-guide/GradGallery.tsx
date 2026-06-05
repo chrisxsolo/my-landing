@@ -1,6 +1,7 @@
 "use client";
 import { supabase } from "@/lib/supabase";
 import { useEffect, useState } from "react";
+import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 
 // Client island for the "Recent grad shoots" gallery. This is the ONLY part of
 // the grad-guide hub that needs the browser — it reads published photos from
@@ -58,12 +59,11 @@ export default function GradGallery() {
     <div className="gg-gallery">
       {photos.map((photo) => (
         <div key={photo.id} className="gg-photo" data-reveal data-delay="1">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+          <OptimizedPhoto
             src={photo.image_url}
             alt={photo.caption || "Graduation photo"}
-            loading="lazy"
-            decoding="async"
+            sizes="(max-width: 760px) 50vw, 25vw"
+            quality={75}
           />
           {photo.caption && (
             <div className="gg-photo-cap">

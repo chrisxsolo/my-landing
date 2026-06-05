@@ -18,6 +18,7 @@
 
 import type { Metadata } from "next";
 import Link from "next/link";
+import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 
 export const metadata: Metadata = {
   title: "About | soloxsnaps",
@@ -115,7 +116,9 @@ const CSS = `
 
   /* Portrait photo */
   .about-portrait-wrap {
+    position: relative;
     overflow: hidden;
+    aspect-ratio: 4 / 5;
     border-radius: 12px;
     background: #dfe8e4;
     box-shadow: 0 20px 60px rgba(18, 24, 22, 0.1);
@@ -123,7 +126,7 @@ const CSS = `
     margin: 0 auto;
   }
   .about-portrait-wrap img {
-    width: 100%; height: auto;
+    width: 100%; height: 100%;
     display: block;
     transition: transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
   }
@@ -362,7 +365,14 @@ export default function ProfessionalAboutPage() {
       <section className="about-bio">
         <div className="about-shell about-bio-grid">
           <div className="about-portrait-wrap" data-reveal="scale">
-            <img src={portrait} alt="Chris Solorzano" loading="eager" decoding="async" />
+            <OptimizedPhoto
+              src={portrait}
+              alt="Chris Solorzano"
+              sizes="(max-width: 920px) 90vw, 40vw"
+              priority
+              quality={90}
+              objectPosition="center top"
+            />
           </div>
           <div className="about-bio-text" data-reveal data-delay="2">
             <p className="about-section-kicker">Photographer, Bay Area</p>

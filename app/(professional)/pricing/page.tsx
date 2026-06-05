@@ -5,6 +5,7 @@
 
 import type { Metadata } from "next";
 import Link from "next/link";
+import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 import { getPortfolioData, getSiteSettings } from "@/lib/professionalData";
 
 export const metadata: Metadata = {
@@ -90,9 +91,15 @@ export default async function RatesPage() {
               {bg && (
                 <div
                   className="rate-card-bg"
-                  style={{ backgroundImage: `url(${bg})` }}
                   aria-hidden="true"
-                />
+                >
+                  <OptimizedPhoto
+                    src={bg}
+                    alt=""
+                    sizes="(max-width: 860px) 100vw, 33vw"
+                    quality={85}
+                  />
+                </div>
               )}
 
               {/* Gradient overlay — always present */}
@@ -230,10 +237,11 @@ const CSS = `
   .rate-card-bg {
     position: absolute;
     inset: 0;
-    background-size: cover;
-    background-position: center 20%;
     transition: transform 0.7s cubic-bezier(0.22,1,0.36,1), filter 0.4s ease;
     will-change: transform;
+  }
+  .rate-card-bg img {
+    object-position: center 20%;
   }
   .rate-card:hover .rate-card-bg {
     transform: scale(1.04);

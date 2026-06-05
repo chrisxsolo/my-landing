@@ -23,7 +23,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getPortfolioData, getSiteSettings, type PortfolioCategory, type PortfolioImage } from "@/lib/professionalData";
 import HeroCarousel from "@/app/components/HeroCarousel";
+import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 import Testimonials from "@/app/components/Testimonials";
+import { getPhotoAlt, selectDistinctImageUrl } from "@/lib/photoMetadata";
 
 export const dynamic = "force-dynamic";
 
@@ -446,6 +448,7 @@ const CSS = `
   }
   .home-cta-copy { padding: 32px 28px; }
   .home-cta-media {
+    position: relative;
     overflow: hidden;
     min-height: 420px;
     border-radius: 12px;
@@ -458,13 +461,10 @@ const CSS = `
   @media (max-width: 920px) {
     .home-cta-media {
       min-height: 0;
+      aspect-ratio: 4 / 5;
       max-width: 460px;
       margin: 0 auto;
       width: 100%;
-    }
-    .home-cta-media img {
-      height: auto;
-      object-fit: contain;
     }
   }
 
@@ -491,6 +491,7 @@ const CSS = `
     padding-bottom: 4px;
   }
   .home-strip-link {
+    position: relative;
     display: block;
     min-width: 120px;
     aspect-ratio: 1;
@@ -748,7 +749,19 @@ export default async function ProfessionalHomePage() {
 
   function resolveSettingsCover(key: string, fallback: PortfolioImage | undefined): CoverImage | undefined {
     const url = settings[key];
-    if (url) return { image_url: url, alt: key.replace("home_cover_", "") };
+    if (url) {
+      return {
+        image_url: url,
+        alt: getPhotoAlt({
+          alt: key.includes("families")
+            ? "Bay Area family photography session"
+            : key.includes("grads")
+            ? "Bay Area graduation photography session"
+            : "Bay Area portrait photography session",
+          categorySlug: key.includes("families") ? "families" : key.includes("grads") ? "grads" : "portfolio",
+        }),
+      };
+    }
     return fallback;
   }
 
@@ -774,8 +787,19 @@ export default async function ProfessionalHomePage() {
   const carouselImages   = images.filter((img) => img.hero_carousel).slice(0, 5);
   const heroImages       = carouselImages.length > 0 ? carouselImages : images.slice(0, 5);
   const instagramImages  = images.slice(0, 8);
-  const firstPortfolioImage  = settings.home_editorial_large ?? portfolioSections[0]?.cover?.image_url ?? heroImageUrl;
-  const secondPortfolioImage = settings.home_editorial_small ?? portfolioSections[1]?.cover?.image_url ?? heroImageUrl;
+  const firstPortfolioImage = {
+    image_url: settings.home_editorial_large ?? portfolioSections[0]?.cover?.image_url ?? heroImageUrl,
+    alt: "Bay Area portrait session by soloxsnaps",
+  };
+  const secondPortfolioImage = {
+    image_url: settings.home_editorial_small ?? portfolioSections[1]?.cover?.image_url ?? heroImageUrl,
+    alt: "Family or graduation session detail by soloxsnaps",
+  };
+  const ctaImageUrl = selectDistinctImageUrl(images, [
+    heroImageUrl,
+    firstPortfolioImage.image_url,
+    secondPortfolioImage.image_url,
+  ], heroImageUrl);
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -847,7 +871,11 @@ export default async function ProfessionalHomePage() {
               <Link key={category.slug} href={`/portfolio?category=${category.slug}`} className="home-card glass-shimmer" data-reveal data-delay={String(i + 1)}>
                 {cover && (
                   <div className="home-card-media">
-                    <img src={cover.image_url} alt={cover.alt} loading="lazy" decoding="async" />
+                    <OptimizedPhoto
+                      src={cover.image_url}
+                      alt={cover.alt}
+                      sizes="(max-width: 760px) 50vw, 33vw"
+                    />
                   </div>
                 )}
                 <div className="home-card-body">
@@ -863,7 +891,11 @@ export default async function ProfessionalHomePage() {
 
             <Link href="/contact" className="home-card glass-shimmer" data-reveal data-delay="3">
               <div className="home-card-media">
-                <img src={settings.home_cover_contact ?? heroImageUrl} alt="Book a Bay Area photography session" loading="lazy" decoding="async" />
+                <OptimizedPhoto
+                  src={settings.home_cover_contact ?? heroImageUrl}
+                  alt="Book a Bay Area photography session"
+                  sizes="(max-width: 760px) 50vw, 33vw"
+                />
               </div>
               <div className="home-card-body">
                 <p className="home-card-kicker">Booking</p>
@@ -903,10 +935,18 @@ export default async function ProfessionalHomePage() {
             </div>
             <div className="home-editorial-media" aria-label="Featured photography" data-reveal data-delay="2">
               <div className="home-stacked-photo" data-size="large">
-                <img src={firstPortfolioImage}  alt="Bay Area portrait session" loading="lazy" decoding="async" />
+                <OptimizedPhoto
+                  src={firstPortfolioImage.image_url}
+                  alt={firstPortfolioImage.alt}
+                  sizes="(max-width: 920px) 95vw, 50vw"
+                />
               </div>
               <div className="home-stacked-photo" data-size="small">
-                <img src={secondPortfolioImage} alt="Family or graduation session detail" loading="lazy" decoding="async" />
+                <OptimizedPhoto
+                  src={secondPortfolioImage.image_url}
+                  alt={secondPortfolioImage.alt}
+                  sizes="(max-width: 920px) 35vw, 24vw"
+                />
               </div>
             </div>
           </div>
@@ -1004,7 +1044,13 @@ export default async function ProfessionalHomePage() {
               </div>
             </div>
             <div className="home-cta-media">
-              <img src={heroImageUrl} alt="Graduation portrait by soloxsnaps" loading="lazy" decoding="async" />
+              {ctaImageUrl && (
+                <OptimizedPhoto
+                  src={ctaImageUrl}
+                  alt="Bay Area portrait by soloxsnaps"
+                  sizes="(max-width: 920px) 90vw, 38vw"
+                />
+              )}
             </div>
           </div>
         </div>
@@ -1037,7 +1083,12 @@ export default async function ProfessionalHomePage() {
                   rel="noopener noreferrer"
                   className="home-strip-link"
                 >
-                  <img src={image.image_url} alt={image.alt} loading="lazy" decoding="async" />
+                  <OptimizedPhoto
+                    src={image.image_url}
+                    alt={image.alt}
+                    sizes="(max-width: 540px) 25vw, 13vw"
+                    quality={75}
+                  />
                 </a>
               ))}
             </div>

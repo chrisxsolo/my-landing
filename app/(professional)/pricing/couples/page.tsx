@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 import { getPortfolioData, getSiteSettings } from "@/lib/professionalData";
 import { pricingCSS, anim } from "@/lib/proStyles";
 import CouplesRateEstimator from "@/app/components/CouplesRateEstimator";
@@ -81,7 +82,18 @@ export default async function CouplesPricingPage() {
     <main className="pricing-modern">
       <style>{CSS + COUPLES_CSS}</style>
 
-      <section className="pricing-hero-dark" style={heroImage ? { backgroundImage: `url(${heroImage})` } : {}}>
+      <section className="pricing-hero-dark">
+        {heroImage && (
+          <div className="pricing-hero-photo" aria-hidden="true">
+            <OptimizedPhoto
+              src={heroImage}
+              alt=""
+              sizes="100vw"
+              priority
+              quality={90}
+            />
+          </div>
+        )}
         <div className="pricing-shell">
           <p className="pricing-kicker">Couples photography</p>
           <h1 className="pricing-title">Couples photos that actually feel like you</h1>
@@ -118,7 +130,7 @@ export default async function CouplesPricingPage() {
       <section className="pricing-shell couples-intro">
         <h2 className="couples-intro-heading">Couples Photography</h2>
         <p className="couples-intro-copy">
-          Whether you're celebrating an anniversary, looking for romantic lifestyle portraits around San Francisco, planning engagement photos for your save-the-dates, or setting up a surprise proposal, I offer couples photography sessions designed around your timeline and vision. All sessions take place in real Bay Area locations — parks, waterfront spots, urban neighborhoods, and beyond. Every package includes guided posing so you're never standing there guessing what to do with your hands.
+          Whether you&apos;re celebrating an anniversary, looking for romantic lifestyle portraits around San Francisco, planning engagement photos for your save-the-dates, or setting up a surprise proposal, I offer couples photography sessions designed around your timeline and vision. All sessions take place in real Bay Area locations — parks, waterfront spots, urban neighborhoods, and beyond. Every package includes guided posing so you&apos;re never standing there guessing what to do with your hands.
         </p>
         <p className="couples-intro-copy" style={{ marginTop: 14 }}>
           I usually recommend scheduling closer to sunset when possible for the best lighting, but timing can depend on the location and overall session plan.
