@@ -21,11 +21,12 @@ const CLIENT_DASHBOARD_HREF = "/dashboard";
 const CONTACT_HREF = "/contact";
 
 const primaryLinks = [
-  { label: "Home",    href: "/" },
-  { label: "Dates",   href: "/availability" },
-  { label: "About",   href: "/about" },
-  { label: "FAQ",     href: "/faq" },
-  { label: "Journal", href: "/blog" },
+  { label: "Home",       href: "/" },
+  { label: "Dates",      href: "/availability" },
+  { label: "Grad guide", href: "/grad-guide" },
+  { label: "About",      href: "/about" },
+  { label: "FAQ",        href: "/faq" },
+  { label: "Journal",    href: "/blog" },
 ];
 
 const portfolioLinks = [

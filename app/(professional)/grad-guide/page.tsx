@@ -1,6 +1,7 @@
 // GRAD GUIDE HUB  →  soloxsnaps.com/grad-guide
 // Server component — exports metadata + breadcrumb JSON-LD.
 // Interactive content (Supabase gallery) lives in GradGuideClient.tsx.
+// Lives on the professional site and renders inside ProfessionalLayout.
 
 import type { Metadata } from "next";
 import GradGuideClient from "./GradGuideClient";

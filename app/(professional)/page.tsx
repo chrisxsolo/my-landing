@@ -298,6 +298,43 @@ const CSS = `
   }
 
   /* ═══════════════════════════════════════════════════════════════════════════
+     GRAD GUIDE SECTION — white bg, frosted glass cards linking into /grad-guide
+     ═══════════════════════════════════════════════════════════════════════════ */
+  .home-guide {
+    background: #ffffff;
+    padding: 80px 0 88px;
+    border-top: 1px solid rgba(18, 24, 22, 0.06);
+  }
+  .home-guide-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+    margin-top: 30px;
+  }
+  .home-guide-card {
+    position: relative;
+    display: block;
+    overflow: hidden;
+    padding: 22px;
+    border-radius: 13px;
+    background: rgba(255, 255, 255, 0.86);
+    border: 1px solid rgba(18, 24, 22, 0.08);
+    box-shadow: 0 6px 20px rgba(18, 24, 22, 0.05);
+    text-decoration: none;
+    transition: transform 0.22s cubic-bezier(0.22,1,0.36,1), box-shadow 0.22s ease, border-color 0.22s ease;
+  }
+  .home-guide-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 18px 40px rgba(18, 24, 22, 0.10);
+    border-color: rgba(112, 139, 133, 0.32);
+  }
+  .home-guide-emoji { display: block; margin-bottom: 12px; font-size: 28px; }
+  .home-guide-card h3 { margin: 0 0 6px; color: #101412; font-size: 17px; font-weight: 860; letter-spacing: -0.01em; }
+  .home-guide-card p { margin: 0; color: #4b5a55; font-size: 14px; line-height: 1.55; }
+  .home-guide-arrow { position: absolute; top: 18px; right: 18px; color: rgba(112, 139, 133, 0.5); font-size: 15px; transition: color 0.2s ease, transform 0.2s ease; }
+  .home-guide-card:hover .home-guide-arrow { color: #3d6b5e; transform: translate(2px, -2px); }
+
+  /* ═══════════════════════════════════════════════════════════════════════════
      EDITORIAL SECTION — white bg, stacked photos + copy
      ═══════════════════════════════════════════════════════════════════════════ */
   .home-editorial {
@@ -904,6 +941,43 @@ export default async function ProfessionalHomePage() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── GRAD GUIDE ────────────────────────────────────────────────────────────
+           White bg. Frosted glass cards linking into the free /grad-guide hub.
+           To edit cards: change the guideChapters array below. */}
+      <section className="home-guide" aria-label="Free graduation photo guide">
+        <div className="home-shell">
+          <div className="home-services-header">
+            <div>
+              <p className="home-kicker">Free graduation guide 🎓</p>
+              <h2 className="home-title">Show up ready for your grad shoot.</h2>
+            </div>
+            <p className="home-copy">
+              Posing, outfits, prep, and the best Bay Area campus spots — everything you need before we shoot, free to read.
+            </p>
+          </div>
+
+          <div className="home-guide-grid">
+            {[
+              { href: "/grad-guide/posing",        emoji: "📸", title: "Posing Guide",   copy: "Natural, flattering poses that actually look good on camera." },
+              { href: "/grad-guide/what-to-wear",  emoji: "👗", title: "What to Wear",    copy: "Colors and fits that photograph beautifully under cap and gown." },
+              { href: "/grad-guide/how-to-prepare", emoji: "✅", title: "How to Prepare", copy: "Everything to do before shoot day so you feel confident and ready." },
+            ].map((chapter, i) => (
+              <Link key={chapter.href} href={chapter.href} className="home-guide-card glass-shimmer" data-reveal data-delay={String(i + 1)}>
+                <span className="home-guide-arrow" aria-hidden="true">↗</span>
+                <span className="home-guide-emoji">{chapter.emoji}</span>
+                <h3>{chapter.title}</h3>
+                <p>{chapter.copy}</p>
+              </Link>
+            ))}
+          </div>
+
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 24 }}>
+            <Link href="/grad-guide" className="home-link home-link--green">Open the full guide</Link>
+            <Link href="/grads" className="home-link home-link--ghost">Browse campus spots</Link>
           </div>
         </div>
       </section>

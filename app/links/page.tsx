@@ -41,7 +41,6 @@ const DRAFT_LINKS: Link[] = [
   { id:2, label:"Graduation Pricing",   url:"https://soloxsnaps.com/gradpricing",  emoji:"💰", description:"Packages and rates for grad sessions", active:true, order:2 },
   { id:3, label:"Check My Availability",url:"https://chrissolo.dev/availability",  emoji:"📅", description:"See what dates I have open",           active:true, order:3 },
   { id:4, label:"Website",              url:"https://soloxsnaps.com",              emoji:"🌐", description:"View more of my work",                 active:true, order:4 },
-  { id:5, label:"Graduation Guide",     url:"https://chrissolo.dev/grad-guide",    emoji:"🎓", description:"Poses, outfits, and prep tips",        active:true, order:5 },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
