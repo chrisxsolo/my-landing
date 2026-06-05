@@ -44,9 +44,17 @@ import { uploadImage } from "@/lib/uploadImage";
 import {
   GRAD_LOCATION_OPTIONS,
   GRAD_SCHOOL_OPTIONS,
+  GRAD_SESSION_OPTIONS,
+  GRAD_DEGREE_OPTIONS,
+  GRAD_YEAR_OPTIONS,
+  GRAD_ATTIRE_OPTIONS,
   buildPortfolioSeoDescription,
   type GradLocationOption,
   type GradSchoolOption,
+  type GradSessionOption,
+  type GradDegreeOption,
+  type GradYearOption,
+  type GradAttireOption,
 } from "@/lib/portfolioSeoDescription";
 import {
   findMatchingClientSession,
@@ -74,11 +82,11 @@ function fmt12h(t:string|null):string{
 }
 type PortfolioCategory = { id:number; name:string; slug:string; description:string|null; sort_order:number; active:boolean; };
 type PortfolioImage = { id:number; title:string; alt:string|null; image_url:string; category_id:number|null; category_slug:string; featured:boolean; hero_carousel:boolean; sort_order:number; created_at:string|null; };
-type PortfolioSeoDraft = { school: GradSchoolOption|null; location: GradLocationOption|null; goldenHour: boolean; };
+type PortfolioSeoDraft = { school: GradSchoolOption|null; location: GradLocationOption|null; session: GradSessionOption|null; degree: GradDegreeOption|null; year: GradYearOption|null; attire: GradAttireOption|null; goldenHour: boolean; };
 
 const EMPTY_CATEGORY = {name:"",slug:"",description:"",sort_order:"1",active:true};
 const EMPTY_PORTFOLIO = {title:"",alt:"",category_slug:"graduation",featured:false,sort_order:""};
-const EMPTY_PORTFOLIO_SEO_DRAFT: PortfolioSeoDraft = {school:null,location:null,goldenHour:false};
+const EMPTY_PORTFOLIO_SEO_DRAFT: PortfolioSeoDraft = {school:null,location:null,session:null,degree:null,year:null,attire:null,goldenHour:false};
 const WEBSITE_TABS:Tab[]=["poses","locations","bayGuide","portfolio","categories","blog","library"];
 const CLIENT_TABS:Tab[]=["inquiries","clients","analytics","payments","funnel","ai","chat","format"];
 const VAULT_TABS:Tab[]=["vault"];
@@ -1851,6 +1859,54 @@ function AdminDashboard() {
                                       className="text-xs font-bold px-2.5 py-1.5 rounded-lg border transition-colors"
                                       style={portfolioSeoDraft.location===location?{background:C.p1,color:C.white,borderColor:C.p1}:{background:C.white,color:C.inkSoft,borderColor:C.borderSubtle}}>
                                       {location}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                              <div>
+                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Session</p>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {GRAD_SESSION_OPTIONS.map(session=>(
+                                    <button key={session} onClick={()=>setPortfolioSeoDraft(d=>({...d,session:d.session===session?null:session}))}
+                                      className="text-xs font-bold px-2.5 py-1.5 rounded-lg border transition-colors"
+                                      style={portfolioSeoDraft.session===session?{background:C.p2,color:C.white,borderColor:C.p2}:{background:C.white,color:C.inkSoft,borderColor:C.borderSubtle}}>
+                                      {session}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                              <div>
+                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Degree</p>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {GRAD_DEGREE_OPTIONS.map(degree=>(
+                                    <button key={degree} onClick={()=>setPortfolioSeoDraft(d=>({...d,degree:d.degree===degree?null:degree}))}
+                                      className="text-xs font-bold px-2.5 py-1.5 rounded-lg border transition-colors"
+                                      style={portfolioSeoDraft.degree===degree?{background:C.p2,color:C.white,borderColor:C.p2}:{background:C.white,color:C.inkSoft,borderColor:C.borderSubtle}}>
+                                      {degree}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                              <div>
+                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Class year</p>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {GRAD_YEAR_OPTIONS.map(year=>(
+                                    <button key={year} onClick={()=>setPortfolioSeoDraft(d=>({...d,year:d.year===year?null:year}))}
+                                      className="text-xs font-bold px-2.5 py-1.5 rounded-lg border transition-colors"
+                                      style={portfolioSeoDraft.year===year?{background:C.p2,color:C.white,borderColor:C.p2}:{background:C.white,color:C.inkSoft,borderColor:C.borderSubtle}}>
+                                      {year}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                              <div>
+                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Attire</p>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {GRAD_ATTIRE_OPTIONS.map(attire=>(
+                                    <button key={attire} onClick={()=>setPortfolioSeoDraft(d=>({...d,attire:d.attire===attire?null:attire}))}
+                                      className="text-xs font-bold px-2.5 py-1.5 rounded-lg border transition-colors"
+                                      style={portfolioSeoDraft.attire===attire?{background:C.p2,color:C.white,borderColor:C.p2}:{background:C.white,color:C.inkSoft,borderColor:C.borderSubtle}}>
+                                      {attire}
                                     </button>
                                   ))}
                                 </div>

@@ -10,6 +10,10 @@ type RequestBody = {
   imageId?: unknown;
   school?: unknown;
   location?: unknown;
+  session?: unknown;
+  degree?: unknown;
+  year?: unknown;
+  attire?: unknown;
   goldenHour?: unknown;
 };
 
@@ -53,6 +57,10 @@ async function polishWithAi(fallback: { title: string; alt: string }, body: Requ
           fallback,
           school: body.school,
           location: body.location,
+          session: body.session,
+          degree: body.degree,
+          year: body.year,
+          attire: body.attire,
           goldenHour: body.goldenHour === true,
         }),
       },

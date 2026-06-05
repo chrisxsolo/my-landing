@@ -4,9 +4,14 @@ import { supabase } from "@/lib/supabase";
 import { C } from "@/lib/colors";
 import { uploadImage } from "@/lib/uploadImage";
 import { buildJournalImageLibraryRows } from "@/lib/imageLibraryShared";
+import { GRAD_SCHOOL_OPTIONS, GRAD_LOCATION_OPTIONS, GRAD_SESSION_OPTIONS } from "@/lib/portfolioSeoDescription";
 
 type BlogCategory = "journal" | "professional";
-type BlogPost = { id: number; title: string; body: string; published_at: string; slug: string; cover_image_url: string | null; extra_image_urls: string[]; category?: BlogCategory | string | null; sites?: string[] | null };
+type BlogPost = { id: number; title: string; body: string; published_at: string; slug: string; cover_image_url: string | null; extra_image_urls: string[]; category?: BlogCategory | string | null; sites?: string[] | null; meta_description?: string | null; meta_keywords?: string | null };
+
+// Clickable keyword chips for blog SEO — same vocabulary as the photo SEO tagger.
+const BLOG_KEYWORD_OPTIONS: readonly string[] = [...GRAD_SCHOOL_OPTIONS, ...GRAD_LOCATION_OPTIONS, ...GRAD_SESSION_OPTIONS];
+const META_DESCRIPTION_MAX = 155;
 type Props = { showToast: (msg: string, ok?: boolean) => void };
 
 const card = "bg-white rounded-2xl border border-slate-100 overflow-hidden";
@@ -72,7 +77,7 @@ async function compressForAI(file: File, maxPx = 900, quality = 0.75): Promise<B
 }
 
 export default function BlogTab({ showToast }: Props) {
-  const EMPTY_POST = { title: "", body: "", slug: "", category: "professional" as BlogCategory, sites: ["professional"] as string[], published_at: new Date().toISOString().slice(0, 16) };
+  const EMPTY_POST = { title: "", body: "", slug: "", category: "professional" as BlogCategory, sites: ["professional"] as string[], published_at: new Date().toISOString().slice(0, 16), meta_description: "", meta_keywords: "" };
 
   const [posts, setPosts] = useState<BlogPost[]>([]);
   const [postsLoading, setPostsLoading] = useState(false);
@@ -110,7 +115,7 @@ export default function BlogTab({ showToast }: Props) {
 
   function startEditPost(post: BlogPost) {
     setEditingPost(post);
-    setPostForm({ title: post.title, body: post.body, slug: post.slug, category: "professional", sites: ["professional"], published_at: post.published_at.slice(0, 16) });
+    setPostForm({ title: post.title, body: post.body, slug: post.slug, category: "professional", sites: ["professional"], published_at: post.published_at.slice(0, 16), meta_description: post.meta_description ?? "", meta_keywords: post.meta_keywords ?? "" });
     setCoverImg(null); setCoverImgPreview(post.cover_image_url || null);
     setExtraImgs([]); setExtraPreviews(post.extra_image_urls ?? []);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -217,7 +222,7 @@ export default function BlogTab({ showToast }: Props) {
     const existingKept = existingExtras.filter(url => extraPreviews.includes(url));
     const extra_image_urls = [...existingKept, ...newExtraUrls];
     const sites = ["professional"];
-    const payload = { title: postForm.title, body: postForm.body, slug, category: "professional", sites, cover_image_url, extra_image_urls, published_at: new Date(postForm.published_at).toISOString() };
+    const payload = { title: postForm.title, body: postForm.body, slug, category: "professional", sites, cover_image_url, extra_image_urls, published_at: new Date(postForm.published_at).toISOString(), meta_description: postForm.meta_description.trim() || null, meta_keywords: postForm.meta_keywords.trim() || null };
     if (editingPost) {
       const { error } = await supabase.from("blog_posts").update(payload).eq("id", editingPost.id);
       if (error) showToast("Update failed", false);
@@ -236,6 +241,13 @@ export default function BlogTab({ showToast }: Props) {
     setPostDeleteConfirm(null);
     if (editingPost?.id === id) cancelEditPost();
     showToast("Post deleted");
+  }
+
+  const keywordList = postForm.meta_keywords.split(",").map(k => k.trim()).filter(Boolean);
+  function toggleKeyword(kw: string) {
+    const exists = keywordList.some(k => k.toLowerCase() === kw.toLowerCase());
+    const next = exists ? keywordList.filter(k => k.toLowerCase() !== kw.toLowerCase()) : [...keywordList, kw];
+    setPostForm(f => ({ ...f, meta_keywords: next.join(", ") }));
   }
 
   return (
@@ -333,6 +345,34 @@ export default function BlogTab({ showToast }: Props) {
               <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1.5">Body</label>
               <textarea className={ta} rows={8} placeholder={"Write your shoot story here...\n\nUse blank lines between paragraphs — each one becomes its own paragraph on the post page."} value={postForm.body} onChange={e => setPostForm(f => ({ ...f, body: e.target.value }))} />
               <p className="text-xs text-slate-400 mt-1">Separate paragraphs with a blank line.</p>
+            </div>
+
+            {/* SEO */}
+            <div className="rounded-xl p-4 space-y-3" style={{ background: C.p1_04, border: `1.5px dashed ${C.p1_20}` }}>
+              <label className="block text-xs font-bold uppercase tracking-widest" style={{ color: C.p1 }}>SEO</label>
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="block text-xs font-bold uppercase tracking-widest text-slate-400">Meta description</span>
+                  <span className="text-xs font-bold" style={{ color: postForm.meta_description.length > META_DESCRIPTION_MAX ? "#be123c" : C.p1 }}>{postForm.meta_description.length}/{META_DESCRIPTION_MAX}</span>
+                </div>
+                <textarea className={ta} rows={2} placeholder="One or two sentences that show under the title in Google. If blank, the post body is used." value={postForm.meta_description} onChange={e => setPostForm(f => ({ ...f, meta_description: e.target.value }))} />
+              </div>
+              <div>
+                <span className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1.5">Tags / keywords</span>
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {BLOG_KEYWORD_OPTIONS.map(kw => {
+                    const active = keywordList.some(k => k.toLowerCase() === kw.toLowerCase());
+                    return (
+                      <button key={kw} type="button" onClick={() => toggleKeyword(kw)}
+                        className="text-xs font-bold px-2.5 py-1.5 rounded-lg border transition-colors"
+                        style={active ? { background: C.p1, color: C.white, borderColor: C.p1 } : { background: C.white, color: C.inkSoft, borderColor: C.borderSubtle }}>
+                        {kw}
+                      </button>
+                    );
+                  })}
+                </div>
+                <input className={inp} placeholder="Comma-separated keywords (tap chips above or type your own)" value={postForm.meta_keywords} onChange={e => setPostForm(f => ({ ...f, meta_keywords: e.target.value }))} />
+              </div>
             </div>
 
             {/* Extra photos */}
