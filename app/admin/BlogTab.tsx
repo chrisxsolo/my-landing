@@ -451,9 +451,9 @@ export default function BlogTab({ showToast }: Props) {
                           <p className="text-xs text-slate-400">{(post.sites && post.sites.length > 0 ? post.sites : [post.category === "professional" ? "professional" : "journal"]).map(s => s === "professional" ? "Professional" : "Journal").join(" + ")} · {new Date(post.published_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} · {(post.extra_image_urls?.length ?? 0) + 1} photo{(post.extra_image_urls?.length ?? 0) > 0 ? "s" : ""}</p>
                         </div>
                         <div className="flex gap-2 flex-shrink-0 flex-wrap">
-                          {(post.sites && post.sites.length > 0 ? post.sites : [post.category === "professional" ? "professional" : "journal"]).map(site => (
-                            <a key={site} href={`${site === "professional" ? "/blog" : "/journal"}/${post.slug}`} target="_blank" className="text-xs font-bold px-3 py-1.5 rounded-lg" style={{ background: C.p1_08, color: C.p1 }}>{site === "professional" ? "Blog →" : "Journal →"}</a>
-                          ))}
+                          {(post.sites && post.sites.length > 0 ? post.sites : [post.category === "professional" ? "professional" : "journal"]).includes("professional") && (
+                            <a href={`/blog/${post.slug}`} target="_blank" className="text-xs font-bold px-3 py-1.5 rounded-lg" style={{ background: C.p1_08, color: C.p1 }}>Blog →</a>
+                          )}
                           <button onClick={() => generateSeoForPost(post)} disabled={seoGeneratingId === post.id} title="Analyze photos + text and write SEO metadata" className="text-xs font-bold px-3 py-1.5 rounded-lg" style={{ background: C.p3_10, color: C.ink, opacity: seoGeneratingId === post.id ? 0.6 : 1 }}>{seoGeneratingId === post.id ? "✨ Generating…" : "✨ SEO"}</button>
                           {editingPost?.id !== post.id && <button onClick={() => startEditPost(post)} className="text-xs font-bold px-3 py-1.5 rounded-lg" style={{ background: C.p2_08, color: C.p2 }}>Edit</button>}
                           {postDeleteConfirm === post.id ? (
