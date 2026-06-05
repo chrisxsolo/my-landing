@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
 export type AvailDate = {
@@ -16,6 +16,13 @@ function getDaysInMonth(year: number, month: number) { return new Date(year, mon
 function getFirstDay(year: number, month: number)    { return new Date(year, month, 1).getDay(); }
 function toStr(year: number, month: number, day: number) {
   return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+function isoFromDate(d: Date) {
+  return toStr(d.getFullYear(), d.getMonth(), d.getDate());
+}
+// Same day-of-month in a (year, month), clamped to the last valid day.
+function isoFromYMD(year: number, month: number, day: number) {
+  return toStr(year, month, Math.min(day, getDaysInMonth(year, month)));
 }
 function formatDate(date: string) {
   return new Date(`${date}T12:00:00`).toLocaleDateString("en-US", {
@@ -179,6 +186,8 @@ const CSS = `
     gap: 6px; padding: 12px 16px 16px;
   }
   .avail-blank { aspect-ratio: 1; }
+  /* Grid rows: contents so the day buttons stay grid items of .avail-grid */
+  .avail-week { display: contents; }
 
   /* Base date button */
   .avail-date-btn {
@@ -348,6 +357,21 @@ export default function AvailabilityCalendar({ initialDates }: { initialDates: A
   const [year, setYear]         = useState(today.getFullYear());
   const [dates]                 = useState<AvailDate[]>(initialDates);
   const [selected, setSelected] = useState<AvailDate | null>(null);
+  // Roving-tabindex target: the single grid cell reachable with Tab. Arrow keys
+  // move it; the displayed month is always kept in sync so it stays rendered.
+  const [activeDate, setActiveDate] = useState(() => isoFromDate(today));
+  const gridRef        = useRef<HTMLDivElement>(null);
+  const focusActiveRef = useRef(false);
+
+  // Move focus to the active cell only after a keyboard-driven change, so we
+  // never steal focus on mount or when the month is changed by mouse.
+  useEffect(() => {
+    if (!focusActiveRef.current) return;
+    focusActiveRef.current = false;
+    gridRef.current
+      ?.querySelector<HTMLButtonElement>(`[data-date="${activeDate}"]`)
+      ?.focus();
+  }, [activeDate]);
 
   useEffect(() => {
     const link = document.createElement("link");
@@ -373,8 +397,80 @@ export default function AvailabilityCalendar({ initialDates }: { initialDates: A
     ? selected.status === "available" ? "Available" : selected.status === "hold" ? "On hold" : "Booked"
     : "Pick a date";
 
-  const prevMonth = () => { setSelected(null); if (month === 0) { setMonth(11); setYear((v) => v - 1); } else { setMonth((v) => v - 1); } };
-  const nextMonth = () => { setSelected(null); if (month === 11) { setMonth(0); setYear((v) => v + 1); } else { setMonth((v) => v + 1); } };
+  // Build calendar cells (leading blanks + days, padded to whole weeks) so the
+  // grid can be rendered as role="grid" rows of role="gridcell" cells.
+  type Cell = { kind: "blank"; key: string } | { kind: "day"; day: number; key: string };
+  const cells: Cell[] = [
+    ...Array.from({ length: firstDay }, (_, i): Cell => ({ kind: "blank", key: `blank-${i}` })),
+    ...Array.from({ length: daysInMonth }, (_, i): Cell => ({ kind: "day", day: i + 1, key: `day-${i + 1}` })),
+  ];
+  while (cells.length % 7 !== 0) cells.push({ kind: "blank", key: `tail-${cells.length}` });
+  const weeks: Cell[][] = [];
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+
+  // Single funnel for changing the roving target. Always syncs the displayed
+  // month so the active date is rendered; focus moves only on keyboard nav.
+  const moveActive = (iso: string, focus: boolean) => {
+    const [y, m] = iso.split("-").map(Number);
+    setActiveDate(iso);
+    setYear(y);
+    setMonth(m - 1);
+    if (focus) focusActiveRef.current = true;
+  };
+
+  const isClickable = (dateStr: string) => {
+    const entry = dateMap[dateStr];
+    return Boolean(entry && dateStr >= todayStr && entry.status !== "booked");
+  };
+
+  // Click / Enter / Space: make the date active, and select it if bookable.
+  const selectDate = (dateStr: string) => {
+    moveActive(dateStr, false);
+    if (!isClickable(dateStr)) return;
+    setSelected((prev) => (prev?.date === dateStr ? null : dateMap[dateStr]));
+  };
+
+  const changeMonth = (dir: -1 | 1) => {
+    let m = month + dir;
+    let y = year;
+    if (m < 0)  { m = 11; y -= 1; }
+    if (m > 11) { m = 0;  y += 1; }
+    setSelected(null);
+    moveActive(isoFromYMD(y, m, Number(activeDate.split("-")[2])), false);
+  };
+  const prevMonth = () => changeMonth(-1);
+  const nextMonth = () => changeMonth(1);
+
+  // PageUp/PageDown: keep the same day-of-month (clamped) and move focus.
+  const changeMonthFocused = (dir: -1 | 1) => {
+    let m = month + dir;
+    let y = year;
+    if (m < 0)  { m = 11; y -= 1; }
+    if (m > 11) { m = 0;  y += 1; }
+    moveActive(isoFromYMD(y, m, Number(activeDate.split("-")[2])), true);
+  };
+
+  // Roving-tabindex keyboard model. Enter/Space activation is left to the native
+  // <button> (it fires onClick), so this only handles movement keys.
+  const handleGridKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "PageUp" || e.key === "PageDown") {
+      e.preventDefault();
+      changeMonthFocused(e.key === "PageUp" ? -1 : 1);
+      return;
+    }
+    const d = new Date(activeDate + "T12:00:00");
+    switch (e.key) {
+      case "ArrowLeft":  d.setDate(d.getDate() - 1); break;
+      case "ArrowRight": d.setDate(d.getDate() + 1); break;
+      case "ArrowUp":    d.setDate(d.getDate() - 7); break;
+      case "ArrowDown":  d.setDate(d.getDate() + 7); break;
+      case "Home":       d.setDate(d.getDate() - d.getDay()); break;       // Sunday of this week
+      case "End":        d.setDate(d.getDate() + (6 - d.getDay())); break; // Saturday of this week
+      default: return;
+    }
+    e.preventDefault();
+    moveActive(isoFromDate(d), true);
+  };
 
   return (
     <>
@@ -412,7 +508,7 @@ export default function AvailabilityCalendar({ initialDates }: { initialDates: A
           <div className="avail-calendar" data-reveal>
             <div className="avail-cal-head">
               <button className="avail-nav" onClick={prevMonth} aria-label="Previous month">{"<"}</button>
-              <div>
+              <div aria-live="polite" aria-atomic="true">
                 <h2 className="avail-month">{MONTHS[month]} {year}</h2>
                 <p className="avail-month-meta">{availCount > 0 ? `${availCount} open dates` : "No marked openings yet"}</p>
               </div>
@@ -423,35 +519,52 @@ export default function AvailabilityCalendar({ initialDates }: { initialDates: A
               {DAYS.map((d) => <div key={d} className="avail-day-label">{d}</div>)}
             </div>
 
-            <div className="avail-grid">
-              {Array.from({ length: firstDay }).map((_, i) => <div key={`blank-${i}`} className="avail-blank" />)}
-              {Array.from({ length: daysInMonth }).map((_, i) => {
-                const day        = i + 1;
-                const dateStr    = toStr(year, month, day);
-                const entry      = dateMap[dateStr];
-                const isPast     = dateStr < todayStr;
-                const isToday    = dateStr === todayStr;
-                const isSelected = selected?.date === dateStr;
-                const clickable  = Boolean(entry && !isPast && entry.status !== "booked");
-                return (
-                  <button
-                    key={dateStr}
-                    className="avail-date-btn"
-                    type="button"
-                    data-status={entry?.status ?? "none"}
-                    data-clickable={clickable}
-                    data-past={isPast}
-                    data-today={isToday}
-                    data-selected={isSelected}
-                    disabled={!clickable}
-                    onClick={() => entry && setSelected(isSelected ? null : entry)}
-                    aria-label={`${MONTHS[month]} ${day}${entry ? `, ${entry.status}` : ""}`}
-                  >
-                    {day}
-                    {!isPast && entry && entry.status !== "booked" && !isSelected && <span className="avail-dot" />}
-                  </button>
-                );
-              })}
+            <div
+              ref={gridRef}
+              className="avail-grid"
+              role="grid"
+              aria-label={`${MONTHS[month]} ${year} availability`}
+              onKeyDown={handleGridKeyDown}
+            >
+              {weeks.map((week, wi) => (
+                <div key={`week-${wi}`} className="avail-week" role="row">
+                  {week.map((cell) => {
+                    if (cell.kind === "blank") {
+                      return <div key={cell.key} className="avail-blank" role="gridcell" />;
+                    }
+                    const day        = cell.day;
+                    const dateStr    = toStr(year, month, day);
+                    const entry      = dateMap[dateStr];
+                    const isPast     = dateStr < todayStr;
+                    const isToday    = dateStr === todayStr;
+                    const isSelected = selected?.date === dateStr;
+                    const isActive   = dateStr === activeDate;
+                    const clickable  = Boolean(entry && !isPast && entry.status !== "booked");
+                    return (
+                      <button
+                        key={dateStr}
+                        className="avail-date-btn"
+                        type="button"
+                        role="gridcell"
+                        data-date={dateStr}
+                        data-status={entry?.status ?? "none"}
+                        data-clickable={clickable}
+                        data-past={isPast}
+                        data-today={isToday}
+                        data-selected={isSelected}
+                        aria-selected={isSelected}
+                        aria-disabled={!clickable}
+                        tabIndex={isActive ? 0 : -1}
+                        onClick={() => selectDate(dateStr)}
+                        aria-label={`${MONTHS[month]} ${day}${entry ? `, ${entry.status}` : ""}`}
+                      >
+                        {day}
+                        {!isPast && entry && entry.status !== "booked" && !isSelected && <span className="avail-dot" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              ))}
             </div>
 
             {/* ── Legend ── */}
@@ -466,7 +579,7 @@ export default function AvailabilityCalendar({ initialDates }: { initialDates: A
 
           {/* ── SIDEBAR ── */}
           <aside className="avail-sidebar" aria-label="Availability details">
-            <div className="avail-sidebar-panel" data-reveal data-delay="2">
+            <div className="avail-sidebar-panel" data-reveal data-delay="2" aria-live="polite" aria-atomic="true">
               <p className="avail-mini-label">{selectedLabel}</p>
               <h2>{selected ? formatDate(selected.date) : "Tap an open date"}</h2>
               <p>
@@ -485,7 +598,9 @@ export default function AvailabilityCalendar({ initialDates }: { initialDates: A
                 }
                 className="avail-link"
               >
-                {selected ? "Book this date →" : "Start inquiry"}
+                {selected
+                  ? selected.status === "hold" ? "Ask about this date →" : "Book this date →"
+                  : "Start inquiry"}
               </Link>
             </div>
 
@@ -495,7 +610,7 @@ export default function AvailabilityCalendar({ initialDates }: { initialDates: A
                 <div className="avail-upcoming">
                   {upcomingDates.map((date) => (
                     <button key={date.date} type="button"
-                      onClick={() => { const [ny, nm] = date.date.split("-").map(Number); setYear(ny); setMonth(nm - 1); setSelected(date); }}>
+                      onClick={() => { moveActive(date.date, false); setSelected(date); }}>
                       <span>{formatDate(date.date)}</span>
                       <span>{date.status === "available" ? "Open" : "Hold"}</span>
                     </button>

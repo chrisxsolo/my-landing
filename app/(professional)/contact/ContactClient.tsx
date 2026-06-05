@@ -214,6 +214,17 @@ const CSS = `
     font-weight: 760;
     line-height: 1.5;
   }
+  .contact-sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
   .contact-sidebar {
     display: grid;
     gap: 14px;
@@ -434,7 +445,7 @@ function ContactForm() {
 
       <section className="contact-shell contact-layout">
         <div className="contact-form-panel">
-          <form onSubmit={handleSubmit} noValidate>
+          <form onSubmit={handleSubmit}>
             {/* Honeypot — hidden from real users; bots fill it and get rejected. */}
             <div aria-hidden="true" style={{ position: "absolute", left: "-9999px", width: 1, height: 1, overflow: "hidden" }}>
               <label htmlFor="website">Website</label>
@@ -613,11 +624,16 @@ function ContactForm() {
               />
             </div>
 
-            {errorMsg && <p className="contact-error">{errorMsg}</p>}
+            {errorMsg && <p className="contact-error" role="alert">{errorMsg}</p>}
 
             <button type="submit" disabled={status === "sending"} className="submit-btn">
               {status === "sending" ? "Sending..." : "Send inquiry"}
             </button>
+
+            {/* Screen-reader-only live region announcing submission progress. */}
+            <p className="contact-sr-only" aria-live="polite">
+              {status === "sending" ? "Sending your inquiry…" : ""}
+            </p>
           </form>
         </div>
 
