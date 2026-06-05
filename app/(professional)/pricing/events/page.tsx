@@ -17,6 +17,10 @@ import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 import { getPortfolioData, getSiteSettings } from "@/lib/professionalData";
 import { pricingCSS, anim } from "@/lib/proStyles";
 
+// Cached/ISR: refreshed at most hourly, or immediately on admin content saves
+// (POST /api/admin/revalidate).
+export const revalidate = 3600;
+
 export const metadata: Metadata = {
   title: "Event Pricing | soloxsnaps",
   description: "Event photography pricing by Chris Solorzano — Bay Area event coverage.",

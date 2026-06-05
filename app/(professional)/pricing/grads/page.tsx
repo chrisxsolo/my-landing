@@ -24,6 +24,10 @@ import { selectDistinctImageUrl } from "@/lib/photoMetadata";
 import { pricingCSS, anim } from "@/lib/proStyles";
 import GraduationRateEstimator from "@/app/components/GraduationRateEstimator";
 
+// Cached/ISR: refreshed at most hourly, or immediately on admin content saves
+// (POST /api/admin/revalidate).
+export const revalidate = 3600;
+
 // ── SEO metadata (tab title + Google description) ────────────────────────────
 export const metadata: Metadata = {
   title: "Grad Pricing | soloxsnaps",

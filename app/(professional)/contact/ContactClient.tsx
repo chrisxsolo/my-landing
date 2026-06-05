@@ -329,6 +329,10 @@ function ContactForm() {
   });
   const [status, setStatus] = useState<"idle" | "sending" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
+  // Anti-bot: honeypot field (humans never fill it) + form render timestamp
+  // (humans take longer than a couple of seconds to submit).
+  const [website, setWebsite] = useState("");
+  const [startedAt] = useState(() => Date.now());
 
   const showSchoolField = !form.sessionType || form.sessionType === "Graduation Portrait";
 
@@ -380,7 +384,7 @@ function ContactForm() {
       const res = await fetch("/api/contact", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, website, renderedAt: startedAt }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -431,6 +435,19 @@ function ContactForm() {
       <section className="contact-shell contact-layout">
         <div className="contact-form-panel">
           <form onSubmit={handleSubmit} noValidate>
+            {/* Honeypot — hidden from real users; bots fill it and get rejected. */}
+            <div aria-hidden="true" style={{ position: "absolute", left: "-9999px", width: 1, height: 1, overflow: "hidden" }}>
+              <label htmlFor="website">Website</label>
+              <input
+                id="website"
+                name="website"
+                type="text"
+                tabIndex={-1}
+                autoComplete="off"
+                value={website}
+                onChange={(e) => setWebsite(e.target.value)}
+              />
+            </div>
             <div className="form-row">
               <div className="contact-field">
                 <label htmlFor="name" className="contact-label">Name *</label>

@@ -8,6 +8,10 @@ import Link from "next/link";
 import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 import { getPortfolioData, getSiteSettings } from "@/lib/professionalData";
 
+// Cached/ISR: refreshed at most hourly, or immediately on admin content saves
+// (POST /api/admin/revalidate).
+export const revalidate = 3600;
+
 export const metadata: Metadata = {
   title: "Rates | soloxsnaps",
   description: "Photography pricing by Chris Solorzano — graduation and family sessions in the Bay Area.",

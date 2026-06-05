@@ -45,6 +45,18 @@ export type BlogPost = {
   extra_image_alts?: string[] | null;
 };
 
+// Exactly the columns normalizeImage reads — avoids select("*") pulling future
+// columns (e.g. updated_at) the public pages never use.
+const PORTFOLIO_IMAGE_COLUMNS =
+  "id,title,alt,image_url,category_id,category_slug,featured,sort_order,created_at,hero_carousel";
+
+// Blog listing/sitemap never render the full article, so omit the heavy `body`
+// column. /blog/[slug] uses getBlogPostBySlug, which still selects everything.
+export type BlogPostSummary = Omit<BlogPost, "body">;
+
+const BLOG_SUMMARY_COLUMNS =
+  "id,title,published_at,slug,cover_image_url,extra_image_urls,category,sites,meta_description,meta_keywords,og_image_url,cover_image_alt,extra_image_alts";
+
 type RawCategory = Partial<PortfolioCategory> & {
   order?: number;
 };
@@ -222,7 +234,7 @@ export async function getPortfolioImages(categories: PortfolioCategory[]) {
     const supabase = createSupabaseServerClient();
     const { data, error } = await supabase
       .from("portfolio_images")
-      .select("*")
+      .select(PORTFOLIO_IMAGE_COLUMNS)
       .order("featured", { ascending: false })
       .order("sort_order", { ascending: true });
 
@@ -257,13 +269,16 @@ export async function getSiteSettings(): Promise<Record<string, string | null>> 
   }
 }
 
-export async function getBlogPostsByCategory(category: "professional" | "journal") {
+// Lists posts for a category without the heavy `body` column — for the listing
+// grid and sitemap, which only need metadata + cover images. /blog/[slug] uses
+// getBlogPostBySlug, which still selects the full row including body.
+export async function getBlogPostSummaries(category: "professional" | "journal") {
   try {
     const supabase = createSupabaseServerClient();
     // Try sites array column first (supports cross-posting)
     const { data, error } = await supabase
       .from("blog_posts")
-      .select("*")
+      .select(BLOG_SUMMARY_COLUMNS)
       .contains("sites", [category])
       .order("published_at", { ascending: false });
 
@@ -271,18 +286,18 @@ export async function getBlogPostsByCategory(category: "professional" | "journal
       // Fall back to legacy single-category column
       const fallback = await supabase
         .from("blog_posts")
-        .select("*")
+        .select(BLOG_SUMMARY_COLUMNS)
         .eq("category", category)
         .order("published_at", { ascending: false });
       if (fallback.error && !isMissingColumnError(fallback.error)) {
-        console.error(`Failed to load ${category} posts`, fallback.error);
+        console.error(`Failed to load ${category} post summaries`, fallback.error);
       }
-      return (fallback.data ?? []) as BlogPost[];
+      return (fallback.data ?? []) as unknown as BlogPostSummary[];
     }
 
-    return (data ?? []) as BlogPost[];
+    return (data ?? []) as unknown as BlogPostSummary[];
   } catch (error) {
-    console.error(`Failed to load ${category} posts`, error);
+    console.error(`Failed to load ${category} post summaries`, error);
     return [];
   }
 }

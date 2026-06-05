@@ -28,6 +28,10 @@ import { useEffect } from "react";
 
 export default function ScrollReveal() {
   useEffect(() => {
+    // Respect the user's reduced-motion preference: skip the reveal entirely so
+    // elements render in their final, visible state (CSS also guards this).
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
     // Add class to <html> — this activates the reveal CSS (safe progressive enhancement)
     document.documentElement.classList.add("js-scroll-reveal");
 

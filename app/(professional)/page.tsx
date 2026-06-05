@@ -27,7 +27,9 @@ import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 import Testimonials from "@/app/components/Testimonials";
 import { getPhotoAlt, selectDistinctImageUrl } from "@/lib/photoMetadata";
 
-export const dynamic = "force-dynamic";
+// Cached/ISR: rebuilt at most hourly, or immediately on admin content saves
+// (POST /api/admin/revalidate).
+export const revalidate = 3600;
 
 const title = "soloxsnaps | Bay Area Couples, Family & Graduation Photographer";
 const description =

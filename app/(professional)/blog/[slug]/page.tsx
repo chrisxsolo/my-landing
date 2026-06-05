@@ -6,7 +6,9 @@ import { getBlogPostBySlug } from "@/lib/professionalData";
 import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
 import { renderPostBody, detectSchoolLink } from "./postBody";
 
-export const dynamic = "force-dynamic";
+// Cached/ISR: rebuilt at most hourly, or immediately on admin post saves
+// (POST /api/admin/revalidate).
+export const revalidate = 3600;
 
 type Props = { params: Promise<{ slug: string }> };
 

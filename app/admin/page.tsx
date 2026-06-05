@@ -780,6 +780,7 @@ function AdminDashboard() {
     setBatchItems([]);
     showToast(`${saved} image${saved!==1?"s":""} uploaded`);
     fetchPortfolioImages();
+    if(saved>0)revalidatePublicSite();
   }
 
   async function importGradPhotos(){
@@ -800,7 +801,12 @@ function AdminDashboard() {
     setImporting(false);
     showToast(`${count} grad photo${count!==1?"s":""} imported`);
     fetchPortfolioImages();
+    if(count>0)revalidatePublicSite();
   }
+
+  // Fire-and-forget: refresh the cached public marketing pages after a content
+  // change so edits show up immediately instead of waiting for hourly ISR.
+  function revalidatePublicSite(){fetch("/api/admin/revalidate",{method:"POST"}).catch(()=>{});}
 
   async function updateSiteSetting(key:string,value:string|null){
     setSettingsSaving(key);
@@ -808,6 +814,7 @@ function AdminDashboard() {
     setSiteSettings(prev=>({...prev,[key]:value}));
     setSettingsSaving(null);
     setCoverPickerKey(null);
+    revalidatePublicSite();
     showToast("Photo selection updated");
   }
 
@@ -870,6 +877,7 @@ function AdminDashboard() {
       await supabase.from('image_library').update({in_portfolio:true}).eq('id',row.id);
       setLibraryImages(p=>p.map(x=>x.id===row.id?{...x,in_portfolio:true}:x));
       fetchPortfolioImages();
+      revalidatePublicSite();
       showToast("Added to portfolio!");
     }
     setLibraryPushingId(null);
@@ -894,14 +902,14 @@ function AdminDashboard() {
     const payload={name:categoryForm.name,slug:slugify(categoryForm.slug),description:categoryForm.description||null,sort_order:parseInt(categoryForm.sort_order)||categories.length+1,active:categoryForm.active};
     if(editingCategory){
       const{error}=await supabase.from('portfolio_categories').update(payload).eq('id',editingCategory.id);
-      if(error)showToast("Category update failed — "+error.message,false);else{showToast("Category updated!");cancelEditCategory();fetchCategories();}
+      if(error)showToast("Category update failed — "+error.message,false);else{showToast("Category updated!");cancelEditCategory();fetchCategories();revalidatePublicSite();}
     }else{
       const{error}=await supabase.from('portfolio_categories').insert(payload);
-      if(error)showToast("Category save failed — "+error.message,false);else{showToast("Category added!");setCategoryForm(EMPTY_CATEGORY);fetchCategories();}
+      if(error)showToast("Category save failed — "+error.message,false);else{showToast("Category added!");setCategoryForm(EMPTY_CATEGORY);fetchCategories();revalidatePublicSite();}
     }
     setCategorySaving(false);
   }
-  async function deleteCategory(id:number){await supabase.from('portfolio_categories').delete().eq('id',id);setCategories(p=>p.filter(x=>x.id!==id));setCategoryDeleteConfirm(null);if(editingCategory?.id===id)cancelEditCategory();showToast("Category deleted");}
+  async function deleteCategory(id:number){await supabase.from('portfolio_categories').delete().eq('id',id);setCategories(p=>p.filter(x=>x.id!==id));setCategoryDeleteConfirm(null);if(editingCategory?.id===id)cancelEditCategory();revalidatePublicSite();showToast("Category deleted");}
 
   function startEditPortfolioImage(image:PortfolioImage){setEditingPortfolioImage(image);setPortfolioForm({title:image.title,alt:image.alt??"",category_slug:image.category_slug,featured:image.featured,sort_order:String(image.sort_order)});setPortfolioFile(null);setPortfolioPreview(image.image_url);window.scrollTo({top:0,behavior:"smooth"});}
   function cancelEditPortfolioImage(){setEditingPortfolioImage(null);setPortfolioForm(EMPTY_PORTFOLIO);setPortfolioFile(null);setPortfolioPreview(null);if(portfolioFileRef.current)portfolioFileRef.current.value="";}
@@ -928,6 +936,7 @@ function AdminDashboard() {
       updatePortfolioImageState(json.image as PortfolioImage);
       setPortfolioSeoEditorId(null);
       setPortfolioSeoDraft(EMPTY_PORTFOLIO_SEO_DRAFT);
+      revalidatePublicSite();
       showToast("SEO description saved");
     }catch(err){
       console.error("[admin] savePortfolioSeoDescription",err);
@@ -946,20 +955,21 @@ function AdminDashboard() {
     const payload={title:portfolioForm.title,alt:portfolioForm.alt||portfolioForm.title,image_url,category_id:category?.id??null,category_slug:portfolioForm.category_slug,featured:portfolioForm.featured,sort_order:parseInt(portfolioForm.sort_order)||editingPortfolioImage?.sort_order||portfolioImages.length+1};
     if(editingPortfolioImage){
       const{error}=await supabase.from('portfolio_images').update(payload).eq('id',editingPortfolioImage.id);
-      if(error)showToast("Portfolio update failed — "+error.message,false);else{showToast("Portfolio image updated!");cancelEditPortfolioImage();fetchPortfolioImages();}
+      if(error)showToast("Portfolio update failed — "+error.message,false);else{showToast("Portfolio image updated!");cancelEditPortfolioImage();fetchPortfolioImages();revalidatePublicSite();}
     }else{
       const{error}=await supabase.from('portfolio_images').insert(payload);
-      if(error)showToast("Portfolio save failed — "+error.message,false);else{showToast("Portfolio image added!");cancelEditPortfolioImage();fetchPortfolioImages();}
+      if(error)showToast("Portfolio save failed — "+error.message,false);else{showToast("Portfolio image added!");cancelEditPortfolioImage();fetchPortfolioImages();revalidatePublicSite();}
     }
     setPortfolioSaving(false);
   }
-  async function deletePortfolioImage(id:number){await supabase.from('portfolio_images').delete().eq('id',id);setPortfolioImages(p=>p.filter(x=>x.id!==id));setPortfolioDeleteConfirm(null);if(editingPortfolioImage?.id===id)cancelEditPortfolioImage();showToast("Portfolio image deleted");}
+  async function deletePortfolioImage(id:number){await supabase.from('portfolio_images').delete().eq('id',id);setPortfolioImages(p=>p.filter(x=>x.id!==id));setPortfolioDeleteConfirm(null);if(editingPortfolioImage?.id===id)cancelEditPortfolioImage();revalidatePublicSite();showToast("Portfolio image deleted");}
 
   async function toggleCarousel(id:number, current:boolean){
     const carouselCount = portfolioImages.filter(i=>i.hero_carousel).length;
     if(!current && carouselCount>=5){showToast("Max 5 carousel images — remove one first",false);return;}
     await supabase.from('portfolio_images').update({hero_carousel:!current}).eq('id',id);
     setPortfolioImages(p=>p.map(x=>x.id===id?{...x,hero_carousel:!current}:x));
+    revalidatePublicSite();
     showToast(!current?"Added to carousel":"Removed from carousel");
   }
 

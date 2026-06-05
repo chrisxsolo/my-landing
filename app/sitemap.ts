@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { getBlogPostsByCategory } from "@/lib/professionalData";
+import { getBlogPostSummaries } from "@/lib/professionalData";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // app/sitemap.ts — programmatic sitemap served at /sitemap.xml
@@ -62,7 +62,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   // Pull dynamic posts. /blog/[slug] is the server-rendered, canonical version
   // of every published entry. (The former /journal section has been retired.)
-  const professional = await getBlogPostsByCategory("professional");
+  const professional = await getBlogPostSummaries("professional");
 
   const blogEntries: MetadataRoute.Sitemap = professional.map((post) => ({
     url: `${SITE_URL}/blog/${post.slug}`,

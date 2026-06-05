@@ -1,13 +1,43 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
+import { rateLimit } from "@/lib/rateLimit";
 
 const DEFAULT_CONTACT_EMAIL_TO = "chrisxsolo2@gmail.com";
 const DEFAULT_CONTACT_EMAIL_FROM = "soloxsnaps contact <onboarding@resend.dev>";
 const DEFAULT_SITE_URL = "https://soloxsnaps.com";
 
+// ── Abuse protection knobs ───────────────────────────────────────────────────
+// Per-field max lengths. Anything over these is almost certainly junk/bot data.
+const MAX_LENGTHS: Record<string, number> = {
+  name: 100,
+  email: 254,
+  phone: 30,
+  instagram: 100,
+  sessionType: 100,
+  school: 150,
+  people: 100,
+  date: 100,
+  preferredTime: 100,
+  location: 200,
+  message: 3000,
+};
+const MAX_BODY_BYTES = 16 * 1024;        // reject oversized payloads before parsing
+const MIN_FILL_MS = 2_500;               // humans take longer than this to fill the form
+const IP_LIMIT = 5;                      // max submissions per IP …
+const IP_WINDOW_MS = 10 * 60 * 1000;     // … per 10 minutes
+const EMAIL_COOLDOWN_MS = 45 * 1000;     // min gap between submissions from one email
+const EMAIL_HOURLY_LIMIT = 5;            // max submissions per email per hour
+
 function cleanText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+// Pull the client IP from Vercel/proxy headers (NextRequest has no .ip in v16).
+function getClientIp(req: NextRequest): string {
+  const fwd = req.headers.get("x-forwarded-for");
+  if (fwd) return fwd.split(",")[0].trim();
+  return req.headers.get("x-real-ip")?.trim() || "unknown";
 }
 
 function getContactRecipients() {
@@ -63,7 +93,27 @@ function renderInquiryRow(label: string, value: string) {
 
 export async function POST(req: NextRequest) {
   try {
+    // Reject oversized payloads before reading/parsing the body.
+    const contentLength = Number(req.headers.get("content-length") ?? 0);
+    if (contentLength > MAX_BODY_BYTES) {
+      return NextResponse.json({ error: "Request too large." }, { status: 413 });
+    }
+
     const body = await req.json();
+
+    // Honeypot: a hidden field real users never see. If it's filled, it's a bot.
+    // Return a fake success so the bot can't tell it was blocked.
+    if (cleanText(body.website)) {
+      return NextResponse.json({ ok: true });
+    }
+
+    // Timing check: bots submit near-instantly. The client stamps form render
+    // time in `renderedAt`; reject (silently) anything faster than a human.
+    const renderedAt = Number(body.renderedAt);
+    if (!Number.isFinite(renderedAt) || Date.now() - renderedAt < MIN_FILL_MS) {
+      return NextResponse.json({ ok: true });
+    }
+
     const name = cleanText(body.name);
     const email = cleanText(body.email);
     const phone = cleanText(body.phone);
@@ -80,13 +130,52 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Name, email, and message are required." }, { status: 400 });
     }
 
+    // Per-field length limits — block giant payloads and obvious junk.
+    const fields: Record<string, string> = {
+      name, email, phone, sessionType, date, message, instagram, school, preferredTime, people, location,
+    };
+    for (const [key, value] of Object.entries(fields)) {
+      if (value.length > (MAX_LENGTHS[key] ?? 200)) {
+        return NextResponse.json({ error: "One of your fields is too long. Please shorten it and try again." }, { status: 400 });
+      }
+    }
+
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       return NextResponse.json({ error: "Invalid email address." }, { status: 400 });
     }
 
+    // IP-based rate limit (in-memory, per instance — catches rapid bursts).
+    const ip = getClientIp(req);
+    const ipLimit = rateLimit(`contact:${ip}`, IP_LIMIT, IP_WINDOW_MS);
+    if (!ipLimit.ok) {
+      return NextResponse.json(
+        { error: "Too many requests. Please try again in a few minutes." },
+        { status: 429, headers: { "Retry-After": String(ipLimit.retryAfter) } },
+      );
+    }
+
     // Save to Supabase
     const supabase = createSupabaseServerClient();
+
+    // Email cooldown (durable, cross-instance): block rapid repeats and floods
+    // from the same address using the inquiries already on record.
+    const emailNormalized = email.toLowerCase();
+    const { data: recent } = await supabase
+      .from("inquiries")
+      .select("created_at")
+      .ilike("email", emailNormalized)
+      .gte("created_at", new Date(Date.now() - 60 * 60 * 1000).toISOString())
+      .order("created_at", { ascending: false });
+    if (recent && recent.length > 0) {
+      const lastMs = Date.now() - new Date(recent[0].created_at).getTime();
+      if (lastMs < EMAIL_COOLDOWN_MS || recent.length >= EMAIL_HOURLY_LIMIT) {
+        return NextResponse.json(
+          { error: "We already received a message from you recently. Please give it a little time before sending another." },
+          { status: 429 },
+        );
+      }
+    }
     const { data: inquiry, error: dbError } = await supabase
       .from("inquiries")
       .insert({

@@ -23,6 +23,10 @@ import { getPortfolioData, getSiteSettings } from "@/lib/professionalData";
 import { selectDistinctImageUrl } from "@/lib/photoMetadata";
 import { pricingCSS, anim } from "@/lib/proStyles";
 
+// Cached/ISR: refreshed at most hourly, or immediately on admin content saves
+// (POST /api/admin/revalidate).
+export const revalidate = 3600;
+
 // ── SEO metadata (tab title + Google description) ────────────────────────────
 export const metadata: Metadata = {
   title: "Family Pricing | soloxsnaps",

@@ -203,12 +203,16 @@ export default function BlogTab({ showToast }: Props) {
         }
       }
       showToast(`Published: "${json.title}" — ${json.photo_count} photos`);
-      setAiDropFiles([]); setAiDropPreviews([]); fetchPosts();
+      setAiDropFiles([]); setAiDropPreviews([]); fetchPosts(); revalidatePublicSite();
     } catch (err) {
       console.error("[ai-blog]", err);
       showToast("AI generation failed", false);
     } finally { setAiGenerating(false); }
   }
+
+  // Fire-and-forget: refresh the cached /blog pages after a post change so it
+  // shows up immediately instead of waiting for hourly ISR.
+  function revalidatePublicSite() { fetch("/api/admin/revalidate", { method: "POST" }).catch(() => {}); }
 
   async function savePost() {
     if (!postForm.title || !postForm.body) { showToast("Title and body required", false); return; }
@@ -227,11 +231,11 @@ export default function BlogTab({ showToast }: Props) {
     if (editingPost) {
       const { error } = await supabase.from("blog_posts").update(payload).eq("id", editingPost.id);
       if (error) showToast("Update failed", false);
-      else { await syncImagesToLibrary(editingPost.id, slug, postForm.title, cover_image_url, extra_image_urls); showToast("Post updated!"); cancelEditPost(); fetchPosts(); }
+      else { await syncImagesToLibrary(editingPost.id, slug, postForm.title, cover_image_url, extra_image_urls); showToast("Post updated!"); cancelEditPost(); fetchPosts(); revalidatePublicSite(); }
     } else {
       const { data: inserted, error } = await supabase.from("blog_posts").insert(payload).select("id").single();
       if (error || !inserted) showToast("Save failed — " + (error?.message ?? ""), false);
-      else { await syncImagesToLibrary(inserted.id, slug, postForm.title, cover_image_url, extra_image_urls); showToast("Post published!"); cancelEditPost(); fetchPosts(); }
+      else { await syncImagesToLibrary(inserted.id, slug, postForm.title, cover_image_url, extra_image_urls); showToast("Post published!"); cancelEditPost(); fetchPosts(); revalidatePublicSite(); }
     }
     setPostSaving(false);
   }
@@ -241,6 +245,7 @@ export default function BlogTab({ showToast }: Props) {
     setPosts(p => p.filter(x => x.id !== id));
     setPostDeleteConfirm(null);
     if (editingPost?.id === id) cancelEditPost();
+    revalidatePublicSite();
     showToast("Post deleted");
   }
 
@@ -257,6 +262,7 @@ export default function BlogTab({ showToast }: Props) {
       const seo = json.seo as { meta_description: string; meta_keywords: string; cover_image_alt: string; extra_image_alts: string[] };
       setPosts(prev => prev.map(p => p.id === post.id ? { ...p, meta_description: seo.meta_description, meta_keywords: seo.meta_keywords, cover_image_alt: seo.cover_image_alt, extra_image_alts: seo.extra_image_alts } : p));
       if (editingPost?.id === post.id) setPostForm(f => ({ ...f, meta_description: seo.meta_description, meta_keywords: seo.meta_keywords }));
+      revalidatePublicSite();
       showToast("AI SEO generated & saved ✓");
     } catch (err) {
       console.error("[blog] generateSeoForPost", err);

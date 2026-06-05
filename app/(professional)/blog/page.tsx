@@ -4,10 +4,12 @@
 
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getBlogPostsByCategory } from "@/lib/professionalData";
+import { getBlogPostSummaries } from "@/lib/professionalData";
 import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 
-export const dynamic = "force-dynamic";
+// Cached/ISR: rebuilt at most hourly, or immediately when the admin saves a
+// post (POST /api/admin/revalidate).
+export const revalidate = 3600;
 
 export const metadata: Metadata = {
   title: "Blog | soloxsnaps",
@@ -428,7 +430,7 @@ const CSS = `
 `;
 
 export default async function ProfessionalBlogPage() {
-  const posts = await getBlogPostsByCategory("professional");
+  const posts = await getBlogPostSummaries("professional");
   const [featured, ...rest] = posts;
 
   return (
@@ -506,7 +508,7 @@ export default async function ProfessionalBlogPage() {
                     <h2 className="blog-featured-title">{featured.title}</h2>
 
                     <p className="blog-featured-excerpt">
-                      {excerpt(featured.meta_description || featured.body, 170)}
+                      {excerpt(featured.meta_description || "", 170)}
                     </p>
 
                     <div className="blog-featured-meta">
@@ -562,7 +564,7 @@ export default async function ProfessionalBlogPage() {
                         <p className="blog-card-date">{formatDate(post.published_at)}</p>
                         <h2 className="blog-card-title">{post.title}</h2>
                         <p className="blog-card-excerpt">
-                          {excerpt(post.meta_description || post.body, 110)}
+                          {excerpt(post.meta_description || "", 110)}
                         </p>
                         <span className="blog-card-cta">
                           Read the story

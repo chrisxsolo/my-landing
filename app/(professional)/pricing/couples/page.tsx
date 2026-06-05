@@ -5,6 +5,10 @@ import { getPortfolioData, getSiteSettings } from "@/lib/professionalData";
 import { pricingCSS, anim } from "@/lib/proStyles";
 import CouplesRateEstimator from "@/app/components/CouplesRateEstimator";
 
+// Cached/ISR: refreshed at most hourly, or immediately on admin content saves
+// (POST /api/admin/revalidate).
+export const revalidate = 3600;
+
 export const metadata: Metadata = {
   title: "Couples Photography Pricing | SoloXSnaps",
   description:
