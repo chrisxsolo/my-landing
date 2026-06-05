@@ -4,6 +4,7 @@ import Image from "next/image";
 import { notFound } from "next/navigation";
 import { getBlogPostBySlug } from "@/lib/professionalData";
 import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
+import { renderPostBody, detectSchoolLink } from "./postBody";
 
 export const dynamic = "force-dynamic";
 
@@ -53,6 +54,7 @@ export default async function ProfessionalBlogPostPage({ params }: Props) {
   if (!post) notFound();
 
   const extraImages = post.extra_image_urls ?? [];
+  const schoolLink = detectSchoolLink(`${post.title} ${post.slug}`);
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -168,20 +170,7 @@ export default async function ProfessionalBlogPostPage({ params }: Props) {
           </p>
         </aside>
         <div>
-          {post.body
-            .split(/\n\n+/)
-            .filter((p) => p.trim())
-            .map((paragraph, i) => (
-              <p key={i} style={{
-                fontFamily: "Georgia, 'Times New Roman', serif",
-                fontSize: "1.05rem",
-                lineHeight: 1.9,
-                color: "#555",
-                marginBottom: 24,
-              }}>
-                {paragraph.trim()}
-              </p>
-            ))}
+          {renderPostBody(post.body)}
         </div>
       </div>
 
@@ -237,11 +226,64 @@ export default async function ProfessionalBlogPostPage({ params }: Props) {
         </section>
       )}
 
+      {/* ── INTERNAL LINKS — keep exploring ── */}
+      <section style={{
+        borderTop: "1px solid rgba(0,0,0,0.07)",
+        padding: "64px 60px 0",
+        maxWidth: 900,
+        margin: "0 auto",
+      }}>
+        <p style={{
+          fontFamily: "Georgia, 'Times New Roman', serif",
+          fontSize: "0.7rem",
+          letterSpacing: "0.22em",
+          textTransform: "uppercase",
+          color: "#555",
+          marginBottom: 18,
+        }}>
+          Keep exploring
+        </p>
+        <ul style={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: "10px 14px",
+          listStyle: "none",
+          padding: 0,
+          margin: 0,
+          fontFamily: "Georgia, 'Times New Roman', serif",
+        }}>
+          {[
+            ...(schoolLink ? [schoolLink] : []),
+            { label: "Graduation pricing", href: "/pricing/grads" },
+            { label: "Check availability", href: "/availability" },
+            { label: "Graduation photo guide", href: "/grad-guide" },
+            { label: "Bay Area location guide", href: "/location-guide" },
+            { label: "Contact", href: "/contact" },
+          ].map((l) => (
+            <li key={l.href}>
+              <Link href={l.href} style={{
+                display: "inline-block",
+                fontSize: "0.85rem",
+                color: "#4f6d67",
+                background: "rgba(246, 250, 248, 0.94)",
+                border: "1px solid rgba(112, 139, 133, 0.22)",
+                borderRadius: 999,
+                padding: "8px 18px",
+                textDecoration: "none",
+              }}>
+                {l.label}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </section>
+
       {/* ── CTA ── */}
       <section style={{
         borderTop: "1px solid rgba(0,0,0,0.07)",
         padding: "80px 60px",
         textAlign: "center",
+        marginTop: 64,
       }}>
         <p style={{
           fontFamily: "Georgia, 'Times New Roman', serif",
