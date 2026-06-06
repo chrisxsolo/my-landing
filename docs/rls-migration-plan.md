@@ -433,3 +433,105 @@ explanatory comment — never in code that reads/writes the key. ✓
 | 7 | Reconnect Gmail | **Human (browser OAuth)** | ⏳ pending |
 | 8 | Incident verification | Human + Claude/Codex | partial — repo search ✅; runtime/Google/Supabase-log review pending |
 | 9 | Clean baseline | Claude | ✅ done (above) |
+
+### 2026-06-06 — Phase 2 payments lockdown complete
+
+**Payments browser reads moved behind server route.**
+- Added `/api/admin/payments` as an admin-only, service-role read route.
+- `PaymentAnalyticsTab` now loads payments through `/api/admin/payments`, not the browser Supabase client.
+- The main admin inquiry loader now derives deposit summaries from `/api/admin/payments`, not direct
+  browser reads from `payments`.
+- Existing payment write/mutation paths (`manual-payments`, `record-final-payment`, `void-payment`,
+  `sync-payments`) already run server-side with `requireAdmin`/service-role access.
+
+**Verification before locking payments:**
+- Local `/api/admin/payments` with admin cookie → 200, 115 rows.
+- Production `/api/admin/payments` with admin cookie → 200, 115 rows after deployment
+  `dpl_C9zH3K7WYGn7xNcYreRjnsBVhZQq`.
+- Production `/admin` → 200 after deployment.
+- `npx tsc --noEmit` → exit 0.
+- Focused tests (`paymentAnalytics`, `siteSettings`, `adminAuthShared`) → 13/13 pass.
+- `npx next build --webpack` → exit 0.
+
+**Production database lock:**
+- Applied `20260606000003_lock_payments.sql` to Supabase project
+  `dmtslzwglpezympptqls` at `2026-06-06T00:55:54Z`.
+- Remote migration record: `20260606005554_lock_payments`.
+- Migration completed successfully with no notices or errors.
+- RLS enabled: yes. FORCE RLS enabled: yes.
+- Payment policies remaining: 0.
+- `anon`, `authenticated`, and `PUBLIC` table grants remaining: 0.
+- Anonymous SELECT/INSERT/UPDATE/DELETE: denied.
+- Ordinary authenticated SELECT: denied.
+- Service-role payment count: 115.
+
+**Production smoke tests after locking:**
+- Anonymous REST `payments?select=id&limit=1` → HTTP 401 with a sanitized permission error;
+  no rows or payment values returned.
+- `/admin` → HTTP 200.
+- `/api/admin/payments` without admin cookie → HTTP 401.
+- `/api/admin/payments` with valid admin cookie → HTTP 200 with 115 rows.
+- Revenue analytics rendered in the production browser with payment rows.
+- Inquiry deposit/final-payment summaries rendered in the production browser.
+- Safe future-month `/api/sync-payments` check → HTTP 200, 0 synced, total 0.
+- `payment-confirmation`, `void-payment`, and `record-final-payment` accepted valid admin auth and
+  returned expected HTTP 400 validation responses for intentionally incomplete bodies; no real
+  payment was created, changed, voided, refunded, or emailed.
+- Payment mutation routes use `createSupabaseServerClient()` and remain server-side.
+- No direct browser Supabase query to `payments` remains under `app`.
+- No raw payment data was returned to unauthorized clients.
+
+Rollback was not required and `20260606000003_lock_payments_rollback.sql` was not run. Remaining
+payment table access is limited to reviewed server-side admin and synchronization routes using the
+service-role client.
+
+### 2026-06-06 — Phase 2 inquiries lockdown complete
+
+**Inquiries browser access moved behind server routes.**
+- Added `/api/admin/inquiries` with `requireAdmin`, explicit field selection, strict create/update
+  allowlists, type checks, length limits, email/date/timestamp validation, and generic errors.
+- Migrated the admin inquiry list, inquiry analytics, client timeline, and conversation page away
+  from direct browser Supabase access.
+- `/api/contact` remains the public submission boundary and inserts with the server-side service
+  role after its existing validation and rate controls. No anonymous table INSERT policy is needed.
+- No direct browser Supabase query to `inquiries` remains under `app`.
+
+**Deployment and pre-lock verification:**
+- Deployed production app `dpl_BVqzY55A9RfRyX7DNPSzCWtPxSbY`, aliased to
+  `https://www.soloxsnaps.com`.
+- Production `/api/admin/inquiries` without the admin cookie returned HTTP 401.
+- Production `/api/admin/inquiries` with the valid admin cookie returned HTTP 200 with 28 rows.
+- A forbidden `payment_note` patch returned HTTP 400, confirming the update allowlist.
+- `npx tsc --noEmit`, focused inquiry/auth/payment tests (10/10), targeted ESLint, and
+  `npx next build --webpack` completed successfully.
+
+**Production database lock:**
+- Applied `20260606000004_lock_inquiries.sql` to Supabase project
+  `dmtslzwglpezympptqls` at `2026-06-06T01:49:57Z` (`2026-06-05 18:49:57 PDT`).
+- Remote migration record: `20260606015014_lock_inquiries`.
+- Migration completed successfully with no notices or errors.
+- RLS enabled: yes. FORCE RLS enabled: yes.
+- Inquiry policies remaining: 0.
+- `anon`, `authenticated`, and `PUBLIC` table grants remaining: 0.
+- Anonymous and ordinary authenticated SELECT/INSERT/UPDATE/DELETE privileges: denied.
+- Service-role inquiry count after locking: 28.
+
+**Production smoke tests after locking:**
+- Anonymous REST `inquiries?select=id&limit=1` returned HTTP 401 with a sanitized permission error;
+  no inquiry rows or private values were returned.
+- Anonymous REST INSERT, UPDATE, and DELETE checks also returned HTTP 401 and changed no rows.
+- `/api/admin/inquiries` without the valid admin cookie returned HTTP 401.
+- `/api/admin/inquiries` with the valid admin cookie returned HTTP 200 with 28 rows.
+- A no-op status update through the authorized admin API returned HTTP 200.
+- Inquiry list, inquiry analytics, funnel analytics, client timelines, deposit summaries, and the
+  conversation page rendered in production without inquiry-load errors.
+- An isolated `/api/contact` smoke test with email sending disabled returned HTTP 200, inserted one
+  synthetic inquiry through service-role access, and exposed it only through the authorized admin
+  API. The synthetic row was immediately deleted; the count returned to 28.
+- Remaining inquiry access paths are server-side routes for contact intake, admin workflows,
+  payment synchronization, reminders, Gmail workflows, client provisioning, and authenticated
+  extension operations.
+
+Rollback was not required and `20260606000004_lock_inquiries_rollback.sql` was not run. Do not
+begin the next Phase 2 table until `blog_posts` and its browser/admin access paths are separately
+reviewed and deployed.

@@ -1,23 +1,11 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { supabase } from "@/lib/supabase";
 import { C } from "@/lib/colors";
+import { loadAdminInquiries, type AdminInquiry } from "@/lib/adminInquiries";
 
 const card = "bg-white rounded-2xl border border-slate-100 overflow-hidden";
 
-type Inquiry = {
-  id: number;
-  name: string;
-  email: string;
-  session_type: string | null;
-  message: string;
-  status: string;
-  created_at: string;
-  payment_status: string | null;
-  payment_note: string | null;
-  reply_sent_at: string | null;
-  session_date: string | null;
-};
+type Inquiry = AdminInquiry;
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -114,12 +102,14 @@ export default function InquiryAnalyticsTab() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase
-      .from("inquiries")
-      .select("id,name,email,session_type,message,status,created_at,payment_status,payment_note,reply_sent_at,session_date")
-      .order("created_at", { ascending: false });
-    setInquiries((data ?? []) as Inquiry[]);
-    setLoading(false);
+    try {
+      setInquiries(await loadAdminInquiries());
+    } catch (error) {
+      console.error("[InquiryAnalyticsTab] load failed:", error);
+      setInquiries([]);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { load(); }, [load]);

@@ -1,6 +1,6 @@
 "use client";
 import { C } from "@/lib/colors";
-import { supabase } from "@/lib/supabase";
+import { updateAdminInquiry } from "@/lib/adminInquiries";
 import { useState } from "react";
 
 export type TimelineInquiry = {
@@ -58,13 +58,14 @@ export default function ClientTimeline({ inq, onUpdate }: Props) {
     const newVal = alreadyDone ? null : new Date().toISOString();
 
     setSaving(field);
-    const { error } = await supabase
-      .from("inquiries")
-      .update({ [field]: newVal })
-      .eq("id", inq.id);
-    setSaving(null);
-
-    if (!error) onUpdate({ [field]: newVal } as Partial<TimelineInquiry>);
+    try {
+      await updateAdminInquiry(inq.id, { [field]: newVal });
+      onUpdate({ [field]: newVal } as Partial<TimelineInquiry>);
+    } catch (error) {
+      console.error("[ClientTimeline] update failed:", error);
+    } finally {
+      setSaving(null);
+    }
   }
 
   const completedCount = STEPS.filter(s => isDone(inq, s)).length;

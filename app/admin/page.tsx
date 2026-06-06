@@ -64,13 +64,21 @@ import {
   type AdminClientSessionDTO,
   type ClientSessionStatus,
 } from "@/lib/clientSessions";
+import {
+  createAdminInquiry,
+  deleteAdminInquiry,
+  loadAdminInquiries,
+  updateAdminInquiry,
+  type AdminInquiry,
+} from "@/lib/adminInquiries";
 
 export const dynamic = 'force-dynamic'
 
 type Tab = "home"|"poses"|"locations"|"bayGuide"|"portfolio"|"categories"|"blog"|"library"|"analytics"|"payments"|"inquiries"|"clients"|"funnel"|"vault"|"ai"|"chat"|"format"|"accounts";
 type ImageLibraryRow = { id:number; title:string; alt:string|null; image_url:string; source_type:string; source_post_id:number|null; source_post_slug:string|null; source_role:string; in_portfolio:boolean; created_at:string; };
-type Inquiry = { id:number; name:string; email:string; phone:string|null; session_type:string|null; date_in_mind:string|null; message:string; status:string; created_at:string; payment_status:string|null; payment_note:string|null; payment_detected_at:string|null; session_date:string|null; booking_confirmed:boolean|null; reply_sent_at:string|null; invoice_sent_at:string|null; contract_sent_at:string|null; deposit_paid_at:string|null; gallery_delivered_at:string|null; confirmation_sent_at:string|null; preferred_time:string|null; location:string|null; school:string|null; instagram:string|null; people:string|null; };
+type Inquiry = AdminInquiry;
 type AdminSessionsResponse = { sessions?: AdminClientSessionDTO[]; session?: AdminClientSessionDTO; error?: string; };
+type AdminPaymentSummaryRow = { inquiry_id:number|null; amount:string; client_email:string; payment_type:string|null };
 
 function fmt12h(t:string|null):string{
   if(!t)return"";
@@ -472,11 +480,16 @@ function AdminDashboard() {
       message:`Subject: ${t.subject}\n\n${t.snippet}`,
       status:"manual",payment_status:null,booking_confirmed:null,
     };
-    const{data,error}=await supabase.from("inquiries").insert(row).select().single();
-    if(error){console.error("createInquiryFromThread",error);return null;}
-    setInquiries(p=>[data,...p]);
-    showToast(`Client card created for ${row.name} ✓`);
-    return data as Inquiry;
+    try{
+      const data=await createAdminInquiry(row);
+      setInquiries(p=>[data,...p]);
+      showToast(`Client card created for ${row.name} ✓`);
+      return data;
+    }catch(error){
+      console.error("createInquiryFromThread",error);
+      showToast("Could not create client card",false);
+      return null;
+    }
   }
 
   async function generateInboxDraft(t:InboxThread){
@@ -600,7 +613,45 @@ function AdminDashboard() {
     return Object.keys(headers).length?{headers}:undefined;
   }
 
-  async function fetchInquiries(){setInquiriesLoading(true);const[{data},{data:dep2},{data:dep1}]=await Promise.all([supabase.from('inquiries').select('*').order('created_at',{ascending:false}),supabase.from('payments').select('inquiry_id').eq('payment_type','deposit_2').not('inquiry_id','is',null),supabase.from('payments').select('inquiry_id,amount,client_email').eq('payment_type','deposit_1')]);setInquiries(data??[]);setFinalPaymentIds(new Set((dep2??[]).map((p:{inquiry_id:number})=>p.inquiry_id)));const d1Map=new Map<number,string>();const emailAmt=new Map<string,string>();(dep1??[]).forEach((p:{inquiry_id:number|null;amount:string;client_email:string})=>{const a=p.amount?.replace(/[^0-9.]/g,"");if(!a)return;if(p.inquiry_id)d1Map.set(p.inquiry_id,a);if(p.client_email)emailAmt.set(p.client_email.toLowerCase(),a);});(data??[]).forEach((inq:{id:number;email:string;payment_note:string|null})=>{if(d1Map.has(inq.id))return;const byEmail=emailAmt.get(inq.email?.toLowerCase());if(byEmail){d1Map.set(inq.id,byEmail);return;}const m=inq.payment_note?.match(/\$?([\d,]+(?:\.\d{1,2})?)/);if(m)d1Map.set(inq.id,m[1].replace(/,/g,""));});setDeposit1Amounts(d1Map);setInquiriesLoading(false);}
+  async function fetchInquiries(){
+    setInquiriesLoading(true);
+    const paymentsReq = fetch("/api/admin/payments")
+      .then(res => res.json() as Promise<{ payments?: AdminPaymentSummaryRow[]; error?: string }>)
+      .catch(err => {
+        console.error("[admin] payments summary failed", err);
+        return { payments: [] };
+      });
+    const [inquiryRows, paymentJson] = await Promise.all([
+      loadAdminInquiries().catch(err => {
+        console.error("[admin] inquiries load failed",err);
+        showToast("Failed to load inquiries",false);
+        return [];
+      }),
+      paymentsReq,
+    ]);
+    const paymentRows = paymentJson.payments ?? [];
+    const dep2 = paymentRows.filter(p => p.payment_type === "deposit_2" && p.inquiry_id);
+    const dep1 = paymentRows.filter(p => p.payment_type === "deposit_1");
+    setInquiries(inquiryRows);
+    setFinalPaymentIds(new Set(dep2.map(p => p.inquiry_id).filter((id): id is number => typeof id === "number")));
+    const d1Map = new Map<number,string>();
+    const emailAmt = new Map<string,string>();
+    dep1.forEach(p => {
+      const a = p.amount?.replace(/[^0-9.]/g,"");
+      if(!a)return;
+      if(p.inquiry_id)d1Map.set(p.inquiry_id,a);
+      if(p.client_email)emailAmt.set(p.client_email.toLowerCase(),a);
+    });
+    inquiryRows.forEach((inq:{id:number;email:string;payment_note:string|null})=>{
+      if(d1Map.has(inq.id))return;
+      const byEmail=emailAmt.get(inq.email?.toLowerCase());
+      if(byEmail){d1Map.set(inq.id,byEmail);return;}
+      const m=inq.payment_note?.match(/\$?([\d,]+(?:\.\d{1,2})?)/);
+      if(m)d1Map.set(inq.id,m[1].replace(/,/g,""));
+    });
+    setDeposit1Amounts(d1Map);
+    setInquiriesLoading(false);
+  }
 
   async function handleFinalPayment(id:number,amount:string,method:string){
     const inq=inquiries.find(i=>i.id===id);
@@ -632,30 +683,70 @@ function AdminDashboard() {
       setPortalSessionsLoading(false);
     }
   }
-  async function deleteInquiry(id:number){const{error}=await supabase.from('inquiries').delete().eq('id',id);if(error){showToast("Delete failed",false);}else{setInquiries(p=>p.filter(x=>x.id!==id));setInquiryDeleteConfirm(null);showToast("Inquiry deleted");}}
-  async function updateInquiryStatus(id:number,status:string){const{error}=await supabase.from('inquiries').update({status}).eq('id',id);if(error){showToast("Update failed",false);}else{setInquiries(p=>p.map(x=>x.id===id?{...x,status}:x));showToast("Status updated");}}
-  async function saveSessionType(id:number,value:string){const{error}=await supabase.from('inquiries').update({session_type:value.trim()||null}).eq('id',id);if(error){showToast("Update failed",false);}else{setInquiries(p=>p.map(x=>x.id===id?{...x,session_type:value.trim()||null}:x));setEditingSessionType(null);showToast("Session type updated ✓");}}
+  async function deleteInquiry(id:number){
+    try{
+      await deleteAdminInquiry(id);
+      setInquiries(p=>p.filter(x=>x.id!==id));
+      setInquiryDeleteConfirm(null);
+      showToast("Inquiry deleted");
+    }catch(error){
+      console.error("[admin] deleteInquiry",error);
+      showToast("Delete failed",false);
+    }
+  }
+  async function updateInquiryStatus(id:number,status:string){
+    try{
+      const updated=await updateAdminInquiry(id,{status});
+      setInquiries(p=>p.map(x=>x.id===id?updated:x));
+      showToast("Status updated");
+    }catch(error){
+      console.error("[admin] updateInquiryStatus",error);
+      showToast("Update failed",false);
+    }
+  }
+  async function saveSessionType(id:number,value:string){
+    try{
+      const updated=await updateAdminInquiry(id,{session_type:value.trim()||null});
+      setInquiries(p=>p.map(x=>x.id===id?updated:x));
+      setEditingSessionType(null);
+      showToast("Session type updated ✓");
+    }catch(error){
+      console.error("[admin] saveSessionType",error);
+      showToast("Update failed",false);
+    }
+  }
   async function rescheduleSession(id:number,datetimeLocal:string){
     // datetimeLocal is "YYYY-MM-DDTHH:mm" from datetime-local input
     const date=new Date(datetimeLocal);
     if(isNaN(date.getTime())){showToast("Invalid date",false);return;}
     const sessionDate=`${datetimeLocal.slice(0,10)}`;
     const preferredTime=new Intl.DateTimeFormat("en-US",{hour:"numeric",minute:"2-digit"}).format(date);
-    const{error}=await supabase.from('inquiries').update({session_date:sessionDate,preferred_time:preferredTime}).eq('id',id);
-    if(error){showToast("Could not reschedule",false);}else{setInquiries(p=>p.map(x=>x.id===id?{...x,session_date:sessionDate,preferred_time:preferredTime}:x));showToast("Session rescheduled ✓");}
+    try{
+      const updated=await updateAdminInquiry(id,{session_date:sessionDate,preferred_time:preferredTime});
+      setInquiries(p=>p.map(x=>x.id===id?updated:x));
+      showToast("Session rescheduled ✓");
+    }catch(error){
+      console.error("[admin] rescheduleSession",error);
+      showToast("Could not reschedule",false);
+    }
   }
   async function saveManualClient(){
     const{name,email,session_type,session_date,phone,message}=addClientForm;
     if(!name.trim()||!email.trim()){showToast("Name and email are required",false);return;}
     setAddClientSaving(true);
     const row={name:name.trim(),email:email.trim().toLowerCase(),phone:phone.trim()||null,session_type:session_type.trim()||null,session_date:session_date||null,message:message.trim()||"Added manually from Instagram DM",status:"manual",payment_status:null,booking_confirmed:null,date_in_mind:null};
-    const{data,error}=await supabase.from('inquiries').insert(row).select().single();
-    setAddClientSaving(false);
-    if(error){showToast("Failed to add client",false);return;}
-    setInquiries(p=>[data,...p]);
-    setAddClientForm(EMPTY_CLIENT);
-    setAddClientOpen(false);
-    showToast(`${name} added ✓`);
+    try{
+      const data=await createAdminInquiry(row);
+      setInquiries(p=>[data,...p]);
+      setAddClientForm(EMPTY_CLIENT);
+      setAddClientOpen(false);
+      showToast(`${name} added ✓`);
+    }catch(error){
+      console.error("[admin] saveManualClient",error);
+      showToast("Failed to add client",false);
+    }finally{
+      setAddClientSaving(false);
+    }
   }
 
   async function saveCalendarEvent(){
@@ -664,13 +755,18 @@ function AdminDashboard() {
     if(!session_date){showToast("Session date is required",false);return;}
     setAddEventSaving(true);
     const row={name:name.trim(),email:email.trim().toLowerCase(),phone:phone.trim()||null,session_type:session_type.trim()||null,session_date,preferred_time:session_time||null,location:location.trim()||null,message:notes.trim()||"Added manually from calendar",status:"manual",payment_status:addEventForm.payment_received?"paid":null,booking_confirmed:addEventForm.payment_received,date_in_mind:session_date};
-    const{data,error}=await supabase.from('inquiries').insert(row).select().single();
-    setAddEventSaving(false);
-    if(error){showToast("Failed to add event",false);return;}
-    setInquiries(p=>[data,...p]);
-    setAddEventForm(EMPTY_EVENT);
-    setAddEventOpen(false);
-    showToast(`${name} added to calendar ✓`);
+    try{
+      const data=await createAdminInquiry(row);
+      setInquiries(p=>[data,...p]);
+      setAddEventForm(EMPTY_EVENT);
+      setAddEventOpen(false);
+      showToast(`${name} added to calendar ✓`);
+    }catch(error){
+      console.error("[admin] saveCalendarEvent",error);
+      showToast("Failed to add event",false);
+    }finally{
+      setAddEventSaving(false);
+    }
   }
 
   function replacePortalSession(next:AdminClientSessionDTO){

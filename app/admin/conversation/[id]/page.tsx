@@ -6,19 +6,15 @@ import { C } from "@/lib/colors";
 import { checkAuth } from "@/lib/adminAuth";
 import type { GmailMessage } from "@/app/api/gmail/thread/route";
 import { buildReminderEmail, type ReminderEmailType } from "@/lib/reminderEmail";
+import {
+  loadAdminInquiry,
+  updateAdminInquiry,
+  type AdminInquiry,
+} from "@/lib/adminInquiries";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-type Inquiry = {
-  id: number; name: string; email: string; phone: string | null;
-  session_type: string | null; date_in_mind: string | null;
-  message: string; status: string; created_at: string;
-  payment_status: string | null; payment_note: string | null;
-  payment_detected_at: string | null; booking_confirmed: boolean | null;
-  session_date: string | null;
-  school: string | null; instagram: string | null; people: string | null;
-  preferred_time: string | null; location: string | null;
-};
+type Inquiry = AdminInquiry;
 
 function fmt12h(t: string | null): string {
   if (!t) return "";
@@ -249,8 +245,8 @@ export default function ConversationPage() {
     if (!checkAuth()) { router.push("/admin"); return; }
     if (!inquiryId) return;
 
-    supabase.from("inquiries").select("*").eq("id", inquiryId).single()
-      .then(async ({ data }) => {
+    loadAdminInquiry(inquiryId)
+      .then(async (data) => {
         if (!data) { router.push("/admin?tab=inquiries"); return; }
         setInquiry(data);
         setStatus(data.status);
@@ -259,6 +255,10 @@ export default function ConversationPage() {
         // Show sunset immediately — confirmed date wins, fall back to client's requested date
         const sunsetDate = data.session_date ?? tryParseDate(data.date_in_mind ?? "");
         if (sunsetDate) fetchSunset(sunsetDate);
+      })
+      .catch((error) => {
+        console.error("[conversation] inquiry load failed:", error);
+        router.push("/admin?tab=inquiries");
       });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inquiryId]);
@@ -688,7 +688,11 @@ export default function ConversationPage() {
       const json = await res.json();
       if (json.ok) {
         showToast(`✓ Sent to ${inquiry.name}`);
-        await supabase.from("inquiries").update({ status: "responded", reply_sent_at: new Date().toISOString() }).eq("id", inquiry.id);
+        const updated = await updateAdminInquiry(inquiry.id, {
+          status: "responded",
+          reply_sent_at: new Date().toISOString(),
+        });
+        setInquiry(updated);
         setStatus("responded");
 
         // Auto-learn from every send — fire and forget (don't block UX)
@@ -732,9 +736,15 @@ export default function ConversationPage() {
 
   async function updateStatus(s: string) {
     if (!inquiry) return;
-    await supabase.from("inquiries").update({ status: s }).eq("id", inquiry.id);
-    setStatus(s);
-    showToast(`Marked as ${s}`);
+    try {
+      const updated = await updateAdminInquiry(inquiry.id, { status: s });
+      setInquiry(updated);
+      setStatus(s);
+      showToast(`Marked as ${s}`);
+    } catch (error) {
+      console.error("[conversation] status update failed:", error);
+      showToast("Status update failed", false);
+    }
   }
 
   // ── Check payment via Gmail + Claude ──────────────────────────────────────
@@ -763,8 +773,8 @@ export default function ConversationPage() {
       }
 
       // Refresh inquiry to pick up new payment fields
-      const { data } = await supabase.from("inquiries").select("*").eq("id", inquiry.id).single();
-      if (data) setInquiry(data);
+      const updated = await loadAdminInquiry(inquiry.id);
+      if (updated) setInquiry(updated);
     } catch {
       showToast("Payment check failed", false);
     } finally {
@@ -850,7 +860,7 @@ export default function ConversationPage() {
     if (!inquiry) return;
     setDateConfirming(true);
     try {
-      await supabase.from("inquiries").update({ session_date: dateStr }).eq("id", inquiry.id);
+      await updateAdminInquiry(inquiry.id, { session_date: dateStr });
       // Availability is locked down at the DB level — write through the admin
       // server route (service role) rather than the public anon client.
       await fetch("/api/admin/availability", {
@@ -863,8 +873,8 @@ export default function ConversationPage() {
         .update({ session_date: dateStr })
         .eq("client_email", inquiry.email)
         .is("session_date", null);
-      const { data } = await supabase.from("inquiries").select("*").eq("id", inquiry.id).single();
-      if (data) setInquiry(data);
+      const updated = await loadAdminInquiry(inquiry.id);
+      if (updated) setInquiry(updated);
       setDetectedDate(null);
       fetchSunset(dateStr);
       showToast("Session date confirmed and calendar updated ✓");

@@ -1,7 +1,6 @@
 "use client";
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
 import { C } from "@/lib/colors";
 import {
   buildMonthPeriod,
@@ -14,7 +13,6 @@ import {
 } from "@/lib/paymentAnalytics";
 
 const card = "bg-white rounded-2xl border border-slate-100 overflow-hidden";
-const PAYMENT_SELECT = "id,inquiry_id,client_name,client_email,amount,amount_cents,method,payment_type,invoice,note,source,status,paid_at,session_date";
 
 type Payment = {
   id: number;
@@ -211,23 +209,34 @@ export default function PaymentAnalyticsTab() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase
-      .from("payments")
-      .select(PAYMENT_SELECT)
-      .order("paid_at", { ascending: false });
-    setPayments((data ?? []) as Payment[]);
-    setLoading(false);
+    try {
+      const res = await fetch("/api/admin/payments");
+      const json = await res.json() as { payments?: Payment[]; error?: string };
+      if (!res.ok) throw new Error(json.error ?? "Failed to load payments");
+      setPayments(json.payments ?? []);
+    } catch (err) {
+      console.error("[PaymentAnalyticsTab] load payments failed:", err);
+      setPayments([]);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
     let cancelled = false;
     async function loadInitialPayments() {
-      const { data } = await supabase
-        .from("payments")
-        .select(PAYMENT_SELECT)
-        .order("paid_at", { ascending: false });
+      setLoading(true);
+      let nextPayments: Payment[] = [];
+      try {
+        const res = await fetch("/api/admin/payments");
+        const json = await res.json() as { payments?: Payment[]; error?: string };
+        if (!res.ok) throw new Error(json.error ?? "Failed to load payments");
+        nextPayments = json.payments ?? [];
+      } catch (err) {
+        console.error("[PaymentAnalyticsTab] initial payments load failed:", err);
+      }
       if (cancelled) return;
-      setPayments((data ?? []) as Payment[]);
+      setPayments(nextPayments);
       setLoading(false);
     }
     loadInitialPayments();
