@@ -12,12 +12,13 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { type NextRequest, NextResponse } from "next/server";
+import { isValidAdminSession } from "@/lib/adminAuthShared";
 
 export function requireAdmin(req: NextRequest): NextResponse | null {
   const session = req.cookies.get("admin_session")?.value;
   const secret  = process.env.ADMIN_SESSION_SECRET;
 
-  if (!secret || !session || session !== secret) {
+  if (!isValidAdminSession(session, secret)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

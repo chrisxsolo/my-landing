@@ -122,6 +122,10 @@ const CSS = `
     border-radius: 12px;
     background: #dfe8e4;
     box-shadow: 0 20px 60px rgba(18, 24, 22, 0.1);
+    /* width:100% is required: the only child is an absolutely-positioned
+       next/image fill, so without an explicit width the grid item's auto
+       margins collapse it to 0 and aspect-ratio yields 0 height. */
+    width: 100%;
     max-width: 460px;
     margin: 0 auto;
   }

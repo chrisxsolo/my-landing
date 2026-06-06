@@ -750,11 +750,13 @@ function AdminDashboard() {
   function isSetupMissing(error:{code?:string;message?:string}|null){const message=error?.message?.toLowerCase()??"";return error?.code==="42P01"||error?.code==="42703"||message.includes("does not exist")||message.includes("schema cache");}
 
   async function fetchSiteSettings(){
-    const{data}=await supabase.from('site_settings').select('key,value');
-    if(data){
-      const map=data.reduce((acc:{[k:string]:string|null},r)=>{acc[r.key]=r.value;return acc;},{});
-      setSiteSettings(map);
-    }
+    // Server route returns only the non-secret editable allowlist (never tokens).
+    try{
+      const res=await fetch('/api/admin/site-settings');
+      if(!res.ok)return;
+      const json=await res.json();
+      setSiteSettings(json.settings??{});
+    }catch{/* leave settings as-is on failure */}
   }
 
   function onBatchFiles(e:React.ChangeEvent<HTMLInputElement>){
@@ -810,12 +812,21 @@ function AdminDashboard() {
 
   async function updateSiteSetting(key:string,value:string|null){
     setSettingsSaving(key);
-    await supabase.from('site_settings').upsert({key,value,updated_at:new Date().toISOString()},{onConflict:'key'});
-    setSiteSettings(prev=>({...prev,[key]:value}));
-    setSettingsSaving(null);
-    setCoverPickerKey(null);
-    revalidatePublicSite();
-    showToast("Photo selection updated");
+    try{
+      // value null → clear the setting (DELETE); otherwise upsert via PUT.
+      const res=value===null
+        ? await fetch('/api/admin/site-settings',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({key})})
+        : await fetch('/api/admin/site-settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({key,value})});
+      if(!res.ok){const j=await res.json().catch(()=>({}));showToast(j.error||"Couldn't update photo selection",false);return;}
+      setSiteSettings(prev=>({...prev,[key]:value}));
+      setCoverPickerKey(null);
+      revalidatePublicSite();
+      showToast("Photo selection updated");
+    }catch{
+      showToast("Couldn't update photo selection",false);
+    }finally{
+      setSettingsSaving(null);
+    }
   }
 
   async function fetchCategories(){

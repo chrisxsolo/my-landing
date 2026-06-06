@@ -3,12 +3,12 @@
 //
 // Google redirects here after the user approves (or denies) access.
 // Exchanges the one-time code for access + refresh tokens, grabs the
-// connected email address, stores everything in site_settings, then
-// sends the user back to /admin?tab=inquiries.
+// connected email address, stores everything in the dedicated, locked-down
+// gmail_credentials table, then sends the user back to /admin?tab=inquiries.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabaseServer";
+import { getStoredRefreshToken, saveGmailTokens } from "@/lib/gmailTokens";
 
 export const dynamic = "force-dynamic";
 
@@ -70,44 +70,28 @@ export async function GET(req: NextRequest) {
     // non-fatal — we still have the token
   }
 
-  // ── Persist tokens in Supabase ────────────────────────────────────────────
-  const supabase = createSupabaseServerClient();
-
+  // ── Persist tokens (dedicated gmail_credentials table, service-role only) ──
   // Google only returns a refresh_token on first auth (or when prompt=consent).
-  // If we somehow don't get one, preserve the existing one from the DB so we
-  // don't accidentally lose the ability to auto-refresh.
+  // If we somehow don't get one, preserve the existing one so we don't lose the
+  // ability to auto-refresh.
   let refreshToken = tokens.refresh_token ?? null;
   if (!refreshToken) {
     try {
-      const { data: existing } = await supabase
-        .from("site_settings")
-        .select("value")
-        .eq("key", "gmail_tokens")
-        .single();
-      if (existing?.value) {
-        const prev = JSON.parse(existing.value) as { refresh_token?: string };
-        refreshToken = prev.refresh_token ?? null;
-      }
+      refreshToken = await getStoredRefreshToken();
     } catch {
       // If we can't read the old token, proceed without it
     }
   }
 
-  const { error: upsertError } = await supabase.from("site_settings").upsert(
-    {
-      key: "gmail_tokens",
-      value: JSON.stringify({
-        access_token:  tokens.access_token,
-        refresh_token: refreshToken,
-        expiry_date:   Date.now() + (tokens.expires_in ?? 3600) * 1000,
-        email,
-      }),
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "key" }
-  );
-  if (upsertError) {
-    console.error("Failed to save Gmail tokens to DB:", upsertError);
+  try {
+    await saveGmailTokens({
+      access_token:  tokens.access_token,
+      refresh_token: refreshToken,
+      expiry_date:   Date.now() + (tokens.expires_in ?? 3600) * 1000,
+      email,
+    });
+  } catch (saveError) {
+    console.error("Failed to save Gmail tokens:", saveError);
     return NextResponse.redirect(`${siteUrl}/admin?tab=inquiries&gmail=error`);
   }
 

@@ -273,27 +273,28 @@ export default function ConversationPage() {
     if (localAi)       setLastAiDraft(localAi);
     if (localOriginal) setOriginalAiDraft(localOriginal);
 
-    // Only hit Supabase if localStorage was empty (other device may have saved)
+    // Only hit the server if localStorage was empty (other device may have saved).
+    // Drafts now sync through /api/admin/drafts (service role) — no browser
+    // access to site_settings.
     if (!localDraft || !localAi || !localOriginal) {
-      supabase.from("site_settings").select("key,value")
-        .in("key", [`draft_${inquiryId}`, `ai_draft_${inquiryId}`, `original_ai_draft_${inquiryId}`])
-        .then(({ data }) => {
+      fetch(`/api/admin/drafts?inquiryId=${inquiryId}`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
           if (!data) return;
-          for (const row of data) {
-            if (row.key === `draft_${inquiryId}` && !localDraft && row.value) {
-              setDraft(row.value);
-              localStorage.setItem(`draft_${inquiryId}`, row.value);
-            }
-            if (row.key === `ai_draft_${inquiryId}` && !localAi && row.value) {
-              setLastAiDraft(row.value);
-              localStorage.setItem(`ai_draft_${inquiryId}`, row.value);
-            }
-            if (row.key === `original_ai_draft_${inquiryId}` && !localOriginal && row.value) {
-              setOriginalAiDraft(row.value);
-              localStorage.setItem(`original_ai_draft_${inquiryId}`, row.value);
-            }
+          if (data.draft && !localDraft) {
+            setDraft(data.draft);
+            localStorage.setItem(`draft_${inquiryId}`, data.draft);
           }
-        });
+          if (data.ai_draft && !localAi) {
+            setLastAiDraft(data.ai_draft);
+            localStorage.setItem(`ai_draft_${inquiryId}`, data.ai_draft);
+          }
+          if (data.original_ai_draft && !localOriginal) {
+            setOriginalAiDraft(data.original_ai_draft);
+            localStorage.setItem(`original_ai_draft_${inquiryId}`, data.original_ai_draft);
+          }
+        })
+        .catch(() => {});
     }
   }, [inquiryId]);
 
@@ -432,16 +433,21 @@ export default function ConversationPage() {
         }
         // Lock in the original draft on first generate only (not refinements)
         const isRefine = Boolean(refeedback);
-        const upsertRows: { key: string; value: string }[] = [
-          { key: `draft_${inquiryId}`,    value: json.draft },
-          { key: `ai_draft_${inquiryId}`, value: json.draft },
-        ];
+        const draftPayload: { inquiryId: number | string; draft: string; ai_draft: string; original_ai_draft?: string } = {
+          inquiryId,
+          draft: json.draft,
+          ai_draft: json.draft,
+        };
         if (!isRefine && !originalAiDraft) {
           setOriginalAiDraft(json.draft);
-          upsertRows.push({ key: `original_ai_draft_${inquiryId}`, value: json.draft });
+          draftPayload.original_ai_draft = json.draft;
         }
-        // Persist to Supabase so draft is accessible on any device
-        await supabase.from("site_settings").upsert(upsertRows, { onConflict: "key" });
+        // Persist server-side (service role) so draft is accessible on any device
+        await fetch("/api/admin/drafts", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(draftPayload),
+        }).catch(() => {});
       }
       else showToast(json.error ?? "Draft failed", false);
     } catch {
@@ -644,15 +650,17 @@ export default function ConversationPage() {
     if (voiceActive) { stopVoice(); } else { startVoice(); }
   }
 
-  // ── Save draft to Supabase (cross-device sync) ────────────────────────────
+  // ── Save draft server-side (cross-device sync via /api/admin/drafts) ──────
   async function saveDraftToCloud() {
     if (!draft.trim()) return;
     setDraftSaving(true);
     try {
-      await supabase.from("site_settings").upsert(
-        [{ key: `draft_${inquiryId}`, value: draft }],
-        { onConflict: "key" }
-      );
+      const res = await fetch("/api/admin/drafts", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ inquiryId, draft }),
+      });
+      if (!res.ok) throw new Error("save failed");
       setDraftSaved(true);
       setTimeout(() => setDraftSaved(false), 2500);
     } catch {
@@ -702,9 +710,12 @@ export default function ConversationPage() {
         }
 
         setDraft("");
-        // Clear cloud drafts now that it's sent
-        await supabase.from("site_settings").delete()
-          .in("key", [`draft_${inquiryId}`, `ai_draft_${inquiryId}`]);
+        // Clear cloud drafts now that it's sent (server-side, service role)
+        await fetch("/api/admin/drafts", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ inquiryId, kinds: ["draft", "ai_draft"] }),
+        }).catch(() => {});
         localStorage.removeItem(`draft_${inquiryId}`);
         localStorage.removeItem(`ai_draft_${inquiryId}`);
         // Refresh thread to show the sent message

@@ -1,11 +1,19 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // lib/gmailTokens.ts
 //
-// Shared helper: load Gmail OAuth tokens from site_settings and auto-refresh
-// when they're within 5 minutes of expiry.
+// Loads Gmail OAuth tokens from the dedicated, locked-down `gmail_credentials`
+// table (service-role only) and auto-refreshes when within 5 minutes of expiry.
+//
+// Tokens are NEVER stored in the general-purpose site_settings table and are
+// only ever read/written here by the server-side service-role client. Callers
+// (Gmail send/read routes) receive the token object server-side; it must never
+// be returned in a browser-facing API response.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
+
+export const GMAIL_CREDENTIALS_TABLE = "gmail_credentials";
+const SINGLETON_ID = 1;
 
 export type GmailTokens = {
   access_token:  string;
@@ -14,24 +22,57 @@ export type GmailTokens = {
   email:         string;
 };
 
+/** Read the current refresh token (or null). Server-side only. */
+export async function getStoredRefreshToken(): Promise<string | null> {
+  const supabase = createSupabaseServerClient();
+  const { data } = await supabase
+    .from(GMAIL_CREDENTIALS_TABLE)
+    .select("refresh_token")
+    .eq("id", SINGLETON_ID)
+    .maybeSingle();
+  return data?.refresh_token ?? null;
+}
+
+/** Persist the connection (single row). Server-side only. */
+export async function saveGmailTokens(tokens: GmailTokens): Promise<void> {
+  const supabase = createSupabaseServerClient();
+  await supabase.from(GMAIL_CREDENTIALS_TABLE).upsert(
+    {
+      id:            SINGLETON_ID,
+      access_token:  tokens.access_token,
+      refresh_token: tokens.refresh_token,
+      expiry_date:   tokens.expiry_date,
+      email:         tokens.email,
+      updated_at:    new Date().toISOString(),
+    },
+    { onConflict: "id" },
+  );
+}
+
+/** Remove the stored connection (disconnect). Server-side only. */
+export async function clearGmailTokens(): Promise<void> {
+  const supabase = createSupabaseServerClient();
+  await supabase.from(GMAIL_CREDENTIALS_TABLE).delete().eq("id", SINGLETON_ID);
+}
+
 export async function getValidTokens(): Promise<GmailTokens | null> {
   const supabase = createSupabaseServerClient();
   const { data } = await supabase
-    .from("site_settings")
-    .select("value")
-    .eq("key", "gmail_tokens")
-    .single();
+    .from(GMAIL_CREDENTIALS_TABLE)
+    .select("access_token,refresh_token,expiry_date,email")
+    .eq("id", SINGLETON_ID)
+    .maybeSingle();
 
-  if (!data?.value) return null;
+  if (!data?.access_token) return null;
 
-  let tokens: GmailTokens;
-  try {
-    tokens = JSON.parse(data.value);
-  } catch {
-    return null;
-  }
+  let tokens: GmailTokens = {
+    access_token:  data.access_token,
+    refresh_token: data.refresh_token ?? null,
+    expiry_date:   Number(data.expiry_date ?? 0),
+    email:         data.email ?? "Gmail",
+  };
 
-  // Refresh if expiring within 5 minutes
+  // Refresh if expiring within 5 minutes.
   if (tokens.expiry_date < Date.now() + 5 * 60 * 1000) {
     if (!tokens.refresh_token) return null;
 
@@ -55,10 +96,7 @@ export async function getValidTokens(): Promise<GmailTokens | null> {
       expiry_date:  Date.now() + (refreshed.expires_in ?? 3600) * 1000,
     };
 
-    await supabase.from("site_settings").upsert(
-      { key: "gmail_tokens", value: JSON.stringify(tokens), updated_at: new Date().toISOString() },
-      { onConflict: "key" }
-    );
+    await saveGmailTokens(tokens);
   }
 
   return tokens;
