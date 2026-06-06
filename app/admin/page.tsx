@@ -95,6 +95,8 @@ const WEBSITE_TABS:Tab[]=["poses","locations","bayGuide","portfolio","categories
 const CLIENT_TABS:Tab[]=["inquiries","clients","testimonials","analytics","payments","funnel","ai","chat","format"];
 const VAULT_TABS:Tab[]=["vault"];
 const TAB_LABELS:Record<Tab,string>={home:"🏠 Home",poses:"📸 Grad Poses",locations:"📍 Campus Spots",bayGuide:"🗺️ Bay Guide",portfolio:"🖼️ Portfolio",categories:"🏷️ Categories",blog:"✍️ Blog",library:"🗄️ Image Library",navigation:"🧭 Navigation",analytics:"📊 Analytics",payments:"💵 Revenue",funnel:"📈 Funnel",inquiries:"📬 Inquiries",clients:"👥 Clients",testimonials:"💬 Testimonials",vault:"📓 Vault",ai:"🤖 AI Training",chat:"💬 AI Chat",format:"✨ Quick Format",accounts:"👤 Accounts"};
+// The six home-page "work grid" slots, in display order — used for the batch picker.
+const WORK_GRID_KEYS=["home_story_1","home_story_2","home_story_3","home_story_4","home_story_5","home_story_6"] as const;
 
 function detectSchool(text:string):string|null{
   // Normalize accents (e.g. "José" → "Jose") so accented names still match
@@ -231,6 +233,11 @@ function AdminDashboard() {
   const [siteSettings, setSiteSettings] = useState<Record<string,string|null>>({});
   const [settingsSaving, setSettingsSaving] = useState<string|null>(null);
   const [coverPickerKey, setCoverPickerKey] = useState<string|null>(null);
+  // Work-grid batch picker: pick up to 6 photos in order, then fill slots 1–6 in one save.
+  const [gridBatchOpen, setGridBatchOpen] = useState(false);
+  const [gridBatchPick, setGridBatchPick] = useState<string[]>([]);
+  const [gridBatchSaving, setGridBatchSaving] = useState(false);
+  const gridBatchAnchorRef = useRef<number|null>(null);
 
   // ── Reply style ───────────────────────────────────────────────────────
 
@@ -918,21 +925,25 @@ function AdminDashboard() {
   }
   // Targets the checked photos, or every queued photo when none are checked.
   function batchTargets(){return batchSelected.size===0?batchItems.map(i=>i.id):batchSelected;}
-  function applyBulkCategory(){
+  // Sets category and location together in one pass. Location is only applied when typed,
+  // so leaving it blank keeps each photo's existing location instead of wiping it.
+  function applyBulkTags(){
     const cat=bulkCategory||categories[0]?.slug;
     if(!cat){showToast("Add a category first",false);return;}
+    const loc=bulkLocation.trim();
     const targets=new Set(batchTargets());
-    setBatchItems(prev=>prev.map(item=>targets.has(item.id)?{...item,category_slug:cat}:item));
-    showToast(`Set category on ${targets.size} photo${targets.size!==1?"s":""}`);
+    setBatchItems(prev=>prev.map(item=>targets.has(item.id)?{...item,category_slug:cat,...(loc?{location:loc}:{})}:item));
+    showToast(`Updated ${targets.size} photo${targets.size!==1?"s":""}`);
     clearBatchSelection(); // deselect so you can move on to the next group
   }
-  function applyBulkLocation(){
-    const loc=bulkLocation.trim();
-    if(!loc){showToast("Type a location first",false);return;}
-    const targets=new Set(batchTargets());
-    setBatchItems(prev=>prev.map(item=>targets.has(item.id)?{...item,location:loc}:item));
-    showToast(`Set location on ${targets.size} photo${targets.size!==1?"s":""}`);
+  // Removes every checked photo from the queue at once (Shift-click selects a range first).
+  function removeSelectedBatch(){
+    if(batchSelected.size===0)return;
+    const ids=new Set(batchSelected);
+    const removed=ids.size;
+    setBatchItems(prev=>prev.filter(item=>!ids.has(item.id)));
     clearBatchSelection();
+    showToast(`Removed ${removed} photo${removed!==1?"s":""} from the queue`);
   }
 
   async function saveBatchImages(){
@@ -999,6 +1010,55 @@ function AdminDashboard() {
       showToast("Couldn't update photo selection",false);
     }finally{
       setSettingsSaving(null);
+    }
+  }
+
+  // ── Work-grid batch picker ──
+  function openGridBatch(){setGridBatchOpen(o=>!o);setGridBatchPick([]);gridBatchAnchorRef.current=null;}
+  // Click adds/removes a photo in pick order; Shift-click adds the whole range (list order) up to 6.
+  function onGridPickClick(e:React.MouseEvent,index:number){
+    const url=portfolioImages[index].image_url;
+    if(e.shiftKey&&gridBatchAnchorRef.current!==null){
+      const [a,b]=[gridBatchAnchorRef.current,index].sort((x,y)=>x-y);
+      const next=[...gridBatchPick];
+      for(let i=a;i<=b&&next.length<WORK_GRID_KEYS.length;i++){
+        const u=portfolioImages[i].image_url;
+        if(!next.includes(u))next.push(u);
+      }
+      setGridBatchPick(next);
+    }else if(gridBatchPick.includes(url)){
+      setGridBatchPick(gridBatchPick.filter(x=>x!==url));
+    }else if(gridBatchPick.length>=WORK_GRID_KEYS.length){
+      showToast(`That's all ${WORK_GRID_KEYS.length} slots — deselect one first`,false);
+    }else{
+      setGridBatchPick([...gridBatchPick,url]);
+    }
+    gridBatchAnchorRef.current=index;
+  }
+  async function applyWorkGridBatch(){
+    const picks=gridBatchPick;
+    if(picks.length===0){showToast("Pick at least one photo",false);return;}
+    setGridBatchSaving(true);
+    const updates:Record<string,string>={};
+    let fail=0;
+    for(let i=0;i<picks.length;i++){
+      const key=WORK_GRID_KEYS[i];
+      try{
+        const res=await fetch('/api/admin/site-settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({key,value:picks[i]})});
+        if(!res.ok)throw new Error();
+        updates[key]=picks[i];
+      }catch{fail++;}
+    }
+    setSiteSettings(prev=>({...prev,...updates}));
+    setGridBatchSaving(false);
+    revalidatePublicSite();
+    if(fail===0){
+      setGridBatchOpen(false);
+      setGridBatchPick([]);
+      gridBatchAnchorRef.current=null;
+      showToast(`Set ${picks.length} work grid photo${picks.length!==1?"s":""} ✓`);
+    }else{
+      showToast(`${picks.length-fail} set, ${fail} failed`,false);
     }
   }
 
@@ -1829,34 +1889,38 @@ function AdminDashboard() {
                   <h2 className="text-base font-black text-slate-900">Batch Upload</h2>
                   <button onClick={()=>batchFileRef.current?.click()} className="text-xs font-bold px-4 py-2 rounded-xl text-white" style={{background:C.grad12}}>+ Add photos</button>
                 </div>
-                <p className="text-xs text-slate-400 mb-4">Check the photos you want (Shift-click to select a range), then apply a category or location to all of them at once. Location is optional and helps SEO later. Duplicate photos already in the queue or your library are skipped automatically. You can also edit each photo individually.</p>
+                <p className="text-xs text-slate-400 mb-4">Check the photos you want (Shift-click to select a range), then apply category and location together in one tap — or delete the selected ones if you added them by mistake. Location is optional and helps SEO later. Duplicate photos already in the queue or your library are skipped automatically. You can also edit each photo individually.</p>
                 <input ref={batchFileRef} type="file" accept="image/*" multiple className="hidden" onChange={onBatchFiles}/>
                 <datalist id="batch-location-options">{locationOptions.map(loc=><option key={loc} value={loc}/>)}</datalist>
 
                 {batchItems.length>0?(
                   <>
-                    {/* Bulk bar: select photos, then apply a category and/or location to all of them */}
+                    {/* Bulk bar: select photos, then apply category + location together (or delete the selected ones) */}
                     <div className="mb-3 p-3 rounded-xl bg-slate-50 border border-slate-100 space-y-2">
-                      <label className="flex items-center gap-2 text-xs font-bold text-slate-600 cursor-pointer select-none">
-                        <input type="checkbox" checked={allBatchSelected} onChange={toggleSelectAllBatch} className="w-4 h-4 accent-slate-900"/>
-                        {batchSelected.size>0?`${batchSelected.size} selected`:"Select all"}
-                      </label>
+                      <div className="flex items-center justify-between gap-2">
+                        <label className="flex items-center gap-2 text-xs font-bold text-slate-600 cursor-pointer select-none">
+                          <input type="checkbox" checked={allBatchSelected} onChange={toggleSelectAllBatch} className="w-4 h-4 accent-slate-900"/>
+                          {batchSelected.size>0?`${batchSelected.size} selected`:"Select all"}
+                        </label>
+                        {batchSelected.size>0&&(
+                          <button onClick={removeSelectedBatch} className="text-xs font-bold px-3 py-1.5 rounded-lg text-red-500 bg-red-50 hover:bg-red-100 transition-colors">
+                            Delete {batchSelected.size} selected
+                          </button>
+                        )}
+                      </div>
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="text-xs font-bold text-slate-500 w-16">Category</span>
                         <select value={bulkCategory||categories[0]?.slug||""} onChange={e=>setBulkCategory(e.target.value)} className="flex-1 min-w-[120px] px-2 py-1 rounded-lg text-xs font-medium text-slate-800 outline-none border border-slate-200 bg-white">
                           {categories.map(c=><option key={c.slug} value={c.slug}>{c.name}</option>)}
                         </select>
-                        <button onClick={applyBulkCategory} className="text-xs font-bold px-3 py-1.5 rounded-lg text-white" style={{background:C.grad12}}>
-                          Apply to {batchSelected.size>0?"selected":"all"}
-                        </button>
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="text-xs font-bold text-slate-500 w-16">Location</span>
                         <input list="batch-location-options" value={bulkLocation} onChange={e=>setBulkLocation(e.target.value)} placeholder="e.g. Crissy Field (optional)" className="flex-1 min-w-[120px] px-2 py-1 rounded-lg text-xs font-medium text-slate-800 outline-none border border-slate-200 bg-white"/>
-                        <button onClick={applyBulkLocation} className="text-xs font-bold px-3 py-1.5 rounded-lg text-white" style={{background:C.grad12}}>
-                          Apply to {batchSelected.size>0?"selected":"all"}
-                        </button>
                       </div>
+                      <button onClick={applyBulkTags} className="w-full text-xs font-bold px-3 py-1.5 rounded-lg text-white" style={{background:C.grad12}}>
+                        Apply category{bulkLocation.trim()?" + location":""} to {batchSelected.size>0?`${batchSelected.size} selected`:"all"}
+                      </button>
                     </div>
                     <div className="space-y-2 mb-4">
                       {batchItems.map((item,idx)=>(
@@ -1936,6 +2000,54 @@ function AdminDashboard() {
 
                     return(
                       <div key={key}>
+                        {key==="home_story_1"&&(
+                          <div className="mb-4 rounded-xl border p-3" style={{borderColor:C.borderSubtle,background:C.p3_10}}>
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <p className="text-xs font-black uppercase tracking-widest text-slate-700">Work grid — set all {WORK_GRID_KEYS.length} at once</p>
+                                <p className="text-xs text-slate-400 mt-0.5">Shift-click to grab a run of photos. They fill photos 1–{WORK_GRID_KEYS.length} in the order you pick them.</p>
+                              </div>
+                              <button onClick={openGridBatch}
+                                className="text-xs font-bold px-3 py-1.5 rounded-lg border transition-colors flex-shrink-0"
+                                style={gridBatchOpen?{background:C.ink,color:C.white,borderColor:C.ink}:{background:C.white,color:C.inkSoft,borderColor:C.borderSubtle}}>
+                                {gridBatchOpen?"Cancel":"Select multiple"}
+                              </button>
+                            </div>
+                            {gridBatchOpen&&(
+                              <div className="mt-3">
+                                {portfolioImages.length>0?(
+                                  <div className="grid grid-cols-3 gap-2 max-h-72 overflow-y-auto mb-2">
+                                    {portfolioImages.map((img,idx)=>{
+                                      const pos=gridBatchPick.indexOf(img.image_url);
+                                      return(
+                                        <button key={img.id} onClick={e=>onGridPickClick(e,idx)}
+                                          className="relative aspect-square rounded-xl overflow-hidden border-2 transition-all hover:scale-105"
+                                          style={{borderColor:pos>=0?C.p1:"transparent"}}>
+                                          <img src={img.image_url} className="w-full h-full object-cover"/>
+                                          {pos>=0&&(
+                                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                                              <span className="text-white text-sm font-black w-6 h-6 rounded-full flex items-center justify-center" style={{background:C.p1}}>{pos+1}</span>
+                                            </div>
+                                          )}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                ):(
+                                  <p className="text-xs text-slate-400 mb-2 rounded-xl bg-white border border-slate-100 p-3">Upload portfolio images first.</p>
+                                )}
+                                <div className="flex items-center gap-2">
+                                  <button onClick={applyWorkGridBatch} disabled={gridBatchSaving||gridBatchPick.length===0}
+                                    className="text-xs font-bold px-3 py-1.5 rounded-lg text-white" style={{background:C.grad12,opacity:gridBatchSaving||gridBatchPick.length===0?0.5:1}}>
+                                    {gridBatchSaving?"Saving…":`Apply ${gridBatchPick.length} to grid`}
+                                  </button>
+                                  {gridBatchPick.length>0&&<button onClick={()=>{setGridBatchPick([]);gridBatchAnchorRef.current=null;}} className="text-xs font-bold px-3 py-1.5 rounded-lg bg-white text-slate-500 border border-slate-200">Clear</button>}
+                                  <span className="text-xs text-slate-400">{gridBatchPick.length}/{WORK_GRID_KEYS.length} chosen</span>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
                         <p className="text-xs font-black uppercase tracking-widest text-slate-500 mb-1">{label}</p>
                         <p className="text-xs text-slate-400 mb-2">{helper}</p>
                         {coverPickerKey===key?(
