@@ -1,6 +1,14 @@
 import type { BlogPostSummary, PortfolioImage } from "@/lib/professionalData";
 
-type HomepageImage = Pick<PortfolioImage, "id" | "image_url" | "alt" | "category_slug">;
+type HomepageImage = Pick<
+  PortfolioImage,
+  "id" | "image_url" | "alt" | "category_slug" | "hero_carousel"
+>;
+
+export type HomepageHeroSlide = HomepageImage & {
+  objectPosition: string;
+  mobileObjectPosition: string;
+};
 
 export type FeaturedSession = {
   title: string;
@@ -51,6 +59,7 @@ const ABOUT_PORTRAIT_ALT =
 // Every resolved image slot the redesigned homepage renders. Components receive
 // these directly instead of re-deriving images from the raw portfolio.
 export type HomepageImages = {
+  heroSlides: HomepageHeroSlide[];
   heroPrimary: HomepageImage;
   heroSecondary: HomepageImage;
   cardGrads: HomepageImage;
@@ -87,6 +96,7 @@ export function resolveHomepageImages(
     image_url: url,
     alt,
     category_slug: categorySlug,
+    hero_carousel: false,
   });
 
   const all = images.filter((image) => image.image_url);
@@ -157,8 +167,10 @@ export function resolveHomepageImages(
     image_url: settings.home_about_portrait || aboutPortraitFallback,
     alt: ABOUT_PORTRAIT_ALT,
   };
+  const heroSlides = buildHomepageHeroSlides(images, heroPrimary, cardPortrait);
 
   return {
+    heroSlides,
     heroPrimary,
     heroSecondary,
     cardGrads,
@@ -169,6 +181,54 @@ export function resolveHomepageImages(
     finalCta,
     aboutPortrait,
   };
+}
+
+function pickSpread(images: HomepageImage[], count: number) {
+  if (images.length <= count) return images;
+  if (count === 1) return [images[0]];
+
+  return Array.from({ length: count }, (_, index) => {
+    const position = Math.round((index * (images.length - 1)) / (count - 1));
+    return images[position];
+  });
+}
+
+function getHeroPosition(categorySlug: string) {
+  if (categorySlug === "families") {
+    return { objectPosition: "center 52%", mobileObjectPosition: "68% center" };
+  }
+  if (categorySlug === "couples") {
+    return { objectPosition: "center 64%", mobileObjectPosition: "center 58%" };
+  }
+  return { objectPosition: "center 64%", mobileObjectPosition: "center 56%" };
+}
+
+function buildHomepageHeroSlides(
+  images: HomepageImage[],
+  primaryImage: HomepageImage,
+  portraitImage: HomepageImage,
+): HomepageHeroSlide[] {
+  const grads = images.filter((image) => image.category_slug === "grads");
+  const couples = images.filter((image) => image.category_slug === "couples");
+  const curatedGrads = images.filter(
+    (image) => image.hero_carousel && image.category_slug === "grads",
+  );
+  const gradSlides = dedupeByUrl([...curatedGrads, ...grads, primaryImage]).slice(0, 3);
+  const coupleSlides = pickSpread(dedupeByUrl(couples), 2);
+  const ordered = [
+    gradSlides[0],
+    coupleSlides[0],
+    gradSlides[1],
+    portraitImage,
+    coupleSlides[1],
+    gradSlides[2],
+  ].filter((image): image is HomepageImage => Boolean(image));
+  const fallbacks = dedupeByUrl([...ordered, ...images]).slice(0, 6);
+
+  return fallbacks.map((image) => ({
+    ...image,
+    ...getHeroPosition(image.category_slug),
+  }));
 }
 
 export function pickDistinctCategoryImages(

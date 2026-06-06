@@ -8,10 +8,10 @@ import {
 } from "../lib/homepageData.ts";
 
 const IMAGES = [
-  { id: 1, image_url: "grad-a.jpg", alt: "Grad A", category_slug: "grads" },
-  { id: 2, image_url: "grad-b.jpg", alt: "Grad B", category_slug: "grads" },
-  { id: 3, image_url: "couple-a.jpg", alt: "Couple A", category_slug: "couples" },
-  { id: 4, image_url: "family-a.jpg", alt: "Family A", category_slug: "families" },
+  { id: 1, image_url: "grad-a.jpg", alt: "Grad A", category_slug: "grads", hero_carousel: false },
+  { id: 2, image_url: "grad-b.jpg", alt: "Grad B", category_slug: "grads", hero_carousel: false },
+  { id: 3, image_url: "couple-a.jpg", alt: "Couple A", category_slug: "couples", hero_carousel: false },
+  { id: 4, image_url: "family-a.jpg", alt: "Family A", category_slug: "families", hero_carousel: false },
 ];
 
 const FALLBACK_PORTRAIT = "/images/about/chris.webp";
@@ -54,6 +54,28 @@ test("resolveHomepageImages auto-picks by category when no settings are set", ()
   assert.equal(home.cardCouples.image_url, "couple-a.jpg");
   assert.equal(home.cardPortrait.image_url, "family-a.jpg");
   assert.equal(home.aboutPortrait.image_url, FALLBACK_PORTRAIT);
+});
+
+test("hero slides open with curated graduation work and balance service categories", () => {
+  const images = [
+    { id: 1, image_url: "grad-1.jpg", alt: "Grad 1", category_slug: "grads", hero_carousel: true },
+    { id: 2, image_url: "grad-2.jpg", alt: "Grad 2", category_slug: "grads", hero_carousel: true },
+    { id: 3, image_url: "grad-3.jpg", alt: "Grad 3", category_slug: "grads", hero_carousel: true },
+    { id: 4, image_url: "couple-1.jpg", alt: "Couple 1", category_slug: "couples", hero_carousel: false },
+    { id: 5, image_url: "couple-2.jpg", alt: "Couple 2", category_slug: "couples", hero_carousel: false },
+    { id: 6, image_url: "family-1.jpg", alt: "Family 1", category_slug: "families", hero_carousel: false },
+  ];
+  const home = resolveHomepageImages(
+    { home_hero_primary: "legacy-family-frame.jpg" },
+    images,
+    FALLBACK_PORTRAIT,
+  );
+
+  assert.deepEqual(
+    home.heroSlides.map((image) => image.category_slug),
+    ["grads", "couples", "grads", "families", "couples", "grads"],
+  );
+  assert.equal(home.heroSlides[0].image_url, "grad-1.jpg");
 });
 
 test("resolveHomepageImages prefers explicit settings, then legacy keys", () => {

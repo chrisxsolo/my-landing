@@ -16,6 +16,7 @@ import {
 } from "@/lib/professionalData";
 import { getApprovedTestimonials } from "@/lib/testimonialsData";
 import styles from "@/app/(professional)/home.module.css";
+import pageStyles from "@/app/(professional)/HomePage.module.css";
 
 export const revalidate = 3600;
 
@@ -104,12 +105,13 @@ export default async function ProfessionalHomePage() {
   };
 
   return (
-    <main className={styles.page} style={COLOR_VARS}>
+    <main className={`${styles.page} ${pageStyles.fullBleed}`} style={COLOR_VARS}>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
       />
-      <HomeHero primaryImage={home.heroPrimary} secondaryImage={home.heroSecondary} />
+      <HomeHero slides={home.heroSlides} />
+      <div id="homepage-content" aria-hidden="true" />
       <HomeStorySections
         cardGrads={home.cardGrads}
         cardCouples={home.cardCouples}

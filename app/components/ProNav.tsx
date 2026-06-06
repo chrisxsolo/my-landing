@@ -1,22 +1,13 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// PRONAV  →  floating fixed navigation bar on all professional pages
-// ─────────────────────────────────────────────────────────────────────────────
-// The nav contents (order, labels, links, dropdowns, visibility) are now edited
-// from the admin dashboard → "Navigation" tab, persisted in site_settings, and
-// passed in here as `config`. To change the structure, edit it there — not here.
-// This file owns only the markup, styling, and open/close interaction.
-//   → Nav pill color: change .pro-nav-shell background/border values below.
-// ─────────────────────────────────────────────────────────────────────────────
-
 "use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState, type CSSProperties } from "react";
+import { C } from "@/lib/colors";
 import { DEFAULT_NAV_CONFIG, type NavConfig, type NavGroup } from "@/lib/navConfig";
+import { useHomepageHeroNavState } from "@/app/components/useHomepageHeroNavState";
+import heroStyles from "@/app/components/ProNavHero.module.css";
 
-// The client portal "active" state also covers the logged-in dashboard route,
-// which isn't itself a nav link.
 const CLIENT_DASHBOARD_HREF = "/dashboard";
 
 function isActive(pathname: string, href: string) {
@@ -39,6 +30,8 @@ export default function ProNav({ config = DEFAULT_NAV_CONFIG }: { config?: NavCo
   const primary = config.primary.filter((item) => item.visible);
   const isPortalActive =
     isActive(pathname, clientLogin.href) || isActive(pathname, CLIENT_DASHBOARD_HREF);
+  const isHomepageHero = useHomepageHeroNavState(pathname) && !menuOpen;
+  const heroVariables = { "--nav-hero-border": C.white_22, "--nav-hero-ink": C.ink, "--nav-hero-paper": C.white } as CSSProperties;
 
   const closeMenus = () => {
     setMenuOpen(false);
@@ -82,8 +75,6 @@ export default function ProNav({ config = DEFAULT_NAV_CONFIG }: { config?: NavCo
   const renderDesktopGroup = (group: NavGroup) => {
     const open = openGroupId === group.id;
     const active = isGroupActive(pathname, group);
-
-    // href === null → a plain dropdown button (e.g. "Guides").
     if (group.href == null) {
       return (
         <div key={group.id} className="pro-dropdown-wrap">
@@ -97,8 +88,6 @@ export default function ProNav({ config = DEFAULT_NAV_CONFIG }: { config?: NavCo
         </div>
       );
     }
-
-    // href set → split button: a real link + a caret that opens the dropdown.
     return (
       <div key={group.id} className="pro-dropdown-wrap" style={{ display: "flex" }}>
         <Link href={group.href} className="pro-nav-link"
@@ -118,8 +107,6 @@ export default function ProNav({ config = DEFAULT_NAV_CONFIG }: { config?: NavCo
     );
   };
 
-  // Mobile groups use Fragments so the button / split stays a direct child of
-  // .pro-mobile-panel (its full-width styling relies on the `>` child selector).
   const renderMobileGroup = (group: NavGroup) => {
     const open = openGroupId === group.id;
     const active = isGroupActive(pathname, group);
@@ -161,11 +148,6 @@ export default function ProNav({ config = DEFAULT_NAV_CONFIG }: { config?: NavCo
           padding: 14px 24px;
           pointer-events: none;
         }
-
-        /* ── NAV PILL ─────────────────────────────────────────────────────────
-           White frosted glass — clean light appearance on all pages.
-           To change color: adjust background rgba values.
-           backdrop-filter adds the frosted blur effect. */
         .pro-nav-shell {
           width: min(1180px, 100%);
           min-height: 58px;
@@ -182,15 +164,14 @@ export default function ProNav({ config = DEFAULT_NAV_CONFIG }: { config?: NavCo
           -webkit-backdrop-filter: blur(20px) saturate(180%);
           box-shadow: 0 8px 28px rgba(16, 24, 22, 0.09), inset 0 1px 0 rgba(255,255,255,0.9);
           pointer-events: auto;
+          transition: background 0.24s ease, border-color 0.24s ease, box-shadow 0.24s ease;
         }
-
         .pro-nav-brand, .pro-nav-link, .pro-nav-button, .pro-nav-cta, .pro-nav-dropdown-link {
           font-family: var(--font-dm-sans), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
           letter-spacing: 0;
           text-decoration: none;
         }
 
-        /* ── BRAND ─────────────────────────────────────────────────────────── */
         .pro-nav-brand {
           display: inline-flex;
           align-items: center;
@@ -202,7 +183,6 @@ export default function ProNav({ config = DEFAULT_NAV_CONFIG }: { config?: NavCo
           line-height: 1;
         }
 
-        /* ── INNER NAV GROUP ───────────────────────────────────────────────── */
         .pro-desktop-nav {
           justify-self: center;
           display: flex;
@@ -213,7 +193,6 @@ export default function ProNav({ config = DEFAULT_NAV_CONFIG }: { config?: NavCo
           background: rgba(245, 249, 247, 0.72);
         }
 
-        /* ── LINKS & BUTTONS ───────────────────────────────────────────────── */
         .pro-nav-link, .pro-nav-button {
           min-height: 36px;
           display: inline-flex;
@@ -239,11 +218,7 @@ export default function ProNav({ config = DEFAULT_NAV_CONFIG }: { config?: NavCo
         }
 
         .pro-nav-caret { color: #687571; font-size: 10px; line-height: 1; }
-
-        /* ── ACTIONS (right side) ──────────────────────────────────────────── */
         .pro-nav-actions { justify-self: end; display: flex; align-items: center; gap: 8px; }
-
-        /* ── CTA BUTTON ────────────────────────────────────────────────────── */
         .pro-nav-cta {
           min-height: 42px;
           display: inline-flex;
@@ -267,7 +242,6 @@ export default function ProNav({ config = DEFAULT_NAV_CONFIG }: { config?: NavCo
           box-shadow: 0 12px 26px rgba(112, 139, 133, 0.07);
         }
 
-        /* ── DROPDOWN ──────────────────────────────────────────────────────── */
         .pro-dropdown-wrap { position: relative; }
         .pro-nav-dropdown {
           position: absolute;
@@ -301,9 +275,7 @@ export default function ProNav({ config = DEFAULT_NAV_CONFIG }: { config?: NavCo
           color: #0d1412;
         }
 
-        /* ── MOBILE ────────────────────────────────────────────────────────── */
         .pro-mobile-button, .pro-mobile-panel { display: none; }
-
         @media (max-width: 880px) {
           .pro-header { padding: 10px 12px; }
           .pro-nav-shell { grid-template-columns: 1fr auto; min-height: 56px; }
@@ -350,7 +322,10 @@ export default function ProNav({ config = DEFAULT_NAV_CONFIG }: { config?: NavCo
       `}</style>
 
       <header ref={navRef} className="pro-header">
-        <div className="pro-nav-shell">
+        <div
+          className={`pro-nav-shell${isHomepageHero ? ` ${heroStyles.hero}` : ""}`}
+          style={heroVariables}
+        >
           <Link href="/" className="pro-nav-brand" aria-label="soloxsnaps home" onClick={closeMenus}>soloxsnaps</Link>
 
           <nav className="pro-desktop-nav" aria-label="Primary navigation">
