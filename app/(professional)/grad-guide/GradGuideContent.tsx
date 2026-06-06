@@ -11,7 +11,7 @@ const sections = [
   { href: "/grad-guide/posing",         num: "01", title: "Posing Guide",   desc: "Natural, flattering poses that actually look good on camera.", emoji: "📸" },
   { href: "/grad-guide/what-to-wear",   num: "02", title: "What to Wear",    desc: "Colors and fits that photograph beautifully in any Bay Area location.", emoji: "👗" },
   { href: "/grad-guide/how-to-prepare", num: "03", title: "How to Prepare",  desc: "Everything to do before your shoot so you show up confident and ready.", emoji: "✅" },
-  { href: "/grad-guide/campus-spots",   num: "04", title: "Campus Spots",    desc: "Where we shoot at SJSU, Berkeley, SF State, CSUEB, and USF.", emoji: "📍" },
+  { href: "/grad-guide/campus-spots",   num: "04", title: "Campus Spots",    desc: "Where we shoot at SJSU, Berkeley, SF State, CSUEB, USF, Santa Clara, and Stanford.", emoji: "📍" },
   { href: "/pricing/grads",             num: "05", title: "Grad Pricing",    desc: "Session lengths, rates, and exactly what every package includes.", emoji: "📋" },
   { href: "/availability",              num: "06", title: "My Availability", desc: "Check what dates are open and reach out to lock one in.", emoji: "📅" },
 ];
@@ -48,6 +48,18 @@ const schools: Array<{ name: string; href: string; blurb: string }> = [
     href: "/grads/csueb",
     blurb:
       "The Hayward hilltop campus has some of the best skyline and bay views in the system. Golden hour here is hard to beat for wide, editorial grad portraits.",
+  },
+  {
+    name: "Santa Clara University Graduation Photos",
+    href: "/grads/santa-clara",
+    blurb:
+      "Mission Santa Clara, the Rose Garden, and the palm-lined walkways give SCU grads a warm, timeless backdrop. Late afternoon light on the adobe Mission is the sweet spot.",
+  },
+  {
+    name: "Stanford Graduation Photos",
+    href: "/grads/stanford",
+    blurb:
+      "The Main Quad, Memorial Church, Palm Drive, and Hoover Tower make Stanford one of the most striking campuses on the Peninsula. Soft afternoon light fills the sandstone arches.",
   },
 ];
 
