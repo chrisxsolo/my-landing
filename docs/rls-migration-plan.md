@@ -327,18 +327,18 @@ drop Group-A anon policies → zero anon table access remains.
 > Do **not** print existing Gmail tokens into logs, test output, terminal, commits, or API
 > responses at any point.
 
-- [ ] **Revoke** the currently stored Google OAuth access **and refresh** tokens
+- [x] **Revoke** the currently stored Google OAuth access **and refresh** tokens
       (https://myaccount.google.com/permissions → remove this app's access; and/or call Google's
       token revocation endpoint for the refresh token).
-- [ ] **Disconnect** the existing Google authorization grant (same screen).
-- [ ] **Remove/null** the exposed `gmail_tokens` value from `site_settings`
+- [x] **Disconnect** the existing Google authorization grant (same screen).
+- [x] **Remove/null** the exposed `gmail_tokens` value from `site_settings`
       (e.g. `DELETE FROM site_settings WHERE key='gmail_tokens';` via service role — do not echo it).
 - [ ] **Deploy** the new server routes + migrated admin UI (this change set).
-- [ ] **Apply** `20260606000000_create_gmail_credentials.sql` then
+- [x] **Apply** `20260606000000_create_gmail_credentials.sql` then
       `20260606000001_emergency_lock_site_settings.sql`.
 - [ ] **Reconnect** Gmail (admin → connect) to generate a fresh authorization grant; confirm the
       new tokens land in `gmail_credentials` (service-role only), not `site_settings`.
-- [ ] **Confirm** new credentials are written only by server-side code.
+- [x] **Confirm** new credentials are written only by server-side code.
 - [ ] **Review** Supabase DB/API logs for unexpected `site_settings` access during the exposure window.
 - [ ] **Review** Google account security & OAuth activity for unfamiliar usage.
 - [ ] **Search** all `site_settings` rows for additional secrets (API keys, tokens, passwords).
@@ -385,6 +385,18 @@ which is the intended trust boundary.
 
 ### 2026-06-05 — containment in progress
 
+**Steps 1–3 + 5 — production containment executed after Google grant revocation.**
+Google OAuth access was revoked by the account owner first. Then the production database was locked
+down with the emergency `site_settings` migration, the exposed `gmail_tokens` row was deleted, and
+the dedicated `gmail_credentials` table was created.
+
+**Codex verification after Claude interruption:**
+- `site_settings` remains reachable through the service-role path: 40 rows.
+- `site_settings` has 0 remaining `gmail_tokens` rows.
+- `gmail_credentials` exists and is service-role reachable: 0 rows before Gmail reconnect.
+- Anon REST access to `site_settings` is denied: HTTP 401.
+- Anon REST access to `gmail_credentials` is denied: HTTP 401.
+
 **Step 4 — `site_settings` secret audit (read-only; key names + value lengths only, never contents).**
 41 keys. Pattern scan flagged exactly **one** credential row: `gmail_tokens` (suspect key name +
 suspect value shape). Other non-image keys present:
@@ -412,12 +424,12 @@ explanatory comment — never in code that reads/writes the key. ✓
 **Step status:**
 | # | Step | Owner | Status |
 |---|---|---|---|
-| 1 | Revoke Google OAuth grant | **Human (Google account)** | ⏳ pending — gates 2–3 |
-| 2 | Apply emergency_lock_site_settings + verify | Claude (MCP) | ⏳ ready; awaits step 1 confirmation |
-| 3 | DELETE gmail_tokens row | Claude (MCP) | ⏳ ready; awaits step 1 confirmation |
+| 1 | Revoke Google OAuth grant | **Human (Google account)** | ✅ done |
+| 2 | Apply emergency_lock_site_settings + verify | Claude/Codex | ✅ done; anon denied, service role reachable |
+| 3 | DELETE gmail_tokens row | Claude/Codex | ✅ done; 0 rows remain |
 | 4 | Audit remaining keys | Claude | ✅ done (above) |
-| 5 | Apply create_gmail_credentials + verify | Claude (MCP) | ⏳ ready; awaits step 1 confirmation |
+| 5 | Apply create_gmail_credentials + verify | Claude/Codex | ✅ done; table reachable, 0 rows before reconnect |
 | 6 | Deploy app code | **Human (commit + Vercel)** | ⏳ pending (not yet committed) |
 | 7 | Reconnect Gmail | **Human (browser OAuth)** | ⏳ pending |
-| 8 | Incident verification | Human + Claude | partial — repo search ✅; runtime/Google/Supabase-log review pending |
+| 8 | Incident verification | Human + Claude/Codex | partial — repo search ✅; runtime/Google/Supabase-log review pending |
 | 9 | Clean baseline | Claude | ✅ done (above) |
