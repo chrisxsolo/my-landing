@@ -1,6 +1,7 @@
 import Link from "next/link";
 import ProNav from "@/app/components/ProNav";
 import ScrollReveal from "@/app/components/ScrollReveal";
+import { getNavConfig } from "@/lib/professionalData";
 
 const footerLinks = [
   { label: "Couples rates", href: "/pricing/couples" },
@@ -11,7 +12,8 @@ const footerLinks = [
   { label: "Contact", href: "/contact" },
 ];
 
-export default function ProfessionalLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default async function ProfessionalLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  const navConfig = await getNavConfig();
   return (
     <div className="professional-shell">
       <style>{`
@@ -223,7 +225,7 @@ export default function ProfessionalLayout({ children }: Readonly<{ children: Re
         }
       `}</style>
       <ScrollReveal />
-      <ProNav />
+      <ProNav config={navConfig} />
       {children}
 
       <footer className="professional-footer">

@@ -4,6 +4,12 @@ import {
   getPhotoTitle,
   normalizePortfolioCategorySlug,
 } from "@/lib/photoMetadata";
+import {
+  NAV_CONFIG_SETTING_KEY,
+  DEFAULT_NAV_CONFIG,
+  parseNavConfig,
+  type NavConfig,
+} from "@/lib/navConfig";
 
 export type PortfolioCategory = {
   id: number;
@@ -256,6 +262,23 @@ export async function getPortfolioData() {
   const images = await getPortfolioImages(categories);
 
   return { categories, images };
+}
+
+// Reads the admin-editable primary nav from site_settings. Always returns a
+// valid NavConfig — parseNavConfig falls back to DEFAULT_NAV_CONFIG on a missing
+// row or malformed JSON, so ProNav can render before the admin ever saves.
+export async function getNavConfig(): Promise<NavConfig> {
+  try {
+    const supabase = createSupabaseServerClient();
+    const { data } = await supabase
+      .from("site_settings")
+      .select("value")
+      .eq("key", NAV_CONFIG_SETTING_KEY)
+      .maybeSingle();
+    return data?.value ? parseNavConfig(data.value) : DEFAULT_NAV_CONFIG;
+  } catch {
+    return DEFAULT_NAV_CONFIG;
+  }
 }
 
 export async function getSiteSettings(): Promise<Record<string, string | null>> {

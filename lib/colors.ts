@@ -41,6 +41,7 @@ export const C = {
   success,
   white_22: "rgba(255,255,255,0.22)",
   white_82: "rgba(255,255,255,0.82)",
+  modalOverlay: "rgba(14,20,18,0.55)",
 
   // Main gradients
   grad:    `linear-gradient(135deg, ${p1}, ${p2}, ${p3})`,

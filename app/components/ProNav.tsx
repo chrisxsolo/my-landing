@@ -1,92 +1,75 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // PRONAV  →  floating fixed navigation bar on all professional pages
 // ─────────────────────────────────────────────────────────────────────────────
-// QUICK EDITS:
-//   → Add/remove primary links:   edit the primaryLinks array
-//   → Add/remove guide pages:     edit the guideLinks array (Guides dropdown)
-//   → Add/remove portfolio pages: edit the portfolioLinks array
-//   → Add/remove pricing pages:   edit the pricingLinks array
-//   → Client portal link:         edit CLIENT_PORTAL_HREF below
-//   → CTA button text/href:       find "Book a shoot" below
-//   → Nav pill color:             change .pro-nav-shell background/border values
+// The nav contents (order, labels, links, dropdowns, visibility) are now edited
+// from the admin dashboard → "Navigation" tab, persisted in site_settings, and
+// passed in here as `config`. To change the structure, edit it there — not here.
+// This file owns only the markup, styling, and open/close interaction.
+//   → Nav pill color: change .pro-nav-shell background/border values below.
 // ─────────────────────────────────────────────────────────────────────────────
 
 "use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
+import { DEFAULT_NAV_CONFIG, type NavConfig, type NavGroup } from "@/lib/navConfig";
 
-const CLIENT_PORTAL_HREF = "/login";
+// The client portal "active" state also covers the logged-in dashboard route,
+// which isn't itself a nav link.
 const CLIENT_DASHBOARD_HREF = "/dashboard";
-const CONTACT_HREF = "/contact";
-
-const primaryLinks = [
-  { label: "Home",    href: "/" },
-  { label: "Dates",   href: "/availability" },
-  { label: "About",   href: "/about" },
-  { label: "Blog", href: "/blog" },
-];
-
-const guideLinks = [
-  { label: "Grad guide", href: "/grad-guide" },
-  { label: "Locations",  href: "/bay-area-locations" },
-  { label: "FAQ",        href: "/faq" },
-];
-
-const portfolioLinks = [
-  { label: "Grad gallery",    href: "/portfolio?category=grads" },
-  { label: "Family gallery",  href: "/portfolio?category=families" },
-];
-
-const pricingLinks = [
-  { label: "Couples rates", href: "/pricing/couples" },
-  { label: "Grad rates",    href: "/pricing/grads" },
-  { label: "Family rates",  href: "/pricing/families" },
-];
 
 function isActive(pathname: string, href: string) {
   const path = href.split("?")[0];
   return path === "/" ? pathname === path : pathname === path || pathname.startsWith(`${path}/`);
 }
 
-export default function ProNav() {
+function isGroupActive(pathname: string, group: NavGroup) {
+  if (group.href && isActive(pathname, group.href)) return true;
+  return group.children.some((link) => isActive(pathname, link.href));
+}
+
+export default function ProNav({ config = DEFAULT_NAV_CONFIG }: { config?: NavConfig }) {
   const pathname = usePathname();
-  const [menuOpen, setMenuOpen]           = useState(false);
-  const [portfolioOpen, setPortfolioOpen] = useState(false);
-  const [pricingOpen, setPricingOpen]     = useState(false);
-  const [guidesOpen, setGuidesOpen]       = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [openGroupId, setOpenGroupId] = useState<string | null>(null);
   const navRef = useRef<HTMLElement>(null);
 
-  const isPortfolioActive = portfolioLinks.some((link) => isActive(pathname, link.href));
-  const isPricingActive   = pathname === "/pricing" || pricingLinks.some((link) => isActive(pathname, link.href));
-  const isGuidesActive    = guideLinks.some((link) => isActive(pathname, link.href));
-  const isPortalActive = isActive(pathname, CLIENT_PORTAL_HREF) || isActive(pathname, CLIENT_DASHBOARD_HREF);
+  const { clientLogin, cta } = config;
+  const primary = config.primary.filter((item) => item.visible);
+  const isPortalActive =
+    isActive(pathname, clientLogin.href) || isActive(pathname, CLIENT_DASHBOARD_HREF);
 
   const closeMenus = () => {
     setMenuOpen(false);
-    setPortfolioOpen(false);
-    setPricingOpen(false);
-    setGuidesOpen(false);
+    setOpenGroupId(null);
   };
+  const toggleGroup = (id: string) => setOpenGroupId((cur) => (cur === id ? null : id));
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (navRef.current && !navRef.current.contains(e.target as Node)) {
-        setMenuOpen(false); setPortfolioOpen(false); setPricingOpen(false); setGuidesOpen(false);
+        setMenuOpen(false);
+        setOpenGroupId(null);
       }
     }
     function handleKeydown(e: KeyboardEvent) {
-      if (e.key === "Escape") { setMenuOpen(false); setPortfolioOpen(false); setPricingOpen(false); setGuidesOpen(false); }
+      if (e.key === "Escape") {
+        setMenuOpen(false);
+        setOpenGroupId(null);
+      }
     }
     document.addEventListener("mousedown", handleClick);
     document.addEventListener("keydown", handleKeydown);
-    return () => { document.removeEventListener("mousedown", handleClick); document.removeEventListener("keydown", handleKeydown); };
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKeydown);
+    };
   }, []);
 
-  const renderDropdownLink = (link: { label: string; href: string }) => (
+  const renderDropdownLink = (link: { id: string; label: string; href: string }) => (
     <Link
-      key={link.href}
+      key={link.id}
       href={link.href}
       className="pro-nav-dropdown-link"
       aria-current={isActive(pathname, link.href) ? "page" : undefined}
@@ -95,6 +78,78 @@ export default function ProNav() {
       {link.label}
     </Link>
   );
+
+  const renderDesktopGroup = (group: NavGroup) => {
+    const open = openGroupId === group.id;
+    const active = isGroupActive(pathname, group);
+
+    // href === null → a plain dropdown button (e.g. "Guides").
+    if (group.href == null) {
+      return (
+        <div key={group.id} className="pro-dropdown-wrap">
+          <button className="pro-nav-button" type="button"
+            aria-expanded={open}
+            aria-current={active ? "page" : undefined}
+            onClick={() => toggleGroup(group.id)}>
+            {group.label} <span className="pro-nav-caret">{open ? "▲" : "▼"}</span>
+          </button>
+          {open && <div className="pro-nav-dropdown">{group.children.map(renderDropdownLink)}</div>}
+        </div>
+      );
+    }
+
+    // href set → split button: a real link + a caret that opens the dropdown.
+    return (
+      <div key={group.id} className="pro-dropdown-wrap" style={{ display: "flex" }}>
+        <Link href={group.href} className="pro-nav-link"
+          style={{ borderRadius: "8px 0 0 8px", paddingRight: 8 }}
+          aria-current={active ? "page" : undefined}
+          onClick={closeMenus}>
+          {group.label}
+        </Link>
+        <button className="pro-nav-button" type="button"
+          style={{ borderRadius: "0 8px 8px 0", paddingLeft: 6, paddingRight: 8, minWidth: 0 }}
+          aria-expanded={open}
+          onClick={() => toggleGroup(group.id)}>
+          <span className="pro-nav-caret">{open ? "▲" : "▼"}</span>
+        </button>
+        {open && <div className="pro-nav-dropdown">{group.children.map(renderDropdownLink)}</div>}
+      </div>
+    );
+  };
+
+  // Mobile groups use Fragments so the button / split stays a direct child of
+  // .pro-mobile-panel (its full-width styling relies on the `>` child selector).
+  const renderMobileGroup = (group: NavGroup) => {
+    const open = openGroupId === group.id;
+    const active = isGroupActive(pathname, group);
+    return (
+      <Fragment key={group.id}>
+        {group.href == null ? (
+          <button className="pro-nav-button" type="button"
+            aria-expanded={open}
+            aria-current={active ? "page" : undefined}
+            onClick={() => toggleGroup(group.id)}>
+            {group.label} <span className="pro-nav-caret">{open ? "▲" : "▼"}</span>
+          </button>
+        ) : (
+          <div className="pro-mobile-split">
+            <Link href={group.href} className="pro-nav-link"
+              aria-current={active ? "page" : undefined}
+              onClick={closeMenus}>
+              {group.label}
+            </Link>
+            <button className="pro-nav-button" type="button"
+              aria-expanded={open}
+              onClick={() => toggleGroup(group.id)}>
+              <span className="pro-nav-caret">{open ? "▲" : "▼"}</span>
+            </button>
+          </div>
+        )}
+        {open && <div className="pro-mobile-submenu">{group.children.map(renderDropdownLink)}</div>}
+      </Fragment>
+    );
+  };
 
   return (
     <>
@@ -299,73 +354,33 @@ export default function ProNav() {
           <Link href="/" className="pro-nav-brand" aria-label="soloxsnaps home" onClick={closeMenus}>soloxsnaps</Link>
 
           <nav className="pro-desktop-nav" aria-label="Primary navigation">
-            {primaryLinks.map((link) => (
-              <Link key={link.href} href={link.href} className="pro-nav-link"
-                aria-current={isActive(pathname, link.href) ? "page" : undefined}
-                onClick={closeMenus}>
-                {link.label}
-              </Link>
-            ))}
-
-            <div className="pro-dropdown-wrap">
-              <button className="pro-nav-button" type="button"
-                aria-expanded={guidesOpen}
-                aria-current={isGuidesActive ? "page" : undefined}
-                onClick={() => setGuidesOpen((o) => !o)}>
-                Guides <span className="pro-nav-caret">{guidesOpen ? "▲" : "▼"}</span>
-              </button>
-              {guidesOpen && <div className="pro-nav-dropdown">{guideLinks.map(renderDropdownLink)}</div>}
-            </div>
-
-            <div className="pro-dropdown-wrap" style={{ display: "flex" }}>
-              <Link
-                href="/portfolio"
-                className="pro-nav-link"
-                style={{ borderRadius: "8px 0 0 8px", paddingRight: 8 }}
-                aria-current={isPortfolioActive ? "page" : undefined}
-                onClick={closeMenus}
-              >
-                Work
-              </Link>
-              <button className="pro-nav-button" type="button"
-                style={{ borderRadius: "0 8px 8px 0", paddingLeft: 6, paddingRight: 8, minWidth: 0 }}
-                aria-expanded={portfolioOpen}
-                onClick={() => setPortfolioOpen((o) => !o)}>
-                <span className="pro-nav-caret">{portfolioOpen ? "▲" : "▼"}</span>
-              </button>
-              {portfolioOpen && <div className="pro-nav-dropdown">{portfolioLinks.map(renderDropdownLink)}</div>}
-            </div>
-
-            <div className="pro-dropdown-wrap" style={{ display: "flex" }}>
-              <Link
-                href="/pricing"
-                className="pro-nav-link"
-                style={{ borderRadius: "8px 0 0 8px", paddingRight: 8 }}
-                aria-current={isPricingActive ? "page" : undefined}
-                onClick={closeMenus}
-              >
-                Rates
-              </Link>
-              <button className="pro-nav-button" type="button"
-                style={{ borderRadius: "0 8px 8px 0", paddingLeft: 6, paddingRight: 8, minWidth: 0 }}
-                aria-expanded={pricingOpen}
-                onClick={() => setPricingOpen((o) => !o)}>
-                <span className="pro-nav-caret">{pricingOpen ? "▲" : "▼"}</span>
-              </button>
-              {pricingOpen && <div className="pro-nav-dropdown">{pricingLinks.map(renderDropdownLink)}</div>}
-            </div>
+            {primary.map((item) =>
+              item.type === "link" ? (
+                <Link key={item.id} href={item.href} className="pro-nav-link"
+                  aria-current={isActive(pathname, item.href) ? "page" : undefined}
+                  onClick={closeMenus}>
+                  {item.label}
+                </Link>
+              ) : (
+                renderDesktopGroup(item)
+              )
+            )}
           </nav>
 
           <div className="pro-nav-actions">
-            <Link
-              href={CLIENT_PORTAL_HREF}
-              className="pro-nav-link"
-              aria-current={isPortalActive ? "page" : undefined}
-              onClick={closeMenus}
-            >
-              Client login
-            </Link>
-            <Link href={CONTACT_HREF} className="pro-nav-cta" onClick={closeMenus}>Book a shoot</Link>
+            {clientLogin.visible && (
+              <Link
+                href={clientLogin.href}
+                className="pro-nav-link"
+                aria-current={isPortalActive ? "page" : undefined}
+                onClick={closeMenus}
+              >
+                {clientLogin.label}
+              </Link>
+            )}
+            {cta.visible && (
+              <Link href={cta.href} className="pro-nav-cta" onClick={closeMenus}>{cta.label}</Link>
+            )}
           </div>
 
           <button className="pro-nav-button pro-mobile-button" type="button"
@@ -376,55 +391,30 @@ export default function ProNav() {
 
           {menuOpen && (
             <nav id="pro-mobile-menu" className="pro-mobile-panel" aria-label="Mobile navigation">
-              {primaryLinks.map((link) => (
-                <Link key={link.href} href={link.href} className="pro-nav-link"
-                  aria-current={isActive(pathname, link.href) ? "page" : undefined}
-                  onClick={closeMenus}>
-                  {link.label}
+              {primary.map((item) =>
+                item.type === "link" ? (
+                  <Link key={item.id} href={item.href} className="pro-nav-link"
+                    aria-current={isActive(pathname, item.href) ? "page" : undefined}
+                    onClick={closeMenus}>
+                    {item.label}
+                  </Link>
+                ) : (
+                  renderMobileGroup(item)
+                )
+              )}
+              {clientLogin.visible && (
+                <Link
+                  href={clientLogin.href}
+                  className="pro-nav-link"
+                  aria-current={isPortalActive ? "page" : undefined}
+                  onClick={closeMenus}
+                >
+                  {clientLogin.label}
                 </Link>
-              ))}
-              <button className="pro-nav-button" type="button"
-                aria-expanded={guidesOpen}
-                aria-current={isGuidesActive ? "page" : undefined}
-                onClick={() => setGuidesOpen((o) => !o)}>
-                Guides <span className="pro-nav-caret">{guidesOpen ? "▲" : "▼"}</span>
-              </button>
-              {guidesOpen && <div className="pro-mobile-submenu">{guideLinks.map(renderDropdownLink)}</div>}
-              <div className="pro-mobile-split">
-                <Link href="/portfolio" className="pro-nav-link"
-                  aria-current={isPortfolioActive ? "page" : undefined}
-                  onClick={closeMenus}>
-                  Work
-                </Link>
-                <button className="pro-nav-button" type="button"
-                  aria-expanded={portfolioOpen}
-                  onClick={() => setPortfolioOpen((o) => !o)}>
-                  <span className="pro-nav-caret">{portfolioOpen ? "▲" : "▼"}</span>
-                </button>
-              </div>
-              {portfolioOpen && <div className="pro-mobile-submenu">{portfolioLinks.map(renderDropdownLink)}</div>}
-              <div className="pro-mobile-split">
-                <Link href="/pricing" className="pro-nav-link"
-                  aria-current={isPricingActive ? "page" : undefined}
-                  onClick={closeMenus}>
-                  Rates
-                </Link>
-                <button className="pro-nav-button" type="button"
-                  aria-expanded={pricingOpen}
-                  onClick={() => setPricingOpen((o) => !o)}>
-                  <span className="pro-nav-caret">{pricingOpen ? "▲" : "▼"}</span>
-                </button>
-              </div>
-              {pricingOpen && <div className="pro-mobile-submenu">{pricingLinks.map(renderDropdownLink)}</div>}
-              <Link
-                href={CLIENT_PORTAL_HREF}
-                className="pro-nav-link"
-                aria-current={isPortalActive ? "page" : undefined}
-                onClick={closeMenus}
-              >
-                Client login
-              </Link>
-              <Link href={CONTACT_HREF} className="pro-nav-cta" onClick={closeMenus}>Book a shoot</Link>
+              )}
+              {cta.visible && (
+                <Link href={cta.href} className="pro-nav-cta" onClick={closeMenus}>{cta.label}</Link>
+              )}
             </nav>
           )}
         </div>
