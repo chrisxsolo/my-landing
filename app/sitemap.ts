@@ -28,6 +28,7 @@ const STATIC_ROUTES: Array<{
   { path: "/grads/usf", changeFrequency: "monthly", priority: 0.9 },
   { path: "/grads/sf-state", changeFrequency: "monthly", priority: 0.9 },
   { path: "/grads/csueb", changeFrequency: "monthly", priority: 0.9 },
+  { path: "/grads/santa-clara", changeFrequency: "monthly", priority: 0.9 },
   { path: "/pricing", changeFrequency: "monthly", priority: 0.8 },
   { path: "/pricing/grads", changeFrequency: "monthly", priority: 0.8 },
   { path: "/pricing/couples", changeFrequency: "monthly", priority: 0.7 },

@@ -467,6 +467,7 @@ function ContactForm() {
                   name="name"
                   type="text"
                   required
+                  autoComplete="name"
                   placeholder="Your name"
                   className="contact-input"
                   value={form.name}
@@ -480,6 +481,7 @@ function ContactForm() {
                   name="email"
                   type="email"
                   required
+                  autoComplete="email"
                   placeholder="you@email.com"
                   className="contact-input"
                   value={form.email}
@@ -495,6 +497,7 @@ function ContactForm() {
                   id="phone"
                   name="phone"
                   type="tel"
+                  autoComplete="tel"
                   placeholder="Optional"
                   className="contact-input"
                   value={form.phone}

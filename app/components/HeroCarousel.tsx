@@ -16,10 +16,32 @@ export default function HeroCarousel({ images }: { images: CarouselImage[] }) {
 
   useEffect(() => {
     if (images.length <= 1) return;
-    const id = window.setInterval(() => {
-      setCurrent((index) => (index + 1) % images.length);
-    }, 5200);
-    return () => window.clearInterval(id);
+
+    // Respect reduced-motion: hold on the first slide, no auto-rotation.
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    let intervalId: number | null = null;
+    const start = () => {
+      if (intervalId !== null) return;
+      intervalId = window.setInterval(() => {
+        setCurrent((index) => (index + 1) % images.length);
+      }, 5200);
+    };
+    const stop = () => {
+      if (intervalId === null) return;
+      window.clearInterval(intervalId);
+      intervalId = null;
+    };
+
+    // Pause rotation while the tab is hidden; resume when it returns.
+    const handleVisibility = () => (document.hidden ? stop() : start());
+    document.addEventListener("visibilitychange", handleVisibility);
+    if (!document.hidden) start();
+
+    return () => {
+      stop();
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
   }, [images.length]);
 
   if (!images.length) return null;
@@ -210,7 +232,7 @@ export default function HeroCarousel({ images }: { images: CarouselImage[] }) {
         ))}
 
         <div className="home-hero-inner">
-          <p className="home-hero-kicker">Guided Bay Area photo sessions</p>
+          <p className="home-hero-kicker">Bay Area graduation, couples &amp; family photographer</p>
           <h1 className="home-hero-title">
             Photos that feel real, not rehearsed.
           </h1>
