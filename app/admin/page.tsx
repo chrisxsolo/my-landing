@@ -1783,7 +1783,8 @@ function AdminDashboard() {
                     {key:"home_about_portrait",label:"Chris portrait",helper:"Photo in the 'Hi, I'm Chris' section.",category:"all"},
                     {key:"home_final_cta",label:"Closing banner",helper:"Wide photo in the 'Ready to plan your session?' banner.",category:"all"},
                   ] as {key:string;label:string;helper:string;category:"grads"|"families"|"couples"|"all"}[]).map(({key,label,helper,category})=>{
-                    const pickerImages=category==="all"?portfolioImages:(()=>{const c=portfolioImages.filter(img=>matchesPortfolioGroup(img,category));return c.length>0?c:portfolioImages;})();
+                    // Show every portfolio photo; for a tagged slot, float the matching category to the top so it's handy without hiding the rest.
+                    const pickerImages=category==="all"?portfolioImages:[...portfolioImages.filter(img=>matchesPortfolioGroup(img,category)),...portfolioImages.filter(img=>!matchesPortfolioGroup(img,category))];
 
                     return(
                       <div key={key}>
@@ -1849,8 +1850,8 @@ function AdminDashboard() {
                     {key:"pricing_couples_engagement_image",label:"Engagement session photo",helper:"Shown beside the engagement package.",category:"couples"},
                     {key:"pricing_couples_proposal_image",label:"Proposal coverage photo",helper:"Shown beside the proposal coverage package.",category:"couples"},
                   ] as {key:string;label:string;helper:string;category:"grads"|"families"|"couples"}[]).map(({key,label,helper,category})=>{
-                    const categoryImages=portfolioImages.filter(img=>matchesPortfolioGroup(img,category));
-                    const pickerImages=categoryImages.length>0?categoryImages:portfolioImages;
+                    // Show every portfolio photo; float this package's category to the top so it's handy without hiding the rest.
+                    const pickerImages=[...portfolioImages.filter(img=>matchesPortfolioGroup(img,category)),...portfolioImages.filter(img=>!matchesPortfolioGroup(img,category))];
 
                     return(
                       <div key={key}>
