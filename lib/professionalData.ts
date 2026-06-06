@@ -75,7 +75,7 @@ type RawPortfolioImage = Partial<PortfolioImage> & {
 const FALLBACK_PROFILE_IMAGE =
   "https://dmtslzwglpezympptqls.supabase.co/storage/v1/object/public/grad-photos/chris-portrait.jpg";
 
-const VISIBLE_PORTFOLIO_SLUGS = ["grads", "families"];
+const VISIBLE_PORTFOLIO_SLUGS = ["grads", "couples", "families"];
 
 export const FALLBACK_CATEGORIES: PortfolioCategory[] = [
   {
@@ -98,9 +98,9 @@ export const FALLBACK_CATEGORIES: PortfolioCategory[] = [
     id: 3,
     name: "Couples",
     slug: "couples",
-    description: "Couples sessions, held quietly for a future portfolio section.",
+    description: "Guided Bay Area couples sessions with natural movement and clear direction.",
     sort_order: 3,
-    active: false,
+    active: true,
   },
 ];
 

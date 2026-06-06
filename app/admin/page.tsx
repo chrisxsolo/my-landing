@@ -1758,50 +1758,76 @@ function AdminDashboard() {
               </div>
             </div>
 
-            {/* ── Home Cover Photos ── */}
+            {/* ── Home Page Photos ── */}
             <div className={card}>
               <div className="h-[3px]" style={{background:"#111827"}}/>
               <div className="p-6">
-                <h2 className="text-base font-black text-slate-900 mb-1">Home Page Cover Photos</h2>
-                <p className="text-xs text-slate-400 mb-5">Pick which portfolio image appears on the home page for each section card. Click a slot to open the picker.</p>
+                <h2 className="text-base font-black text-slate-900 mb-1">Home Page Photos</h2>
+                <p className="text-xs text-slate-400 mb-5">Pick the photo for every slot on the home page. Each slot falls back to an automatic portfolio photo until you set it, so you only need to choose the ones you care about.</p>
                 <div className="space-y-4">
-                  {([["home_cover_grads","Grads card"],["home_cover_families","Families card"],["home_cover_contact","Contact card"],["home_editorial_large","Editorial — large photo (right, back)"],["home_editorial_small","Editorial — small photo (right, front)"]] as [string,string][]).map(([key,label])=>(
-                    <div key={key}>
-                      <p className="text-xs font-black uppercase tracking-widest text-slate-500 mb-2">{label}</p>
-                      {coverPickerKey===key?(
-                        <div>
-                          <div className="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto mb-2">
-                            {portfolioImages.map(img=>(
-                              <button key={img.id} onClick={()=>updateSiteSetting(key,img.image_url)} disabled={settingsSaving===key}
-                                className="relative aspect-square rounded-xl overflow-hidden border-2 transition-all hover:scale-105"
-                                style={{borderColor:siteSettings[key]===img.image_url?"#111827":"transparent"}}>
-                                <img src={img.image_url} className="w-full h-full object-cover"/>
-                                {siteSettings[key]===img.image_url&&<div className="absolute inset-0 bg-black/40 flex items-center justify-center"><span className="text-white text-lg font-black">✓</span></div>}
-                              </button>
-                            ))}
-                          </div>
-                          <div className="flex gap-2">
-                            <button onClick={()=>setCoverPickerKey(null)} className="text-xs font-bold px-3 py-1.5 rounded-lg bg-slate-100 text-slate-500">Cancel</button>
-                            {siteSettings[key]&&<button onClick={()=>updateSiteSetting(key,null)} className="text-xs font-bold px-3 py-1.5 rounded-lg text-red-500 bg-red-50">Remove cover</button>}
-                          </div>
-                        </div>
-                      ):(
-                        <button onClick={()=>setCoverPickerKey(key)} className="flex items-center gap-3 w-full p-2 rounded-xl border border-slate-100 bg-slate-50 hover:bg-slate-100 transition-colors text-left">
-                          {siteSettings[key]?(
-                            <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-slate-200">
-                              <img src={siteSettings[key]!} className="w-full h-full object-cover"/>
-                            </div>
-                          ):(
-                            <div className="w-16 h-16 rounded-lg flex-shrink-0 bg-slate-200 flex items-center justify-center text-slate-400 text-xl">🖼️</div>
-                          )}
+                  {([
+                    {key:"home_hero_primary",label:"Hero — main photo",helper:"The large photo at the very top of the home page.",category:"grads"},
+                    {key:"home_hero_secondary",label:"Hero — small photo",helper:"The small photo tucked beside the main hero photo.",category:"couples"},
+                    {key:"home_card_grads",label:"Graduation card",helper:"Photo on the Graduation card in 'Choose your session.'",category:"grads"},
+                    {key:"home_card_couples",label:"Couples card",helper:"Photo on the Couples card in 'Choose your session.'",category:"couples"},
+                    {key:"home_card_portrait",label:"Portrait card",helper:"Photo on the Portrait card in 'Choose your session.'",category:"families"},
+                    {key:"home_couples_1",label:"Couples section — photo 1",helper:"First photo in the 'Couples sessions that feel like a date' gallery.",category:"couples"},
+                    {key:"home_couples_2",label:"Couples section — photo 2",helper:"Second photo in the couples gallery.",category:"couples"},
+                    {key:"home_couples_3",label:"Couples section — photo 3",helper:"Third photo in the couples gallery.",category:"couples"},
+                    {key:"home_story_1",label:"The work grid — photo 1",helper:"Photo 1 in the 'Bright, natural photographs' grid.",category:"all"},
+                    {key:"home_story_2",label:"The work grid — photo 2",helper:"Photo 2 in the work grid.",category:"all"},
+                    {key:"home_story_3",label:"The work grid — photo 3",helper:"Photo 3 in the work grid.",category:"all"},
+                    {key:"home_story_4",label:"The work grid — photo 4",helper:"Photo 4 in the work grid.",category:"all"},
+                    {key:"home_story_5",label:"The work grid — photo 5",helper:"Photo 5 in the work grid.",category:"all"},
+                    {key:"home_story_6",label:"The work grid — photo 6",helper:"Photo 6 in the work grid.",category:"all"},
+                    {key:"home_about_portrait",label:"Chris portrait",helper:"Photo in the 'Hi, I'm Chris' section.",category:"all"},
+                    {key:"home_final_cta",label:"Closing banner",helper:"Wide photo in the 'Ready to plan your session?' banner.",category:"all"},
+                  ] as {key:string;label:string;helper:string;category:"grads"|"families"|"couples"|"all"}[]).map(({key,label,helper,category})=>{
+                    const pickerImages=category==="all"?portfolioImages:(()=>{const c=portfolioImages.filter(img=>matchesPortfolioGroup(img,category));return c.length>0?c:portfolioImages;})();
+
+                    return(
+                      <div key={key}>
+                        <p className="text-xs font-black uppercase tracking-widest text-slate-500 mb-1">{label}</p>
+                        <p className="text-xs text-slate-400 mb-2">{helper}</p>
+                        {coverPickerKey===key?(
                           <div>
-                            <p className="text-xs font-black text-slate-800">{siteSettings[key]?"Change cover photo":"Set cover photo"}</p>
-                            <p className="text-xs text-slate-400">{siteSettings[key]?"Click to pick a different image":"Uses first portfolio image as fallback"}</p>
+                            {pickerImages.length>0?(
+                              <div className="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto mb-2">
+                                {pickerImages.map(img=>(
+                                  <button key={img.id} onClick={()=>updateSiteSetting(key,img.image_url)} disabled={settingsSaving===key}
+                                    className="relative aspect-square rounded-xl overflow-hidden border-2 transition-all hover:scale-105"
+                                    style={{borderColor:siteSettings[key]===img.image_url?"#111827":"transparent"}}>
+                                    <img src={img.image_url} className="w-full h-full object-cover"/>
+                                    {siteSettings[key]===img.image_url&&<div className="absolute inset-0 bg-black/40 flex items-center justify-center"><span className="text-white text-lg font-black">✓</span></div>}
+                                  </button>
+                                ))}
+                              </div>
+                            ):(
+                              <p className="text-xs text-slate-400 mb-2 rounded-xl bg-slate-50 border border-slate-100 p-3">Upload portfolio images first, then come back here to choose home page photos.</p>
+                            )}
+                            <div className="flex gap-2">
+                              <button onClick={()=>setCoverPickerKey(null)} className="text-xs font-bold px-3 py-1.5 rounded-lg bg-slate-100 text-slate-500">Cancel</button>
+                              {siteSettings[key]&&<button onClick={()=>updateSiteSetting(key,null)} className="text-xs font-bold px-3 py-1.5 rounded-lg text-red-500 bg-red-50">Reset to automatic</button>}
+                            </div>
                           </div>
-                        </button>
-                      )}
-                    </div>
-                  ))}
+                        ):(
+                          <button onClick={()=>setCoverPickerKey(key)} className="flex items-center gap-3 w-full p-2 rounded-xl border border-slate-100 bg-slate-50 hover:bg-slate-100 transition-colors text-left">
+                            {siteSettings[key]?(
+                              <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-slate-200">
+                                <img src={siteSettings[key]!} className="w-full h-full object-cover"/>
+                              </div>
+                            ):(
+                              <div className="w-16 h-16 rounded-lg flex-shrink-0 bg-slate-200 flex items-center justify-center text-slate-400 text-xl">🖼️</div>
+                            )}
+                            <div>
+                              <p className="text-xs font-black text-slate-800">{siteSettings[key]?"Change photo":"Set photo"}</p>
+                              <p className="text-xs text-slate-400">{siteSettings[key]?"Click to pick a different image":"Using an automatic photo"}</p>
+                            </div>
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
