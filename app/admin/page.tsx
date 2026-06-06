@@ -44,13 +44,6 @@ import NavigationTab from "@/app/admin/NavigationTab";
 import TestimonialsTab from "@/app/admin/TestimonialsTab";
 import { uploadImage } from "@/lib/uploadImage";
 import {
-  GRAD_LOCATION_OPTIONS,
-  GRAD_SCHOOL_OPTIONS,
-  GRAD_SESSION_OPTIONS,
-  GRAD_DEGREE_OPTIONS,
-  GRAD_YEAR_OPTIONS,
-  GRAD_ATTIRE_OPTIONS,
-  buildPortfolioSeoDescription,
   type GradLocationOption,
   type GradSchoolOption,
   type GradSessionOption,
@@ -58,6 +51,7 @@ import {
   type GradYearOption,
   type GradAttireOption,
 } from "@/lib/portfolioSeoDescription";
+import PortfolioSeoPanel from "@/app/admin/PortfolioSeoPanel";
 import {
   findMatchingClientSession,
   getClientSessionEmailMatches,
@@ -91,7 +85,7 @@ function fmt12h(t:string|null):string{
   return `${h12}:${String(m).padStart(2,"0")} ${ampm}`;
 }
 type PortfolioCategory = { id:number; name:string; slug:string; description:string|null; sort_order:number; active:boolean; };
-type PortfolioImage = { id:number; title:string; alt:string|null; image_url:string; category_id:number|null; category_slug:string; featured:boolean; hero_carousel:boolean; sort_order:number; created_at:string|null; location?:string|null; };
+type PortfolioImage = { id:number; title:string; alt:string|null; image_url:string; category_id:number|null; category_slug:string; featured:boolean; hero_carousel:boolean; sort_order:number; created_at:string|null; location?:string|null; content_hash?:string|null; };
 type PortfolioSeoDraft = { school: GradSchoolOption|null; location: GradLocationOption|null; session: GradSessionOption|null; degree: GradDegreeOption|null; year: GradYearOption|null; attire: GradAttireOption|null; goldenHour: boolean; };
 
 const EMPTY_CATEGORY = {name:"",slug:"",description:"",sort_order:"1",active:true};
@@ -124,6 +118,12 @@ function buildSubject(inq:{session_type:string|null;message:string;date_in_mind:
   const school=detectSchool(haystack);
   return school?`${school} Graduation Inquiry`:"Graduation Inquiry";
 }
+// SHA-256 of a file's bytes — used to detect duplicate photos regardless of filename.
+async function fileHash(file:File):Promise<string>{
+  const digest=await crypto.subtle.digest("SHA-256",await file.arrayBuffer());
+  return Array.from(new Uint8Array(digest)).map(b=>b.toString(16).padStart(2,"0")).join("");
+}
+
 // Runs `fn` over items with at most `limit` in flight at once, preserving order.
 // Used to upload a batch of photos in parallel instead of one slow await-chain.
 async function mapWithConcurrency<T,R>(items:T[],limit:number,fn:(item:T)=>Promise<R>):Promise<R[]>{
@@ -200,6 +200,12 @@ function AdminDashboard() {
   const [portfolioSeoEditorId,setPortfolioSeoEditorId]=useState<number|null>(null);
   const [portfolioSeoDraft,setPortfolioSeoDraft]=useState<PortfolioSeoDraft>(EMPTY_PORTFOLIO_SEO_DRAFT);
   const [portfolioSeoSavingId,setPortfolioSeoSavingId]=useState<number|null>(null);
+  const [seoBatchMode,setSeoBatchMode]=useState(false);
+  const [seoBatchSelected,setSeoBatchSelected]=useState<number[]>([]);
+  const [seoBatchOpen,setSeoBatchOpen]=useState(false);
+  const [seoBatchDraft,setSeoBatchDraft]=useState<PortfolioSeoDraft>(EMPTY_PORTFOLIO_SEO_DRAFT);
+  const [seoBatchSaving,setSeoBatchSaving]=useState(false);
+  const [seoBatchProgress,setSeoBatchProgress]=useState<{done:number;total:number}|null>(null);
   const portfolioFileRef=useRef<HTMLInputElement>(null);
 
   const [categories,setCategories]=useState<PortfolioCategory[]>([]);
@@ -210,7 +216,7 @@ function AdminDashboard() {
   const [categoryDeleteConfirm,setCategoryDeleteConfirm]=useState<number|null>(null);
 
   // ── Batch upload ─────────────────────────────────────────────────────
-  type BatchItem = { id: number; file: File; preview: string; category_slug: string; title: string; location: string; };
+  type BatchItem = { id: number; file: File; preview: string; category_slug: string; title: string; location: string; hash: string; };
   const [batchItems, setBatchItems] = useState<BatchItem[]>([]);
   const [batchSaving, setBatchSaving] = useState(false);
   const [batchSelected, setBatchSelected] = useState<Set<number>>(new Set());
@@ -872,12 +878,23 @@ function AdminDashboard() {
     }catch{/* leave settings as-is on failure */}
   }
 
-  function onBatchFiles(e:React.ChangeEvent<HTMLInputElement>){
+  async function onBatchFiles(e:React.ChangeEvent<HTMLInputElement>){
     const files=Array.from(e.target.files??[]);
+    if(batchFileRef.current)batchFileRef.current.value=""; // allow re-selecting the same files
     if(!files.length)return;
     const defaultCat=categories[0]?.slug??"grads";
-    setBatchItems(prev=>[...prev,...files.map(f=>({id:batchIdRef.current++,file:f,preview:URL.createObjectURL(f),category_slug:defaultCat,title:f.name.replace(/\.[^.]+$/,"").replace(/[-_]/g," "),location:""}))]);
-    if(batchFileRef.current)batchFileRef.current.value="";
+    // Skip files whose content already exists in the queue or in the saved library.
+    const seen=new Set<string>([...batchItems.map(i=>i.hash),...portfolioImages.map(i=>i.content_hash).filter(Boolean) as string[]]);
+    const additions:BatchItem[]=[];
+    let dupes=0;
+    for(const f of files){
+      const hash=await fileHash(f);
+      if(seen.has(hash)){dupes++;continue;}
+      seen.add(hash);
+      additions.push({id:batchIdRef.current++,file:f,preview:URL.createObjectURL(f),category_slug:defaultCat,title:f.name.replace(/\.[^.]+$/,"").replace(/[-_]/g," "),location:"",hash});
+    }
+    if(additions.length)setBatchItems(prev=>[...prev,...additions]);
+    if(dupes>0)showToast(`Skipped ${dupes} duplicate photo${dupes!==1?"s":""}`,true);
   }
 
   // ── Batch selection + bulk category/location assignment ──
@@ -926,7 +943,7 @@ function AdminDashboard() {
     const base=portfolioImages.length;
     const rows=uploads.filter(u=>u.url).map((u,idx)=>{
       const cat=categories.find(c=>c.slug===u.item.category_slug);
-      return {title:u.item.title||"Portfolio image",alt:u.item.title||"Portfolio image",image_url:u.url,category_id:cat?.id??null,category_slug:u.item.category_slug,location:u.item.location.trim()||null,featured:false,sort_order:base+idx+1};
+      return {title:u.item.title||"Portfolio image",alt:u.item.title||"Portfolio image",image_url:u.url,category_id:cat?.id??null,category_slug:u.item.category_slug,location:u.item.location.trim()||null,content_hash:u.item.hash,featured:false,sort_order:base+idx+1};
     });
     let saved=0;
     if(rows.length){
@@ -1110,6 +1127,51 @@ function AdminDashboard() {
       showToast(err instanceof Error?err.message:"Description update failed",false);
     }finally{
       setPortfolioSeoSavingId(null);
+    }
+  }
+  function toggleSeoBatchMode(){
+    setSeoBatchMode(m=>!m);
+    setSeoBatchSelected([]);
+    setSeoBatchOpen(false);
+    setPortfolioSeoEditorId(null);
+  }
+  function toggleSeoBatchSelect(id:number){
+    setSeoBatchSelected(prev=>prev.includes(id)?prev.filter(x=>x!==id):[...prev,id]);
+  }
+  async function saveBatchPortfolioSeo(){
+    if(!seoBatchDraft.school&&!seoBatchDraft.location){showToast("Pick a school or location first",false);return;}
+    const ids=[...seoBatchSelected];
+    if(ids.length===0){showToast("Select at least one photo",false);return;}
+    setSeoBatchSaving(true);
+    let ok=0,fail=0;
+    for(const id of ids){
+      setSeoBatchProgress({done:ok+fail,total:ids.length});
+      try{
+        const res=await fetch("/api/admin/portfolio-image-description",{
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({imageId:id,...seoBatchDraft}),
+        });
+        const json=await res.json();
+        if(!res.ok)throw new Error(json.error||"Description update failed");
+        updatePortfolioImageState(json.image as PortfolioImage);
+        ok++;
+      }catch(err){
+        console.error("[admin] saveBatchPortfolioSeo",id,err);
+        fail++;
+      }
+    }
+    setSeoBatchProgress(null);
+    setSeoBatchSaving(false);
+    revalidatePublicSite();
+    if(fail===0){
+      setSeoBatchOpen(false);
+      setSeoBatchMode(false);
+      setSeoBatchSelected([]);
+      setSeoBatchDraft(EMPTY_PORTFOLIO_SEO_DRAFT);
+      showToast(`Tagged ${ok} photo${ok===1?"":"s"} ✓`);
+    }else{
+      showToast(`Tagged ${ok}, ${fail} failed — check console`,false);
     }
   }
   async function savePortfolioImage(){
@@ -1767,7 +1829,7 @@ function AdminDashboard() {
                   <h2 className="text-base font-black text-slate-900">Batch Upload</h2>
                   <button onClick={()=>batchFileRef.current?.click()} className="text-xs font-bold px-4 py-2 rounded-xl text-white" style={{background:C.grad12}}>+ Add photos</button>
                 </div>
-                <p className="text-xs text-slate-400 mb-4">Check the photos you want (Shift-click to select a range), then apply a category or location to all of them at once. Location is optional and helps SEO later. You can also edit each photo individually.</p>
+                <p className="text-xs text-slate-400 mb-4">Check the photos you want (Shift-click to select a range), then apply a category or location to all of them at once. Location is optional and helps SEO later. Duplicate photos already in the queue or your library are skipped automatically. You can also edit each photo individually.</p>
                 <input ref={batchFileRef} type="file" accept="image/*" multiple className="hidden" onChange={onBatchFiles}/>
                 <datalist id="batch-location-options">{locationOptions.map(loc=><option key={loc} value={loc}/>)}</datalist>
 
@@ -2018,20 +2080,64 @@ function AdminDashboard() {
 
             {/* ── Image list ── */}
             <div>
-              <div className="flex items-center gap-2 mb-3">
-                <p className="text-xs font-black uppercase tracking-widest text-slate-900">Portfolio Images</p>
-                <span className="text-xs font-bold text-slate-400">({portfolioImages.length})</span>
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <div className="flex items-center gap-2">
+                  <p className="text-xs font-black uppercase tracking-widest text-slate-900">Portfolio Images</p>
+                  <span className="text-xs font-bold text-slate-400">({portfolioImages.length})</span>
+                </div>
+                <button onClick={toggleSeoBatchMode}
+                  className="text-xs font-bold px-3 py-1.5 rounded-lg border transition-colors"
+                  style={seoBatchMode?{background:C.ink,color:C.white,borderColor:C.ink}:{background:C.white,color:C.inkSoft,borderColor:C.borderSubtle}}>
+                  {seoBatchMode?"Done selecting":"Select multiple for SEO"}
+                </button>
               </div>
+              {seoBatchMode&&(
+                <div className="flex items-center justify-between gap-2 mb-3 rounded-xl border px-3 py-2" style={{borderColor:C.borderSubtle,background:C.p3_10}}>
+                  <p className="text-xs font-bold text-slate-700">{seoBatchSelected.length} selected · check the grad photos that share the same tags</p>
+                  <div className="flex gap-2">
+                    {seoBatchSelected.length>0&&<button onClick={()=>setSeoBatchSelected([])} className="text-xs font-bold px-3 py-1.5 rounded-lg bg-white text-slate-500 border border-slate-200">Clear</button>}
+                    <button onClick={()=>{if(seoBatchSelected.length===0){showToast("Select at least one photo",false);return;}setSeoBatchOpen(true);}}
+                      className="text-xs font-bold px-3 py-1.5 rounded-lg text-white" style={{background:C.grad12,opacity:seoBatchSelected.length===0?0.5:1}}>
+                      Tag {seoBatchSelected.length||""} selected
+                    </button>
+                  </div>
+                </div>
+              )}
+              {seoBatchMode&&seoBatchOpen&&(
+                <div className={`${card} mb-3`} style={{outline:"2px solid #111827"}}>
+                  <PortfolioSeoPanel
+                    draft={seoBatchDraft}
+                    setDraft={setSeoBatchDraft}
+                    heading={`Batch SEO · ${seoBatchSelected.length} photos`}
+                    subheading={seoBatchProgress?`Saving ${seoBatchProgress.done} of ${seoBatchProgress.total}…`:"These tags apply to every selected photo. Each photo still gets its own AI-written alt text."}
+                    saveLabel={`Generate with AI and save (${seoBatchSelected.length})`}
+                    saving={seoBatchSaving}
+                    onSave={saveBatchPortfolioSeo}
+                    onClose={()=>setSeoBatchOpen(false)}/>
+                </div>
+              )}
               {portfolioLoading?[...Array(3)].map((_,i)=><div key={i} className="rounded-2xl animate-pulse h-20 mb-3 bg-slate-100"/>):(
                 portfolioImages.length===0?<p className="text-sm text-slate-400 font-medium">No portfolio images yet — upload the first one above.</p>:(
                   <div className="space-y-3">
                     {portfolioImages.map(image=>{
                       const isGradImage=matchesPortfolioGroup(image,"grads");
-                      const seoPreview=buildPortfolioSeoDescription(portfolioSeoDraft);
+                      const batchSelected=seoBatchSelected.includes(image.id);
                       return(
-                      <div key={image.id} className={card} style={editingPortfolioImage?.id===image.id?{outline:"2px solid #111827"}:{}}>
+                      <div key={image.id} className={card} style={editingPortfolioImage?.id===image.id||(seoBatchMode&&batchSelected)?{outline:"2px solid #111827"}:{}}>
                         <div className="flex">
-                          <div className="w-24 h-24 flex-shrink-0 overflow-hidden bg-slate-100"><img src={image.image_url} className="w-full h-full object-cover"/></div>
+                          <div className="w-24 h-24 flex-shrink-0 overflow-hidden bg-slate-100 relative">
+                            <img src={image.image_url} className="w-full h-full object-cover"/>
+                            {seoBatchMode&&isGradImage&&(
+                              <button onClick={()=>toggleSeoBatchSelect(image.id)} title={batchSelected?"Deselect":"Select for batch SEO"}
+                                className="absolute inset-0 flex items-center justify-center transition-colors"
+                                style={{background:batchSelected?"rgba(17,24,39,0.45)":"rgba(0,0,0,0.12)"}}>
+                                <span className="w-6 h-6 rounded-md flex items-center justify-center text-sm font-black border-2"
+                                  style={batchSelected?{background:C.white,borderColor:C.white,color:C.ink}:{background:"rgba(255,255,255,0.45)",borderColor:C.white,color:"transparent"}}>
+                                  ✓
+                                </span>
+                              </button>
+                            )}
+                          </div>
                           <div className="flex-1 p-4 min-w-0">
                             <div className="flex items-start justify-between gap-2">
                               <div className="min-w-0">
@@ -2062,105 +2168,15 @@ function AdminDashboard() {
                           </div>
                         </div>
                         {portfolioSeoEditorId===image.id&&(
-                          <div className="border-t border-slate-100 p-4 bg-slate-50">
-                            <div className="flex items-start justify-between gap-3 mb-3">
-                              <div>
-                                <p className="text-xs font-black uppercase tracking-widest text-slate-700">AI SEO description</p>
-                                <p className="text-xs text-slate-400 mt-1">Pick what is visible, then save the generated title and alt text to this photo.</p>
-                              </div>
-                              <button onClick={()=>setPortfolioSeoEditorId(null)} className="text-xs font-bold px-2.5 py-1 rounded-lg bg-white text-slate-500 border border-slate-200">Close</button>
-                            </div>
-                            <div className="space-y-3">
-                              <div>
-                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">School</p>
-                                <div className="flex flex-wrap gap-1.5">
-                                  {GRAD_SCHOOL_OPTIONS.map(school=>(
-                                    <button key={school} onClick={()=>setPortfolioSeoDraft(d=>({...d,school:d.school===school?null:school}))}
-                                      className="text-xs font-bold px-2.5 py-1.5 rounded-lg border transition-colors"
-                                      style={portfolioSeoDraft.school===school?{background:C.ink,color:C.white,borderColor:C.ink}:{background:C.white,color:C.inkSoft,borderColor:C.borderSubtle}}>
-                                      {school}
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-                              <div>
-                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Location</p>
-                                <div className="flex flex-wrap gap-1.5">
-                                  {GRAD_LOCATION_OPTIONS.map(location=>(
-                                    <button key={location} onClick={()=>setPortfolioSeoDraft(d=>({...d,location:d.location===location?null:location}))}
-                                      className="text-xs font-bold px-2.5 py-1.5 rounded-lg border transition-colors"
-                                      style={portfolioSeoDraft.location===location?{background:C.p1,color:C.white,borderColor:C.p1}:{background:C.white,color:C.inkSoft,borderColor:C.borderSubtle}}>
-                                      {location}
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-                              <div>
-                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Session</p>
-                                <div className="flex flex-wrap gap-1.5">
-                                  {GRAD_SESSION_OPTIONS.map(session=>(
-                                    <button key={session} onClick={()=>setPortfolioSeoDraft(d=>({...d,session:d.session===session?null:session}))}
-                                      className="text-xs font-bold px-2.5 py-1.5 rounded-lg border transition-colors"
-                                      style={portfolioSeoDraft.session===session?{background:C.p2,color:C.white,borderColor:C.p2}:{background:C.white,color:C.inkSoft,borderColor:C.borderSubtle}}>
-                                      {session}
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-                              <div>
-                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Degree</p>
-                                <div className="flex flex-wrap gap-1.5">
-                                  {GRAD_DEGREE_OPTIONS.map(degree=>(
-                                    <button key={degree} onClick={()=>setPortfolioSeoDraft(d=>({...d,degree:d.degree===degree?null:degree}))}
-                                      className="text-xs font-bold px-2.5 py-1.5 rounded-lg border transition-colors"
-                                      style={portfolioSeoDraft.degree===degree?{background:C.p2,color:C.white,borderColor:C.p2}:{background:C.white,color:C.inkSoft,borderColor:C.borderSubtle}}>
-                                      {degree}
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-                              <div>
-                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Class year</p>
-                                <div className="flex flex-wrap gap-1.5">
-                                  {GRAD_YEAR_OPTIONS.map(year=>(
-                                    <button key={year} onClick={()=>setPortfolioSeoDraft(d=>({...d,year:d.year===year?null:year}))}
-                                      className="text-xs font-bold px-2.5 py-1.5 rounded-lg border transition-colors"
-                                      style={portfolioSeoDraft.year===year?{background:C.p2,color:C.white,borderColor:C.p2}:{background:C.white,color:C.inkSoft,borderColor:C.borderSubtle}}>
-                                      {year}
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-                              <div>
-                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Attire</p>
-                                <div className="flex flex-wrap gap-1.5">
-                                  {GRAD_ATTIRE_OPTIONS.map(attire=>(
-                                    <button key={attire} onClick={()=>setPortfolioSeoDraft(d=>({...d,attire:d.attire===attire?null:attire}))}
-                                      className="text-xs font-bold px-2.5 py-1.5 rounded-lg border transition-colors"
-                                      style={portfolioSeoDraft.attire===attire?{background:C.p2,color:C.white,borderColor:C.p2}:{background:C.white,color:C.inkSoft,borderColor:C.borderSubtle}}>
-                                      {attire}
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-                              <div className="flex flex-wrap gap-2 items-center">
-                                <button onClick={()=>setPortfolioSeoDraft(d=>({...d,goldenHour:!d.goldenHour}))}
-                                  className="text-xs font-bold px-3 py-1.5 rounded-lg border transition-colors"
-                                  style={portfolioSeoDraft.goldenHour?{background:C.p3,color:C.ink,borderColor:C.p3}:{background:C.white,color:C.inkSoft,borderColor:C.borderSubtle}}>
-                                  {portfolioSeoDraft.goldenHour?"Golden hour ✓":"Golden hour"}
-                                </button>
-                                <div className="flex-1 min-w-[220px] rounded-xl bg-white border border-slate-100 px-3 py-2">
-                                  <p className="text-xs font-black text-slate-800 truncate">{seoPreview.title}</p>
-                                  <p className="text-xs text-slate-500 mt-0.5">{seoPreview.alt}</p>
-                                </div>
-                              </div>
-                              <button onClick={()=>savePortfolioSeoDescription(image)} disabled={portfolioSeoSavingId===image.id}
-                                className="w-full py-2.5 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90 active:scale-95"
-                                style={{background:C.grad12,opacity:portfolioSeoSavingId===image.id?0.7:1}}>
-                                {portfolioSeoSavingId===image.id?"Saving description…":"Generate with AI and save"}
-                              </button>
-                            </div>
-                          </div>
+                          <PortfolioSeoPanel
+                            draft={portfolioSeoDraft}
+                            setDraft={setPortfolioSeoDraft}
+                            heading="AI SEO description"
+                            subheading="Pick what is visible, then save the generated title and alt text to this photo."
+                            saveLabel="Generate with AI and save"
+                            saving={portfolioSeoSavingId===image.id}
+                            onSave={()=>savePortfolioSeoDescription(image)}
+                            onClose={()=>setPortfolioSeoEditorId(null)}/>
                         )}
                       </div>
                     )})}

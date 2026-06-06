@@ -33,6 +33,7 @@ export type PortfolioImage = {
   sort_order: number;
   created_at: string | null;
   location?: string | null;
+  content_hash?: string | null;
 };
 
 export type BlogPost = {
