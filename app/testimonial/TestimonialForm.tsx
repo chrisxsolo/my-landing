@@ -35,11 +35,11 @@ const DISPLAY_OPTIONS: Array<{ value: TestimonialDisplayPreference; label: strin
   { value: "first_name_last_initial", label: "First name and last initial" },
   { value: "full_name", label: "Full name" },
   { value: "first_name_only", label: "First name only" },
-  { value: "anonymous", label: "Anonymous" },
 ];
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const INPUT_CLASS = "w-full rounded-2xl px-4 py-3 text-[15px] outline-none transition";
+const INPUT_CLASS = "w-full rounded-lg px-4 py-3 text-[15px] outline-none transition focus:ring-2";
+const FIELD_RING = { "--tw-ring-color": C.proAccentSoft } as React.CSSProperties;
 
 function validateForm(form: FormState): FieldErrors {
   const errors: FieldErrors = {};
@@ -52,7 +52,7 @@ function validateForm(form: FormState): FieldErrors {
   if (messageLength < 20) errors.message = "Please share at least 20 characters about your experience";
   if (messageLength > 2000) errors.message = "Your testimonial must be 2,000 characters or fewer";
   if (!form.consent_to_marketing) {
-    errors.consent_to_marketing = "Please confirm that SoloXSnaps may use your testimonial";
+    errors.consent_to_marketing = "Please confirm that soloxsnaps may use your testimonial";
   }
   return errors;
 }
@@ -118,28 +118,29 @@ export default function TestimonialForm({ source, galleryId, sessionType }: Prop
 
   if (status === "success") {
     return (
-      <main className="relative min-h-screen overflow-hidden px-5 py-16 sm:py-24" style={{ background: C.page }}>
-        <div className="absolute -left-24 top-10 h-80 w-80 rounded-full" style={{ background: C.blob1 }} />
-        <div className="absolute -right-24 bottom-0 h-96 w-96 rounded-full" style={{ background: C.blob2 }} />
+      <main className="min-h-screen px-5 py-16 sm:py-24" style={{ background: C.proPage }}>
         <section
-          className="relative mx-auto max-w-xl rounded-[2rem] p-8 text-center sm:p-12"
-          style={{ background: C.surfaceStrong, border: `1px solid ${C.warmEdge}`, boxShadow: C.shadowWarmLg }}
+          className="mx-auto max-w-xl rounded-xl p-8 text-center sm:p-12"
+          style={{ background: C.white, border: `1px solid ${C.proBorder}`, boxShadow: C.proShadow }}
         >
-          <div className="mx-auto mb-6 h-14 w-14 rounded-full p-[2px]" style={{ background: C.grad }}>
-            <div className="flex h-full w-full items-center justify-center rounded-full text-2xl" style={{ background: C.white, color: C.success }}>✓</div>
+          <div
+            className="mx-auto mb-6 flex h-12 w-12 items-center justify-center rounded-full text-xl"
+            style={{ background: C.proAccentSoft, color: C.proAccent }}
+          >
+            ✓
           </div>
           <h1 ref={successHeadingRef} tabIndex={-1} className="text-3xl font-black tracking-tight outline-none" style={{ color: C.ink }}>
-            Thank You!
+            Thank you
           </h1>
           <p className="mx-auto mt-4 max-w-md text-base leading-7" style={{ color: C.muted }}>
-            Your testimonial has been submitted successfully. I truly appreciate you taking the time to share your experience
+            Your testimonial was submitted. I appreciate you taking the time to share your experience.
           </p>
           <Link
             href="/"
-            className="mt-8 inline-flex rounded-full px-6 py-3 text-sm font-black transition hover:opacity-90"
-            style={{ background: C.grad12, color: C.white }}
+            className="mt-8 inline-flex rounded-lg px-6 py-3 text-sm font-black transition hover:-translate-y-0.5"
+            style={{ background: C.proAccent, color: C.white }}
           >
-            Return to SoloXSnaps
+            Return to soloxsnaps
           </Link>
         </section>
       </main>
@@ -148,28 +149,27 @@ export default function TestimonialForm({ source, galleryId, sessionType }: Prop
 
   const messageCount = form.message.length;
   return (
-    <main className="relative min-h-screen overflow-hidden px-4 py-10 sm:px-6 sm:py-16" style={{ background: C.page }}>
-      <div className="absolute -left-28 top-16 h-96 w-96 rounded-full" style={{ background: C.blob1 }} />
-      <div className="absolute -right-32 top-1/3 h-[28rem] w-[28rem] rounded-full" style={{ background: C.blob2 }} />
-      <div className="relative mx-auto max-w-2xl">
-        <header className="mb-8 text-center">
-          <Link href="/" className="text-sm font-black uppercase tracking-[0.22em]" style={C.text}>
-            SoloXSnaps
+    <main className="min-h-screen px-4 py-10 sm:px-6 sm:py-16" style={{ background: C.proPage }}>
+      <div className="mx-auto max-w-2xl">
+        <header className="mb-9">
+          <Link href="/" className="text-[17px] font-black tracking-tight" style={{ color: C.ink }}>
+            soloxsnaps
           </Link>
-          <p className="mt-8 text-xs font-black uppercase tracking-[0.18em]" style={{ color: C.p1 }}>A note from Chris</p>
+          <div className="mt-9 h-px w-12" style={{ background: C.proAccent }} />
+          <p className="mt-6 text-xs font-black uppercase tracking-[0.16em]" style={{ color: C.proAccent }}>A note from Chris</p>
           <h1 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl" style={{ color: C.ink }}>
             Share Your Experience
           </h1>
-          <p className="mx-auto mt-4 max-w-xl text-[15px] leading-7" style={{ color: C.muted }}>
-            Thank you for choosing SoloXSnaps Photography! I&apos;d love to hear about your experience. Your feedback helps me improve the client experience and may be featured on the SoloXSnaps website or in future marketing materials
+          <p className="mt-4 max-w-xl text-[15px] leading-7" style={{ color: C.muted }}>
+            Thank you for choosing soloxsnaps. I&apos;d love to hear about your experience. Your feedback helps me improve and may be featured on the website or in future marketing materials.
           </p>
         </header>
 
         <form
           onSubmit={handleSubmit}
           noValidate
-          className="rounded-[2rem] p-5 sm:p-8"
-          style={{ background: C.surfaceStrong, border: `1px solid ${C.warmEdge}`, boxShadow: C.shadowWarmLg }}
+          className="rounded-xl p-5 sm:p-8"
+          style={{ background: C.white, border: `1px solid ${C.proBorder}`, boxShadow: C.proShadow }}
         >
           <div aria-hidden="true" className="absolute left-[-9999px] h-px w-px overflow-hidden">
             <label htmlFor="website">Website</label>
@@ -200,7 +200,7 @@ export default function TestimonialForm({ source, galleryId, sessionType }: Prop
               aria-invalid={Boolean(errors.message)}
               aria-describedby={errors.message ? "message-error message-count" : "message-count"}
               className={`${INPUT_CLASS} resize-y`}
-              style={{ color: C.ink, background: C.white, border: `1px solid ${errors.message ? C.danger : C.warmEdge}` }}
+              style={{ ...FIELD_RING, color: C.ink, background: C.white, border: `1px solid ${errors.message ? C.danger : C.proBorder}` }}
             />
             <div className="mt-1.5 flex items-start justify-between gap-4">
               <FieldError id="message-error" message={errors.message} />
@@ -212,15 +212,15 @@ export default function TestimonialForm({ source, galleryId, sessionType }: Prop
 
           <fieldset className="mt-6">
             <legend className="text-sm font-black" style={{ color: C.inkSoft }}>How may your name appear with your testimonial?</legend>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <div className="mt-3 grid gap-2 sm:grid-cols-3">
               {DISPLAY_OPTIONS.map((option) => (
                 <label
                   key={option.value}
-                  className="flex cursor-pointer items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold"
+                  className="flex cursor-pointer items-center gap-3 rounded-lg px-4 py-3 text-sm font-bold transition"
                   style={{
                     color: C.inkSoft,
-                    background: form.display_name_preference === option.value ? C.p1_08 : C.white,
-                    border: `1px solid ${form.display_name_preference === option.value ? C.p1_30 : C.warmEdge}`,
+                    background: form.display_name_preference === option.value ? C.proAccentSoft : C.white,
+                    border: `1px solid ${form.display_name_preference === option.value ? C.proAccentBorder : C.proBorder}`,
                   }}
                 >
                   <input
@@ -229,7 +229,7 @@ export default function TestimonialForm({ source, galleryId, sessionType }: Prop
                     value={option.value}
                     checked={form.display_name_preference === option.value}
                     onChange={() => updateField("display_name_preference", option.value)}
-                    style={{ accentColor: C.p1 }}
+                    style={{ accentColor: C.proAccent }}
                   />
                   {option.label}
                 </label>
@@ -237,7 +237,7 @@ export default function TestimonialForm({ source, galleryId, sessionType }: Prop
             </div>
           </fieldset>
 
-          <div className="mt-6 rounded-2xl p-4" style={{ background: C.p2_06, border: `1px solid ${errors.consent_to_marketing ? C.danger : C.borderWarm}` }}>
+          <div className="mt-6 rounded-lg p-4" style={{ background: C.proAccentSoft, border: `1px solid ${errors.consent_to_marketing ? C.danger : C.proAccentBorder}` }}>
             <label className="flex cursor-pointer items-start gap-3">
               <input
                 id="consent_to_marketing"
@@ -247,10 +247,10 @@ export default function TestimonialForm({ source, galleryId, sessionType }: Prop
                 aria-invalid={Boolean(errors.consent_to_marketing)}
                 aria-describedby="consent-clarification consent-error"
                 className="mt-1 h-4 w-4 shrink-0"
-                style={{ accentColor: C.p1 }}
+                style={{ accentColor: C.proAccent }}
               />
               <span className="text-sm font-bold leading-6" style={{ color: C.inkSoft }}>
-                I give SoloXSnaps Photography permission to use my testimonial on its website, social media, and other marketing materials
+                I give soloxsnaps permission to use my testimonial on its website, social media, and other marketing materials.
               </span>
             </label>
             <p id="consent-clarification" className="ml-7 mt-2 text-xs leading-5" style={{ color: C.muted }}>
@@ -259,13 +259,13 @@ export default function TestimonialForm({ source, galleryId, sessionType }: Prop
             <FieldError id="consent-error" message={errors.consent_to_marketing} />
           </div>
 
-          {serverError && <p role="alert" className="mt-5 rounded-2xl px-4 py-3 text-sm" style={{ color: C.danger, background: C.p2_08 }}>{serverError}</p>}
+          {serverError && <p role="alert" className="mt-5 rounded-lg px-4 py-3 text-sm" style={{ color: C.danger, background: C.pageAlt }}>{serverError}</p>}
 
           <button
             type="submit"
             disabled={status === "submitting"}
-            className="mt-6 w-full rounded-full px-6 py-3.5 text-sm font-black transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-            style={{ background: C.grad12, color: C.white }}
+            className="mt-6 w-full rounded-lg px-6 py-3.5 text-sm font-black transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+            style={{ background: C.proAccent, color: C.white }}
           >
             {status === "submitting" ? "Submitting..." : "Submit Testimonial"}
           </button>
@@ -301,7 +301,7 @@ function TextField({ id, label, type = "text", autoComplete, maxLength, value, e
         aria-invalid={Boolean(error)}
         aria-describedby={error ? errorId : id === "email" ? "email-helper" : undefined}
         className={INPUT_CLASS}
-        style={{ color: C.ink, background: C.white, border: `1px solid ${error ? C.danger : C.warmEdge}` }}
+        style={{ ...FIELD_RING, color: C.ink, background: C.white, border: `1px solid ${error ? C.danger : C.proBorder}` }}
       />
       <FieldError id={errorId} message={error} />
     </div>

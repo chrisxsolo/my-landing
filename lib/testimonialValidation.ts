@@ -2,7 +2,6 @@ export const TESTIMONIAL_DISPLAY_PREFERENCES = [
   "first_name_last_initial",
   "full_name",
   "first_name_only",
-  "anonymous",
 ] as const;
 
 export const TESTIMONIAL_STATUSES = [
@@ -97,7 +96,7 @@ export function validatePublicTestimonial(value: unknown): ValidationResult<Publ
     return { ok: false, error: "Your testimonial must be 2,000 characters or fewer" };
   }
   if (value.consent_to_marketing !== true) {
-    return { ok: false, error: "Please confirm that SoloXSnaps may use your testimonial" };
+    return { ok: false, error: "Please confirm that soloxsnaps may use your testimonial" };
   }
   if (typeof value.display_name_preference !== "string" || !DISPLAY_PREFERENCE_SET.has(value.display_name_preference)) {
     return { ok: false, error: "Please choose a valid display preference" };
@@ -144,10 +143,9 @@ export function buildTestimonialDisplayName(
   lastName: unknown,
   preference: TestimonialDisplayPreference,
 ): string {
-  if (preference === "anonymous") return "SoloXSnaps Client";
   const first = cleanText(firstName);
   const last = cleanText(lastName);
-  if (!first) return "SoloXSnaps Client";
+  if (!first) return "soloxsnaps client";
   if (preference === "first_name_only") return first;
   if (!last) return first;
   if (preference === "full_name") return `${first} ${last}`;

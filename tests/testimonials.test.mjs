@@ -64,6 +64,10 @@ test("public validation rejects invalid email, message limits, consent, and disp
     validatePublicTestimonial({ ...VALID_SUBMISSION, display_name_preference: "initials" }).error ?? "",
     /display preference/i,
   );
+  assert.match(
+    validatePublicTestimonial({ ...VALID_SUBMISSION, display_name_preference: "anonymous" }).error ?? "",
+    /display preference/i,
+  );
 });
 
 test("valid public submissions are trimmed and server controlled", () => {
@@ -98,13 +102,12 @@ test("honeypot submissions are rejected before insert preparation", () => {
   assert.match(result.error, /unable to submit/i);
 });
 
-test("display name helper supports every preference and malformed values", () => {
+test("display name helper supports every public preference and malformed values", () => {
   assert.equal(buildTestimonialDisplayName(" Chris ", " solorzano ", "first_name_last_initial"), "Chris S.");
   assert.equal(buildTestimonialDisplayName("Chris", "Solorzano", "full_name"), "Chris Solorzano");
   assert.equal(buildTestimonialDisplayName("Chris", "Solorzano", "first_name_only"), "Chris");
-  assert.equal(buildTestimonialDisplayName("Chris", "Solorzano", "anonymous"), "SoloXSnaps Client");
   assert.equal(buildTestimonialDisplayName("Ana", "de-la-cruz", "first_name_last_initial"), "Ana D.");
-  assert.equal(buildTestimonialDisplayName("", "", "full_name"), "SoloXSnaps Client");
+  assert.equal(buildTestimonialDisplayName("", "", "full_name"), "soloxsnaps client");
 });
 
 test("admin patch only permits status and private notes", () => {

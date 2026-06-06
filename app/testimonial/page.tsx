@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import TestimonialForm from "./TestimonialForm";
 
 export const metadata: Metadata = {
-  title: "Share Your Experience | SoloXSnaps",
-  description: "Share feedback about your SoloXSnaps photography experience.",
+  title: "Share Your Experience | soloxsnaps",
+  description: "Share feedback about your soloxsnaps photography experience.",
   robots: { index: false, follow: false },
 };
 
