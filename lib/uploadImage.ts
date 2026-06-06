@@ -6,7 +6,8 @@ export async function uploadImage(
   toast: (msg: string, ok?: boolean) => void,
 ): Promise<string | null> {
   const ext = file.name.split(".").pop()?.toLowerCase() ?? "jpg";
-  const path = `${folder}/${Date.now()}.${ext}`;
+  // Random suffix keeps parallel uploads (same millisecond) from colliding under upsert.
+  const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
   const { error } = await supabase.storage
     .from("grad-photos")
     .upload(path, file, { upsert: true, contentType: file.type });

@@ -91,7 +91,7 @@ function fmt12h(t:string|null):string{
   return `${h12}:${String(m).padStart(2,"0")} ${ampm}`;
 }
 type PortfolioCategory = { id:number; name:string; slug:string; description:string|null; sort_order:number; active:boolean; };
-type PortfolioImage = { id:number; title:string; alt:string|null; image_url:string; category_id:number|null; category_slug:string; featured:boolean; hero_carousel:boolean; sort_order:number; created_at:string|null; };
+type PortfolioImage = { id:number; title:string; alt:string|null; image_url:string; category_id:number|null; category_slug:string; featured:boolean; hero_carousel:boolean; sort_order:number; created_at:string|null; location?:string|null; };
 type PortfolioSeoDraft = { school: GradSchoolOption|null; location: GradLocationOption|null; session: GradSessionOption|null; degree: GradDegreeOption|null; year: GradYearOption|null; attire: GradAttireOption|null; goldenHour: boolean; };
 
 const EMPTY_CATEGORY = {name:"",slug:"",description:"",sort_order:"1",active:true};
@@ -124,6 +124,16 @@ function buildSubject(inq:{session_type:string|null;message:string;date_in_mind:
   const school=detectSchool(haystack);
   return school?`${school} Graduation Inquiry`:"Graduation Inquiry";
 }
+// Runs `fn` over items with at most `limit` in flight at once, preserving order.
+// Used to upload a batch of photos in parallel instead of one slow await-chain.
+async function mapWithConcurrency<T,R>(items:T[],limit:number,fn:(item:T)=>Promise<R>):Promise<R[]>{
+  const results:R[]=new Array(items.length);
+  let next=0;
+  async function worker(){while(next<items.length){const idx=next++;results[idx]=await fn(items[idx]);}}
+  await Promise.all(Array.from({length:Math.min(limit,items.length)},()=>worker()));
+  return results;
+}
+
 function matchesPortfolioGroup(image:PortfolioImage,group:"grads"|"families"|"couples"){
   const slug=image.category_slug;
   if(group==="grads")return slug==="grads"||slug==="graduation";
@@ -200,11 +210,16 @@ function AdminDashboard() {
   const [categoryDeleteConfirm,setCategoryDeleteConfirm]=useState<number|null>(null);
 
   // ── Batch upload ─────────────────────────────────────────────────────
-  type BatchItem = { file: File; preview: string; category_slug: string; title: string; };
+  type BatchItem = { id: number; file: File; preview: string; category_slug: string; title: string; location: string; };
   const [batchItems, setBatchItems] = useState<BatchItem[]>([]);
   const [batchSaving, setBatchSaving] = useState(false);
+  const [batchSelected, setBatchSelected] = useState<Set<number>>(new Set());
+  const [bulkCategory, setBulkCategory] = useState("");
+  const [bulkLocation, setBulkLocation] = useState("");
   const [importing, setImporting] = useState(false);
   const batchFileRef = useRef<HTMLInputElement>(null);
+  const batchIdRef = useRef(0);
+  const batchAnchorRef = useRef<number | null>(null); // last checkbox toggled, for shift-range select
 
   // ── Site settings (site image selections) ────────────────────────────
   const [siteSettings, setSiteSettings] = useState<Record<string,string|null>>({});
@@ -861,26 +876,69 @@ function AdminDashboard() {
     const files=Array.from(e.target.files??[]);
     if(!files.length)return;
     const defaultCat=categories[0]?.slug??"grads";
-    setBatchItems(prev=>[...prev,...files.map(f=>({file:f,preview:URL.createObjectURL(f),category_slug:defaultCat,title:f.name.replace(/\.[^.]+$/,"").replace(/[-_]/g," ")}))]);
+    setBatchItems(prev=>[...prev,...files.map(f=>({id:batchIdRef.current++,file:f,preview:URL.createObjectURL(f),category_slug:defaultCat,title:f.name.replace(/\.[^.]+$/,"").replace(/[-_]/g," "),location:""}))]);
     if(batchFileRef.current)batchFileRef.current.value="";
+  }
+
+  // ── Batch selection + bulk category/location assignment ──
+  const allBatchSelected=batchItems.length>0&&batchSelected.size===batchItems.length;
+  // Reusable location suggestions: every location already saved on a photo, plus any typed in this session.
+  const locationOptions=Array.from(new Set([...portfolioImages.map(i=>i.location),...batchItems.map(i=>i.location)].map(l=>(l??"").trim()).filter(Boolean))).sort();
+  function clearBatchSelection(){setBatchSelected(new Set());batchAnchorRef.current=null;}
+  function toggleBatchSelect(id:number){setBatchSelected(prev=>{const next=new Set(prev);if(next.has(id))next.delete(id);else next.add(id);return next;});}
+  function toggleSelectAllBatch(){if(allBatchSelected)clearBatchSelection();else setBatchSelected(new Set(batchItems.map(item=>item.id)));}
+  function removeBatchItem(id:number){setBatchItems(prev=>prev.filter(item=>item.id!==id));setBatchSelected(prev=>{const next=new Set(prev);next.delete(id);return next;});}
+  // Shift+click selects the whole range from the last toggled checkbox to this one.
+  function onBatchCheckboxClick(e:React.MouseEvent,index:number,id:number){
+    if(e.shiftKey&&batchAnchorRef.current!==null){
+      const [a,b]=[batchAnchorRef.current,index].sort((x,y)=>x-y);
+      const rangeIds=batchItems.slice(a,b+1).map(item=>item.id);
+      setBatchSelected(prev=>{const next=new Set(prev);rangeIds.forEach(rid=>next.add(rid));return next;});
+    }else{
+      toggleBatchSelect(id);
+    }
+    batchAnchorRef.current=index;
+  }
+  // Targets the checked photos, or every queued photo when none are checked.
+  function batchTargets(){return batchSelected.size===0?batchItems.map(i=>i.id):batchSelected;}
+  function applyBulkCategory(){
+    const cat=bulkCategory||categories[0]?.slug;
+    if(!cat){showToast("Add a category first",false);return;}
+    const targets=new Set(batchTargets());
+    setBatchItems(prev=>prev.map(item=>targets.has(item.id)?{...item,category_slug:cat}:item));
+    showToast(`Set category on ${targets.size} photo${targets.size!==1?"s":""}`);
+    clearBatchSelection(); // deselect so you can move on to the next group
+  }
+  function applyBulkLocation(){
+    const loc=bulkLocation.trim();
+    if(!loc){showToast("Type a location first",false);return;}
+    const targets=new Set(batchTargets());
+    setBatchItems(prev=>prev.map(item=>targets.has(item.id)?{...item,location:loc}:item));
+    showToast(`Set location on ${targets.size} photo${targets.size!==1?"s":""}`);
+    clearBatchSelection();
   }
 
   async function saveBatchImages(){
     if(!batchItems.length){showToast("No images queued",false);return;}
     setBatchSaving(true);
+    // Upload all files in parallel (5 at a time) — the old one-at-a-time loop was the bottleneck.
+    const uploads=await mapWithConcurrency(batchItems,5,async item=>({item,url:await uploadImage(item.file,"portfolio",showToast)}));
+    const base=portfolioImages.length;
+    const rows=uploads.filter(u=>u.url).map((u,idx)=>{
+      const cat=categories.find(c=>c.slug===u.item.category_slug);
+      return {title:u.item.title||"Portfolio image",alt:u.item.title||"Portfolio image",image_url:u.url,category_id:cat?.id??null,category_slug:u.item.category_slug,location:u.item.location.trim()||null,featured:false,sort_order:base+idx+1};
+    });
     let saved=0;
-    for(const item of batchItems){
-      const url=await uploadImage(item.file,"portfolio",showToast);
-      if(!url)continue;
-      const cat=categories.find(c=>c.slug===item.category_slug);
-      const{error}=await supabase.from('portfolio_images').insert({title:item.title||"Portfolio image",alt:item.title||"Portfolio image",image_url:url,category_id:cat?.id??null,category_slug:item.category_slug,featured:false,sort_order:portfolioImages.length+saved+1});
-      if(!error)saved++;
+    if(rows.length){
+      // Single bulk insert instead of one request per photo.
+      const{error}=await supabase.from('portfolio_images').insert(rows);
+      if(error)showToast("Some photos failed to save — "+error.message,false);else saved=rows.length;
     }
+    if(saved<batchItems.length)showToast(`${batchItems.length-saved} photo${batchItems.length-saved!==1?"s":""} failed to upload`,false);
     setBatchSaving(false);
     setBatchItems([]);
-    showToast(`${saved} image${saved!==1?"s":""} uploaded`);
-    fetchPortfolioImages();
-    if(saved>0)revalidatePublicSite();
+    clearBatchSelection();
+    if(saved>0){showToast(`${saved} image${saved!==1?"s":""} uploaded`);fetchPortfolioImages();revalidatePublicSite();}
   }
 
   async function importGradPhotos(){
@@ -1709,24 +1767,52 @@ function AdminDashboard() {
                   <h2 className="text-base font-black text-slate-900">Batch Upload</h2>
                   <button onClick={()=>batchFileRef.current?.click()} className="text-xs font-bold px-4 py-2 rounded-xl text-white" style={{background:C.grad12}}>+ Add photos</button>
                 </div>
-                <p className="text-xs text-slate-400 mb-4">Select multiple photos at once. Set a category for each before saving.</p>
+                <p className="text-xs text-slate-400 mb-4">Check the photos you want (Shift-click to select a range), then apply a category or location to all of them at once. Location is optional and helps SEO later. You can also edit each photo individually.</p>
                 <input ref={batchFileRef} type="file" accept="image/*" multiple className="hidden" onChange={onBatchFiles}/>
+                <datalist id="batch-location-options">{locationOptions.map(loc=><option key={loc} value={loc}/>)}</datalist>
 
                 {batchItems.length>0?(
                   <>
+                    {/* Bulk bar: select photos, then apply a category and/or location to all of them */}
+                    <div className="mb-3 p-3 rounded-xl bg-slate-50 border border-slate-100 space-y-2">
+                      <label className="flex items-center gap-2 text-xs font-bold text-slate-600 cursor-pointer select-none">
+                        <input type="checkbox" checked={allBatchSelected} onChange={toggleSelectAllBatch} className="w-4 h-4 accent-slate-900"/>
+                        {batchSelected.size>0?`${batchSelected.size} selected`:"Select all"}
+                      </label>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-xs font-bold text-slate-500 w-16">Category</span>
+                        <select value={bulkCategory||categories[0]?.slug||""} onChange={e=>setBulkCategory(e.target.value)} className="flex-1 min-w-[120px] px-2 py-1 rounded-lg text-xs font-medium text-slate-800 outline-none border border-slate-200 bg-white">
+                          {categories.map(c=><option key={c.slug} value={c.slug}>{c.name}</option>)}
+                        </select>
+                        <button onClick={applyBulkCategory} className="text-xs font-bold px-3 py-1.5 rounded-lg text-white" style={{background:C.grad12}}>
+                          Apply to {batchSelected.size>0?"selected":"all"}
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-xs font-bold text-slate-500 w-16">Location</span>
+                        <input list="batch-location-options" value={bulkLocation} onChange={e=>setBulkLocation(e.target.value)} placeholder="e.g. Crissy Field (optional)" className="flex-1 min-w-[120px] px-2 py-1 rounded-lg text-xs font-medium text-slate-800 outline-none border border-slate-200 bg-white"/>
+                        <button onClick={applyBulkLocation} className="text-xs font-bold px-3 py-1.5 rounded-lg text-white" style={{background:C.grad12}}>
+                          Apply to {batchSelected.size>0?"selected":"all"}
+                        </button>
+                      </div>
+                    </div>
                     <div className="space-y-2 mb-4">
-                      {batchItems.map((item,i)=>(
-                        <div key={i} className="flex items-center gap-3 p-2 rounded-xl bg-slate-50 border border-slate-100">
+                      {batchItems.map((item,idx)=>(
+                        <div key={item.id} className="flex items-center gap-3 p-2 rounded-xl bg-slate-50 border border-slate-100" style={{borderColor:batchSelected.has(item.id)?C.p1:undefined}}>
+                          <input type="checkbox" checked={batchSelected.has(item.id)} onChange={()=>{}} onClick={e=>onBatchCheckboxClick(e,idx,item.id)} className="w-4 h-4 flex-shrink-0 accent-slate-900"/>
                           <div className="w-14 h-14 flex-shrink-0 rounded-lg overflow-hidden bg-slate-200">
                             <img src={item.preview} className="w-full h-full object-cover"/>
                           </div>
                           <div className="flex-1 min-w-0 space-y-1.5">
-                            <input className="w-full px-2 py-1 rounded-lg text-xs font-medium text-slate-800 outline-none border border-slate-200 bg-white" placeholder="Title" value={item.title} onChange={e=>setBatchItems(prev=>prev.map((x,j)=>j===i?{...x,title:e.target.value}:x))}/>
-                            <select className="w-full px-2 py-1 rounded-lg text-xs font-medium text-slate-800 outline-none border border-slate-200 bg-white" value={item.category_slug} onChange={e=>setBatchItems(prev=>prev.map((x,j)=>j===i?{...x,category_slug:e.target.value}:x))}>
-                              {categories.map(c=><option key={c.slug} value={c.slug}>{c.name}</option>)}
-                            </select>
+                            <input className="w-full px-2 py-1 rounded-lg text-xs font-medium text-slate-800 outline-none border border-slate-200 bg-white" placeholder="Title" value={item.title} onChange={e=>setBatchItems(prev=>prev.map(x=>x.id===item.id?{...x,title:e.target.value}:x))}/>
+                            <div className="flex gap-1.5">
+                              <select className="flex-1 min-w-0 px-2 py-1 rounded-lg text-xs font-medium text-slate-800 outline-none border border-slate-200 bg-white" value={item.category_slug} onChange={e=>setBatchItems(prev=>prev.map(x=>x.id===item.id?{...x,category_slug:e.target.value}:x))}>
+                                {categories.map(c=><option key={c.slug} value={c.slug}>{c.name}</option>)}
+                              </select>
+                              <input list="batch-location-options" className="flex-1 min-w-0 px-2 py-1 rounded-lg text-xs font-medium text-slate-800 outline-none border border-slate-200 bg-white" placeholder="Location (optional)" value={item.location} onChange={e=>setBatchItems(prev=>prev.map(x=>x.id===item.id?{...x,location:e.target.value}:x))}/>
+                            </div>
                           </div>
-                          <button onClick={()=>setBatchItems(prev=>prev.filter((_,j)=>j!==i))} className="w-7 h-7 rounded-full bg-slate-200 text-slate-500 text-xs font-bold flex-shrink-0 flex items-center justify-center hover:bg-red-100 hover:text-red-500 transition-colors">✕</button>
+                          <button onClick={()=>removeBatchItem(item.id)} className="w-7 h-7 rounded-full bg-slate-200 text-slate-500 text-xs font-bold flex-shrink-0 flex items-center justify-center hover:bg-red-100 hover:text-red-500 transition-colors">✕</button>
                         </div>
                       ))}
                     </div>
