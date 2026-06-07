@@ -24,6 +24,7 @@
 
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 import { getPortfolioData } from "@/lib/professionalData";
 
@@ -423,8 +424,10 @@ export default async function PortfolioPage({
   // categories → the filter tabs (All, Grads, Families, etc.) from Supabase
   // images     → all portfolio photos from Supabase
   const { categories, images } = await getPortfolioData();
-  const selectedCategory = (await searchParams).category;
-  const selected = categories.find((c) => c.slug === selectedCategory);
+  const requestedCategory = (await searchParams).category;
+  const selected = categories.find((category) => category.slug === requestedCategory);
+  if (requestedCategory && !selected) redirect("/portfolio");
+  const selectedCategory = selected?.slug;
 
   // Filter images to the selected category, or show all
   const filteredImages = selectedCategory

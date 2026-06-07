@@ -119,7 +119,7 @@ export default async function ProfessionalHomePage() {
         storyImages={home.storyImages}
         featuredSessions={featuredSessions}
       />
-      <HomeConversionSections couplesGallery={home.couplesGallery} aboutPortrait={home.aboutPortrait} />
+      <HomeConversionSections aboutPortrait={home.aboutPortrait} />
       <HomepageFAQ items={getHomepageFaqItems()} />
       <Testimonials
         title="Real people, clearly guided from the first frame."

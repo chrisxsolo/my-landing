@@ -77,7 +77,7 @@ type RawPortfolioImage = Partial<PortfolioImage> & {
 const FALLBACK_PROFILE_IMAGE =
   "https://dmtslzwglpezympptqls.supabase.co/storage/v1/object/public/grad-photos/chris-portrait.jpg";
 
-const VISIBLE_PORTFOLIO_SLUGS = ["grads", "couples", "families"];
+const VISIBLE_PORTFOLIO_SLUGS = ["grads", "families"];
 
 export const FALLBACK_CATEGORIES: PortfolioCategory[] = [
   {
@@ -140,6 +140,12 @@ function normalizeCategory(raw: RawCategory, index: number): PortfolioCategory {
   };
 }
 
+function getVisiblePortfolioCategories(categories: PortfolioCategory[]) {
+  return categories.filter(
+    (category) => category.active && VISIBLE_PORTFOLIO_SLUGS.includes(category.slug),
+  );
+}
+
 function normalizeImage(
   raw: RawPortfolioImage,
   index: number,
@@ -181,21 +187,20 @@ export async function getPortfolioCategories() {
       .order("sort_order", { ascending: true });
 
     if (error || !data || data.length === 0) {
-      return FALLBACK_CATEGORIES.filter((category) => category.active);
+      return getVisiblePortfolioCategories(FALLBACK_CATEGORIES);
     }
 
     const normalized = data
       .map((item, index) => normalizeCategory(item, index))
-      .filter((category) => category.active && VISIBLE_PORTFOLIO_SLUGS.includes(category.slug));
+      .filter((category) => category.active);
 
-    const merged = FALLBACK_CATEGORIES
-      .filter((category) => category.active)
+    const merged = getVisiblePortfolioCategories(FALLBACK_CATEGORIES)
       .map((fallback) => normalized.find((category) => category.slug === fallback.slug) ?? fallback);
 
     return merged;
   } catch (error) {
     console.error("Failed to load portfolio categories", error);
-    return FALLBACK_CATEGORIES.filter((category) => category.active);
+    return getVisiblePortfolioCategories(FALLBACK_CATEGORIES);
   }
 }
 

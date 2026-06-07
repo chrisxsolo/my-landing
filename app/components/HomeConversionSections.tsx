@@ -1,11 +1,8 @@
 import Link from "next/link";
 import OptimizedPhoto from "@/app/components/OptimizedPhoto";
-import type { PortfolioImage } from "@/lib/professionalData";
 import styles from "@/app/(professional)/home.module.css";
 import details from "@/app/(professional)/homeDetails.module.css";
 import responsive from "@/app/(professional)/homeResponsive.module.css";
-
-type HomeImage = Pick<PortfolioImage, "id" | "image_url" | "alt" | "category_slug">;
 
 const SCHOOLS = [
   ["UC Berkeley", "/grads/uc-berkeley"],
@@ -66,10 +63,8 @@ function DashboardPreview() {
 }
 
 export default function HomeConversionSections({
-  couplesGallery,
   aboutPortrait,
 }: {
-  couplesGallery: HomeImage[];
   aboutPortrait: { image_url: string; alt: string };
 }) {
   return (
@@ -154,38 +149,6 @@ export default function HomeConversionSections({
           <div className={styles.actions}>
             <Link href="/pricing/grads" className={styles.button}>Explore Graduation Photography</Link>
             <Link href="/grad-guide" className={`${styles.button} ${styles.buttonGhost}`}>Read the Graduation Guide</Link>
-          </div>
-        </div>
-      </section>
-
-      <section className={`${styles.section} ${styles.tint} ${responsive.section}`}>
-        <div className={`${styles.shell} ${responsive.shell}`}>
-          <div className={details.split}>
-            <div>
-              <p className={styles.eyebrow}>Couples and engagements</p>
-              <h2 className={styles.title}>Couples sessions that feel more like a date</h2>
-              <p className={styles.copy}>
-                Instead of repeating stiff poses, you will receive prompts that create movement,
-                conversation, and natural interaction. I still guide the details, including where to stand,
-                what to do with your hands, and how to look your best on camera.
-              </p>
-              <ul className={details.featureList}>
-                <li>Engagements and proposals</li>
-                <li>Anniversaries and date-night sessions</li>
-                <li>Everyday couples portraits</li>
-              </ul>
-              <div className={styles.actions}>
-                <Link href="/pricing/couples" className={styles.button}>Explore Couples Sessions</Link>
-                <Link href="/portfolio?category=couples" className={`${styles.button} ${styles.buttonGhost}`}>View Couples Work</Link>
-              </div>
-            </div>
-            <div className={details.couplesGallery} aria-label="Couples photography gallery">
-              {couplesGallery.map((image) => (
-                <div key={image.id} className={details.couplesImage}>
-                  <OptimizedPhoto src={image.image_url} alt={image.alt} sizes="(max-width: 920px) 50vw, 28vw" />
-                </div>
-              ))}
-            </div>
           </div>
         </div>
       </section>

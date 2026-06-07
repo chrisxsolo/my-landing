@@ -66,7 +66,6 @@ export type HomepageImages = {
   cardCouples: HomepageImage;
   cardPortrait: HomepageImage;
   storyImages: HomepageImage[];
-  couplesGallery: HomepageImage[];
   finalCta: HomepageImage;
   aboutPortrait: { image_url: string; alt: string };
 };
@@ -152,13 +151,6 @@ export function resolveHomepageImages(
     "",
   );
 
-  const couplesGallery = group(
-    ["home_couples_1", "home_couples_2", "home_couples_3"],
-    dedupeByUrl([...couples, ...all]),
-    DEFAULT_ALT.couples,
-    "couples",
-  );
-
   const finalCta = settings.home_final_cta
     ? make(settings.home_final_cta, DEFAULT_ALT.any, "")
     : storyPool.find((image) => image.image_url !== heroPrimary.image_url) ?? heroPrimary;
@@ -177,7 +169,6 @@ export function resolveHomepageImages(
     cardCouples,
     cardPortrait,
     storyImages,
-    couplesGallery,
     finalCta,
     aboutPortrait,
   };

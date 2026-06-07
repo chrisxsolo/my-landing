@@ -13,14 +13,18 @@ const dmSans = DM_Sans({
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://www.soloxsnaps.com"),
-  title: "Chris Solorzano",
+  title: {
+    default: "SoloXSnaps | Bay Area Graduation & Portrait Photographer",
+    template: "%s | SoloXSnaps",
+  },
   description:
-    "Photographer, developer, and curious person based in San Francisco, CA.",
+    "Bay Area graduation, couples, family, and portrait photography by Chris Solorzano.",
+  applicationName: "SoloXSnaps",
   // Open Graph — controls how the link looks when shared on Instagram/iMessage
   openGraph: {
-    title: "Chris Solorzano",
-    description: "Photographer · Developer · San Francisco",
+    siteName: "SoloXSnaps",
     type: "website",
+    locale: "en_US",
   },
 };
 

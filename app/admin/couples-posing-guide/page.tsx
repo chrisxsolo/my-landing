@@ -1,0 +1,9 @@
+import { redirect } from "next/navigation";
+
+export const metadata = {
+  robots: { index: false, follow: false },
+};
+
+export default function CouplesPosingGuideAdminRoute() {
+  redirect("/admin?tab=couplesGuide");
+}

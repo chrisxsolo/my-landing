@@ -42,6 +42,7 @@ import LocationsTab from "@/app/admin/LocationsTab";
 import BlogTab from "@/app/admin/BlogTab";
 import NavigationTab from "@/app/admin/NavigationTab";
 import TestimonialsTab from "@/app/admin/TestimonialsTab";
+import CouplesPosingGuideTab from "@/app/admin/CouplesPosingGuideTab";
 import { uploadImage } from "@/lib/uploadImage";
 import {
   type GradLocationOption,
@@ -70,7 +71,7 @@ import {
 
 export const dynamic = 'force-dynamic'
 
-type Tab = "home"|"poses"|"locations"|"bayGuide"|"portfolio"|"categories"|"blog"|"library"|"navigation"|"analytics"|"payments"|"inquiries"|"clients"|"testimonials"|"funnel"|"vault"|"ai"|"chat"|"format"|"accounts";
+type Tab = "home"|"poses"|"couplesGuide"|"locations"|"bayGuide"|"portfolio"|"categories"|"blog"|"library"|"navigation"|"analytics"|"payments"|"inquiries"|"clients"|"testimonials"|"funnel"|"vault"|"ai"|"chat"|"format"|"accounts";
 type ImageLibraryRow = { id:number; title:string; alt:string|null; image_url:string; source_type:string; source_post_id:number|null; source_post_slug:string|null; source_role:string; in_portfolio:boolean; created_at:string; };
 type Inquiry = AdminInquiry;
 type AdminSessionsResponse = { sessions?: AdminClientSessionDTO[]; session?: AdminClientSessionDTO; error?: string; };
@@ -91,10 +92,10 @@ type PortfolioSeoDraft = { school: GradSchoolOption|null; location: GradLocation
 const EMPTY_CATEGORY = {name:"",slug:"",description:"",sort_order:"1",active:true};
 const EMPTY_PORTFOLIO = {title:"",alt:"",category_slug:"graduation",featured:false,sort_order:""};
 const EMPTY_PORTFOLIO_SEO_DRAFT: PortfolioSeoDraft = {school:null,location:null,session:null,degree:null,year:null,attire:null,goldenHour:false};
-const WEBSITE_TABS:Tab[]=["poses","locations","bayGuide","portfolio","categories","blog","library","navigation"];
+const WEBSITE_TABS:Tab[]=["poses","couplesGuide","locations","bayGuide","portfolio","categories","blog","library","navigation"];
 const CLIENT_TABS:Tab[]=["inquiries","clients","testimonials","analytics","payments","funnel","ai","chat","format"];
 const VAULT_TABS:Tab[]=["vault"];
-const TAB_LABELS:Record<Tab,string>={home:"🏠 Home",poses:"📸 Grad Poses",locations:"📍 Campus Spots",bayGuide:"🗺️ Bay Guide",portfolio:"🖼️ Portfolio",categories:"🏷️ Categories",blog:"✍️ Blog",library:"🗄️ Image Library",navigation:"🧭 Navigation",analytics:"📊 Analytics",payments:"💵 Revenue",funnel:"📈 Funnel",inquiries:"📬 Inquiries",clients:"👥 Clients",testimonials:"💬 Testimonials",vault:"📓 Vault",ai:"🤖 AI Training",chat:"💬 AI Chat",format:"✨ Quick Format",accounts:"👤 Accounts"};
+const TAB_LABELS:Record<Tab,string>={home:"🏠 Home",poses:"📸 Grad Poses",couplesGuide:"💞 Couples Posing Guide",locations:"📍 Campus Spots",bayGuide:"🗺️ Bay Guide",portfolio:"🖼️ Portfolio",categories:"🏷️ Categories",blog:"✍️ Blog",library:"🗄️ Image Library",navigation:"🧭 Navigation",analytics:"📊 Analytics",payments:"💵 Revenue",funnel:"📈 Funnel",inquiries:"📬 Inquiries",clients:"👥 Clients",testimonials:"💬 Testimonials",vault:"📓 Vault",ai:"🤖 AI Training",chat:"💬 AI Chat",format:"✨ Quick Format",accounts:"👤 Accounts"};
 // The six home-page "work grid" slots, in display order — used for the batch picker.
 const WORK_GRID_KEYS=["home_story_1","home_story_2","home_story_3","home_story_4","home_story_5","home_story_6"] as const;
 
@@ -1383,8 +1384,8 @@ function AdminDashboard() {
                 ))}
                 <div className="h-px my-2 mx-1" style={{background:"rgba(0,0,0,0.06)"}}/>
                 <p className="text-[10px] font-black uppercase tracking-[0.13em] px-3 pt-0.5 pb-1" style={{color:C.mutedSoft}}>Website</p>
-                {(["poses","locations","bayGuide","portfolio","categories","blog","library","navigation"] as Tab[]).map(t=>(
-                  <NavBtn key={t} t={t} icon={t==="poses"?"📸":t==="locations"?"📍":t==="bayGuide"?"🗺️":t==="portfolio"?"🖼️":t==="categories"?"🏷️":t==="blog"?"✍️":t==="navigation"?"🧭":"🗄️"} label={TAB_LABELS[t].replace(/^[^\s]+\s/,"")}/>
+                {WEBSITE_TABS.map(t=>(
+                  <NavBtn key={t} t={t} icon={t==="poses"?"📸":t==="couplesGuide"?"💞":t==="locations"?"📍":t==="bayGuide"?"🗺️":t==="portfolio"?"🖼️":t==="categories"?"🏷️":t==="blog"?"✍️":t==="navigation"?"🧭":"🗄️"} label={TAB_LABELS[t].replace(/^[^\s]+\s/,"")}/>
                 ))}
                 <div className="h-px my-2 mx-1" style={{background:"rgba(0,0,0,0.06)"}}/>
                 <p className="text-[10px] font-black uppercase tracking-[0.13em] px-3 pt-0.5 pb-1" style={{color:C.mutedSoft}}>Tools</p>
@@ -1412,7 +1413,7 @@ function AdminDashboard() {
           type MobileNavItem={t:Tab;icon:string;label:string};
           const all:MobileNavItem[]=[
             {t:"home",icon:"🏠",label:"Home"},{t:"inquiries",icon:"📬",label:"Inquiries"},{t:"clients",icon:"👥",label:"Clients"},{t:"testimonials",icon:"💬",label:"Testimonials"},{t:"analytics",icon:"📊",label:"Analytics"},{t:"payments",icon:"💵",label:"Revenue"},{t:"funnel",icon:"📈",label:"Funnel"},
-            {t:"poses",icon:"📸",label:"Poses"},{t:"locations",icon:"📍",label:"Spots"},{t:"bayGuide",icon:"🗺️",label:"Bay Guide"},{t:"portfolio",icon:"🖼️",label:"Portfolio"},{t:"categories",icon:"🏷️",label:"Categories"},{t:"blog",icon:"✍️",label:"Blog"},{t:"library",icon:"🗄️",label:"Library"},{t:"navigation",icon:"🧭",label:"Navigation"},
+            {t:"poses",icon:"📸",label:"Poses"},{t:"couplesGuide",icon:"💞",label:"Couples Guide"},{t:"locations",icon:"📍",label:"Spots"},{t:"bayGuide",icon:"🗺️",label:"Bay Guide"},{t:"portfolio",icon:"🖼️",label:"Portfolio"},{t:"categories",icon:"🏷️",label:"Categories"},{t:"blog",icon:"✍️",label:"Blog"},{t:"library",icon:"🗄️",label:"Library"},{t:"navigation",icon:"🧭",label:"Navigation"},
             {t:"ai",icon:"🤖",label:"AI Training"},{t:"chat",icon:"💬",label:"AI Chat"},{t:"format",icon:"✨",label:"Format"},{t:"vault",icon:"📓",label:"Vault"},{t:"accounts",icon:"👤",label:"Accounts"},
           ];
           return(
@@ -1833,6 +1834,7 @@ function AdminDashboard() {
 
         {/* ── POSES ── */}
         {tab==="poses"&&<PosesTab showToast={showToast}/>}
+        {tab==="couplesGuide"&&<CouplesPosingGuideTab showToast={showToast}/>}
 
         {tab==="locations"&&<LocationsTab showToast={showToast}/>}
 

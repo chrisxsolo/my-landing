@@ -96,17 +96,17 @@ test("resolveHomepageImages prefers explicit settings, then legacy keys", () => 
   assert.equal(home.aboutPortrait.image_url, "custom-chris.jpg");
 });
 
-test("resolveHomepageImages fills group overrides and avoids repeating URLs", () => {
+test("resolveHomepageImages fills story overrides and avoids repeating URLs", () => {
   const home = resolveHomepageImages(
-    { home_couples_1: "pinned-couple.jpg" },
+    { home_story_1: "pinned-story.jpg" },
     IMAGES,
     FALLBACK_PORTRAIT,
   );
 
-  assert.equal(home.couplesGallery[0].image_url, "pinned-couple.jpg");
+  assert.equal(home.storyImages[0].image_url, "pinned-story.jpg");
   // Remaining auto-filled slots must not repeat the pinned override.
-  assert.ok(home.couplesGallery.slice(1).every((image) => image.image_url !== "pinned-couple.jpg"));
-  assert.equal(new Set(home.couplesGallery.map((image) => image.image_url)).size, home.couplesGallery.length);
+  assert.ok(home.storyImages.slice(1).every((image) => image.image_url !== "pinned-story.jpg"));
+  assert.equal(new Set(home.storyImages.map((image) => image.image_url)).size, home.storyImages.length);
 });
 
 test("resolveHomepageImages never throws on an empty portfolio", () => {
@@ -114,6 +114,5 @@ test("resolveHomepageImages never throws on an empty portfolio", () => {
 
   assert.equal(home.heroPrimary.image_url, FALLBACK_PORTRAIT);
   assert.ok(home.storyImages.length <= 1); // only the global portrait fallback, at most
-  assert.equal(home.couplesGallery.length, 0);
   assert.equal(home.aboutPortrait.image_url, FALLBACK_PORTRAIT);
 });
