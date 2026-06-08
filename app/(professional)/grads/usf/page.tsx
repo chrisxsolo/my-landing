@@ -36,7 +36,6 @@ const data: SchoolLandingData = {
         "Open lawn with good shade from mature trees. Relaxed and versatile for group shots or candid frames.",
     },
   ],
-  travelNote: "No travel fee for USF — all San Francisco campus sessions are included.",
   sessionNote:
     "USF commencement is typically in late May. Early inquiries are recommended for peak spring dates.",
 };

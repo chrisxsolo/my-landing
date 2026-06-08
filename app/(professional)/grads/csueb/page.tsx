@@ -36,7 +36,6 @@ const data: SchoolLandingData = {
         "Landscaped open areas with mature trees. Good for relaxed individual portraits away from the main architectural backdrops.",
     },
   ],
-  travelNote: "CSU East Bay sessions include a $30 travel fee from San Francisco.",
   sessionNote:
     "Spring commencement at CSUEB typically falls in late May. Send an inquiry early if you need a specific date.",
 };

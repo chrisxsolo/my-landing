@@ -19,6 +19,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import OptimizedPhoto from "@/app/components/OptimizedPhoto";
+import { BOOKING_POLICY, PRICING_CATALOG } from "@/lib/pricingCatalog";
 
 export const metadata: Metadata = {
   title: "About",
@@ -39,9 +40,9 @@ const portrait =
 // ── PROCESS STEPS ─────────────────────────────────────────────────────────────
 // Format: ["number", "Step name", "Description"]
 const process = [
-  ["01", "Inquiry to booking",  "Send the date, campus, and headcount. I reply within 24 hours with availability, pricing, and next steps. 50% deposit reserves the date."],
+  ["01", "Inquiry to booking", `Send the date, campus, and headcount. I reply within 24 hours with availability, pricing, and next steps. A ${BOOKING_POLICY.retainerPercent}% ${BOOKING_POLICY.retainerRefundability} retainer reserves the session.`],
   ["02", "Session day",         "Campus route, light, and timing are planned before you arrive. I give clear direction throughout so you're never stuck wondering what to do."],
-  ["03", "Gallery delivery",    "50+ professionally edited images delivered to a private online gallery within two weeks. Clean download link, easy sharing."],
+  ["03", "Gallery delivery", `${PRICING_CATALOG.graduation.standardMinimumImages}+ professionally edited images delivered to a private online gallery within ${PRICING_CATALOG.standardTurnaroundDays / 7} weeks. Clean download link, easy sharing.`],
 ];
 
 const CSS = `

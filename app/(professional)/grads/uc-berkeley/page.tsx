@@ -36,7 +36,6 @@ const data: SchoolLandingData = {
         "Tucked away with redwood canopy and dappled light. One of the more serene and less crowded spots on campus.",
     },
   ],
-  travelNote: "Berkeley sessions include a $35 travel fee from San Francisco.",
   sessionNote:
     "Spring graduation season (May) books quickly — inquire early if you have a specific date in mind.",
 };

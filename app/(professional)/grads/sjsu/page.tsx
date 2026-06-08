@@ -36,7 +36,6 @@ const data: SchoolLandingData = {
         "Tree-lined campus boundary with good shade and quiet compared to the main quad. Works well for candid movement shots.",
     },
   ],
-  travelNote: "SJSU sessions include a $75 travel fee from San Francisco.",
   sessionNote:
     "May graduation week fills fast. If you have a specific date near your ceremony, send an inquiry early.",
 };

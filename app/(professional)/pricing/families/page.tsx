@@ -22,6 +22,8 @@ import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 import { getPortfolioData, getSiteSettings } from "@/lib/professionalData";
 import { selectDistinctImageUrl } from "@/lib/photoMetadata";
 import { pricingCSS, anim } from "@/lib/proStyles";
+import { formatCurrency } from "@/lib/pricing";
+import { PRICING_CATALOG, getBookingPolicyItems } from "@/lib/pricingCatalog";
 
 // Cached/ISR: refreshed at most hourly, or immediately on admin content saves
 // (POST /api/admin/revalidate).
@@ -39,15 +41,16 @@ export const metadata: Metadata = {
 // mediaMinHeight    → desktop package photo height (px)
 // mediaMinHeightMobile → mobile photo height (px)
 const CSS = pricingCSS({ mediaMinHeight: 560, mediaMinHeightMobile: 390 });
+const familyPricing = PRICING_CATALOG.families;
 
 // ── ADD-ONS LIST ──────────────────────────────────────────────────────────────
 // Shown below each package's bullet list.
 // To add/remove items: edit this array. Format: { label, price }
 const addOns = [
-  { label: "Additional nearby location",  price: "$125" },
-  { label: "72-hour full gallery delivery",  price: "$150" },
-  { label: "Extended family members",     price: "$50-$75" },
-  { label: "Additional time",             price: "$100 / 30 min" },
+  familyPricing.addOns.extraLocation,
+  familyPricing.addOns.expedited,
+  familyPricing.addOns.extendedFamily,
+  familyPricing.addOns.extra30Minutes,
 ];
 
 // ── INFO CARDS (Booking / Session flow / Travel) ─────────────────────────────
@@ -57,7 +60,7 @@ const addOns = [
 const infoCards = [
   {
     heading: "Booking",
-    items: ["50% deposit to reserve the date. Deposits are non-refundable but transferable.", "Contract completed before the session.", "Remaining balance due on shoot day."],
+    items: getBookingPolicyItems(),
     delay: 0.28,
   },
   {
@@ -138,7 +141,7 @@ export default async function FamilyPricingPage() {
             {/* Starting price — change "$350" and label here */}
             <div className="pricing-hero-price-block">
               <span className="pricing-hero-price-label">starting from</span>
-              <span className="pricing-hero-price-big">$350</span>
+              <span className="pricing-hero-price-big">{formatCurrency(familyPricing.packages.standard.price)}</span>
             </div>
 
             <span className="pricing-hero-divider" aria-hidden="true" />
@@ -183,21 +186,21 @@ export default async function FamilyPricingPage() {
           {/* What's included — add/remove items here */}
           <ul>
             {[
-              "Up to 30 minutes",
+              `Up to ${familyPricing.packages.standard.durationMinutes} minutes`,
               "One location",
               "Guided, relaxed session",
-              "Minimum 10 professionally edited images",
+              `Minimum ${familyPricing.packages.standard.minimumImages} professionally edited images`,
               "Private online gallery",
-              "Up to two-week standard turnaround",
+              `Up to ${PRICING_CATALOG.standardTurnaroundDays / 7}-week standard turnaround`,
             ].map((item) => <li key={item}>{item}</li>)}
           </ul>
 
           {/* Add-ons list — defined in the addOns array at the top of the file */}
           <div className="pricing-addons">
             <p className="pricing-kicker">Add-ons</p>
-            {addOns.map(({ label, price }) => (
+            {addOns.map(({ label, displayPrice }) => (
               <div key={label} className="pricing-row">
-                <span>{label}</span><span>{price}</span>
+                <span>{label}</span><span>{displayPrice}</span>
               </div>
             ))}
           </div>
@@ -206,7 +209,7 @@ export default async function FamilyPricingPage() {
           <div className="pricing-investment">
             <div>
               <p className="pricing-kicker">Investment</p>
-              <p className="pricing-price">$350</p>
+              <p className="pricing-price">{formatCurrency(familyPricing.packages.standard.price)}</p>
               <p className="pricing-meta">starting from</p>
             </div>
             <Link href="/contact" className="pricing-link">Book this session</Link>
@@ -251,22 +254,22 @@ export default async function FamilyPricingPage() {
           {/* What's included — add/remove items here */}
           <ul>
             {[
-              "Up to 60 minutes",
+              `Up to ${familyPricing.packages.extended.durationMinutes} minutes`,
               "One location",
               "More time for kids to warm up",
               "Greater variety of groupings and moments",
-              "Minimum 30 professionally edited images",
+              `Minimum ${familyPricing.packages.extended.minimumImages} professionally edited images`,
               "Private online gallery",
-              "Up to two-week standard turnaround",
+              `Up to ${PRICING_CATALOG.standardTurnaroundDays / 7}-week standard turnaround`,
             ].map((item) => <li key={item}>{item}</li>)}
           </ul>
 
           {/* Add-ons list — same list used for both packages */}
           <div className="pricing-addons">
             <p className="pricing-kicker">Add-ons</p>
-            {addOns.map(({ label, price }) => (
+            {addOns.map(({ label, displayPrice }) => (
               <div key={label} className="pricing-row">
-                <span>{label}</span><span>{price}</span>
+                <span>{label}</span><span>{displayPrice}</span>
               </div>
             ))}
           </div>
@@ -275,7 +278,7 @@ export default async function FamilyPricingPage() {
           <div className="pricing-investment">
             <div>
               <p className="pricing-kicker">Investment</p>
-              <p className="pricing-price">$500</p>
+              <p className="pricing-price">{formatCurrency(familyPricing.packages.extended.price)}</p>
               <p className="pricing-meta">starting from</p>
             </div>
             <Link href="/contact" className="pricing-link">Book this session</Link>

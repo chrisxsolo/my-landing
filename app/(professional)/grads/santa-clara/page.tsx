@@ -36,7 +36,6 @@ const data: SchoolLandingData = {
         "The open central lawn with mature trees and room to move. Works especially well for wide shots, group photos, and the classic cap-toss.",
     },
   ],
-  travelNote: "Santa Clara sessions include a $70 travel fee from San Francisco.",
   sessionNote:
     "Spring graduation season (June) books quickly — inquire early if you have a specific date in mind.",
 };

@@ -16,6 +16,8 @@ import Link from "next/link";
 import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 import { getPortfolioData, getSiteSettings } from "@/lib/professionalData";
 import { pricingCSS, anim } from "@/lib/proStyles";
+import { formatCurrency } from "@/lib/pricing";
+import { PRICING_CATALOG, getBookingPolicyItems } from "@/lib/pricingCatalog";
 
 // Cached/ISR: refreshed at most hourly, or immediately on admin content saves
 // (POST /api/admin/revalidate).
@@ -28,36 +30,32 @@ export const metadata: Metadata = {
 };
 
 const CSS = pricingCSS({ mediaMinHeight: 580, mediaMinHeightMobile: 400, mediaObjectPosition: "center center" });
+const eventPricing = PRICING_CATALOG.events;
 
 // ── ADD-ONS LIST ──────────────────────────────────────────────────────────────
 const addOns = [
-  { label: "Second shooter",               price: "$100–$150 / hr" },
-  { label: "48–72 hour expedited delivery", price: "$250–$500" },
-  { label: "Travel beyond 20 miles of SF",  price: "$0.75–$1.00 / mile (round trip)" },
+  eventPricing.addOns.secondShooter,
+  eventPricing.addOns.expedited,
+  eventPricing.addOns.travel,
 ];
 
 // ── HALF-DAY / FULL-DAY RATES ─────────────────────────────────────────────────
 const largeEventRates = [
-  { label: "Half-Day (up to 5 hrs)",  price: "$2,200" },
-  { label: "Full-Day",                price: "Starting at $4,000" },
+  { label: `Half-Day (up to ${eventPricing.largeEvent.halfDayHours} hrs)`, price: formatCurrency(eventPricing.largeEvent.halfDayPrice) },
+  { label: "Full-Day", price: `Starting at ${formatCurrency(eventPricing.largeEvent.fullDayStartingPrice)}` },
 ];
 
 // ── MEDIUM EVENT RATE TABLE ───────────────────────────────────────────────────
-const mediumRates = [
-  { hours: "4 hours", price: "$1,800" },
-  { hours: "5 hours", price: "$2,250" },
-  { hours: "6 hours", price: "$2,700" },
-];
+const mediumRates = eventPricing.mediumEvent.exampleHours.map((hours) => ({
+  hours: `${hours} hours`,
+  price: formatCurrency(hours * eventPricing.mediumEvent.hourlyRate),
+}));
 
 // ── INFO CARDS ────────────────────────────────────────────────────────────────
 const infoCards = [
   {
     heading: "Booking",
-    items: [
-      "50% deposit to reserve the date. Deposits are non-refundable but transferable.",
-      "Contract completed before the event.",
-      "Remaining balance due on event day.",
-    ],
+    items: getBookingPolicyItems(),
     delay: 0.28,
   },
   {
@@ -72,7 +70,7 @@ const infoCards = [
   {
     heading: "Travel",
     items: [
-      "Included within 20 miles of San Francisco.",
+      `Included within ${eventPricing.includedTravelMiles} miles of San Francisco.`,
       "Beyond local area: custom quote based on mileage, lodging, and logistics.",
     ],
     delay: 0.52,
@@ -119,14 +117,14 @@ export default async function EventPricingPage() {
           <div className="pricing-hero-dark-footer">
             <div className="pricing-hero-price-block">
               <span className="pricing-hero-price-label">starting at</span>
-              <span className="pricing-hero-price-big">$500</span>
+              <span className="pricing-hero-price-big">{formatCurrency(eventPricing.smallEvent.hourlyRate)}</span>
               <span className="pricing-hero-price-unit">/ hr</span>
             </div>
 
             <span className="pricing-hero-divider" aria-hidden="true" />
 
             <div className="pricing-chip-row" style={{ marginTop: 0 }}>
-              <span className="pricing-chip">2-hour minimum</span>
+              <span className="pricing-chip">{eventPricing.smallEvent.minimumHours}-hour minimum</span>
               <span className="pricing-chip">Edited gallery</span>
               <span className="pricing-chip">Private online delivery</span>
             </div>
@@ -161,15 +159,15 @@ export default async function EventPricingPage() {
               "Group photos included",
               "Edited high-resolution gallery",
               "Private online delivery",
-              "1–2 week standard turnaround",
+              eventPricing.smallEvent.turnaroundLabel,
             ].map((item) => <li key={item}>{item}</li>)}
           </ul>
 
           <div className="pricing-addons">
             <p className="pricing-kicker">Add-ons</p>
-            {addOns.map(({ label, price }) => (
+            {addOns.map(({ label, displayPrice }) => (
               <div key={label} className="pricing-row">
-                <span>{label}</span><span>{price}</span>
+                <span>{label}</span><span>{displayPrice}</span>
               </div>
             ))}
           </div>
@@ -177,8 +175,8 @@ export default async function EventPricingPage() {
           <div className="pricing-investment">
             <div>
               <p className="pricing-kicker">Investment</p>
-              <p className="pricing-price">$500</p>
-              <p className="pricing-meta">per hour · 2-hour minimum</p>
+              <p className="pricing-price">{formatCurrency(eventPricing.smallEvent.hourlyRate)}</p>
+              <p className="pricing-meta">per hour · {eventPricing.smallEvent.minimumHours}-hour minimum</p>
             </div>
             <Link href="/contact" className="pricing-link">Inquire now</Link>
           </div>
@@ -215,7 +213,9 @@ export default async function EventPricingPage() {
           </p>
 
           {/* Medium event hourly examples */}
-          <p className="pricing-kicker" style={{ marginBottom: 8 }}>Medium event examples ($450/hr · 4-hr min)</p>
+          <p className="pricing-kicker" style={{ marginBottom: 8 }}>
+            Medium event examples ({formatCurrency(eventPricing.mediumEvent.hourlyRate)}/hr · {eventPricing.mediumEvent.minimumHours}-hr min)
+          </p>
           <div className="pricing-group-table">
             {mediumRates.map(({ hours, price }) => (
               <div key={hours} className="pricing-row">

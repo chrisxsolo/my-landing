@@ -7,6 +7,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 import { getPortfolioData, getSiteSettings } from "@/lib/professionalData";
+import { formatCurrency } from "@/lib/pricing";
+import { PRICING_CATALOG } from "@/lib/pricingCatalog";
+
+const graduationPricing = PRICING_CATALOG.graduation;
+const familyPricing = PRICING_CATALOG.families;
+const couplesPricing = PRICING_CATALOG.couples;
 
 // Cached/ISR: refreshed at most hourly, or immediately on admin content saves
 // (POST /api/admin/revalidate).
@@ -24,9 +30,9 @@ const RATES = [
     href:    "/pricing/grads",
     kicker:  "Graduation photography",
     heading: "Grad rates",
-    copy:    "Senior portraits and graduation day coverage. Packages starting from $350/hr with add-ons for groups, extra locations, and rush delivery.",
+    copy:    `Senior portraits and graduation day coverage. Packages starting from ${formatCurrency(graduationPricing.baseHourlyRate)}/hr with add-ons for groups, extra locations, and rush delivery.`,
     cta:     "See grad pricing",
-    chips:   ["From $350 / hr", "50+ edited images", "Bay Area locations"],
+    chips:   [`From ${formatCurrency(graduationPricing.baseHourlyRate)} / hr`, `${graduationPricing.standardMinimumImages}+ edited images`, "Bay Area locations"],
   },
   {
     slug:    "families",
@@ -35,16 +41,16 @@ const RATES = [
     heading: "Family rates",
     copy:    "Relaxed family sessions with enough structure for everyone — kids, grandparents, and everyone who says they feel awkward in photos.",
     cta:     "See family pricing",
-    chips:   ["From $350", "Guided session", "Family-friendly pacing"],
+    chips:   [`From ${formatCurrency(familyPricing.packages.standard.price)}`, "Guided session", "Family-friendly pacing"],
   },
   {
     slug:    "couples",
     href:    "/pricing/couples",
     kicker:  "Couples photography",
     heading: "Couples rates",
-    copy:    "Anniversary photos, engagement sessions, lifestyle portraits, and proposal coverage. Sessions from 30 minutes to 90+ minutes across Bay Area locations.",
+    copy:    `Anniversary photos, engagement sessions, lifestyle portraits, and proposal coverage. Sessions from ${couplesPricing.packages.mini.durationMinutes} minutes to ${couplesPricing.packages.engagement.durationMinutes}+ minutes across Bay Area locations.`,
     cta:     "See couples pricing",
-    chips:   ["From $350", "25+ edited images", "Guided posing"],
+    chips:   [`From ${formatCurrency(couplesPricing.packages.mini.price)}`, `${couplesPricing.packages.mini.minimumImages}+ edited images`, "Guided posing"],
   },
 ] as const;
 

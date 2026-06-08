@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
+import { PRICING_CATALOG, getGraduationTravelNote } from "@/lib/pricingCatalog";
+import SchoolLandingDetails from "./SchoolLandingDetails";
 
 // ── TYPES ─────────────────────────────────────────────────────────────────────
 
@@ -12,7 +14,7 @@ export interface SchoolSpot {
 export interface SchoolLandingData {
   school: string;                // "UC Berkeley"
   schoolShort: string;           // "Berkeley"
-  slug: string;                  // "uc-berkeley" — matches SCHOOLS in lib/pricing.ts
+  slug: keyof typeof PRICING_CATALOG.graduation.travelFees;
   city: string;                  // "Berkeley, CA"
   metaTitle: string;
   metaDescription: string;
@@ -20,7 +22,6 @@ export interface SchoolLandingData {
   heroTagline: string;           // sentence under the h1
   bodyIntro: string;             // 2-3 sentences about the school
   spots: SchoolSpot[];           // 3–4 notable campus spots
-  travelNote: string;            // short travel fee sentence
   sessionNote?: string;          // optional timing/season note
   heroImage?: string;            // optional Supabase image URL
 }
@@ -295,16 +296,10 @@ const CSS = `
   }
 `;
 
-const TRUST_ITEMS = [
-  "Guided posing — no awkward standing around",
-  "Fast, clear communication",
-  "Private online gallery",
-  "Bay Area campus expertise",
-];
-
 // ── TEMPLATE COMPONENT ────────────────────────────────────────────────────────
 
 export default function SchoolLandingTemplate({ data }: { data: SchoolLandingData }) {
+  const travelNote = getGraduationTravelNote(data.slug);
   const contactParams = new URLSearchParams({ school: data.school });
 
   return (
@@ -360,97 +355,13 @@ export default function SchoolLandingTemplate({ data }: { data: SchoolLandingDat
         </div>
       </section>
 
-      {/* ── BODY ──────────────────────────────────────────────────────────────── */}
-      <section className="school-body">
-        <div className="school-shell school-body-grid">
-          <div>
-            <p className="school-kicker">About this location</p>
-            <h2 className="school-section-title">Grad sessions at {data.schoolShort}</h2>
-            <p className="school-body-copy">{data.bodyIntro}</p>
-            {data.travelNote && (
-              <p className="school-body-copy" style={{ color: "#667f79", fontSize: 15 }}>{data.travelNote}</p>
-            )}
-            {data.sessionNote && (
-              <p className="school-body-copy" style={{ color: "#667f79", fontSize: 15 }}>{data.sessionNote}</p>
-            )}
-          </div>
-          <div>
-            <p className="school-kicker">What&apos;s included</p>
-            <h2 className="school-section-title">Every grad session includes</h2>
-            {[
-              "Professionally guided posing and direction throughout",
-              "Multiple on-campus location selections",
-              "50+ professionally edited images",
-              "Private online gallery with download link",
-              "Up to two-week standard turnaround",
-              "Clear communication from inquiry to delivery",
-            ].map((item) => (
-              <p key={item} className="school-body-copy" style={{ display: "flex", gap: 10, alignItems: "flex-start", margin: "0 0 12px" }}>
-                <span style={{ color: "#4f6d67", fontWeight: 700, flexShrink: 0 }}>✓</span>
-                {item}
-              </p>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── CAMPUS SPOTS ──────────────────────────────────────────────────────── */}
-      {data.spots.length > 0 && (
-        <section className="school-spots">
-          <div className="school-shell">
-            <p className="school-kicker">Campus locations</p>
-            <h2 className="school-section-title" style={{ maxWidth: 540 }}>
-              Where we shoot at {data.schoolShort}
-            </h2>
-            <div className="school-spots-grid">
-              {data.spots.map((spot) => (
-                <div key={spot.name} className="school-spot-card">
-                  <h3 className="school-spot-name">{spot.name}</h3>
-                  <p className="school-spot-desc">{spot.description}</p>
-                </div>
-              ))}
-            </div>
-            <p className="school-body-copy" style={{ marginTop: 22, color: "#667f79", fontSize: 15 }}>
-              New to grad photos? The{" "}
-              <Link href="/grad-guide" style={{ color: "#3d6b5e", fontWeight: 700 }}>
-                Bay Area graduation photo guide
-              </Link>{" "}
-              covers what to wear, posing, how to prepare, and the best campus spots before your session.
-            </p>
-          </div>
-        </section>
-      )}
-
-      {/* ── INFO ROW ──────────────────────────────────────────────────────────── */}
-      <section className="school-info">
-        <div className="school-shell">
-          <p className="school-kicker">Quick reference</p>
-          <div className="school-info-grid">
-            {[
-              { label: "Starting rate",    value: "$350 / hour" },
-              { label: "Session length",   value: "1, 1.5, or 2 hours" },
-              { label: "Deposit",          value: "50% to reserve" },
-              { label: "Turnaround",       value: "Up to 2 weeks" },
-              { label: "Delivery",         value: "Private online gallery" },
-              { label: "Response time",    value: "Within 24 hours" },
-            ].map(({ label, value }) => (
-              <div key={label} className="school-info-item">
-                <p className="school-info-label">{label}</p>
-                <p className="school-info-value">{value}</p>
-              </div>
-            ))}
-          </div>
-
-          <div className="school-trust">
-            {TRUST_ITEMS.map((item) => (
-              <span key={item} className="school-trust-item">
-                <span className="school-trust-check">✓</span>
-                {item}
-              </span>
-            ))}
-          </div>
-        </div>
-      </section>
+      <SchoolLandingDetails
+        schoolShort={data.schoolShort}
+        bodyIntro={data.bodyIntro}
+        travelNote={travelNote}
+        sessionNote={data.sessionNote}
+        spots={data.spots}
+      />
 
       {/* ── CTA ───────────────────────────────────────────────────────────────── */}
       <section className="school-cta">

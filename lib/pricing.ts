@@ -1,45 +1,42 @@
-// lib/pricing.ts — SoloXSnaps pricing logic
-// Update rates here to keep pricing consistent across the site.
+// lib/pricing.ts - SoloXSnaps pricing calculations.
+// Operational rates and policies live in pricingCatalog.ts.
+
+import {
+  PRICING_CATALOG,
+  calculatePaymentSchedule,
+} from "./pricingCatalog";
 
 // ── BASE RATES ────────────────────────────────────────────────────────────────
-export const GRAD_HOURLY_RATE = 350 // 1 graduate, per hour
+export const GRAD_HOURLY_RATE = PRICING_CATALOG.graduation.baseHourlyRate;
 
 export const GROUP_RATES: Record<number, number> = {
-  2: 300,
-  3: 275,
-  4: 250,
-  5: 225,
-}
-export const GROUP_RATE_6_PLUS = 200
+  2: PRICING_CATALOG.graduation.groupRates[2],
+  3: PRICING_CATALOG.graduation.groupRates[3],
+  4: PRICING_CATALOG.graduation.groupRates[4],
+  5: PRICING_CATALOG.graduation.groupRates[5],
+};
+export const GROUP_RATE_6_PLUS = PRICING_CATALOG.graduation.groupRates[6];
 
 // ── ADD-ON RATES ──────────────────────────────────────────────────────────────
-export const ADDON_EXTRA_OUTFIT     = 75
-export const ADDON_SECOND_LOCATION  = 125
-export const ADDON_EXPEDITED        = 150
-export const ADDON_CHAMPAGNE        = 15
-export const ADDON_EXTRA_30_MIN     = 100
+export const ADDON_EXTRA_OUTFIT = PRICING_CATALOG.graduation.addOns.extraOutfit.price;
+export const ADDON_SECOND_LOCATION = PRICING_CATALOG.graduation.addOns.secondLocation.price;
+export const ADDON_EXPEDITED = PRICING_CATALOG.graduation.addOns.expedited.price;
+export const ADDON_CHAMPAGNE = PRICING_CATALOG.graduation.addOns.champagne.price;
+export const ADDON_EXTRA_30_MIN = PRICING_CATALOG.graduation.addOns.extra30Minutes.price;
 
 // ── SESSION LENGTH (in hours) ─────────────────────────────────────────────────
 export const SESSION_LENGTHS = {
-  "1hr":    1,
-  "1.5hr":  1.5,
-  "2hr":    2,
-} as const
-export type SessionLengthKey = keyof typeof SESSION_LENGTHS
+  "1hr": PRICING_CATALOG.graduation.durationRules.allowedMinutes[0] / 60,
+  "1.5hr": PRICING_CATALOG.graduation.durationRules.allowedMinutes[1] / 60,
+  "2hr": PRICING_CATALOG.graduation.durationRules.allowedMinutes[2] / 60,
+} as const;
+export type SessionLengthKey = keyof typeof SESSION_LENGTHS;
 
 // ── TRAVEL FEES ───────────────────────────────────────────────────────────────
 // Flat fees per school. null = no travel fee. undefined = fee TBD.
 export const TRAVEL_FEES: Record<string, number | null | undefined> = {
-  "sf-state":    null,
-  "usf":         null,
-  "sf-other":    null,
-  "uc-berkeley": 35,
-  "csueb":       30,
-  "sjsu":        75,
-  "santa-clara": 70,
-  "stanford":    45,
-  "other":       undefined, // calculated or TBD
-}
+  ...PRICING_CATALOG.graduation.travelFees,
+};
 
 // ── SCHOOL LABELS ─────────────────────────────────────────────────────────────
 export const SCHOOLS = [
@@ -126,12 +123,13 @@ export function calculateGraduationEstimate(input: EstimateInput): EstimateResul
   const travelAmount = travelFee ?? 0
 
   const subtotal = sessionBase + addons + travelAmount
-  const deposit  = subtotal / 2
-  const remainingBalance = subtotal / 2
+  const paymentSchedule = calculatePaymentSchedule(subtotal);
+  const deposit = paymentSchedule.retainer;
+  const remainingBalance = paymentSchedule.remainingBalance;
 
   // Group note
   const groupNote =
-    people >= 3 && sessionLength === "1hr"
+    people >= PRICING_CATALOG.graduation.durationRules.groupMinimumSize && sessionLength === "1hr"
       ? "Groups of 3 or more usually need at least 90 minutes for individual and group photos."
       : null
 
@@ -144,33 +142,33 @@ export function formatCurrency(amount: number): string {
 
 // ── COUPLES PACKAGES ─────────────────────────────────────────────────────────
 export const COUPLES_PACKAGES = {
-  mini:       { label: "30-Min Mini Session",    price: 350 },
-  "1hr":      { label: "1-Hour Session",         price: 450 },
-  signature:  { label: "Signature Session",      price: 575 },
-  engagement: { label: "Engagement Session",     price: 650 },
-  proposal:   { label: "Proposal Session",       price: 750 },
-} as const
+  mini: PRICING_CATALOG.couples.packages.mini,
+  "1hr": PRICING_CATALOG.couples.packages["1hr"],
+  signature: PRICING_CATALOG.couples.packages.signature,
+  engagement: PRICING_CATALOG.couples.packages.engagement,
+  proposal: PRICING_CATALOG.couples.packages.proposal,
+} as const;
 export type CouplesPackageKey = keyof typeof COUPLES_PACKAGES
 
 // ── COUPLES LOCATIONS ────────────────────────────────────────────────────────
 export const COUPLES_LOCATIONS = [
-  { value: "sf",          label: "San Francisco",           fee: null      },
-  { value: "oakland",     label: "Oakland / East Bay",      fee: 35        },
-  { value: "berkeley",    label: "Berkeley / UC Area",      fee: 35        },
-  { value: "peninsula",   label: "Peninsula / Palo Alto",   fee: 45        },
-  { value: "south-bay",   label: "South Bay / San Jose",    fee: 75        },
-  { value: "santa-clara", label: "Santa Clara",             fee: 70        },
-  { value: "other",       label: "Other Bay Area Location", fee: undefined },
+  { value: "sf", label: "San Francisco", fee: PRICING_CATALOG.couples.travelFees.sf },
+  { value: "oakland", label: "Oakland / East Bay", fee: PRICING_CATALOG.couples.travelFees.oakland },
+  { value: "berkeley", label: "Berkeley / UC Area", fee: PRICING_CATALOG.couples.travelFees.berkeley },
+  { value: "peninsula", label: "Peninsula / Palo Alto", fee: PRICING_CATALOG.couples.travelFees.peninsula },
+  { value: "south-bay", label: "South Bay / San Jose", fee: PRICING_CATALOG.couples.travelFees["south-bay"] },
+  { value: "santa-clara", label: "Santa Clara", fee: PRICING_CATALOG.couples.travelFees["santa-clara"] },
+  { value: "other", label: "Other Bay Area Location", fee: PRICING_CATALOG.couples.travelFees.other },
 ] as const
 export type CouplesLocationValue = typeof COUPLES_LOCATIONS[number]["value"]
 
 // ── COUPLES ADD-ON RATES ──────────────────────────────────────────────────────
-export const COUPLES_ADDON_EXTRA_LOCATION = 125
-export const COUPLES_ADDON_EXTRA_OUTFIT   = 75
-export const COUPLES_ADDON_EXTRA_30_MIN   = 175
-export const COUPLES_ADDON_PROOFING       = 75
-export const COUPLES_ADDON_RUSH_PREVIEW   = 75
-export const COUPLES_ADDON_EXPEDITED      = 150
+export const COUPLES_ADDON_EXTRA_LOCATION = PRICING_CATALOG.couples.addOns.extraLocation.price;
+export const COUPLES_ADDON_EXTRA_OUTFIT = PRICING_CATALOG.couples.addOns.extraOutfit.price;
+export const COUPLES_ADDON_EXTRA_30_MIN = PRICING_CATALOG.couples.addOns.extra30Minutes.price;
+export const COUPLES_ADDON_PROOFING = PRICING_CATALOG.couples.addOns.proofingGallery.price;
+export const COUPLES_ADDON_RUSH_PREVIEW = PRICING_CATALOG.couples.addOns.rushPreview.price;
+export const COUPLES_ADDON_EXPEDITED = PRICING_CATALOG.couples.addOns.expedited.price;
 
 // ── COUPLES ESTIMATE ─────────────────────────────────────────────────────────
 export interface CouplesEstimateInput {
@@ -204,8 +202,9 @@ export function calculateCouplesEstimate(input: CouplesEstimateInput): EstimateR
   const travelAmount = (travelFee ?? 0) as number
 
   const subtotal = pkg.price + addons + travelAmount
-  const deposit  = subtotal / 2
-  const remainingBalance = subtotal / 2
+  const paymentSchedule = calculatePaymentSchedule(subtotal);
+  const deposit = paymentSchedule.retainer;
+  const remainingBalance = paymentSchedule.remainingBalance;
 
   return { sessionBase: pkg.price, travelFee, addons, subtotal, deposit, remainingBalance, travelMethod, groupNote: null }
 }

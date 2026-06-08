@@ -1,3 +1,5 @@
+import { BOOKING_POLICY, PRICING_CATALOG } from "@/lib/pricingCatalog";
+
 export const metadata = {
   title: "Terms of Service",
   description: "Terms and conditions for booking and working with soloxsnaps.",
@@ -21,11 +23,13 @@ export default function TermsPage() {
 
       <Section title="Booking and payment">
         <ul style={{ marginTop: 12, paddingLeft: 20, lineHeight: 2 }}>
-          <li>A session is confirmed only after a deposit has been received.</li>
-          <li>Deposits are non-refundable unless the photographer cancels.</li>
           <li>
-            Full payment is due on or before the day of the session unless otherwise agreed
-            in writing.
+            A session is confirmed after the {BOOKING_POLICY.retainerPercent}%{" "}
+            {BOOKING_POLICY.retainerRefundability} retainer has been received.
+          </li>
+          <li>
+            The remaining balance is due {BOOKING_POLICY.remainingBalanceDeadline} unless
+            otherwise agreed in writing.
           </li>
           <li>
             Pricing shown on the site is subject to change. Quoted prices are locked in at
@@ -41,7 +45,7 @@ export default function TermsPage() {
             accommodated at no extra charge, subject to availability.
           </li>
           <li>
-            Cancellations within 24 hours of the session forfeit the deposit and may incur
+            Cancellations within 24 hours of the session forfeit the retainer and may incur
             an additional fee.
           </li>
           <li>
@@ -53,7 +57,10 @@ export default function TermsPage() {
 
       <Section title="Photos and delivery">
         <ul style={{ marginTop: 12, paddingLeft: 20, lineHeight: 2 }}>
-          <li>Edited galleries are typically delivered within 1–3 weeks after the session.</li>
+          <li>
+            Standard edited galleries are delivered within{" "}
+            {PRICING_CATALOG.standardTurnaroundDays / 7} weeks after the session.
+          </li>
           <li>
             You receive a personal-use license for all delivered photos — you may print,
             share, and use them for personal purposes.

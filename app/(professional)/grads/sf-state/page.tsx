@@ -36,7 +36,6 @@ const data: SchoolLandingData = {
         "If you want San Francisco in the background, we can build an itinerary that includes campus and nearby SF spots in the same session.",
     },
   ],
-  travelNote: "No travel fee for SF State and all San Francisco locations.",
   sessionNote:
     "SF State ceremony dates vary by college — confirm your ceremony date when you inquire.",
 };

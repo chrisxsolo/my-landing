@@ -6,6 +6,7 @@ import {
   parseLoosePaymentCents,
 } from "@/lib/paymentTotalInference";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
+import { calculatePaymentSchedule } from "@/lib/pricingCatalog";
 
 export const dynamic = "force-dynamic";
 
@@ -86,10 +87,10 @@ function buildPlanRows(input: PaymentPlanInput, existingTypes: Set<string>, tota
   if (!paidAt) return [];
 
   const types = input.paid === "full" ? ["deposit_1", "deposit_2"] : [input.paid ?? "deposit_1"];
-  const halfCents = Math.round(totalCents / 2);
+  const paymentSchedule = calculatePaymentSchedule(totalCents);
   const amounts = {
-    deposit_1: halfCents,
-    deposit_2: totalCents - halfCents,
+    deposit_1: paymentSchedule.retainer,
+    deposit_2: paymentSchedule.remainingBalance,
   };
 
   return types

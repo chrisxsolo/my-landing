@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { checkAuth } from "@/lib/adminAuth";
 import { C } from "@/lib/colors";
+import { calculatePaymentSchedule } from "@/lib/pricingCatalog";
 import { inferSessionTotalCents } from "@/lib/paymentTotalInference";
 import PaymentStatusPanel from "./PaymentStatusPanel";
 import RowActions from "./RowActions";
@@ -108,8 +109,10 @@ export default function ManualPaymentsPage() {
     if (!match) { patchRow(key, { client_name: value, inquiry_id: null }); return; }
     const total = inferSessionTotalCents(match);
     const pt = current?.payment_type ?? "deposit_1";
-    const half = Math.round(total / 2);
-    const suggested = total > 0 ? formatCents(pt === "full" ? total : pt === "deposit_2" ? total - half : half) : "";
+    const schedule = calculatePaymentSchedule(total);
+    const suggested = total > 0
+      ? formatCents(pt === "full" ? total : pt === "deposit_2" ? schedule.remainingBalance : schedule.retainer)
+      : "";
     patchRow(key, {
       inquiry_id: match.id, client_name: match.name, client_email: match.email,
       session_date: parseToIsoDate(match.session_date ?? match.date_in_mind),

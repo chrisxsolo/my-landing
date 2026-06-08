@@ -36,7 +36,6 @@ const data: SchoolLandingData = {
         "Open lawn for wide, editorial compositions and the classic cap-toss, plus the unique textures of the historic cactus garden just a short walk away.",
     },
   ],
-  travelNote: "Stanford sessions include a $45 travel fee from San Francisco.",
   sessionNote:
     "Spring graduation season (June) books quickly — inquire early if you have a specific date in mind.",
 };

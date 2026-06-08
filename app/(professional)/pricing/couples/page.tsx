@@ -4,6 +4,8 @@ import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 import { getPortfolioData, getSiteSettings } from "@/lib/professionalData";
 import { pricingCSS, anim } from "@/lib/proStyles";
 import CouplesRateEstimator from "@/app/components/CouplesRateEstimator";
+import { formatCurrency } from "@/lib/pricing";
+import { PRICING_CATALOG, getBookingPolicyItems } from "@/lib/pricingCatalog";
 
 // Cached/ISR: refreshed at most hourly, or immediately on admin content saves
 // (POST /api/admin/revalidate).
@@ -17,61 +19,62 @@ export const metadata: Metadata = {
 };
 
 const CSS = pricingCSS({ mediaMinHeight: 580, mediaMinHeightMobile: 400, mediaObjectPosition: "center 30%" });
+const couplesPricing = PRICING_CATALOG.couples;
 
 const packages = [
   {
+    ...couplesPricing.packages.mini,
     kicker: "Mini session",
     name: "30-Minute Couples Mini Session",
-    price: "$350",
     bestFor: "Quick anniversary photos, casual lifestyle portraits, and couples who want a shorter session.",
-    items: ["30 minute session", "1 location", "1 outfit", "Posing guidance throughout", "Private online gallery", "Minimum 25 professionally edited images", "Standard 2-week turnaround"],
+    items: ["1 location", "1 outfit", "Posing guidance throughout", "Private online gallery"],
   },
   {
+    ...couplesPricing.packages["1hr"],
     kicker: "Standard",
     name: "1-Hour Couples Session",
-    price: "$450",
     badge: "Most popular",
     bestFor: "The best all-around option — more variety, more posing options, and a fuller gallery.",
-    items: ["1 hour session", "1 location", "1–2 outfits", "Posing guidance throughout", "More candid, romantic, and lifestyle image variety", "Private online gallery", "Minimum 40 professionally edited images", "Standard 2-week turnaround"],
+    items: ["1 location", "1–2 outfits", "Posing guidance throughout", "More candid, romantic, and lifestyle image variety", "Private online gallery"],
   },
   {
+    ...couplesPricing.packages.signature,
     kicker: "Signature",
     name: "Couples Signature Session",
-    price: "$575",
     bestFor: "Couples who want more time, more creative direction, and a larger final gallery.",
-    items: ["75–90 minute session", "1 location", "Up to 2 outfits", "More posing variety and movement-based prompts", "Candid, romantic, and editorial-style images", "Private online gallery", "Minimum 60 professionally edited images", "Standard 2-week turnaround"],
+    items: ["1 location", "Up to 2 outfits", "More posing variety and movement-based prompts", "Candid, romantic, and editorial-style images", "Private online gallery"],
   },
   {
+    ...couplesPricing.packages.engagement,
     kicker: "Engagement",
     name: "Engagement Session",
-    price: "$650",
     bestFor: "Save-the-dates, wedding websites, announcements, and a more intentional couples session experience.",
-    items: ["90 minute session", "1–2 nearby locations", "Up to 2 outfits", "Location planning support", "Posing guidance throughout", "Private online gallery", "Minimum 70 professionally edited images", "Standard 2-week turnaround"],
+    items: ["1–2 nearby locations", "Up to 2 outfits", "Location planning support", "Posing guidance throughout", "Private online gallery"],
   },
   {
+    ...couplesPricing.packages.proposal,
     kicker: "Proposals",
     name: "Proposal Session",
-    price: "$750",
     startingAt: true,
     bestFor: "Surprise proposals and romantic portraits afterward — planning and coordination included. Final pricing varies with location, timing, and complexity.",
-    items: ["Planning and coordination before the session", "Location and timing guidance", "Surprise proposal coverage", "Portraits after the proposal", "Private online gallery", "Minimum 50 professionally edited images", "Standard 2-week turnaround"],
+    items: ["Planning and coordination before the session", "Location and timing guidance", "Surprise proposal coverage", "Portraits after the proposal", "Private online gallery"],
   },
 ] as const;
 
 const addOns = [
-  { label: "Additional nearby location",                       price: "+$125" },
-  { label: "Additional outfit",                                price: "+$75" },
-  { label: "Extra 30 minutes",                                 price: "+$175" },
-  { label: "Client proofing gallery",                          price: "+$75" },
-  { label: "Rush preview — 5 edited images within 48 hours",   price: "+$75" },
-  { label: "Expedited full gallery delivery within 72 hours",  price: "+$150" },
-  { label: "Short-form video / BTS reel",                      price: "$175+" },
-  { label: "Advanced retouching",                              price: "$25 / image" },
+  { label: couplesPricing.addOns.extraLocation.label, price: `+${formatCurrency(couplesPricing.addOns.extraLocation.price)}` },
+  { label: couplesPricing.addOns.extraOutfit.label, price: `+${formatCurrency(couplesPricing.addOns.extraOutfit.price)}` },
+  { label: couplesPricing.addOns.extra30Minutes.label, price: `+${formatCurrency(couplesPricing.addOns.extra30Minutes.price)}` },
+  { label: couplesPricing.addOns.proofingGallery.label, price: `+${formatCurrency(couplesPricing.addOns.proofingGallery.price)}` },
+  { label: couplesPricing.addOns.rushPreview.label, price: `+${formatCurrency(couplesPricing.addOns.rushPreview.price)}` },
+  { label: couplesPricing.addOns.expedited.label, price: `+${formatCurrency(couplesPricing.addOns.expedited.price)}` },
+  couplesPricing.addOns.shortFormVideo,
+  couplesPricing.addOns.advancedRetouching,
   { label: "Travel outside San Francisco",                     price: "based on distance" },
 ] as const;
 
 const infoCards = [
-  { heading: "Booking",      items: ["50% deposit to reserve the date. Deposits are non-refundable but transferable.", "Contract completed before the session.", "Remaining balance due on shoot day."],                                                  delay: 0.28 },
+  { heading: "Booking",      items: getBookingPolicyItems(), delay: 0.28 },
   { heading: "Session flow", items: ["Guided posing throughout every session.", "Location and timing planned before shoot day.", "Proposal sessions include pre-shoot coordination."],                                                                   delay: 0.40 },
   { heading: "Travel",       items: ["San Francisco locations are included.", "Locations outside San Francisco may include a travel fee based on distance."],                                                                                         delay: 0.52 },
 ] as const;
@@ -107,18 +110,20 @@ export default async function CouplesPricingPage() {
           <div className="pricing-hero-dark-footer">
             <div className="pricing-hero-price-block">
               <span className="pricing-hero-price-label">starting at</span>
-              <span className="pricing-hero-price-big">$350</span>
+              <span className="pricing-hero-price-big">{formatCurrency(couplesPricing.packages.mini.price)}</span>
             </div>
             <span className="pricing-hero-divider" aria-hidden="true" />
             <div className="pricing-chip-row" style={{ marginTop: 0 }}>
-              <span className="pricing-chip">Starting at $350</span>
-              <span className="pricing-chip">25+ edited images</span>
+              <span className="pricing-chip">Starting at {formatCurrency(couplesPricing.packages.mini.price)}</span>
+              <span className="pricing-chip">{couplesPricing.packages.mini.minimumImages}+ edited images</span>
               <span className="pricing-chip">Guided posing</span>
-              <span className="pricing-chip">2-week turnaround</span>
+              <span className="pricing-chip">{PRICING_CATALOG.standardTurnaroundDays / 7}-week turnaround</span>
             </div>
             <Link href="/contact" className="pricing-link">Inquire About a Couples Session</Link>
           </div>
-          <p className="pricing-hero-fineprint">Starting at $350 for a 30-minute couples session.</p>
+          <p className="pricing-hero-fineprint">
+            Starting at {formatCurrency(couplesPricing.packages.mini.price)} for a {couplesPricing.packages.mini.durationLabel.toLowerCase()}.
+          </p>
         </div>
       </section>
 
@@ -143,7 +148,7 @@ export default async function CouplesPricingPage() {
 
       <section className="pricing-shell couples-grid" aria-label="Couples session packages">
         {packages.map((pkg) => {
-          const { kicker, name, price, bestFor, items } = pkg;
+          const { kicker, name, price, bestFor, items, durationLabel, minimumImages } = pkg;
           const badge = "badge" in pkg ? pkg.badge : undefined;
           const startingAt = "startingAt" in pkg ? pkg.startingAt : false;
           return (
@@ -153,11 +158,14 @@ export default async function CouplesPricingPage() {
               <p className="pricing-kicker" style={{ marginBottom: 8 }}>{kicker}</p>
               <h3 className="couples-card-name">{name}</h3>
               {startingAt && <span className="couples-card-price-prefix">Starting at</span>}
-              <p className="couples-card-price">{price}</p>
+              <p className="couples-card-price">{formatCurrency(price)}</p>
             </div>
             <p className="couples-card-best-for"><strong>Best for:</strong> {bestFor}</p>
             <ul className="couples-card-list">
+              <li>{durationLabel}</li>
               {items.map((item) => <li key={item}>{item}</li>)}
+              <li>Minimum {minimumImages} professionally edited images</li>
+              <li>Standard {PRICING_CATALOG.standardTurnaroundDays / 7}-week turnaround</li>
             </ul>
             <div className="couples-card-cta">
               <Link href="/contact" className="pricing-link couples-card-link">Inquire About a Couples Session</Link>
@@ -191,7 +199,7 @@ export default async function CouplesPricingPage() {
           {[
             ["No awkward posing", "I’ll guide you through natural prompts and simple direction so you’re never standing around wondering what to do."],
             ["Real locations", "We’ll choose a Bay Area spot that fits your vibe, from city architecture to beach sunsets to quiet park trails."],
-            ["Easy from start to finish", "Once the date is confirmed, I’ll send the invoice and contract, help with planning, and deliver your final gallery within two weeks."],
+              ["Easy from start to finish", `Once the date is confirmed, I’ll send the invoice and contract, help with planning, and deliver your final gallery within ${PRICING_CATALOG.standardTurnaroundDays / 7} weeks.`],
           ].map(([title, copy]) => (
             <div key={title} className="couples-feel-card">
               <h3>{title}</h3>
@@ -205,9 +213,9 @@ export default async function CouplesPricingPage() {
         <p className="pricing-kicker">Add-ons</p>
         <h2 className="couples-addons-heading">Customize your session</h2>
         <div className="couples-addons-grid">
-          {addOns.map(({ label, price }) => (
-            <div key={label} className="pricing-row">
-              <span>{label}</span><span>{price}</span>
+          {addOns.map((addOn) => (
+            <div key={addOn.label} className="pricing-row">
+              <span>{addOn.label}</span><span>{"price" in addOn ? addOn.price : addOn.displayPrice}</span>
             </div>
           ))}
         </div>

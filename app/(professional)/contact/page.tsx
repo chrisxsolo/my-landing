@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 import ContactClient from "./ContactClient";
 import ContactStyles from "./ContactStyles";
+import { BOOKING_POLICY } from "@/lib/pricingCatalog";
 
 const PAGE_TITLE = "Book a Bay Area Photography Session";
 const SOCIAL_TITLE = `${PAGE_TITLE} | SoloXSnaps`;
@@ -16,7 +17,7 @@ const EXPECTATIONS = [
   "Fast, clear communication",
   "Private gallery delivered on time",
   "Bay Area location and campus expertise",
-  "50% deposit to reserve your date",
+  `${BOOKING_POLICY.retainerPercent}% ${BOOKING_POLICY.retainerRefundability} retainer to reserve your session`,
 ];
 
 export const metadata: Metadata = {

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { C } from "@/lib/colors";
+import { inferTotalFromRetainer } from "@/lib/pricingCatalog";
 import {
   inferSessionTotalCents,
   parseKnownMoneyCents,
@@ -52,7 +53,10 @@ function inferTotal(payments: SavedPayment[], note: string | null) {
     return { cents: deposits.reduce((sum, payment) => sum + (payment.amount_cents || parseCents(payment.amount)), 0), source: "two deposits" };
   }
   if (deposits.length === 1) {
-    return { cents: (deposits[0].amount_cents || parseCents(deposits[0].amount)) * 2, source: "deposit x2" };
+    return {
+      cents: inferTotalFromRetainer(deposits[0].amount_cents || parseCents(deposits[0].amount)),
+      source: "retainer policy",
+    };
   }
 
   const noteCents = parseKnownMoneyCents(note);

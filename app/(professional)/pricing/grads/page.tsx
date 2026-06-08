@@ -23,6 +23,8 @@ import { getPortfolioData, getSiteSettings } from "@/lib/professionalData";
 import { selectDistinctImageUrl } from "@/lib/photoMetadata";
 import { pricingCSS, anim } from "@/lib/proStyles";
 import GraduationRateEstimator from "@/app/components/GraduationRateEstimator";
+import { formatCurrency } from "@/lib/pricing";
+import { BOOKING_POLICY, PRICING_CATALOG, getBookingPolicyItems } from "@/lib/pricingCatalog";
 
 // Cached/ISR: refreshed at most hourly, or immediately on admin content saves
 // (POST /api/admin/revalidate).
@@ -40,27 +42,28 @@ export const metadata: Metadata = {
 // mediaMinHeightMobile → mobile photo height (px)
 // mediaObjectPosition  → "center top" keeps faces in frame on portrait crops
 const CSS = pricingCSS({ mediaMinHeight: 620, mediaMinHeightMobile: 420, mediaObjectPosition: "center top" });
+const graduationPricing = PRICING_CATALOG.graduation;
 
 // ── ADD-ONS LIST ──────────────────────────────────────────────────────────────
 // Shown below the Graduation Package bullet list.
 // To add/remove items: edit this array. Format: { label, price }
 const addOns = [
-  { label: "Additional outfit",                  price: "$75" },
-  { label: "Second nearby off-campus location",  price: "$125" },
-  { label: "72-hour full gallery delivery",       price: "$150" },
-  { label: "Champagne setup (provided by photographer)", price: "$15" },
-  { label: "Extended time",                      price: "$100 / 30 min" },
+  { ...graduationPricing.addOns.extraOutfit, priceLabel: formatCurrency(graduationPricing.addOns.extraOutfit.price) },
+  { ...graduationPricing.addOns.secondLocation, priceLabel: formatCurrency(graduationPricing.addOns.secondLocation.price) },
+  { ...graduationPricing.addOns.expedited, priceLabel: formatCurrency(graduationPricing.addOns.expedited.price) },
+  { ...graduationPricing.addOns.champagne, priceLabel: formatCurrency(graduationPricing.addOns.champagne.price) },
+  { ...graduationPricing.addOns.extra30Minutes, priceLabel: `${formatCurrency(graduationPricing.addOns.extra30Minutes.price)} / 30 min` },
 ];
 
 // ── GROUP PRICING TABLE ───────────────────────────────────────────────────────
 // Shown in the Group Grad Package section.
 // To change prices: edit price values below.
 const groupPricing = [
-  { people: "2 people",   price: "$300", unit: "per person" },
-  { people: "3 people",   price: "$275", unit: "per person" },
-  { people: "4 people",   price: "$250", unit: "per person" },
-  { people: "5 people",   price: "$225", unit: "per person" },
-  { people: "6-8 people", price: "$200", unit: "per person" },
+  { people: "2 people", price: graduationPricing.groupRates[2] },
+  { people: "3 people", price: graduationPricing.groupRates[3] },
+  { people: "4 people", price: graduationPricing.groupRates[4] },
+  { people: "5 people", price: graduationPricing.groupRates[5] },
+  { people: "6-8 people", price: graduationPricing.groupRates[6] },
 ];
 
 // ── FALLBACK GROUP IMAGE ──────────────────────────────────────────────────────
@@ -76,7 +79,7 @@ const GROUP_GRAD_IMAGE_URL =
 const infoCards = [
   {
     heading: "Booking",
-    items: ["50% deposit to reserve the date. Deposits are non-refundable but transferable.", "Contract completed before the session.", "Remaining balance due on shoot day."],
+    items: getBookingPolicyItems(),
     delay: 0.28,
   },
   {
@@ -164,7 +167,7 @@ export default async function GradPricingPage() {
             {/* Price block — change "$350" and "/ hr" here */}
             <div className="pricing-hero-price-block">
               <span className="pricing-hero-price-label">from</span>
-              <span className="pricing-hero-price-big">$350</span>
+              <span className="pricing-hero-price-big">{formatCurrency(graduationPricing.baseHourlyRate)}</span>
               <span className="pricing-hero-price-unit">/ hr</span>
             </div>
 
@@ -172,9 +175,9 @@ export default async function GradPricingPage() {
 
             {/* Chips — edit or add/remove spans here */}
             <div className="pricing-chip-row" style={{ marginTop: 0 }}>
-              <span className="pricing-chip">50+ edited images</span>
+              <span className="pricing-chip">{graduationPricing.standardMinimumImages}+ edited images</span>
               <span className="pricing-chip">Guided posing</span>
-              <span className="pricing-chip">Up to 2-week turnaround</span>
+              <span className="pricing-chip">Up to {PRICING_CATALOG.standardTurnaroundDays / 7}-week turnaround</span>
             </div>
 
             {/* CTA button — links to the contact/booking page */}
@@ -211,22 +214,22 @@ export default async function GradPricingPage() {
           {/* What's included list — add/remove items here */}
           <ul>
             {[
-              "Approximately 1 hour on campus",
+              `Approximately ${graduationPricing.durationRules.standardMinutes / 60} hour on campus`,
               "Professionally guided posing and direction throughout",
               "One curated outfit look",
               "Multiple on-campus location selections",
               "Private online gallery",
-              "50+ professionally edited images",
-              "Up to two-week standard turnaround",
+              `${graduationPricing.standardMinimumImages}+ professionally edited images`,
+              `Up to ${PRICING_CATALOG.standardTurnaroundDays / 7}-week standard turnaround`,
             ].map((item) => <li key={item}>{item}</li>)}
           </ul>
 
           {/* Add-ons list — defined in the addOns array at the top of the file */}
           <div className="pricing-addons">
             <p className="pricing-kicker">Add-ons</p>
-            {addOns.map(({ label, price }) => (
+            {addOns.map(({ label, priceLabel }) => (
               <div key={label} className="pricing-row">
-                <span>{label}</span><span>{price}</span>
+                <span>{label}</span><span>{priceLabel}</span>
               </div>
             ))}
           </div>
@@ -235,7 +238,7 @@ export default async function GradPricingPage() {
           <div className="pricing-investment">
             <div>
               <p className="pricing-kicker">Investment</p>
-              <p className="pricing-price">$350</p>
+              <p className="pricing-price">{formatCurrency(graduationPricing.baseHourlyRate)}</p>
               <p className="pricing-meta">per hour</p>
             </div>
             <Link href="/contact" className="pricing-link">Book this session</Link>
@@ -287,22 +290,23 @@ export default async function GradPricingPage() {
               "Professionally guided posing and direction",
               "Strategic on-campus location planning",
               "Private online gallery delivery",
-              "25+ professionally edited images per person",
+              `${graduationPricing.groupMinimumImagesPerPerson}+ professionally edited images per person`,
             ].map((item) => <li key={item}>{item}</li>)}
           </ul>
 
           {/* Group pricing table — defined in groupPricing array above */}
           <div className="pricing-group-table">
-            {groupPricing.map(({ people, price, unit }) => (
+            {groupPricing.map(({ people, price }) => (
               <div key={people} className="pricing-row">
-                <span>{people}</span><span>{price} {unit}</span>
+                <span>{people}</span><span>{formatCurrency(price)} per person</span>
               </div>
             ))}
           </div>
 
           {/* Small note below the group table — edit text here */}
           <p className="pricing-note">
-            Sessions with 3 or more graduates require at least 90 minutes to maintain quality and flow.
+            Sessions with {graduationPricing.durationRules.groupMinimumSize} or more graduates require at least{" "}
+            {graduationPricing.durationRules.groupMinimumMinutes} minutes to maintain quality and flow.
           </p>
 
           <div className="pricing-investment">
@@ -337,7 +341,7 @@ export default async function GradPricingPage() {
             "Fast communication, clear next steps",
             "Private online gallery delivery",
             "Bay Area campus expertise",
-            "50% deposit to reserve your date",
+            `${BOOKING_POLICY.retainerPercent}% ${BOOKING_POLICY.retainerRefundability} retainer to reserve your session`,
           ].map((item) => (
             <span key={item} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, color: "#4b5a55" }}>
               <span style={{ color: "#4f6d67", fontWeight: 700 }}>✓</span>

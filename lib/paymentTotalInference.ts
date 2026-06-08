@@ -1,4 +1,8 @@
 import { COUPLES_PACKAGES, GRAD_HOURLY_RATE, getGroupRatePerPerson } from "./pricing";
+import {
+  getGraduationTravelFeeFromText,
+  inferTotalFromRetainer,
+} from "./pricingCatalog";
 
 export const PAYMENT_SOURCE_MANUAL = "auto";
 
@@ -49,15 +53,6 @@ function parsePeopleCount(value: string | number | null | undefined, text: strin
   return explicit ? Math.max(1, Number(explicit[1])) : 1;
 }
 
-function detectTravelFee(text: string): number {
-  if (/\bstanford\b/.test(text)) return 45;
-  if (/\buc berkeley\b|\bberkeley\b|\bcal bears\b/.test(text)) return 35;
-  if (/\bcsueb\b|cal state east bay|eastbay/.test(text)) return 30;
-  if (/\bsjsu\b|san jose state/.test(text)) return 75;
-  if (/\bsanta clara\b|\bscu\b/.test(text)) return 70;
-  return 0;
-}
-
 export function inferSessionTotalCents(inquiry: PaymentTotalInquiry | null | undefined): number {
   if (!inquiry) return 0;
 
@@ -74,7 +69,7 @@ export function inferSessionTotalCents(inquiry: PaymentTotalInquiry | null | und
   if (/\bgrad|graduat|campus|sjsu|berkeley|stanford|sf state|santa clara|csueb\b/.test(text)) {
     const people = parsePeopleCount(inquiry.people, text);
     const base = people > 1 ? getGroupRatePerPerson(people) * people : GRAD_HOURLY_RATE;
-    return Math.round((base + detectTravelFee(text)) * 100);
+    return Math.round((base + getGraduationTravelFeeFromText(text)) * 100);
   }
 
   if (/\bproposal\b/.test(text)) return COUPLES_PACKAGES.proposal.price * 100;
@@ -102,7 +97,9 @@ export function inferPaymentTotalCents(
     return deposits.reduce((sum, payment) => sum + (payment.amount_cents ?? parseLoosePaymentCents(payment.amount)), 0);
   }
   if (deposits.length === 1) {
-    return (deposits[0].amount_cents ?? parseLoosePaymentCents(deposits[0].amount)) * 2;
+    return inferTotalFromRetainer(
+      deposits[0].amount_cents ?? parseLoosePaymentCents(deposits[0].amount),
+    );
   }
 
   return inferSessionTotalCents(inquiry);

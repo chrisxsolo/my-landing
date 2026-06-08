@@ -11,6 +11,9 @@ import {
   type CouplesPackageKey,
   type CouplesLocationValue,
 } from "@/lib/pricing"
+import { BOOKING_POLICY, PRICING_CATALOG } from "@/lib/pricingCatalog"
+
+const couplesPricing = PRICING_CATALOG.couples
 
 // ── SHARED STYLE HELPERS ──────────────────────────────────────────────────────
 
@@ -160,22 +163,22 @@ export default function CouplesRateEstimator() {
           <label style={{ ...LABEL_STYLE, marginBottom: 12 }}>Add-ons</label>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
             <button style={toggleStyle(extraLocation)}  onClick={() => setExtraLoc(v => !v)}>
-              {extraLocation ? "✓ " : ""}Extra location +$125
+              {extraLocation ? "✓ " : ""}{couplesPricing.addOns.extraLocation.shortLabel} +{formatCurrency(couplesPricing.addOns.extraLocation.price)}
             </button>
             <button style={toggleStyle(extraOutfit)}    onClick={() => setExtraOutfit(v => !v)}>
-              {extraOutfit ? "✓ " : ""}Extra outfit +$75
+              {extraOutfit ? "✓ " : ""}{couplesPricing.addOns.extraOutfit.shortLabel} +{formatCurrency(couplesPricing.addOns.extraOutfit.price)}
             </button>
             <button style={toggleStyle(extra30Min)}     onClick={() => setExtra30Min(v => !v)}>
-              {extra30Min ? "✓ " : ""}Extra 30 min +$175
+              {extra30Min ? "✓ " : ""}{couplesPricing.addOns.extra30Minutes.shortLabel} +{formatCurrency(couplesPricing.addOns.extra30Minutes.price)}
             </button>
             <button style={toggleStyle(proofingGallery)} onClick={() => setProofing(v => !v)}>
-              {proofingGallery ? "✓ " : ""}Proofing gallery +$75
+              {proofingGallery ? "✓ " : ""}{couplesPricing.addOns.proofingGallery.shortLabel} +{formatCurrency(couplesPricing.addOns.proofingGallery.price)}
             </button>
             <button style={toggleStyle(rushPreview)}    onClick={() => setRushPreview(v => !v)}>
-              {rushPreview ? "✓ " : ""}Rush preview +$75
+              {rushPreview ? "✓ " : ""}{couplesPricing.addOns.rushPreview.shortLabel} +{formatCurrency(couplesPricing.addOns.rushPreview.price)}
             </button>
             <button style={toggleStyle(expedited)}      onClick={() => setExpedited(v => !v)}>
-              {expedited ? "✓ " : ""}72-hr delivery +$150
+              {expedited ? "✓ " : ""}{couplesPricing.addOns.expedited.shortLabel} +{formatCurrency(couplesPricing.addOns.expedited.price)}
             </button>
           </div>
         </div>
@@ -198,10 +201,10 @@ export default function CouplesRateEstimator() {
               <span style={{ fontSize: 42, fontWeight: 800, color: "#101412", lineHeight: 1 }}>
                 {formatCurrency(estimate.deposit)}
               </span>
-              <span style={{ fontSize: 15, color: "#667f79" }}>deposit</span>
+              <span style={{ fontSize: 15, color: "#667f79" }}>{BOOKING_POLICY.retainerRefundability} retainer</span>
             </div>
             <p style={{ fontSize: 13, color: "#667f79", marginTop: 6 }}>
-              {formatCurrency(estimate.remainingBalance)} remaining balance due on shoot day
+              {formatCurrency(estimate.remainingBalance)} remaining balance due {BOOKING_POLICY.remainingBalanceDeadline}
             </p>
           </div>
 

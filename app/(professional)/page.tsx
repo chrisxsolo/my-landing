@@ -5,7 +5,6 @@ import HomeFinalCTA from "@/app/components/HomeFinalCTA";
 import HomeHero from "@/app/components/HomeHero";
 import HomepageFAQ from "@/app/components/HomepageFAQ";
 import HomeStorySections from "@/app/components/HomeStorySections";
-import Testimonials from "@/app/components/Testimonials";
 import { FAQS } from "@/app/(professional)/faq/faqData";
 import { C } from "@/lib/colors";
 import { buildFeaturedSessions, resolveHomepageImages } from "@/lib/homepageData";
@@ -124,17 +123,14 @@ export default async function ProfessionalHomePage() {
         cardPortrait={home.cardPortrait}
         storyImages={home.storyImages}
         featuredSessions={featuredSessions}
-      />
-      <HomeConversionSections aboutPortrait={home.aboutPortrait} />
-      <HomepageFAQ items={getHomepageFaqItems()} />
-      <Testimonials
-        title="Real people, clearly guided from the first frame."
-        items={approvedTestimonials.map((testimonial) => ({
+        testimonials={approvedTestimonials.map((testimonial) => ({
           quote: testimonial.message,
           name: testimonial.display_name,
           context: testimonial.session_type ?? "SoloXSnaps session",
         }))}
       />
+      <HomeConversionSections aboutPortrait={home.aboutPortrait} />
+      <HomepageFAQ items={getHomepageFaqItems()} />
       <HomeFinalCTA image={home.finalCta} />
     </main>
   );

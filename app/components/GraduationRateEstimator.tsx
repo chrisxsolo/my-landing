@@ -10,6 +10,9 @@ import {
   type SchoolValue,
   type SessionLengthKey,
 } from "@/lib/pricing"
+import { BOOKING_POLICY, PRICING_CATALOG } from "@/lib/pricingCatalog"
+
+const graduationPricing = PRICING_CATALOG.graduation
 
 // ── SHARED STYLE HELPERS ──────────────────────────────────────────────────────
 
@@ -170,16 +173,16 @@ export default function GraduationRateEstimator() {
           <label style={{ ...LABEL_STYLE, marginBottom: 12 }}>Add-ons</label>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
             <button style={toggleStyle(extraOutfit)}    onClick={() => setExtraOutfit(v => !v)}>
-              {extraOutfit ? "✓ " : ""}Extra outfit +$75
+              {extraOutfit ? "✓ " : ""}{graduationPricing.addOns.extraOutfit.shortLabel} +{formatCurrency(graduationPricing.addOns.extraOutfit.price)}
             </button>
             <button style={toggleStyle(secondLocation)} onClick={() => setSecondLoc(v => !v)}>
-              {secondLocation ? "✓ " : ""}Second location +$125
+              {secondLocation ? "✓ " : ""}{graduationPricing.addOns.secondLocation.shortLabel} +{formatCurrency(graduationPricing.addOns.secondLocation.price)}
             </button>
             <button style={toggleStyle(expedited)}      onClick={() => setExpedited(v => !v)}>
-              {expedited ? "✓ " : ""}72-hr delivery +$150
+              {expedited ? "✓ " : ""}{graduationPricing.addOns.expedited.shortLabel} +{formatCurrency(graduationPricing.addOns.expedited.price)}
             </button>
             <button style={toggleStyle(champagne)}      onClick={() => setChampagne(v => !v)}>
-              {champagne ? "✓ " : ""}Champagne +$15
+              {champagne ? "✓ " : ""}{graduationPricing.addOns.champagne.shortLabel} +{formatCurrency(graduationPricing.addOns.champagne.price)}
             </button>
           </div>
         </div>
@@ -218,10 +221,10 @@ export default function GraduationRateEstimator() {
               <span style={{ fontSize: 42, fontWeight: 800, color: "#101412", lineHeight: 1 }}>
                 {formatCurrency(estimate.deposit)}
               </span>
-              <span style={{ fontSize: 15, color: "#667f79" }}>deposit</span>
+              <span style={{ fontSize: 15, color: "#667f79" }}>{BOOKING_POLICY.retainerRefundability} retainer</span>
             </div>
             <p style={{ fontSize: 13, color: "#667f79", marginTop: 6 }}>
-              {formatCurrency(estimate.remainingBalance)} remaining balance due before final delivery
+              {formatCurrency(estimate.remainingBalance)} remaining balance due {BOOKING_POLICY.remainingBalanceDeadline}
             </p>
           </div>
 

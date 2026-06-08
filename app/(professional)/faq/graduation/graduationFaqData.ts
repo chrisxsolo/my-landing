@@ -5,6 +5,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { FAQGroup } from "../faqShared";
+import { BOOKING_POLICY, PRICING_CATALOG } from "@/lib/pricingCatalog";
+
+const graduationPricing = PRICING_CATALOG.graduation;
 
 export const FAQS: FAQGroup[] = [
   {
@@ -13,7 +16,7 @@ export const FAQS: FAQGroup[] = [
     items: [
       {
         q: "How do I book a session?",
-        a: "Send an inquiry through the contact page with your date, campus, and how many people. I'll reply within 24 hours with availability, pricing, and next steps. A 50% deposit reserves your date — the remaining balance is due on shoot day.",
+        a: `Send an inquiry through the contact page with your date, campus, and how many people. I'll reply within 24 hours with availability, pricing, and next steps. A ${BOOKING_POLICY.retainerPercent}% ${BOOKING_POLICY.retainerRefundability} retainer reserves your session, and the remaining balance is due ${BOOKING_POLICY.remainingBalanceDeadline}.`,
       },
       {
         q: "How far in advance should I book?",
@@ -21,7 +24,7 @@ export const FAQS: FAQGroup[] = [
       },
       {
         q: "What's the deposit and when is it due?",
-        a: "The deposit is 50% of the session total. It's due when you confirm your date and is non-refundable but transferable — it can be applied toward rescheduling or a future session with advance notice.",
+        a: `The retainer is ${BOOKING_POLICY.retainerPercent}% of the session total. It's due when you confirm your date and is ${BOOKING_POLICY.retainerRefundability} but transferable - it can be applied toward rescheduling or a future session with advance notice.`,
       },
       {
         q: "What happens if I need to reschedule?",
@@ -43,11 +46,11 @@ export const FAQS: FAQGroup[] = [
       },
       {
         q: "How long is the session?",
-        a: "Standard sessions are 1 hour. Groups of 3 or more usually need at least 90 minutes to cover individual portraits plus group combinations. 2-hour sessions are available if you want more locations or more time.",
+        a: `Standard sessions are ${graduationPricing.durationRules.standardMinutes} minutes. Groups of ${graduationPricing.durationRules.groupMinimumSize} or more need at least ${graduationPricing.durationRules.groupMinimumMinutes} minutes to cover individual portraits plus group combinations. ${graduationPricing.durationRules.allowedMinutes.at(-1)! / 60}-hour sessions are available if you want more locations or more time.`,
       },
       {
         q: "How many photos will I receive?",
-        a: "You'll receive 50+ professionally edited images in your private gallery. The exact number depends on session length and group size — longer sessions and larger groups typically produce more deliverables.",
+        a: `You'll receive ${graduationPricing.standardMinimumImages}+ professionally edited images in your private gallery. The exact number depends on session length and group size - longer sessions and larger groups typically produce more deliverables.`,
       },
       {
         q: "Can family members join the session?",
@@ -63,7 +66,7 @@ export const FAQS: FAQGroup[] = [
       },
       {
         q: "Can I do a champagne pop shot?",
-        a: "Yes — it's available as an add-on for $15. I'll plan it at the right moment in the session so it doesn't interrupt the flow. Just give me a heads-up when you book so we're both prepared.",
+        a: `Yes - it's available as an add-on for $${graduationPricing.addOns.champagne.price}. I'll plan it at the right moment in the session so it doesn't interrupt the flow. Just give me a heads-up when you book so we're both prepared.`,
       },
     ],
   },
@@ -73,7 +76,7 @@ export const FAQS: FAQGroup[] = [
     items: [
       {
         q: "How many outfits can I wear?",
-        a: "Every session includes one outfit look. You can add a second outfit change for $75. If you do change, I'll build a short break into the session routing — just factor in 5–10 minutes for the swap.",
+        a: `Every session includes one outfit look. You can add a second outfit change for $${graduationPricing.addOns.extraOutfit.price}. If you do change, I'll build a short break into the session routing - just factor in 5-10 minutes for the swap.`,
       },
       {
         q: "What should I wear under my gown?",
@@ -99,7 +102,7 @@ export const FAQS: FAQGroup[] = [
     items: [
       {
         q: "How long until I receive my photos?",
-        a: "Standard turnaround is up to two weeks from shoot day. If you need your photos faster, 72-hour full gallery delivery is available as an add-on for $150.",
+        a: `Standard turnaround is up to ${PRICING_CATALOG.standardTurnaroundDays / 7} weeks from the session date. If you need your photos faster, ${graduationPricing.addOns.expedited.label.toLowerCase()} is available for $${graduationPricing.addOns.expedited.price}.`,
       },
       {
         q: "How are the photos delivered?",
@@ -125,11 +128,11 @@ export const FAQS: FAQGroup[] = [
       },
       {
         q: "Is there a travel fee?",
-        a: "San Francisco locations (SF State, USF, and anywhere within SF city limits) have no travel fee. Travel fees apply for campuses outside SF: UC Berkeley ($35), CSU East Bay ($30), Santa Clara ($70), SJSU ($75). Palo Alto / Stanford is TBD — reach out to confirm.",
+        a: `San Francisco locations (SF State, USF, and anywhere within SF city limits) have no travel fee. Travel fees apply outside SF: UC Berkeley ($${graduationPricing.travelFees["uc-berkeley"]}), CSU East Bay ($${graduationPricing.travelFees.csueb}), Santa Clara ($${graduationPricing.travelFees["santa-clara"]}), SJSU ($${graduationPricing.travelFees.sjsu}), and Stanford ($${graduationPricing.travelFees.stanford}).`,
       },
       {
         q: "Can we shoot at multiple locations?",
-        a: "Yes. Multiple on-campus locations are included in every session as part of the planned route. If you want to add a second distinct location (a different campus or off-campus spot), that's available as an add-on for $125.",
+        a: `Yes. Multiple on-campus locations are included in every session as part of the planned route. A second distinct location is available for $${graduationPricing.addOns.secondLocation.price}.`,
       },
     ],
   },

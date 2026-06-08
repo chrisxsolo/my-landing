@@ -13,6 +13,12 @@ import Anthropic from "@anthropic-ai/sdk";
 import { getValidTokens } from "@/lib/gmailTokens";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { requireAdmin } from "@/lib/requireAdmin";
+import {
+  PRICING_CATALOG,
+  calculatePaymentSchedule,
+  getGraduationTravelFeeFromText,
+  getMinimumImageCountForSessionType,
+} from "@/lib/pricingCatalog";
 
 export const dynamic = "force-dynamic";
 
@@ -76,8 +82,9 @@ function buildContract(opts: {
   effectiveDate: string; clientName: string; clientEmail: string;
   sessionType: string; sessionDate: string; sessionTime: string;
   location: string; totalFee: string; retainer: string; remaining: string;
+  minimumImages: number;
 }): string {
-  const { effectiveDate, clientName, clientEmail, sessionType, sessionDate, sessionTime, location, totalFee, retainer, remaining } = opts;
+  const { effectiveDate, clientName, clientEmail, sessionType, sessionDate, sessionTime, location, totalFee, retainer, remaining, minimumImages } = opts;
   return `Portrait Photography Services Agreement
 
 
@@ -102,7 +109,7 @@ Location of Portrait Session: ${location}
 
 Description of Services:
 
-[Minimum of 30 edited images delivered within two weeks through an online gallery]
+[Minimum of ${minimumImages} edited images delivered within ${PRICING_CATALOG.standardTurnaroundDays / 7} weeks through an online gallery]
 
 
 
@@ -125,7 +132,7 @@ Total Fee for Services: [${totalFee}]
 
 Retainer due upon signing: [${retainer}]
 
-Remaining amount due on [${sessionDate}]: [${remaining}]
+Remaining amount due on or before [${sessionDate}]: [${remaining}]
 
 2.2 Retainer. Client acknowledges and agrees that the retainer amount set out above is due upon the signing of this Agreement and is not refundable ("Retainer"), so as to fairly compensate Photographer for committing his/her time to provide the Services and turning down other potential projects or clients. Both parties agree that the Retainer will be credited towards the total Fees payable by Client.
 
@@ -325,18 +332,8 @@ ${emailContext || "(no email history found)"}`,
   else if (inq.date_in_mind && inq.date_in_mind.toLowerCase() !== "flexible")
                                        sessionDate = inq.date_in_mind;
 
-  // ── Apply travel fee for known schools ──────────────────────────────────
-  // Detect school from the school field, session_type, and message text
   const haystack = [inq.school, inq.session_type, inq.message, inq.email].filter(Boolean).join(" ").toLowerCase();
-  function detectTravelFee(text: string): number {
-    if (/\bstanford\b/.test(text))                                  return 45;
-    if (/\buc berkeley\b|\bberkeley\b|cal bears/.test(text))        return 35;
-    if (/\bcsueb\b|cal state east bay|eastbay/.test(text))          return 30;
-    if (/\bsjsu\b|san jose state/.test(text))                       return 75;
-    if (/\bsanta clara\b|\bscu\b/.test(text))                       return 70;
-    return 0;
-  }
-  const travelFee = detectTravelFee(haystack);
+  const travelFee = getGraduationTravelFeeFromText(haystack);
 
   let totalFeeStr  = extracted.totalFee ?? "[TOTAL FEE — fill in]";
   let totalNum     = parseAmount(totalFeeStr);
@@ -344,8 +341,9 @@ ${emailContext || "(no email history found)"}`,
     totalNum    += travelFee;
     totalFeeStr  = fmtMoney(totalNum);
   }
-  const retainerStr  = totalNum ? fmtMoney(Math.ceil(totalNum / 2))  : "[RETAINER — fill in]";
-  const remainingStr = totalNum ? fmtMoney(Math.floor(totalNum / 2)) : "[REMAINING — fill in]";
+  const paymentSchedule = calculatePaymentSchedule(totalNum);
+  const retainerStr = totalNum ? fmtMoney(paymentSchedule.retainer) : "[RETAINER — fill in]";
+  const remainingStr = totalNum ? fmtMoney(paymentSchedule.remainingBalance) : "[REMAINING — fill in]";
 
   const contract = buildContract({
     effectiveDate,
@@ -358,6 +356,7 @@ ${emailContext || "(no email history found)"}`,
     totalFee:     totalFeeStr,
     retainer:     retainerStr,
     remaining:    remainingStr,
+    minimumImages: getMinimumImageCountForSessionType(inq.session_type ?? "Graduation"),
   });
 
   return NextResponse.json({ contract });

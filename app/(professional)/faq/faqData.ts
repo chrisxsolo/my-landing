@@ -5,6 +5,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { FAQGroup } from "./faqShared";
+import { BOOKING_POLICY, PRICING_CATALOG } from "@/lib/pricingCatalog";
 
 export const FAQS: FAQGroup[] = [
   {
@@ -13,7 +14,7 @@ export const FAQS: FAQGroup[] = [
     items: [
       {
         q: "How do I book a session?",
-        a: "Send an inquiry through the contact page with the type of session you're after, your ideal date, location, and how many people will be in the photos. I'll reply within 24 hours with availability, pricing, and next steps. A 50% deposit reserves your date — the remaining balance is due on shoot day.",
+        a: `Send an inquiry through the contact page with the type of session you're after, your ideal date, location, and how many people will be in the photos. I'll reply within 24 hours with availability, pricing, and next steps. A ${BOOKING_POLICY.retainerPercent}% ${BOOKING_POLICY.retainerRefundability} retainer reserves your session, and the remaining balance is due ${BOOKING_POLICY.remainingBalanceDeadline}.`,
       },
       {
         q: "How far in advance should I book?",
@@ -21,7 +22,7 @@ export const FAQS: FAQGroup[] = [
       },
       {
         q: "What's the deposit and when is it due?",
-        a: "The deposit is 50% of the session total and is due when you confirm your date. It's non-refundable but transferable — it can be applied toward rescheduling or a future session with advance notice.",
+        a: `The retainer is ${BOOKING_POLICY.retainerPercent}% of the session total and is due when you confirm your date. It's ${BOOKING_POLICY.retainerRefundability} but transferable - it can be applied toward rescheduling or a future session with advance notice.`,
       },
       {
         q: "What happens if I need to reschedule?",
@@ -47,7 +48,7 @@ export const FAQS: FAQGroup[] = [
       },
       {
         q: "How many photos will I receive?",
-        a: "You'll receive 50+ professionally edited images in your private gallery. The exact number depends on session length and group size — longer sessions and larger groups typically produce more deliverables.",
+        a: `A standard graduation session includes ${PRICING_CATALOG.graduation.standardMinimumImages}+ professionally edited images. Other package minimums vary by session type, length, and group size.`,
       },
       {
         q: "What kinds of sessions do you shoot?",
@@ -113,7 +114,7 @@ export const FAQS: FAQGroup[] = [
     items: [
       {
         q: "How long until I receive my photos?",
-        a: "Standard turnaround is up to two weeks from shoot day. If you need them sooner — for an announcement, gift, or deadline — expedited delivery is available as an add-on. Just flag it when you book.",
+        a: `Standard turnaround is up to ${PRICING_CATALOG.standardTurnaroundDays / 7} weeks from the session date. If you need them sooner - for an announcement, gift, or deadline - expedited delivery is available as an add-on. Just flag it when you book.`,
       },
       {
         q: "How are the photos delivered?",

@@ -12,56 +12,6 @@ const SCHOOLS = [
   ["CSU East Bay", "/grads/csueb"],
 ] as const;
 
-const PRICING = [
-  {
-    title: "Graduation Sessions",
-    copy: "Guided on-campus sessions with time for individual portraits, landmark locations, and photographs with friends or family.",
-    href: "/pricing/grads",
-    cta: "View Graduation Pricing",
-  },
-  {
-    title: "Couples Sessions",
-    copy: "Choose a shorter focused session or more time for movement, outfits, locations, engagements, and proposals.",
-    href: "/pricing/couples",
-    cta: "View Couples Pricing",
-  },
-  {
-    title: "Family & Portrait Sessions",
-    copy: "Natural, guided portraits for families, maternity, individuals, and personal milestones throughout the Bay Area.",
-    href: "/pricing/families",
-    cta: "View Portrait Pricing",
-  },
-] as const;
-
-function DashboardPreview() {
-  return (
-    <div className={details.dashboard} aria-label="Example SoloXSnaps client dashboard">
-      <div className={details.dashboardBar}>
-        <div className={details.dashboardDots} aria-hidden="true"><span /><span /><span /></div>
-        <span>Example client dashboard</span>
-      </div>
-      <div className={details.dashboardPanel}>
-        <p className={details.dashboardLabel}>Graduation session</p>
-        <h3>Your gallery is in editing</h3>
-        <div className={details.progress} aria-hidden="true"><span /></div>
-        <div className={details.dashboardGrid}>
-          {[
-            ["Session plan", "Campus route, date, and start time"],
-            ["Preparation", "Outfit and arrival reminders"],
-            ["Editing status", "Progress from booked to gallery ready"],
-            ["Gallery access", "Private delivery link when complete"],
-          ].map(([title, copy]) => (
-            <div key={title} className={details.dashboardTile}>
-              <strong>{title}</strong>
-              <span>{copy}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function HomeConversionSections({
   aboutPortrait,
 }: {
@@ -69,32 +19,6 @@ export default function HomeConversionSections({
 }) {
   return (
     <>
-      <section className={`${styles.section} ${styles.paper} ${responsive.section}`}>
-        <div className={`${styles.shell} ${responsive.shell}`}>
-          <div className={details.split}>
-            <div data-reveal="left">
-              <p className={styles.eyebrow}>Private client dashboard</p>
-              <h2 className={styles.title}>Your session, organized in one place</h2>
-              <p className={styles.copy}>
-                After booking, you will receive a private dashboard containing your session plan,
-                location details, reminders, editing status, and final gallery link.
-              </p>
-              <ul className={details.featureList}>
-                <li>Session information and location details</li>
-                <li>Preparation reminders before shoot day</li>
-                <li>Editing and delivery status updates</li>
-                <li>Final private gallery access</li>
-              </ul>
-              <div className={styles.actions}>
-                <Link href="/faq" className={`${styles.button} ${styles.buttonGhost}`}>Learn How Booking Works</Link>
-                <Link href="/login" className={`${styles.button} ${styles.buttonGhost}`}>Client Login</Link>
-              </div>
-            </div>
-            <div data-reveal data-delay="2"><DashboardPreview /></div>
-          </div>
-        </div>
-      </section>
-
       <section className={`${styles.section} ${styles.tint} ${responsive.section}`}>
         <div className={`${styles.shell} ${responsive.shell}`}>
           <div className={details.split}>
@@ -149,25 +73,6 @@ export default function HomeConversionSections({
           <div className={styles.actions}>
             <Link href="/pricing/grads" className={styles.button}>Explore Graduation Photography</Link>
             <Link href="/grad-guide" className={`${styles.button} ${styles.buttonGhost}`}>Read the Graduation Guide</Link>
-          </div>
-        </div>
-      </section>
-
-      <section className={`${styles.section} ${styles.paper} ${responsive.section}`}>
-        <div className={`${styles.shell} ${responsive.shell}`}>
-          <p className={styles.eyebrow}>Transparent pricing</p>
-          <h2 className={styles.title}>Clear pricing before you inquire</h2>
-          <p className={styles.copy}>
-            Review current session options, package inclusions, and available add-ons before choosing what fits your plans.
-          </p>
-          <div className={details.pricingGrid} style={{ marginTop: 38 }}>
-            {PRICING.map((item) => (
-              <article key={item.href} className={details.pricingCard}>
-                <h3>{item.title}</h3>
-                <p>{item.copy}</p>
-                <Link href={item.href}>{item.cta} →</Link>
-              </article>
-            ))}
           </div>
         </div>
       </section>
