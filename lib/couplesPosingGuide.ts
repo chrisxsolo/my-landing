@@ -25,6 +25,7 @@ export const COUPLES_IMAGE_VISIBILITIES = [
 
 export const COUPLES_INSPIRATION_BUCKET = "couples-posing-inspiration";
 export const COUPLES_INSPIRATION_TABLE = "couples_inspiration_images";
+export const COUPLES_PROMPTS_TABLE = "couples_posing_prompts";
 export const COUPLES_GUIDE_FAVORITES_KEY = "couples_guide_favorites";
 export const COUPLES_GUIDE_USED_KEY = "couples_guide_recently_used";
 export const MAX_COUPLES_IMAGE_BYTES = 6 * 1024 * 1024;
@@ -47,6 +48,14 @@ export type CouplesPosingPrompt = {
   category: CouplesPromptCategory;
   instructions: string;
   keywords: string[];
+};
+
+export type AdminCouplesPosingPrompt = CouplesPosingPrompt & {
+  id: string;
+  display_order: number;
+  is_published: boolean;
+  created_at: string;
+  updated_at: string;
 };
 
 export type CouplesInspirationImage = {
@@ -72,6 +81,13 @@ export type CouplesInspirationImage = {
   created_at: string;
   updated_at: string;
 };
+
+export function normalizeCouplesPromptRow<T extends { prompt_number: number }>(
+  row: T,
+): Omit<T, "prompt_number"> & { number: number } {
+  const { prompt_number: number, ...prompt } = row;
+  return { ...prompt, number };
+}
 
 const prompt = (
   number: number,
@@ -173,6 +189,44 @@ function stringList(value: unknown, allowed?: readonly string[]) {
   }))).slice(0, 20);
 }
 
+export function createCouplesPromptSlug(title: string) {
+  return title
+    .normalize("NFKD")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 120) || "couples-prompt";
+}
+
+export function validateCouplesPromptInput(input: Record<string, unknown>) {
+  const title = optionalText(input.title, 160);
+  if (!title) return { ok: false as const, error: "Prompt title is required." };
+
+  const instructions = optionalText(input.instructions, 5000);
+  if (!instructions) {
+    return { ok: false as const, error: "Directing language is required." };
+  }
+
+  const category = COUPLES_PROMPT_CATEGORIES.includes(
+    input.category as CouplesPromptCategory,
+  ) ? input.category as CouplesPromptCategory : null;
+  if (!category) return { ok: false as const, error: "Choose a prompt category." };
+
+  return {
+    ok: true as const,
+    data: {
+      title,
+      instructions,
+      category,
+      keywords: stringList(input.keywords),
+      display_order: Number.isFinite(Number(input.display_order))
+        ? Math.max(0, Math.trunc(Number(input.display_order)))
+        : 0,
+      is_published: input.is_published !== false,
+    },
+  };
+}
+
 export function validateInspirationUpload(file: { type: string; size: number }) {
   if (!COUPLES_IMAGE_TYPES.includes(file.type as (typeof COUPLES_IMAGE_TYPES)[number])) {
     return { ok: false as const, error: "Upload a JPEG, PNG, WebP, or AVIF image." };
@@ -216,8 +270,7 @@ export function validateInspirationImageInput(input: Record<string, unknown>) {
   }
 
   const promptNumber = Number(input.related_prompt_number);
-  const relatedPromptNumber = Number.isInteger(promptNumber) &&
-    COUPLES_POSING_PROMPTS.some((item) => item.number === promptNumber)
+  const relatedPromptNumber = Number.isInteger(promptNumber) && promptNumber > 0
     ? promptNumber
     : null;
 

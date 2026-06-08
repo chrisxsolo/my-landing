@@ -3,10 +3,14 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { C } from "@/lib/colors";
-import { COUPLES_INSPIRATION_CATEGORIES } from "@/lib/couplesPosingGuide";
+import {
+  COUPLES_INSPIRATION_CATEGORIES,
+  type AdminCouplesPosingPrompt,
+} from "@/lib/couplesPosingGuide";
 import CouplesInspirationEditor, {
   type AdminInspirationImage,
 } from "@/app/admin/CouplesInspirationEditor";
+import CouplesPromptManager from "@/app/admin/CouplesPromptManager";
 
 type Props = {
   showToast: (message: string, ok?: boolean) => void;
@@ -19,8 +23,11 @@ const visibilityLabel = {
 };
 
 export default function CouplesPosingGuideTab({ showToast }: Props) {
+  const [view, setView] = useState<"prompts" | "photos">("prompts");
+  const [prompts, setPrompts] = useState<AdminCouplesPosingPrompt[]>([]);
   const [images, setImages] = useState<AdminInspirationImage[]>([]);
   const [loading, setLoading] = useState(true);
+  const [promptsLoading, setPromptsLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
   const [visibility, setVisibility] = useState("All");
@@ -55,7 +62,28 @@ export default function CouplesPosingGuideTab({ showToast }: Props) {
     }
   }, []);
 
-  useEffect(() => { void loadImages(); }, [loadImages]);
+  const loadPrompts = useCallback(async () => {
+    setPromptsLoading(true);
+    try {
+      const response = await fetch("/api/admin/couples-posing-prompts");
+      const json = await response.json();
+      if (!response.ok) {
+        showToastRef.current(json.error ?? "Could not load couples prompts", false);
+        return;
+      }
+      setPrompts(json.prompts ?? []);
+    } catch (error) {
+      console.error("[couples-guide-admin] prompt load failed", error);
+      showToastRef.current("Could not load couples prompts", false);
+    } finally {
+      setPromptsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadImages();
+    void loadPrompts();
+  }, [loadImages, loadPrompts]);
 
   const filtered = useMemo(() => {
     const needle = search.trim().toLowerCase();
@@ -186,7 +214,7 @@ export default function CouplesPosingGuideTab({ showToast }: Props) {
         <div>
           <p className="text-xs font-black uppercase tracking-[0.16em]" style={{ color: C.proAccent }}>Website tools</p>
           <h1 className="mt-1 text-3xl font-black tracking-tight text-slate-950">Couples Posing Guide</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-500">Manage visual references, publication rights, client visibility, and the order used below the 23 fixed posing prompts.</p>
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-500">Add and edit posing prompts or upload visual references directly from your phone.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Link href="/couples-posing-guide?preview=client" target="_blank" className="inline-flex min-h-11 items-center rounded-xl border px-3 text-sm font-bold" style={{ borderColor: C.proAccentBorder, color: C.proAccent }}>Preview client view</Link>
@@ -194,14 +222,29 @@ export default function CouplesPosingGuideTab({ showToast }: Props) {
         </div>
       </div>
 
-      <CouplesInspirationEditor
-        editing={editing}
-        onSaved={() => { setEditing(null); void loadImages(); }}
-        onCancel={() => setEditing(null)}
-        showToast={showToast}
-      />
+      <div className="grid grid-cols-2 gap-2 rounded-2xl border border-slate-200 bg-white p-2">
+        <button type="button" onClick={() => setView("prompts")} className="min-h-12 rounded-xl text-sm font-black" style={view === "prompts" ? { background: C.proAccent, color: C.white } : { color: C.inkSoft }}>Prompts</button>
+        <button type="button" onClick={() => setView("photos")} className="min-h-12 rounded-xl text-sm font-black" style={view === "photos" ? { background: C.proAccent, color: C.white } : { color: C.inkSoft }}>Photos</button>
+      </div>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-4 md:p-5">
+      {view === "prompts" ? (
+        <CouplesPromptManager
+          prompts={prompts}
+          loading={promptsLoading}
+          onChanged={loadPrompts}
+          showToast={showToast}
+        />
+      ) : (
+        <>
+          <CouplesInspirationEditor
+            editing={editing}
+            prompts={prompts}
+            onSaved={() => { setEditing(null); void loadImages(); }}
+            onCancel={() => setEditing(null)}
+            showToast={showToast}
+          />
+
+          <section className="rounded-2xl border border-slate-200 bg-white p-4 md:p-5">
         <div className="grid gap-3 md:grid-cols-4">
           <input className={fieldClass} type="search" placeholder="Search images..." value={search} onChange={(event) => setSearch(event.target.value)} />
           <select className={fieldClass} value={category} onChange={(event) => setCategory(event.target.value)}><option>All</option>{COUPLES_INSPIRATION_CATEGORIES.map((item) => <option key={item}>{item}</option>)}</select>
@@ -221,9 +264,9 @@ export default function CouplesPosingGuideTab({ showToast }: Props) {
             <button type="button" disabled={busy} onClick={() => deleteSelected()} className="min-h-11 rounded-xl px-3 text-sm font-black text-white" style={{ background: C.danger }}>{deleteArmed ? "Confirm delete" : "Delete"}</button>
           </div>
         )}
-      </section>
+          </section>
 
-      {loading ? (
+          {loading ? (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">{Array.from({ length: 8 }, (_, index) => <div key={index} className="aspect-[4/5] animate-pulse rounded-2xl bg-slate-100" />)}</div>
       ) : filtered.length === 0 ? (
         <div className="rounded-2xl border border-dashed p-10 text-center" style={{ borderColor: C.proAccentBorder, background: C.proAccentSoft }}>
@@ -259,6 +302,8 @@ export default function CouplesPosingGuideTab({ showToast }: Props) {
             </article>
           ))}
         </div>
+          )}
+        </>
       )}
     </div>
   );

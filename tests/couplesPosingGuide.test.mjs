@@ -6,6 +6,8 @@ import {
   filterCouplesPosingPrompts,
   filterInspirationImagesForMode,
   getOwnedStoragePaths,
+  normalizeCouplesPromptRow,
+  validateCouplesPromptInput,
   validateInspirationImageInput,
   validateInspirationUpload,
 } from "../lib/couplesPosingGuide.ts";
@@ -52,6 +54,38 @@ test("prompt filtering matches title, instructions, category, and keywords", () 
   assert.deepEqual(filterCouplesPosingPrompts(COUPLES_POSING_PROMPTS, "kiss").map((item) => item.number), [8, 12, 18, 20, 23]);
   assert.deepEqual(filterCouplesPosingPrompts(COUPLES_POSING_PROMPTS, "walking").map((item) => item.number), [1, 2, 3, 4, 5, 6]);
   assert.deepEqual(filterCouplesPosingPrompts(COUPLES_POSING_PROMPTS, "", "Sitting").map((item) => item.number), [22]);
+});
+
+test("admin prompt input validates mobile-created prompts", () => {
+  const valid = validateCouplesPromptInput({
+    title: "  Forehead Touch  ",
+    instructions: "  Have them pause and gently touch foreheads.  ",
+    category: "Standing and Intimate",
+    keywords: ["close", " forehead ", "close"],
+    is_published: true,
+    display_order: 24,
+  });
+  assert.equal(valid.ok, true);
+  assert.equal(valid.data.title, "Forehead Touch");
+  assert.equal(valid.data.instructions, "Have them pause and gently touch foreheads.");
+  assert.deepEqual(valid.data.keywords, ["close", "forehead"]);
+
+  const invalid = validateCouplesPromptInput({
+    title: "",
+    instructions: "",
+    category: "Unknown",
+  });
+  assert.equal(invalid.ok, false);
+});
+
+test("database prompt rows expose the prompt number expected by the UI", () => {
+  const normalized = normalizeCouplesPromptRow({
+    id: "prompt-id",
+    prompt_number: 24,
+    title: "Forehead Touch",
+  });
+  assert.equal(normalized.number, 24);
+  assert.equal("prompt_number" in normalized, false);
 });
 
 test("public and client modes never receive private or unpublished images", () => {

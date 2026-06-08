@@ -5,8 +5,8 @@ import { C } from "@/lib/colors";
 import {
   COUPLES_IMAGE_TYPES,
   COUPLES_INSPIRATION_CATEGORIES,
-  COUPLES_POSING_PROMPTS,
   MAX_COUPLES_IMAGE_BYTES,
+  type CouplesPosingPrompt,
 } from "@/lib/couplesPosingGuide";
 
 export type AdminInspirationImage = {
@@ -35,6 +35,7 @@ export type AdminInspirationImage = {
 
 type Props = {
   editing: AdminInspirationImage | null;
+  prompts: CouplesPosingPrompt[];
   onSaved: () => void;
   onCancel: () => void;
   showToast: (message: string, ok?: boolean) => void;
@@ -108,6 +109,7 @@ async function readDimensions(file: File) {
 
 export default function CouplesInspirationEditor({
   editing,
+  prompts,
   onSaved,
   onCancel,
   showToast,
@@ -296,7 +298,7 @@ export default function CouplesInspirationEditor({
           <label className="grid gap-1.5 text-xs font-bold text-slate-500">Attribution text<input className={inputClass} value={draft.attribution_text} onChange={(event) => setDraft({ ...draft, attribution_text: event.target.value })} /></label>
           <label className="grid gap-1.5 text-xs font-bold text-slate-500">Alt text<input className={inputClass} value={draft.alt_text} onChange={(event) => setDraft({ ...draft, alt_text: event.target.value })} /></label>
           <label className="grid gap-1.5 text-xs font-bold text-slate-500">Tags, comma separated<input className={inputClass} value={draft.tags} onChange={(event) => setDraft({ ...draft, tags: event.target.value })} /></label>
-          <label className="grid gap-1.5 text-xs font-bold text-slate-500">Related prompt<select className={inputClass} value={draft.related_prompt_number} onChange={(event) => setDraft({ ...draft, related_prompt_number: event.target.value })}><option value="">None</option>{COUPLES_POSING_PROMPTS.map((item) => <option key={item.number} value={item.number}>{item.number}. {item.title}</option>)}</select></label>
+          <label className="grid gap-1.5 text-xs font-bold text-slate-500">Related prompt<select className={inputClass} value={draft.related_prompt_number} onChange={(event) => setDraft({ ...draft, related_prompt_number: event.target.value })}><option value="">None</option>{prompts.map((item) => <option key={item.number} value={item.number}>{item.number}. {item.title}</option>)}</select></label>
           <label className="grid gap-1.5 text-xs font-bold text-slate-500">Display order<input className={inputClass} type="number" min="0" value={draft.display_order} onChange={(event) => setDraft({ ...draft, display_order: event.target.value })} /></label>
           <label className="grid gap-1.5 text-xs font-bold text-slate-500">Private notes<textarea className={inputClass} rows={4} value={draft.internal_notes} onChange={(event) => setDraft({ ...draft, internal_notes: event.target.value })} /></label>
           <label className="grid gap-1.5 text-xs font-bold text-slate-500">Client-facing notes<textarea className={inputClass} rows={4} value={draft.client_notes} onChange={(event) => setDraft({ ...draft, client_notes: event.target.value })} /></label>

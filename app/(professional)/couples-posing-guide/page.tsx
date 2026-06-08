@@ -3,9 +3,9 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { isValidAdminSession } from "@/lib/adminAuthShared";
 import { listCouplesInspirationImages } from "@/lib/couplesInspiration";
+import { listCouplesPosingPrompts } from "@/lib/couplesPrompts";
 import {
   COUPLES_INSPIRATION_CATEGORIES,
-  COUPLES_POSING_PROMPTS,
   COUPLES_PROMPT_CATEGORIES,
   filterInspirationImagesForMode,
   type CouplesGuideMode,
@@ -81,9 +81,10 @@ export default async function CouplesPosingGuidePage({ searchParams }: PageProps
     }
   }
 
+  const loadedPrompts = await listCouplesPosingPrompts(dataMode, true);
   const prompts = displayMode === "photographer"
-    ? COUPLES_POSING_PROMPTS
-    : COUPLES_POSING_PROMPTS.map(({ number, slug, title, category, keywords }) => ({
+    ? loadedPrompts
+    : loadedPrompts.map(({ number, slug, title, category, keywords }) => ({
         number,
         slug,
         title,
