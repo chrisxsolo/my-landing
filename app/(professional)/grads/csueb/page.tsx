@@ -6,7 +6,7 @@ const data: SchoolLandingData = {
   schoolShort: "CSUEB",
   slug: "csueb",
   city: "Hayward, CA",
-  metaTitle: "CSU East Bay Graduation Photographer | CSUEB | soloxsnaps",
+  metaTitle: "CSU East Bay Graduation Photographer | CSUEB",
   metaDescription:
     "Graduation portraits at CSU East Bay by Chris Solorzano. Meiklejohn Hall, the Pioneer Heights, Main Street — guided sessions, fast turnaround, private gallery delivery.",
   canonicalPath: "/grads/csueb",

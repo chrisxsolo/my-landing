@@ -5,7 +5,8 @@ import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 import ContactClient from "./ContactClient";
 import ContactStyles from "./ContactStyles";
 
-const TITLE = "Book a Bay Area Photography Session | soloxsnaps";
+const PAGE_TITLE = "Book a Bay Area Photography Session";
+const SOCIAL_TITLE = `${PAGE_TITLE} | SoloXSnaps`;
 const DESCRIPTION =
   "Inquire about graduation, couples, family, and event photography in the Bay Area. Send Chris Solorzano your date, location, and session type — replies within 24 hours.";
 const CONTACT_IMAGE =
@@ -19,11 +20,16 @@ const EXPECTATIONS = [
 ];
 
 export const metadata: Metadata = {
-  title: TITLE,
+  title: PAGE_TITLE,
   description: DESCRIPTION,
   alternates: { canonical: "/contact" },
-  openGraph: { title: TITLE, description: DESCRIPTION, type: "website", siteName: "soloxsnaps" },
-  twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION },
+  openGraph: {
+    title: SOCIAL_TITLE,
+    description: DESCRIPTION,
+    type: "website",
+    siteName: "SoloXSnaps",
+  },
+  twitter: { card: "summary_large_image", title: SOCIAL_TITLE, description: DESCRIPTION },
 };
 
 function ContactFormFallback() {

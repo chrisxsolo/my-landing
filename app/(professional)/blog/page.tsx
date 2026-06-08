@@ -12,7 +12,7 @@ import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 export const revalidate = 3600;
 
 export const metadata: Metadata = {
-  title: "Blog | soloxsnaps",
+  title: "Blog",
   description: "Session notes and case studies from soloxsnaps in San Francisco and the Bay Area.",
   alternates: { canonical: "/blog" },
   openGraph: {

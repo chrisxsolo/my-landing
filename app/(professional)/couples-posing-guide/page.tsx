@@ -18,7 +18,7 @@ import styles from "./couplesPosingGuide.module.css";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Couples Posing Guide | SoloXSnaps Photography",
+  title: "Couples Posing Guide",
   description:
     "Explore the natural, playful, and documentary-inspired posing approach used during SoloXSnaps couples photography sessions in the San Francisco Bay Area",
   alternates: { canonical: "/couples-posing-guide" },

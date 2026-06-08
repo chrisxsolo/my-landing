@@ -20,13 +20,14 @@ import pageStyles from "@/app/(professional)/HomePage.module.css";
 
 export const revalidate = 3600;
 
-const title = "Bay Area Graduation & Couples Photographer | SoloXSnaps";
+const PAGE_TITLE = "Bay Area Graduation & Couples Photographer";
+const SOCIAL_TITLE = `${PAGE_TITLE} | SoloXSnaps`;
 const description =
   "SoloXSnaps provides graduation, couples, and portrait photography throughout San Francisco and the Bay Area with clear posing guidance, transparent pricing, and private online galleries.";
 const CHRIS_PORTRAIT = "/images/about/chris-solorzano-photographer.webp";
 
 export const metadata: Metadata = {
-  title,
+  title: PAGE_TITLE,
   description,
   alternates: { canonical: "/" },
   keywords: [
@@ -37,13 +38,18 @@ export const metadata: Metadata = {
     "Chris Solorzano photographer",
   ],
   openGraph: {
-    title,
+    title: SOCIAL_TITLE,
     description,
     type: "website",
     siteName: "SoloXSnaps",
     images: [{ url: CHRIS_PORTRAIT, alt: "San Francisco photographer Chris Solorzano" }],
   },
-  twitter: { card: "summary_large_image", title, description, images: [CHRIS_PORTRAIT] },
+  twitter: {
+    card: "summary_large_image",
+    title: SOCIAL_TITLE,
+    description,
+    images: [CHRIS_PORTRAIT],
+  },
 };
 
 const COLOR_VARS = {

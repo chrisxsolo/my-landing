@@ -1,5 +1,5 @@
 export const metadata = {
-  title: "Privacy Policy | soloxsnaps",
+  title: "Privacy Policy",
   description: "How soloxsnaps collects, uses, and protects your personal information.",
 };
 

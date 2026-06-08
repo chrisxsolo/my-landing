@@ -6,7 +6,7 @@ const data: SchoolLandingData = {
   schoolShort: "Berkeley",
   slug: "uc-berkeley",
   city: "Berkeley, CA",
-  metaTitle: "UC Berkeley Graduation Photographer | soloxsnaps",
+  metaTitle: "UC Berkeley Graduation Photographer",
   metaDescription:
     "Graduation portraits at UC Berkeley by Chris Solorzano. Sather Gate, Memorial Glade, the Campanile — clean direction, fast communication, private gallery delivery.",
   canonicalPath: "/grads/uc-berkeley",

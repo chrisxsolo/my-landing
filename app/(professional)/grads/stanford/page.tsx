@@ -6,7 +6,7 @@ const data: SchoolLandingData = {
   schoolShort: "Stanford",
   slug: "stanford",
   city: "Stanford, CA",
-  metaTitle: "Stanford University Graduation Photographer | soloxsnaps",
+  metaTitle: "Stanford University Graduation Photographer",
   metaDescription:
     "Graduation portraits at Stanford University by Chris Solorzano. Main Quad, Memorial Church, Palm Drive, Hoover Tower — clean direction, fast communication, private gallery delivery.",
   canonicalPath: "/grads/stanford",

@@ -6,7 +6,7 @@ const data: SchoolLandingData = {
   schoolShort: "SFSU",
   slug: "sf-state",
   city: "San Francisco, CA",
-  metaTitle: "SF State Graduation Photographer | SFSU | soloxsnaps",
+  metaTitle: "SF State Graduation Photographer | SFSU",
   metaDescription:
     "Graduation portraits at SF State by Chris Solorzano. On-campus and nearby San Francisco locations — no travel fee, guided sessions, private gallery delivery.",
   canonicalPath: "/grads/sf-state",

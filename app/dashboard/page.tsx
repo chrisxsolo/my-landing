@@ -4,7 +4,7 @@ import ClientSessionDashboard from "@/app/components/client-session-dashboard";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Session Dashboard | SoloXSnaps",
+  title: "Session Dashboard",
   description: "Track the progress of your SoloXSnaps photo session.",
 };
 

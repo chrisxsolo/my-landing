@@ -21,7 +21,7 @@ import Link from "next/link";
 import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 
 export const metadata: Metadata = {
-  title: "About | soloxsnaps",
+  title: "About",
   description: "Meet Chris Solorzano, the San Francisco based photographer behind soloxsnaps.",
   alternates: { canonical: "/about" },
   openGraph: {

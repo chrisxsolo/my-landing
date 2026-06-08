@@ -4,7 +4,7 @@ import AdminSessionsDashboard from "@/app/components/admin-sessions-dashboard";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Portal Sessions | SoloXSnaps Admin",
+  title: "Admin Portal Sessions",
   description: "Manage SoloXSnaps client portal session progress.",
 };
 

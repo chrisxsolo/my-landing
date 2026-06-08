@@ -6,7 +6,7 @@ const data: SchoolLandingData = {
   schoolShort: "USF",
   slug: "usf",
   city: "San Francisco, CA",
-  metaTitle: "USF Graduation Photographer | University of San Francisco | soloxsnaps",
+  metaTitle: "USF Graduation Photographer | University of San Francisco",
   metaDescription:
     "Graduation portraits at the University of San Francisco by Chris Solorzano. St. Ignatius, Lone Mountain, Kalmanovitz Hall — no travel fee, guided sessions, fast delivery.",
   canonicalPath: "/grads/usf",

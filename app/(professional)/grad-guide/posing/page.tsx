@@ -13,7 +13,7 @@ const DESCRIPTION =
   "Natural, flattering graduation photo poses that actually look good on camera — posing tips for caps, gowns, and campus portraits across the Bay Area.";
 
 export const metadata: Metadata = {
-  title: `${TITLE} | soloxsnaps`,
+  title: TITLE,
   description: DESCRIPTION,
   alternates: { canonical: PATH },
   openGraph: {

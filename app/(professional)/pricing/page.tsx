@@ -13,7 +13,7 @@ import { getPortfolioData, getSiteSettings } from "@/lib/professionalData";
 export const revalidate = 3600;
 
 export const metadata: Metadata = {
-  title: "Rates | soloxsnaps",
+  title: "Rates",
   description: "Photography pricing by Chris Solorzano — graduation and family sessions in the Bay Area.",
   alternates: { canonical: "/pricing" },
 };

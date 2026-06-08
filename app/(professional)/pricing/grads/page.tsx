@@ -30,7 +30,7 @@ export const revalidate = 3600;
 
 // ── SEO metadata (tab title + Google description) ────────────────────────────
 export const metadata: Metadata = {
-  title: "Grad Pricing | soloxsnaps",
+  title: "Grad Pricing",
   description: "Graduation photography pricing by Chris Solorzano — Bay Area grad portraits.",
   alternates: { canonical: "/pricing/grads" },
 };

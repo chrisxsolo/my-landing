@@ -22,7 +22,7 @@ import { pricingCSS, anim } from "@/lib/proStyles";
 export const revalidate = 3600;
 
 export const metadata: Metadata = {
-  title: "Event Pricing | soloxsnaps",
+  title: "Event Pricing",
   description: "Event photography pricing by Chris Solorzano — Bay Area event coverage.",
   alternates: { canonical: "/pricing/events" },
 };

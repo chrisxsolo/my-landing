@@ -6,7 +6,7 @@ const data: SchoolLandingData = {
   schoolShort: "Santa Clara",
   slug: "santa-clara",
   city: "Santa Clara, CA",
-  metaTitle: "Santa Clara University Graduation Photographer | soloxsnaps",
+  metaTitle: "Santa Clara University Graduation Photographer",
   metaDescription:
     "Graduation portraits at Santa Clara University by Chris Solorzano. Mission Santa Clara, the Rose Garden, palm-lined walkways — clean direction, fast communication, private gallery delivery.",
   canonicalPath: "/grads/santa-clara",

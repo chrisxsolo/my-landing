@@ -29,7 +29,7 @@ export const revalidate = 3600;
 
 // ── SEO metadata (tab title + Google description) ────────────────────────────
 export const metadata: Metadata = {
-  title: "Family Pricing | soloxsnaps",
+  title: "Family Pricing",
   description: "Family photography pricing by Chris Solorzano — Bay Area family portraits.",
   alternates: { canonical: "/pricing/families" },
 };

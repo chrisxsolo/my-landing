@@ -13,7 +13,7 @@ const DESCRIPTION =
   "How to prepare for your graduation photo session — steaming your gown, hair and makeup, props, timing, and everything to do before shoot day.";
 
 export const metadata: Metadata = {
-  title: `${TITLE} | soloxsnaps`,
+  title: TITLE,
   description: DESCRIPTION,
   alternates: { canonical: PATH },
   openGraph: {

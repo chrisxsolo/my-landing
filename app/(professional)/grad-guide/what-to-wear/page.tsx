@@ -13,7 +13,7 @@ const DESCRIPTION =
   "What to wear for your graduation photos: the colors, fits, and styling that photograph beautifully under your cap and gown at Bay Area campuses.";
 
 export const metadata: Metadata = {
-  title: `${TITLE} | soloxsnaps`,
+  title: TITLE,
   description: DESCRIPTION,
   alternates: { canonical: PATH },
   openGraph: {

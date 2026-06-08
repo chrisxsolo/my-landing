@@ -21,7 +21,7 @@ const PAGE_DESCRIPTION =
   "Explore Chris Solorzano's favorite Bay Area photo locations for portraits, couples, creative shoots, beaches, South Bay, San Francisco, East Bay, and Peninsula sessions.";
 
 export const metadata: Metadata = {
-  title: `${PAGE_TITLE} | soloxsnaps`,
+  title: PAGE_TITLE,
   description: PAGE_DESCRIPTION,
   alternates: {
     canonical: PATH,

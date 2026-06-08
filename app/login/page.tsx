@@ -5,7 +5,7 @@ import LoginPanel from "@/app/components/login-panel";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Login | SoloXSnaps",
+  title: "Login",
   description: "Log in to your SoloXSnaps client portal.",
 };
 

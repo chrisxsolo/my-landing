@@ -6,7 +6,7 @@ const data: SchoolLandingData = {
   schoolShort: "SJSU",
   slug: "sjsu",
   city: "San Jose, CA",
-  metaTitle: "SJSU Graduation Photographer | San Jose State | soloxsnaps",
+  metaTitle: "SJSU Graduation Photographer | San Jose State",
   metaDescription:
     "Graduation portraits at San Jose State by Chris Solorzano. Tower Hall, the Event Center, campus quad — guided sessions, fast turnaround, private gallery delivery.",
   canonicalPath: "/grads/sjsu",

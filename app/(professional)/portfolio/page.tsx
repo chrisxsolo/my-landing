@@ -31,7 +31,7 @@ import { getPortfolioData } from "@/lib/professionalData";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Portfolio | soloxsnaps",
+  title: "Portfolio",
   description: "Portfolio of Bay Area graduation and family photography by Chris Solorzano.",
   alternates: { canonical: "/portfolio" },
   openGraph: {

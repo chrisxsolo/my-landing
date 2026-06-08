@@ -10,7 +10,7 @@ import CouplesRateEstimator from "@/app/components/CouplesRateEstimator";
 export const revalidate = 3600;
 
 export const metadata: Metadata = {
-  title: "Couples Photography Pricing | SoloXSnaps",
+  title: "Couples Photography Pricing",
   description:
     "Bay Area couples photography pricing by Chris Solorzano — engagement sessions, proposal coverage, anniversary photos, and lifestyle portraits in San Francisco and beyond.",
   alternates: { canonical: "/pricing/couples" },

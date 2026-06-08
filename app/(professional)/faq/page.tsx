@@ -11,7 +11,7 @@ const FAQ_DESCRIPTION =
   "Common questions about photography sessions — booking, outfits, delivery, locations, and more, for portraits, couples, family, maternity, and creative shoots.";
 
 export const metadata: Metadata = {
-  title: "FAQ | soloxsnaps",
+  title: "FAQ",
   description: FAQ_DESCRIPTION,
   alternates: { canonical: "/faq" },
   openGraph: {

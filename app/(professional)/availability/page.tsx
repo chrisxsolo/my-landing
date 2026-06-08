@@ -32,16 +32,22 @@ import AvailabilityCalendar, { type AvailDate } from "./AvailabilityCalendar";
 
 export const revalidate = 300;
 
-const TITLE = "Bay Area Photography Availability | soloxsnaps";
+const PAGE_TITLE = "Bay Area Photography Availability";
+const SOCIAL_TITLE = `${PAGE_TITLE} | SoloXSnaps`;
 const DESCRIPTION =
   "See open dates for Bay Area graduation, couples, family, and portrait photography sessions with Chris Solorzano. Check availability before you book.";
 
 export const metadata: Metadata = {
-  title: TITLE,
+  title: PAGE_TITLE,
   description: DESCRIPTION,
   alternates: { canonical: "/availability" },
-  openGraph: { title: TITLE, description: DESCRIPTION, type: "website", siteName: "soloxsnaps" },
-  twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION },
+  openGraph: {
+    title: SOCIAL_TITLE,
+    description: DESCRIPTION,
+    type: "website",
+    siteName: "SoloXSnaps",
+  },
+  twitter: { card: "summary_large_image", title: SOCIAL_TITLE, description: DESCRIPTION },
 };
 
 export default async function AvailabilityPage() {

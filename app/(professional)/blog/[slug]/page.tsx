@@ -21,10 +21,10 @@ function formatDate(iso: string) {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const post = await getBlogPostBySlug("professional", slug);
-  if (!post) return { title: "Not Found | soloxsnaps" };
+  if (!post) return { title: "Not Found" };
   const description = post.meta_description || (post.body.length > 155 ? `${post.body.slice(0, 155).trim()}…` : post.body);
   return {
-    title: `${post.title} | soloxsnaps`,
+    title: post.title,
     description,
     alternates: { canonical: `/blog/${post.slug}` },
     keywords: post.meta_keywords ?? undefined,

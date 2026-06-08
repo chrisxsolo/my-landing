@@ -10,7 +10,7 @@ import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
 
 const SITE_URL = "https://www.soloxsnaps.com";
 const PATH = "/grad-guide";
-const TITLE = "Bay Area Graduation Photo Guide — Posing, Outfits & Prep | soloxsnaps";
+const TITLE = "Bay Area Graduation Photo Guide — Posing, Outfits & Prep";
 const DESCRIPTION =
   "Your complete guide to graduation photos in the Bay Area — posing tips, what to wear, how to prepare, and the best campus spots at SJSU, UC Berkeley, SF State, USF, and CSU East Bay.";
 

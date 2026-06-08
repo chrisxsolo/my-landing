@@ -13,7 +13,7 @@ const DESCRIPTION =
   "Where to shoot your graduation photos at SJSU, UC Berkeley, SF State, Cal State East Bay, and USF — the best spots on each Bay Area campus and when to show up.";
 
 export const metadata: Metadata = {
-  title: `${TITLE} | soloxsnaps`,
+  title: TITLE,
   description: DESCRIPTION,
   alternates: { canonical: PATH },
   openGraph: {

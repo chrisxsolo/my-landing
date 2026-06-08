@@ -11,7 +11,7 @@ const FAQ_DESCRIPTION =
   "Everything about graduation photography sessions — booking, caps & gowns, campus locations, props, delivery, and more.";
 
 export const metadata: Metadata = {
-  title: "Graduation FAQ | soloxsnaps",
+  title: "Graduation FAQ",
   description: FAQ_DESCRIPTION,
   alternates: { canonical: "/faq/graduation" },
   openGraph: {
