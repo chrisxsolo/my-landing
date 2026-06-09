@@ -1,7 +1,5 @@
 import Link from "next/link";
 import OptimizedPhoto from "@/app/components/OptimizedPhoto";
-import Testimonials from "@/app/components/Testimonials";
-import type { Testimonial } from "@/lib/testimonials";
 import type { FeaturedSession } from "@/lib/homepageData";
 import type { PortfolioImage } from "@/lib/professionalData";
 import styles from "@/app/(professional)/home.module.css";
@@ -90,14 +88,12 @@ export default function HomeStorySections({
   cardPortrait,
   storyImages,
   featuredSessions,
-  testimonials,
 }: {
   cardGrads: HomeImage;
   cardCouples: HomeImage;
   cardPortrait: HomeImage;
   storyImages: HomeImage[];
   featuredSessions: FeaturedSession[];
-  testimonials: Testimonial[];
 }) {
   return (
     <>
@@ -112,12 +108,6 @@ export default function HomeStorySections({
           </div>
         </div>
       </section>
-
-      <Testimonials
-        kicker="What clients say"
-        title="What clients say about their sessions"
-        items={testimonials.slice(0, 2)}
-      />
 
       <section id="sessions" className={`${styles.section} ${styles.tint} ${responsive.section}`}>
         <div className={`${styles.shell} ${responsive.shell}`}>

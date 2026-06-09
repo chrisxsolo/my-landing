@@ -1,0 +1,109 @@
+.header {
+  max-width: 680px;
+  margin: 0 auto 44px;
+  text-align: center;
+}
+
+.header .eyebrow,
+.header .copy {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+  align-items: stretch;
+}
+
+/* A single featured testimonial sits centered rather than stretched. */
+.solo {
+  grid-template-columns: minmax(0, 620px);
+  justify-content: center;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin: 0;
+  padding: 34px 32px;
+  background: var(--home-paper);
+  border: 1px solid var(--home-border);
+  border-radius: 18px;
+  box-shadow: var(--home-shadow);
+}
+
+.badge {
+  align-self: flex-start;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--home-accent-soft);
+  color: var(--home-accent-dark);
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.quote {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.quoteText {
+  margin: 0;
+  color: var(--home-ink);
+  font-size: 17px;
+  line-height: 1.72;
+  text-wrap: pretty;
+}
+
+.cite {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.name {
+  color: var(--home-ink);
+  font-size: 15px;
+  font-weight: 850;
+  font-style: normal;
+}
+
+.role {
+  color: var(--home-muted);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.cta {
+  margin-top: 48px;
+  text-align: center;
+}
+
+.ctaHeading {
+  margin: 0 0 18px;
+  color: var(--home-ink);
+  font-size: clamp(1.4rem, 3vw, 2rem);
+  font-weight: 850;
+  letter-spacing: -0.02em;
+}
+
+.cta .actions {
+  justify-content: center;
+}
+
+@media (max-width: 760px) {
+  .grid {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+  .card {
+    padding: 28px 24px;
+  }
+}

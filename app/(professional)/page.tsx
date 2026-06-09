@@ -5,6 +5,7 @@ import HomeFinalCTA from "@/app/components/HomeFinalCTA";
 import HomeHero from "@/app/components/HomeHero";
 import HomepageFAQ from "@/app/components/HomepageFAQ";
 import HomeStorySections from "@/app/components/HomeStorySections";
+import HomeTestimonials from "@/app/components/HomeTestimonials";
 import { FAQS } from "@/app/(professional)/faq/faqData";
 import { C } from "@/lib/colors";
 import { buildFeaturedSessions, resolveHomepageImages } from "@/lib/homepageData";
@@ -13,7 +14,7 @@ import {
   getPortfolioData,
   getSiteSettings,
 } from "@/lib/professionalData";
-import { getApprovedTestimonials } from "@/lib/testimonialsData";
+import { getFeaturedTestimonials } from "@/lib/testimonialsData";
 import styles from "@/app/(professional)/home.module.css";
 import pageStyles from "@/app/(professional)/HomePage.module.css";
 
@@ -80,15 +81,15 @@ function getHomepageFaqItems() {
 
 async function getHomepageTestimonials() {
   try {
-    return await getApprovedTestimonials(3);
+    return await getFeaturedTestimonials(6);
   } catch (error) {
-    console.error("Failed to load approved homepage testimonials", error);
+    console.error("Failed to load featured homepage testimonials", error);
     return [];
   }
 }
 
 export default async function ProfessionalHomePage() {
-  const [{ images }, settings, posts, approvedTestimonials] = await Promise.all([
+  const [{ images }, settings, posts, featuredTestimonials] = await Promise.all([
     getPortfolioData(),
     getSiteSettings(),
     getBlogPostSummaries("professional"),
@@ -123,13 +124,9 @@ export default async function ProfessionalHomePage() {
         cardPortrait={home.cardPortrait}
         storyImages={home.storyImages}
         featuredSessions={featuredSessions}
-        testimonials={approvedTestimonials.map((testimonial) => ({
-          quote: testimonial.message,
-          name: testimonial.display_name,
-          context: testimonial.session_type ?? "SoloXSnaps session",
-        }))}
       />
       <HomeConversionSections aboutPortrait={home.aboutPortrait} />
+      <HomeTestimonials testimonials={featuredTestimonials} />
       <HomepageFAQ items={getHomepageFaqItems()} />
       <HomeFinalCTA image={home.finalCta} />
     </main>

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { C } from "@/lib/colors";
 import {
+  type AdminTestimonialUpdates,
   buildTestimonialDisplayName,
   TESTIMONIAL_SOURCES,
   TESTIMONIAL_STATUSES,
@@ -25,6 +26,8 @@ type Testimonial = {
   source: TestimonialSource;
   gallery_id: string | null;
   session_type: string | null;
+  featured: boolean;
+  display_order: number | null;
   admin_notes: string | null;
   submitted_at: string;
   reviewed_at: string | null;
@@ -51,6 +54,14 @@ function formatDate(value: string | null): string {
   return new Intl.DateTimeFormat("en-US", {
     month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit",
   }).format(new Date(value));
+}
+
+function messageForUpdate(updates: AdminTestimonialUpdates): string {
+  if (updates.status) return `Testimonial marked ${STATUS_LABELS[updates.status].toLowerCase()}`;
+  if (updates.published !== undefined) return updates.published ? "Testimonial published" : "Testimonial unpublished";
+  if (updates.featured !== undefined) return updates.featured ? "Added to homepage" : "Removed from homepage";
+  if (updates.session_type !== undefined || updates.display_order !== undefined) return "Homepage details saved";
+  return "Notes saved";
 }
 
 function StatusBadge({ status }: { status: TestimonialStatus }) {
@@ -115,7 +126,7 @@ export default function TestimonialsTab({ showToast }: Props) {
     setNotes(updated.admin_notes ?? "");
   }
 
-  async function updateTestimonial(updates: { status?: TestimonialStatus; admin_notes?: string | null }) {
+  async function updateTestimonial(updates: AdminTestimonialUpdates) {
     if (!selected || saving) return;
     setSaving(true);
     try {
@@ -127,10 +138,10 @@ export default function TestimonialsTab({ showToast }: Props) {
       const body = await response.json();
       if (!response.ok) throw new Error(body.error);
       replaceRow(body.testimonial);
-      const message = updates.status
-        ? `Testimonial marked ${STATUS_LABELS[updates.status].toLowerCase()}`
-        : "Notes saved";
-      showToast(message);
+      // Publishing, featuring, ordering, and status changes all affect the
+      // public homepage section — refresh its cache so edits appear immediately.
+      fetch("/api/admin/revalidate", { method: "POST" }).catch(() => {});
+      showToast(messageForUpdate(updates));
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Update failed", false);
     } finally {
@@ -243,6 +254,7 @@ export default function TestimonialsTab({ showToast }: Props) {
           onClose={() => setSelected(null)}
           onStatus={(status) => updateTestimonial({ status })}
           onSaveNotes={() => updateTestimonial({ admin_notes: notes })}
+          onUpdate={updateTestimonial}
           onDeleteConfirm={setDeleteConfirm}
           onDelete={deleteTestimonial}
         />
@@ -260,9 +272,120 @@ type DetailProps = {
   onClose: () => void;
   onStatus: (status: TestimonialStatus) => void;
   onSaveNotes: () => void;
+  onUpdate: (updates: AdminTestimonialUpdates) => void;
   onDeleteConfirm: (value: boolean) => void;
   onDelete: () => void;
 };
+
+function HomepageControls({ row, saving, onUpdate }: { row: Testimonial; saving: boolean; onUpdate: (updates: AdminTestimonialUpdates) => void }) {
+  const [sessionType, setSessionType] = useState(row.session_type ?? "");
+  const [displayOrder, setDisplayOrder] = useState(row.display_order === null ? "" : String(row.display_order));
+  const isApproved = row.status === "approved";
+  const published = row.published_at !== null;
+
+  function saveDetails() {
+    const trimmedOrder = displayOrder.trim();
+    onUpdate({
+      session_type: sessionType.trim() || null,
+      display_order: trimmedOrder === "" ? null : Number(trimmedOrder),
+    });
+  }
+
+  const orderInvalid = displayOrder.trim() !== "" && !/^\d{1,4}$/.test(displayOrder.trim());
+
+  return (
+    <div className="mt-6 rounded-2xl p-5" style={{ background: C.white, border: `1px solid ${C.warmEdge}` }}>
+      <p className="text-sm font-black" style={{ color: C.ink }}>Homepage visibility</p>
+      <p className="mt-1 text-xs" style={{ color: C.muted }}>
+        Approved, published, and featured testimonials appear in the homepage testimonials section.
+      </p>
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        <button
+          type="button"
+          disabled={saving}
+          onClick={() => onUpdate({ published: !published })}
+          className="rounded-full px-4 py-2 text-xs font-black disabled:opacity-40"
+          style={{ color: published ? C.muted : C.success, background: published ? C.p1_06 : C.p1_10 }}
+        >
+          {published ? "Unpublish" : "Publish"}
+        </button>
+        <button
+          type="button"
+          disabled={saving || !isApproved}
+          onClick={() => onUpdate({ featured: !row.featured })}
+          className="rounded-full px-4 py-2 text-xs font-black disabled:opacity-40"
+          style={{ color: row.featured ? C.muted : C.p1, background: row.featured ? C.p1_06 : C.p1_15 }}
+        >
+          {row.featured ? "Remove from featured" : "Feature on homepage"}
+        </button>
+      </div>
+      {!isApproved && (
+        <p className="mt-2 text-xs" style={{ color: C.mutedSoft }}>Approve this testimonial before featuring it.</p>
+      )}
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_120px]">
+        <div>
+          <label htmlFor="testimonial-session-type" className="text-[11px] font-black uppercase tracking-wider" style={{ color: C.mutedSoft }}>Session badge</label>
+          <input
+            id="testimonial-session-type"
+            type="text"
+            maxLength={120}
+            value={sessionType}
+            placeholder="e.g. SJSU Graduation Session"
+            onChange={(event) => setSessionType(event.target.value)}
+            className="mt-1 w-full rounded-xl px-3 py-2.5 text-sm outline-none"
+            style={{ color: C.ink, background: C.white, border: `1px solid ${C.warmEdge}` }}
+          />
+        </div>
+        <div>
+          <label htmlFor="testimonial-display-order" className="text-[11px] font-black uppercase tracking-wider" style={{ color: C.mutedSoft }}>Order</label>
+          <input
+            id="testimonial-display-order"
+            type="number"
+            min={0}
+            max={9999}
+            value={displayOrder}
+            placeholder="1"
+            onChange={(event) => setDisplayOrder(event.target.value)}
+            className="mt-1 w-full rounded-xl px-3 py-2.5 text-sm outline-none"
+            style={{ color: C.ink, background: C.white, border: `1px solid ${C.warmEdge}` }}
+          />
+        </div>
+      </div>
+      <button
+        type="button"
+        disabled={saving || orderInvalid}
+        onClick={saveDetails}
+        className="mt-3 rounded-full px-4 py-2 text-xs font-black disabled:opacity-50"
+        style={{ background: C.grad12, color: C.white }}
+      >
+        Save homepage details
+      </button>
+    </div>
+  );
+}
+
+function PublicPreview({ row }: { row: Testimonial }) {
+  const displayName = buildTestimonialDisplayName(row.first_name, row.last_name, row.display_name_preference);
+  return (
+    <div className="mt-6">
+      <p className="text-sm font-black" style={{ color: C.ink }}>Public preview</p>
+      <figure className="mt-2 flex flex-col gap-4 rounded-2xl p-5" style={{ background: C.page, border: `1px solid ${C.warmEdge}` }}>
+        {row.session_type && (
+          <span className="self-start rounded-full px-3 py-1.5 text-[10px] font-black uppercase tracking-wider" style={{ background: C.proAccentSoft, color: C.proAccentDark }}>
+            {row.session_type}
+          </span>
+        )}
+        <blockquote className="m-0 text-[15px] leading-7" style={{ color: C.ink }}>{`“${row.message}”`}</blockquote>
+        <figcaption className="flex flex-col">
+          <span className="text-sm font-black" style={{ color: C.ink }}>{displayName}</span>
+          <span className="text-xs font-semibold" style={{ color: C.muted }}>SoloXSnaps Client</span>
+        </figcaption>
+      </figure>
+    </div>
+  );
+}
 
 function TestimonialDetail(props: DetailProps) {
   const row = props.testimonial;
@@ -307,6 +430,9 @@ function TestimonialDetail(props: DetailProps) {
             </button>
           ))}
         </div>
+
+        <HomepageControls row={row} saving={props.saving} onUpdate={props.onUpdate} />
+        <PublicPreview row={row} />
 
         <div className="mt-7 border-t pt-5" style={{ borderColor: C.warmEdge }}>
           {props.deleteConfirm ? (

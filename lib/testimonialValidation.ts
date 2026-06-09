@@ -152,19 +152,30 @@ export function buildTestimonialDisplayName(
   return `${first} ${last.charAt(0).toUpperCase()}.`;
 }
 
+export type AdminTestimonialUpdates = {
+  status?: TestimonialStatus;
+  admin_notes?: string | null;
+  published?: boolean;
+  featured?: boolean;
+  display_order?: number | null;
+  session_type?: string | null;
+};
+
+const ADMIN_PATCH_KEYS = ["status", "admin_notes", "published", "featured", "display_order", "session_type"];
+
 export function validateAdminTestimonialPatch(value: unknown): ValidationResult<{
   id: string;
-  updates: { status?: TestimonialStatus; admin_notes?: string | null };
+  updates: AdminTestimonialUpdates;
 }> {
   if (!isRecord(value) || typeof value.id !== "string" || !UUID_PATTERN.test(value.id)) {
     return { ok: false, error: "A valid testimonial id is required." };
   }
   if (!isRecord(value.updates)) return { ok: false, error: "updates must be an object." };
-  const unknown = Object.keys(value.updates).find((key) => !["status", "admin_notes"].includes(key));
+  const unknown = Object.keys(value.updates).find((key) => !ADMIN_PATCH_KEYS.includes(key));
   if (unknown) return { ok: false, error: `Field "${unknown}" is not allowed.` };
   if (Object.keys(value.updates).length === 0) return { ok: false, error: "At least one update is required." };
 
-  const updates: { status?: TestimonialStatus; admin_notes?: string | null } = {};
+  const updates: AdminTestimonialUpdates = {};
   if (value.updates.status !== undefined) {
     if (typeof value.updates.status !== "string" || !STATUS_SET.has(value.updates.status)) {
       return { ok: false, error: "status is not allowed." };
@@ -178,6 +189,29 @@ export function validateAdminTestimonialPatch(value: unknown): ValidationResult<
     const notes = cleanText(value.updates.admin_notes);
     if (notes.length > 2000) return { ok: false, error: "admin_notes is too long." };
     updates.admin_notes = notes || null;
+  }
+  if (value.updates.published !== undefined) {
+    if (typeof value.updates.published !== "boolean") return { ok: false, error: "published must be a boolean." };
+    updates.published = value.updates.published;
+  }
+  if (value.updates.featured !== undefined) {
+    if (typeof value.updates.featured !== "boolean") return { ok: false, error: "featured must be a boolean." };
+    updates.featured = value.updates.featured;
+  }
+  if (value.updates.display_order !== undefined) {
+    if (value.updates.display_order === null) {
+      updates.display_order = null;
+    } else if (typeof value.updates.display_order !== "number" || !Number.isInteger(value.updates.display_order) || value.updates.display_order < 0 || value.updates.display_order > 9999) {
+      return { ok: false, error: "display_order must be an integer between 0 and 9999." };
+    } else {
+      updates.display_order = value.updates.display_order;
+    }
+  }
+  if (value.updates.session_type !== undefined) {
+    if (typeof value.updates.session_type !== "string" && value.updates.session_type !== null) {
+      return { ok: false, error: "session_type must be a string or null." };
+    }
+    updates.session_type = sanitizeContext(value.updates.session_type, 120, /[^a-zA-Z0-9 &'()./-]/g);
   }
   return { ok: true, data: { id: value.id, updates } };
 }
