@@ -324,6 +324,30 @@
   min-height: 430px;
 }
 
+/* Keep the lower text panel compact so more of the photo stays visible */
+.sessionCard::after {
+  background: linear-gradient(180deg, transparent 52%, color-mix(in srgb, var(--home-ink) 80%, transparent) 88%);
+}
+
+.sessionBody {
+  padding: 22px;
+}
+
+.sessionBody h3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.sessionBody p {
+  margin-top: 8px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 .sessionMeta {
   display: block;
   margin-bottom: 10px;
