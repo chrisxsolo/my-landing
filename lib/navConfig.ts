@@ -71,6 +71,7 @@ export const DEFAULT_NAV_CONFIG: NavConfig = {
       visible: true,
       children: [
         { id: "grad-guide", label: "Grad guide", href: "/grad-guide" },
+        { id: "family-guide", label: "Family guide", href: "/family-guide" },
         { id: "locations", label: "Locations", href: "/bay-area-locations" },
         { id: "faq", label: "FAQ", href: "/faq" },
       ],

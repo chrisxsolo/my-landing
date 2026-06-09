@@ -332,6 +332,38 @@ export async function getBlogPostSummaries(category: "professional" | "journal")
   }
 }
 
+// Generalized version of getBlogPostSummaries for an arbitrary category tag
+// (e.g. "family-photography"). Tries the `sites` array first (cross-posting),
+// then falls back to the legacy single `category` column. Returns [] on error so
+// category archive pages always render.
+export async function getBlogPostSummariesForCategory(category: string) {
+  try {
+    const supabase = createSupabaseServerClient();
+    const { data, error } = await supabase
+      .from("blog_posts")
+      .select(BLOG_SUMMARY_COLUMNS)
+      .contains("sites", [category])
+      .order("published_at", { ascending: false });
+
+    if (error) {
+      const fallback = await supabase
+        .from("blog_posts")
+        .select(BLOG_SUMMARY_COLUMNS)
+        .eq("category", category)
+        .order("published_at", { ascending: false });
+      if (fallback.error && !isMissingColumnError(fallback.error)) {
+        console.error(`Failed to load ${category} post summaries`, fallback.error);
+      }
+      return (fallback.data ?? []) as unknown as BlogPostSummary[];
+    }
+
+    return (data ?? []) as unknown as BlogPostSummary[];
+  } catch (error) {
+    console.error(`Failed to load ${category} post summaries`, error);
+    return [];
+  }
+}
+
 export async function getBlogPostBySlug(category: "professional" | "journal", slug: string) {
   try {
     const supabase = createSupabaseServerClient();

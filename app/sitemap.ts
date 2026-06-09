@@ -1,5 +1,7 @@
 import type { MetadataRoute } from "next";
-import { getBlogPostSummaries } from "@/lib/professionalData";
+import { getBlogPostSummaries, getBlogPostSummariesForCategory } from "@/lib/professionalData";
+import { getPublishedFamilyLocations } from "@/lib/familyGuide/locations";
+import { getBlogCategorySlugs } from "@/lib/familyGuide/journal";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // app/sitemap.ts — programmatic sitemap served at /sitemap.xml
@@ -41,6 +43,13 @@ const STATIC_ROUTES: Array<{
   { path: "/grad-guide/how-to-prepare", changeFrequency: "monthly", priority: 0.7 },
   { path: "/grad-guide/posing", changeFrequency: "monthly", priority: 0.7 },
   { path: "/grad-guide/campus-spots", changeFrequency: "monthly", priority: 0.7 },
+  { path: "/family-guide", changeFrequency: "monthly", priority: 0.8 },
+  { path: "/family-guide/locations", changeFrequency: "monthly", priority: 0.7 },
+  { path: "/family-guide/what-to-wear", changeFrequency: "monthly", priority: 0.6 },
+  { path: "/family-guide/how-to-prepare", changeFrequency: "monthly", priority: 0.6 },
+  { path: "/family-guide/what-to-expect", changeFrequency: "monthly", priority: 0.6 },
+  { path: "/family-guide/best-time-for-family-photos", changeFrequency: "monthly", priority: 0.6 },
+  { path: "/family-guide/faq", changeFrequency: "monthly", priority: 0.6 },
   { path: "/bay-area-locations", changeFrequency: "monthly", priority: 0.7 },
   { path: "/faq", changeFrequency: "monthly", priority: 0.6 },
   { path: "/faq/graduation", changeFrequency: "monthly", priority: 0.7 },
@@ -75,5 +84,29 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.6,
   }));
 
-  return [...staticEntries, ...blogEntries];
+  // Individual family-location pages — generated from the published location
+  // registry, so new locations appear in the sitemap automatically.
+  const familyLocationEntries: MetadataRoute.Sitemap = getPublishedFamilyLocations().map((loc) => ({
+    url: `${SITE_URL}${loc.canonicalPath}`,
+    changeFrequency: "monthly",
+    priority: 0.7,
+  }));
+
+  // Blog category archives (e.g. the family journal) — included only once a
+  // category has at least one post, so empty/thin archives stay out of the index.
+  const categoryResults = await Promise.all(
+    getBlogCategorySlugs().map(async (slug) => ({
+      slug,
+      count: (await getBlogPostSummariesForCategory(slug)).length,
+    })),
+  );
+  const categoryEntries: MetadataRoute.Sitemap = categoryResults
+    .filter((c) => c.count > 0)
+    .map((c) => ({
+      url: `${SITE_URL}/blog/category/${c.slug}`,
+      changeFrequency: "weekly",
+      priority: 0.6,
+    }));
+
+  return [...staticEntries, ...familyLocationEntries, ...categoryEntries, ...blogEntries];
 }
