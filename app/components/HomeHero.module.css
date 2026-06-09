@@ -357,11 +357,6 @@
     font-size: 10px;
   }
 
-  .brand,
-  .content h1 {
-    transform: translateY(-54px);
-  }
-
   .actions {
     width: 100%;
     display: grid;
