@@ -8,20 +8,21 @@
 //   4. Package     — Extended Family Session (photo left, text right)
 //   5. CTA strip   — "Ready for family photos?" at the bottom
 //
-// TO CHANGE THE PHOTO SIZES:
-//   → pricingCSS({ mediaMinHeight: 560 })  ← desktop photo height in px
-//   → pricingCSS({ mediaMinHeightMobile: 390 })  ← mobile photo height
-//   → heroPanel: true keeps the 2-column hero with the $350 side panel
+// TO CHANGE THE PHOTO SIZES: edit the `mediaVars` object below
+//   → --pricing-media-h         desktop photo height
+//   → --pricing-media-h-mobile  mobile photo height
 //
-// ALL SHARED STYLES live in lib/proStyles.ts
+// ALL SHARED STYLES live in app/(professional)/pricing/Pricing.module.css
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { Metadata } from "next";
 import Link from "next/link";
 import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 import { getPortfolioData, getSiteSettings } from "@/lib/professionalData";
+import type { CSSProperties } from "react";
 import { selectDistinctImageUrl } from "@/lib/photoMetadata";
-import { pricingCSS, anim } from "@/lib/proStyles";
+import { anim } from "@/lib/proStyles";
+import styles from "@/app/(professional)/pricing/Pricing.module.css";
 import { formatCurrency } from "@/lib/pricing";
 import { PRICING_CATALOG, getBookingPolicyItems } from "@/lib/pricingCatalog";
 
@@ -36,11 +37,12 @@ export const metadata: Metadata = {
   alternates: { canonical: "/pricing/families" },
 };
 
-// ── CSS: generated from shared factory in lib/proStyles.ts ───────────────────
-// heroPanel: false  → no 2-column hero grid (dark hero handles layout now)
-// mediaMinHeight    → desktop package photo height (px)
-// mediaMinHeightMobile → mobile photo height (px)
-const CSS = pricingCSS({ mediaMinHeight: 560, mediaMinHeightMobile: 390 });
+// ── PACKAGE PHOTO SIZING ─────────────────────────────────────────────────────
+// Read by Pricing.module.css (.pricingPackageMedia) via CSS custom properties.
+const mediaVars = {
+  "--pricing-media-h": "560px",
+  "--pricing-media-h-mobile": "390px",
+} as CSSProperties;
 const familyPricing = PRICING_CATALOG.families;
 
 // ── ADD-ONS LIST ──────────────────────────────────────────────────────────────
@@ -90,8 +92,7 @@ export default async function FamilyPricingPage() {
   const heroImage = selectDistinctImageUrl(familyImages, [sessionImage, extendedImage], sessionImage);
 
   return (
-    <main className="pricing-modern">
-      <style>{CSS}</style>
+    <main className={styles.pricingModern} style={mediaVars}>
 
       {/* ── DARK PHOTO HERO ───────────────────────────────────────────────────
            Full-bleed photo background with dark gradient overlay + grain texture.
@@ -107,10 +108,10 @@ export default async function FamilyPricingPage() {
              → Chips:            edit the pricing-chip spans in the footer row
              → Heading text:     edit the h1 below */}
       <section
-        className="pricing-hero-dark"
+        className={styles.pricingHeroDark}
       >
         {heroImage && (
-          <div className="pricing-hero-photo" aria-hidden="true">
+          <div className={styles.pricingHeroPhoto} aria-hidden="true">
             <OptimizedPhoto
               src={heroImage}
               alt=""
@@ -120,50 +121,50 @@ export default async function FamilyPricingPage() {
             />
           </div>
         )}
-        <div className="pricing-shell">
+        <div className={styles.pricingShell}>
           {/* Small eyebrow label — change text here */}
-          <p className="pricing-kicker">Family pricing</p>
+          <p className={styles.pricingKicker}>Family pricing</p>
 
           {/* Big display heading — change text here */}
-          <h1 className="pricing-title">
+          <h1 className={styles.pricingTitle}>
             Clean family photos without turning the day into a production.
           </h1>
 
           {/* Subtext — change text here */}
-          <p className="pricing-copy">
+          <p className={styles.pricingCopy}>
             Relaxed sessions with enough structure for kids, grandparents, and everyone who says they feel awkward in photos.
           </p>
 
           {/* ── HERO FOOTER: price + chips + book button ────────────────────
                Sits at the very bottom of the dark hero.
                To remove divider: delete the span.pricing-hero-divider. */}
-          <div className="pricing-hero-dark-footer">
+          <div className={styles.pricingHeroDarkFooter}>
             {/* Starting price — change "$350" and label here */}
-            <div className="pricing-hero-price-block">
-              <span className="pricing-hero-price-label">starting from</span>
-              <span className="pricing-hero-price-big">{formatCurrency(familyPricing.packages.standard.price)}</span>
+            <div className={styles.pricingHeroPriceBlock}>
+              <span className={styles.pricingHeroPriceLabel}>starting from</span>
+              <span className={styles.pricingHeroPriceBig}>{formatCurrency(familyPricing.packages.standard.price)}</span>
             </div>
 
-            <span className="pricing-hero-divider" aria-hidden="true" />
+            <span className={styles.pricingHeroDivider} aria-hidden="true" />
 
             {/* Chips — edit or add/remove spans here */}
-            <div className="pricing-chip-row" style={{ marginTop: 0 }}>
-              <span className="pricing-chip">Guided session</span>
-              <span className="pricing-chip">Bay Area locations</span>
-              <span className="pricing-chip">Family-friendly pacing</span>
+            <div className={styles.pricingChipRow} style={{ marginTop: 0 }}>
+              <span className={styles.pricingChip}>Guided session</span>
+              <span className={styles.pricingChip}>Bay Area locations</span>
+              <span className={styles.pricingChip}>Family-friendly pacing</span>
             </div>
 
             {/* CTA button — links to the contact/booking page */}
-            <Link href="/contact" className="pricing-link">Book a session</Link>
+            <Link href="/contact" className={styles.pricingLink}>Book a session</Link>
           </div>
         </div>
       </section>
 
       {/* ── INFO CARDS (Booking / Session flow / Travel) ──────────────────────
            Defined in the infoCards array above — edit that to change content. */}
-      <section className="pricing-shell pricing-info-grid" aria-label="Booking details">
+      <section className={`${styles.pricingShell} ${styles.pricingInfoGrid}`} aria-label="Booking details">
         {infoCards.map(({ heading, items, delay }) => (
-          <div key={heading} className="pricing-info-card" style={anim.fadeUp(delay)}>
+          <div key={heading} className={styles.pricingInfoCard} style={anim.fadeUp(delay)}>
             <h2>{heading}</h2>
             {items.map((item) => <p key={item}>{item}</p>)}
           </div>
@@ -175,11 +176,11 @@ export default async function FamilyPricingPage() {
            To change included items: edit the array in the ul below.
            To change the price: find "$350" and update.
            sessionImage comes from Supabase (see image logic above). */}
-      <section className="pricing-shell pricing-package">
-        <div className="pricing-package-content">
-          <p className="pricing-kicker">Quick and clean</p>
+      <section className={`${styles.pricingShell} ${styles.pricingPackage}`}>
+        <div className={styles.pricingPackageContent}>
+          <p className={styles.pricingKicker}>Quick and clean</p>
           <h2>Family Session</h2>
-          <p className="pricing-copy">
+          <p className={styles.pricingCopy}>
             Ideal for families who want updated photos without a long session or overstimulation.
           </p>
 
@@ -196,29 +197,29 @@ export default async function FamilyPricingPage() {
           </ul>
 
           {/* Add-ons list — defined in the addOns array at the top of the file */}
-          <div className="pricing-addons">
-            <p className="pricing-kicker">Add-ons</p>
+          <div className={styles.pricingAddons}>
+            <p className={styles.pricingKicker}>Add-ons</p>
             {addOns.map(({ label, displayPrice }) => (
-              <div key={label} className="pricing-row">
+              <div key={label} className={styles.pricingRow}>
                 <span>{label}</span><span>{displayPrice}</span>
               </div>
             ))}
           </div>
 
           {/* Investment block — change "$350" and "starting from" here */}
-          <div className="pricing-investment">
+          <div className={styles.pricingInvestment}>
             <div>
-              <p className="pricing-kicker">Investment</p>
-              <p className="pricing-price">{formatCurrency(familyPricing.packages.standard.price)}</p>
-              <p className="pricing-meta">starting from</p>
+              <p className={styles.pricingKicker}>Investment</p>
+              <p className={styles.pricingPrice}>{formatCurrency(familyPricing.packages.standard.price)}</p>
+              <p className={styles.pricingMeta}>starting from</p>
             </div>
-            <Link href="/contact" className="pricing-link">Book this session</Link>
+            <Link href="/contact" className={styles.pricingLink}>Book this session</Link>
           </div>
         </div>
 
         {/* Session photo — set via Supabase site_settings.pricing_family_session_image */}
         {sessionImage && (
-          <div className="pricing-package-media">
+          <div className={styles.pricingPackageMedia}>
             <OptimizedPhoto
               src={sessionImage}
               alt="Bay Area family portrait by soloxsnaps"
@@ -232,10 +233,10 @@ export default async function FamilyPricingPage() {
            data-reverse="true" = photo on LEFT, text on RIGHT.
            extendedImage comes from Supabase (see image logic above).
            To change the price: find "$500" below and update. */}
-      <section className="pricing-shell pricing-package" data-reverse="true">
+      <section className={`${styles.pricingShell} ${styles.pricingPackage}`} data-reverse="true">
         {/* Extended session photo — set via Supabase site_settings.pricing_family_extended_image */}
         {extendedImage && (
-          <div className="pricing-package-media">
+          <div className={styles.pricingPackageMedia}>
             <OptimizedPhoto
               src={extendedImage}
               alt="Extended family portrait by soloxsnaps"
@@ -244,10 +245,10 @@ export default async function FamilyPricingPage() {
           </div>
         )}
 
-        <div className="pricing-package-content">
-          <p className="pricing-kicker">More breathing room</p>
+        <div className={styles.pricingPackageContent}>
+          <p className={styles.pricingKicker}>More breathing room</p>
           <h2>Extended Family Session</h2>
-          <p className="pricing-copy">
+          <p className={styles.pricingCopy}>
             Best for larger families, younger kids, or anyone who wants more variety and flexibility.
           </p>
 
@@ -265,23 +266,23 @@ export default async function FamilyPricingPage() {
           </ul>
 
           {/* Add-ons list — same list used for both packages */}
-          <div className="pricing-addons">
-            <p className="pricing-kicker">Add-ons</p>
+          <div className={styles.pricingAddons}>
+            <p className={styles.pricingKicker}>Add-ons</p>
             {addOns.map(({ label, displayPrice }) => (
-              <div key={label} className="pricing-row">
+              <div key={label} className={styles.pricingRow}>
                 <span>{label}</span><span>{displayPrice}</span>
               </div>
             ))}
           </div>
 
           {/* Investment block — change "$500" and "starting from" here */}
-          <div className="pricing-investment">
+          <div className={styles.pricingInvestment}>
             <div>
-              <p className="pricing-kicker">Investment</p>
-              <p className="pricing-price">{formatCurrency(familyPricing.packages.extended.price)}</p>
-              <p className="pricing-meta">starting from</p>
+              <p className={styles.pricingKicker}>Investment</p>
+              <p className={styles.pricingPrice}>{formatCurrency(familyPricing.packages.extended.price)}</p>
+              <p className={styles.pricingMeta}>starting from</p>
             </div>
-            <Link href="/contact" className="pricing-link">Book this session</Link>
+            <Link href="/contact" className={styles.pricingLink}>Book this session</Link>
           </div>
         </div>
       </section>
@@ -289,13 +290,13 @@ export default async function FamilyPricingPage() {
       {/* ── BOTTOM CTA STRIP ──────────────────────────────────────────────────
            The panel at the very bottom before the footer.
            To change the heading: edit the h2 below. */}
-      <section className="pricing-shell pricing-cta">
-        <div className="pricing-cta-panel">
+      <section className={`${styles.pricingShell} ${styles.pricingCta}`}>
+        <div className={styles.pricingCtaPanel}>
           <div>
-            <p className="pricing-kicker">Ready for family photos?</p>
-            <h2 className="pricing-title" style={{ fontSize: 38 }}>Send the people, date, and location.</h2>
+            <p className={styles.pricingKicker}>Ready for family photos?</p>
+            <h2 className={styles.pricingTitle} style={{ fontSize: 38 }}>Send the people, date, and location.</h2>
           </div>
-          <Link href="/contact" className="pricing-link">Inquire now</Link>
+          <Link href="/contact" className={styles.pricingLink}>Inquire now</Link>
         </div>
       </section>
     </main>

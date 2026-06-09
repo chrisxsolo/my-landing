@@ -30,7 +30,7 @@ const nextConfig: NextConfig = {
       { source: "/booking", destination: "/availability", permanent: true },
       { source: "/booking-process", destination: "/", permanent: true },
       { source: "/journal", destination: "/blog", permanent: true },
-      { source: "/journal/:slug", destination: "/blog", permanent: true },
+      { source: "/journal/:slug", destination: "/blog/:slug", permanent: true },
     ];
   },
 };

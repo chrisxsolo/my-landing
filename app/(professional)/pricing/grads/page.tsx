@@ -8,20 +8,22 @@
 //   4. Package     — Group Grad Package (photo left, text right)
 //   5. CTA strip   — "Ready for grad photos?" at the bottom
 //
-// TO CHANGE THE PHOTO SIZES:
-//   → pricingCSS({ mediaMinHeight: 620 })  ← desktop photo height in px
-//   → pricingCSS({ mediaMinHeightMobile: 420 })  ← mobile photo height
-//   → pricingCSS({ mediaObjectPosition: "center top" })  ← which part of photo shows
+// TO CHANGE THE PHOTO SIZES: edit the `mediaVars` object below
+//   → --pricing-media-h         desktop photo height
+//   → --pricing-media-h-mobile  mobile photo height
+//   → --pricing-media-pos       which part of the photo shows (object-position)
 //
-// ALL SHARED STYLES live in lib/proStyles.ts
+// ALL SHARED STYLES live in app/(professional)/pricing/Pricing.module.css
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { Metadata } from "next";
+import type { CSSProperties } from "react";
 import Link from "next/link";
 import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 import { getPortfolioData, getSiteSettings } from "@/lib/professionalData";
 import { selectDistinctImageUrl } from "@/lib/photoMetadata";
-import { pricingCSS, anim } from "@/lib/proStyles";
+import { anim } from "@/lib/proStyles";
+import styles from "@/app/(professional)/pricing/Pricing.module.css";
 import GraduationRateEstimator from "@/app/components/GraduationRateEstimator";
 import { formatCurrency } from "@/lib/pricing";
 import { BOOKING_POLICY, PRICING_CATALOG, getBookingPolicyItems } from "@/lib/pricingCatalog";
@@ -37,11 +39,16 @@ export const metadata: Metadata = {
   alternates: { canonical: "/pricing/grads" },
 };
 
-// ── CSS: generated from shared factory in lib/proStyles.ts ───────────────────
-// mediaMinHeight    → desktop package photo height (px)
-// mediaMinHeightMobile → mobile photo height (px)
-// mediaObjectPosition  → "center top" keeps faces in frame on portrait crops
-const CSS = pricingCSS({ mediaMinHeight: 620, mediaMinHeightMobile: 420, mediaObjectPosition: "center top" });
+// ── PACKAGE PHOTO SIZING ─────────────────────────────────────────────────────
+// Read by Pricing.module.css (.pricingPackageMedia) via CSS custom properties.
+//   --pricing-media-h        → desktop package photo height
+//   --pricing-media-h-mobile → mobile photo height
+//   --pricing-media-pos      → "center top" keeps faces in frame on portrait crops
+const mediaVars = {
+  "--pricing-media-h": "620px",
+  "--pricing-media-h-mobile": "420px",
+  "--pricing-media-pos": "center top",
+} as CSSProperties;
 const graduationPricing = PRICING_CATALOG.graduation;
 
 // ── ADD-ONS LIST ──────────────────────────────────────────────────────────────
@@ -115,9 +122,7 @@ export default async function GradPricingPage() {
   const heroImage = selectDistinctImageUrl(gradImages, [packageImage, groupImage], packageImage);
 
   return (
-    <main className="pricing-modern">
-      <style>{CSS}</style>
-
+    <main className={styles.pricingModern} style={mediaVars}>
       {/* ── DARK PHOTO HERO ───────────────────────────────────────────────────
            Full-bleed photo background with dark gradient overlay + grain texture.
            Same vibe as the portfolio page hero.
@@ -126,16 +131,16 @@ export default async function GradPricingPage() {
 
            TO CHANGE:
              → Background photo: set pricing_grad_standard_image in Supabase site_settings
-             → Overlay darkness: adjust rgba values in .pricing-hero-dark::before (proStyles.ts)
-             → Hero height:      change clamp() in .pricing-hero-dark (proStyles.ts)
+             → Overlay darkness: adjust rgba values in .pricingHeroDark::before (Pricing.module.css)
+             → Hero height:      change clamp() in .pricingHeroDark (Pricing.module.css)
              → Price shown:      find "$350" in the footer row below
-             → Chips:            edit the pricing-chip spans in the footer row
+             → Chips:            edit the chip spans in the footer row
              → Heading text:     edit the h1 below */}
       <section
-        className="pricing-hero-dark"
+        className={styles.pricingHeroDark}
       >
         {heroImage && (
-          <div className="pricing-hero-photo" aria-hidden="true">
+          <div className={styles.pricingHeroPhoto} aria-hidden="true">
             <OptimizedPhoto
               src={heroImage}
               alt=""
@@ -145,43 +150,42 @@ export default async function GradPricingPage() {
             />
           </div>
         )}
-        <div className="pricing-shell">
+        <div className={styles.pricingShell}>
           {/* Small eyebrow label — change text here */}
-          <p className="pricing-kicker">Graduation pricing</p>
+          <p className={styles.pricingKicker}>Graduation pricing</p>
 
           {/* Big display heading — change text here */}
-          <h1 className="pricing-title">
+          <h1 className={styles.pricingTitle}>
             For grads who want the gallery to feel as big as the moment.
           </h1>
 
           {/* Subtext — change text here */}
-          <p className="pricing-copy">
+          <p className={styles.pricingCopy}>
             Campus portraits with clean direction, efficient pacing, and enough room for personality, friend groups, and the little details.
           </p>
 
           {/* ── HERO FOOTER: price + chips + book button ────────────────────
                Sits at the very bottom of the dark hero.
-               pricing-hero-divider = thin vertical line separator.
-               To remove divider: delete the span.pricing-hero-divider. */}
-          <div className="pricing-hero-dark-footer">
+               pricingHeroDivider = thin vertical line separator. */}
+          <div className={styles.pricingHeroDarkFooter}>
             {/* Price block — change "$350" and "/ hr" here */}
-            <div className="pricing-hero-price-block">
-              <span className="pricing-hero-price-label">from</span>
-              <span className="pricing-hero-price-big">{formatCurrency(graduationPricing.baseHourlyRate)}</span>
-              <span className="pricing-hero-price-unit">/ hr</span>
+            <div className={styles.pricingHeroPriceBlock}>
+              <span className={styles.pricingHeroPriceLabel}>from</span>
+              <span className={styles.pricingHeroPriceBig}>{formatCurrency(graduationPricing.baseHourlyRate)}</span>
+              <span className={styles.pricingHeroPriceUnit}>/ hr</span>
             </div>
 
-            <span className="pricing-hero-divider" aria-hidden="true" />
+            <span className={styles.pricingHeroDivider} aria-hidden="true" />
 
             {/* Chips — edit or add/remove spans here */}
-            <div className="pricing-chip-row" style={{ marginTop: 0 }}>
-              <span className="pricing-chip">{graduationPricing.standardMinimumImages}+ edited images</span>
-              <span className="pricing-chip">Guided posing</span>
-              <span className="pricing-chip">Up to {PRICING_CATALOG.standardTurnaroundDays / 7}-week turnaround</span>
+            <div className={styles.pricingChipRow} style={{ marginTop: 0 }}>
+              <span className={styles.pricingChip}>{graduationPricing.standardMinimumImages}+ edited images</span>
+              <span className={styles.pricingChip}>Guided posing</span>
+              <span className={styles.pricingChip}>Up to {PRICING_CATALOG.standardTurnaroundDays / 7}-week turnaround</span>
             </div>
 
             {/* CTA button — links to the contact/booking page */}
-            <Link href="/contact" className="pricing-link">Book a session</Link>
+            <Link href="/contact" className={styles.pricingLink}>Book a session</Link>
           </div>
         </div>
       </section>
@@ -189,9 +193,9 @@ export default async function GradPricingPage() {
       {/* ── INFO CARDS (Booking / Session flow / Travel) ──────────────────────
            Defined in the infoCards array above — edit that to change content.
            style={anim.fadeUp(delay)} staggers each card's entrance animation. */}
-      <section className="pricing-shell pricing-info-grid" aria-label="Booking details">
+      <section className={`${styles.pricingShell} ${styles.pricingInfoGrid}`} aria-label="Booking details">
         {infoCards.map(({ heading, items, delay }) => (
-          <div key={heading} className="pricing-info-card" style={anim.fadeUp(delay)}>
+          <div key={heading} className={styles.pricingInfoCard} style={anim.fadeUp(delay)}>
             <h2>{heading}</h2>
             {items.map((item) => <p key={item}>{item}</p>)}
           </div>
@@ -203,11 +207,11 @@ export default async function GradPricingPage() {
            To change included items: edit the array in the ul below.
            To change the price: find "$350" below and update both instances.
            packageImage comes from Supabase (see image logic above). */}
-      <section className="pricing-shell pricing-package">
-        <div className="pricing-package-content">
-          <p className="pricing-kicker">Standard</p>
+      <section className={`${styles.pricingShell} ${styles.pricingPackage}`}>
+        <div className={styles.pricingPackageContent}>
+          <p className={styles.pricingKicker}>Standard</p>
           <h2>Graduation Package</h2>
-          <p className="pricing-copy">
+          <p className={styles.pricingCopy}>
             Ideal for graduates who want a cohesive, elevated gallery without feeling rushed or over-posed.
           </p>
 
@@ -225,29 +229,29 @@ export default async function GradPricingPage() {
           </ul>
 
           {/* Add-ons list — defined in the addOns array at the top of the file */}
-          <div className="pricing-addons">
-            <p className="pricing-kicker">Add-ons</p>
+          <div className={styles.pricingAddons}>
+            <p className={styles.pricingKicker}>Add-ons</p>
             {addOns.map(({ label, priceLabel }) => (
-              <div key={label} className="pricing-row">
+              <div key={label} className={styles.pricingRow}>
                 <span>{label}</span><span>{priceLabel}</span>
               </div>
             ))}
           </div>
 
           {/* Investment block — change "$350" and "per hour" text here */}
-          <div className="pricing-investment">
+          <div className={styles.pricingInvestment}>
             <div>
-              <p className="pricing-kicker">Investment</p>
-              <p className="pricing-price">{formatCurrency(graduationPricing.baseHourlyRate)}</p>
-              <p className="pricing-meta">per hour</p>
+              <p className={styles.pricingKicker}>Investment</p>
+              <p className={styles.pricingPrice}>{formatCurrency(graduationPricing.baseHourlyRate)}</p>
+              <p className={styles.pricingMeta}>per hour</p>
             </div>
-            <Link href="/contact" className="pricing-link">Book this session</Link>
+            <Link href="/contact" className={styles.pricingLink}>Book this session</Link>
           </div>
         </div>
 
         {/* Package photo — set via Supabase site_settings.pricing_grad_standard_image */}
         {packageImage && (
-          <div className="pricing-package-media">
+          <div className={styles.pricingPackageMedia}>
             <OptimizedPhoto
               src={packageImage}
               alt="Graduation portrait by soloxsnaps"
@@ -262,10 +266,10 @@ export default async function GradPricingPage() {
            data-reverse="true" = photo on LEFT, text on RIGHT.
            Group pricing table is defined in the groupPricing array above.
            groupImage comes from Supabase (see image logic above). */}
-      <section className="pricing-shell pricing-package" data-reverse="true">
+      <section className={`${styles.pricingShell} ${styles.pricingPackage}`} data-reverse="true">
         {/* Group photo — set via Supabase site_settings.pricing_grad_group_image */}
         {groupImage && (
-          <div className="pricing-package-media">
+          <div className={styles.pricingPackageMedia}>
             <OptimizedPhoto
               src={groupImage}
               alt="Group graduation portraits by soloxsnaps"
@@ -275,10 +279,10 @@ export default async function GradPricingPage() {
           </div>
         )}
 
-        <div className="pricing-package-content">
-          <p className="pricing-kicker">Group sessions</p>
+        <div className={styles.pricingPackageContent}>
+          <p className={styles.pricingKicker}>Group sessions</p>
           <h2>Group Grad Package</h2>
-          <p className="pricing-copy">
+          <p className={styles.pricingCopy}>
             Built for friends who want individual portraits and celebratory group photos in one organized session.
           </p>
 
@@ -295,22 +299,22 @@ export default async function GradPricingPage() {
           </ul>
 
           {/* Group pricing table — defined in groupPricing array above */}
-          <div className="pricing-group-table">
+          <div className={styles.pricingGroupTable}>
             {groupPricing.map(({ people, price }) => (
-              <div key={people} className="pricing-row">
+              <div key={people} className={styles.pricingRow}>
                 <span>{people}</span><span>{formatCurrency(price)} per person</span>
               </div>
             ))}
           </div>
 
           {/* Small note below the group table — edit text here */}
-          <p className="pricing-note">
+          <p className={styles.pricingNote}>
             Sessions with {graduationPricing.durationRules.groupMinimumSize} or more graduates require at least{" "}
             {graduationPricing.durationRules.groupMinimumMinutes} minutes to maintain quality and flow.
           </p>
 
-          <div className="pricing-investment">
-            <Link href="/contact" className="pricing-link">Inquire about group sessions</Link>
+          <div className={styles.pricingInvestment}>
+            <Link href="/contact" className={styles.pricingLink}>Inquire about group sessions</Link>
           </div>
         </div>
       </section>
@@ -319,13 +323,13 @@ export default async function GradPricingPage() {
            Client-side interactive estimate tool.
            Pricing logic lives in lib/pricing.ts — update rates there.
            Component lives in app/components/GraduationRateEstimator.tsx */}
-      <section className="pricing-shell" style={{ paddingTop: 0, paddingBottom: 64 }}>
+      <section className={styles.pricingShell} style={{ paddingTop: 0, paddingBottom: 64 }}>
         <GraduationRateEstimator />
       </section>
 
       {/* ── MICRO TRUST CHECKLIST ─────────────────────────────────────────────────
            Subtle trust reinforcement just before the final CTA. */}
-      <section className="pricing-shell" style={{ paddingTop: 0, paddingBottom: 56 }}>
+      <section className={styles.pricingShell} style={{ paddingTop: 0, paddingBottom: 56 }}>
         <div style={{
           display: "flex",
           flexWrap: "wrap",
@@ -355,18 +359,18 @@ export default async function GradPricingPage() {
            The panel at the very bottom before the footer.
            To change the heading text: edit the h2 below.
            style={{ fontSize: 38 }} overrides the default 58px title size. */}
-      <section className="pricing-shell pricing-cta">
-        <div className="pricing-cta-panel">
+      <section className={`${styles.pricingShell} ${styles.pricingCta}`}>
+        <div className={styles.pricingCtaPanel}>
           <div>
-            <p className="pricing-kicker">Ready for grad photos?</p>
-            <h2 className="pricing-title" style={{ fontSize: 38 }}>Send the date and campus.</h2>
-            <p className="pricing-copy" style={{ marginTop: 10 }}>
+            <p className={styles.pricingKicker}>Ready for grad photos?</p>
+            <h2 className={styles.pricingTitle} style={{ fontSize: 38 }}>Send the date and campus.</h2>
+            <p className={styles.pricingCopy} style={{ marginTop: 10 }}>
               Still planning? The{" "}
               <Link href="/grad-guide" style={{ color: "#3d6b5e", fontWeight: 700 }}>graduation photo guide</Link>{" "}
               covers outfits, posing, prep, and the best campus spots.
             </p>
           </div>
-          <Link href="/contact" className="pricing-link">Inquire now</Link>
+          <Link href="/contact" className={styles.pricingLink}>Inquire now</Link>
         </div>
       </section>
     </main>

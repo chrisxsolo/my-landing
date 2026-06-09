@@ -151,9 +151,9 @@ export default function HomeStorySections({
               href="/pricing/families"
               image={cardPortrait}
               eyebrow="Families and portraits"
-              title="Portrait Sessions"
+              title="Family & Portrait Sessions"
               copy="Natural portraits for families, individuals, maternity sessions, and personal milestones."
-              cta="Explore Portrait Sessions"
+              cta="Explore Family & Portrait Sessions"
             />
           </div>
         </div>

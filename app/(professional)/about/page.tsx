@@ -359,7 +359,7 @@ export default function ProfessionalAboutPage() {
           <p className="about-kicker">About</p>
           <h1 className="about-hero-title">I&rsquo;m Chris.</h1>
           <p className="about-hero-sub">
-            Bay Area graduation and family photographer. I guide every session so the photos feel natural — even if you hate being in front of the camera.
+            Bay Area graduation and couples photographer. I guide every session so the photos feel natural — even if you hate being in front of the camera.
           </p>
         </div>
       </section>
@@ -389,7 +389,7 @@ export default function ProfessionalAboutPage() {
               you always know what to do next. There&rsquo;s no standing around hoping something looks right.
             </p>
             <p className="about-body">
-              My work is focused on Bay Area graduation portraits, families, and individual sessions.
+              My work is focused on Bay Area graduation and couples portraits, with family and individual sessions also available.
               I know the light at Sather Gate in the morning, the best spots at SJSU before crowds
               arrive, and how to keep a group session from turning into chaos. That location knowledge
               is part of what you&rsquo;re booking.

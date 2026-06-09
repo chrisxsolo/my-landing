@@ -1,0 +1,182 @@
+/* ── PROFESSIONAL NAV ──────────────────────────────────────────────────────
+   Fixed frosted-glass header with desktop dropdowns and a mobile menu.
+   The homepage hero variant lives in ProNavHero.module.css. */
+
+.proHeader {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 100;
+  padding: 14px 24px;
+  pointer-events: none;
+}
+.proNavShell {
+  width: min(1180px, 100%);
+  min-height: 58px;
+  margin: 0 auto;
+  padding: 7px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 14px;
+  border: 1px solid rgba(18, 24, 22, 0.1);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  box-shadow: 0 8px 28px rgba(16, 24, 22, 0.09), inset 0 1px 0 rgba(255,255,255,0.9);
+  pointer-events: auto;
+  transition: background 0.24s ease, border-color 0.24s ease, box-shadow 0.24s ease;
+}
+.proNavBrand, .proNavLink, .proNavButton, .proNavCta, .proNavDropdownLink {
+  font-family: var(--font-dm-sans), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  letter-spacing: 0;
+  text-decoration: none;
+}
+
+.proNavBrand {
+  display: inline-flex;
+  align-items: center;
+  min-height: 42px;
+  padding: 0 14px;
+  color: #0e1412;
+  font-size: 17px;
+  font-weight: 860;
+  line-height: 1;
+}
+
+.proDesktopNav {
+  justify-self: center;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 8px;
+  background: rgba(245, 249, 247, 0.72);
+}
+
+.proNavLink, .proNavButton {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: #2f3835;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 740;
+  line-height: 1;
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+}
+.proNavLink:hover, .proNavButton:hover,
+.proNavLink[aria-current="page"], .proNavButton[aria-current="page"] {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(18, 24, 22, 0.1);
+  color: #0e1412;
+}
+
+.proNavCaret { color: #687571; font-size: 10px; line-height: 1; }
+.proNavActions { justify-self: end; display: flex; align-items: center; gap: 8px; }
+.proNavCta {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 18px;
+  border: 1px solid rgba(112, 139, 133, 0.22);
+  border-radius: 8px;
+  background: rgba(246, 250, 248, 0.94);
+  color: #4f6d67;
+  box-shadow: 0 8px 20px rgba(112, 139, 133, 0.05);
+  font-size: 13px;
+  font-weight: 820;
+  line-height: 1;
+  transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+.proNavCta:hover {
+  transform: translateY(-1px);
+  border-color: rgba(112, 139, 133, 0.32);
+  background: rgba(239, 246, 244, 0.98);
+  box-shadow: 0 12px 26px rgba(112, 139, 133, 0.07);
+}
+
+.proDropdownWrap { position: relative; }
+.proNavDropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 50%;
+  min-width: 194px;
+  padding: 7px;
+  display: grid;
+  gap: 3px;
+  border: 1px solid rgba(18, 24, 22, 0.1);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 16px 34px rgba(16, 24, 22, 0.12);
+  transform: translateX(-50%);
+}
+.proNavDropdownLink {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  border-radius: 7px;
+  color: #2f3835;
+  font-size: 13px;
+  font-weight: 720;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.proNavDropdownLink:hover, .proNavDropdownLink[aria-current="page"] {
+  background: rgba(112, 139, 133, 0.09);
+  color: #0d1412;
+}
+
+.proMobileButton, .proMobilePanel { display: none; }
+@media (max-width: 880px) {
+  .proHeader { padding: 10px 12px; }
+  .proNavShell { grid-template-columns: 1fr auto; min-height: 56px; }
+  .proDesktopNav, .proNavActions { display: none; }
+  .proMobileButton { display: inline-flex; }
+  .proMobilePanel {
+    position: absolute;
+    top: calc(100% + 10px);
+    left: 0; right: 0;
+    display: grid;
+    gap: 8px;
+    max-height: calc(100svh - 86px);
+    overflow-y: auto;
+    padding: 10px;
+    border: 1px solid rgba(18, 24, 22, 0.1);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.97);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow: 0 16px 34px rgba(16, 24, 22, 0.12);
+  }
+  .proMobilePanel > .proNavLink,
+  .proMobilePanel > .proNavButton,
+  .proMobilePanel > .proNavCta {
+    width: 100%; min-height: 46px; justify-content: space-between; padding: 0 14px;
+  }
+  .proMobilePanel > .proNavCta { justify-content: center; margin-top: 6px; }
+  .proMobileSplit {
+    display: flex; width: 100%; min-height: 46px;
+    border: 1px solid rgba(18,24,22,0.1); border-radius: 8px; overflow: hidden;
+  }
+  .proMobileSplit .proNavLink {
+    flex: 1; min-height: 46px; border-radius: 0; border: none;
+    justify-content: flex-start; padding: 0 14px;
+  }
+  .proMobileSplit .proNavButton {
+    min-height: 46px; border-radius: 0; border: none;
+    border-left: 1px solid rgba(18,24,22,0.1);
+    padding: 0 14px; min-width: 0;
+  }
+  .proMobileSubmenu { display: grid; gap: 4px; padding: 4px 0 8px 12px; }
+  .proMobileSubmenu .proNavDropdownLink { min-height: 40px; background: rgba(245, 249, 247, 0.82); }
+}

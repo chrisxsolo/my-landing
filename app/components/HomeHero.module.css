@@ -292,7 +292,7 @@
 @media (max-width: 820px) {
   .hero {
     height: 82svh;
-    min-height: 650px;
+    min-height: 600px;
     max-height: 860px;
   }
 
@@ -345,7 +345,7 @@
 @media (max-width: 560px) {
   .hero {
     height: 78svh;
-    min-height: 640px;
+    min-height: 560px;
   }
 
   .content {

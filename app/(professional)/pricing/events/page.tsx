@@ -15,7 +15,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 import { getPortfolioData, getSiteSettings } from "@/lib/professionalData";
-import { pricingCSS, anim } from "@/lib/proStyles";
+import type { CSSProperties } from "react";
+import { anim } from "@/lib/proStyles";
+import styles from "@/app/(professional)/pricing/Pricing.module.css";
 import { formatCurrency } from "@/lib/pricing";
 import { PRICING_CATALOG, getBookingPolicyItems } from "@/lib/pricingCatalog";
 
@@ -29,7 +31,12 @@ export const metadata: Metadata = {
   alternates: { canonical: "/pricing/events" },
 };
 
-const CSS = pricingCSS({ mediaMinHeight: 580, mediaMinHeightMobile: 400, mediaObjectPosition: "center center" });
+// Package photo sizing → read by Pricing.module.css via CSS custom properties.
+const mediaVars = {
+  "--pricing-media-h": "580px",
+  "--pricing-media-h-mobile": "400px",
+  "--pricing-media-pos": "center center",
+} as CSSProperties;
 const eventPricing = PRICING_CATALOG.events;
 
 // ── ADD-ONS LIST ──────────────────────────────────────────────────────────────
@@ -85,15 +92,14 @@ export default async function EventPricingPage() {
   const secondaryImage = siteSettings.pricing_event_secondary_image || eventImages[1]?.image_url || primaryImage;
 
   return (
-    <main className="pricing-modern">
-      <style>{CSS}</style>
+    <main className={styles.pricingModern} style={mediaVars}>
 
       {/* ── DARK PHOTO HERO ─────────────────────────────────────────────────── */}
       <section
-        className="pricing-hero-dark"
+        className={styles.pricingHeroDark}
       >
         {primaryImage && (
-          <div className="pricing-hero-photo" aria-hidden="true">
+          <div className={styles.pricingHeroPhoto} aria-hidden="true">
             <OptimizedPhoto
               src={primaryImage}
               alt=""
@@ -103,41 +109,41 @@ export default async function EventPricingPage() {
             />
           </div>
         )}
-        <div className="pricing-shell">
-          <p className="pricing-kicker">Event pricing</p>
+        <div className={styles.pricingShell}>
+          <p className={styles.pricingKicker}>Event pricing</p>
 
-          <h1 className="pricing-title">
+          <h1 className={styles.pricingTitle}>
             Coverage that keeps up with the room.
           </h1>
 
-          <p className="pricing-copy">
+          <p className={styles.pricingCopy}>
             Candid event photography for reunions, mixers, corporate events, school gatherings, and private celebrations — with edited galleries and a smooth delivery.
           </p>
 
-          <div className="pricing-hero-dark-footer">
-            <div className="pricing-hero-price-block">
-              <span className="pricing-hero-price-label">starting at</span>
-              <span className="pricing-hero-price-big">{formatCurrency(eventPricing.smallEvent.hourlyRate)}</span>
-              <span className="pricing-hero-price-unit">/ hr</span>
+          <div className={styles.pricingHeroDarkFooter}>
+            <div className={styles.pricingHeroPriceBlock}>
+              <span className={styles.pricingHeroPriceLabel}>starting at</span>
+              <span className={styles.pricingHeroPriceBig}>{formatCurrency(eventPricing.smallEvent.hourlyRate)}</span>
+              <span className={styles.pricingHeroPriceUnit}>/ hr</span>
             </div>
 
-            <span className="pricing-hero-divider" aria-hidden="true" />
+            <span className={styles.pricingHeroDivider} aria-hidden="true" />
 
-            <div className="pricing-chip-row" style={{ marginTop: 0 }}>
-              <span className="pricing-chip">{eventPricing.smallEvent.minimumHours}-hour minimum</span>
-              <span className="pricing-chip">Edited gallery</span>
-              <span className="pricing-chip">Private online delivery</span>
+            <div className={styles.pricingChipRow} style={{ marginTop: 0 }}>
+              <span className={styles.pricingChip}>{eventPricing.smallEvent.minimumHours}-hour minimum</span>
+              <span className={styles.pricingChip}>Edited gallery</span>
+              <span className={styles.pricingChip}>Private online delivery</span>
             </div>
 
-            <Link href="/contact" className="pricing-link">Inquire about your event</Link>
+            <Link href="/contact" className={styles.pricingLink}>Inquire about your event</Link>
           </div>
         </div>
       </section>
 
       {/* ── INFO CARDS ──────────────────────────────────────────────────────── */}
-      <section className="pricing-shell pricing-info-grid" aria-label="Booking details">
+      <section className={`${styles.pricingShell} ${styles.pricingInfoGrid}`} aria-label="Booking details">
         {infoCards.map(({ heading, items, delay }) => (
-          <div key={heading} className="pricing-info-card" style={anim.fadeUp(delay)}>
+          <div key={heading} className={styles.pricingInfoCard} style={anim.fadeUp(delay)}>
             <h2>{heading}</h2>
             {items.map((item) => <p key={item}>{item}</p>)}
           </div>
@@ -145,11 +151,11 @@ export default async function EventPricingPage() {
       </section>
 
       {/* ── SMALL EVENT PACKAGE ─────────────────────────────────────────────── */}
-      <section className="pricing-shell pricing-package">
-        <div className="pricing-package-content">
-          <p className="pricing-kicker">Smaller gatherings</p>
+      <section className={`${styles.pricingShell} ${styles.pricingPackage}`}>
+        <div className={styles.pricingPackageContent}>
+          <p className={styles.pricingKicker}>Smaller gatherings</p>
           <h2>Small Event Coverage</h2>
-          <p className="pricing-copy">
+          <p className={styles.pricingCopy}>
             Ideal for intimate events where you want candid moments captured without a large production crew.
           </p>
 
@@ -163,27 +169,27 @@ export default async function EventPricingPage() {
             ].map((item) => <li key={item}>{item}</li>)}
           </ul>
 
-          <div className="pricing-addons">
-            <p className="pricing-kicker">Add-ons</p>
+          <div className={styles.pricingAddons}>
+            <p className={styles.pricingKicker}>Add-ons</p>
             {addOns.map(({ label, displayPrice }) => (
-              <div key={label} className="pricing-row">
+              <div key={label} className={styles.pricingRow}>
                 <span>{label}</span><span>{displayPrice}</span>
               </div>
             ))}
           </div>
 
-          <div className="pricing-investment">
+          <div className={styles.pricingInvestment}>
             <div>
-              <p className="pricing-kicker">Investment</p>
-              <p className="pricing-price">{formatCurrency(eventPricing.smallEvent.hourlyRate)}</p>
-              <p className="pricing-meta">per hour · {eventPricing.smallEvent.minimumHours}-hour minimum</p>
+              <p className={styles.pricingKicker}>Investment</p>
+              <p className={styles.pricingPrice}>{formatCurrency(eventPricing.smallEvent.hourlyRate)}</p>
+              <p className={styles.pricingMeta}>per hour · {eventPricing.smallEvent.minimumHours}-hour minimum</p>
             </div>
-            <Link href="/contact" className="pricing-link">Inquire now</Link>
+            <Link href="/contact" className={styles.pricingLink}>Inquire now</Link>
           </div>
         </div>
 
         {primaryImage && (
-          <div className="pricing-package-media">
+          <div className={styles.pricingPackageMedia}>
             <OptimizedPhoto
               src={primaryImage}
               alt="Event photography by soloxsnaps"
@@ -194,9 +200,9 @@ export default async function EventPricingPage() {
       </section>
 
       {/* ── HALF-DAY / FULL-DAY PACKAGE ─────────────────────────────────────── */}
-      <section className="pricing-shell pricing-package" data-reverse="true">
+      <section className={`${styles.pricingShell} ${styles.pricingPackage}`} data-reverse="true">
         {secondaryImage && (
-          <div className="pricing-package-media">
+          <div className={styles.pricingPackageMedia}>
             <OptimizedPhoto
               src={secondaryImage}
               alt="Full event coverage by soloxsnaps"
@@ -205,53 +211,53 @@ export default async function EventPricingPage() {
           </div>
         )}
 
-        <div className="pricing-package-content">
-          <p className="pricing-kicker">Larger events</p>
+        <div className={styles.pricingPackageContent}>
+          <p className={styles.pricingKicker}>Larger events</p>
           <h2>Half-Day &amp; Full-Day Coverage</h2>
-          <p className="pricing-copy">
+          <p className={styles.pricingCopy}>
             For medium and large events that need sustained coverage, multiple locations, or a second shooter.
           </p>
 
           {/* Medium event hourly examples */}
-          <p className="pricing-kicker" style={{ marginBottom: 8 }}>
+          <p className={styles.pricingKicker} style={{ marginBottom: 8 }}>
             Medium event examples ({formatCurrency(eventPricing.mediumEvent.hourlyRate)}/hr · {eventPricing.mediumEvent.minimumHours}-hr min)
           </p>
-          <div className="pricing-group-table">
+          <div className={styles.pricingGroupTable}>
             {mediumRates.map(({ hours, price }) => (
-              <div key={hours} className="pricing-row">
+              <div key={hours} className={styles.pricingRow}>
                 <span>{hours}</span><span>{price}</span>
               </div>
             ))}
           </div>
 
           {/* Flat rates */}
-          <div className="pricing-addons" style={{ marginTop: 24 }}>
-            <p className="pricing-kicker">Flat rates</p>
+          <div className={styles.pricingAddons} style={{ marginTop: 24 }}>
+            <p className={styles.pricingKicker}>Flat rates</p>
             {largeEventRates.map(({ label, price }) => (
-              <div key={label} className="pricing-row">
+              <div key={label} className={styles.pricingRow}>
                 <span>{label}</span><span>{price}</span>
               </div>
             ))}
           </div>
 
-          <p className="pricing-note">
+          <p className={styles.pricingNote}>
             Full-day pricing depends on complexity, number of locations, assistant requirements, and delivery timeline.
           </p>
 
-          <div className="pricing-investment">
-            <Link href="/contact" className="pricing-link">Get a custom quote</Link>
+          <div className={styles.pricingInvestment}>
+            <Link href="/contact" className={styles.pricingLink}>Get a custom quote</Link>
           </div>
         </div>
       </section>
 
       {/* ── BOTTOM CTA STRIP ────────────────────────────────────────────────── */}
-      <section className="pricing-shell pricing-cta">
-        <div className="pricing-cta-panel">
+      <section className={`${styles.pricingShell} ${styles.pricingCta}`}>
+        <div className={styles.pricingCtaPanel}>
           <div>
-            <p className="pricing-kicker">Ready to book?</p>
-            <h2 className="pricing-title" style={{ fontSize: 38 }}>Send the date, location, and event type.</h2>
+            <p className={styles.pricingKicker}>Ready to book?</p>
+            <h2 className={styles.pricingTitle} style={{ fontSize: 38 }}>Send the date, location, and event type.</h2>
           </div>
-          <Link href="/contact" className="pricing-link">Inquire now</Link>
+          <Link href="/contact" className={styles.pricingLink}>Inquire now</Link>
         </div>
       </section>
     </main>

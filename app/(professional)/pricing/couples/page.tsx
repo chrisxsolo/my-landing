@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
+import type { CSSProperties } from "react";
 import Link from "next/link";
 import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 import { getPortfolioData, getSiteSettings } from "@/lib/professionalData";
-import { pricingCSS, anim } from "@/lib/proStyles";
+import { anim } from "@/lib/proStyles";
+import styles from "@/app/(professional)/pricing/Pricing.module.css";
 import CouplesRateEstimator from "@/app/components/CouplesRateEstimator";
 import { formatCurrency } from "@/lib/pricing";
 import { PRICING_CATALOG, getBookingPolicyItems } from "@/lib/pricingCatalog";
@@ -18,7 +20,12 @@ export const metadata: Metadata = {
   alternates: { canonical: "/pricing/couples" },
 };
 
-const CSS = pricingCSS({ mediaMinHeight: 580, mediaMinHeightMobile: 400, mediaObjectPosition: "center 30%" });
+// Package photo sizing → read by Pricing.module.css via CSS custom properties.
+const mediaVars = {
+  "--pricing-media-h": "580px",
+  "--pricing-media-h-mobile": "400px",
+  "--pricing-media-pos": "center 30%",
+} as CSSProperties;
 const couplesPricing = PRICING_CATALOG.couples;
 
 const packages = [
@@ -86,12 +93,11 @@ export default async function CouplesPricingPage() {
   const heroImage = siteSettings.pricing_couples_standard_image || coupleImages[0]?.image_url || fallback;
 
   return (
-    <main className="pricing-modern">
-      <style>{CSS + COUPLES_CSS}</style>
+    <main className={styles.pricingModern} style={mediaVars}>
 
-      <section className="pricing-hero-dark">
+      <section className={styles.pricingHeroDark}>
         {heroImage && (
-          <div className="pricing-hero-photo" aria-hidden="true">
+          <div className={styles.pricingHeroPhoto} aria-hidden="true">
             <OptimizedPhoto
               src={heroImage}
               alt=""
@@ -101,83 +107,83 @@ export default async function CouplesPricingPage() {
             />
           </div>
         )}
-        <div className="pricing-shell">
-          <p className="pricing-kicker">Couples photography</p>
-          <h1 className="pricing-title">Couples photos that actually feel like you</h1>
-          <p className="pricing-copy">
+        <div className={styles.pricingShell}>
+          <p className={styles.pricingKicker}>Couples photography</p>
+          <h1 className={styles.pricingTitle}>Couples photos that actually feel like you</h1>
+          <p className={styles.pricingCopy}>
             Bay Area couples photography for anniversaries, engagements, proposals, and lifestyle sessions. I&rsquo;ll guide the posing so everything feels natural, relaxed, and easy from start to finish.
           </p>
-          <div className="pricing-hero-dark-footer">
-            <div className="pricing-hero-price-block">
-              <span className="pricing-hero-price-label">starting at</span>
-              <span className="pricing-hero-price-big">{formatCurrency(couplesPricing.packages.mini.price)}</span>
+          <div className={styles.pricingHeroDarkFooter}>
+            <div className={styles.pricingHeroPriceBlock}>
+              <span className={styles.pricingHeroPriceLabel}>starting at</span>
+              <span className={styles.pricingHeroPriceBig}>{formatCurrency(couplesPricing.packages.mini.price)}</span>
             </div>
-            <span className="pricing-hero-divider" aria-hidden="true" />
-            <div className="pricing-chip-row" style={{ marginTop: 0 }}>
-              <span className="pricing-chip">Starting at {formatCurrency(couplesPricing.packages.mini.price)}</span>
-              <span className="pricing-chip">{couplesPricing.packages.mini.minimumImages}+ edited images</span>
-              <span className="pricing-chip">Guided posing</span>
-              <span className="pricing-chip">{PRICING_CATALOG.standardTurnaroundDays / 7}-week turnaround</span>
+            <span className={styles.pricingHeroDivider} aria-hidden="true" />
+            <div className={styles.pricingChipRow} style={{ marginTop: 0 }}>
+              <span className={styles.pricingChip}>Starting at {formatCurrency(couplesPricing.packages.mini.price)}</span>
+              <span className={styles.pricingChip}>{couplesPricing.packages.mini.minimumImages}+ edited images</span>
+              <span className={styles.pricingChip}>Guided posing</span>
+              <span className={styles.pricingChip}>{PRICING_CATALOG.standardTurnaroundDays / 7}-week turnaround</span>
             </div>
-            <Link href="/contact" className="pricing-link">Inquire About a Couples Session</Link>
+            <Link href="/contact" className={styles.pricingLink}>Inquire About a Couples Session</Link>
           </div>
-          <p className="pricing-hero-fineprint">
+          <p className={styles.pricingHeroFineprint}>
             Starting at {formatCurrency(couplesPricing.packages.mini.price)} for a {couplesPricing.packages.mini.durationLabel.toLowerCase()}.
           </p>
         </div>
       </section>
 
-      <section className="pricing-shell pricing-info-grid" aria-label="Booking details">
+      <section className={`${styles.pricingShell} ${styles.pricingInfoGrid}`} aria-label="Booking details">
         {infoCards.map(({ heading, items, delay }) => (
-          <div key={heading} className="pricing-info-card" style={anim.fadeUp(delay)}>
+          <div key={heading} className={styles.pricingInfoCard} style={anim.fadeUp(delay)}>
             <h2>{heading}</h2>
             {items.map((item) => <p key={item}>{item}</p>)}
           </div>
         ))}
       </section>
 
-      <section className="pricing-shell couples-intro">
-        <h2 className="couples-intro-heading">Couples Photography</h2>
-        <p className="couples-intro-copy">
+      <section className={`${styles.pricingShell} ${styles.couplesIntro}`}>
+        <h2 className={styles.couplesIntroHeading}>Couples Photography</h2>
+        <p className={styles.couplesIntroCopy}>
           Whether you&apos;re celebrating an anniversary, looking for romantic lifestyle portraits around San Francisco, planning engagement photos for your save-the-dates, or setting up a surprise proposal, I offer couples photography sessions designed around your timeline and vision. All sessions take place in real Bay Area locations — parks, waterfront spots, urban neighborhoods, and beyond. Every package includes guided posing so you&apos;re never standing there guessing what to do with your hands.
         </p>
-        <p className="couples-intro-copy" style={{ marginTop: 14 }}>
+        <p className={styles.couplesIntroCopy} style={{ marginTop: 14 }}>
           I usually recommend scheduling closer to sunset when possible for the best lighting, but timing can depend on the location and overall session plan.
         </p>
       </section>
 
-      <section className="pricing-shell couples-grid" aria-label="Couples session packages">
+      <section className={`${styles.pricingShell} ${styles.couplesGrid}`} aria-label="Couples session packages">
         {packages.map((pkg) => {
           const { kicker, name, price, bestFor, items, durationLabel, minimumImages } = pkg;
           const badge = "badge" in pkg ? pkg.badge : undefined;
           const startingAt = "startingAt" in pkg ? pkg.startingAt : false;
           return (
-          <div key={name} className={`couples-card${badge ? " couples-card--featured" : ""}`}>
-            {badge && <span className="couples-card-badge">{badge}</span>}
-            <div className="couples-card-header">
-              <p className="pricing-kicker" style={{ marginBottom: 8 }}>{kicker}</p>
-              <h3 className="couples-card-name">{name}</h3>
-              {startingAt && <span className="couples-card-price-prefix">Starting at</span>}
-              <p className="couples-card-price">{formatCurrency(price)}</p>
+          <div key={name} className={`${styles.couplesCard}${badge ? ` ${styles.couplesCardFeatured}` : ""}`}>
+            {badge && <span className={styles.couplesCardBadge}>{badge}</span>}
+            <div className={styles.couplesCardHeader}>
+              <p className={styles.pricingKicker} style={{ marginBottom: 8 }}>{kicker}</p>
+              <h3 className={styles.couplesCardName}>{name}</h3>
+              {startingAt && <span className={styles.couplesCardPricePrefix}>Starting at</span>}
+              <p className={styles.couplesCardPrice}>{formatCurrency(price)}</p>
             </div>
-            <p className="couples-card-best-for"><strong>Best for:</strong> {bestFor}</p>
-            <ul className="couples-card-list">
+            <p className={styles.couplesCardBestFor}><strong>Best for:</strong> {bestFor}</p>
+            <ul className={styles.couplesCardList}>
               <li>{durationLabel}</li>
               {items.map((item) => <li key={item}>{item}</li>)}
               <li>Minimum {minimumImages} professionally edited images</li>
               <li>Standard {PRICING_CATALOG.standardTurnaroundDays / 7}-week turnaround</li>
             </ul>
-            <div className="couples-card-cta">
-              <Link href="/contact" className="pricing-link couples-card-link">Inquire About a Couples Session</Link>
+            <div className={styles.couplesCardCta}>
+              <Link href="/contact" className={`${styles.pricingLink} ${styles.couplesCardLink}`}>Inquire About a Couples Session</Link>
             </div>
           </div>
           );
         })}
       </section>
 
-      <section className="pricing-shell couples-chooser" aria-label="Which couples session should I book?">
-        <h2 className="couples-chooser-heading">Which couples session should I book?</h2>
-        <div className="couples-chooser-table">
+      <section className={`${styles.pricingShell} ${styles.couplesChooser}`} aria-label="Which couples session should I book?">
+        <h2 className={styles.couplesChooserHeading}>Which couples session should I book?</h2>
+        <div className={styles.couplesChooserTable}>
           {[
             ["30-Minute Couples Mini Session", "Quick anniversaries, casual portraits, and couples who want a short session."],
             ["1-Hour Couples Session", "The best all-around option with more variety and a fuller gallery."],
@@ -185,23 +191,23 @@ export default async function CouplesPricingPage() {
             ["Engagement Session", "Save-the-dates, wedding websites, announcements, and more intentional planning."],
             ["Proposal Session", "Surprise proposals, pre-shoot coordination, and portraits afterward."],
           ].map(([session, bestFor]) => (
-            <div key={session} className="couples-chooser-row">
-              <span className="couples-chooser-session">{session}</span>
-              <span className="couples-chooser-best">{bestFor}</span>
+            <div key={session} className={styles.couplesChooserRow}>
+              <span className={styles.couplesChooserSession}>{session}</span>
+              <span className={styles.couplesChooserBest}>{bestFor}</span>
             </div>
           ))}
         </div>
       </section>
 
-      <section className="pricing-shell couples-feel" aria-label="What the session feels like">
-        <h2 className="couples-feel-heading">What the session feels like</h2>
-        <div className="couples-feel-grid">
+      <section className={`${styles.pricingShell} ${styles.couplesFeel}`} aria-label="What the session feels like">
+        <h2 className={styles.couplesFeelHeading}>What the session feels like</h2>
+        <div className={styles.couplesFeelGrid}>
           {[
             ["No awkward posing", "I’ll guide you through natural prompts and simple direction so you’re never standing around wondering what to do."],
             ["Real locations", "We’ll choose a Bay Area spot that fits your vibe, from city architecture to beach sunsets to quiet park trails."],
               ["Easy from start to finish", `Once the date is confirmed, I’ll send the invoice and contract, help with planning, and deliver your final gallery within ${PRICING_CATALOG.standardTurnaroundDays / 7} weeks.`],
           ].map(([title, copy]) => (
-            <div key={title} className="couples-feel-card">
+            <div key={title} className={styles.couplesFeelCard}>
               <h3>{title}</h3>
               <p>{copy}</p>
             </div>
@@ -209,138 +215,34 @@ export default async function CouplesPricingPage() {
         </div>
       </section>
 
-      <section className="pricing-shell couples-addons-section">
-        <p className="pricing-kicker">Add-ons</p>
-        <h2 className="couples-addons-heading">Customize your session</h2>
-        <div className="couples-addons-grid">
+      <section className={`${styles.pricingShell} ${styles.couplesAddonsSection}`}>
+        <p className={styles.pricingKicker}>Add-ons</p>
+        <h2 className={styles.couplesAddonsHeading}>Customize your session</h2>
+        <div className={styles.couplesAddonsGrid}>
           {addOns.map((addOn) => (
-            <div key={addOn.label} className="pricing-row">
+            <div key={addOn.label} className={styles.pricingRow}>
               <span>{addOn.label}</span><span>{"price" in addOn ? addOn.price : addOn.displayPrice}</span>
             </div>
           ))}
         </div>
       </section>
 
-      <section className="pricing-shell" style={{ paddingTop: 0, paddingBottom: 64 }}>
+      <section className={styles.pricingShell} style={{ paddingTop: 0, paddingBottom: 64 }}>
         <CouplesRateEstimator />
       </section>
 
-      <section className="pricing-shell pricing-cta">
-        <div className="pricing-cta-panel">
+      <section className={`${styles.pricingShell} ${styles.pricingCta}`}>
+        <div className={styles.pricingCtaPanel}>
           <div>
-            <p className="pricing-kicker">Ready for couples photos?</p>
-            <h2 className="pricing-title" style={{ fontSize: 38 }}>Ready for couples photos?</h2>
-            <p className="couples-cta-copy">
+            <p className={styles.pricingKicker}>Ready for couples photos?</p>
+            <h2 className={styles.pricingTitle} style={{ fontSize: 38 }}>Ready for couples photos?</h2>
+            <p className={styles.couplesCtaCopy}>
               Send your preferred date, location idea, and session type. I&rsquo;ll confirm availability and send the invoice and contract once everything is set.
             </p>
           </div>
-          <Link href="/contact" className="pricing-link">Inquire About a Couples Session</Link>
+          <Link href="/contact" className={styles.pricingLink}>Inquire About a Couples Session</Link>
         </div>
       </section>
     </main>
   );
 }
-
-const COUPLES_CSS = `
-  .pricing-hero-fineprint { margin: 14px 0 0; color: rgba(255,255,255,0.78); font-size: 13.5px; line-height: 1.5; font-family: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif; }
-
-  /* Featured package card + badge (P5) */
-  .couples-card { position: relative; }
-  .couples-card--featured { border-color: rgba(154,185,178,0.55); box-shadow: 0 18px 40px rgba(18,24,22,0.12); }
-  .couples-card-badge {
-    position: absolute; top: -11px; left: 28px;
-    padding: 5px 12px; border-radius: 999px;
-    background: #33403b; color: #fff;
-    font-size: 11px; font-weight: 820; letter-spacing: 0.04em; text-transform: uppercase;
-    box-shadow: 0 6px 16px rgba(18,24,22,0.18);
-    font-family: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
-  }
-  .couples-card-price-prefix { display: block; margin: 0 0 2px; color: #667f79; font-size: 12px; font-weight: 760; letter-spacing: 0.04em; text-transform: uppercase; font-family: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif; }
-
-  /* Which session should I book? (P8) */
-  .couples-chooser { padding: 8px 0 56px; }
-  .couples-chooser-heading { margin: 0 0 20px; color: #101412; font-size: 28px; font-weight: 860; line-height: 1.1; letter-spacing: 0; }
-  .couples-chooser-table {
-    border: 1px solid rgba(18,24,22,0.1); border-radius: 8px; overflow: hidden;
-    background: rgba(255,255,255,0.76); box-shadow: 0 14px 34px rgba(18,24,22,0.07);
-  }
-  .couples-chooser-row {
-    display: grid; grid-template-columns: minmax(180px, 0.8fr) 1.4fr; gap: 18px;
-    padding: 16px 20px; border-bottom: 1px solid rgba(18,24,22,0.08);
-    font-family: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
-  }
-  .couples-chooser-row:last-child { border-bottom: none; }
-  .couples-chooser-session { color: #101412; font-size: 14.5px; font-weight: 820; line-height: 1.4; }
-  .couples-chooser-best { color: #4b5a55; font-size: 14px; line-height: 1.55; }
-
-  /* What the session feels like (P9) */
-  .couples-feel { padding: 8px 0 56px; }
-  .couples-feel-heading { margin: 0 0 20px; color: #101412; font-size: 28px; font-weight: 860; line-height: 1.1; letter-spacing: 0; }
-  .couples-feel-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
-  .couples-feel-card {
-    padding: 26px 24px; border: 1px solid rgba(18,24,22,0.1); border-radius: 8px;
-    background: rgba(255,255,255,0.76); box-shadow: 0 14px 34px rgba(18,24,22,0.07);
-    font-family: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
-  }
-  .couples-feel-card h3 { margin: 0 0 10px; color: #101412; font-size: 18px; font-weight: 860; line-height: 1.2; }
-  .couples-feel-card p { margin: 0; color: #4b5a55; font-size: 14.5px; line-height: 1.62; }
-
-  .couples-cta-copy { max-width: 520px; margin: 14px 0 0; color: #4b5a55; font-size: 15px; line-height: 1.65; font-family: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif; }
-
-  @media (max-width: 660px) {
-    .couples-chooser-row { grid-template-columns: 1fr; gap: 4px; }
-    .couples-feel-grid { grid-template-columns: 1fr; }
-    .couples-chooser-heading, .couples-feel-heading { font-size: 24px; }
-  }
-
-  .couples-intro { padding: 56px 0 40px; }
-  .couples-intro-heading { margin: 0 0 20px; color: #101412; font-size: 34px; font-weight: 880; line-height: 1.02; letter-spacing: 0; }
-  .couples-intro-copy { max-width: 720px; margin: 0; color: #4b5a55; font-size: 17px; line-height: 1.72; text-wrap: pretty; font-family: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif; }
-
-  .couples-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; padding-bottom: 56px; }
-
-  .couples-card {
-    display: flex; flex-direction: column; gap: 18px; padding: 28px;
-    border: 1px solid rgba(18,24,22,0.1); border-radius: 8px; background: rgba(255,255,255,0.76);
-    box-shadow: 0 14px 34px rgba(18,24,22,0.07);
-    transition: transform 0.22s cubic-bezier(0.22,1,0.36,1), box-shadow 0.22s ease, border-color 0.22s ease;
-  }
-  .couples-card:hover { transform: translateY(-4px); box-shadow: 0 20px 44px rgba(18,24,22,0.1); border-color: rgba(18,24,22,0.16); }
-
-  .couples-card-header { display: flex; flex-direction: column; padding-bottom: 18px; border-bottom: 1px solid rgba(18,24,22,0.08); }
-  .couples-card-name { margin: 0 0 10px; color: #101412; font-size: 21px; font-weight: 860; line-height: 1.14; letter-spacing: 0; }
-  .couples-card-price { margin: 0; color: #101412; font-size: 44px; font-weight: 880; letter-spacing: -0.025em; line-height: 0.94; font-family: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif; }
-
-  .couples-card-best-for {
-    margin: 0; color: #4b5a55; font-size: 13.5px; line-height: 1.65;
-    padding: 10px 13px; background: rgba(247,250,248,0.9); border-radius: 6px;
-    border: 1px solid rgba(18,24,22,0.07); font-family: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
-  }
-  .couples-card-best-for strong { color: #33403b; font-weight: 820; }
-
-  .couples-card-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; flex: 1; }
-  .couples-card-list li { position: relative; padding-left: 18px; color: #4d5a55; font-size: 13.5px; line-height: 1.6; font-family: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif; }
-  .couples-card-list li::before { content: ""; position: absolute; left: 0; top: 0.68em; width: 7px; height: 7px; border-radius: 99px; background: #9ab9b2; }
-
-  .couples-card-cta { margin-top: auto; padding-top: 4px; }
-  .couples-card-link { width: 100%; justify-content: center; }
-
-  .couples-addons-section { padding-bottom: 56px; }
-  .couples-addons-heading { margin: 0 0 20px; color: #101412; font-size: 28px; font-weight: 860; line-height: 1.1; letter-spacing: 0; }
-  .couples-addons-grid {
-    max-width: 640px; border: 1px solid rgba(18,24,22,0.1); border-radius: 8px;
-    background: rgba(255,255,255,0.76); box-shadow: 0 14px 34px rgba(18,24,22,0.07); overflow: hidden;
-  }
-  .couples-addons-grid .pricing-row { padding: 14px 20px; }
-  .couples-addons-grid .pricing-row:last-child { border-bottom: none; }
-
-  @media (max-width: 1060px) { .couples-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-  @media (max-width: 660px) {
-    .couples-grid { grid-template-columns: 1fr; gap: 12px; }
-    .couples-card-price { font-size: 36px; }
-    .couples-intro { padding: 40px 0 28px; }
-    .couples-intro-copy { font-size: 16px; }
-    .couples-intro-heading { font-size: 28px; }
-    .couples-addons-heading { font-size: 24px; }
-  }
-`;

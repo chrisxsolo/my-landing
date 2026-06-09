@@ -54,11 +54,11 @@ const STATIC_ROUTES: Array<{
 ];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const now = new Date();
-
+  // Static routes intentionally omit lastModified: we have no real
+  // per-page modification timestamps, and stamping "now" on every hourly
+  // regeneration would broadcast a false "recently changed" signal.
   const staticEntries: MetadataRoute.Sitemap = STATIC_ROUTES.map((route) => ({
     url: `${SITE_URL}${route.path}`,
-    lastModified: now,
     changeFrequency: route.changeFrequency,
     priority: route.priority,
   }));
@@ -69,7 +69,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const blogEntries: MetadataRoute.Sitemap = professional.map((post) => ({
     url: `${SITE_URL}/blog/${post.slug}`,
-    lastModified: post.published_at ? new Date(post.published_at) : now,
+    // Real publish timestamp; only fall back to "now" if it's genuinely missing.
+    lastModified: post.published_at ? new Date(post.published_at) : new Date(),
     changeFrequency: "yearly",
     priority: 0.6,
   }));
