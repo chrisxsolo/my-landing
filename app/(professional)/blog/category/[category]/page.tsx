@@ -11,7 +11,7 @@ import { notFound } from "next/navigation";
 import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
 import { getBlogPostSummariesForCategory } from "@/lib/professionalData";
-import { getBlogCategory, getBlogCategorySlugs } from "@/lib/familyGuide/journal";
+import { getBlogCategory, getBlogCategorySlugs } from "@/lib/blogCategories";
 import { FAMILY_GUIDE_CSS } from "@/lib/familyGuide/styles";
 
 export const revalidate = 3600;
@@ -81,10 +81,10 @@ export default async function BlogCategoryPage({
           <p className="fg-kicker"><span className="fg-kicker-dot" /> Journal</p>
           <h1 className="fg-h1">{cat.title}</h1>
           <p className="fg-sub">{cat.intro}</p>
-          {cat.family && (
+          {cat.guide && (
             <div className="fg-actions">
-              <Link href="/family-guide" className="fg-btn fg-btn--primary">Family photography guide →</Link>
-              <Link href="/family-guide/locations" className="fg-btn fg-btn--ghost">Family photo locations</Link>
+              <Link href={cat.guide.href} className="fg-btn fg-btn--primary">{cat.guide.label} →</Link>
+              <Link href={cat.guide.locationsHref} className="fg-btn fg-btn--ghost">{cat.guide.locationsLabel}</Link>
             </div>
           )}
         </div>
@@ -115,11 +115,15 @@ export default async function BlogCategoryPage({
           ) : (
             <div className="fg-empty" data-reveal>
               <p style={{ fontSize: 34, margin: "0 0 10px" }} aria-hidden="true">📓</p>
-              <p style={{ fontWeight: 760, color: "var(--ink)", marginBottom: 6 }}>Family journal posts are on the way.</p>
-              <p style={{ color: "var(--ink-muted)" }}>
-                In the meantime, explore the{" "}
-                <Link href="/family-guide" className="fg-inline-link">family photography guide</Link>.
+              <p style={{ fontWeight: 760, color: "var(--ink)", marginBottom: 6 }}>
+                {cat.guide?.emptyState ?? "Journal posts are on the way."}
               </p>
+              {cat.guide && (
+                <p style={{ color: "var(--ink-muted)" }}>
+                  In the meantime, explore the{" "}
+                  <Link href={cat.guide.href} className="fg-inline-link">{cat.guide.label.toLowerCase()}</Link>.
+                </p>
+              )}
             </div>
           )}
         </div>

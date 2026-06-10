@@ -1,7 +1,8 @@
 import type { MetadataRoute } from "next";
 import { getBlogPostSummaries, getBlogPostSummariesForCategory } from "@/lib/professionalData";
 import { getPublishedFamilyLocations } from "@/lib/familyGuide/locations";
-import { getBlogCategorySlugs } from "@/lib/familyGuide/journal";
+import { getPublishedCouplesLocations } from "@/lib/couplesGuide/locations";
+import { getBlogCategorySlugs } from "@/lib/blogCategories";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // app/sitemap.ts — programmatic sitemap served at /sitemap.xml
@@ -50,6 +51,13 @@ const STATIC_ROUTES: Array<{
   { path: "/family-guide/what-to-expect", changeFrequency: "monthly", priority: 0.6 },
   { path: "/family-guide/best-time-for-family-photos", changeFrequency: "monthly", priority: 0.6 },
   { path: "/family-guide/faq", changeFrequency: "monthly", priority: 0.6 },
+  { path: "/couples-guide", changeFrequency: "monthly", priority: 0.8 },
+  { path: "/couples-guide/locations", changeFrequency: "monthly", priority: 0.7 },
+  { path: "/couples-guide/what-to-wear", changeFrequency: "monthly", priority: 0.6 },
+  { path: "/couples-guide/how-to-prepare", changeFrequency: "monthly", priority: 0.6 },
+  { path: "/couples-guide/what-to-expect", changeFrequency: "monthly", priority: 0.6 },
+  { path: "/couples-guide/best-time-for-couples-photos", changeFrequency: "monthly", priority: 0.6 },
+  { path: "/couples-guide/faq", changeFrequency: "monthly", priority: 0.6 },
   { path: "/bay-area-locations", changeFrequency: "monthly", priority: 0.7 },
   { path: "/faq", changeFrequency: "monthly", priority: 0.6 },
   { path: "/faq/graduation", changeFrequency: "monthly", priority: 0.7 },
@@ -92,6 +100,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.7,
   }));
 
+  // Individual couples-location pages — generated from the published location
+  // registry, so new locations appear in the sitemap automatically once published.
+  const couplesLocationEntries: MetadataRoute.Sitemap = getPublishedCouplesLocations().map((loc) => ({
+    url: `${SITE_URL}${loc.canonicalPath}`,
+    changeFrequency: "monthly",
+    priority: 0.7,
+  }));
+
   // Blog category archives (e.g. the family journal) — included only once a
   // category has at least one post, so empty/thin archives stay out of the index.
   const categoryResults = await Promise.all(
@@ -108,5 +124,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.6,
     }));
 
-  return [...staticEntries, ...familyLocationEntries, ...categoryEntries, ...blogEntries];
+  return [...staticEntries, ...familyLocationEntries, ...couplesLocationEntries, ...categoryEntries, ...blogEntries];
 }
