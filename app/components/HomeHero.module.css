@@ -212,49 +212,19 @@
 }
 
 .pause {
-  min-width: 62px;
-  padding: 0 14px;
-  font-size: 11px;
-  font-weight: 820;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.scroll {
-  position: absolute;
-  z-index: 4;
-  left: 50%;
-  bottom: 38px;
-  display: grid;
-  justify-items: center;
-  gap: 9px;
-  color: color-mix(in srgb, var(--home-paper) 76%, transparent);
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.14em;
-  text-decoration: none;
-  text-transform: uppercase;
-  transform: translateX(-50%);
-}
-
-.scrollLine {
-  width: 1px;
-  height: 28px;
-  background: color-mix(in srgb, var(--home-paper) 60%, transparent);
-  transform-origin: top;
-  animation: scrollPulse 2.4s ease-in-out infinite;
-}
-
-@keyframes scrollPulse {
-  0%,
-  100% {
-    transform: scaleY(0.45);
-    opacity: 0.45;
-  }
-  50% {
-    transform: scaleY(1);
-    opacity: 1;
-  }
+.pause svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
 }
 
 @media (min-width: 821px) and (max-height: 700px) {
@@ -282,10 +252,6 @@
 
   .controls {
     bottom: 18px;
-  }
-
-  .scroll {
-    display: none;
   }
 }
 
@@ -337,7 +303,7 @@
     bottom: 22px;
   }
 
-  .scroll {
+  .arrowControls {
     display: none;
   }
 }
@@ -373,17 +339,12 @@
     right: 18px;
     justify-content: space-between;
   }
-
-  .pause {
-    display: none;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .slide,
   .image,
-  .indicators button,
-  .scrollLine {
+  .indicators button {
     transition: none;
     animation: none;
   }

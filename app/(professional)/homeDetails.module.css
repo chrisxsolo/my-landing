@@ -335,6 +335,21 @@
   line-height: 1.65;
 }
 
+.finalCopy .finalFaqLink {
+  max-width: 580px;
+  margin: 22px 0 0;
+  color: color-mix(in srgb, var(--home-paper) 72%, transparent);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.finalCopy .finalFaqLink a {
+  color: var(--home-paper);
+  font-weight: 750;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 @media (max-width: 1040px) {
   .schoolGrid {
     grid-template-columns: repeat(3, minmax(0, 1fr));

@@ -1,4 +1,3 @@
-import Link from "next/link";
 import type { FeaturedTestimonial } from "@/lib/testimonialsData";
 import styles from "@/app/(professional)/home.module.css";
 import responsive from "@/app/(professional)/homeResponsive.module.css";
@@ -42,13 +41,6 @@ export default function HomeTestimonials({ testimonials }: { testimonials: Featu
               </blockquote>
             </article>
           ))}
-        </div>
-
-        <div className={local.cta} data-reveal>
-          <h3 className={local.ctaHeading}>Ready to Create Your Own Photos?</h3>
-          <div className={`${styles.actions} ${local.actions}`}>
-            <Link href="/contact" className={styles.button}>Inquire About a Session</Link>
-          </div>
         </div>
       </div>
     </section>

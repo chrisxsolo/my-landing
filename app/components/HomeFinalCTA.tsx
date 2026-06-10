@@ -25,6 +25,10 @@ export default function HomeFinalCTA({ image }: { image: HomeImage }) {
               <Link href="/availability" className={styles.button}>Check Availability</Link>
               <Link href="/pricing" className={`${styles.button} ${styles.buttonGhost}`}>View Pricing</Link>
             </div>
+            <p className={details.finalFaqLink}>
+              Questions about posing, weather, outfits, or gallery delivery?{" "}
+              <Link href="/faq">Read the FAQs</Link>
+            </p>
           </div>
         </div>
       </div>

@@ -81,23 +81,6 @@
   font-weight: 650;
 }
 
-.cta {
-  margin-top: 48px;
-  text-align: center;
-}
-
-.ctaHeading {
-  margin: 0 0 18px;
-  color: var(--home-ink);
-  font-size: clamp(1.4rem, 3vw, 2rem);
-  font-weight: 850;
-  letter-spacing: -0.02em;
-}
-
-.cta .actions {
-  justify-content: center;
-}
-
 @media (max-width: 760px) {
   .grid {
     grid-template-columns: 1fr;

@@ -23,6 +23,21 @@ function ArrowIcon({ direction }: { direction: "left" | "right" }) {
   );
 }
 
+function PlaybackIcon({ paused }: { paused: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      {paused ? (
+        <path d="M8 5v14l11-7-11-7Z" />
+      ) : (
+        <>
+          <path d="M9 5v14" />
+          <path d="M15 5v14" />
+        </>
+      )}
+    </svg>
+  );
+}
+
 function trackHero(action: string) {
   track("Homepage Hero Interaction", { action });
 }
@@ -136,11 +151,11 @@ export default function HomeHero({ slides }: { slides: HomepageHeroSlide[] }) {
             Check Availability
           </Link>
           <Link
-            href="#sessions"
+            href="/portfolio"
             className={styles.secondaryAction}
-            onClick={() => trackHero("explore_sessions")}
+            onClick={() => trackHero("view_portfolio")}
           >
-            Explore Sessions
+            View Portfolio
           </Link>
         </div>
       </div>
@@ -183,22 +198,13 @@ export default function HomeHero({ slides }: { slides: HomepageHeroSlide[] }) {
                 setPaused((value) => !value);
                 trackHero(paused ? "play_slideshow" : "pause_slideshow");
               }}
-              aria-label={paused ? "Play hero slideshow" : "Pause hero slideshow"}
+              aria-label={paused ? "Play slideshow" : "Pause slideshow"}
             >
-              {paused ? "Play" : "Pause"}
+              <PlaybackIcon paused={paused} />
             </button>
           ) : null}
         </div>
       ) : null}
-
-      <Link
-        href="#homepage-content"
-        className={styles.scroll}
-        onClick={() => trackHero("scroll_to_content")}
-      >
-        <span>Scroll to explore</span>
-        <span className={styles.scrollLine} aria-hidden="true" />
-      </Link>
     </section>
   );
 }

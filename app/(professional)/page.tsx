@@ -1,12 +1,11 @@
 import type { CSSProperties } from "react";
 import type { Metadata } from "next";
-import HomeConversionSections from "@/app/components/HomeConversionSections";
+import HomeAboutExperience from "@/app/components/HomeAboutExperience";
+import HomeFeaturedWork from "@/app/components/HomeFeaturedWork";
 import HomeFinalCTA from "@/app/components/HomeFinalCTA";
 import HomeHero from "@/app/components/HomeHero";
-import HomepageFAQ from "@/app/components/HomepageFAQ";
-import HomeStorySections from "@/app/components/HomeStorySections";
+import HomeServices from "@/app/components/HomeServices";
 import HomeTestimonials from "@/app/components/HomeTestimonials";
-import { FAQS } from "@/app/(professional)/faq/faqData";
 import { C } from "@/lib/colors";
 import { buildFeaturedSessions, resolveHomepageImages } from "@/lib/homepageData";
 import {
@@ -67,18 +66,6 @@ const COLOR_VARS = {
   "--home-shadow-lg": C.shadowWarmLg,
 } as CSSProperties;
 
-function getHomepageFaqItems() {
-  const allItems = FAQS.flatMap((group) => group.items);
-  const questions = [
-    "I'm not photogenic / I hate being on camera. Will that be a problem?",
-    "How do I book a session?",
-    "What if the weather is bad?",
-    "How long until I receive my photos?",
-    "Can extended family or extra people join?",
-  ];
-  return questions.flatMap((question) => allItems.filter((item) => item.q === question));
-}
-
 async function getHomepageTestimonials() {
   try {
     return await getFeaturedTestimonials(6);
@@ -96,7 +83,7 @@ export default async function ProfessionalHomePage() {
     getHomepageTestimonials(),
   ]);
   const home = resolveHomepageImages(settings, images, CHRIS_PORTRAIT);
-  const featuredSessions = buildFeaturedSessions(posts, images, 3);
+  const featuredSessions = buildFeaturedSessions(posts, images, 2);
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -117,17 +104,14 @@ export default async function ProfessionalHomePage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
       />
       <HomeHero slides={home.heroSlides} />
-      <div id="homepage-content" aria-hidden="true" />
-      <HomeStorySections
+      <HomeServices
         cardGrads={home.cardGrads}
         cardCouples={home.cardCouples}
         cardPortrait={home.cardPortrait}
-        storyImages={home.storyImages}
-        featuredSessions={featuredSessions}
       />
-      <HomeConversionSections aboutPortrait={home.aboutPortrait} />
-      <HomeTestimonials testimonials={featuredTestimonials} />
-      <HomepageFAQ items={getHomepageFaqItems()} />
+      <HomeFeaturedWork images={home.storyImages} featuredSessions={featuredSessions} />
+      <HomeAboutExperience aboutPortrait={home.aboutPortrait} />
+      <HomeTestimonials testimonials={featuredTestimonials.slice(0, 3)} />
       <HomeFinalCTA image={home.finalCta} />
     </main>
   );
