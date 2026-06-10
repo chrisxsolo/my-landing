@@ -542,6 +542,17 @@ export default function ConversationPage() {
   const draftRef          = useRef("");
   useEffect(() => { draftRef.current = draft; }, [draft]);
 
+  // Compose textarea — focused by the mobile "Keyboard" button so the native
+  // on-screen keyboard (with its built-in dictation mic) slides up.
+  const composeRef = useRef<HTMLTextAreaElement | null>(null);
+  function focusComposeForDictation() {
+    const el = composeRef.current;
+    if (!el) return;
+    el.focus();
+    const end = el.value.length;
+    el.setSelectionRange(end, end);
+  }
+
   async function startVoice() {
     setVoiceError(null);
     try {
@@ -1375,6 +1386,12 @@ export default function ConversationPage() {
                 </div>
                 {/* AI action buttons */}
                 <div className="flex gap-2">
+                  <button onClick={focusComposeForDictation}
+                    title="Open the keyboard — use its mic button for native voice dictation"
+                    className="sm:hidden text-xs font-bold px-2.5 py-1.5 rounded-lg transition-all hover:opacity-80 flex items-center gap-1"
+                    style={{ background: "rgba(16,185,129,0.1)", color: "#059669", border: "1px solid rgba(16,185,129,0.25)" }}>
+                    ⌨️ Keyboard
+                  </button>
                   <button onClick={toggleVoice}
                     title={voiceActive ? "Stop recording — will auto-polish" : "Speak your reply — auto-polishes when done"}
                     className="text-xs font-bold px-2.5 py-1.5 rounded-lg transition-all hover:opacity-80 flex items-center gap-1"
@@ -1456,6 +1473,7 @@ export default function ConversationPage() {
                   </button>
                 </div>
                 <textarea
+                  ref={composeRef}
                   value={draft} onChange={e => setDraft(e.target.value)}
                   rows={11}
                   placeholder={"Write your reply here…\n\nTip: type in bullet points and hit ✨ Polish to auto-format into a proper email."}
