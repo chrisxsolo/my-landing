@@ -5,12 +5,12 @@ import {
   finalizeUpload,
   UploadFinalizationError,
 } from "@/lib/contentEngine/finalizeUpload";
+import { isUuid } from "@/lib/contentEngine/uploadConfig";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const MAX_FILENAME_CHARS = 255;
 
 export async function POST(req: NextRequest) {
   const deny = requireAdmin(req);
@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
   const storagePath =
     typeof body.storagePath === "string" ? body.storagePath : "";
 
-  if (!UUID_RE.test(sessionId))
+  if (!isUuid(sessionId))
     return NextResponse.json(
       { error: "sessionId must be a uuid" },
       { status: 400 },
@@ -56,7 +56,9 @@ export async function POST(req: NextRequest) {
       storagePath,
       declared: {
         filename:
-          typeof body.filename === "string" ? body.filename : "upload",
+          typeof body.filename === "string"
+            ? body.filename.slice(0, MAX_FILENAME_CHARS)
+            : "upload",
         mime: typeof body.mime === "string" ? body.mime : "",
         sizeBytes:
           typeof body.sizeBytes === "number" ? body.sizeBytes : 0,

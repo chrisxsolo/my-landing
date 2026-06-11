@@ -5,14 +5,12 @@ import {
   ORIGINALS_BUCKET,
   MAX_UPLOAD_BYTES,
   isAllowedMime,
+  isUuid,
   issueUploadPath,
 } from "@/lib/contentEngine/uploadConfig";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function POST(req: NextRequest) {
   const deny = requireAdmin(req);
@@ -20,7 +18,6 @@ export async function POST(req: NextRequest) {
 
   let body: {
     sessionId?: unknown;
-    filename?: unknown;
     mime?: unknown;
     sizeBytes?: unknown;
   };
@@ -35,7 +32,7 @@ export async function POST(req: NextRequest) {
   const sizeBytes =
     typeof body.sizeBytes === "number" ? body.sizeBytes : -1;
 
-  if (!UUID_RE.test(sessionId))
+  if (!isUuid(sessionId))
     return NextResponse.json(
       { error: "sessionId must be a uuid" },
       { status: 400 },
@@ -61,7 +58,13 @@ export async function POST(req: NextRequest) {
     .select("id")
     .eq("id", normalizedSessionId)
     .maybeSingle();
-  if (sErr) return NextResponse.json({ error: sErr.message }, { status: 500 });
+  if (sErr) {
+    console.error("session lookup failed for sign request", sErr);
+    return NextResponse.json(
+      { error: "could not look up photography session" },
+      { status: 500 },
+    );
+  }
   if (!session)
     return NextResponse.json(
       { error: "photography session not found" },

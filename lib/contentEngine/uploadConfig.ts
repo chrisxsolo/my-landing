@@ -15,6 +15,15 @@ const MIME_EXT: Record<AllowedUploadMime, string> = {
   "image/webp": "webp",
 };
 
+// Shared by the sign/finalize routes to validate session ids at the HTTP
+// boundary. Case-insensitive; DB uuids are lowercase, so callers normalize
+// with .toLowerCase() after this check passes.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function isUuid(value: string): boolean {
+  return UUID_RE.test(value);
+}
+
 export function extForMime(mime: string): string | null {
   return MIME_EXT[mime as AllowedUploadMime] ?? null;
 }
