@@ -38,6 +38,10 @@ function summariesBlock(photos: PhotoSummary[]): string {
   return `Analyzed photos:\n${JSON.stringify(photos, null, 2)}`;
 }
 
+// CALLER CONTRACT: image blocks must be attached to the message in EXACTLY the
+// order of photoIds — the prompt maps "Image N" to the Nth id. A mismatched
+// order produces a silently wrong image↔id pairing that identity validation
+// cannot catch (all ids would still be present and valid).
 export function buildAnalysisPrompt(facts: SessionFactsSnapshot, photoIds: string[]): BuiltPrompt {
   return {
     system:
