@@ -122,3 +122,10 @@ export async function createItem(
 export async function publish(itemId: string) {
   return service.rpc("publish_session_content_item", { p_item_id: itemId });
 }
+
+// The public derivatives bucket exists in production but not in the local
+// stack (the baseline dump is schema-only). Tests create it on demand.
+export async function ensurePublicBucket(name: string) {
+  const { error } = await service.storage.createBucket(name, { public: true });
+  if (error && !/already exists/i.test(error.message)) throw error;
+}

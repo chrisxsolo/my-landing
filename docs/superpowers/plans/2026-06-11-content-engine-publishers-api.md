@@ -111,7 +111,7 @@ async function approvedItem(sessionId: string, contentType: string, payload: Rec
     p_session_id: sessionId, p_model_name: "claude-sonnet-4-6", p_prompt_version: "v1",
     p_selected_types: [contentType === "portfolio_pick" ? "portfolio_pick" : "journal_post"],
     p_session_facts: { service_type: "grads" }, p_generation_settings: {},
-    p_archive_current: false, p_copy_items: [],
+    p_archive_current: true, p_copy_items: [], // archive prior package: tests reuse sessions
   });
   if (pErr) throw pErr;
   const { data, error } = await service.from("session_content_items").insert({
