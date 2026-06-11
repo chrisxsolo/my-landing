@@ -1,0 +1,137 @@
+// All engine prompts live here (spec §8.3) and carry PROMPT_VERSION, which is
+// stored on every package and item. Builders accept ONLY SessionFactsSnapshot
+// (no internal_client_name / internal_notes / email by type construction) plus
+// closed taxonomy lists — output destinations outside those lists fail Zod
+// validation downstream.
+import type { SessionFactsSnapshot } from "@/lib/contentEngine/payloads";
+import {
+  CANONICAL_INTERNAL_LINKS, guideLocationKeys, PORTFOLIO_CATEGORIES,
+  type GuideType, type SchoolSlug,
+} from "@/lib/contentEngine/taxonomy";
+
+export const PROMPT_VERSION = "2026-06-11.1";
+
+export interface BuiltPrompt {
+  system: string;
+  userText: string;
+}
+
+export interface PhotoSummary {
+  session_photo_id: string;
+  alt_text: string | null;
+  title: string | null;
+  description: string | null;
+  tags: string[];
+  quality_score: number | null;
+  suggested_category: string | null;
+}
+
+const BRAND =
+  "You write for soloxsnaps, a Bay Area photographer (grads, couples, families). " +
+  "Voice: warm, specific, natural — never keyword-stuffed, never invented facts.";
+
+function factsBlock(facts: SessionFactsSnapshot): string {
+  return `Session facts (the ONLY facts you may use):\n${JSON.stringify(facts, null, 2)}`;
+}
+
+function summariesBlock(photos: PhotoSummary[]): string {
+  return `Analyzed photos:\n${JSON.stringify(photos, null, 2)}`;
+}
+
+export function buildAnalysisPrompt(facts: SessionFactsSnapshot, photoIds: string[]): BuiltPrompt {
+  return {
+    system:
+      `${BRAND} You analyze session photographs for marketing use. ` +
+      "Return ONLY a JSON object — no prose, no markdown fences.",
+    userText:
+      `${factsBlock(facts)}\n\n` +
+      `You are given ${photoIds.length} image(s). Image N corresponds to session_photo_id N in this list:\n` +
+      photoIds.map((id, i) => `${i + 1}. ${id}`).join("\n") +
+      "\n\nReturn JSON: {\"photos\":[{\"session_photo_id\":\"<uuid from the list>\"," +
+      "\"alt_text\":\"<=300 chars, descriptive, mentions setting/light/attire\"," +
+      "\"title\":\"<=160 chars\",\"description\":\"<=1000 chars\"," +
+      "\"tags\":[\"<=15 short tags\"],\"quality_score\":1-10," +
+      `\"suggested_category\":one of ${JSON.stringify(PORTFOLIO_CATEGORIES)} or null,` +
+      "\"destination_recommendations\":{\"portfolio\":bool,\"school_page\":bool,\"guide\":bool,\"journal\":bool}}]}\n" +
+      "Every listed session_photo_id must appear EXACTLY once. Key results by session_photo_id, never by position alone.",
+  };
+}
+
+export interface JournalInputs {
+  links: { url: string; label: string }[];
+  testimonialQuote: string | null;
+}
+
+export function buildJournalPrompt(
+  facts: SessionFactsSnapshot, photos: PhotoSummary[], inputs: JournalInputs,
+): BuiltPrompt {
+  return {
+    system:
+      `${BRAND} You draft a journal/blog post about one photo session. ` +
+      "Return ONLY JSON: {\"title\",\"slug\" (lowercase-kebab),\"body\" (markdown)," +
+      "\"meta_description\" (<=160 chars),\"photo_ids\":[uuids],\"cover_photo_id\":uuid}. " +
+      "Choose photo_ids and the cover from the provided analyzed photos only.",
+    userText:
+      `${factsBlock(facts)}\n\n${summariesBlock(photos)}\n\n` +
+      `Internal links to weave naturally into the body where relevant (use markdown links; do not invent others):\n` +
+      `${JSON.stringify(inputs.links)}\n\n` +
+      (inputs.testimonialQuote
+        ? `Client words to include as a blockquote, attributed to ${facts.public_display_name ?? "the client"}: "${inputs.testimonialQuote}"\n\n`
+        : "") +
+      "Write 350-600 words. Mention the location and light honestly.",
+  };
+}
+
+export function buildPortfolioPickPrompt(
+  facts: SessionFactsSnapshot, photos: PhotoSummary[],
+): BuiltPrompt {
+  return {
+    system:
+      `${BRAND} You select portfolio-worthy photos. Return ONLY JSON: ` +
+      "{\"picks\":[{\"session_photo_id\":uuid,\"category\":" +
+      `one of ${JSON.stringify(PORTFOLIO_CATEGORIES)},` +
+      "\"title\":\"<=160\",\"alt_text\":\"<=300\",\"description\":\"\",\"featured\":false}]}. " +
+      "Pick at most 8, only quality_score >= 7 unless nothing qualifies (then pick the best 1).",
+    userText: `${factsBlock(facts)}\n\n${summariesBlock(photos)}`,
+  };
+}
+
+export function buildSchoolPagePhotoPrompt(
+  facts: SessionFactsSnapshot, photos: PhotoSummary[], schoolSlug: SchoolSlug,
+): BuiltPrompt {
+  return {
+    system:
+      `${BRAND} You choose photos for a university page gallery. Return ONLY JSON: ` +
+      "{\"placements\":[{\"session_photo_id\":uuid,\"school_slug\":\"" + schoolSlug + "\"," +
+      "\"alt_override\":\"\",\"caption\":\"<=300\",\"sort_order\":0}]}. Pick at most 4.",
+    userText: `${factsBlock(facts)}\n\nschool_slug: ${schoolSlug}\n\n${summariesBlock(photos)}`,
+  };
+}
+
+export function buildGuidePhotoPrompt(
+  facts: SessionFactsSnapshot, photos: PhotoSummary[], guide: GuideType,
+): BuiltPrompt {
+  const keys = guideLocationKeys(guide);
+  return {
+    system:
+      `${BRAND} You place photos on location-guide pages. Return ONLY JSON: ` +
+      "{\"placements\":[{\"session_photo_id\":uuid,\"guide\":\"" + guide + "\"," +
+      "\"location_key\":\"<one of the allowed keys>\",\"alt_text\":\"<=300\"}]}. " +
+      "If no allowed location matches the session, return {\"placements\":[]}.",
+    userText:
+      `${factsBlock(facts)}\n\nAllowed location keys for the ${guide} guide ` +
+      `(any other value is invalid): ${JSON.stringify(keys)}\n\n${summariesBlock(photos)}`,
+  };
+}
+
+export function buildInternalLinkPrompt(facts: SessionFactsSnapshot): BuiltPrompt {
+  return {
+    system:
+      `${BRAND} You suggest internal links for a journal post. You may use ONLY ` +
+      "urls from the provided list — anything else is invalid. Return ONLY JSON: " +
+      "{\"links\":[{\"url\":\"<from list>\",\"label\":\"<=120\",\"reason\":\"<=300\"}]}. Suggest 2-5.",
+    userText:
+      `${factsBlock(facts)}\n\nCanonical internal links (closed list):\n` +
+      JSON.stringify([...CANONICAL_INTERNAL_LINKS], null, 1),
+  };
+}
