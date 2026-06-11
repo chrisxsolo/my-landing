@@ -1,19 +1,21 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/sync-payments
 //
-// Two-pass payment sync with full Gmail access:
+// Two-pass payment detection with full Gmail access. Detected payments are
+// written to `payments_staging` (status "pending") — NEVER directly into
+// `payments`. The ledger only changes when staged rows are approved via
+// /api/admin/payment-staging, which also applies inquiry/availability side
+// effects. Dedup is fingerprint-based (see lib/paymentFingerprint.ts).
 //
 // Pass 1 — Known payment senders: Searches Pixieset, Venmo, Zelle, PayPal,
 //           Cash App notification emails and extracts client info via Claude.
-//           Records EVERY payment (deposit 1, deposit 2, etc.) in `payments`.
-//           paid_at = actual email Date header (not sync time).
-//           Orphan contacts (no matching inquiry) also get a payment row.
+//           Fingerprint = Gmail message id (true source transaction identity).
 //
 // Pass 2 — Per-client sweep: For every unpaid inquiry, searches ALL of Gmail
 //           for emails to/from that client and asks Claude if any contains
-//           payment evidence. Catches anything Pass 1 misses.
+//           payment evidence. Fingerprint = payer|amount|date|method.
 //
-// Returns: { synced: [...], total: number }
+// Returns: { staged: [...], total: number }
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
@@ -22,8 +24,13 @@ import { getValidTokens } from "@/lib/gmailTokens";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { requireAdmin } from "@/lib/requireAdmin";
 import { parsePaymentSyncMonth, withGmailMonthFilter } from "@/lib/paymentSyncShared";
+import { paymentFingerprint } from "@/lib/paymentFingerprint";
 
 export const dynamic = "force-dynamic";
+
+const STAGING_TABLE = "payments_staging";
+const PAYMENTS_TABLE = "payments";
+const EVIDENCE_MAX_CHARS = 500;
 
 type MimePart = {
   mimeType?: string;
@@ -109,13 +116,13 @@ async function searchMessageIds(query: string, auth: string, maxResults: number)
 }
 
 // Returns body text AND the actual email send date from the Date header / internalDate
-async function fetchMessage(id: string, auth: string): Promise<{ content: string; sentAt: string }> {
+async function fetchMessage(id: string, auth: string): Promise<{ id: string; content: string; sentAt: string }> {
   try {
     const res = await fetch(
       `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=full`,
       { headers: { Authorization: auth } }
     );
-    if (!res.ok) return { content: "", sentAt: "" };
+    if (!res.ok) return { id, content: "", sentAt: "" };
     const msg = await res.json() as GmailMessage;
 
     // Extract body
@@ -134,8 +141,8 @@ async function fetchMessage(id: string, auth: string): Promise<{ content: string
       sentAt = new Date(parseInt(msg.internalDate, 10)).toISOString();
     }
 
-    return { content, sentAt };
-  } catch { return { content: "", sentAt: "" }; }
+    return { id, content, sentAt };
+  } catch { return { id, content: "", sentAt: "" }; }
 }
 
 // Pass 1: extract structured payment info from a known payment notification email
@@ -197,77 +204,11 @@ Respond ONLY with valid JSON, no markdown:
   } catch { return null; }
 }
 
-// Dedup key: same person + same amount (case-insensitive, trimmed)
-function paymentKey(name: string, email: string, amount: string): string {
-  return `${(email || name).toLowerCase().trim()}::${amount.toLowerCase().trim()}`;
-}
-
-// Search Gmail for emails to/from clientEmail and ask Claude for the session date.
-// Returns a YYYY-MM-DD string, or null if not found.
-async function detectSessionDate(
-  clientEmail: string,
-  clientName: string,
-  dateInMind: string | null,
-  auth: string,
-  anthropic: Anthropic
-): Promise<string | null> {
-  try {
-    const searchRes = await fetch(
-      `https://gmail.googleapis.com/gmail/v1/users/me/messages` +
-      `?q=${encodeURIComponent(`from:${clientEmail} OR to:${clientEmail}`)}&maxResults=20`,
-      { headers: { Authorization: auth } }
-    );
-    if (!searchRes.ok) return null;
-    const searchData = await searchRes.json() as { messages?: { id: string }[] };
-    const ids = (searchData.messages ?? []).map(m => m.id).slice(0, 15);
-    if (!ids.length) return null;
-
-    const bodies = await Promise.all(ids.map(async id => {
-      try {
-        const r = await fetch(
-          `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=full`,
-          { headers: { Authorization: auth } }
-        );
-        if (!r.ok) return "";
-        const msg = await r.json() as GmailMessage;
-        const { text, html } = extractContent(msg.payload ?? {});
-        return (text || stripHtml(html) || msg.snippet || "").slice(0, 2000);
-      } catch { return ""; }
-    }));
-
-    const emailContext = bodies
-      .filter(Boolean)
-      .map((b, i) => `--- Email ${i + 1} ---\n${b}`)
-      .join("\n\n");
-    if (!emailContext) return null;
-
-    const today = new Date().toISOString().split("T")[0];
-    const currentYear = new Date().getFullYear();
-
-    const res = await anthropic.messages.create({
-      model:      "claude-haiku-4-5",
-      max_tokens: 150,
-      system: `Extract the confirmed or agreed photography session date from these emails. Today is ${today}. Current year is ${currentYear}.
-Rules:
-- Find the most recently discussed/confirmed date.
-- If month+day given without year, use ${currentYear}. Only use ${currentYear + 1} if that date is already past.
-- Confirmation = one person proposes a date + the other agrees ("sounds good", "perfect", "see you then", "that works", "confirmed").
-- Return ONLY valid JSON, no markdown:
-{"date":"YYYY-MM-DD"}
-If no specific session date is mentioned: {"date":null}`,
-      messages: [{
-        role: "user",
-        content: `Client: ${clientName}\nDate they mentioned: ${dateInMind ?? "not specified"}\n\n${emailContext}`,
-      }],
-    });
-
-    const raw = res.content[0].type === "text" ? res.content[0].text.trim() : "{}";
-    const jsonStr = raw.replace(/^```[a-z]*\n?/i, "").replace(/\n?```$/, "");
-    const parsed = JSON.parse(jsonStr) as { date: string | null };
-    if (!parsed.date || !/^\d{4}-\d{2}-\d{2}$/.test(parsed.date)) return null;
-    return parsed.date;
-  } catch { return null; }
-}
+type StagedSummary = {
+  name: string; email: string; amount: string; method: string;
+  invoice: string; paymentType: string; paidAt: string;
+  pass: number; orphan: boolean;
+};
 
 async function syncPayments(req: NextRequest) {
   const deny = requireAdmin(req);
@@ -292,30 +233,44 @@ async function syncPayments(req: NextRequest) {
   const inquiries = allInquiries ?? [];
 
   // Never touch inquiries that are closed/rejected — these statuses mean the
-  // client didn't book, so any matching payment notification is a false positive
-  // (e.g. same invoice number belonging to someone else, or a payment that was
-  // refunded). Keeps them out of all three passes.
+  // client didn't book, so any matching payment notification is a false positive.
   const SKIP_STATUSES = new Set(["not_interested", "archived", "declined", "cancelled", "ghosted"]);
   const activeInquiries = inquiries.filter(inq => !SKIP_STATUSES.has(inq.status));
   const unpaid = activeInquiries.filter(inq => inq.payment_status !== "paid");
 
-  // Load existing payments for dedup logic
-  const { data: existingPaymentRows } = await supabase
-    .from("payments")
-    .select("client_name, client_email, amount, payment_type, inquiry_id");
-
-  const existingPayments = existingPaymentRows ?? [];
-  const existingKeys = new Set<string>(
-    existingPayments.map(p => paymentKey(p.client_name, p.client_email, p.amount))
+  // Fingerprint dedup set: everything already in the ledger or awaiting review.
+  const [{ data: ledgerFps }, { data: stagedFps }] = await Promise.all([
+    supabase.from(PAYMENTS_TABLE).select("fingerprint"),
+    supabase.from(STAGING_TABLE).select("fingerprint").eq("status", "pending"),
+  ]);
+  const knownFingerprints = new Set<string>(
+    [...(ledgerFps ?? []), ...(stagedFps ?? [])]
+      .map(row => row.fingerprint as string)
+      .filter(Boolean)
   );
 
-  const markedPaid = new Set<number>();
+  // Inquiries already handled by a staged pass-1 row this run (skip in pass 2).
+  const handledInquiries = new Set<number>();
+  const staged: StagedSummary[] = [];
 
-  const synced: {
-    name: string; email: string; amount: string; method: string;
-    invoice: string; paymentType: string; paidAt: string;
-    alreadyPaid: boolean; dateBooked?: string; pass: number; orphan: boolean;
-  }[] = [];
+  // Returns false when the fingerprint was already known (nothing staged).
+  async function stageRow(row: {
+    fingerprint: string; inquiry_id: number | null;
+    client_name: string; client_email: string;
+    amount: string; amount_cents: number; method: string;
+    payment_type: string; invoice: string; note: string;
+    source: string; source_txn_id: string;
+    paid_at: string; session_date: string | null; evidence: string;
+  }): Promise<boolean> {
+    if (knownFingerprints.has(row.fingerprint)) return false;
+    const { error } = await supabase.from(STAGING_TABLE).insert({ ...row, status: "pending" });
+    if (error) {
+      console.error("[sync-payments] staging insert failed:", error);
+      return false;
+    }
+    knownFingerprints.add(row.fingerprint);
+    return true;
+  }
 
   // ═══════════════════════════════════════════════════════════════════════════
   // PASS 1 — Known payment sender notification emails
@@ -333,7 +288,7 @@ async function syncPayments(req: NextRequest) {
   const pass1Messages = await Promise.all(pass1Ids.map(id => fetchMessage(id, auth)));
 
   // Extract payment info in batches of 5
-  type Pass1Entry = { payment: PaymentInfo; sentAt: string };
+  type Pass1Entry = { payment: PaymentInfo; messageId: string; sentAt: string; evidence: string };
   const pass1Entries: Pass1Entry[] = [];
   for (let i = 0; i < pass1Messages.length; i += 5) {
     const batch = pass1Messages.slice(i, i + 5);
@@ -341,14 +296,19 @@ async function syncPayments(req: NextRequest) {
       batch.map(m => m.content ? extractPaymentFromNotification(m.content, anthropic) : null)
     );
     results.forEach((r, j) => {
-      if (r) pass1Entries.push({ payment: r, sentAt: batch[j].sentAt });
+      if (r) pass1Entries.push({
+        payment: r,
+        messageId: batch[j].id,
+        sentAt: batch[j].sentAt,
+        evidence: batch[j].content.slice(0, EVIDENCE_MAX_CHARS),
+      });
     });
   }
 
-  // Match pass 1 payments to inquiries (allow multiple payments per person)
-  for (const { payment, sentAt } of pass1Entries) {
+  for (const { payment, messageId, sentAt, evidence } of pass1Entries) {
     const clientEmail = payment.clientEmail?.toLowerCase();
     const clientName  = payment.clientName?.toLowerCase().trim();
+    if (!payment.clientName?.trim()) continue;
 
     let matching = clientEmail?.includes("@")
       ? activeInquiries.filter(inq => inq.email?.toLowerCase() === clientEmail)
@@ -370,124 +330,53 @@ async function syncPayments(req: NextRequest) {
       });
     }
 
-    const pKey = paymentKey(payment.clientName, payment.clientEmail, payment.amount);
-    const alreadyRecorded = existingKeys.has(pKey);
-    // Use the real email send date; fall back to now only if unavailable
+    const amountCents = parseCents(payment.amount);
     const paidAt = sentAt || new Date().toISOString();
+    // Gmail message id is the true transaction identity…
+    const txnFingerprint = paymentFingerprint({ sourceTxnId: `gmail:${messageId}`, amountCents, paidAt });
+    // …but legacy ledger rows were backfilled with field hashes, so check both.
+    const fieldFingerprint = paymentFingerprint({
+      clientEmail: payment.clientEmail,
+      clientName: payment.clientName,
+      amountCents,
+      paidAt,
+      method: payment.method,
+    });
+    if (knownFingerprints.has(fieldFingerprint)) continue;
 
-    if (matching.length) {
-      const alreadyPaid = matching.every(inq => inq.payment_status === "paid");
-      const note = [
-        payment.amount && `${payment.method || "Payment"}: ${payment.amount}`,
-        payment.invoice && `Invoice ${payment.invoice}`,
-      ].filter(Boolean).join(" · ");
+    const inq = matching[0] ?? null;
+    const note = [
+      payment.amount && `${payment.method || "Payment"}: ${payment.amount}`,
+      payment.invoice && `Invoice ${payment.invoice}`,
+    ].filter(Boolean).join(" · ");
 
-      const now = new Date().toISOString();
-      const newlyPaidIds = matching
-        .filter(inq => !markedPaid.has(inq.id) && inq.payment_status !== "paid")
-        .map(inq => inq.id);
-      const allMatchIds = matching.map(inq => inq.id);
+    const didStage = await stageRow({
+      fingerprint: txnFingerprint,
+      inquiry_id: inq?.id ?? null,
+      client_name: payment.clientName,
+      client_email: payment.clientEmail,
+      amount: payment.amount,
+      amount_cents: amountCents,
+      method: payment.method,
+      payment_type: payment.paymentType,
+      invoice: payment.invoice,
+      note,
+      source: "pass1",
+      source_txn_id: `gmail:${messageId}`,
+      paid_at: paidAt,
+      session_date: inq?.session_date ?? null,
+      evidence,
+    });
 
-      await supabase.from("inquiries").update({
-        payment_status: "paid", payment_note: note,
-        payment_detected_at: now, booking_confirmed: true,
-      }).in("id", allMatchIds);
+    matching.forEach(m => handledInquiries.add(m.id));
 
-      if (newlyPaidIds.length) {
-        await supabase.from("inquiries").update({ deposit_paid_at: paidAt }).in("id", newlyPaidIds);
-      }
-
-      allMatchIds.forEach(id => markedPaid.add(id));
-
-      if (!alreadyRecorded) {
-        existingKeys.add(pKey);
-        const inq = matching[0];
-        const sessionDate: string | null = inq.session_date ?? null;
-        await supabase.from("payments").insert({
-          inquiry_id:   inq.id,
-          client_name:  payment.clientName,
-          client_email: payment.clientEmail,
-          amount:       payment.amount,
-          amount_cents: parseCents(payment.amount),
-          method:       payment.method,
-          payment_type: payment.paymentType,
-          invoice:      payment.invoice,
-          note,
-          source:       "pass1",
-          paid_at:      paidAt,
-          session_date: sessionDate,
-        });
-      }
-
-      let dateBooked: string | undefined;
-      const primaryInq = matching[0];
-
-      // Try to auto-detect session date from Gmail if not already set
-      let resolvedSessionDate = matching.find(inq => inq.session_date)?.session_date ?? null;
-      if (!resolvedSessionDate && payment.clientEmail?.includes("@")) {
-        resolvedSessionDate = await detectSessionDate(
-          payment.clientEmail, payment.clientName, null, auth, anthropic
-        );
-        if (resolvedSessionDate) {
-          await supabase.from("inquiries")
-            .update({ session_date: resolvedSessionDate })
-            .in("id", allMatchIds);
-        }
-      }
-
-      if (!alreadyPaid && resolvedSessionDate) {
-        await supabase.from("availability").upsert(
-          { date: resolvedSessionDate, status: "booked", note: payment.clientName },
-          { onConflict: "date" }
-        );
-        dateBooked = resolvedSessionDate;
-      }
-
-      // Update the payment row's session_date if we just found one
-      if (resolvedSessionDate && !alreadyRecorded) {
-        await supabase.from("payments")
-          .update({ session_date: resolvedSessionDate })
-          .eq("inquiry_id", primaryInq.id)
-          .eq("client_email", payment.clientEmail);
-      }
-
-      synced.push({
+    if (didStage) {
+      staged.push({
         name: payment.clientName, email: payment.clientEmail,
         amount: payment.amount, method: payment.method,
         invoice: payment.invoice, paymentType: payment.paymentType,
-        paidAt, alreadyPaid, dateBooked, pass: 1, orphan: false,
+        paidAt, pass: 1, orphan: !inq,
       });
-    } else {
-      // No matching inquiry — orphan payment
-      if (!alreadyRecorded && payment.clientName.trim()) {
-        existingKeys.add(pKey);
-        const note = [
-          payment.amount && `${payment.method || "Payment"}: ${payment.amount}`,
-          payment.invoice && `Invoice ${payment.invoice}`,
-        ].filter(Boolean).join(" · ");
-
-        await supabase.from("payments").insert({
-          inquiry_id:   null,
-          client_name:  payment.clientName,
-          client_email: payment.clientEmail,
-          amount:       payment.amount,
-          amount_cents: parseCents(payment.amount),
-          method:       payment.method,
-          payment_type: payment.paymentType,
-          invoice:      payment.invoice,
-          note,
-          source:       "orphan",
-          paid_at:      paidAt,
-          session_date: null,
-        });
-
-        synced.push({
-          name: payment.clientName, email: payment.clientEmail,
-          amount: payment.amount, method: payment.method,
-          invoice: payment.invoice, paymentType: payment.paymentType,
-          paidAt, alreadyPaid: false, pass: 1, orphan: true,
-        });
-      }
     }
   }
 
@@ -496,11 +385,9 @@ async function syncPayments(req: NextRequest) {
   // ═══════════════════════════════════════════════════════════════════════════
 
   const clientSweepInquiries = syncMonth ? activeInquiries : unpaid;
-  const stillUnpaid = clientSweepInquiries.filter(inq => !markedPaid.has(inq.id));
+  const stillUnpaid = clientSweepInquiries.filter(inq => !handledInquiries.has(inq.id));
 
   for (const inq of stillUnpaid) {
-    if (markedPaid.has(inq.id)) continue;
-
     const [threadIds, paymentMentionIds] = await Promise.all([
       searchMessageIds(withGmailMonthFilter(`from:${inq.email} OR to:${inq.email}`, syncMonth), auth, 10),
       searchMessageIds(
@@ -527,76 +414,50 @@ async function syncPayments(req: NextRequest) {
 
     // Use earliest message date that has content as the paid_at approximation
     const paidAt = messages.find(m => m.content && m.sentAt)?.sentAt || new Date().toISOString();
-    const now = new Date().toISOString();
     const note = [
       result.note,
       result.amount && `${result.amount}`,
       result.method && `via ${result.method}`,
     ].filter(Boolean).join(" · ");
 
-    await supabase.from("inquiries").update({
-      payment_status: "paid", payment_note: note,
-      payment_detected_at: now, deposit_paid_at: paidAt,
-      booking_confirmed: true,
-    }).eq("id", inq.id);
+    const fingerprint = paymentFingerprint({
+      clientEmail: inq.email ?? "",
+      clientName: inq.name ?? "",
+      amountCents,
+      paidAt,
+      method: result.method,
+    });
 
-    markedPaid.add(inq.id);
+    const didStage = await stageRow({
+      fingerprint,
+      inquiry_id: inq.id,
+      client_name: inq.name ?? "",
+      client_email: inq.email ?? "",
+      amount: result.amount,
+      amount_cents: amountCents,
+      method: result.method,
+      payment_type: result.paymentType,
+      invoice: "",
+      note,
+      source: "pass2",
+      source_txn_id: "",
+      paid_at: paidAt,
+      session_date: inq.session_date ?? null,
+      evidence: context.slice(0, EVIDENCE_MAX_CHARS),
+    });
 
-    const pKey = paymentKey(inq.name ?? "", inq.email ?? "", result.amount);
-    if (!existingKeys.has(pKey)) {
-      existingKeys.add(pKey);
-      await supabase.from("payments").insert({
-        inquiry_id:   inq.id,
-        client_name:  inq.name ?? "",
-        client_email: inq.email ?? "",
-        amount:       result.amount,
-        amount_cents: amountCents,
-        method:       result.method,
-        payment_type: result.paymentType,
-        invoice:      "",
-        note,
-        source:       "pass2",
-        paid_at:      paidAt,
-        session_date: inq.session_date ?? null,
+    if (didStage) {
+      handledInquiries.add(inq.id);
+      staged.push({
+        name: inq.name ?? "", email: inq.email ?? "",
+        amount: result.amount, method: result.method,
+        invoice: "", paymentType: result.paymentType,
+        paidAt, pass: 2, orphan: false,
       });
     }
-
-    // Auto-detect session date from Gmail if not already set
-    let resolvedDate = inq.session_date ?? null;
-    if (!resolvedDate && inq.email) {
-      resolvedDate = await detectSessionDate(
-        inq.email, inq.name ?? "", null, auth, anthropic
-      );
-      if (resolvedDate) {
-        await supabase.from("inquiries")
-          .update({ session_date: resolvedDate })
-          .eq("id", inq.id);
-        // Back-fill the payment row we just inserted
-        await supabase.from("payments")
-          .update({ session_date: resolvedDate })
-          .eq("inquiry_id", inq.id)
-          .eq("source", "pass2");
-      }
-    }
-
-    let dateBooked: string | undefined;
-    if (resolvedDate) {
-      await supabase.from("availability").upsert(
-        { date: resolvedDate, status: "booked", note: inq.name },
-        { onConflict: "date" }
-      );
-      dateBooked = resolvedDate;
-    }
-
-    synced.push({
-      name: inq.name ?? "", email: inq.email ?? "",
-      amount: result.amount, method: result.method,
-      invoice: "", paymentType: result.paymentType,
-      paidAt, alreadyPaid: false, dateBooked, pass: 2, orphan: false,
-    });
   }
 
-  return NextResponse.json({ synced, total: synced.length });
+  return NextResponse.json({ staged, total: staged.length });
 }
 
 export async function POST(req: NextRequest) {
