@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   ORIGINALS_BUCKET, MAX_UPLOAD_BYTES, MAX_IMAGE_PIXELS, ALLOWED_UPLOAD_MIME,
-  extForMime, issueUploadPath, isOwnedUploadPath,
+  extForMime, isAllowedMime, issueUploadPath, isOwnedUploadPath,
 } from "@/lib/contentEngine/uploadConfig";
 
 const SESSION = "11111111-1111-4111-8111-111111111111";
@@ -45,5 +45,19 @@ describe("path issue + ownership", () => {
 
   it("rejects issuing a path for a disallowed MIME", () => {
     expect(() => issueUploadPath(SESSION, "image/gif")).toThrow(/mime|unsupported/i);
+  });
+
+  it("guards MIME types with narrowing", () => {
+    expect(isAllowedMime("image/jpeg")).toBe(true);
+    expect(isAllowedMime("image/gif")).toBe(false);
+    expect(isAllowedMime("")).toBe(false);
+  });
+
+  it("normalizes session-id casing: issued paths are lowercase and ownership is case-insensitive", () => {
+    const upper = SESSION.toUpperCase();
+    const p = issueUploadPath(upper, "image/jpeg");
+    expect(p.startsWith(`originals/${SESSION}/`)).toBe(true); // lowercased on issue
+    expect(isOwnedUploadPath(p, SESSION)).toBe(true);         // canonical DB id matches
+    expect(isOwnedUploadPath(p, upper)).toBe(true);           // request-cased id matches too
   });
 });
