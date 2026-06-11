@@ -14,8 +14,8 @@ describe("school, guide, and testimonial publishers", () => {
 
     const { data: row } = await service.from("school_page_photos")
       .select("id,school_slug,session_photo_id,active").eq("session_photo_id", photo.id).single();
-    expect(row.school_slug).toBe("sjsu");
-    expect(row.active).toBe(true);
+    expect(row!.school_slug).toBe("sjsu");
+    expect(row!.active).toBe(true);
   });
 
   it("guide_photo concurrency: advisory lock yields exactly one row", async () => {

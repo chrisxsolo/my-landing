@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import { readdirSync } from "node:fs";
 import path from "node:path";
 import {
-  SERVICE_TYPES, SCHOOL_SLUGS, PORTFOLIO_CATEGORIES, LIGHTING_CONDITIONS,
-  CONTENT_TYPES, GENERATABLE_CONTENT_TYPES, PUBLICATION_TARGET_TYPES, GUIDE_TYPES,
+  SERVICE_TYPES, SCHOOL_SLUGS, LIGHTING_CONDITIONS,
+  CONTENT_TYPES, GENERATABLE_CONTENT_TYPES, PUBLICATION_TARGET_TYPES,
   CANONICAL_INTERNAL_LINKS,
   isServiceType, isSchoolSlug, isPortfolioCategory, isLightingCondition,
   isContentType, isGuideType, isGuideLocationKey, isCanonicalInternalLink,

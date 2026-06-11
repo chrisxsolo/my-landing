@@ -30,9 +30,9 @@ describe("portfolio publisher", () => {
     const { data: img } = await service.from("portfolio_images")
       .select("image_url,content_hash,category_slug,alt,title,featured")
       .eq("content_hash", photo.content_hash).single();
-    expect(img.image_url).toBe(photo.public_derivative_url);
-    expect(img.category_slug).toBe("grads");
-    expect(img.featured).toBe(false);
+    expect(img!.image_url).toBe(photo.public_derivative_url);
+    expect(img!.category_slug).toBe("grads");
+    expect(img!.featured).toBe(false);
   });
 
   it("reconciles to an existing row with the same content_hash instead of duplicating", async () => {
