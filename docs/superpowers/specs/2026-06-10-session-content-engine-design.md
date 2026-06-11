@@ -24,9 +24,14 @@ Completed session
 ```
 
 **Core invariant:** live tables (`blog_posts`, `portfolio_images`, guide photo
-tables) and public storage are never touched until an item is explicitly
-published. Drafts cannot leak: unapproved images live in a private bucket and
-unapproved copy lives only in staging tables.
+tables) are never touched, and public storage is never touched, until an
+**administrator explicitly initiates publication for an approved item**.
+Drafts cannot leak: unapproved images live in a private bucket and unapproved
+copy lives only in staging tables. Within an initiated publication, Step A may
+create an unreferenced public derivative before Step B's transaction commits;
+if Step B fails the derivative remains an orphaned but unlinked asset, retries
+reuse the same content-addressed file, and orphan reconciliation can remove
+unused derivatives later (§9.1).
 
 ### v1 outputs per session
 
@@ -34,10 +39,17 @@ unapproved copy lives only in staging tables.
 - Portfolio picks + per-photo SEO metadata (alt/title)
 - School-page photo placements (new DB-backed gallery on `/grads/*`)
 - Guide-photo placements (`family_location_photos` / `couples_location_photos`)
-- Social caption drafts (copy-paste; no auto-posting)
 - Testimonial linking
 - Internal-link suggestions
 - First-party content analytics (`page_view`, `cta_click`)
+
+### Phase 2 (schema-supported, deliberately not built in v1)
+
+Social caption drafts. `social_caption` stays in the `content_type`
+constraint, payload schemas, and publisher design so adding it later needs no
+redesign — but v1 ships **no** social-caption generator, editor, approval
+flow, or publisher, and the generation UI does not offer the type in
+`selected_types`. v1 focuses on durable website and SEO outputs.
 
 ### Explicit non-goals (v1)
 
@@ -78,9 +90,17 @@ shoots, portfolio collaborations, marketing-only sessions).
 
 ## 3. Data model
 
-Six new tables, one modified table, two RPCs. Check constraints over Postgres
+Six new tables, one new column on `testimonials`, one new unique index on
+`portfolio_images.content_hash`, two RPCs. Check constraints over Postgres
 enums (matches the `testimonials` house style). All tables with `updated_at`
 get the existing `set_updated_at` trigger.
+
+All live-schema assumptions in this spec were verified against the production
+database on 2026-06-10 (`information_schema.columns` / `pg_indexes`):
+`blog_posts` has no `excerpt` or `meta_title` columns but has
+`meta_keywords`, `og_image_url`, `cover_image_alt`, `extra_image_alts`;
+`portfolio_images.content_hash` exists (text, nullable; 43 of 173 rows
+populated; zero duplicate hashes) with a non-unique index only.
 
 ### 3.1 `photography_sessions`
 
@@ -311,9 +331,10 @@ create index session_content_items_published_target_lookup
 Payload shapes (Zod, abbreviated):
 
 ```jsonc
-// journal_post
-{ "title": "", "slug": "", "body": "", "excerpt": "",
-  "meta_title": "", "meta_description": "",
+// journal_post  (no excerpt/meta_title: blog_posts has no such columns —
+//                nothing is staged that publication would discard, §9.3)
+{ "title": "", "slug": "", "body": "", "meta_description": "",
+  "meta_keywords": "",
   "photo_ids": ["uuid"], "cover_photo_id": "uuid",
   "internal_links": [{ "url": "/grads/sjsu", "label": "" }],
   "testimonial_id": null }
@@ -330,7 +351,7 @@ Payload shapes (Zod, abbreviated):
 { "session_photo_id": "uuid", "guide": "family|couples",
   "location_key": "", "alt_text": "" }
 
-// social_caption
+// social_caption (Phase 2 — schema-supported, not generated/published in v1)
 { "platform": "instagram|tiktok", "caption": "", "photo_ids": ["uuid"] }
 
 // testimonial_feature
@@ -440,9 +461,10 @@ client_sessions (uuid)        inquiries (bigint)
 ### 4.1 Buckets
 
 - **`session-content-originals` (new, private).** No public access, no
-  anon/authenticated storage policies. Holds all uploaded originals forever:
-  included, excluded, rejected, archived. Admin UI thumbnails use short-lived
-  (1h) signed read URLs. Not reusing the public `grad-photos` bucket.
+  anon/authenticated storage policies. Holds all uploaded originals —
+  included, excluded, rejected, archived — under the retention policy in
+  §4.4. Admin UI thumbnails use short-lived (1h) signed read URLs. Not
+  reusing the public `grad-photos` bucket.
 - **Existing public bucket(s).** Receive only published derivatives at
   `engine/<session_id>/<photo_id>/<content_hash>.jpg` — content-addressed so a
   replaced source can never serve stale bytes through caches. Published bytes
@@ -488,14 +510,51 @@ duplicate warning, instant UI). Authoritative flow:
 - A-succeeded/B-failed gap is harmless: an unreferenced public file, reused
   verbatim on retry.
 
+### 4.4 Private-source retention policy
+
+"Forever" is not the operational rule:
+
+- Private sources are retained until manually deleted or until the retention
+  review window expires. Default retention window: **24 months after
+  `session_date`**, after which the session surfaces in a retention-review
+  list — nothing is auto-deleted in v1.
+- Deleting a source for a session with active public placements requires a
+  blocking warning listing those placements. Published derivatives are
+  independent files, so deleting a private source never breaks published
+  content.
+- Excluded or rejected images may be deleted earlier, after confirming no
+  approved or published item references them.
+- Abandoned uploads (signed URL issued/used but never finalized) are cleaned
+  automatically after 7 days; invalid uploads are deleted immediately at
+  finalization (§4.2).
+- Permission revocation offers an **optional** source-deletion action; it
+  never deletes sources automatically.
+- Package archival has no effect on source retention.
+- Deferred cleanup tooling (§15): abandoned-upload sweep, orphaned private
+  objects after session deletion, retention-window review.
+
 ---
 
 ## 5. RLS and authorization
 
 Every new table copies the `testimonials` lockdown: `revoke all from anon,
 authenticated; grant all to service_role; enable + force row level security;`
-**no anon/authenticated policies.** Both RPCs are `security definer` with
-`EXECUTE` revoked from `anon`/`authenticated`.
+**no anon/authenticated policies.**
+
+Both RPCs are `security definer set search_path = public, pg_temp`, use fully
+qualified table names, and avoid dynamically constructed SQL. For each
+function, `EXECUTE` is revoked from **`PUBLIC`**, `anon`, and `authenticated`
+(all three, explicitly — `PUBLIC` gets default EXECUTE on new functions), and
+granted only to the service-role server path:
+
+```sql
+revoke all on function public.create_content_package(...) from public, anon, authenticated;
+revoke all on function public.publish_session_content_item(uuid) from public, anon, authenticated;
+```
+
+Verification tests confirm: `PUBLIC` cannot execute, `anon` cannot,
+`authenticated` cannot, the service-role path can, and the function cannot be
+redirected through a malicious search-path object.
 
 | Operation | Path | Auth |
 |---|---|---|
@@ -611,8 +670,13 @@ Per-photo: signed-URL thumbnail, analysis-status chip
 quality, destination recommendations), **Exclude** toggle (greyed; removed
 from analysis/generation/publication; never deleted). Toolbar: select all,
 exclude/include selected, set cover candidate, filter by analysis state or
-recommendation, manual sort, near-duplicate groups (by perceptual similarity
-of tags/quality in v1 — exact-duplicate by hash always). Section header shows
+recommendation, manual sort. Duplicate handling in v1: **exact** duplicates
+are prevented by server-computed SHA-256 (§4.2); the AI analysis may flag
+likely-similar frames as a non-authoritative variety suggestion. v1 does not
+claim or advertise deterministic near-duplicate grouping — tags and quality
+scores do not measure visual similarity; true near-duplicate detection
+(perceptual hashing, embeddings, SSIM, visual clustering) is deferred (§15).
+Section header shows
 batch progress with **Retry failed** and lease-aware
 *"Analysis interrupted 14 minutes ago — [Resume analysis]"*.
 
@@ -632,8 +696,8 @@ editor, **Approve**, **Reject** (optional reason), **Un-reject**. Editors:
 journal post — full-screen title/slug/body/meta/photo-picker/internal-links;
 portfolio picks — per-photo title/alt/category(live `portfolio_categories`)/
 featured; school/guide — validated destination dropdowns (canonical taxonomy /
-actual guide location lists), alt override, sort; social — per-platform
-textareas; testimonial — matched-by-email candidate with quote excerpt.
+actual guide location lists), alt override, sort; testimonial —
+matched-by-email candidate with quote excerpt. (Social-caption editor: Phase 2.)
 Destination dropdowns make invalid slugs unrepresentable.
 
 **Autosave (server-backed).** Debounced (~1.5s) `PATCH` of the item payload
@@ -703,6 +767,10 @@ testimonial_feature ───────▶ journal_post         validated agai
 all others: independent                           canonical URL list, then fed
                                                   into journal generation)
 ```
+
+v1 `selected_types` offers: `journal_post`, `portfolio_pick`,
+`school_page_photo`, `guide_photo`, `testimonial_feature`,
+`internal_link_suggestion`. `social_caption` is Phase 2 and not offered.
 
 `POST .../packages` → **RPC `create_content_package`** (one transaction):
 row-lock the session (`select … for update`), archive the active package if
@@ -807,6 +875,12 @@ Step C (after commit, retry-safe, recorded as recoverable tasks on failure)
 - **portfolio_pick** → insert `portfolio_images` (derivative URL +
   `content_hash`). Existing row with the same hash is provably the same bytes
   → reconcile (point `published_target_*` at it) instead of duplicating.
+  Production verified 2026-06-10: the `content_hash` column exists (43/173
+  rows populated, zero duplicate hashes) but has only a non-unique index;
+  migration 7 adds the partial unique index that makes this race-safe. Legacy
+  rows with null hashes cannot be hash-reconciled — publishing a photo that
+  visually duplicates an un-hashed legacy image creates a second record until
+  the optional legacy backfill (§15) computes their hashes.
 - **school_page_photo** → insert `school_page_photos`; the
   `(school_slug, session_photo_id)` unique constraint makes concurrent
   conflicts reconcilable in-transaction.
@@ -816,8 +890,9 @@ Step C (after commit, retry-safe, recorded as recoverable tasks on failure)
   (table, location, derivative hash), then checks-and-inserts. (Adding unique
   indexes to those tables is a candidate follow-up after auditing existing
   rows; not assumed for v1.)
-- **social_caption** → no live table; `published_target_type='none'`;
-  published = marked done for copy-paste.
+- **social_caption** (Phase 2 — design retained, not built in v1) → no live
+  table; `published_target_type='none'`; published = marked done for
+  copy-paste.
 - **testimonial_feature** → sets `testimonials.photography_session_id`
   (target = testimonial uuid).
 - **internal_link_suggestion** → consumed by journal generation;
@@ -827,7 +902,45 @@ The partial unique index on `(published_target_type, published_target_id)`
 guarantees two staging items can never claim one live record, on top of the
 per-item idempotency key.
 
-### 9.3 Reconciliation
+### 9.3 Journal payload → `blog_posts` mapping (exact; verified against production schema 2026-06-10)
+
+| Staged payload | Live `blog_posts` column / behavior |
+|---|---|
+| `title` | `title` (also serves as the meta title — see below) |
+| `slug` | `slug` (conflict aborts the transaction, §9.2) |
+| `body` (testimonial blockquote already inline) + deterministic "Keep exploring" section | `body` |
+| `meta_description` | `meta_description` |
+| `meta_keywords` | `meta_keywords` |
+| `cover_photo_id` → `session_photos.public_derivative_url` | `cover_image_url` |
+| `cover_photo_id` → `session_photos.alt_text` | `cover_image_alt` |
+| `photo_ids` minus cover → derivative URLs, in payload order | `extra_image_urls` |
+| same photos → `session_photos.alt_text`, index-aligned | `extra_image_alts` |
+| cover derivative URL | `og_image_url` |
+| transaction time | `published_at` |
+| fixed configuration | `sites = ['professional']`, `category = 'professional'` |
+
+Explicit decisions — no staged field is silently discarded:
+
+- **`excerpt`: not staged.** `blog_posts` has no excerpt column (verified);
+  listing previews derive from `body` at render time. Nothing is generated
+  that publication would throw away.
+- **`meta_title`: not staged.** The post title is the meta title (current
+  site behavior); no migration.
+- **`meta_keywords`: staged.** Derived **deterministically** from the
+  approved taxonomy (school, location, service type) at generation time — not
+  AI-invented — and editable in the journal editor; maps to the existing
+  `meta_keywords` column.
+- **Internal links:** stored structured in `payload.internal_links` while in
+  draft (so the editor adds/removes links without hand-editing markup), then
+  deterministically rendered into a final **"Keep exploring"** section
+  appended to `body` inside the publication transaction.
+- **Testimonial quote:** when `payload.testimonial_id` is set, generation
+  embeds the quote as a blockquote inside the draft `body` (attributed to the
+  public display name) so Chris reviews and edits it inline; publication
+  publishes the body as-is. The separate `testimonial_feature` item records
+  the session relationship on the `testimonials` row.
+
+### 9.4 Reconciliation
 
 `GET /api/admin/session-content/reconcile?session=…`, surfaced as a workspace
 banner: items stuck `publishing` past the lease (resume or fail), `failed`
@@ -852,12 +965,29 @@ required for slug matches — plus the orphaned-derivative report (§4.3).
   because no Public Suffix List dependency is added; the admin view may group
   known hostnames into friendly labels), **server timestamps only** (a client
   timestamp, if ever wanted, would be stored separately and range-bounded).
-- Attribution at write time: `(content_type, content_id)` →
-  indexed reverse lookup on `(published_target_type, published_target_id)` —
-  never `content_id` alone — stamping `content_item_id` and
-  `photography_session_id`.
-- Admin surfaces: per-item view counts in publication history; per-session
-  rollup in the workspace.
+- Attribution rules — no false attribution on shared pages:
+  - **Single-session content** (a journal post page; an explicit
+    click/open of one specific published photo or session highlight): the
+    event carries the live target identity; the server resolves
+    `(published_target_type, published_target_id)` — never `content_id`
+    alone, since numeric and textual IDs overlap across live tables — via
+    the indexed reverse lookup and stamps `content_item_id` +
+    `photography_session_id`.
+  - **Shared pages** (`/grads/*`, `/portfolio`, guide pages, homepage): the
+    general `page_view` stores only path, page content type/identifier,
+    event type, referrer hostname, and server timestamp;
+    `content_item_id` and `photography_session_id` stay **null**. A school
+    page shows many sessions' photos — its views belong to the page, not to
+    any one session.
+  - **Interactions on shared pages** attribute to a session only when the
+    user interacts with a specific published item (e.g. opens a session
+    photo), in which case the event carries that item's target identity and
+    resolves as single-session content.
+  - **CTA clicks** are attributed to the page they happen on, never to a
+    session whose image happened to appear there.
+- Admin surfaces: per-item view counts in publication history (true page
+  views for journal posts; interaction events only for placements on shared
+  pages); per-session rollup in the workspace.
 
 ---
 
@@ -893,7 +1023,8 @@ cross-session reporting is needed later: an additive `ai_usage_log` table.
 `deriveSessionEngineState` (the ten mandated cases, §6), every Zod schema
 (valid + hostile inputs), taxonomy validators, idempotency-key builder,
 copy-forward rules, lease-expiry logic, path/referrer normalization, adaptive
-batch sizing.
+batch sizing, and the attribution rules (shared-page view → null session/item;
+single-session view → resolved item; CTA → page, never a session).
 
 ### 13.2 Integration (mandatory, scripted, against a disposable Supabase
 branch or local instance — tests call the actual RPCs)
@@ -906,7 +1037,9 @@ image-library rows atomic); transaction rollback on live-table failure;
 repeat publication attempt; target reconciliation; guide-photo concurrency
 (advisory lock); permission revocation and takedown; public-derivative
 authorization (unapproved/rejected/foreign-photo attempts); expired
-publication recovery.
+publication recovery; RPC EXECUTE denied for `PUBLIC`, `anon`, and
+`authenticated` while the service-role path succeeds; search-path
+redirection attempt fails against the pinned `search_path`.
 
 ### 13.3 SQL verify scripts
 
@@ -932,14 +1065,39 @@ Additive-only; each migration ships with `_rollback.sql` and `_verify.sql`.
 4. `create_school_page_photos`
 5. `create_content_events`
 6. `alter_testimonials_add_photography_session`
-7. `create_content_engine_rpcs` (`create_content_package`,
-   `publish_session_content_item`; security definer; EXECUTE revoked from
-   anon/authenticated)
+7. `add_portfolio_images_content_hash_unique` —
+   `add column if not exists content_hash text null` (a no-op in production,
+   verified present 2026-06-10; the guard keeps the migration portable) +
+   `create unique index ... on portfolio_images(content_hash) where
+   content_hash is not null`. Safe to apply: zero duplicate hashes exist.
+   Null-hash behavior: the 130 legacy rows without hashes are unaffected by
+   the partial index and cannot participate in hash reconciliation; a
+   gradual backfill (compute SHA-256 from stored bytes) is optional (§15).
+8. `create_content_engine_rpcs` (`create_content_package`,
+   `publish_session_content_item`; `security definer set search_path =
+   public, pg_temp`; EXECUTE revoked from PUBLIC, anon, and authenticated)
 
-Rollback order is the reverse; every rollback is a drop of objects created by
-its migration (the `testimonials` rollback drops one nullable column). No
-destructive operations against existing data anywhere. Existing content
-remains unlinked to photography sessions until optionally backfilled.
+The forward direction is additive-only: no existing data is rewritten or
+deleted anywhere, and existing content remains unlinked to photography
+sessions until optionally backfilled.
+
+### Rollback modes
+
+**Pre-launch** (migration testing; no production data in the new tables):
+rollbacks run in reverse order and may drop the newly created tables,
+indexes, functions, the nullable `testimonials` column, the
+`portfolio_images` unique index (the column is dropped only if this
+migration created it), and the private bucket if empty. Every `_rollback.sql`
+guards itself: it **fails with an explicit notice if its target tables
+contain rows**.
+
+**Post-launch** (real sessions, drafts, photos, or analytics exist):
+rollback means disabling, not destroying — disable the content-engine
+routes, revert the application deployment, revoke RPC EXECUTE, and preserve
+all new tables and stored data, private source images, and public
+derivatives that remain referenced. Any destructive step requires a prior
+data export and explicit human authorization; the row-count guards in the
+rollback scripts enforce the stop.
 
 Risks: `inquiries.id` bigint FK (verified); `content_events` growth (bounded
 by retention + indexes); one-active-package index requires archival inside the
@@ -957,6 +1115,13 @@ construction (single shared helper).
   `publication_id` name in `content_events`)
 - Public Suffix List dependency for true registrable-domain analytics
 - Backfill tooling linking historical blog posts/testimonials to sessions
+- **Phase 2: social captions** — generator, editor, approval flow, publisher
+  (schema, taxonomy, and publisher design already in place)
+- True near-duplicate detection (perceptual hashing, image embeddings,
+  structural similarity, visual clustering)
+- `content_hash` backfill for the 130 legacy portfolio images
+- Storage cleanup tooling: abandoned-upload sweep, orphaned private objects,
+  orphaned public derivatives, retention-window review (§4.4)
 - Social auto-posting integrations
 - Playwright end-to-end suite
 - Multiple photography sessions per client session (drop the partial unique
