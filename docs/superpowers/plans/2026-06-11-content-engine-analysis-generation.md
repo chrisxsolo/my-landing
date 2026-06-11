@@ -1499,9 +1499,12 @@ import type { ModelCaller } from "@/lib/contentEngine/aiClient";
 beforeAll(() => resetDb());
 
 // Real bytes in real storage: upload + finalize like production does.
+// Seed varies the DIMENSIONS (not just color): JPEG quantization collapses
+// near-identical solid colors to identical bytes, which would trip the
+// unique (session, content_hash) constraint.
 async function realPhoto(sessionId: string, seed: number) {
   const buf = await sharp({
-    create: { width: 320, height: 240, channels: 3, background: { r: seed % 255, g: 120, b: 90 } },
+    create: { width: 300 + seed * 2, height: 240, channels: 3, background: { r: (seed * 40) % 255, g: 120, b: 90 } },
   }).jpeg().toBuffer();
   const path = issueUploadPath(sessionId, "image/jpeg");
   const { error } = await service.storage.from(ORIGINALS_BUCKET).upload(path, buf, { contentType: "image/jpeg" });
