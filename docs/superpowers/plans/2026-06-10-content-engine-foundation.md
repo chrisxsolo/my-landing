@@ -732,6 +732,8 @@ begin
     raise exception 'unique published target index missing';
   end if;
   if has_table_privilege('anon','public.session_content_items','select')
+     or has_table_privilege('authenticated','public.session_content_items','select')
+     or has_table_privilege('anon','public.session_content_packages','select')
      or has_table_privilege('authenticated','public.session_content_packages','select') then
     raise exception 'engine tables readable by anon/authenticated';
   end if;
