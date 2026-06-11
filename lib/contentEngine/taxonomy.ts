@@ -73,9 +73,9 @@ export const CANONICAL_INTERNAL_LINKS: readonly string[] = [
   "/pricing",
 ];
 
-const has = (arr: readonly string[]) => {
+const has = <T extends string>(arr: readonly T[]) => {
   const set = new Set<string>(arr);
-  return (v: unknown): boolean => typeof v === "string" && set.has(v);
+  return (v: unknown): v is T => typeof v === "string" && set.has(v);
 };
 
 export const isServiceType = has(SERVICE_TYPES);

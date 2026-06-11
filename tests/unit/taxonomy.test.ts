@@ -1,7 +1,10 @@
 import { describe, it, expect } from "vitest";
+import { readdirSync } from "node:fs";
+import path from "node:path";
 import {
   SERVICE_TYPES, SCHOOL_SLUGS, PORTFOLIO_CATEGORIES, LIGHTING_CONDITIONS,
-  CONTENT_TYPES, PUBLICATION_TARGET_TYPES, GUIDE_TYPES, CANONICAL_INTERNAL_LINKS,
+  CONTENT_TYPES, GENERATABLE_CONTENT_TYPES, PUBLICATION_TARGET_TYPES, GUIDE_TYPES,
+  CANONICAL_INTERNAL_LINKS,
   isServiceType, isSchoolSlug, isPortfolioCategory, isLightingCondition,
   isContentType, isGuideType, isGuideLocationKey, isCanonicalInternalLink,
   guideLocationKeys,
@@ -24,6 +27,20 @@ describe("taxonomy constants", () => {
   it("content types include social_caption (Phase 2, schema-supported) and the 7 targets", () => {
     expect(CONTENT_TYPES).toContain("social_caption");
     expect(PUBLICATION_TARGET_TYPES).toContain("none");
+  });
+
+  it("generatable types exclude social_caption (Phase 2) but keep the other six", () => {
+    expect(GENERATABLE_CONTENT_TYPES).not.toContain("social_caption");
+    expect(GENERATABLE_CONTENT_TYPES).toHaveLength(CONTENT_TYPES.length - 1);
+    expect(CONTENT_TYPES).toEqual(expect.arrayContaining([...GENERATABLE_CONTENT_TYPES]));
+  });
+
+  it("SCHOOL_SLUGS exactly matches the app/(professional)/grads/* route directories", () => {
+    const dirs = readdirSync(path.join(process.cwd(), "app", "(professional)", "grads"), { withFileTypes: true })
+      .filter((e) => e.isDirectory())
+      .map((e) => e.name)
+      .sort();
+    expect([...SCHOOL_SLUGS].sort()).toEqual(dirs);
   });
 });
 
