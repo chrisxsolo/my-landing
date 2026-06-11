@@ -410,6 +410,9 @@ alter table public.photography_sessions force row level security;
 
 ```sql
 -- PRE-LAUNCH ONLY (spec §14): refuses when data exists.
+-- Wrapped in one transaction: if the guard raises, the drop cannot commit
+-- even when run without ON_ERROR_STOP.
+begin;
 do $$
 begin
   if exists (select 1 from public.photography_sessions limit 1) then
@@ -417,6 +420,7 @@ begin
   end if;
 end $$;
 drop table if exists public.photography_sessions;
+commit;
 ```
 
 - [ ] **Step 3: Write the verify** (`..._verify.sql`)
@@ -536,6 +540,9 @@ on conflict (id) do nothing;
 
 ```sql
 -- PRE-LAUNCH ONLY (spec §14).
+-- Wrapped in one transaction: if the guard raises, the drop cannot commit
+-- even when run without ON_ERROR_STOP.
+begin;
 do $$
 begin
   if exists (select 1 from public.session_photos limit 1) then
@@ -546,7 +553,10 @@ begin
   end if;
 end $$;
 drop table if exists public.session_photos;
-delete from storage.buckets where id = 'session-content-originals';
+commit;
+-- NOTE: the 'session-content-originals' bucket cannot be deleted via SQL
+-- (storage protect_buckets_delete trigger). If a true teardown is needed,
+-- delete it via the Storage API / dashboard after this rollback.
 ```
 
 - [ ] **Step 3: Write the verify**
@@ -693,6 +703,9 @@ alter table public.session_content_items force row level security;
 
 ```sql
 -- PRE-LAUNCH ONLY (spec §14).
+-- Wrapped in one transaction: if the guard raises, the drop cannot commit
+-- even when run without ON_ERROR_STOP.
+begin;
 do $$
 begin
   if exists (select 1 from public.session_content_items limit 1)
@@ -702,6 +715,7 @@ begin
 end $$;
 drop table if exists public.session_content_items;
 drop table if exists public.session_content_packages;
+commit;
 ```
 
 - [ ] **Step 3: Write the verify**
@@ -778,6 +792,9 @@ alter table public.school_page_photos force row level security;
 Rollback (`...000004_..._rollback.sql`):
 
 ```sql
+-- Wrapped in one transaction: if the guard raises, the drop cannot commit
+-- even when run without ON_ERROR_STOP.
+begin;
 do $$
 begin
   if exists (select 1 from public.school_page_photos limit 1) then
@@ -785,6 +802,7 @@ begin
   end if;
 end $$;
 drop table if exists public.school_page_photos;
+commit;
 ```
 
 Verify (`...000004_..._verify.sql`):
@@ -838,6 +856,9 @@ alter table public.content_events force row level security;
 Rollback:
 
 ```sql
+-- Wrapped in one transaction: if the guard raises, the drop cannot commit
+-- even when run without ON_ERROR_STOP.
+begin;
 do $$
 begin
   if exists (select 1 from public.content_events limit 1) then
@@ -845,6 +866,7 @@ begin
   end if;
 end $$;
 drop table if exists public.content_events;
+commit;
 ```
 
 Verify:
@@ -877,6 +899,9 @@ create index if not exists testimonials_photography_session_idx
 Rollback:
 
 ```sql
+-- Wrapped in one transaction: if the guard raises, the drop cannot commit
+-- even when run without ON_ERROR_STOP.
+begin;
 do $$
 begin
   if exists (select 1 from public.testimonials where photography_session_id is not null limit 1) then
@@ -884,6 +909,7 @@ begin
   end if;
 end $$;
 alter table public.testimonials drop column if exists photography_session_id;
+commit;
 ```
 
 Verify:
@@ -936,9 +962,13 @@ create unique index if not exists portfolio_images_content_hash_unique
 Rollback (index only — the column predates this migration in production):
 
 ```sql
+-- Wrapped in one transaction: if the guard raises, the drop cannot commit
+-- even when run without ON_ERROR_STOP.
+begin;
 drop index if exists public.portfolio_images_content_hash_unique;
 -- The content_hash column is NOT dropped: it exists in production independent
 -- of this migration and is used by the existing admin upload dedupe.
+commit;
 ```
 
 Verify:

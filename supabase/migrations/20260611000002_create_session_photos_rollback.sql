@@ -1,4 +1,7 @@
 -- PRE-LAUNCH ONLY (spec §14).
+-- Wrapped in one transaction: if the guard raises, the drop cannot commit
+-- even when run without ON_ERROR_STOP.
+begin;
 do $$
 begin
   if exists (select 1 from public.session_photos limit 1) then
@@ -9,4 +12,7 @@ begin
   end if;
 end $$;
 drop table if exists public.session_photos;
-delete from storage.buckets where id = 'session-content-originals';
+commit;
+-- NOTE: the 'session-content-originals' bucket cannot be deleted via SQL
+-- (storage protect_buckets_delete trigger). If a true teardown is needed,
+-- delete it via the Storage API / dashboard after this rollback.
