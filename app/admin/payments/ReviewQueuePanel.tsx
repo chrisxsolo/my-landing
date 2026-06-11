@@ -77,6 +77,23 @@ export default function ReviewQueuePanel({ activeRows, reloadToken, onLedgerChan
     }
   }
 
+  // Dismiss a duplicate-suspect group: both payments are real, mark reconciled.
+  async function keepAll(ids: number[]) {
+    setError("");
+    try {
+      const res = await fetch("/api/admin/payments", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids, reconciliation_status: "reconciled" }),
+      });
+      const json = await res.json() as { ok?: boolean; error?: string };
+      if (!json.ok) throw new Error(json.error ?? "Update failed");
+      onLedgerChanged();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Update failed");
+    }
+  }
+
   async function voidPayment(paymentId: number) {
     try {
       const res = await fetch("/api/void-payment", {
@@ -166,9 +183,17 @@ export default function ReviewQueuePanel({ activeRows, reloadToken, onLedgerChan
         {duplicateGroups.map((group, gi) => (
           <div key={`dup-${gi}`} className="px-4 py-3 rounded-xl"
             style={{ background: "rgba(239,68,68,0.03)", border: "1px solid rgba(239,68,68,0.15)" }}>
-            <p className="text-[10px] font-black uppercase tracking-widest mb-2" style={{ color: "#ef4444" }}>
-              Possible duplicate — same payer &amp; amount within 3 days
-            </p>
+            <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
+              <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: "#ef4444" }}>
+                Possible duplicate — same payer &amp; amount within 3 days
+              </p>
+              <button onClick={() => keepAll(group.map(p => p.id))}
+                title="Both payments are real — mark reconciled and stop flagging this pair"
+                className="text-[10px] font-bold px-2.5 py-1 rounded-lg"
+                style={{ background: "rgba(16,185,129,0.1)", color: "#10b981" }}>
+                ✓ keep both — not duplicates
+              </button>
+            </div>
             <div className="space-y-1.5">
               {group.map(p => (
                 <div key={p.id} className="flex items-center justify-between gap-2 flex-wrap">

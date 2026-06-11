@@ -144,6 +144,8 @@ function payerKey(row: PaymentRow): string {
 
 // Groups of 2+ ACTIVE rows with the same payer and amount paid within 3 days
 // of each other. Surfaced as suspects for human review — never auto-deleted.
+// Groups where every row is already marked "reconciled" have been reviewed
+// and dismissed, so they stay hidden.
 export function findDuplicateSuspects(rows: PaymentRow[]): PaymentRow[][] {
   const buckets = new Map<string, PaymentRow[]>();
   for (const row of rows) {
@@ -173,5 +175,5 @@ export function findDuplicateSuspects(rows: PaymentRow[]): PaymentRow[][] {
     }
     if (current.length >= 2) groups.push(current);
   }
-  return groups;
+  return groups.filter(group => group.some(r => r.reconciliation_status !== "reconciled"));
 }

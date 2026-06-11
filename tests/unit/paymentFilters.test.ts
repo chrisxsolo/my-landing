@@ -109,6 +109,20 @@ describe("findDuplicateSuspects", () => {
     expect(groups[0].map(r => r.id)).toEqual([1, 2]);
   });
 
+  it("hides groups where every row was already marked reconciled", () => {
+    const reviewed = findDuplicateSuspects([
+      row({ id: 1, paid_at: "2026-05-01T00:00:00Z", reconciliation_status: "reconciled" }),
+      row({ id: 2, paid_at: "2026-05-02T00:00:00Z", reconciliation_status: "reconciled" }),
+    ]);
+    expect(reviewed).toHaveLength(0);
+
+    const partiallyReviewed = findDuplicateSuspects([
+      row({ id: 1, paid_at: "2026-05-01T00:00:00Z", reconciliation_status: "reconciled" }),
+      row({ id: 2, paid_at: "2026-05-02T00:00:00Z", reconciliation_status: "confirmed" }),
+    ]);
+    expect(partiallyReviewed).toHaveLength(1);
+  });
+
   it("does not group payments more than 3 days apart", () => {
     const groups = findDuplicateSuspects([
       row({ id: 1, paid_at: "2026-05-01T00:00:00Z" }),
