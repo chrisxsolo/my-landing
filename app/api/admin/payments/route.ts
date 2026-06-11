@@ -8,7 +8,7 @@ const PAYMENTS_TABLE = "payments";
 const PAYMENT_SELECT =
   "id,inquiry_id,client_name,client_email,amount,amount_cents,method,payment_type," +
   "invoice,note,source,status,paid_at,session_date,fee_cents,refund_cents," +
-  "imported_at,reconciliation_status,reconciled_at,source_txn_id,inquiries(session_type)";
+  "posted_at,imported_at,reconciliation_status,reconciled_at,source_txn_id,inquiries(session_type)";
 
 type PaymentRowWithInquiry = Record<string, unknown> & {
   reconciled_at: string | null;

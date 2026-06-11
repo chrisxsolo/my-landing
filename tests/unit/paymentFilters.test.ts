@@ -57,6 +57,13 @@ describe("applyPaymentFilters", () => {
     }));
   });
 
+  it("filters by row status", () => {
+    const mixed = [...rows, row({ id: 9, status: "refunded", paid_at: "2026-05-04T00:00:00Z" })];
+    expect(applyPaymentFilters(mixed, { ...DEFAULT_PAYMENT_FILTERS, status: "refunded" }).map(r => r.id)).toEqual([9]);
+    expect(applyPaymentFilters(mixed, { ...DEFAULT_PAYMENT_FILTERS, status: "" })).toHaveLength(4);
+    expect(applyPaymentFilters(mixed, DEFAULT_PAYMENT_FILTERS)).toHaveLength(3);
+  });
+
   it("filters by method, type, and session type", () => {
     expect(applyPaymentFilters(rows, { ...DEFAULT_PAYMENT_FILTERS, method: "Zelle" }).map(r => r.id)).toEqual([2]);
     expect(applyPaymentFilters(rows, { ...DEFAULT_PAYMENT_FILTERS, paymentType: "full" }).map(r => r.id)).toEqual([3]);

@@ -18,6 +18,7 @@ export type PaymentRow = {
   session_date: string | null;
   fee_cents: number;
   refund_cents: number;
+  posted_at?: string | null;
   imported_at: string | null;
   reconciliation_status: string;
   source_txn_id: string;
@@ -28,6 +29,7 @@ export type PaymentSortKey = "date" | "amount" | "client" | "imported";
 
 export type PaymentFilterState = {
   search: string;
+  status: string; // active | voided | refunded, "" = all
   method: string; // normalized label, "" = all
   paymentType: string; // "" = all
   recon: string; // reconciliation_status, "" = all
@@ -40,6 +42,7 @@ export type PaymentFilterState = {
 
 export const DEFAULT_PAYMENT_FILTERS: PaymentFilterState = {
   search: "",
+  status: "active",
   method: "",
   paymentType: "",
   recon: "",
@@ -79,6 +82,7 @@ export function applyPaymentFilters(rows: PaymentRow[], f: PaymentFilterState): 
   const needle = f.search.trim().toLowerCase();
   const filtered = rows.filter(row => {
     if (needle && !rowMatchesSearch(row, needle)) return false;
+    if (f.status && row.status !== f.status) return false;
     if (f.method && normalizePaymentMethod(row.method) !== f.method) return false;
     if (f.paymentType && row.payment_type !== f.paymentType) return false;
     if (f.recon && row.reconciliation_status !== f.recon) return false;
