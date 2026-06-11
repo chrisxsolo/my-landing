@@ -293,7 +293,7 @@ function AdminDashboard() {
 
   // ── Payment sync ──────────────────────────────────────────────────────────
   const [syncLoading,setSyncLoading]=useState(false);
-  const [syncResult,setSyncResult]=useState<{name:string;email:string;amount:string;method:string;paymentType:string;paidAt:string;alreadyPaid:boolean;dateBooked?:string;orphan:boolean;pass:number}[]|null>(null);
+  const [syncResult,setSyncResult]=useState<{name:string;email:string;amount:string;method:string;paymentType:string;paidAt:string;orphan:boolean;pass:number}[]|null>(null);
   const [syncMsg,setSyncMsg]=useState<string|null>(null);
   const [timelineSyncLoading,setTimelineSyncLoading]=useState(false);
 
@@ -316,8 +316,7 @@ function AdminDashboard() {
       const json=await res.json();
       if(!res.ok){setSyncMsg(json.error??"Sync failed");return;}
       if(json.message){setSyncMsg(json.message);}
-      setSyncResult(json.synced??[]);
-      if((json.synced??[]).length>0)fetchInquiries();
+      setSyncResult(json.staged??[]);
     }catch{setSyncMsg("Sync request failed");}
     finally{setSyncLoading(false);}
   }
@@ -2474,7 +2473,7 @@ function AdminDashboard() {
                   {syncMsg&&<p className="text-slate-500 text-xs">{syncMsg}</p>}
                   {syncResult?.length?(
                     <div className="space-y-1">
-                      <p className="text-xs font-black text-emerald-600 mb-2">✓ {syncResult.length} payment{syncResult.length===1?"":"s"} synced</p>
+                      <p className="text-xs font-black text-emerald-600 mb-2">✓ {syncResult.length} payment{syncResult.length===1?"":"s"} found — review &amp; approve in the Payments tab</p>
                       {syncResult.map((r,i)=>(
                         <div key={i} className="flex items-center gap-3 text-xs text-slate-600 flex-wrap">
                           <span className="font-semibold">{r.name}</span>
@@ -2482,14 +2481,8 @@ function AdminDashboard() {
                           {r.amount&&<span className="text-emerald-600 font-bold">{r.amount}</span>}
                           {r.method&&<span className="text-slate-400">via {r.method}</span>}
                           {r.paidAt&&<span className="text-slate-400">{new Date(r.paidAt).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}</span>}
-                          {r.paymentType==="deposit_2"&&r.pass===3
-                            ?<span className="text-blue-500 font-semibold">balance (auto)</span>
-                            :r.paymentType&&r.paymentType!=="deposit_1"
-                              ?<span className="text-amber-600 font-semibold capitalize">{r.paymentType.replace("_"," ")}</span>
-                              :null}
+                          {r.paymentType&&r.paymentType!=="deposit_1"&&<span className="text-amber-600 font-semibold capitalize">{r.paymentType.replace("_"," ")}</span>}
                           {r.orphan&&<span className="text-orange-500 font-bold">no inquiry</span>}
-                          {r.dateBooked&&<span className="font-bold text-violet-600">📅 {new Date(r.dateBooked+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric"})} blocked</span>}
-                          {r.alreadyPaid&&r.pass!==3&&<span className="text-slate-400">(already marked)</span>}
                         </div>
                       ))}
                     </div>
@@ -3212,7 +3205,7 @@ function AdminDashboard() {
                   {syncMsg&&<p className="text-slate-500 text-xs">{syncMsg}</p>}
                   {syncResult?.length?(
                     <div className="space-y-1">
-                      <p className="text-xs font-black text-emerald-600 mb-2">✓ {syncResult.length} payment{syncResult.length===1?"":"s"} synced</p>
+                      <p className="text-xs font-black text-emerald-600 mb-2">✓ {syncResult.length} payment{syncResult.length===1?"":"s"} found — review &amp; approve in the Payments tab</p>
                       {syncResult.map((r,i)=>(
                         <div key={i} className="flex items-center gap-3 text-xs text-slate-600 flex-wrap">
                           <span className="font-semibold">{r.name}</span>
@@ -3220,14 +3213,8 @@ function AdminDashboard() {
                           {r.amount&&<span className="text-emerald-600 font-bold">{r.amount}</span>}
                           {r.method&&<span className="text-slate-400">via {r.method}</span>}
                           {r.paidAt&&<span className="text-slate-400">{new Date(r.paidAt).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}</span>}
-                          {r.paymentType==="deposit_2"&&r.pass===3
-                            ?<span className="text-blue-500 font-semibold">balance (auto)</span>
-                            :r.paymentType&&r.paymentType!=="deposit_1"
-                              ?<span className="text-amber-600 font-semibold capitalize">{r.paymentType.replace("_"," ")}</span>
-                              :null}
+                          {r.paymentType&&r.paymentType!=="deposit_1"&&<span className="text-amber-600 font-semibold capitalize">{r.paymentType.replace("_"," ")}</span>}
                           {r.orphan&&<span className="text-orange-500 font-bold">no inquiry</span>}
-                          {r.dateBooked&&<span className="font-bold text-violet-600">📅 {new Date(r.dateBooked+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric"})} blocked</span>}
-                          {r.alreadyPaid&&r.pass!==3&&<span className="text-slate-400">(already marked)</span>}
                         </div>
                       ))}
                     </div>
