@@ -816,7 +816,8 @@ begin
                  where conrelid='public.school_page_photos'::regclass and contype='u') then
     raise exception 'school_page_photos unique (school_slug, session_photo_id) missing';
   end if;
-  if has_table_privilege('anon','public.school_page_photos','select') then
+  if has_table_privilege('anon','public.school_page_photos','select')
+     or has_table_privilege('anon','public.school_page_photos','insert') then
     raise exception 'school_page_photos readable by anon';
   end if;
   raise notice 'VERIFY OK: school_page_photos';
@@ -848,6 +849,7 @@ create index if not exists content_events_path_idx on public.content_events (pat
 create index if not exists content_events_type_idx on public.content_events (event_type);
 create index if not exists content_events_content_idx on public.content_events (content_type, content_id);
 create index if not exists content_events_session_idx on public.content_events (photography_session_id);
+create index if not exists content_events_content_item_idx on public.content_events (content_item_id);
 
 revoke all on public.content_events from anon, authenticated;
 grant all on public.content_events to service_role;

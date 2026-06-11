@@ -20,6 +20,7 @@ create index if not exists content_events_path_idx on public.content_events (pat
 create index if not exists content_events_type_idx on public.content_events (event_type);
 create index if not exists content_events_content_idx on public.content_events (content_type, content_id);
 create index if not exists content_events_session_idx on public.content_events (photography_session_id);
+create index if not exists content_events_content_item_idx on public.content_events (content_item_id);
 
 revoke all on public.content_events from anon, authenticated;
 grant all on public.content_events to service_role;
