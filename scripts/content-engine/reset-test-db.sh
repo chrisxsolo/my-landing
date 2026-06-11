@@ -62,7 +62,13 @@ run_psql() {
   else
     # Inside the container postgres listens on its default port (5432) via
     # unix socket — do NOT pass the external $DB_URL which uses 54322.
-    docker exec -i "$DB_CONTAINER" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -q "$@"
+    if [[ "${1:-}" == "-f" ]]; then
+      docker exec -i "$DB_CONTAINER" psql -U postgres -d postgres \
+        -v ON_ERROR_STOP=1 -q < "$2"
+    else
+      docker exec -i "$DB_CONTAINER" psql -U postgres -d postgres \
+        -v ON_ERROR_STOP=1 -q "$@"
+    fi
   fi
 }
 
