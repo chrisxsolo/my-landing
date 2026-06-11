@@ -1,18 +1,6 @@
 -- Transactional RPCs (spec §8.2, §8.4, §9). security definer with pinned
 -- search_path; EXECUTE revoked from PUBLIC/anon/authenticated (spec §5).
 
--- Grant service_role access to live tables that the publish RPC writes to.
--- In the local test stack the prod-baseline dump does not carry these grants;
--- this is idempotent and harmless on production (service_role is already the
--- owner-equivalent there via Supabase's default grants).
-grant all on public.blog_posts to service_role;
-grant all on public.portfolio_categories to service_role;
-grant all on public.portfolio_images to service_role;
-grant all on public.testimonials to service_role;
-grant all on public.image_library to service_role;
-grant all on public.family_location_photos to service_role;
-grant all on public.couples_location_photos to service_role;
-
 create or replace function public.create_content_package(
   p_session_id uuid,
   p_model_name text,

@@ -89,6 +89,9 @@ SQL
 echo "Applying production schema baseline..."
 run_psql -f supabase/test/prod-baseline.sql
 
+echo "Applying local test grants..."
+run_psql -f supabase/test/test-grants.sql
+
 # Apply only content-engine migrations (20260611* prefix), skipping rollbacks.
 shopt -s nullglob
 COUNT=0

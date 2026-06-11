@@ -1,0 +1,12 @@
+-- Local-test-only grants. The schema-only production baseline dump does not
+-- carry production's privilege grants, so the service-role test client cannot
+-- write to these pre-existing live tables until we grant here. On PRODUCTION
+-- service_role already holds these (Supabase default), so this file is NEVER a
+-- migration — it lives only in the local reset path.
+grant all on public.blog_posts to service_role;
+grant all on public.portfolio_categories to service_role;
+grant all on public.portfolio_images to service_role;
+grant all on public.testimonials to service_role;
+grant all on public.image_library to service_role;
+grant all on public.family_location_photos to service_role;
+grant all on public.couples_location_photos to service_role;
