@@ -27,17 +27,26 @@ export interface DeriveInput {
 }
 
 // A lease is "expired" when absent or strictly in the past (spec §6).
+// Used for analysis_lease_expires_at, which stores the expiry timestamp directly.
 export function isLeaseExpired(leaseExpiresAt: string | null, now: Date): boolean {
   if (!leaseExpiresAt) return true;
   return new Date(leaseExpiresAt).getTime() <= now.getTime();
 }
 
+// Publishing claims are considered live for this window after
+// publishing_started_at; past it the claim is interrupted (resumable, spec §9.4).
+// Mirrors the 3-minute analysis lease the SQL claim uses.
+export const PUBLISHING_LEASE_MS = 3 * 60_000;
+
 export function deriveSessionEngineState(input: DeriveInput): SessionEngineState {
   const { photos, activePackage, activeItems, now } = input;
   const liveProcessing = (p: PhotoState) =>
     p.analysis_status === "processing" && !isLeaseExpired(p.analysis_lease_expires_at, now);
+  // analysis stores an expiry timestamp; publishing stores a start time + constant window.
   const livePublishing = (i: ItemState) =>
-    i.status === "publishing" && !isLeaseExpired(i.publishing_started_at, now);
+    i.status === "publishing"
+    && i.publishing_started_at !== null
+    && new Date(i.publishing_started_at).getTime() + PUBLISHING_LEASE_MS > now.getTime();
 
   const nonExcluded = photos.filter((p) => !p.excluded);
   const nonRejected = activeItems.filter((i) => i.status !== "rejected");

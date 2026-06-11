@@ -7,6 +7,7 @@ import {
 const NOW = new Date("2026-06-11T12:00:00Z");
 const PAST = "2026-06-11T11:50:00Z";   // lease already expired
 const FUTURE = "2026-06-11T12:05:00Z"; // lease still valid
+const RECENT = "2026-06-11T11:59:00Z"; // 1 min before NOW, within the 3-min publishing window
 
 const photo = (o: Partial<PhotoState> = {}): PhotoState => ({
   excluded: false, analysis_status: "completed", analysis_lease_expires_at: null, ...o,
@@ -111,7 +112,17 @@ describe("deriveSessionEngineState — lease-aware edges", () => {
   it("an active item publishing with a live lease → publishing", () => {
     expect(derive({
       photos: [photo()], activePackage: pkg("ready"),
-      activeItems: [item({ status: "publishing", publishing_started_at: FUTURE })],
+      activeItems: [item({ status: "publishing", publishing_started_at: RECENT })],
     })).toBe("publishing");
+  });
+
+  it("an EXPIRED publishing claim is NOT 'publishing' (interrupted, resumable)", () => {
+    // started 10 minutes before NOW — past the 3-minute window. With no other
+    // reviewable items, derivation falls through to the photo-based states;
+    // the §9.4 reconciliation banner is what surfaces the interrupted publish.
+    expect(derive({
+      photos: [photo()], activePackage: pkg("ready"),
+      activeItems: [item({ status: "publishing", publishing_started_at: "2026-06-11T11:50:00Z" })],
+    })).toBe("analyzed");
   });
 });
