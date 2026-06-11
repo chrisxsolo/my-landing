@@ -313,7 +313,12 @@ begin
       raise exception 'photo has no public derivative — run prepareApprovedDerivatives first';
     end if;
 
-    -- race-safe without a unique index on the live table (spec §9.2)
+    -- race-safe without a unique index on the live table (spec §9.2).
+    -- ADVISORY-LOCK KEY ASSUMPTION (spec §14 risks): the lock key is the exact
+    -- string '<guide>:<location_key>:<derivative_content_hash>' hashed via
+    -- hashtextextended(..., 0). Any other code path that ever guards
+    -- guide-photo inserts MUST build the identical string — keep construction
+    -- in this single place or extract a shared helper first.
     perform pg_advisory_xact_lock(hashtextextended(
       format('%s:%s:%s', v_guide, v_item.payload->>'location_key', v_photo.public_derivative_content_hash), 0));
 
