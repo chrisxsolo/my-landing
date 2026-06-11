@@ -10,3 +10,4 @@ grant all on public.testimonials to service_role;
 grant all on public.image_library to service_role;
 grant all on public.family_location_photos to service_role;
 grant all on public.couples_location_photos to service_role;
+grant all on public.client_sessions to service_role;

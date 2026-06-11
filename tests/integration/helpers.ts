@@ -30,6 +30,7 @@ type SessionOverrides = Partial<{
   service_type: string;
   school_slug: string | null;
   public_display_name: string | null;
+  client_session_id: string | null;
 }>;
 
 export async function createTestSession(overrides: SessionOverrides = {}) {
@@ -77,13 +78,17 @@ export async function createTestPhoto(sessionId: string, opts: { derivative?: bo
   return data as { id: string; content_hash: string; public_derivative_url: string | null };
 }
 
-export async function createPackage(sessionId: string, selectedTypes: string[] = ["journal_post"]) {
+export async function createPackage(
+  sessionId: string,
+  selectedTypes: string[] = ["journal_post"],
+  facts: Record<string, unknown> = { service_type: "grads" },
+) {
   const { data, error } = await service.rpc("create_content_package", {
     p_session_id: sessionId,
     p_model_name: "claude-sonnet-4-6",
     p_prompt_version: "v1",
     p_selected_types: selectedTypes,
-    p_session_facts: { service_type: "grads" },
+    p_session_facts: facts,
     p_generation_settings: {},
     p_archive_current: false,
     p_copy_items: [],
