@@ -133,9 +133,153 @@ begin
 end;
 $$;
 
+-- ── claim_generation_type ───────────────────────────────────────────────────
+-- Atomic per-type claim via jsonb_set on generation_settings.progress[type]
+-- (spec §8.2): row-locks the package, never read-modify-writes the whole
+-- object, never touches other types' entries or usage. Completed types and
+-- live claims return false (no steal); pending/failed/expired claim and
+-- increment attempt. ai_processing_allowed enforced server-side here too.
+create or replace function public.claim_generation_type(
+  p_package_id uuid,
+  p_content_type text,
+  p_lease_seconds int default 180
+) returns boolean
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_pkg public.session_content_packages%rowtype;
+  v_allowed boolean;
+  v_entry jsonb;
+begin
+  select * into v_pkg from public.session_content_packages
+   where id = p_package_id for update;
+  if not found then raise exception 'package not found'; end if;
+  if v_pkg.archived_at is not null then raise exception 'package is archived'; end if;
+
+  select s.ai_processing_allowed into v_allowed
+    from public.photography_sessions s where s.id = v_pkg.photography_session_id;
+  if not coalesce(v_allowed, false) then
+    raise exception 'ai processing is not allowed for this session';
+  end if;
+
+  v_entry := v_pkg.generation_settings->'progress'->p_content_type;
+  if v_entry is null then
+    raise exception 'content type % is not selected for this package', p_content_type;
+  end if;
+
+  if not (v_entry->>'status' in ('pending','failed')
+          or (v_entry->>'status' = 'processing'
+              and coalesce((v_entry->>'lease_expires_at')::timestamptz,
+                           'epoch'::timestamptz) <= now())) then
+    return false;
+  end if;
+
+  update public.session_content_packages
+     set generation_settings = jsonb_set(
+           generation_settings,
+           array['progress', p_content_type],
+           v_entry || jsonb_build_object(
+             'status', 'processing',
+             'attempt', coalesce((v_entry->>'attempt')::int, 0) + 1,
+             'lease_started_at', to_jsonb(now()),
+             'lease_expires_at', to_jsonb(now() + make_interval(secs => p_lease_seconds)),
+             'error', null))
+   where id = p_package_id;
+  return true;
+end;
+$$;
+
+-- ── record_generation_result ────────────────────────────────────────────────
+-- Writes ONE type's terminal progress entry atomically with its usage
+-- (spec §11: "written atomically with that type's progress"), then recomputes
+-- the package status (spec §8.2): any pending/processing → 'generating';
+-- all completed|skipped → 'ready'; otherwise (≥1 failed, all terminal)
+-- → 'needs_attention'. 'skipped' from 'failed' is the Skip-failed-type action.
+create or replace function public.record_generation_result(
+  p_package_id uuid,
+  p_content_type text,
+  p_outcome text,
+  p_error text default null,
+  p_usage jsonb default null
+) returns text
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_pkg public.session_content_packages%rowtype;
+  v_entry jsonb;
+  v_progress jsonb;
+  v_k text;
+  v_s text;
+  v_all_terminal boolean := true;
+  v_any_failed boolean := false;
+  v_new_status text;
+begin
+  if p_outcome not in ('completed','failed','skipped') then
+    raise exception 'invalid outcome %', p_outcome;
+  end if;
+
+  select * into v_pkg from public.session_content_packages
+   where id = p_package_id for update;
+  if not found then raise exception 'package not found'; end if;
+  if v_pkg.archived_at is not null then raise exception 'package is archived'; end if;
+
+  v_entry := v_pkg.generation_settings->'progress'->p_content_type;
+  if v_entry is null then
+    raise exception 'content type % is not selected for this package', p_content_type;
+  end if;
+  if p_outcome in ('completed','failed') and v_entry->>'status' <> 'processing' then
+    raise exception 'type % is not processing (status=%)', p_content_type, v_entry->>'status';
+  end if;
+  if p_outcome = 'skipped' and v_entry->>'status' not in ('processing','failed') then
+    raise exception 'type % cannot be skipped from status %', p_content_type, v_entry->>'status';
+  end if;
+
+  v_entry := v_entry || jsonb_build_object(
+    'status', p_outcome,
+    'completed_at', case when p_outcome in ('completed','skipped')
+                         then to_jsonb(now()) else 'null'::jsonb end,
+    'error', case when p_outcome = 'failed' and p_error is not null
+                  then to_jsonb(left(p_error, 2000)) else 'null'::jsonb end,
+    'usage', coalesce(p_usage, v_entry->'usage', 'null'::jsonb),
+    'lease_expires_at', 'null'::jsonb);
+
+  v_progress := jsonb_set(v_pkg.generation_settings->'progress',
+                          array[p_content_type], v_entry);
+
+  for v_k in
+    select jsonb_array_elements_text(v_pkg.generation_settings->'selected_types')
+  loop
+    v_s := v_progress->v_k->>'status';
+    if v_s in ('pending','processing') then v_all_terminal := false; end if;
+    if v_s = 'failed' then v_any_failed := true; end if;
+  end loop;
+
+  v_new_status := case
+    when not v_all_terminal then 'generating'
+    when v_any_failed then 'needs_attention'
+    else 'ready' end;
+
+  update public.session_content_packages
+     set generation_settings = jsonb_set(generation_settings, '{progress}', v_progress),
+         status = v_new_status
+   where id = p_package_id;
+  return v_new_status;
+end;
+$$;
+
 revoke all on function public.claim_photos_for_analysis(uuid, uuid[], int, int)
   from public, anon, authenticated;
 grant execute on function public.claim_photos_for_analysis(uuid, uuid[], int, int) to service_role;
 revoke all on function public.record_analysis_batch(uuid, jsonb)
   from public, anon, authenticated;
 grant execute on function public.record_analysis_batch(uuid, jsonb) to service_role;
+revoke all on function public.claim_generation_type(uuid, text, int)
+  from public, anon, authenticated;
+grant execute on function public.claim_generation_type(uuid, text, int) to service_role;
+revoke all on function public.record_generation_result(uuid, text, text, text, jsonb)
+  from public, anon, authenticated;
+grant execute on function public.record_generation_result(uuid, text, text, text, jsonb) to service_role;

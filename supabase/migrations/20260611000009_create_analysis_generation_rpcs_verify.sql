@@ -7,10 +7,9 @@ begin
   for v_fn, v_sig in
     select * from (values
       ('claim_photos_for_analysis', 'public.claim_photos_for_analysis(uuid, uuid[], int, int)'),
-      ('record_analysis_batch',     'public.record_analysis_batch(uuid, jsonb)')
-      -- Task 2 appends these two functions; restore the rows below once Task 2 is done:
-      -- ('claim_generation_type',     'public.claim_generation_type(uuid, text, int)'),
-      -- ('record_generation_result',  'public.record_generation_result(uuid, text, text, text, jsonb)')
+      ('record_analysis_batch',     'public.record_analysis_batch(uuid, jsonb)'),
+      ('claim_generation_type',     'public.claim_generation_type(uuid, text, int)'),
+      ('record_generation_result',  'public.record_generation_result(uuid, text, text, text, jsonb)')
     ) t(fn, sig)
   loop
     if to_regprocedure(v_sig) is null then
