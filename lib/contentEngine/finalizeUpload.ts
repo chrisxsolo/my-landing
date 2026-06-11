@@ -5,10 +5,15 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { verifyImageBuffer, ImageVerificationError } from "@/lib/contentEngine/imageVerification";
 import { ORIGINALS_BUCKET, isOwnedUploadPath } from "@/lib/contentEngine/uploadConfig";
 
+export type UploadFinalizationErrorKind =
+  | "ownership" | "download" | "verification" | "duplicate" | "insert";
+
 export class UploadFinalizationError extends Error {
-  constructor(message: string) {
+  readonly kind: UploadFinalizationErrorKind;
+  constructor(message: string, kind: UploadFinalizationErrorKind) {
     super(message);
     this.name = "UploadFinalizationError";
+    this.kind = kind;
   }
 }
 
@@ -16,7 +21,7 @@ export interface DeclaredUploadMeta {
   filename: string;
   mime: string;
   sizeBytes: number;
-  contentHash: string; // client-claimed; NOT trusted (compared for telemetry only)
+  contentHash: string; // client-claimed; never trusted — logged when it mismatches the server hash
 }
 
 export interface FinalizeUploadArgs {
@@ -37,7 +42,12 @@ export interface SessionPhotoRow {
 }
 
 async function removeOwnedObject(client: SupabaseClient, path: string) {
-  await client.storage.from(ORIGINALS_BUCKET).remove([path]);
+  const { error } = await client.storage.from(ORIGINALS_BUCKET).remove([path]);
+  if (error) {
+    // Lingering private objects are reclaimed by the deferred cleanup sweep
+    // (spec §4.4); log so the failure is traceable.
+    console.error(`failed to remove uploaded object ${path}:`, error.message);
+  }
 }
 
 export async function finalizeUpload(args: FinalizeUploadArgs): Promise<SessionPhotoRow> {
@@ -45,13 +55,19 @@ export async function finalizeUpload(args: FinalizeUploadArgs): Promise<SessionP
 
   // (5) Path ownership: never delete or register a path we don't own.
   if (!isOwnedUploadPath(storagePath, sessionId)) {
-    throw new UploadFinalizationError(`storage path is not owned by session ${sessionId}: ${storagePath}`);
+    throw new UploadFinalizationError(
+      `storage path is not owned by session ${sessionId}: ${storagePath}`,
+      "ownership",
+    );
   }
 
   // (4a) Download the object (service role).
   const { data: blob, error: dlErr } = await client.storage.from(ORIGINALS_BUCKET).download(storagePath);
   if (dlErr || !blob) {
-    throw new UploadFinalizationError(`could not download finalized object: ${dlErr?.message ?? "missing"}`);
+    throw new UploadFinalizationError(
+      `could not download finalized object: ${dlErr?.message ?? "missing"}`,
+      "download",
+    );
   }
   const buffer = Buffer.from(await blob.arrayBuffer());
 
@@ -62,10 +78,18 @@ export async function finalizeUpload(args: FinalizeUploadArgs): Promise<SessionP
   } catch (err) {
     await removeOwnedObject(client, storagePath);
     const reason = err instanceof ImageVerificationError ? err.message : String(err);
-    throw new UploadFinalizationError(`image verification failed: ${reason}`);
+    throw new UploadFinalizationError(`image verification failed: ${reason}`, "verification");
   }
 
   const format = verified.format === "jpeg" ? "image/jpeg" : `image/${verified.format}`;
+
+  // Telemetry: client hash is convenience only (spec §4.2); a mismatch means the
+  // browser hashed different bytes than were stored — worth a trace.
+  if (declared.contentHash && declared.contentHash !== verified.hash) {
+    console.warn(
+      `client-declared hash mismatch for ${storagePath}: declared ${declared.contentHash}, server ${verified.hash}`,
+    );
+  }
 
   // (6) Insert with SERVER-computed hash/dimensions. The unique
   // (photography_session_id, content_hash) prevents accidental re-upload.
@@ -86,9 +110,27 @@ export async function finalizeUpload(args: FinalizeUploadArgs): Promise<SessionP
     .single();
 
   if (error) {
-    // Duplicate hash or any insert failure: delete the now-orphaned object.
-    await removeOwnedObject(client, storagePath);
-    throw new UploadFinalizationError(`could not record session photo: ${error.message}`);
+    // On a unique-constraint violation (23505) we NEVER delete the object.
+    //
+    // Same-path double-finalize: the winner's committed row references this
+    // exact object — deleting it would orphan that row.
+    //
+    // Different-path duplicate (same bytes, different path): the object is a
+    // true orphan, but eagerly deleting here would introduce a TOCTOU race
+    // (our existence-check could run before the winner's INSERT commits).
+    // True orphans are reclaimed by the deferred cleanup sweep (spec §4.4).
+    //
+    // For non-duplicate failures the object is ours to clean up.
+    const isDuplicate = error.code === "23505";
+    if (!isDuplicate) {
+      await removeOwnedObject(client, storagePath);
+    }
+    throw new UploadFinalizationError(
+      isDuplicate
+        ? `duplicate photo: this image is already uploaded for this session (${error.message})`
+        : `could not record session photo: ${error.message}`,
+      isDuplicate ? "duplicate" : "insert",
+    );
   }
   return data as SessionPhotoRow;
 }

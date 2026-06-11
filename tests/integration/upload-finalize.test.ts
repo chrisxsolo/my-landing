@@ -1,3 +1,5 @@
+// Note: the oversized (>25 MB) path is unit-tested in imageVerification with an
+// injected cap and kept out of integration tests for speed.
 import { describe, it, expect, beforeAll } from "vitest";
 import sharp from "sharp";
 import { randomUUID } from "node:crypto";
@@ -87,6 +89,15 @@ describe("finalizeUpload (spec §4.2)", () => {
       client: service, sessionId, storagePath: p2,
       declared: { filename: "b.jpg", mime: "image/jpeg", sizeBytes: buf.length, contentHash: "x" },
     })).rejects.toBeInstanceOf(UploadFinalizationError);
+
+    // p1's object must still be downloadable — the winner's row must not be orphaned.
+    const { data: d1 } = await service.storage.from(ORIGINALS_BUCKET).download(p1);
+    expect(d1).not.toBeNull();
+
+    // p2 is a different-path duplicate orphan; on 23505 we never delete eagerly
+    // (TOCTOU-safe) — the deferred cleanup sweep (spec §4.4) reclaims it.
+    const { data: d2 } = await service.storage.from(ORIGINALS_BUCKET).download(p2);
+    expect(d2).not.toBeNull();
   });
 
   it("rejects a path whose object does not exist in storage", async () => {
@@ -96,5 +107,27 @@ describe("finalizeUpload (spec §4.2)", () => {
       client: service, sessionId, storagePath: path,
       declared: { filename: "x.jpg", mime: "image/jpeg", sizeBytes: 1, contentHash: "x" },
     })).rejects.toBeInstanceOf(UploadFinalizationError);
+  });
+
+  it("same-path double-finalize: loser must not delete the winner's object", async () => {
+    const sessionId = await createTestSession();
+    const path = issueUploadPath(sessionId, "image/jpeg");
+    const buf = await jpeg(99, 77);
+    await uploadRaw(path, buf, "image/jpeg");
+
+    const call = () => finalizeUpload({
+      client: service, sessionId, storagePath: path,
+      declared: { filename: "dbl.jpg", mime: "image/jpeg", sizeBytes: buf.length, contentHash: "" },
+    });
+    const results = await Promise.allSettled([call(), call()]);
+    const wins = results.filter((r) => r.status === "fulfilled");
+    expect(wins.length).toBeGreaterThanOrEqual(1); // ≥1 wins; a tie-loser rejects
+
+    // Exactly one row, and its object must still be downloadable.
+    const { count } = await service.from("session_photos")
+      .select("id", { count: "exact", head: true }).eq("storage_path", path);
+    expect(count).toBe(1);
+    const { data } = await service.storage.from(ORIGINALS_BUCKET).download(path);
+    expect(data).not.toBeNull();
   });
 });
