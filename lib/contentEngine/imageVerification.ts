@@ -14,12 +14,16 @@ export class ImageVerificationError extends Error {
   }
 }
 
+// width/height are PRE-rotation (as encoded); orientation carries the EXIF tag
+// when present so consumers needing display dimensions can account for it.
+// Derivative generation re-applies EXIF orientation with sharp at publish time.
 export interface VerifiedImage {
   hash: string;          // server-computed SHA-256 (feeds the unique constraint)
   format: string;        // 'jpeg' | 'png' | 'webp'
   width: number;
   height: number;
   bytes: number;
+  orientation?: number;  // EXIF orientation tag (1-8) when present
 }
 
 export interface VerifyOptions {
@@ -41,6 +45,10 @@ export async function verifyImageBuffer(buffer: Buffer, opts: VerifyOptions = {}
     throw new ImageVerificationError(`file size ${buffer.length} bytes exceeds cap ${maxBytes}`);
   }
 
+  // Header-level verification by design: metadata() reads the container header
+  // without a full decode, so a file with a valid header but truncated body can
+  // pass here and only fail at derivative-generation decode time (acceptable —
+  // nothing public is created from these bytes until publish, spec §4.3).
   let meta: sharp.Metadata;
   try {
     meta = await sharp(buffer, { limitInputPixels: maxPixels }).metadata();
@@ -61,5 +69,6 @@ export async function verifyImageBuffer(buffer: Buffer, opts: VerifyOptions = {}
   return {
     hash: createHash("sha256").update(buffer).digest("hex"),
     format, width, height, bytes: buffer.length,
+    ...(meta.orientation !== undefined ? { orientation: meta.orientation } : {}),
   };
 }
