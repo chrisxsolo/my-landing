@@ -118,7 +118,7 @@ async function approveRows(supabase: SupabaseServerClient, ids: number[]) {
     .in("id", ids);
 
   if (error) throw error;
-  const rows = (data ?? []) as StagedRow[];
+  const rows = (data ?? []) as unknown as StagedRow[];
 
   const fingerprints = rows.map(row => row.fingerprint);
   const { data: existing, error: existingError } = await supabase
