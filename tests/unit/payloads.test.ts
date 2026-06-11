@@ -86,6 +86,50 @@ describe("social_caption is Phase 2 — not validatable through the dispatcher",
   });
 });
 
+describe("dispatcher unknown-type ZodError contract", () => {
+  it("returns a ZodError with issues on social_caption", () => {
+    const r = validatePayload("social_caption", { platform: "instagram", caption: "hi", photo_ids: [UUID] });
+    expect(r.success).toBe(false);
+    if (!r.success) {
+      expect(r.error.issues.length).toBeGreaterThan(0);
+      expect(r.error.issues[0].path).toEqual(["contentType"]);
+    }
+  });
+
+  it("returns a ZodError with issues on a fully unknown type", () => {
+    const r = validatePayload("bogus_type", {});
+    expect(r.success).toBe(false);
+    if (!r.success) {
+      expect(r.error.issues.length).toBeGreaterThan(0);
+      expect(r.error.issues[0].path).toEqual(["contentType"]);
+    }
+  });
+});
+
+describe("payload edge-case rejections", () => {
+  it("rejects journal_post with photo_ids: [] (min 1)", () => {
+    const r = validatePayload("journal_post", {
+      title: "t", slug: "test-slug", body: "b",
+      photo_ids: [], cover_photo_id: UUID,
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it("rejects school_page_photo with sort_order: -1", () => {
+    const r = validatePayload("school_page_photo", {
+      session_photo_id: UUID, school_slug: "sjsu",
+      alt_override: "", caption: "", sort_order: -1,
+    });
+    expect(r.success).toBe(false);
+  });
+});
+
+describe("buildSessionFactsSnapshot throw contract", () => {
+  it("throws on missing service_type", () => {
+    expect(() => buildSessionFactsSnapshot({ public_display_name: "x" })).toThrow();
+  });
+});
+
 describe("buildSessionFactsSnapshot", () => {
   it("keeps public facts and strips internal-only fields", () => {
     const snap = buildSessionFactsSnapshot({

@@ -5,6 +5,7 @@ import { z } from "zod";
 import {
   isSchoolSlug, isPortfolioCategory, isCanonicalInternalLink,
   isGuideLocationKey, GUIDE_TYPES, SERVICE_TYPES, LIGHTING_CONDITIONS,
+  type ContentType,
 } from "@/lib/contentEngine/taxonomy";
 
 // z.uuid() is the zod-v4 canonical form; z.string().uuid() is deprecated but
@@ -80,21 +81,31 @@ export const internalLinkSuggestionPayloadSchema = z.object({
 });
 
 // Dispatcher: social_caption is intentionally absent (Phase 2, spec §8.2).
-const PAYLOAD_SCHEMAS = {
+// Typed as Record<Exclude<ContentType, "social_caption">, ...> so adding a new
+// ContentType to taxonomy without a schema entry here becomes a build failure.
+const PAYLOAD_SCHEMAS: Record<Exclude<ContentType, "social_caption">, z.ZodType> = {
   journal_post: journalPostPayloadSchema,
   portfolio_pick: portfolioPickPayloadSchema,
   school_page_photo: schoolPagePhotoPayloadSchema,
   guide_photo: guidePhotoPayloadSchema,
   testimonial_feature: testimonialFeaturePayloadSchema,
   internal_link_suggestion: internalLinkSuggestionPayloadSchema,
-} as const;
+};
 
 export type GeneratableContentType = keyof typeof PAYLOAD_SCHEMAS;
 
 export function validatePayload(contentType: string, payload: unknown) {
   const schema = PAYLOAD_SCHEMAS[contentType as GeneratableContentType];
   if (!schema) {
-    return { success: false as const, error: new Error(`no validatable payload schema for content type "${contentType}"`) };
+    return {
+      success: false as const,
+      error: new z.ZodError([{
+        code: "custom",
+        path: ["contentType"],
+        message: `no validatable payload schema for content type "${contentType}"`,
+        input: contentType,
+      }]),
+    };
   }
   return schema.safeParse(payload);
 }
@@ -119,6 +130,10 @@ export type SessionFactsSnapshot = z.infer<typeof sessionFactsSnapshotSchema>;
 
 // Pick only public fields off a session row; internal-only fields are dropped
 // by construction (they are never read here), then validated by the schema.
+//
+// Throws a ZodError on malformed session rows (e.g. missing/invalid
+// service_type) by design — a session without a valid service_type must never
+// silently reach AI input; callers should guard or let the error surface.
 export function buildSessionFactsSnapshot(session: Record<string, unknown>): SessionFactsSnapshot {
   return sessionFactsSnapshotSchema.parse({
     public_display_name: session.public_display_name ?? null,
