@@ -925,21 +925,26 @@ async function removeLiveRecord(client: SupabaseClient, targetType: string, targ
   switch (targetType) {
     case "blog_post": {
       const id = Number(targetId);
+      if (Number.isNaN(id)) throw new TakedownError(`published target id is not numeric: ${targetId}`);
       await client.from("image_library").delete().eq("source_post_id", id);
       await client.from("blog_posts").delete().eq("id", id);
       return;
     }
-    case "portfolio_image":
-      await client.from("portfolio_images").delete().eq("id", Number(targetId));
+    case "portfolio_image": {
+      const id = Number(targetId);
+      if (Number.isNaN(id)) throw new TakedownError(`published target id is not numeric: ${targetId}`);
+      await client.from("portfolio_images").delete().eq("id", id);
       return;
+    }
     case "school_page_photo":
       await client.from("school_page_photos").update({ active: false }).eq("id", targetId);
       return;
     case "family_location_photo":
-      await client.from("family_location_photos").update({ published: false }).eq("id", Number(targetId));
+      // uuid primary key — never Number() these (silent NaN no-op otherwise)
+      await client.from("family_location_photos").update({ published: false }).eq("id", targetId);
       return;
     case "couples_location_photo":
-      await client.from("couples_location_photos").update({ published: false }).eq("id", Number(targetId));
+      await client.from("couples_location_photos").update({ published: false }).eq("id", targetId);
       return;
     case "testimonial":
       await client.from("testimonials").update({ photography_session_id: null }).eq("id", targetId);
