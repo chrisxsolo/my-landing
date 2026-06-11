@@ -130,4 +130,54 @@ describe("takedownPublishedItem (spec §7.3 + §4.3 shared-derivative rule)", ()
     await expect(takedownPublishedItem({ client: service, itemId: item, revalidate: () => {} }))
       .rejects.toThrow(/not published/i);
   });
+
+  it("guide takedown unpublishes (published=false) the live guide row and frees the derivative", async () => {
+    const sessionId = await createTestSession({ service_type: "families" });
+    const photo = await realPhoto(sessionId, 8);
+    const item = await publishItemOfType(sessionId, "guide_photo", {
+      session_photo_id: photo.id, guide: "family", location_key: "crissy-field", alt_text: "Family at Crissy Field",
+    }, "guide_photo");
+
+    const { data: before } = await service.from("session_photos")
+      .select("public_derivative_url").eq("id", photo.id).single();
+    const { data: liveBefore } = await service.from("family_location_photos")
+      .select("id,published").eq("image_url", before!.public_derivative_url!);
+    expect(liveBefore!.some((r) => r.published)).toBe(true);
+
+    const result = await takedownPublishedItem({ client: service, itemId: item, revalidate: () => {} });
+    expect(result.removed).toBe(true);
+
+    const { data: liveAfter } = await service.from("family_location_photos")
+      .select("published").eq("image_url", before!.public_derivative_url!);
+    expect(liveAfter!.every((r) => r.published === false)).toBe(true); // THE Critical-bug regression check
+    const { data: photoAfter } = await service.from("session_photos")
+      .select("public_derivative_url").eq("id", photo.id).single();
+    expect(photoAfter!.public_derivative_url).toBeNull(); // zero refs remain → derivative freed
+  });
+
+  it("a journal EXTRA photo shared with portfolio keeps its derivative until both are gone", async () => {
+    const sessionId = await createTestSession();
+    const cover = await realPhoto(sessionId, 9);
+    const extra = await realPhoto(sessionId, 10);
+
+    // extra photo also lives in the portfolio
+    await publishItemOfType(sessionId, "portfolio_pick", {
+      session_photo_id: extra.id, category: "grads", title: "X", alt_text: "X", description: "", featured: false,
+    }, "portfolio_pick");
+
+    const journalItem = await publishItemOfType(sessionId, "journal_post", {
+      title: "Extras", slug: `extras-${Date.now()}`, body: "B", meta_description: "", meta_keywords: "",
+      photo_ids: [cover.id, extra.id], cover_photo_id: cover.id, internal_links: [], testimonial_id: null,
+    }, "journal_post");
+
+    await takedownPublishedItem({ client: service, itemId: journalItem, revalidate: () => {} });
+
+    // cover had only the journal → freed; extra still referenced by portfolio → kept
+    const { data: coverRow } = await service.from("session_photos")
+      .select("public_derivative_url").eq("id", cover.id).single();
+    expect(coverRow!.public_derivative_url).toBeNull();
+    const { data: extraRow } = await service.from("session_photos")
+      .select("public_derivative_url").eq("id", extra.id).single();
+    expect(extraRow!.public_derivative_url).not.toBeNull();
+  });
 });
