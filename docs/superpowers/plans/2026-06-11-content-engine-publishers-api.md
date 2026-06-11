@@ -725,7 +725,7 @@ async function realPhoto(sessionId: string, seed: number) {
 }
 
 async function publishItemOfType(sessionId: string, contentType: string, payload: Record<string, unknown>, selected: string) {
-  const pkg = await createPackage(sessionId, [selected]);
+  const pkg = await createPackage(sessionId, [selected], undefined, true); // archive prior package per session
   const item = await createItem(pkg, contentType, payload, "approved");
   const outcome = await publishApprovedItem({ client: service, itemId: item, revalidate: () => {} });
   expect(outcome.status).toBe("published");

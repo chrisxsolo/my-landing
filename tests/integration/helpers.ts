@@ -82,6 +82,7 @@ export async function createPackage(
   sessionId: string,
   selectedTypes: string[] = ["journal_post"],
   facts: Record<string, unknown> = { service_type: "grads" },
+  archiveCurrent = false, // pass true when a test creates several packages on one session
 ) {
   const { data, error } = await service.rpc("create_content_package", {
     p_session_id: sessionId,
@@ -90,7 +91,7 @@ export async function createPackage(
     p_selected_types: selectedTypes,
     p_session_facts: facts,
     p_generation_settings: {},
-    p_archive_current: false,
+    p_archive_current: archiveCurrent,
     p_copy_items: [],
   });
   if (error) throw error;
