@@ -94,3 +94,64 @@ describe("session facts PATCH semantics (taxonomy-validated)", () => {
     })).rejects.toThrow(/service type/i);
   });
 });
+
+describe("updatePermissions (spec §7.3, §3.1)", () => {
+  it("enables marketing permission with source + stamp; enables AI with basis + stamp", async () => {
+    const { updatePermissions } = await import("@/lib/contentEngine/permissions");
+    const sessionId = await createTestSession({ marketing_permission: false, ai_processing_allowed: false });
+
+    const result = await updatePermissions({
+      client: service, sessionId,
+      changes: { marketingPermission: true, marketingPermissionSource: "manual_confirmation",
+                 aiProcessingAllowed: true, aiProcessingBasis: "manual_confirmation" },
+    });
+    expect(result.outcome).toBe("updated");
+
+    const { data: row } = await service.from("photography_sessions").select("*").eq("id", sessionId).single();
+    expect(row!.marketing_permission).toBe(true);
+    expect(row!.marketing_permission_source).toBe("manual_confirmation");
+    expect(row!.marketing_permission_confirmed_at).not.toBeNull();
+    expect(row!.marketing_permission_revoked_at).toBeNull();
+    expect(row!.ai_processing_allowed).toBe(true);
+    expect(row!.ai_processing_basis).toBe("manual_confirmation");
+    expect(row!.ai_processing_confirmed_at).not.toBeNull();
+  });
+
+  it("revoking marketing permission with published content requires acknowledgement", async () => {
+    const { updatePermissions } = await import("@/lib/contentEngine/permissions");
+    const sessionId = await createTestSession();
+    const pkg = await createPackage(sessionId, ["internal_link_suggestion"]);
+    const item = await createItem(pkg, "internal_link_suggestion", { links: [] }, "approved");
+    await service.from("session_content_items").update({
+      status: "published", published_target_type: "none", published_at: new Date().toISOString(),
+    }).eq("id", item);
+
+    const blocked = await updatePermissions({
+      client: service, sessionId, changes: { marketingPermission: false },
+    });
+    expect(blocked.outcome).toBe("requires_acknowledgement");
+    if (blocked.outcome !== "requires_acknowledgement") throw new Error("unreachable");
+    expect(blocked.publishedCounts.internal_link_suggestion).toBe(1);
+    const { data: still } = await service.from("photography_sessions")
+      .select("marketing_permission").eq("id", sessionId).single();
+    expect(still!.marketing_permission).toBe(true); // untouched
+
+    const revoked = await updatePermissions({
+      client: service, sessionId, changes: { marketingPermission: false }, acknowledgePublished: true,
+    });
+    expect(revoked.outcome).toBe("updated");
+    const { data: after } = await service.from("photography_sessions")
+      .select("marketing_permission,marketing_permission_revoked_at").eq("id", sessionId).single();
+    expect(after!.marketing_permission).toBe(false);
+    expect(after!.marketing_permission_revoked_at).not.toBeNull();
+  });
+
+  it("rejects sources/bases outside the check-constraint sets", async () => {
+    const { updatePermissions } = await import("@/lib/contentEngine/permissions");
+    const sessionId = await createTestSession();
+    await expect(updatePermissions({
+      client: service, sessionId,
+      changes: { marketingPermission: true, marketingPermissionSource: "vibes" },
+    })).rejects.toThrow(/source/i);
+  });
+});
