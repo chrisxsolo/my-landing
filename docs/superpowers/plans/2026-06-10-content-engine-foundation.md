@@ -1371,6 +1371,7 @@ begin
   ) values (
     p_session_id, v_next, 'generating', coalesce(p_session_facts, '{}'::jsonb),
     p_model_name, p_prompt_version,
+    -- NOTE: selected_types/progress keys in p_generation_settings are overwritten — the RPC is authoritative for both.
     coalesce(p_generation_settings, '{}'::jsonb)
       || jsonb_build_object('selected_types', to_jsonb(p_selected_types), 'progress', v_progress)
   ) returning id into v_pkg_id;
@@ -1788,6 +1789,11 @@ begin
     from public.session_content_packages p where p.id = v_item.package_id;
   select s.* into v_session from public.photography_sessions s
    where s.id = v_session_id for update;
+
+  if exists (select 1 from public.session_content_packages p
+             where p.id = v_item.package_id and p.archived_at is not null) then
+    raise exception 'item belongs to an archived package — restore it into the active package first';
+  end if;
 
   if not v_session.marketing_permission then
     raise exception 'marketing permission is not enabled for this session';
