@@ -1,53 +1,59 @@
-// Visual tokens for the admin home + inquiries redesign — clean neutral
-// "studio" look: ivory canvas, white glass panels, ink type, quiet accents.
+// Visual tokens for the admin "Darkroom" theme — a photography-native dark
+// interface: warm near-black canvas (like a darkroom), one amber *safelight*
+// accent as the primary action color, film-grain texture, paper-white ink.
 // Single source for these surfaces so no hex values live inline in the tabs.
 // (Same pattern as app/admin/payments/palette.ts, which themes Revenue.)
 
 export const T = {
-  // Canvas
-  page: "#f6f6f4",
-  canvasGlow: "radial-gradient(640px 300px at 8% -4%, rgba(31,122,92,0.05), transparent 70%), radial-gradient(720px 340px at 94% -6%, rgba(157,111,232,0.05), transparent 70%)",
+  // Canvas — warm near-black with a faint safelight glow bleeding in from above
+  page: "#131114",
+  canvasGlow: "radial-gradient(900px 420px at 50% -8%, rgba(232,160,76,0.07), transparent 70%), radial-gradient(640px 300px at 8% 110%, rgba(164,143,220,0.05), transparent 70%)",
 
-  // Panels — white glass over the soft canvas (no backdrop-filter; cheap + crisp)
-  panel: "rgba(255,255,255,0.82)",
-  panelSolid: "#ffffff",
-  panelHover: "rgba(255,255,255,0.97)",
-  border: "rgba(28,28,32,0.08)",
-  borderStrong: "rgba(28,28,32,0.16)",
-  rowBorder: "rgba(28,28,32,0.06)",
-  inset: "rgba(28,28,32,0.045)",
-  insetStrong: "rgba(28,28,32,0.08)",
-  shadow: "0 1px 2px rgba(16,18,22,0.04), 0 10px 30px rgba(16,18,22,0.06)",
-  shadowHover: "0 2px 4px rgba(16,18,22,0.05), 0 16px 40px rgba(16,18,22,0.10)",
-  scrim: "rgba(17,18,22,0.40)",
+  // Panels — charcoal glass over the dark canvas
+  panel: "rgba(255,255,255,0.045)",
+  panelSolid: "#1c191d",
+  panelHover: "rgba(255,255,255,0.07)",
+  border: "rgba(255,255,255,0.09)",
+  borderStrong: "rgba(255,255,255,0.18)",
+  rowBorder: "rgba(255,255,255,0.06)",
+  inset: "rgba(255,255,255,0.05)",
+  insetStrong: "rgba(255,255,255,0.10)",
+  shadow: "0 1px 2px rgba(0,0,0,0.5), 0 12px 32px rgba(0,0,0,0.35)",
+  shadowHover: "0 2px 4px rgba(0,0,0,0.5), 0 18px 48px rgba(0,0,0,0.5)",
+  scrim: "rgba(8,7,9,0.72)",
 
-  // Ink (neutral type ramp)
-  ink: "#1c1c20",
-  inkSoft: "#55555c",
-  inkFaint: "#8e8e95",
+  // Ink (warm paper-white type ramp)
+  ink: "#f2efe9",
+  inkSoft: "#b8b2a8",
+  inkFaint: "#75706a",
 
-  // Primary action — ink button, the one strong element on the page
-  action: "#1c1c20",
-  actionHover: "#2c2c33",
-  actionText: "#ffffff",
+  // Primary action — the amber safelight, the one glowing element in the dark
+  action: "#e8a04c",
+  actionHover: "#f0b066",
+  actionText: "#1a1209",
+  glow: "0 0 0 1px rgba(232,160,76,0.25), 0 4px 20px rgba(232,160,76,0.25)",
 
-  // Quiet semantic accents (desaturated, dark enough for white panels)
-  green: "#1f7a5c",
-  greenBg: "rgba(31,122,92,0.09)",
-  greenBorder: "rgba(31,122,92,0.22)",
-  amber: "#9a6b15",
-  amberBg: "rgba(176,124,30,0.11)",
-  amberBorder: "rgba(176,124,30,0.28)",
-  blue: "#3a64b4",
-  blueBg: "rgba(58,100,180,0.09)",
-  blueBorder: "rgba(58,100,180,0.22)",
-  red: "#b4373d",
-  redBg: "rgba(180,55,61,0.08)",
-  redBorder: "rgba(180,55,61,0.22)",
-  violet: "#6d5bc4",
-  violetBg: "rgba(109,91,196,0.09)",
-  violetBorder: "rgba(109,91,196,0.22)",
-  neutralBg: "rgba(28,28,32,0.05)",
+  // Semantic accents — chemical-bath tones, bright enough for dark panels
+  green: "#6fc296",
+  greenBg: "rgba(111,194,150,0.13)",
+  greenBorder: "rgba(111,194,150,0.32)",
+  amber: "#e8a04c",
+  amberBg: "rgba(232,160,76,0.13)",
+  amberBorder: "rgba(232,160,76,0.34)",
+  blue: "#85aede",
+  blueBg: "rgba(133,174,222,0.13)",
+  blueBorder: "rgba(133,174,222,0.32)",
+  red: "#e08585",
+  redBg: "rgba(224,133,133,0.13)",
+  redBorder: "rgba(224,133,133,0.32)",
+  violet: "#ab95e0",
+  violetBg: "rgba(171,149,224,0.13)",
+  violetBorder: "rgba(171,149,224,0.32)",
+  neutralBg: "rgba(255,255,255,0.07)",
+
+  // Typography — editorial serif for headings, mono for EXIF-style data
+  display: "'Fraunces', Georgia, 'Times New Roman', serif",
+  mono: "'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace",
 } as const;
 
 /** Status colors for inquiry pipeline chips/rails. */

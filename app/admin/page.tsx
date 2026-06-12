@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, useCallback, useSyncExternalStore, Suspens
 import { useRouter } from "next/navigation";
 import { C } from "@/lib/colors";
 import { T, INQ_STATUS } from "@/app/admin/adminTheme";
+import CommandPalette from "@/app/admin/CommandPalette";
 
 function subscribeReducedMotion(onChange:()=>void){
   const mq=window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -278,6 +279,14 @@ function AdminDashboard() {
   const [clientSort,setClientSort]=useState<"recent_activity"|"newest_inquiry"|"oldest_inquiry"|"session_date"|"alpha"|"paid_recently">("recent_activity");
   const [inquirySort,setInquirySort]=useState<"needs_reply"|"newest"|"oldest"|"session_date"|"alpha"|"paid_recently">("needs_reply");
   const [inquiryFilter,setInquiryFilter]=useState<"all"|"needs_reply"|"new"|"responded"|"archived"|"not_interested">("all");
+  const [paletteOpen,setPaletteOpen]=useState(false);
+  useEffect(()=>{
+    const onKey=(e:KeyboardEvent)=>{
+      if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="k"){e.preventDefault();setPaletteOpen(o=>!o);}
+    };
+    window.addEventListener("keydown",onKey);
+    return()=>window.removeEventListener("keydown",onKey);
+  },[]);
   const [editingSessionType,setEditingSessionType]=useState<number|null>(null);
   const EMPTY_CLIENT={name:"",email:"",phone:"",session_type:"",session_date:"",message:""};
   const EMPTY_EVENT={name:"",email:"",phone:"",session_type:"",session_date:"",session_time:"",location:"",notes:"",payment_received:false};
@@ -1300,22 +1309,27 @@ function AdminDashboard() {
 
   if(!authed){
     return(
-      <div className="min-h-screen bg-white flex items-center justify-center px-6 font-sans">
+      <div className="min-h-screen flex items-center justify-center px-6 font-sans" style={{backgroundColor:T.page,backgroundImage:T.canvasGlow}}>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..900;1,9..144,400..900&family=IBM+Plex+Mono:wght@400;500;600&display=swap"/>
+        <style>{`@keyframes adm-safelight { 0%,100% { opacity: 0.85; } 50% { opacity: 0.45; } }`}</style>
+        <div className="fixed top-0 left-0 right-0 h-[2px]" style={{background:`linear-gradient(90deg, transparent, ${T.action}, transparent)`,animation:"adm-safelight 5s ease-in-out infinite"}} aria-hidden="true"/>
         <div className="w-full max-w-sm">
           <div className="text-center mb-8">
-            <span className="font-black text-2xl" style={C.text}>Chris.</span>
-            <p className="text-slate-400 text-sm mt-1 font-medium">Studio Admin</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.3em] mb-3" style={{color:T.action,fontFamily:T.mono}}>The Darkroom</p>
+            <span className="text-4xl font-bold" style={{color:T.ink,fontFamily:T.display}}>Chris<span style={{color:T.action}}>.</span></span>
+            <p className="text-sm mt-2 font-medium" style={{color:T.inkFaint}}>Where the business gets developed.</p>
           </div>
-          <div className="rounded-2xl p-8 shadow-xl" style={{border:`1px solid ${C.p1_15}`}}>
-            <div className="h-[3px] rounded-full mb-6" style={{background:C.grad90}}/>
-            <label className="block text-xs font-bold tracking-widest uppercase text-slate-400 mb-2">Password</label>
+          <div className="rounded-2xl p-8" style={{background:T.panel,border:`1px solid ${T.border}`,boxShadow:T.shadowHover}}>
+            <label className="block text-[10px] font-bold tracking-[0.2em] uppercase mb-2" style={{color:T.inkFaint,fontFamily:T.mono}}>Password</label>
             <input type="password" value={pw} onChange={e=>{setPw(e.target.value);setPwErr(false);}}
               onKeyDown={e=>{if(e.key==="Enter")login(pw).then(ok=>{if(ok)setAuthed(true);else setPwErr(true);});}}
-              placeholder="Enter password" className={inp+" mb-4"} style={pwErr?{borderColor:C.p2}:{}}/>
-            {pwErr&&<p className="text-xs font-semibold mb-3" style={{color:C.p2}}>Incorrect password</p>}
+              placeholder="Enter password" autoFocus
+              className="w-full px-3 py-2.5 rounded-xl text-sm font-medium outline-none transition-colors mb-4"
+              style={{background:T.inset,border:`1px solid ${pwErr?T.red:T.border}`,color:T.ink}}/>
+            {pwErr&&<p className="text-xs font-semibold mb-3" style={{color:T.red}}>Incorrect password</p>}
             <button onClick={()=>login(pw).then(ok=>{if(ok)setAuthed(true);else setPwErr(true);})}
-              className="w-full py-2.5 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90" style={{background:C.grad12}}>
-              Enter →
+              className="w-full py-2.5 rounded-xl font-bold text-sm transition-all hover:opacity-90" style={{background:T.action,color:T.actionText,boxShadow:T.glow}}>
+              Step inside →
             </button>
           </div>
         </div>
@@ -1325,62 +1339,109 @@ function AdminDashboard() {
 
   return(
     <div className="min-h-screen font-sans" style={{backgroundColor:T.page,backgroundImage:T.canvasGlow,backgroundAttachment:"fixed"}}>
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..900;1,9..144,400..900&family=IBM+Plex+Mono:wght@400;500;600&display=swap"/>
       <style>{`
         @keyframes adm-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
         .adm-rise { animation: adm-rise 0.45s cubic-bezier(0.22,1,0.36,1) both; }
-        @media (prefers-reduced-motion: reduce) { .adm-rise { animation-duration: 0.01ms; } }
+        @keyframes adm-pop { from { opacity: 0; transform: translateY(8px) scale(0.985); } to { opacity: 1; transform: none; } }
+        .adm-pop { animation: adm-pop 0.18s cubic-bezier(0.22,1,0.36,1) both; }
+        @keyframes adm-safelight { 0%,100% { opacity: 0.85; } 50% { opacity: 0.45; } }
+        .adm-grain { position: fixed; inset: 0; pointer-events: none; z-index: 90; opacity: 0.04; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+        ::selection { background: rgba(232,160,76,0.35); }
+        @media (prefers-reduced-motion: reduce) { .adm-rise, .adm-pop { animation-duration: 0.01ms; } }
       `}</style>
-      {toast&&<div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 rounded-full text-white text-sm font-bold shadow-xl" style={{background:toast.ok?C.grad12:"#be123c"}}>{toast.msg}</div>}
+      <div className="adm-grain" aria-hidden="true"/>
+      <CommandPalette
+        open={paletteOpen}
+        onClose={()=>setPaletteOpen(false)}
+        tabs={(Object.keys(TAB_LABELS) as Tab[]).map(t=>({key:t,icon:TAB_LABELS[t].split(" ")[0],label:TAB_LABELS[t].replace(/^[^\s]+\s/,"")}))}
+        actions={[
+          {key:"new-client",icon:"➕",label:"New client",run:()=>{setTab("clients");setAddClientOpen(true);}},
+          {key:"add-session",icon:"📸",label:"Add session to calendar",run:()=>{setTab("home");setAddEventForm(EMPTY_EVENT);setAddEventOpen(true);}},
+          {key:"sync-payments",icon:"💳",label:"Sync payments from Gmail",run:()=>{syncPayments();}},
+          {key:"reminders",icon:"🔔",label:"Reminder templates",run:()=>router.push("/admin/reminder-templates")},
+          {key:"portal",icon:"🗂️",label:"Portal sessions",run:()=>router.push("/admin/sessions")},
+          {key:"availability",icon:"📆",label:"Availability",run:()=>router.push("/admin/availability")},
+        ]}
+        clients={(()=>{
+          const seen=new Map<string,{id:number;name:string;email:string;sessionType:string|null;paid:boolean}>();
+          [...inquiries].sort((a,b)=>new Date(b.created_at).getTime()-new Date(a.created_at).getTime()).forEach(i=>{
+            const k=i.email.toLowerCase();
+            if(!seen.has(k))seen.set(k,{id:i.id,name:i.name,email:i.email,sessionType:i.session_type,paid:false});
+            if(i.payment_status==="paid")seen.get(k)!.paid=true;
+          });
+          return Array.from(seen.values());
+        })()}
+        onGo={t=>{cancelEditPortfolioImage();cancelEditCategory();setEditingInquiry(null);setInquiryDeleteConfirm(null);setTab(t as Tab);}}
+        onOpenClient={id=>router.push(`/admin/conversation/${id}`)}
+      />
+      {/* Safelight strip — the darkroom signature */}
+      <div className="fixed top-0 left-0 right-0 h-[2px] z-50 pointer-events-none" style={{background:`linear-gradient(90deg, transparent, ${T.action}, transparent)`,animation:"adm-safelight 5s ease-in-out infinite"}} aria-hidden="true"/>
+      {toast&&<div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 rounded-full text-sm font-bold adm-pop" style={{background:T.panelSolid,color:T.ink,border:`1px solid ${toast.ok?T.greenBorder:T.redBorder}`,boxShadow:T.shadowHover}}>
+        <span style={{color:toast.ok?T.green:T.red}}>{toast.ok?"● ":"● "}</span>{toast.msg}
+      </div>}
 
-      {addEventOpen&&(
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{background:"rgba(0,0,0,0.45)",backdropFilter:"blur(6px)"}} onClick={e=>{if(e.target===e.currentTarget){setAddEventOpen(false);setAddEventForm(EMPTY_EVENT);}}}>
-          <div className="w-full max-w-md rounded-3xl overflow-hidden" style={{background:"white",boxShadow:"0 24px 64px rgba(124,58,237,0.2)"}}>
-            <div className="h-[3px]" style={{background:"linear-gradient(90deg,#a78bfa,#7c3aed,#6366f1)"}}/>
+      {addEventOpen&&(()=>{
+        const mInp="w-full px-3 py-2.5 rounded-xl text-sm font-medium outline-none transition-colors";
+        const mInpStyle={background:T.inset,border:`1px solid ${T.border}`,color:T.ink} as const;
+        const mLbl="block text-[10px] font-black uppercase tracking-widest mb-1";
+        return(
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{background:T.scrim,backdropFilter:"blur(6px)"}} onClick={e=>{if(e.target===e.currentTarget){setAddEventOpen(false);setAddEventForm(EMPTY_EVENT);}}}>
+          <div className="w-full max-w-md rounded-3xl overflow-hidden adm-pop" style={{background:T.panelSolid,border:`1px solid ${T.border}`,boxShadow:T.shadowHover}}>
+            <div className="h-[2px]" style={{background:`linear-gradient(90deg, transparent, ${T.action}, transparent)`}}/>
             <div className="p-6">
               <div className="flex items-center justify-between mb-5">
                 <div>
-                  <p className="text-[10px] font-black uppercase tracking-widest mb-0.5" style={{color:"#7c3aed"}}>📸 Add to Calendar</p>
-                  <p className="text-base font-black text-slate-900">New Session</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest mb-0.5" style={{color:T.amber,fontFamily:T.mono}}>📸 Add to Calendar</p>
+                  <p className="text-lg font-black" style={{color:T.ink,fontFamily:T.display}}>New Session</p>
                 </div>
-                <button onClick={()=>{setAddEventOpen(false);setAddEventForm(EMPTY_EVENT);}} className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-100 transition-colors text-lg font-bold">×</button>
+                <button onClick={()=>{setAddEventOpen(false);setAddEventForm(EMPTY_EVENT);}} className="w-8 h-8 rounded-xl flex items-center justify-center transition-colors text-lg font-bold" style={{color:T.inkFaint,background:T.inset}}>×</button>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div className="col-span-2"><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Name *</label><input className="w-full px-3 py-2.5 rounded-xl text-sm font-medium text-slate-800 outline-none border border-slate-200 focus:border-violet-300 bg-white transition-colors" placeholder="e.g. Maria Lopez" value={addEventForm.name} onChange={e=>setAddEventForm(f=>({...f,name:e.target.value}))}/></div>
-                <div className="col-span-2"><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Email *</label><input className="w-full px-3 py-2.5 rounded-xl text-sm font-medium text-slate-800 outline-none border border-slate-200 focus:border-violet-300 bg-white transition-colors" type="email" placeholder="e.g. maria@gmail.com" value={addEventForm.email} onChange={e=>setAddEventForm(f=>({...f,email:e.target.value}))}/></div>
-                <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Phone</label><input className="w-full px-3 py-2.5 rounded-xl text-sm font-medium text-slate-800 outline-none border border-slate-200 focus:border-violet-300 bg-white transition-colors" type="tel" placeholder="(408) 555-1234" value={addEventForm.phone} onChange={e=>setAddEventForm(f=>({...f,phone:e.target.value}))}/></div>
-                <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Session Type</label><input className="w-full px-3 py-2.5 rounded-xl text-sm font-medium text-slate-800 outline-none border border-slate-200 focus:border-violet-300 bg-white transition-colors" placeholder="e.g. Grad Portraits" value={addEventForm.session_type} onChange={e=>setAddEventForm(f=>({...f,session_type:e.target.value}))}/></div>
-                <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Date *</label><input className="w-full px-3 py-2.5 rounded-xl text-sm font-medium text-slate-800 outline-none border border-slate-200 focus:border-violet-300 bg-white transition-colors" type="text" placeholder="YYYY-MM-DD" value={addEventForm.session_date} onChange={e=>setAddEventForm(f=>({...f,session_date:e.target.value}))}/></div>
-                <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Time</label><input className="w-full px-3 py-2.5 rounded-xl text-sm font-medium text-slate-800 outline-none border border-slate-200 focus:border-violet-300 bg-white transition-colors" type="text" placeholder="HH:MM" value={addEventForm.session_time} onChange={e=>setAddEventForm(f=>({...f,session_time:e.target.value}))}/></div>
-                <div className="col-span-2"><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Location</label><input className="w-full px-3 py-2.5 rounded-xl text-sm font-medium text-slate-800 outline-none border border-slate-200 focus:border-violet-300 bg-white transition-colors" placeholder="e.g. UC Berkeley" value={addEventForm.location} onChange={e=>setAddEventForm(f=>({...f,location:e.target.value}))}/></div>
-                <div className="col-span-2"><label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Notes</label><textarea className="w-full px-3 py-2.5 rounded-xl text-sm font-medium text-slate-800 outline-none border border-slate-200 focus:border-violet-300 bg-white transition-colors resize-none" rows={2} placeholder="Anything relevant from the conversation…" value={addEventForm.notes} onChange={e=>setAddEventForm(f=>({...f,notes:e.target.value}))}/></div>
+                <div className="col-span-2"><label className={mLbl} style={{color:T.inkFaint}}>Name *</label><input className={mInp} style={mInpStyle} placeholder="e.g. Maria Lopez" value={addEventForm.name} onChange={e=>setAddEventForm(f=>({...f,name:e.target.value}))}/></div>
+                <div className="col-span-2"><label className={mLbl} style={{color:T.inkFaint}}>Email *</label><input className={mInp} style={mInpStyle} type="email" placeholder="e.g. maria@gmail.com" value={addEventForm.email} onChange={e=>setAddEventForm(f=>({...f,email:e.target.value}))}/></div>
+                <div><label className={mLbl} style={{color:T.inkFaint}}>Phone</label><input className={mInp} style={mInpStyle} type="tel" placeholder="(408) 555-1234" value={addEventForm.phone} onChange={e=>setAddEventForm(f=>({...f,phone:e.target.value}))}/></div>
+                <div><label className={mLbl} style={{color:T.inkFaint}}>Session Type</label><input className={mInp} style={mInpStyle} placeholder="e.g. Grad Portraits" value={addEventForm.session_type} onChange={e=>setAddEventForm(f=>({...f,session_type:e.target.value}))}/></div>
+                <div><label className={mLbl} style={{color:T.inkFaint}}>Date *</label><input className={mInp} style={mInpStyle} type="text" placeholder="YYYY-MM-DD" value={addEventForm.session_date} onChange={e=>setAddEventForm(f=>({...f,session_date:e.target.value}))}/></div>
+                <div><label className={mLbl} style={{color:T.inkFaint}}>Time</label><input className={mInp} style={mInpStyle} type="text" placeholder="HH:MM" value={addEventForm.session_time} onChange={e=>setAddEventForm(f=>({...f,session_time:e.target.value}))}/></div>
+                <div className="col-span-2"><label className={mLbl} style={{color:T.inkFaint}}>Location</label><input className={mInp} style={mInpStyle} placeholder="e.g. UC Berkeley" value={addEventForm.location} onChange={e=>setAddEventForm(f=>({...f,location:e.target.value}))}/></div>
+                <div className="col-span-2"><label className={mLbl} style={{color:T.inkFaint}}>Notes</label><textarea className={`${mInp} resize-none`} style={mInpStyle} rows={2} placeholder="Anything relevant from the conversation…" value={addEventForm.notes} onChange={e=>setAddEventForm(f=>({...f,notes:e.target.value}))}/></div>
                 <div className="col-span-2">
-                  <label className="flex items-center gap-3 cursor-pointer select-none p-3 rounded-xl transition-colors" style={{background:addEventForm.payment_received?"rgba(16,185,129,0.08)":"rgba(0,0,0,0.03)",border:`1px solid ${addEventForm.payment_received?"rgba(16,185,129,0.25)":"rgba(0,0,0,0.08)"}`}}>
-                    <input type="checkbox" className="w-4 h-4 rounded accent-emerald-500 cursor-pointer" checked={addEventForm.payment_received} onChange={e=>setAddEventForm(f=>({...f,payment_received:e.target.checked}))}/>
+                  <label className="flex items-center gap-3 cursor-pointer select-none p-3 rounded-xl transition-colors" style={{background:addEventForm.payment_received?T.greenBg:T.inset,border:`1px solid ${addEventForm.payment_received?T.greenBorder:T.border}`}}>
+                    <input type="checkbox" className="w-4 h-4 rounded cursor-pointer" style={{accentColor:T.green}} checked={addEventForm.payment_received} onChange={e=>setAddEventForm(f=>({...f,payment_received:e.target.checked}))}/>
                     <div>
-                      <p className="text-xs font-black" style={{color:addEventForm.payment_received?"#059669":"#64748b"}}>Payment received ✓</p>
-                      <p className="text-[10px] text-slate-400 font-medium">Required to show on calendar</p>
+                      <p className="text-xs font-black" style={{color:addEventForm.payment_received?T.green:T.inkSoft}}>Payment received ✓</p>
+                      <p className="text-[10px] font-medium" style={{color:T.inkFaint}}>Required to show on calendar</p>
                     </div>
                   </label>
                 </div>
               </div>
               <div className="flex gap-2 mt-5">
-                <button onClick={()=>{setAddEventOpen(false);setAddEventForm(EMPTY_EVENT);}} className="px-4 py-2.5 rounded-xl text-sm font-bold text-slate-500 hover:bg-slate-100 transition-colors">Cancel</button>
-                <button onClick={saveCalendarEvent} disabled={addEventSaving} className="flex-1 py-2.5 rounded-xl text-sm font-black text-white disabled:opacity-50 transition-opacity" style={{background:"linear-gradient(135deg,#a78bfa,#7c3aed)"}}>
+                <button onClick={()=>{setAddEventOpen(false);setAddEventForm(EMPTY_EVENT);}} className="px-4 py-2.5 rounded-xl text-sm font-bold transition-colors" style={{color:T.inkSoft}}>Cancel</button>
+                <button onClick={saveCalendarEvent} disabled={addEventSaving} className="flex-1 py-2.5 rounded-xl text-sm font-black disabled:opacity-50 transition-opacity" style={{background:T.action,color:T.actionText,boxShadow:T.glow}}>
                   {addEventSaving?"Saving…":"Add to Calendar ✓"}
                 </button>
               </div>
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
 
-      <div className="sticky top-0 z-40 px-3 md:px-6 h-14 flex items-center justify-between" style={{background:"rgba(246,246,244,0.88)",backdropFilter:"blur(20px)",borderBottom:`1px solid ${T.border}`}}>
-        <span className="font-black text-sm md:text-base shrink-0 flex items-center gap-2" style={{color:T.ink}}>
-          <span className="w-2 h-2 rounded-full" style={{background:T.action}}/>
-          Chris<span style={{color:T.inkFaint}}>·</span>Studio
+      <div className="sticky top-0 z-40 px-3 md:px-6 h-14 flex items-center justify-between" style={{background:"rgba(19,17,20,0.82)",backdropFilter:"blur(20px)",borderBottom:`1px solid ${T.border}`}}>
+        <span className="shrink-0 flex items-center gap-2.5" style={{color:T.ink}}>
+          <span className="w-2 h-2 rounded-full" style={{background:T.action,boxShadow:`0 0 8px ${T.action}`}}/>
+          <span className="text-base md:text-lg font-bold" style={{fontFamily:T.display}}>Chris<span style={{color:T.action}}>.</span></span>
+          <span className="hidden sm:inline text-[10px] font-bold uppercase tracking-[0.22em]" style={{color:T.inkFaint,fontFamily:T.mono}}>Darkroom</span>
         </span>
         <div className="flex items-center gap-2 md:gap-3">
+          <button onClick={()=>setPaletteOpen(true)}
+            className="hidden md:inline-flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-[11px] font-bold transition-all hover:-translate-y-px"
+            style={{background:T.inset,color:T.inkSoft,border:`1px solid ${T.border}`}}>
+            <span>Search</span>
+            <kbd className="rounded px-1.5 py-0.5 text-[10px]" style={{background:T.insetStrong,color:T.inkSoft,fontFamily:T.mono}}>⌘K</kbd>
+          </button>
           <Link
             href="/admin/sessions"
             className="inline-flex items-center rounded-full px-2 md:px-3 py-1.5 text-[10px] md:text-[11px] font-black uppercase tracking-[0.12em] transition-all hover:-translate-y-px whitespace-nowrap"
@@ -1403,7 +1464,7 @@ function AdminDashboard() {
             <button onClick={()=>go(t)}
               className="w-full flex items-center gap-2.5 px-3 py-[7px] rounded-xl text-[13px] font-semibold transition-all text-left group"
               style={tab===t
-                ?{background:T.action,color:T.actionText,boxShadow:T.shadow}
+                ?{background:T.action,color:T.actionText,boxShadow:T.glow}
                 :{color:T.inkSoft,background:"transparent"}}
               onMouseEnter={e=>{if(tab!==t)e.currentTarget.style.background=T.inset;}}
               onMouseLeave={e=>{if(tab!==t)e.currentTarget.style.background="transparent";}}>
@@ -1413,7 +1474,7 @@ function AdminDashboard() {
           );
           return(
             <div className="hidden md:flex sticky top-14 flex-shrink-0 w-[200px] h-[calc(100vh-56px)] overflow-y-auto flex-col py-3 px-2"
-                 style={{background:"rgba(255,255,255,0.55)",borderRight:`1px solid ${T.border}`}}>
+                 style={{background:"rgba(255,255,255,0.025)",borderRight:`1px solid ${T.border}`}}>
               <div className="flex-1 space-y-0.5 pb-3">
                 <NavBtn t="home" icon="🏠" label="Home"/>
                 <div className="h-px my-2 mx-1" style={{background:T.rowBorder}}/>
@@ -1459,11 +1520,11 @@ function AdminDashboard() {
             {t:"ai",icon:"🤖",label:"AI Training"},{t:"chat",icon:"💬",label:"AI Chat"},{t:"format",icon:"✨",label:"Format"},{t:"vault",icon:"📓",label:"Vault"},{t:"accounts",icon:"👤",label:"Accounts"},
           ];
           return(
-            <div className="md:hidden sticky top-14 z-30 overflow-x-auto flex items-center gap-1.5 px-3 py-2 [&::-webkit-scrollbar]:hidden" style={{background:"rgba(246,246,244,0.92)",backdropFilter:"blur(16px)",borderBottom:`1px solid ${T.border}`}}>
+            <div className="md:hidden sticky top-14 z-30 overflow-x-auto flex items-center gap-1.5 px-3 py-2 [&::-webkit-scrollbar]:hidden" style={{background:"rgba(19,17,20,0.88)",backdropFilter:"blur(16px)",borderBottom:`1px solid ${T.border}`}}>
               {all.map(({t,icon,label})=>(
                 <button key={t} onClick={()=>go(t)}
                   className="flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[12px] font-semibold whitespace-nowrap transition-all"
-                  style={tab===t?{background:T.action,color:T.actionText,boxShadow:T.shadow}:{color:T.inkSoft,background:T.inset}}>
+                  style={tab===t?{background:T.action,color:T.actionText,boxShadow:T.glow}:{color:T.inkSoft,background:T.inset}}>
                   <span className="text-sm leading-none">{icon}</span>
                   <span>{label}</span>
                 </button>
@@ -1472,8 +1533,8 @@ function AdminDashboard() {
           );
         })()}
 
-        {/* ── MAIN CONTENT ── */}
-        <div className="flex-1 px-4 py-4 md:px-8 md:py-8">
+        {/* ── MAIN CONTENT — key={tab} re-runs the rise animation on every tab switch ── */}
+        <div key={tab} className="flex-1 px-4 py-4 md:px-8 md:py-8 adm-rise">
 
         {/* ── HOME ── */}
         {tab==="home"&&(()=>{
@@ -1488,13 +1549,17 @@ function AdminDashboard() {
             .slice(0,5);
 
           // Revenue this month (paid sessions with payment detected this month)
+          const parsePayment=(inq:Inquiry)=>{
+            const match=(inq.payment_note||"").match(/\$?([\d,]+(?:\.\d{2})?)/);
+            return match?parseFloat(match[1].replace(",","")):0;
+          };
           const monthRevenue=inquiries
             .filter(inq=>inq.payment_status==="paid"&&inq.payment_detected_at&&new Date(inq.payment_detected_at)>=monthStart)
-            .reduce((sum,inq)=>{
-              const note=inq.payment_note||"";
-              const match=note.match(/\$?([\d,]+(?:\.\d{2})?)/);
-              return sum+(match?parseFloat(match[1].replace(",","")): 0);
-            },0);
+            .reduce((sum,inq)=>sum+parsePayment(inq),0);
+          const prevMonthStart=new Date(now.getFullYear(),now.getMonth()-1,1);
+          const prevMonthRevenue=inquiries
+            .filter(inq=>inq.payment_status==="paid"&&inq.payment_detected_at&&new Date(inq.payment_detected_at)>=prevMonthStart&&new Date(inq.payment_detected_at)<monthStart)
+            .reduce((sum,inq)=>sum+parsePayment(inq),0);
 
           // Quick stats
           const totalClients=new Set(inquiries.map(i=>i.email.toLowerCase())).size;
@@ -1520,9 +1585,9 @@ function AdminDashboard() {
               {/* Greeting + quick actions */}
               <div className="adm-rise flex flex-wrap items-end justify-between gap-4 mb-6">
                 <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.22em] mb-1.5" style={{color:T.inkFaint}}>Soloxsnaps Studio</p>
-                  <h1 className="text-[26px] font-black leading-none" style={{color:T.ink}}>
-                    {now.getHours()<12?"Good morning":now.getHours()<17?"Good afternoon":"Good evening"}, Chris
+                  <p className="text-[10px] font-bold uppercase tracking-[0.28em] mb-2" style={{color:T.action,fontFamily:T.mono}}>Soloxsnaps · The Darkroom</p>
+                  <h1 className="text-[30px] font-semibold leading-none" style={{color:T.ink,fontFamily:T.display}}>
+                    {now.getHours()<12?"Good morning":now.getHours()<17?"Good afternoon":"Good evening"}, <em>Chris</em>
                   </h1>
                   <p className="text-sm mt-2 font-medium" style={{color:T.inkSoft}}>
                     {now.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})}
@@ -1571,15 +1636,23 @@ function AdminDashboard() {
                     onMouseEnter={e=>{e.currentTarget.style.background=T.panelHover;e.currentTarget.style.borderColor=T.borderStrong;}}
                     onMouseLeave={e=>{e.currentTarget.style.background=T.panel;e.currentTarget.style.borderColor=T.border;}}>
                     <div className="flex items-center justify-between mb-2">
-                      <p className="text-[10px] font-black uppercase tracking-[0.16em]" style={{color:T.inkSoft}}>{s.label}</p>
-                      <span className="w-1.5 h-1.5 rounded-full" style={{background:s.accent}}/>
+                      <p className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{color:T.inkSoft,fontFamily:T.mono}}>{s.label}</p>
+                      <span className="w-1.5 h-1.5 rounded-full" style={{background:s.accent,boxShadow:`0 0 6px ${s.accent}`}}/>
                     </div>
-                    <p className="text-[26px] font-black leading-none tabular-nums" style={{color:T.ink}}>
+                    <p className="text-[26px] font-bold leading-none tabular-nums flex items-baseline gap-2" style={{color:T.ink,fontFamily:T.mono}}>
                       <CountUpNumber value={s.value} prefix={s.prefix}/>
+                      {s.label==="Revenue"&&prevMonthRevenue>0&&(()=>{
+                        const pct=Math.round(((monthRevenue-prevMonthRevenue)/prevMonthRevenue)*100);
+                        return(
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{background:pct>=0?T.greenBg:T.redBg,color:pct>=0?T.green:T.red}} title={`vs $${Math.round(prevMonthRevenue).toLocaleString()} last month`}>
+                            {pct>=0?"↑":"↓"}{Math.abs(pct)}%
+                          </span>
+                        );
+                      })()}
                     </p>
                     <p className="text-[11px] mt-1.5 font-medium flex items-center" style={{color:T.inkFaint}}>
                       {s.sub}
-                      <span className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity text-[10px] font-bold" style={{color:T.inkSoft}}>Open →</span>
+                      <span className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity text-[10px] font-bold" style={{color:T.action}}>Open →</span>
                     </p>
                   </button>
                 ))}
@@ -1607,7 +1680,7 @@ function AdminDashboard() {
                   <div className="adm-rise rounded-2xl overflow-hidden" style={{background:T.panel,border:`1px solid ${T.border}`,boxShadow:T.shadow,animationDelay:"160ms"}}>
                     <div className="p-4">
                       <div className="flex items-center justify-between mb-2">
-                        <p className="text-[10px] font-black uppercase tracking-[0.16em]" style={{color:T.green}}>Up Next</p>
+                        <p className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{color:T.green,fontFamily:T.mono}}>Up Next</p>
                         <button onClick={()=>setTab("clients")} className="text-[11px] font-bold transition-opacity hover:opacity-70" style={{color:T.inkFaint}}>All →</button>
                       </div>
                       {upcoming.length===0?(
@@ -1648,49 +1721,70 @@ function AdminDashboard() {
                     </div>
                   </div>
 
-                  {/* Needs reply */}
-                  {pendingInquiries>0&&(()=>{
-                    const newInqs=inquiries
-                      .filter(i=>!i.reply_sent_at&&i.status!=="archived"&&i.status!=="not_interested"&&i.status!=="responded"&&i.status!=="manual")
-                      .sort((a,b)=>new Date(b.created_at).getTime()-new Date(a.created_at).getTime())
-                      .slice(0,4);
+                  {/* Action Queue — the highest-ROI next moves, ranked */}
+                  {(()=>{
                     const hoursAgo=(iso:string)=>{
                       const h=Math.round((Date.now()-new Date(iso).getTime())/(1000*60*60));
                       if(h<1)return"just now";if(h===1)return"1h ago";if(h<24)return`${h}h ago`;
                       const d=Math.round(h/24);return d===1?"1d ago":`${d}d ago`;
                     };
+                    const active=(i:Inquiry)=>i.status!=="archived"&&i.status!=="not_interested";
+                    const replies=inquiries
+                      .filter(i=>!i.reply_sent_at&&active(i)&&i.status!=="responded"&&i.status!=="manual")
+                      .sort((a,b)=>new Date(b.created_at).getTime()-new Date(a.created_at).getTime());
+                    const galleries=inquiries
+                      .filter(i=>i.payment_status==="paid"&&i.session_date&&i.session_date<todayStr&&!i.gallery_delivered_at)
+                      .sort((a,b)=>a.session_date!.localeCompare(b.session_date!));
+                    const leads=inquiries
+                      .filter(i=>i.payment_status!=="paid"&&active(i)&&(i.reply_sent_at||i.status==="responded"))
+                      .sort((a,b)=>new Date(b.created_at).getTime()-new Date(a.created_at).getTime());
+                    const paidAmounts=inquiries.filter(i=>i.payment_status==="paid").map(parsePayment).filter(n=>n>0);
+                    const avgPaid=paidAmounts.length?paidAmounts.reduce((a,b)=>a+b,0)/paidAmounts.length:350;
+                    const atStake=Math.round(leads.length*avgPaid);
+                    type QItem={key:string;inq:Inquiry;chip:string;chipColor:string;chipBg:string;note:string;act:()=>void;cta:string};
+                    const queue:QItem[]=[
+                      ...replies.map(i=>({key:`r${i.id}`,inq:i,chip:"REPLY",chipColor:T.amber,chipBg:T.amberBg,note:`${i.session_type||"Session"} · ${hoursAgo(i.created_at)}`,act:()=>setTab("inquiries"),cta:"Reply →"})),
+                      ...galleries.map(i=>({key:`g${i.id}`,inq:i,chip:"DELIVER",chipColor:T.violet,chipBg:T.violetBg,note:`shot ${new Date(i.session_date!+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric"})} · gallery not sent`,act:()=>router.push(`/admin/conversation/${i.id}`),cta:"Open →"})),
+                      ...leads.map(i=>({key:`l${i.id}`,inq:i,chip:`~$${Math.round(avgPaid)}`,chipColor:T.green,chipBg:T.greenBg,note:`${i.session_type||"Session"} · warm, unpaid`,act:()=>router.push(`/admin/conversation/${i.id}`),cta:"Nudge →"})),
+                    ];
+                    const shown=queue.slice(0,6);
                     return(
-                      <div className="adm-rise rounded-2xl overflow-hidden" style={{background:T.panel,border:`1px solid ${T.amberBorder}`,boxShadow:T.shadow,animationDelay:"220ms"}}>
+                      <div className="adm-rise rounded-2xl overflow-hidden" style={{background:T.panel,border:`1px solid ${queue.length?T.amberBorder:T.border}`,boxShadow:T.shadow,animationDelay:"220ms"}}>
                         <div className="p-4">
-                          <div className="flex items-center justify-between mb-2">
-                            <p className="text-[10px] font-black uppercase tracking-[0.16em] flex items-center gap-1.5" style={{color:T.amber}}>
-                              <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{background:T.amber}}/>
-                              Needs Reply
+                          <div className="flex items-center justify-between mb-1">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.18em] flex items-center gap-1.5" style={{color:queue.length?T.amber:T.green,fontFamily:T.mono}}>
+                              {queue.length>0&&<span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{background:T.amber,boxShadow:`0 0 6px ${T.amber}`}}/>}
+                              Action Queue
                             </p>
-                            <button onClick={()=>setTab("inquiries")} className="text-[11px] font-bold transition-opacity hover:opacity-70" style={{color:T.inkFaint}}>
-                              {pendingInquiries>4?`+${pendingInquiries-4} more →`:"All →"}
-                            </button>
+                            {queue.length>6&&<span className="text-[10px] font-bold" style={{color:T.inkFaint,fontFamily:T.mono}}>+{queue.length-6} more</span>}
                           </div>
-                          <div className="flex flex-col gap-1.5">
-                            {newInqs.map(inq=>(
-                              <div key={inq.id} className="flex items-center gap-2 p-2 rounded-xl" style={{background:T.amberBg}}>
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-1.5 flex-wrap">
-                                    <p className="text-xs font-bold" style={{color:T.ink}}>{inq.name}</p>
-                                    <span className="text-[9px] font-bold" style={{color:T.amber}}>{hoursAgo(inq.created_at)}</span>
+                          {leads.length>0&&(
+                            <p className="text-[10px] mb-2" style={{color:T.inkFaint}}>
+                              ≈ <span className="font-bold" style={{color:T.green,fontFamily:T.mono}}>${atStake.toLocaleString()}</span> sitting in warm leads
+                            </p>
+                          )}
+                          {queue.length===0?(
+                            <p className="text-sm py-2" style={{color:T.inkFaint}}>Darkroom clear — nothing waiting on you. ✓</p>
+                          ):(
+                            <div className="flex flex-col gap-1.5 mt-1">
+                              {shown.map(q=>(
+                                <div key={q.key} className="group/q flex items-center gap-2 p-2 rounded-xl transition-colors" style={{background:T.inset}}
+                                     onMouseEnter={e=>{e.currentTarget.style.background=T.insetStrong;}}
+                                     onMouseLeave={e=>{e.currentTarget.style.background=T.inset;}}>
+                                  <span className="flex-shrink-0 text-[8px] font-black px-1.5 py-0.5 rounded-full tracking-wider" style={{background:q.chipBg,color:q.chipColor,fontFamily:T.mono}}>{q.chip}</span>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-xs font-bold truncate" style={{color:T.ink}}>{q.inq.name}</p>
+                                    <p className="text-[10px] truncate" style={{color:T.inkFaint}}>{q.note}</p>
                                   </div>
-                                  <p className="text-[10px] truncate" style={{color:T.inkSoft}}>
-                                    {inq.session_type||"Session"}{inq.date_in_mind?` · ${inq.date_in_mind}`:""}
-                                  </p>
+                                  <button onClick={q.act}
+                                    className="flex-shrink-0 text-[10px] font-bold px-2 py-1 rounded-lg transition-all opacity-80 group-hover/q:opacity-100"
+                                    style={{background:T.action,color:T.actionText}}>
+                                    {q.cta}
+                                  </button>
                                 </div>
-                                <button onClick={()=>setTab("inquiries")}
-                                  className="flex-shrink-0 text-[10px] font-bold px-2 py-1 rounded-lg transition-all hover:opacity-85"
-                                  style={{background:T.action,color:T.actionText}}>
-                                  Reply →
-                                </button>
-                              </div>
-                            ))}
-                          </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
@@ -1718,7 +1812,7 @@ function AdminDashboard() {
                     <div className="p-4">
                       {/* Header */}
                       <div className="flex items-center justify-between mb-3">
-                        <p className="text-[10px] font-black uppercase tracking-[0.16em]" style={{color:T.inkSoft}}>✉️ Inbox</p>
+                        <p className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{color:T.inkSoft,fontFamily:T.mono}}>✉️ Inbox</p>
                         <div className="flex items-center gap-3">
                           <button onClick={()=>setFreeComposeOpen(p=>!p)}
                             className="text-[11px] font-bold px-2.5 py-1 rounded-lg transition-all"
@@ -2686,15 +2780,16 @@ function AdminDashboard() {
                                style={{color:T.inkSoft}}>{inq.email}</a>
                             {inq.phone&&(
                               <>
-                                <span className="text-slate-300">·</span>
+                                <span style={{color:T.inkFaint}}>·</span>
                                 <a href={`tel:${inq.phone}`}
                                    onClick={e=>e.stopPropagation()}
-                                   className="font-medium text-slate-600 hover:underline hover:text-slate-900 transition-colors">
+                                   className="font-medium hover:underline transition-colors"
+                                   style={{color:T.inkSoft}}>
                                   {inq.phone}
                                 </a>
                               </>
                             )}
-                            <span className="text-slate-300">·</span>
+                            <span style={{color:T.inkFaint}}>·</span>
                             {editingSessionType===inq.id?(
                               <SessionTypeEditor
                                 id={inq.id}
@@ -2705,85 +2800,86 @@ function AdminDashboard() {
                             ):(
                               <button
                                 onClick={e=>{e.stopPropagation();setEditingSessionType(inq.id);}}
-                                className="font-semibold text-slate-600 hover:text-violet-600 transition-colors group flex items-center gap-1"
+                                className="font-semibold transition-colors group flex items-center gap-1"
+                                style={{color:T.inkSoft}}
                                 title="Edit session type">
-                                {inq.session_type||<span className="text-slate-400 italic">Set type</span>}
-                                <span className="opacity-0 group-hover:opacity-100 text-[9px] text-slate-400 transition-opacity">✏️</span>
+                                {inq.session_type||<span className="italic" style={{color:T.inkFaint}}>Set type</span>}
+                                <span className="opacity-0 group-hover:opacity-100 text-[9px] transition-opacity" style={{color:T.inkFaint}}>✏️</span>
                               </button>
                             )}
-                            {inq.date_in_mind&&<><span className="text-slate-300">·</span><span className="text-slate-600">{inq.date_in_mind}</span></>}
-                            {inq.school&&<><span className="text-slate-300">·</span><span className="text-slate-600">{inq.school}</span></>}
+                            {inq.date_in_mind&&<><span style={{color:T.inkFaint}}>·</span><span style={{color:T.inkSoft}}>{inq.date_in_mind}</span></>}
+                            {inq.school&&<><span style={{color:T.inkFaint}}>·</span><span style={{color:T.inkSoft}}>{inq.school}</span></>}
                           </div>
                           {/* Payment / confirmation status pills */}
                           {(inq.deposit_paid_at||inq.invoice_sent_at||inq.contract_sent_at||inq.confirmation_sent_at||inq.gallery_delivered_at)&&(
                             <div className="flex flex-wrap gap-1 mb-2">
                               {inq.invoice_sent_at&&(
                                 <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full"
-                                      style={{background:"rgba(99,102,241,0.1)",color:"#6366f1"}}>
+                                      style={{background:T.blueBg,color:T.blue}}>
                                   📄 Invoice {new Date(inq.invoice_sent_at).toLocaleDateString("en-US",{month:"short",day:"numeric"})}
                                 </span>
                               )}
                               {inq.contract_sent_at&&(
                                 <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full"
-                                      style={{background:"rgba(139,92,246,0.1)",color:"#7c3aed"}}>
+                                      style={{background:T.violetBg,color:T.violet}}>
                                   📝 Contract {new Date(inq.contract_sent_at).toLocaleDateString("en-US",{month:"short",day:"numeric"})}
                                 </span>
                               )}
                               {inq.deposit_paid_at&&(
                                 <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full flex items-center gap-1"
-                                      style={{background:"rgba(16,185,129,0.12)",color:"#059669"}}>
+                                      style={{background:T.greenBg,color:T.green}}>
                                   💳 Paid {new Date(inq.deposit_paid_at).toLocaleDateString("en-US",{month:"short",day:"numeric"})}
                                   {inq.confirmation_sent_at?(
-                                    <span style={{color:"#059669"}}>· ✉ Confirmed</span>
+                                    <span style={{color:T.green}}>· ✉ Confirmed</span>
                                   ):(
-                                    <span style={{color:"#d97706"}}>· ✉ Not confirmed</span>
+                                    <span style={{color:T.amber}}>· ✉ Not confirmed</span>
                                   )}
                                 </span>
                               )}
                               {inq.gallery_delivered_at&&(
                                 <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full"
-                                      style={{background:"rgba(251,146,60,0.12)",color:"#ea580c"}}>
+                                      style={{background:T.amberBg,color:T.amber}}>
                                   🖼 Gallery {new Date(inq.gallery_delivered_at).toLocaleDateString("en-US",{month:"short",day:"numeric"})}
                                 </span>
                               )}
                               {inq.deposit_paid_at&&finalPaymentIds.has(inq.id)&&(
                                 <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full"
-                                      style={{background:"rgba(16,185,129,0.15)",color:"#047857"}}>
+                                      style={{background:T.greenBg,color:T.green,border:`1px solid ${T.greenBorder}`}}>
                                   💳 Final Paid ✓
                                 </span>
                               )}
                               {inq.deposit_paid_at&&!finalPaymentIds.has(inq.id)&&(
                                 <button onClick={e=>{e.stopPropagation();const isOpen=cardPaymentId===inq.id;setCardPaymentId(isOpen?null:inq.id);setCardPaymentAmount(isOpen?"":deposit1Amounts.get(inq.id)??"");setCardPaymentMethod("Venmo");}}
                                   className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full cursor-pointer"
-                                  style={{background:"rgba(99,102,241,0.12)",color:"#6366f1"}}>
+                                  style={{background:T.blueBg,color:T.blue}}>
                                   💳 Record 2nd
                                 </button>
                               )}
                             </div>
                           )}
                           {cardPaymentId===inq.id&&(
-                            <div className="mt-2 rounded-xl p-3" style={{background:"rgba(16,185,129,0.05)",border:"1px solid rgba(16,185,129,0.2)"}} onClick={e=>e.stopPropagation()}>
-                              <p className="text-[10px] font-black uppercase tracking-widest mb-2" style={{color:"#059669"}}>Record Final Payment</p>
+                            <div className="mt-2 rounded-xl p-3" style={{background:T.greenBg,border:`1px solid ${T.greenBorder}`}} onClick={e=>e.stopPropagation()}>
+                              <p className="text-[10px] font-black uppercase tracking-widest mb-2" style={{color:T.green}}>Record Final Payment</p>
                               <div className="flex gap-2 mb-2">
                                 <input type="text" placeholder="Amount (e.g. 150)" value={cardPaymentAmount}
                                   onChange={e=>setCardPaymentAmount(e.target.value)}
-                                  className="flex-1 rounded-lg border px-2.5 py-1.5 text-sm font-semibold outline-none"
-                                  style={{borderColor:"rgba(16,185,129,0.3)",background:"white",color:"#1e293b"}}/>
+                                  className="flex-1 rounded-lg px-2.5 py-1.5 text-sm font-semibold outline-none"
+                                  style={{border:`1px solid ${T.greenBorder}`,background:T.panelSolid,color:T.ink}}/>
                                 <select value={cardPaymentMethod} onChange={e=>setCardPaymentMethod(e.target.value)}
-                                  className="rounded-lg border px-2 py-1.5 text-xs font-bold outline-none"
-                                  style={{borderColor:"rgba(16,185,129,0.3)",background:"white",color:"#1e293b"}}>
+                                  className="rounded-lg px-2 py-1.5 text-xs font-bold outline-none"
+                                  style={{border:`1px solid ${T.greenBorder}`,background:T.panelSolid,color:T.ink}}>
                                   <option>Venmo</option><option>Zelle</option><option>PayPal</option><option>Cash App</option><option>Cash</option><option>Other</option>
                                 </select>
                               </div>
                               <div className="flex gap-2">
                                 <button onClick={()=>recordCardPayment(inq.id)} disabled={!cardPaymentAmount||cardPaymentSaving}
-                                  className="flex-1 rounded-lg py-1.5 text-xs font-black text-white disabled:opacity-50"
-                                  style={{background:"linear-gradient(135deg,#10b981,#059669)"}}>
+                                  className="flex-1 rounded-lg py-1.5 text-xs font-black disabled:opacity-50"
+                                  style={{background:T.green,color:"#0d1f15"}}>
                                   {cardPaymentSaving?"Saving…":"Record Payment ✓"}
                                 </button>
                                 <button onClick={e=>{e.stopPropagation();setCardPaymentId(null);setCardPaymentAmount("");}}
                                   className="px-3 rounded-lg py-1.5 text-xs font-bold"
-                                  style={{background:"rgba(0,0,0,0.05)",color:"#64748b"}}>
+                                  style={{background:T.neutralBg,color:T.inkSoft}}>
                                   Cancel
                                 </button>
                               </div>
@@ -3285,14 +3381,21 @@ function AdminDashboard() {
                 <div className="adm-rise rounded-2xl overflow-hidden" style={{background:T.panel,border:`1px solid ${T.borderStrong}`,boxShadow:T.shadowHover}}>
                   <div className="p-5 space-y-3">
                     <p className="text-sm font-black" style={{color:T.ink}}>Add Client from Instagram DM</p>
+                    {(()=>{
+                      const dInp="w-full px-3 py-2.5 rounded-xl text-sm font-medium outline-none transition-colors";
+                      const dInpStyle={background:T.inset,border:`1px solid ${T.border}`,color:T.ink,colorScheme:"dark"} as const;
+                      const dLbl="block text-xs font-bold uppercase tracking-widest mb-1";
+                      return(
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      <div><label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">Name *</label><input className={inp} placeholder="e.g. Karina Lopez" value={addClientForm.name} onChange={e=>setAddClientForm(f=>({...f,name:e.target.value}))}/></div>
-                      <div><label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">Email *</label><input className={inp} type="email" placeholder="e.g. karina@gmail.com" value={addClientForm.email} onChange={e=>setAddClientForm(f=>({...f,email:e.target.value}))}/></div>
-                      <div><label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">Phone</label><input className={inp} type="tel" placeholder="e.g. (408) 555-1234" value={addClientForm.phone} onChange={e=>setAddClientForm(f=>({...f,phone:e.target.value}))}/></div>
-                      <div><label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">Session Type</label><input className={inp} placeholder="e.g. Grad Portraits" value={addClientForm.session_type} onChange={e=>setAddClientForm(f=>({...f,session_type:e.target.value}))}/></div>
-                      <div className="sm:col-span-2"><label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">Session Date</label><input className={inp} type="date" value={addClientForm.session_date} onChange={e=>setAddClientForm(f=>({...f,session_date:e.target.value}))}/></div>
-                      <div className="sm:col-span-2"><label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">Notes</label><textarea className={ta} rows={2} placeholder="Anything from the DM — location, time, vibe, etc." value={addClientForm.message} onChange={e=>setAddClientForm(f=>({...f,message:e.target.value}))}/></div>
+                      <div><label className={dLbl} style={{color:T.inkFaint}}>Name *</label><input className={dInp} style={dInpStyle} placeholder="e.g. Karina Lopez" value={addClientForm.name} onChange={e=>setAddClientForm(f=>({...f,name:e.target.value}))}/></div>
+                      <div><label className={dLbl} style={{color:T.inkFaint}}>Email *</label><input className={dInp} style={dInpStyle} type="email" placeholder="e.g. karina@gmail.com" value={addClientForm.email} onChange={e=>setAddClientForm(f=>({...f,email:e.target.value}))}/></div>
+                      <div><label className={dLbl} style={{color:T.inkFaint}}>Phone</label><input className={dInp} style={dInpStyle} type="tel" placeholder="e.g. (408) 555-1234" value={addClientForm.phone} onChange={e=>setAddClientForm(f=>({...f,phone:e.target.value}))}/></div>
+                      <div><label className={dLbl} style={{color:T.inkFaint}}>Session Type</label><input className={dInp} style={dInpStyle} placeholder="e.g. Grad Portraits" value={addClientForm.session_type} onChange={e=>setAddClientForm(f=>({...f,session_type:e.target.value}))}/></div>
+                      <div className="sm:col-span-2"><label className={dLbl} style={{color:T.inkFaint}}>Session Date</label><input className={dInp} style={dInpStyle} type="date" value={addClientForm.session_date} onChange={e=>setAddClientForm(f=>({...f,session_date:e.target.value}))}/></div>
+                      <div className="sm:col-span-2"><label className={dLbl} style={{color:T.inkFaint}}>Notes</label><textarea className={`${dInp} resize-none`} style={dInpStyle} rows={2} placeholder="Anything from the DM — location, time, vibe, etc." value={addClientForm.message} onChange={e=>setAddClientForm(f=>({...f,message:e.target.value}))}/></div>
                     </div>
+                      );
+                    })()}
                     <button onClick={saveManualClient} disabled={addClientSaving}
                       className="w-full py-3 rounded-xl font-bold text-sm transition-all hover:opacity-90 active:scale-[0.99]"
                       style={{background:T.action,color:T.actionText,opacity:addClientSaving?0.7:1,boxShadow:T.shadow}}>

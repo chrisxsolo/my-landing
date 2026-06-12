@@ -195,8 +195,8 @@ export default function InquiryAnalyticsTab() {
       <div className={`adm-rise ${card}`} style={panel}>
         <div className="p-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.16em] mb-1.5" style={{ color: T.inkSoft }}>Funnel Analytics</p>
-            <h2 className="text-2xl font-black leading-tight" style={{ color: T.ink }}>Where your clients come from — and where they drop.</h2>
+            <p className="text-[10px] font-bold uppercase tracking-[0.22em] mb-1.5" style={{ color: T.action, fontFamily: T.mono }}>Funnel Analytics</p>
+            <h2 className="text-2xl font-semibold leading-tight" style={{ color: T.ink, fontFamily: T.display }}>Where your clients come from — and where they drop.</h2>
             <p className="mt-1.5 text-sm font-medium" style={{ color: T.inkFaint }}>Based on {total} real inquiries.</p>
           </div>
           <button onClick={load} disabled={loading}

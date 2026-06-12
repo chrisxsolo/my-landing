@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { T } from "@/app/admin/adminTheme";
 
 type Session = {
   id: number;
@@ -24,13 +25,15 @@ type Props = {
   deposit1Amounts?: Map<number, string>;
 };
 
-const GRAD_COLOR  = { grad: "linear-gradient(135deg,#34d399,#059669)", text: "#059669", bg: "rgba(52,211,153,0.13)" };
-const TODAY_COLOR = { grad: "linear-gradient(135deg,#a78bfa,#7c3aed)", text: "#7c3aed", bg: "rgba(167,139,250,0.13)" };
-const OTHER_COLORS = [
-  { grad: "linear-gradient(135deg,#60a5fa,#2563eb)", text: "#2563eb", bg: "rgba(96,165,250,0.13)" },
-  { grad: "linear-gradient(135deg,#f472b6,#db2777)", text: "#db2777", bg: "rgba(244,114,182,0.13)" },
-  { grad: "linear-gradient(135deg,#fb923c,#ea580c)", text: "#ea580c", bg: "rgba(251,146,60,0.13)" },
-  { grad: "linear-gradient(135deg,#38bdf8,#0284c7)", text: "#0284c7", bg: "rgba(56,189,248,0.13)" },
+// Session color families on the darkroom palette: grads glow green, today is
+// the amber safelight, everything else rotates through the cool accents.
+type DayColor = { solid: string; text: string; bg: string };
+const GRAD_COLOR: DayColor  = { solid: T.green,  text: T.green,  bg: T.greenBg };
+const TODAY_COLOR: DayColor = { solid: T.amber,  text: T.amber,  bg: T.amberBg };
+const OTHER_COLORS: DayColor[] = [
+  { solid: T.blue,   text: T.blue,   bg: T.blueBg },
+  { solid: T.violet, text: T.violet, bg: T.violetBg },
+  { solid: T.red,    text: T.red,    bg: T.redBg },
 ];
 
 function isGrad(session_type: string | null): boolean {
@@ -39,7 +42,7 @@ function isGrad(session_type: string | null): boolean {
   return t.includes("grad") || t.includes("graduation") || t.includes("senior");
 }
 
-function colorFor(s: Session): typeof GRAD_COLOR {
+function colorFor(s: Session): DayColor {
   if (isGrad(s.session_type)) return GRAD_COLOR;
   return OTHER_COLORS[s.id % OTHER_COLORS.length];
 }
@@ -99,45 +102,43 @@ export default function SessionCalendar({
     return d.getMonth() === viewMonth && d.getFullYear() === viewYear;
   });
 
+  const inputStyle = { background: T.panelSolid, border: `1px solid ${T.borderStrong}`, color: T.ink, colorScheme: "dark" } as const;
+
   return (
     <div
       className="rounded-3xl overflow-hidden"
-      style={{
-        background: "rgba(255,255,255,0.82)",
-        border: "1px solid rgba(28,28,32,0.08)",
-        boxShadow: "0 1px 2px rgba(16,18,22,0.04), 0 10px 30px rgba(16,18,22,0.06)",
-      }}>
+      style={{ background: T.panel, border: `1px solid ${T.border}`, boxShadow: T.shadow }}>
 
       <div className="p-5">
         {/* Header */}
         <div className="flex items-center justify-between mb-5">
           <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] mb-1" style={{ color: "#7c3aed" }}>
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] mb-1" style={{ color: T.inkSoft, fontFamily: T.mono }}>
               📸 Session Calendar
             </p>
-            <p className="text-lg font-black leading-none" style={{ color: "#1c1c20" }}>{monthName}</p>
+            <p className="text-xl font-semibold leading-none" style={{ color: T.ink, fontFamily: T.display }}>{monthName}</p>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="text-xs font-bold mr-1" style={{ color: "#8e8e95" }}>{thisMonthSessions.length} session{thisMonthSessions.length !== 1 ? "s" : ""}</span>
+            <span className="text-xs font-bold mr-1 tabular-nums" style={{ color: T.inkFaint, fontFamily: T.mono }}>{thisMonthSessions.length} session{thisMonthSessions.length !== 1 ? "s" : ""}</span>
             {onAddEvent && (
               <button
                 onClick={() => onAddEvent()}
-                className="text-[10px] font-black px-2.5 py-1.5 rounded-lg transition-all hover:opacity-90 text-white"
-                style={{ background: "linear-gradient(135deg,#a78bfa,#7c3aed)" }}
+                className="text-[10px] font-black px-2.5 py-1.5 rounded-lg transition-all hover:opacity-90"
+                style={{ background: T.action, color: T.actionText, boxShadow: T.glow }}
                 title="Add event">
                 + Add
               </button>
             )}
             {/* Month nav — segmented control */}
-            <div className="flex items-center rounded-xl overflow-hidden" style={{ border: "1px solid rgba(28,28,32,0.08)", background: "rgba(28,28,32,0.03)" }}>
-              <button onClick={prevMonth} className="w-8 h-7 flex items-center justify-center font-bold transition-colors hover:bg-violet-50" style={{ color: "#55555c" }}>‹</button>
+            <div className="flex items-center rounded-xl overflow-hidden" style={{ border: `1px solid ${T.border}`, background: T.inset }}>
+              <button onClick={prevMonth} className="w-8 h-7 flex items-center justify-center font-bold transition-colors hover:opacity-70" style={{ color: T.inkSoft }}>‹</button>
               <button
                 onClick={() => { setViewYear(today.getFullYear()); setViewMonth(today.getMonth()); setSelected(null); }}
-                className="text-[10px] font-black px-2.5 h-7 transition-colors hover:bg-violet-50"
-                style={{ color: "#7c3aed", borderLeft: "1px solid rgba(28,28,32,0.07)", borderRight: "1px solid rgba(28,28,32,0.07)" }}>
+                className="text-[10px] font-black px-2.5 h-7 transition-colors hover:opacity-70"
+                style={{ color: T.amber, borderLeft: `1px solid ${T.rowBorder}`, borderRight: `1px solid ${T.rowBorder}` }}>
                 Today
               </button>
-              <button onClick={nextMonth} className="w-8 h-7 flex items-center justify-center font-bold transition-colors hover:bg-violet-50" style={{ color: "#55555c" }}>›</button>
+              <button onClick={nextMonth} className="w-8 h-7 flex items-center justify-center font-bold transition-colors hover:opacity-70" style={{ color: T.inkSoft }}>›</button>
             </div>
           </div>
         </div>
@@ -145,7 +146,7 @@ export default function SessionCalendar({
         {/* Day-of-week header */}
         <div className="grid grid-cols-7 mb-2">
           {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d => (
-            <div key={d} className="text-center text-[10px] font-black uppercase tracking-widest text-slate-400 py-1">{d}</div>
+            <div key={d} className="text-center text-[10px] font-bold uppercase tracking-widest py-1" style={{ color: T.inkFaint, fontFamily: T.mono }}>{d}</div>
           ))}
         </div>
 
@@ -174,32 +175,33 @@ export default function SessionCalendar({
                 className="aspect-square rounded-xl flex flex-col items-center justify-center relative transition-all group"
                 style={{
                   background: isSelected
-                    ? (isToday ? TODAY_COLOR.grad : firstColor?.grad ?? TODAY_COLOR.grad)
+                    ? (isToday ? TODAY_COLOR.solid : firstColor?.solid ?? TODAY_COLOR.solid)
                     : isToday ? TODAY_COLOR.bg : hasSessions ? firstColor!.bg : "transparent",
                   border: isToday && !isSelected ? `2px solid ${TODAY_COLOR.text}` : "1.5px solid transparent",
                   cursor: hasSessions || canAdd ? "pointer" : "default",
-                  boxShadow: isSelected ? "0 4px 12px rgba(124,58,237,0.25)" : isToday ? "0 0 0 3px rgba(124,58,237,0.12)" : "none",
+                  boxShadow: isSelected ? T.glow : isToday ? `0 0 0 3px ${T.amberBg}` : "none",
                 }}>
                 <span
-                  className="text-xs font-bold leading-none"
+                  className="text-xs leading-none tabular-nums"
                   style={{
-                    color: isSelected ? "#fff" : isToday ? TODAY_COLOR.text : hasSessions ? firstColor!.text : isPast ? "#cbd5e1" : "#475569",
-                    fontWeight: isToday || hasSessions ? 900 : 600,
+                    color: isSelected ? "#15110d" : isToday ? TODAY_COLOR.text : hasSessions ? firstColor!.text : isPast ? T.inkFaint : T.inkSoft,
+                    fontWeight: isToday || hasSessions ? 800 : 500,
+                    fontFamily: T.mono,
                   }}>
                   {dayNum}
                 </span>
                 {hasSessions && !isSelected && (
                   <div className="flex gap-0.5 mt-0.5">
                     {daySessions.slice(0, 3).map((s, di) => (
-                      <div key={di} className="w-1 h-1 rounded-full" style={{ background: colorFor(s).text }} />
+                      <div key={di} className="w-1 h-1 rounded-full" style={{ background: colorFor(s).text, boxShadow: `0 0 4px ${colorFor(s).text}` }} />
                     ))}
                   </div>
                 )}
                 {canAdd && (
-                  <span className="text-[8px] font-black opacity-0 group-hover:opacity-40 transition-opacity leading-none mt-0.5" style={{ color: "#7c3aed" }}>+</span>
+                  <span className="text-[8px] font-black opacity-0 group-hover:opacity-60 transition-opacity leading-none mt-0.5" style={{ color: T.amber }}>+</span>
                 )}
                 {isSelected && daySessions.length > 1 && (
-                  <span className="text-[8px] font-black text-white/80 leading-none mt-0.5">×{daySessions.length}</span>
+                  <span className="text-[8px] font-black leading-none mt-0.5" style={{ color: "rgba(21,17,13,0.7)" }}>×{daySessions.length}</span>
                 )}
               </button>
             );
@@ -209,7 +211,7 @@ export default function SessionCalendar({
         {/* Selected day detail */}
         {selected && selectedSessions.length > 0 && (
           <div className="mt-4 space-y-2">
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">
+            <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: T.inkFaint, fontFamily: T.mono }}>
               {new Date(selected + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
             </p>
             {selectedSessions.map(s => {
@@ -251,22 +253,22 @@ export default function SessionCalendar({
 
               return (
                 <div key={s.id} className="rounded-2xl overflow-hidden"
-                  style={{ background: "rgba(255,255,255,0.9)", border: "1px solid rgba(167,139,250,0.15)", boxShadow: "0 2px 8px rgba(124,58,237,0.06)" }}>
+                  style={{ background: T.panelSolid, border: `1px solid ${T.border}`, boxShadow: T.shadow }}>
                   <div className="flex items-start gap-3 p-3">
-                    <div className="w-9 h-9 rounded-xl flex items-center justify-center text-base flex-shrink-0 mt-0.5" style={{ background: col.grad }}>
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center text-base flex-shrink-0 mt-0.5" style={{ background: col.bg, border: `1px solid ${col.text}33` }}>
                       📸
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-black text-slate-900 truncate">{s.name}</p>
-                      <p className="text-xs text-slate-400 truncate">{s.session_type || "Session"}</p>
+                      <p className="text-sm font-black truncate" style={{ color: T.ink }}>{s.name}</p>
+                      <p className="text-xs truncate" style={{ color: T.inkFaint }}>{s.session_type || "Session"}</p>
                       <div className="flex items-center gap-1.5 flex-wrap mt-2">
                         {isPaid && (
-                          <span className="text-[10px] font-black px-2 py-0.5 rounded-lg" style={{ background: "rgba(16,185,129,0.1)", color: "#059669" }}>
+                          <span className="text-[10px] font-black px-2 py-0.5 rounded-lg" style={{ background: T.greenBg, color: T.green }}>
                             Deposit ✓
                           </span>
                         )}
                         {s.deposit2Received && (
-                          <span className="text-[10px] font-black px-2 py-0.5 rounded-lg" style={{ background: "rgba(16,185,129,0.15)", color: "#047857" }}>
+                          <span className="text-[10px] font-black px-2 py-0.5 rounded-lg" style={{ background: T.greenBg, color: T.green, border: `1px solid ${T.greenBorder}` }}>
                             Final Paid ✓
                           </span>
                         )}
@@ -274,27 +276,27 @@ export default function SessionCalendar({
                           <button
                             onClick={() => { setFinalPaymentId(s.id); setFinalPaymentAmount(deposit1Amounts.get(s.id)??""); setFinalPaymentMethod("Venmo"); }}
                             className="text-[11px] font-bold px-2.5 py-1 rounded-lg"
-                            style={{ background: "rgba(16,185,129,0.12)", color: "#059669" }}>
+                            style={{ background: T.greenBg, color: T.green }}>
                             💳 Final Payment
                           </button>
                         )}
                         {isPast && onThankYouClick && (
                           <button
                             onClick={() => onThankYouClick(s.id)}
-                            className="text-[11px] font-bold px-2.5 py-1 rounded-lg text-white"
-                            style={{ background: "linear-gradient(135deg,#9d6fe8,#e879a0)" }}>
+                            className="text-[11px] font-bold px-2.5 py-1 rounded-lg"
+                            style={{ background: T.violetBg, color: T.violet }}>
                             🙏 Thank You
                           </button>
                         )}
                         {onReschedule && !isRescheduling && (
-                          <button onClick={startReschedule} className="text-[11px] font-bold px-2.5 py-1 rounded-lg" style={{ background: "rgba(124,58,237,0.08)", color: "#7c3aed" }}>
+                          <button onClick={startReschedule} className="text-[11px] font-bold px-2.5 py-1 rounded-lg" style={{ background: T.inset, color: T.inkSoft }}>
                             Reschedule
                           </button>
                         )}
                         <button
                           onClick={() => onClientClick(s.id)}
-                          className="text-[11px] font-bold px-2.5 py-1 rounded-lg text-white"
-                          style={{ background: col.grad }}>
+                          className="text-[11px] font-bold px-2.5 py-1 rounded-lg"
+                          style={{ background: T.action, color: T.actionText }}>
                           View →
                         </button>
                       </div>
@@ -303,24 +305,24 @@ export default function SessionCalendar({
 
                   {isRescheduling && (
                     <div className="px-3 pb-3 pt-0">
-                      <div className="rounded-xl p-3" style={{ background: "rgba(124,58,237,0.06)", border: "1px solid rgba(124,58,237,0.15)" }}>
-                        <p className="text-[10px] font-black uppercase tracking-widest mb-2" style={{ color: "#7c3aed" }}>New date &amp; time</p>
+                      <div className="rounded-xl p-3" style={{ background: T.inset, border: `1px solid ${T.border}` }}>
+                        <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: T.amber, fontFamily: T.mono }}>New date &amp; time</p>
                         <input
                           type="datetime-local"
                           value={rescheduleValue}
                           onChange={e => setRescheduleValue(e.target.value)}
-                          className="w-full rounded-lg border px-2.5 py-1.5 text-sm font-semibold outline-none mb-2"
-                          style={{ borderColor: "rgba(124,58,237,0.25)", background: "white", color: "#1e293b" }}
+                          className="w-full rounded-lg px-2.5 py-1.5 text-sm font-semibold outline-none mb-2"
+                          style={inputStyle}
                         />
                         <div className="flex gap-2">
                           <button onClick={confirmReschedule} disabled={!rescheduleValue || rescheduleLoading}
-                            className="flex-1 rounded-lg py-1.5 text-xs font-black text-white disabled:opacity-50"
-                            style={{ background: "linear-gradient(135deg,#a78bfa,#7c3aed)" }}>
+                            className="flex-1 rounded-lg py-1.5 text-xs font-black disabled:opacity-50"
+                            style={{ background: T.action, color: T.actionText }}>
                             {rescheduleLoading ? "Saving…" : "Save date"}
                           </button>
                           <button onClick={() => setReschedulingId(null)}
                             className="px-3 rounded-lg py-1.5 text-xs font-bold"
-                            style={{ background: "rgba(0,0,0,0.05)", color: "#64748b" }}>
+                            style={{ background: T.neutralBg, color: T.inkSoft }}>
                             Cancel
                           </button>
                         </div>
@@ -330,22 +332,22 @@ export default function SessionCalendar({
 
                   {isRecordingFinalPayment && (
                     <div className="px-3 pb-3 pt-0">
-                      <div className="rounded-xl p-3" style={{ background: "rgba(16,185,129,0.05)", border: "1px solid rgba(16,185,129,0.2)" }}>
-                        <p className="text-[10px] font-black uppercase tracking-widest mb-2" style={{ color: "#059669" }}>Record Final Payment</p>
+                      <div className="rounded-xl p-3" style={{ background: T.greenBg, border: `1px solid ${T.greenBorder}` }}>
+                        <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: T.green, fontFamily: T.mono }}>Record Final Payment</p>
                         <div className="flex gap-2 mb-2">
                           <input
                             type="text"
                             placeholder="Amount (e.g. 150)"
                             value={finalPaymentAmount}
                             onChange={e => setFinalPaymentAmount(e.target.value)}
-                            className="flex-1 rounded-lg border px-2.5 py-1.5 text-sm font-semibold outline-none"
-                            style={{ borderColor: "rgba(16,185,129,0.3)", background: "white", color: "#1e293b" }}
+                            className="flex-1 rounded-lg px-2.5 py-1.5 text-sm font-semibold outline-none"
+                            style={inputStyle}
                           />
                           <select
                             value={finalPaymentMethod}
                             onChange={e => setFinalPaymentMethod(e.target.value)}
-                            className="rounded-lg border px-2 py-1.5 text-xs font-bold outline-none"
-                            style={{ borderColor: "rgba(16,185,129,0.3)", background: "white", color: "#1e293b" }}>
+                            className="rounded-lg px-2 py-1.5 text-xs font-bold outline-none"
+                            style={inputStyle}>
                             <option>Venmo</option>
                             <option>Zelle</option>
                             <option>PayPal</option>
@@ -356,13 +358,13 @@ export default function SessionCalendar({
                         </div>
                         <div className="flex gap-2">
                           <button onClick={confirmFinalPayment} disabled={!finalPaymentAmount || finalPaymentSaving}
-                            className="flex-1 rounded-lg py-1.5 text-xs font-black text-white disabled:opacity-50"
-                            style={{ background: "linear-gradient(135deg,#10b981,#059669)" }}>
+                            className="flex-1 rounded-lg py-1.5 text-xs font-black disabled:opacity-50"
+                            style={{ background: T.green, color: "#0d1f15" }}>
                             {finalPaymentSaving ? "Saving…" : "Record Payment ✓"}
                           </button>
                           <button onClick={() => { setFinalPaymentId(null); setFinalPaymentAmount(""); }}
                             className="px-3 rounded-lg py-1.5 text-xs font-bold"
-                            style={{ background: "rgba(0,0,0,0.05)", color: "#64748b" }}>
+                            style={{ background: T.neutralBg, color: T.inkSoft }}>
                             Cancel
                           </button>
                         </div>
@@ -384,24 +386,24 @@ export default function SessionCalendar({
           if (!next3.length) return null;
           return (
             <div className="mt-4 space-y-1.5">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Next Up</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: T.inkFaint, fontFamily: T.mono }}>Next Up</p>
               {next3.map(s => {
                 const col = colorFor(s);
                 const dt  = new Date(s.session_date + "T12:00:00");
                 const label = s.session_date === todayStr ? "TODAY" : s.session_date === tomorrowStr ? "TOMORROW" : dt.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }).toUpperCase();
                 const isRescheduling = reschedulingId === s.id;
                 return (
-                  <div key={s.id} className="rounded-xl overflow-hidden" style={{ background: col.bg, border: `1px solid ${col.bg}` }}>
+                  <div key={s.id} className="rounded-xl overflow-hidden" style={{ background: col.bg, border: `1px solid ${col.text}26` }}>
                     <div className="flex items-start gap-3 px-3 py-2">
-                      <div className="w-1.5 h-8 rounded-full flex-shrink-0 mt-0.5" style={{ background: col.grad }} />
+                      <div className="w-1.5 h-8 rounded-full flex-shrink-0 mt-0.5" style={{ background: col.solid, boxShadow: `0 0 6px ${col.solid}` }} />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2 flex-wrap">
                           <div className="min-w-0">
-                            <p className="text-xs font-black text-slate-900 truncate">{s.name}</p>
-                            <p className="text-[11px] text-slate-400 truncate">{s.session_type || "Session"}</p>
+                            <p className="text-xs font-black truncate" style={{ color: T.ink }}>{s.name}</p>
+                            <p className="text-[11px] truncate" style={{ color: T.inkFaint }}>{s.session_type || "Session"}</p>
                           </div>
                           <div className="flex items-center gap-1.5 flex-shrink-0">
-                            <span className="text-[10px] font-black" style={{ color: col.text }}>{label}</span>
+                            <span className="text-[10px] font-black" style={{ color: col.text, fontFamily: T.mono }}>{label}</span>
                             {onReschedule && (
                               <button
                                 onClick={() => {
@@ -409,7 +411,7 @@ export default function SessionCalendar({
                                   else { setReschedulingId(s.id); setRescheduleValue(s.session_date); }
                                 }}
                                 className="text-[11px] font-bold px-2 py-1 rounded-lg transition-all hover:opacity-80"
-                                style={{ background: isRescheduling ? "rgba(99,102,241,0.25)" : "rgba(99,102,241,0.15)", color: "#6366f1" }}>
+                                style={{ background: isRescheduling ? T.insetStrong : T.inset, color: T.inkSoft }}>
                                 {isRescheduling ? "✕" : "📅"}
                               </button>
                             )}
@@ -417,14 +419,14 @@ export default function SessionCalendar({
                               <button
                                 onClick={() => onRemindersClick(s.id)}
                                 className="text-[11px] font-bold px-2 py-1 rounded-lg transition-all hover:opacity-80"
-                                style={{ background: remindersOpen[s.id] ? "rgba(245,158,11,0.25)" : "rgba(245,158,11,0.15)", color: "#d97706" }}>
+                                style={{ background: remindersOpen[s.id] ? T.amberBg : T.inset, color: T.amber }}>
                                 {remindersLoading[s.id] ? "…" : "🔔"}
                               </button>
                             )}
                             <button
                               onClick={() => onClientClick(s.id)}
-                              className="text-[11px] font-bold px-2 py-1 rounded-lg transition-all hover:opacity-80 text-white"
-                              style={{ background: col.grad }}>
+                              className="text-[11px] font-bold px-2 py-1 rounded-lg transition-all hover:opacity-80"
+                              style={{ background: T.action, color: T.actionText }}>
                               →
                             </button>
                           </div>
@@ -437,7 +439,8 @@ export default function SessionCalendar({
                           type="date"
                           value={rescheduleValue}
                           onChange={e => setRescheduleValue(e.target.value)}
-                          className="flex-1 text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                          className="flex-1 text-xs rounded-lg px-2 py-1.5 outline-none"
+                          style={inputStyle}
                         />
                         <button
                           onClick={async () => {
@@ -449,7 +452,8 @@ export default function SessionCalendar({
                             setRescheduleValue("");
                           }}
                           disabled={!rescheduleValue || rescheduleLoading}
-                          className="text-[11px] font-bold px-2.5 py-1.5 rounded-lg bg-indigo-500 text-white disabled:opacity-40 hover:bg-indigo-600 transition-colors">
+                          className="text-[11px] font-bold px-2.5 py-1.5 rounded-lg disabled:opacity-40 transition-colors"
+                          style={{ background: T.action, color: T.actionText }}>
                           {rescheduleLoading ? "…" : "Save"}
                         </button>
                       </div>

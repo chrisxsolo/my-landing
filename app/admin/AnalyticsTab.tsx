@@ -28,8 +28,8 @@ const DEV_COLORS: Record<string, string> = {
   desktop: T.blue,
 };
 
-// T.violet as rgb, for the hour-heatmap intensity ramp
-const HEAT_RGB = "109,91,196";
+// T.amber (the safelight) as rgb, for the hour-heatmap intensity ramp
+const HEAT_RGB = "232,160,76";
 
 const fmtNum = (n: number) => new Intl.NumberFormat("en-US").format(n);
 const fmtPct = (n: number) => `${n.toFixed(1)}%`;
@@ -250,8 +250,8 @@ export default function AnalyticsTab() {
       <div className={`adm-rise ${card}`} style={panel}>
         <div className="p-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.16em] mb-1.5" style={{ color: T.inkSoft }}>Linktree Analytics</p>
-            <h2 className="text-2xl font-black leading-tight" style={{ color: T.ink }}>Views, clicks, and where people come from.</h2>
+            <p className="text-[10px] font-bold uppercase tracking-[0.22em] mb-1.5" style={{ color: T.action, fontFamily: T.mono }}>Linktree Analytics</p>
+            <h2 className="text-2xl font-semibold leading-tight" style={{ color: T.ink, fontFamily: T.display }}>Views, clicks, and where people come from.</h2>
             <p className="mt-1.5 text-sm font-medium" style={{ color: T.inkFaint }}>
               Trend arrows compare to {trendLabel}.
             </p>

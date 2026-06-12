@@ -174,8 +174,8 @@ export default function TestimonialsTab({ showToast }: Props) {
     <div className="mx-auto max-w-6xl space-y-5">
       <header className="adm-rise flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
         <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.16em]" style={{ color: T.inkFaint }}>Client feedback</p>
-          <h2 className="mt-1 text-2xl font-black" style={{ color: T.ink }}>Testimonials</h2>
+          <p className="text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: T.action, fontFamily: T.mono }}>Client feedback</p>
+          <h2 className="mt-1 text-2xl font-semibold" style={{ color: T.ink, fontFamily: T.display }}>Testimonials</h2>
           <p className="mt-1 text-sm" style={{ color: T.inkSoft }}>{total} submission{total === 1 ? "" : "s"}</p>
         </div>
         <a href="/testimonial" target="_blank" rel="noreferrer" className="inline-flex self-start rounded-full px-4 py-2 text-xs font-black transition-all hover:-translate-y-px" style={{ background: T.action, color: T.actionText, boxShadow: T.shadow }}>
