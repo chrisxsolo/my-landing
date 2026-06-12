@@ -16,8 +16,8 @@ describe("ABOUT_FACTS", () => {
 });
 
 describe("isValidAboutFactSlug", () => {
-  it("accepts known slugs", () => {
-    expect(isValidAboutFactSlug("burritos")).toBe(true);
+  it("accepts every defined fact slug", () => {
+    for (const f of ABOUT_FACTS) expect(isValidAboutFactSlug(f.slug)).toBe(true);
   });
   it("rejects unknown values", () => {
     expect(isValidAboutFactSlug("nope")).toBe(false);
@@ -28,7 +28,10 @@ describe("isValidAboutFactSlug", () => {
 
 describe("ABOUT_TIMELINE", () => {
   it("is chronological", () => {
-    const years = ABOUT_TIMELINE.map((t) => t.year);
-    expect([...years].sort()).toEqual(years);
+    // Years are 4-digit numeric strings; compare numerically so a future
+    // non-numeric label ("Today") fails loudly instead of sorting alphabetically.
+    const years = ABOUT_TIMELINE.map((t) => Number(t.year));
+    for (const y of years) expect(Number.isInteger(y)).toBe(true);
+    expect([...years].sort((a, b) => a - b)).toEqual(years);
   });
 });
