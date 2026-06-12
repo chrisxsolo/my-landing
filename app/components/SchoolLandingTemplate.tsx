@@ -4,6 +4,7 @@ import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
 import { PRICING_CATALOG, getGraduationTravelNote } from "@/lib/pricingCatalog";
 import SchoolLandingDetails from "./SchoolLandingDetails";
 import SchoolGallery from "./SchoolGallery";
+import ContentEventBeacon from "@/app/components/ContentEventBeacon";
 
 // ── TYPES ─────────────────────────────────────────────────────────────────────
 
@@ -312,6 +313,7 @@ export default function SchoolLandingTemplate({ data }: { data: SchoolLandingDat
 
   return (
     <main className="school-page">
+      <ContentEventBeacon contentType="school_page" contentId={data.slug} />
       <style>{CSS}</style>
 
       {/* JSON-LD for local SEO */}

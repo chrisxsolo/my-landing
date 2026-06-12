@@ -12,6 +12,7 @@ import { COUPLES_GUIDE_CSS } from "@/lib/couplesGuide/styles";
 import { locationDisplayName, type CouplesLocationData } from "@/lib/couplesGuide/types";
 import type { CouplesPhoto } from "@/lib/couplesGuide/photos";
 import CouplesJournalStrip from "../../CouplesJournalStrip";
+import ContentEventBeacon from "@/app/components/ContentEventBeacon";
 
 const SITE_URL = "https://www.soloxsnaps.com";
 
@@ -64,6 +65,7 @@ export default function CouplesLocationTemplate({
 
   return (
     <main className="fg-page">
+      <ContentEventBeacon contentType="guide_page" contentId={data.slug} />
       <style>{COUPLES_GUIDE_CSS}</style>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd).replace(/</g, "\\u003c") }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(serviceLd).replace(/</g, "\\u003c") }} />

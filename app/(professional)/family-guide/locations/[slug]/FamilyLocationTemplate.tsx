@@ -11,6 +11,7 @@ import { FAMILY_GUIDE_CSS } from "@/lib/familyGuide/styles";
 import { locationDisplayName, type FamilyLocationData } from "@/lib/familyGuide/types";
 import type { FamilyPhoto } from "@/lib/familyGuide/photos";
 import FamilyJournalStrip from "../../FamilyJournalStrip";
+import ContentEventBeacon from "@/app/components/ContentEventBeacon";
 
 const SITE_URL = "https://www.soloxsnaps.com";
 
@@ -63,6 +64,7 @@ export default function FamilyLocationTemplate({
 
   return (
     <main className="fg-page">
+      <ContentEventBeacon contentType="guide_page" contentId={data.slug} />
       <style>{FAMILY_GUIDE_CSS}</style>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd).replace(/</g, "\\u003c") }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(serviceLd).replace(/</g, "\\u003c") }} />

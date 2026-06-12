@@ -26,6 +26,7 @@ import { redirect } from "next/navigation";
 import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 import { getPortfolioData } from "@/lib/professionalData";
 import styles from "@/app/(professional)/portfolio/Portfolio.module.css";
+import ContentEventBeacon from "@/app/components/ContentEventBeacon";
 
 export const dynamic = "force-dynamic";
 
@@ -66,6 +67,7 @@ export default async function PortfolioPage({
 
   return (
     <main className={styles.portfolioPage}>
+      <ContentEventBeacon contentType="portfolio" contentId="portfolio" />
       {/* ── HERO ──────────────────────────────────────────────────────────────
            Full-bleed photo background with dark gradient overlay.
            heroBg is the first photo from the filtered set — auto-matches category.

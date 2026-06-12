@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { getBlogPostBySlug } from "@/lib/professionalData";
 import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
 import { renderPostBody, detectSchoolLink } from "./postBody";
+import ContentEventBeacon from "@/app/components/ContentEventBeacon";
 
 // Cached/ISR: rebuilt at most hourly, or immediately on admin post saves
 // (POST /api/admin/revalidate).
@@ -76,6 +77,7 @@ export default async function ProfessionalBlogPostPage({ params }: Props) {
 
   return (
     <main style={{ background: "#fff", color: "#1a1a1a", paddingTop: 80 }}>
+      <ContentEventBeacon contentType="blog_post" contentId={post.slug} target={{ type: "blog_post", id: String(post.id) }} />
       <style>{CSS}</style>
       <script
         type="application/ld+json"
