@@ -1,15 +1,18 @@
 "use client";
 // Session list (spec §7.1): derived-state badges, filters, actionability sort,
 // "New from client session" picker (conflict opens the existing workspace) and
-// "Blank session". Mirrors the /admin/sessions dashboard conventions.
+// "Blank session" — restyled to the Darkroom theme with pipeline totals up top.
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { C } from "@/lib/colors";
+import { T } from "@/app/admin/adminTheme";
 import { checkAuth } from "@/lib/adminAuth";
 import { engineApi, EngineApiError } from "./engineApi";
 import { STATE_BADGES, sortByActionability } from "./stateBadge";
+import EngineShell from "./EngineShell";
+import { WORKFLOW_STEPS, stepFromState } from "./WorkflowStepper";
 import { SERVICE_TYPES } from "@/lib/contentEngine/taxonomy";
+import { btn, card, input as inputStyle, overlay as overlayStyle } from "./[id]/ui";
 import type { EngineSessionRow, SessionEngineState } from "./engineTypes";
 
 type ClientSessionOption = {
@@ -17,10 +20,6 @@ type ClientSessionOption = {
   clientName: string | null;
   sessionType: string | null;
   currentStatus: string;
-};
-
-const card: React.CSSProperties = {
-  background: C.white, border: `1px solid ${C.warmEdge}`, borderRadius: 12, padding: 16,
 };
 
 export default function EngineDashboard() {
@@ -110,39 +109,77 @@ export default function EngineDashboard() {
     return sortByActionability(filtered);
   }, [rows, stateFilter, serviceFilter]);
 
+  // Pipeline totals across every session's active package items
+  const totals = useMemo(() => rows.reduce(
+    (acc, r) => ({
+      draft: acc.draft + (r.itemCounts.draft ?? 0),
+      approved: acc.approved + (r.itemCounts.approved ?? 0),
+      published: acc.published + (r.itemCounts.published ?? 0),
+      failed: acc.failed + (r.itemCounts.failed ?? 0) + (r.state === "failed" ? 1 : 0),
+    }),
+    { draft: 0, approved: 0, published: 0, failed: 0 },
+  ), [rows]);
+
+  const tiles = [
+    { label: "Drafts", sub: "awaiting approval", value: totals.draft, accent: T.amber },
+    { label: "Approved", sub: "ready to publish", value: totals.approved, accent: T.violet },
+    { label: "Published", sub: "live on the site", value: totals.published, accent: T.green },
+    { label: "Attention", sub: "failed items", value: totals.failed, accent: T.red },
+  ];
+
   return (
-    <main style={{ maxWidth: 980, margin: "0 auto", padding: 24, color: C.ink }}>
-      <header style={{
-        display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16,
-      }}>
-        <h1 style={{ fontSize: 22, margin: 0 }}>Content Engine</h1>
-        <div style={{ display: "flex", gap: 8 }}>
+    <EngineShell>
+    <main className="px-4" style={{ maxWidth: 980, margin: "0 auto", padding: 24, color: T.ink }}>
+      <header className="flex flex-wrap items-end justify-between gap-4 mb-5">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.28em] mb-2" style={{ color: T.action, fontFamily: T.mono }}>
+            Session → Marketing Pipeline
+          </p>
+          <h1 className="text-[28px] font-semibold leading-none m-0" style={{ color: T.ink, fontFamily: T.display }}>
+            Content Engine
+          </h1>
+          <p className="text-[11px] mt-2 font-bold uppercase tracking-[0.14em]" style={{ color: T.inkFaint, fontFamily: T.mono }}>
+            {WORKFLOW_STEPS.join(" → ")}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
           <button onClick={() => void openPicker()} style={btn(true)}>
-            New from client session
+            + New from client session
           </button>
-          <select
-            value={blankType}
-            onChange={(e) => setBlankType(e.target.value)}
-            style={inputStyle}
-          >
+          <select value={blankType} onChange={(e) => setBlankType(e.target.value)} style={{ ...inputStyle, width: "auto" }}>
             {SERVICE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
           </select>
           <button onClick={() => void createFrom()} style={btn(false)}>Blank session</button>
         </div>
       </header>
 
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 mb-5">
+        {tiles.map((s) => (
+          <div key={s.label} className="rounded-2xl p-4"
+            style={{ background: T.panel, border: `1px solid ${T.border}`, boxShadow: T.shadow }}>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] m-0" style={{ color: T.inkSoft, fontFamily: T.mono }}>{s.label}</p>
+              <span className="w-1.5 h-1.5 rounded-full" style={{ background: s.accent, boxShadow: `0 0 6px ${s.accent}` }} />
+            </div>
+            <p className="text-[26px] font-bold leading-none tabular-nums m-0" style={{ color: T.ink, fontFamily: T.mono }}>{s.value}</p>
+            <p className="text-[11px] mt-1.5 font-medium m-0" style={{ color: T.inkFaint }}>{s.sub}</p>
+          </div>
+        ))}
+      </div>
+
       {notice && (
-        <p role="alert" style={{ color: C.danger, marginBottom: 12 }}>
-          {notice}{" "}
-          <button onClick={() => setNotice(null)} style={btn(false)}>dismiss</button>
+        <p role="alert" className="flex items-center gap-2 rounded-xl px-3 py-2 mb-3 text-[13px] font-semibold"
+          style={{ color: T.red, background: T.redBg, border: `1px solid ${T.redBorder}` }}>
+          {notice}
+          <button onClick={() => setNotice(null)} style={{ ...btn(false), marginLeft: "auto" }}>dismiss</button>
         </p>
       )}
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+      <div className="flex gap-2 mb-3">
         <select
           value={stateFilter}
           onChange={(e) => setStateFilter(e.target.value as SessionEngineState | "all")}
-          style={inputStyle}
+          style={{ ...inputStyle, width: "auto" }}
         >
           <option value="all">All states</option>
           {Object.entries(STATE_BADGES).map(([s, b]) => (
@@ -152,47 +189,50 @@ export default function EngineDashboard() {
         <select
           value={serviceFilter}
           onChange={(e) => setServiceFilter(e.target.value)}
-          style={inputStyle}
+          style={{ ...inputStyle, width: "auto" }}
         >
           <option value="all">All services</option>
           {SERVICE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
         </select>
       </div>
 
-      {loading ? <p>Loading…</p> : visible.length === 0 ? (
-        <div style={{ ...card, textAlign: "center", color: C.muted }}>
+      {loading ? <p style={{ color: T.inkSoft }}>Loading…</p> : visible.length === 0 ? (
+        <div style={{ ...card, textAlign: "center", color: T.inkFaint }}>
           No sessions yet — create one from a completed client session.
         </div>
       ) : (
         <div style={{ display: "grid", gap: 8 }}>
           {visible.map((row) => {
             const badge = STATE_BADGES[row.state];
+            const step = stepFromState(row.state);
             return (
               <Link
                 key={row.id}
                 href={`/admin/content-engine/${row.id}`}
                 style={{ textDecoration: "none", color: "inherit" }}
               >
-                <div style={{ ...card, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div>
-                    <strong>
+                <div className="transition-all hover:-translate-y-px"
+                  style={{ ...card, marginBottom: 0, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+                  <div style={{ minWidth: 0 }}>
+                    <strong style={{ color: T.ink }}>
                       {row.public_display_name ?? row.internal_client_name ?? "Untitled session"}
                     </strong>
-                    <span style={{ color: C.muted, marginLeft: 8 }}>
+                    <span style={{ color: T.inkFaint, marginLeft: 8, fontSize: 13 }}>
                       {row.service_type}
                       {row.school_slug ? ` · ${row.school_slug}` : ""}
                       {row.session_date ? ` · ${row.session_date}` : ""}
                     </span>
                   </div>
-                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                    <span style={{ color: C.muted, fontSize: 12 }}>
+                  <div style={{ display: "flex", gap: 10, alignItems: "center", flexShrink: 0 }}>
+                    <span style={{ color: T.inkFaint, fontSize: 11, fontFamily: T.mono }}>
                       {row.photoCount} photos
+                      {step < 6 && ` · step ${step + 1}/6 ${WORKFLOW_STEPS[step]}`}
                       {!row.marketing_permission && " · no marketing ✋"}
                       {!row.ai_processing_allowed && " · no AI"}
                     </span>
                     <span style={{
                       background: badge.bg, color: badge.color,
-                      borderRadius: 999, padding: "2px 10px", fontSize: 12,
+                      borderRadius: 999, padding: "2px 10px", fontSize: 12, fontWeight: 700,
                     }}>
                       {badge.label}
                     </span>
@@ -207,12 +247,12 @@ export default function EngineDashboard() {
       {showPicker && (
         <div style={overlayStyle} onClick={() => setShowPicker(false)}>
           <div
-            style={{ ...card, maxWidth: 520, width: "100%", maxHeight: "70vh", overflowY: "auto" }}
+            style={{ ...card, background: T.panelSolid, maxWidth: 520, width: "100%", maxHeight: "70vh", overflowY: "auto", marginBottom: 0 }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 style={{ marginTop: 0, fontSize: 16 }}>Pick a completed client session</h2>
+            <h2 style={{ marginTop: 0, fontSize: 16, color: T.ink, fontFamily: T.display }}>Pick a completed client session</h2>
             {clientSessions.length === 0 ? (
-              <p style={{ color: C.muted }}>No completed client sessions found.</p>
+              <p style={{ color: T.inkFaint }}>No completed client sessions found.</p>
             ) : (
               clientSessions.map((cs) => (
                 <button
@@ -221,7 +261,7 @@ export default function EngineDashboard() {
                   style={{ ...btn(false), display: "block", width: "100%", textAlign: "left", marginBottom: 6 }}
                 >
                   {cs.clientName ?? "Unnamed"} — {cs.sessionType ?? "?"}{" "}
-                  <span style={{ color: C.muted }}>({cs.currentStatus})</span>
+                  <span style={{ color: T.inkFaint }}>({cs.currentStatus})</span>
                 </button>
               ))
             )}
@@ -230,22 +270,6 @@ export default function EngineDashboard() {
         </div>
       )}
     </main>
+    </EngineShell>
   );
-}
-
-const inputStyle: React.CSSProperties = {
-  border: `1px solid ${C.warmEdge}`, borderRadius: 8, padding: "6px 10px",
-  background: C.white, color: C.ink,
-};
-
-const overlayStyle: React.CSSProperties = {
-  position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", display: "flex",
-  alignItems: "center", justifyContent: "center", padding: 24, zIndex: 50,
-};
-
-function btn(primary: boolean): React.CSSProperties {
-  return {
-    border: `1px solid ${C.warmEdge}`, borderRadius: 8, padding: "6px 12px", cursor: "pointer",
-    background: primary ? C.ink : C.white, color: primary ? C.white : C.ink, fontSize: 13,
-  };
 }

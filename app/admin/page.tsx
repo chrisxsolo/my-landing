@@ -300,6 +300,27 @@ function AdminDashboard() {
   const [portalSessionsLoading,setPortalSessionsLoading]=useState(false);
   const [portalStatusSavingKey,setPortalStatusSavingKey]=useState<string|null>(null);
 
+  // ── Content Engine pipeline counts (home card + sidebar badge) ────────
+  type EngineCountRow={state:string;itemCounts:Record<string,number>};
+  const [engineRows,setEngineRows]=useState<EngineCountRow[]>([]);
+  useEffect(()=>{
+    if(!authed)return;
+    fetch("/api/admin/session-content/sessions")
+      .then(r=>r.ok?r.json():Promise.reject(new Error(`engine sessions ${r.status}`)))
+      .then((b:{sessions?:EngineCountRow[]})=>setEngineRows(b.sessions??[]))
+      .catch(err=>console.error("[ContentEngine] counts fetch failed:",err));
+  },[authed]);
+  const engineTotals=engineRows.reduce(
+    (acc,r)=>({
+      draft:acc.draft+(r.itemCounts?.draft??0),
+      approved:acc.approved+(r.itemCounts?.approved??0),
+      published:acc.published+(r.itemCounts?.published??0),
+      failed:acc.failed+(r.itemCounts?.failed??0)+(r.state==="failed"?1:0),
+    }),
+    {draft:0,approved:0,published:0,failed:0},
+  );
+  const engineActionable=engineTotals.draft+engineTotals.approved+engineTotals.failed;
+
   useEffect(() => {
     const searchParams=new URLSearchParams(window.location.search);
     const clientParam=searchParams.get("client");
@@ -1405,6 +1426,7 @@ function AdminDashboard() {
           {key:"new-client",icon:"➕",label:"New client",run:()=>{setTab("clients");setAddClientOpen(true);}},
           {key:"add-session",icon:"📸",label:"Add session to calendar",run:()=>{setTab("home");setAddEventForm(EMPTY_EVENT);setAddEventOpen(true);}},
           {key:"sync-payments",icon:"💳",label:"Sync payments from Gmail",run:()=>{syncPayments();}},
+          {key:"content-engine",icon:"🎞️",label:"Content Engine",run:()=>router.push("/admin/content-engine")},
           {key:"reminders",icon:"🔔",label:"Reminder templates",run:()=>router.push("/admin/reminder-templates")},
           {key:"portal",icon:"🗂️",label:"Portal sessions",run:()=>router.push("/admin/sessions")},
           {key:"availability",icon:"📆",label:"Availability",run:()=>router.push("/admin/availability")},
@@ -1541,6 +1563,22 @@ function AdminDashboard() {
                   <NavBtn key={t} t={t} icon={t==="poses"?"📸":t==="couplesGuide"?"💞":t==="couplesLocations"?"💑":t==="locations"?"📍":t==="bayGuide"?"🗺️":t==="portfolio"?"🖼️":t==="categories"?"🏷️":t==="blog"?"✍️":t==="navigation"?"🧭":"🗄️"} label={TAB_LABELS[t].replace(/^[^\s]+\s/,"")}/>
                 ))}
                 <div className="h-px my-2 mx-1" style={{background:T.rowBorder}}/>
+                <p className="text-[10px] font-black uppercase tracking-[0.13em] px-3 pt-0.5 pb-1" style={{color:T.inkFaint}}>Marketing</p>
+                <button onClick={()=>router.push("/admin/content-engine")}
+                  className="w-full flex items-center gap-2.5 px-3 py-[7px] rounded-xl text-[13px] font-semibold transition-all text-left"
+                  style={{color:T.inkSoft,background:"transparent"}}
+                  onMouseEnter={e=>{e.currentTarget.style.background=T.inset;}}
+                  onMouseLeave={e=>{e.currentTarget.style.background="transparent";}}>
+                  <span className="w-5 flex-shrink-0 text-center text-base leading-none">🎞️</span>
+                  <span className="truncate">Content Engine</span>
+                  {engineActionable>0&&(
+                    <span className="ml-auto flex-shrink-0 text-[9px] font-black px-1.5 py-0.5 rounded-full leading-none tabular-nums"
+                          style={{background:T.amberBg,color:T.amber}}>
+                      {engineActionable}
+                    </span>
+                  )}
+                </button>
+                <div className="h-px my-2 mx-1" style={{background:T.rowBorder}}/>
                 <p className="text-[10px] font-black uppercase tracking-[0.13em] px-3 pt-0.5 pb-1" style={{color:T.inkFaint}}>Tools</p>
                 {(["ai","chat","format","vault","accounts"] as Tab[]).map(t=>(
                   <NavBtn key={t} t={t} icon={t==="ai"?"🤖":t==="chat"?"💬":t==="format"?"✨":t==="vault"?"📓":"👤"} label={TAB_LABELS[t].replace(/^[^\s]+\s/,"")}/>
@@ -1582,6 +1620,12 @@ function AdminDashboard() {
                   <span>{label}</span>
                 </button>
               ))}
+              <button onClick={()=>router.push("/admin/content-engine")}
+                className="flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[12px] font-semibold whitespace-nowrap transition-all"
+                style={{color:T.inkSoft,background:T.inset}}>
+                <span className="text-sm leading-none">🎞️</span>
+                <span>Content Engine</span>
+              </button>
             </div>
           );
         })()}
@@ -1689,6 +1733,9 @@ function AdminDashboard() {
                   <Link href="/admin/sessions" className={pillCls} style={pillStyle}>
                     🗂️ Portal Sessions
                   </Link>
+                  <Link href="/admin/content-engine" className={pillCls} style={pillStyle}>
+                    🎞️ Content Engine
+                  </Link>
                   <a href={`webcal://soloxsnaps.com/api/calendar/sessions?token=${process.env.NEXT_PUBLIC_ICS_TOKEN??""}`} className={pillCls} style={pillStyle}>
                     📅 Subscribe
                   </a>
@@ -1732,6 +1779,37 @@ function AdminDashboard() {
                     </p>
                   </button>
                 ))}
+              </div>
+
+              {/* Content Engine — session → marketing pipeline at a glance */}
+              <div className="adm-rise rounded-2xl mb-5 p-4 flex flex-wrap items-center gap-4"
+                   style={{background:T.panel,border:`1px solid ${engineActionable>0?T.amberBorder:T.border}`,boxShadow:T.shadow,animationDelay:"140ms"}}>
+                <div className="min-w-[180px]">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] mb-1" style={{color:engineActionable>0?T.amber:T.inkSoft,fontFamily:T.mono}}>🎞️ Content Engine</p>
+                  <p className="text-[11px] font-medium" style={{color:T.inkFaint}}>
+                    Session → Photos → Analyze → Generate → Review → Publish
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 flex-1">
+                  {([
+                    {label:"Drafts",sub:"awaiting approval",value:engineTotals.draft,color:T.amber,bg:T.amberBg},
+                    {label:"Approved",sub:"ready to publish",value:engineTotals.approved,color:T.violet,bg:T.violetBg},
+                    {label:"Published",sub:"live",value:engineTotals.published,color:T.green,bg:T.greenBg},
+                    {label:"Attention",sub:"failed",value:engineTotals.failed,color:T.red,bg:T.redBg},
+                  ]).map(c=>(
+                    <span key={c.label} className="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-xl" style={{background:T.inset}}>
+                      <span className="text-sm font-bold tabular-nums" style={{color:c.value>0?c.color:T.inkFaint,fontFamily:T.mono}}>{c.value}</span>
+                      <span className="text-[10px] font-bold leading-tight" style={{color:T.inkSoft}}>
+                        {c.label}<span className="block font-medium" style={{color:T.inkFaint}}>{c.sub}</span>
+                      </span>
+                    </span>
+                  ))}
+                </div>
+                <Link href="/admin/content-engine"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all hover:-translate-y-px active:translate-y-0"
+                  style={{background:T.action,color:T.actionText,boxShadow:T.shadow}}>
+                  Open Engine →
+                </Link>
               </div>
 
               {/* Calendar + right column */}

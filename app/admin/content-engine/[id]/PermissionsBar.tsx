@@ -5,7 +5,7 @@
 // protocol): Cancel / Disable future publishing only. Takedown stays per-item
 // in Publication history.
 import { useState } from "react";
-import { C } from "@/lib/colors";
+import { T } from "@/app/admin/adminTheme";
 import { engineApi, EngineApiError } from "@/app/admin/content-engine/engineApi";
 import { CONTENT_TYPE_LABELS } from "@/app/admin/content-engine/engineTypes";
 import { btn, card, input, label, overlay, sectionTitle } from "./ui";
@@ -85,7 +85,7 @@ export default function PermissionsBar({ session, sessionId, onChanged }: Props)
           )}
         </div>
       </div>
-      {notice && <p style={{ color: C.danger, fontSize: 13, marginBottom: 0 }}>{notice}</p>}
+      {notice && <p style={{ color: T.red, fontSize: 13, marginBottom: 0 }}>{notice}</p>}
 
       {revokeCounts && (
         <div style={overlay} onClick={() => setRevokeCounts(null)}>

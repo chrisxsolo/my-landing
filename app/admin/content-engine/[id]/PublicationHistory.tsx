@@ -3,7 +3,7 @@
 // live link, Revalidate (site-wide cache invalidation — targeted Step-C runs
 // at publish; this is the recovery affordance), and per-item Takedown.
 import { useState } from "react";
-import { C } from "@/lib/colors";
+import { T } from "@/app/admin/adminTheme";
 import { engineApi } from "@/app/admin/content-engine/engineApi";
 import { CONTENT_TYPE_LABELS, type EngineItem } from "@/app/admin/content-engine/engineTypes";
 import { pathsForPublishedItem } from "@/lib/contentEngine/publishRevalidation";
@@ -55,7 +55,7 @@ export default function PublicationHistory({ published, onChanged, viewCounts }:
         </button>
       </div>
       {notice && (
-        <p style={{ fontSize: 13, color: notice === "Caches revalidated." ? C.muted : C.danger }}>{notice}</p>
+        <p style={{ fontSize: 13, color: notice === "Caches revalidated." ? T.inkSoft : T.red }}>{notice}</p>
       )}
       <div style={{ display: "grid", gap: 6 }}>
         {published.map((item) => {
@@ -74,7 +74,7 @@ export default function PublicationHistory({ published, onChanged, viewCounts }:
                 {viewCounts[item.id] !== undefined && <> · {viewCounts[item.id]} views</>}
                 {takenDown && " · taken down"}
                 {livePath && !takenDown && (
-                  <> · <a href={livePath} target="_blank" rel="noreferrer" style={{ color: C.ink }}>{livePath}</a></>
+                  <> · <a href={livePath} target="_blank" rel="noreferrer" style={{ color: T.ink }}>{livePath}</a></>
                 )}
               </span>
               {!takenDown && item.published_target_type !== "none" && (

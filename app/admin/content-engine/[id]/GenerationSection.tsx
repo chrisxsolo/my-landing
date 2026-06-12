@@ -4,7 +4,7 @@
 // — Plan 3 contract), Skip failed type, and Regenerate (archive + new package,
 // optional preserve-approvals copy-forward per §8.4).
 import { useCallback, useState } from "react";
-import { C } from "@/lib/colors";
+import { T } from "@/app/admin/adminTheme";
 import { engineApi } from "@/app/admin/content-engine/engineApi";
 import {
   GENERATION_ORDER, CONTENT_TYPE_LABELS,
@@ -99,7 +99,7 @@ export default function GenerationSection({
     return (
       <section style={card}>
         <h2 style={sectionTitle}>Generation</h2>
-        <p style={{ color: C.muted, fontSize: 13 }}>
+        <p style={{ color: T.inkSoft, fontSize: 13 }}>
           Generation is disabled until AI processing is confirmed in Permissions.
         </p>
       </section>
@@ -114,7 +114,7 @@ export default function GenerationSection({
         </h2>
         {activePackage ? (
           <span style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12 }}>
-            <label style={{ color: C.muted }}>
+            <label style={{ color: T.inkSoft }}>
               <input type="checkbox" checked={preserveApprovals}
                 onChange={(e) => setPreserveApprovals(e.target.checked)} /> preserve approvals
             </label>
@@ -130,11 +130,11 @@ export default function GenerationSection({
           </button>
         )}
       </div>
-      <p style={{ fontSize: 13, color: C.muted, margin: "4px 0 10px" }}>
+      <p style={{ fontSize: 13, color: T.inkSoft, margin: "4px 0 10px" }}>
         Inputs: {analyzedCount} analyzed photos. Journal generation uses the link and
         testimonial drafts, so types run in dependency order.
       </p>
-      {notice && <p style={{ fontSize: 13, color: C.danger }}>{notice}</p>}
+      {notice && <p style={{ fontSize: 13, color: T.red }}>{notice}</p>}
 
       {activePackage && (
         <>
@@ -142,17 +142,17 @@ export default function GenerationSection({
             {GENERATION_ORDER.filter((t) => selected.includes(t)).map((type) => {
               const entry = progress[type];
               const status = entry?.status ?? "pending";
-              const color = status === "failed" ? C.danger : status === "completed" ? C.ink : C.muted;
+              const color = status === "failed" ? T.red : status === "completed" ? T.ink : T.inkSoft;
               return (
                 <div key={type} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13 }}>
                   <span>{CONTENT_TYPE_LABELS[type]}</span>
                   <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
                     {entry?.usage && (
-                      <span style={{ color: C.muted, fontSize: 11 }}>
+                      <span style={{ color: T.inkSoft, fontSize: 11 }}>
                         {entry.usage.input_tokens + entry.usage.output_tokens} tok
                       </span>
                     )}
-                    <span style={chip(color, C.pageAlt)} title={entry?.error ?? undefined}>{status}</span>
+                    <span style={chip(color, T.inset)} title={entry?.error ?? undefined}>{status}</span>
                     {(status === "pending" || status === "failed") && (
                       <button style={btn(false)} disabled={busyType !== null}
                         onClick={() => void generateOne(type)}>

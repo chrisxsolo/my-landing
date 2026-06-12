@@ -2,7 +2,7 @@
 // Section 1 — Session facts (spec §7.4): editable fields; saving commits values.
 // Taxonomy-invalid slugs are rejected server-side (422) and surfaced inline.
 import { useState } from "react";
-import { C } from "@/lib/colors";
+import { T } from "@/app/admin/adminTheme";
 import { engineApi } from "@/app/admin/content-engine/engineApi";
 import { SERVICE_TYPES, SCHOOL_SLUGS, LIGHTING_CONDITIONS } from "@/lib/contentEngine/taxonomy";
 import { btn, card, input, label, sectionTitle } from "./ui";
@@ -103,7 +103,7 @@ export default function FactsSection({ session, sessionId, onSaved }: Props) {
         <button style={btn(true)} onClick={() => void save()} disabled={saving}>
           {saving ? "Saving…" : "Save facts"}
         </button>
-        {notice && <span style={{ fontSize: 13, color: notice === "Saved." ? C.muted : C.danger }}>{notice}</span>}
+        {notice && <span style={{ fontSize: 13, color: notice === "Saved." ? T.inkSoft : T.red }}>{notice}</span>}
       </div>
     </section>
   );

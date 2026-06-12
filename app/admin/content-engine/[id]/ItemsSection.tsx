@@ -3,7 +3,7 @@
 // type-specific editor, Approve / Reject / Un-reject, autosave state line, and
 // the 409 comparison prompt. Published items render display-only.
 import { useState } from "react";
-import { C } from "@/lib/colors";
+import { T } from "@/app/admin/adminTheme";
 import { engineApi } from "@/app/admin/content-engine/engineApi";
 import { CONTENT_TYPE_LABELS, type EngineItem, type EnginePhoto } from "@/app/admin/content-engine/engineTypes";
 import { useAutosave } from "./useAutosave";
@@ -24,8 +24,8 @@ const EDITORS: Record<string, (props: EditorProps) => React.ReactElement> = {
 };
 
 const STATUS_COLORS: Record<EngineItem["status"], string> = {
-  draft: C.muted, approved: C.ink, rejected: C.muted,
-  publishing: C.ink, published: C.muted, failed: C.danger,
+  draft: T.amber, approved: T.violet, rejected: T.inkFaint,
+  publishing: T.blue, published: T.green, failed: T.red,
 };
 
 function ItemCard({ item, photos, onChanged }: {
@@ -58,12 +58,12 @@ function ItemCard({ item, photos, onChanged }: {
     : "";
 
   return (
-    <div style={{ border: `1px solid ${C.warmEdge}`, borderRadius: 10, padding: 12, marginBottom: 10 }}>
+    <div style={{ border: `1px solid ${T.border}`, borderRadius: 10, padding: 12, marginBottom: 10 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
         <strong style={{ fontSize: 14 }}>{CONTENT_TYPE_LABELS[item.content_type] ?? item.content_type}</strong>
         <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
-          <span style={{ fontSize: 11, color: C.muted }}>{saveLine}</span>
-          <span style={chip(STATUS_COLORS[item.status], C.pageAlt)} title={item.error ?? item.rejection_reason ?? undefined}>
+          <span style={{ fontSize: 11, color: T.inkSoft }}>{saveLine}</span>
+          <span style={chip(STATUS_COLORS[item.status], T.inset)} title={item.error ?? item.rejection_reason ?? undefined}>
             {item.status}
           </span>
           {(item.status === "draft" || item.status === "failed") && (
@@ -78,12 +78,12 @@ function ItemCard({ item, photos, onChanged }: {
         </span>
       </div>
       {item.status === "failed" && item.error && (
-        <p style={{ color: C.danger, fontSize: 12 }}>{item.error}</p>
+        <p style={{ color: T.red, fontSize: 12 }}>{item.error}</p>
       )}
-      {notice && <p style={{ color: C.danger, fontSize: 12 }}>{notice}</p>}
+      {notice && <p style={{ color: T.red, fontSize: 12 }}>{notice}</p>}
 
       {state.status === "conflict" && state.conflict && (
-        <div style={{ border: `1px solid ${C.danger}`, borderRadius: 8, padding: 10, marginBottom: 8, fontSize: 13 }}>
+        <div style={{ border: `1px solid ${T.red}`, borderRadius: 8, padding: 10, marginBottom: 8, fontSize: 13 }}>
           <p style={{ marginTop: 0 }}>
             This item changed in another tab/device (server revision {state.conflict.payload_revision}).
           </p>
@@ -110,7 +110,7 @@ export default function ItemsSection({ items, photos, onChanged }: {
     <section style={card}>
       <h2 style={sectionTitle}>Review drafts ({items.length})</h2>
       {items.length === 0 ? (
-        <p style={{ color: C.muted, textAlign: "center", padding: 16 }}>
+        <p style={{ color: T.inkSoft, textAlign: "center", padding: 16 }}>
           No drafts yet — generate a content package above.
         </p>
       ) : (

@@ -1,13 +1,15 @@
 "use client";
 // Workspace (spec §7.4): sticky header (name, type, state, permissions),
-// single-scroll sections gating top-to-bottom, sticky bottom action bar.
-// All durable state is server rows; refresh() refetches everything.
+// guided stepper, single-scroll sections gating top-to-bottom, sticky bottom
+// action bar. All durable state is server rows; refresh() refetches everything.
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { C } from "@/lib/colors";
+import { T } from "@/app/admin/adminTheme";
 import { checkAuth } from "@/lib/adminAuth";
 import { engineApi } from "@/app/admin/content-engine/engineApi";
 import { STATE_BADGES } from "@/app/admin/content-engine/stateBadge";
+import EngineShell from "@/app/admin/content-engine/EngineShell";
+import WorkflowStepper from "@/app/admin/content-engine/WorkflowStepper";
 import type { EnginePhoto, WorkspaceData } from "@/app/admin/content-engine/engineTypes";
 import { chip } from "./ui";
 import FactsSection from "./FactsSection";
@@ -51,27 +53,29 @@ export default function Workspace({ sessionId }: { sessionId: string }) {
   }, [router, refresh]);
 
   if (error) {
-    return <main style={{ padding: 24, color: C.danger }}>{error}</main>;
+    return <EngineShell><main style={{ padding: 24, color: T.red }}>{error}</main></EngineShell>;
   }
   if (!data) {
-    return <main style={{ padding: 24, color: C.muted }}>Loading…</main>;
+    return <EngineShell><main style={{ padding: 24, color: T.inkSoft }}>Loading…</main></EngineShell>;
   }
 
   const badge = STATE_BADGES[data.state];
   const session = data.session;
 
   return (
-    <main style={{ maxWidth: 980, margin: "0 auto", padding: "0 24px 96px", color: C.ink }}>
+    <EngineShell>
+    <main style={{ maxWidth: 980, margin: "0 auto", padding: "0 24px 96px", color: T.ink }}>
       <header style={{
-        position: "sticky", top: 0, zIndex: 20, background: C.page,
+        position: "sticky", top: 56, zIndex: 20,
+        background: "rgba(19,17,20,0.88)", backdropFilter: "blur(16px)",
         display: "flex", justifyContent: "space-between", alignItems: "center",
-        padding: "14px 0", borderBottom: `1px solid ${C.warmEdge}`, marginBottom: 16,
+        padding: "14px 0", borderBottom: `1px solid ${T.border}`, marginBottom: 16,
       }}>
-        <div style={{ display: "flex", gap: 10, alignItems: "baseline" }}>
-          <h1 style={{ fontSize: 18, margin: 0 }}>
+        <div style={{ display: "flex", gap: 10, alignItems: "baseline", minWidth: 0 }}>
+          <h1 style={{ fontSize: 19, margin: 0, fontFamily: T.display, fontWeight: 600 }}>
             {(session.public_display_name as string) ?? "Untitled session"}
           </h1>
-          <span style={{ color: C.muted, fontSize: 13 }}>
+          <span style={{ color: T.inkSoft, fontSize: 13 }}>
             {session.service_type as string}
             {session.school_slug ? ` · ${session.school_slug as string}` : ""}
             {data.activePackage ? ` · package #${data.activePackage.generation_number}` : ""}
@@ -79,12 +83,13 @@ export default function Workspace({ sessionId }: { sessionId: string }) {
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           {analytics !== null && (
-            <span style={{ color: C.muted, fontSize: 12 }}>{analytics.views} views · {analytics.ctaClicks} CTA</span>
+            <span style={{ color: T.inkFaint, fontSize: 12, fontFamily: T.mono }}>{analytics.views} views · {analytics.ctaClicks} CTA</span>
           )}
           <span style={chip(badge.color, badge.bg)}>{badge.label}</span>
         </div>
       </header>
 
+      <WorkflowStepper state={data.state} />
       <ReconcileBanner sessionId={sessionId} onChanged={refresh} />
       <PermissionsBar session={session} sessionId={sessionId} onChanged={refresh} />
       <FactsSection session={session} sessionId={sessionId} onSaved={refresh} />
@@ -98,5 +103,6 @@ export default function Workspace({ sessionId }: { sessionId: string }) {
       <ActionBar items={data.items}
         marketingPermission={session.marketing_permission as boolean} onChanged={refresh} />
     </main>
+    </EngineShell>
   );
 }

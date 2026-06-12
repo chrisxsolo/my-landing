@@ -3,7 +3,7 @@
 // awaiting publish", Approve all remaining (confirmation summary), and
 // Publish approved (sequenced one POST per item; per-item failures surface).
 import { useState } from "react";
-import { C } from "@/lib/colors";
+import { T } from "@/app/admin/adminTheme";
 import { engineApi, EngineApiError } from "@/app/admin/content-engine/engineApi";
 import { CONTENT_TYPE_LABELS, type EngineItem } from "@/app/admin/content-engine/engineTypes";
 import { btn } from "./ui";
@@ -71,12 +71,12 @@ export default function ActionBar({ items, marketingPermission, onChanged }: Pro
   return (
     <div style={{
       position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 30,
-      background: C.white, borderTop: `1px solid ${C.warmEdge}`, padding: "10px 24px",
+      background: T.panelSolid, borderTop: `1px solid ${T.border}`, padding: "10px 24px",
       display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12,
     }}>
-      <span style={{ fontSize: 13, color: C.muted }}>
+      <span style={{ fontSize: 13, color: T.inkSoft }}>
         {handled} of {items.length} handled · {failed.length} failed · {approved.length} approved awaiting publish
-        {notice && <span style={{ color: C.danger }}> — {notice}</span>}
+        {notice && <span style={{ color: T.red }}> — {notice}</span>}
       </span>
       <span style={{ display: "flex", gap: 8 }}>
         {drafts.length > 0 && (

@@ -3,7 +3,7 @@
 // target detectably exists (Link to existing — auto for hash/constraint
 // proofs, confirm for slug matches), and the orphaned-derivative count.
 import { useCallback, useEffect, useState } from "react";
-import { C } from "@/lib/colors";
+import { T } from "@/app/admin/adminTheme";
 import { engineApi } from "@/app/admin/content-engine/engineApi";
 import { CONTENT_TYPE_LABELS, type ReconcileReport } from "@/app/admin/content-engine/engineTypes";
 import { btn, card } from "./ui";
@@ -44,9 +44,9 @@ export default function ReconcileBanner({ sessionId, onChanged }: Props) {
   };
 
   return (
-    <section style={{ ...card, borderColor: C.danger }}>
+    <section style={{ ...card, borderColor: T.red }}>
       <strong style={{ fontSize: 14 }}>Needs reconciliation</strong>
-      {notice && <p style={{ color: C.danger, fontSize: 13 }}>{notice}</p>}
+      {notice && <p style={{ color: T.red, fontSize: 13 }}>{notice}</p>}
       {report.stuckPublishing.map((s) => (
         <p key={s.itemId} style={{ fontSize: 13, display: "flex", gap: 8, alignItems: "center" }}>
           {CONTENT_TYPE_LABELS[s.contentType] ?? s.contentType} stuck publishing since{" "}
@@ -69,7 +69,7 @@ export default function ReconcileBanner({ sessionId, onChanged }: Props) {
         </p>
       ))}
       {report.orphanedDerivatives.length > 0 && (
-        <p style={{ fontSize: 12, color: C.muted, marginBottom: 0 }}>
+        <p style={{ fontSize: 12, color: T.inkSoft, marginBottom: 0 }}>
           {report.orphanedDerivatives.length} orphaned public derivative(s) — reclaimed by the deferred cleanup sweep.
         </p>
       )}

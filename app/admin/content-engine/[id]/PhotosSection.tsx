@@ -4,7 +4,7 @@
 // 1h signed thumbnails with analysis-status chips, Exclude toggle, and the
 // client-orchestrated analyze loop (one batch per call; Resume = same button).
 import { useCallback, useRef, useState } from "react";
-import { C } from "@/lib/colors";
+import { T } from "@/app/admin/adminTheme";
 import { supabase } from "@/lib/supabase";
 import { engineApi, EngineApiError } from "@/app/admin/content-engine/engineApi";
 import type { EnginePhoto } from "@/app/admin/content-engine/engineTypes";
@@ -18,11 +18,11 @@ interface Props {
 }
 
 const STATUS_CHIP: Record<EnginePhoto["analysis_status"], { label: string; color: string }> = {
-  pending: { label: "pending", color: C.muted },
-  processing: { label: "processing…", color: C.ink },
-  completed: { label: "✓ analyzed", color: C.ink },
-  failed: { label: "failed", color: C.danger },
-  skipped: { label: "skipped", color: C.muted },
+  pending: { label: "pending", color: T.inkSoft },
+  processing: { label: "processing…", color: T.blue },
+  completed: { label: "✓ analyzed", color: T.green },
+  failed: { label: "failed", color: T.red },
+  skipped: { label: "skipped", color: T.inkFaint },
 };
 
 export default function PhotosSection({ sessionId, photos, aiAllowed, onChanged }: Props) {
@@ -110,16 +110,16 @@ export default function PhotosSection({ sessionId, photos, aiAllowed, onChanged 
         </div>
       </div>
       {!aiAllowed && (
-        <p style={{ fontSize: 13, color: C.muted }}>
+        <p style={{ fontSize: 13, color: T.inkSoft }}>
           Analysis is disabled until AI processing is confirmed in Permissions.
         </p>
       )}
-      {notice && <p style={{ fontSize: 13, color: C.danger }}>{notice}</p>}
+      {notice && <p style={{ fontSize: 13, color: T.red }}>{notice}</p>}
       <input ref={fileInput} type="file" accept="image/jpeg,image/png,image/webp" multiple hidden
         onChange={(e) => void uploadFiles(e.target.files)} />
 
       {photos.length === 0 ? (
-        <p style={{ color: C.muted, textAlign: "center", padding: 24 }}>
+        <p style={{ color: T.inkSoft, textAlign: "center", padding: 24 }}>
           No photos uploaded — drop files here or use Upload photos.
         </p>
       ) : (
@@ -129,17 +129,17 @@ export default function PhotosSection({ sessionId, photos, aiAllowed, onChanged 
             return (
               <figure key={photo.id} style={{
                 margin: 0, opacity: photo.excluded ? 0.4 : 1,
-                border: `1px solid ${C.warmEdge}`, borderRadius: 10, overflow: "hidden",
+                border: `1px solid ${T.border}`, borderRadius: 10, overflow: "hidden",
               }}>
                 {photo.thumbnailUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element -- short-lived signed URL, next/image can't optimize it
                   <img src={photo.thumbnailUrl} alt={photo.alt_text ?? photo.original_filename ?? "session photo"}
                     style={{ width: "100%", aspectRatio: "1", objectFit: "cover", display: "block" }} />
                 ) : (
-                  <div style={{ aspectRatio: "1", background: C.pageAlt }} />
+                  <div style={{ aspectRatio: "1", background: T.inset }} />
                 )}
                 <figcaption style={{ padding: 6, fontSize: 11, display: "flex", justifyContent: "space-between", gap: 4 }}>
-                  <span style={chip(status.color, C.pageAlt)} title={photo.analysis_error ?? undefined}>
+                  <span style={chip(status.color, T.inset)} title={photo.analysis_error ?? undefined}>
                     {status.label}{photo.quality_score ? ` · ${photo.quality_score}` : ""}
                   </span>
                   <button style={{ ...btn(false), padding: "0 6px", fontSize: 11 }}

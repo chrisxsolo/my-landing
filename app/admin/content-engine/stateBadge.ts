@@ -1,22 +1,20 @@
 // Derived-state badges + the spec §7.1 actionability sort:
 // failed/interrupted → approved-waiting → drafts-for-review → in-progress →
-// uploaded-not-analyzed → done.
-import { C } from "@/lib/colors";
+// uploaded-not-analyzed → done. Colors come from the Darkroom theme (adminTheme).
+import { T } from "@/app/admin/adminTheme";
 import type { SessionEngineState } from "@/lib/contentEngine/state";
 
-
-
 export const STATE_BADGES: Record<SessionEngineState, { label: string; color: string; bg: string }> = {
-  failed:              { label: "Failed",            color: C.danger,   bg: C.dangerBg },
-  publishing:          { label: "Publishing…",       color: C.ink,      bg: C.pageAlt },
-  partially_published: { label: "Partly published",  color: C.ink,      bg: C.pageAlt },
-  published:           { label: "Published",         color: C.muted,    bg: C.page },
-  reviewed:            { label: "Reviewed",          color: C.ink,      bg: C.pageAlt },
-  generated:           { label: "Drafts ready",      color: C.ink,      bg: C.pageAlt },
-  analyzing:           { label: "Analyzing…",        color: C.ink,      bg: C.pageAlt },
-  analyzed:            { label: "Analyzed",          color: C.ink,      bg: C.pageAlt },
-  uploaded:            { label: "Uploaded",          color: C.ink,      bg: C.pageAlt },
-  empty:               { label: "Empty",             color: C.muted,    bg: C.page },
+  failed:              { label: "Failed",            color: T.red,      bg: T.redBg },
+  publishing:          { label: "Publishing…",       color: T.blue,     bg: T.blueBg },
+  partially_published: { label: "Partly published",  color: T.amber,    bg: T.amberBg },
+  published:           { label: "Published",         color: T.green,    bg: T.greenBg },
+  reviewed:            { label: "Ready to publish",  color: T.violet,   bg: T.violetBg },
+  generated:           { label: "Drafts ready",      color: T.amber,    bg: T.amberBg },
+  analyzing:           { label: "Analyzing…",        color: T.blue,     bg: T.blueBg },
+  analyzed:            { label: "Analyzed",          color: T.blue,     bg: T.blueBg },
+  uploaded:            { label: "Uploaded",          color: T.inkSoft,  bg: T.neutralBg },
+  empty:               { label: "Empty",             color: T.inkFaint, bg: T.neutralBg },
 };
 
 const RANK: Record<SessionEngineState, number> = {
