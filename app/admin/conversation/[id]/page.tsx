@@ -11,6 +11,7 @@ import {
   updateAdminInquiry,
   type AdminInquiry,
 } from "@/lib/adminInquiries";
+import { CONV, STATUS_META, Icon, Spinner, Panel, PanelHead, ConvStyles } from "../ui";
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -1132,115 +1133,140 @@ export default function ConversationPage() {
   // ── Render ───────────────────────────────────────────────────────────────────
   if (!inquiry) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: "#f8fafc" }}>
-        <div className="w-8 h-8 rounded-full border-2 border-violet-400 border-t-transparent animate-spin" />
+      <div className="min-h-screen flex items-center justify-center" style={{ background: CONV.canvas }}>
+        <div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: CONV.violet, borderTopColor: "transparent" }} />
       </div>
     );
   }
 
-  const statusColor = status === "new" ? "#10b981" : status === "responded" ? "#3b82f6" : "#94a3b8";
-  const statusBg    = status === "new" ? "rgba(16,185,129,0.1)" : status === "responded" ? "rgba(59,130,246,0.08)" : "rgba(148,163,184,0.08)";
+  const statusMeta = STATUS_META[status] ?? STATUS_META.archived;
+  const initials   = inquiry.name.split(" ").filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join("") || "?";
 
   return (
-    <div className="min-h-screen" style={{ background: "#f1f5f9" }}>
+    <div className="min-h-screen relative" style={{ background: CONV.canvas }}>
+      <ConvStyles />
+      <div className="pointer-events-none fixed inset-0" style={{ background: `${CONV.glowA}, ${CONV.glowB}` }} aria-hidden />
 
       {/* ── Top bar ── */}
-      <div className="sticky top-0 z-30 bg-white border-b border-slate-200 px-4 py-3 flex items-center gap-3">
+      <div className="sticky top-0 z-30 px-4 py-2.5 flex items-center gap-3"
+           style={{ background: CONV.bar, backdropFilter: CONV.barBlur, WebkitBackdropFilter: CONV.barBlur, borderBottom: `1px solid ${CONV.panelBorder}` }}>
         <button onClick={() => router.push("/admin?tab=inquiries")}
-          className="text-sm font-bold px-3 py-1.5 rounded-lg hover:bg-slate-100 transition-colors flex items-center gap-1.5 text-slate-600">
-          ← Back
+          className="text-[13px] font-semibold pl-2 pr-3 py-1.5 rounded-full hover:bg-black/5 transition-colors flex items-center gap-1.5 flex-shrink-0"
+          style={{ color: CONV.textSoft }}>
+          <Icon name="back" size={15} /> Inquiries
         </button>
-        <div className="h-5 w-px bg-slate-200" />
-        <div className="flex items-center gap-2 flex-1 min-w-0">
-          <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full"
-                style={{ background: statusBg, color: statusColor }}>
-            {status === "new" ? "● New" : status === "responded" ? "✓ Responded" : "○ Archived"}
+        <div className="h-5 w-px flex-shrink-0" style={{ background: CONV.rowBorder }} />
+        <div className="flex items-center gap-2.5 flex-1 min-w-0">
+          <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black text-white flex-shrink-0"
+               style={{ background: CONV.gradBrand }}>
+            {initials}
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-bold truncate leading-tight" style={{ color: CONV.text }}>{inquiry.name}</p>
+            {inquiry.session_type && (
+              <p className="text-[11px] truncate leading-tight hidden sm:block" style={{ color: CONV.textFaint }}>{inquiry.session_type}</p>
+            )}
+          </div>
+          <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full flex-shrink-0"
+                style={{ background: statusMeta.bg, color: statusMeta.color }}>
+            <span className="w-1.5 h-1.5 rounded-full" style={{ background: statusMeta.dot }} />
+            {statusMeta.label}
           </span>
-          <p className="text-sm font-black text-slate-900 truncate">{inquiry.name}</p>
-          {inquiry.session_type && (
-            <p className="text-xs text-slate-400 hidden sm:block truncate">· {inquiry.session_type}</p>
-          )}
         </div>
-        {/* Status pills */}
-        <div className="flex items-center gap-1.5 flex-shrink-0">
+        {/* Status segmented control */}
+        <div className="hidden sm:flex items-center gap-0.5 p-0.5 rounded-full flex-shrink-0" style={{ background: CONV.inset }}>
           {(["new", "responded", "archived"] as const).map(s => (
             <button key={s} onClick={() => updateStatus(s)}
-              className="text-[11px] font-bold px-2.5 py-1 rounded-lg transition-all hover:opacity-80 capitalize hidden sm:block"
+              className="text-[11px] font-semibold px-3 py-1 rounded-full transition-all"
               style={status === s
-                ? { background: statusBg, color: statusColor }
-                : { background: "rgba(0,0,0,0.04)", color: "#94a3b8" }}>
-              {s === "new" ? "New" : s === "responded" ? "Responded" : "Archive"}
+                ? { background: CONV.panelSolid, color: STATUS_META[s].color, boxShadow: "0 1px 4px rgba(17,24,39,0.10)" }
+                : { color: CONV.textFaint }}>
+              {s === "archived" ? "Archive" : STATUS_META[s].label}
             </button>
           ))}
         </div>
       </div>
 
       {/* ── Main two-column layout ── */}
-      <div className="max-w-7xl mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-[1fr_420px] gap-6 items-start">
+      <div className="relative max-w-7xl mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-[1fr_420px] gap-6 items-start">
 
         {/* ── LEFT: Gmail thread ── */}
-        <div className="space-y-3">
+        <div className="space-y-3 conv-rise">
           {/* Thread header */}
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between px-1">
             <div>
-              <h2 className="text-base font-black text-slate-900">Email Conversation</h2>
-              <p className="text-xs text-slate-400 mt-0.5">
+              <p className="text-[10px] font-black uppercase tracking-[0.18em]" style={{ color: CONV.violet }}>Conversation</p>
+              <p className="text-xs mt-0.5" style={{ color: CONV.textFaint }}>
                 {threadLoading ? "Loading…" : messages.length === 0
                   ? "No prior emails found in Gmail"
                   : `${messages.length} message${messages.length === 1 ? "" : "s"} with ${inquiry.name}`}
               </p>
             </div>
             <button onClick={() => fetchThread(inquiry.email)} disabled={threadLoading}
-              className="text-xs font-bold px-3 py-1.5 rounded-lg transition-all hover:opacity-80 flex items-center gap-1.5"
+              className="text-xs font-bold px-3 py-1.5 rounded-full transition-all hover:opacity-80 flex items-center gap-1.5"
               style={{ background: C.p1_08, color: C.p1 }}>
-              {threadLoading ? <><span className="animate-spin inline-block">◌</span> Loading…</> : "↻ Refresh"}
+              {threadLoading ? <><Spinner size={12} /> Loading…</> : <><Icon name="refresh" size={12} /> Refresh</>}
             </button>
           </div>
 
           {/* Original inquiry card */}
-          <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
-            <div className="h-[3px]" style={{ background: C.grad12 }} />
-            <div className="p-4">
-              <div className="flex items-start justify-between gap-3 mb-3">
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Contact Form Submission</p>
-                  <p className="text-xs text-slate-500">
-                    {new Date(inquiry.created_at).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-right">
-                  <button onClick={() => copyField(inquiry.email, "Email-header")}
-                    className="font-semibold transition-colors"
-                    style={{ color: copiedField === "Email-header" ? "#10b981" : C.p1 }}
-                    title="Click to copy">
-                    {copiedField === "Email-header" ? "Copied ✓" : inquiry.email}
-                  </button>
-                  {inquiry.phone && <span className="text-slate-500">{inquiry.phone}</span>}
-                  {inquiry.instagram && <span className="text-slate-500">@{inquiry.instagram.replace(/^@/, "")}</span>}
-                  {inquiry.session_type && <span className="font-semibold text-slate-600">{inquiry.session_type}</span>}
-                  {inquiry.school && <span className="text-slate-500">{inquiry.school}</span>}
-                  {inquiry.people && <span className="text-slate-500">{inquiry.people}</span>}
-                  {inquiry.date_in_mind && <span className="text-slate-500">{inquiry.date_in_mind}</span>}
-                  {inquiry.preferred_time && <span className="text-slate-500">{fmt12h(inquiry.preferred_time)}</span>}
-                  {inquiry.location && <span className="text-slate-500">{inquiry.location}</span>}
-                </div>
+          <Panel>
+            <div className="p-4 sm:p-5">
+              <div className="flex items-center justify-between gap-3 mb-2.5">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em]" style={{ color: CONV.textFaint }}>Contact form submission</p>
+                <p className="text-[11px] flex-shrink-0" style={{ color: CONV.textFaint }}>
+                  {new Date(inquiry.created_at).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}
+                </p>
               </div>
-              <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{inquiry.message}</p>
+              <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: CONV.textSoft }}>{inquiry.message}</p>
+              <div className="flex flex-wrap gap-1.5 mt-4 pt-3" style={{ borderTop: `1px solid ${CONV.rowBorder}` }}>
+                <button onClick={() => copyField(inquiry.email, "Email-header")}
+                  className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-1 rounded-md transition-colors"
+                  style={copiedField === "Email-header"
+                    ? { background: CONV.greenBg, color: CONV.green }
+                    : { background: CONV.violetBg, color: CONV.violet }}
+                  title="Click to copy">
+                  <Icon name={copiedField === "Email-header" ? "check" : "mail"} size={11} />
+                  {copiedField === "Email-header" ? "Copied" : inquiry.email}
+                </button>
+                {[
+                  inquiry.phone          && { icon: "phone"    as const, text: inquiry.phone },
+                  inquiry.instagram      && { icon: "instagram" as const, text: `@${inquiry.instagram.replace(/^@/, "")}` },
+                  inquiry.session_type   && { icon: "sparkle"  as const, text: inquiry.session_type },
+                  inquiry.school         && { icon: "cap"      as const, text: inquiry.school },
+                  inquiry.people         && { icon: "users"    as const, text: inquiry.people },
+                  inquiry.date_in_mind   && { icon: "calendar" as const, text: inquiry.date_in_mind },
+                  inquiry.preferred_time && { icon: "clock"    as const, text: fmt12h(inquiry.preferred_time) },
+                  inquiry.location       && { icon: "pin"      as const, text: inquiry.location },
+                ].filter(Boolean).map((chip, i) => {
+                  const c = chip as { icon: Parameters<typeof Icon>[0]["name"]; text: string };
+                  return (
+                    <span key={i} className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-1 rounded-md"
+                          style={{ background: CONV.inset, color: CONV.textSoft }}>
+                      <Icon name={c.icon} size={11} style={{ color: CONV.textFaint }} /> {c.text}
+                    </span>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          </Panel>
 
           {/* Gmail messages */}
           {threadLoading ? (
-            <div className="bg-white rounded-2xl border border-slate-100 p-12 text-center">
-              <div className="w-8 h-8 rounded-full border-2 border-violet-300 border-t-transparent animate-spin mx-auto mb-3" />
-              <p className="text-sm text-slate-400">Loading Gmail conversation…</p>
-            </div>
+            <Panel className="p-12 text-center">
+              <div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin mx-auto mb-3"
+                   style={{ borderColor: CONV.violet, borderTopColor: "transparent" }} />
+              <p className="text-sm" style={{ color: CONV.textFaint }}>Loading Gmail conversation…</p>
+            </Panel>
           ) : messages.length === 0 ? (
-            <div className="bg-white rounded-2xl border border-slate-100 p-10 text-center">
-              <p className="text-3xl mb-2">📭</p>
-              <p className="text-sm font-semibold text-slate-500">No emails found yet</p>
-              <p className="text-xs text-slate-400 mt-1">Emails to/from {inquiry.email} will appear here</p>
-            </div>
+            <Panel className="p-10 text-center">
+              <div className="w-11 h-11 rounded-full flex items-center justify-center mx-auto mb-3"
+                   style={{ background: CONV.inset, color: CONV.textFaint }}>
+                <Icon name="mail" size={18} />
+              </div>
+              <p className="text-sm font-semibold" style={{ color: CONV.textSoft }}>No emails found yet</p>
+              <p className="text-xs mt-1" style={{ color: CONV.textFaint }}>Emails to/from {inquiry.email} will appear here</p>
+            </Panel>
           ) : ((() => {
             const middleMessages = messages.length > 2 ? messages.slice(1, messages.length - 1) : [];
             const hidden = !threadExpanded ? middleMessages : [];
@@ -1251,40 +1277,46 @@ export default function ConversationPage() {
               const loading = bodyLoading[msg.id];
               return (
                 <div key={msg.id}
-                  className="bg-white rounded-2xl border overflow-hidden transition-shadow hover:shadow-sm"
-                  style={{ borderColor: msg.isMe ? C.p1_20 : "#e2e8f0" }}>
+                  className="rounded-2xl overflow-hidden transition-shadow hover:shadow-md"
+                  style={{
+                    background: msg.isMe ? "rgba(255,255,255,0.92)" : CONV.panel,
+                    border: `1px solid ${msg.isMe ? CONV.violetBorder : CONV.panelBorder}`,
+                    boxShadow: CONV.shadow,
+                  }}>
                   <button
                     onClick={() => toggleExpand(msg.id)}
-                    className="w-full flex items-start gap-3 p-4 text-left hover:bg-slate-50/60 transition-colors">
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-black flex-shrink-0 mt-0.5"
-                         style={msg.isMe ? { background: C.grad12, color: "#fff" } : { background: "rgba(148,163,184,0.15)", color: "#475569" }}>
+                    className="w-full flex items-start gap-3 p-4 text-left hover:bg-black/[0.02] transition-colors">
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-[12px] font-black flex-shrink-0 mt-0.5"
+                         style={msg.isMe ? { background: CONV.gradBrand, color: "#fff" } : { background: CONV.inset, color: CONV.textSoft }}>
                       {msg.fromName.charAt(0).toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-baseline justify-between gap-2 flex-wrap">
-                        <p className="text-sm font-bold text-slate-900">
+                        <p className="text-[13px] font-bold" style={{ color: CONV.text }}>
                           {msg.isMe ? "You" : msg.fromName}
-                          {msg.isMe && <span className="text-xs font-normal text-slate-400 ml-1">→ {inquiry!.name}</span>}
+                          {msg.isMe && <span className="text-[11px] font-normal ml-1.5" style={{ color: CONV.textFaint }}>to {inquiry!.name}</span>}
                         </p>
-                        <p className="text-xs text-slate-400 flex-shrink-0">{fmtDate(msg.timestamp)}</p>
+                        <p className="text-[11px] flex-shrink-0" style={{ color: CONV.textFaint }}>{fmtDate(msg.timestamp)}</p>
                       </div>
-                      {!isOpen && <p className="text-xs text-slate-500 mt-0.5 truncate">{msg.snippet}</p>}
+                      {!isOpen && <p className="text-xs mt-0.5 truncate" style={{ color: CONV.textFaint }}>{msg.snippet}</p>}
                     </div>
-                    <span className="text-slate-300 text-xs flex-shrink-0 mt-1">{isOpen ? "▲" : "▼"}</span>
+                    <Icon name="chevron" size={14} className={`flex-shrink-0 mt-1.5 transition-transform ${isOpen ? "rotate-180" : ""}`}
+                          style={{ color: CONV.textFaint }} />
                   </button>
                   {isOpen && (
-                    <div className="px-4 pb-4 pt-1 border-t border-slate-100">
+                    <div className="px-4 pb-4 pt-3" style={{ borderTop: `1px solid ${CONV.rowBorder}` }}>
                       {loading ? (
-                        <div className="flex items-center gap-2 py-4 text-slate-400">
-                          <span className="w-4 h-4 rounded-full border-2 border-slate-300 border-t-transparent animate-spin flex-shrink-0"/>
+                        <div className="flex items-center gap-2 py-4" style={{ color: CONV.textFaint }}>
+                          <Spinner size={14} />
                           <span className="text-xs">Loading message…</span>
                         </div>
                       ) : (
-                        <pre className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap font-sans" style={{ overflowWrap: "anywhere" }}>
+                        <pre className="text-sm leading-relaxed whitespace-pre-wrap font-sans"
+                             style={{ overflowWrap: "anywhere", color: CONV.textSoft }}>
                           {body ? stripQuotes(body) : msg.snippet}
                         </pre>
                       )}
-                      <p className="text-[10px] text-slate-300 mt-3 font-medium">{msg.subject} · {msg.date}</p>
+                      <p className="text-[10px] mt-3 font-medium" style={{ color: CONV.textFaint, opacity: 0.8 }}>{msg.subject} · {msg.date}</p>
                     </div>
                   )}
                 </div>
@@ -1300,9 +1332,9 @@ export default function ConversationPage() {
                 {hidden.length > 0 && (
                   <button
                     onClick={() => setThreadExpanded(true)}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-2xl border border-dashed text-xs font-bold transition-all hover:opacity-80"
-                    style={{ borderColor: C.p1_20, color: C.p1, background: C.p1_04 }}>
-                    <span style={{ background: C.p1_20, borderRadius: "999px", padding: "1px 8px" }}>{hidden.length}</span>
+                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-full border border-dashed text-xs font-bold transition-all hover:opacity-80"
+                    style={{ borderColor: CONV.violetBorder, color: CONV.violet, background: CONV.violetBg }}>
+                    <span style={{ background: C.p1_18, borderRadius: "999px", padding: "1px 8px" }}>{hidden.length}</span>
                     more {hidden.length === 1 ? "message" : "messages"} — tap to expand
                   </button>
                 )}
@@ -1314,9 +1346,9 @@ export default function ConversationPage() {
                 {threadExpanded && middleMessages.length > 0 && (
                   <button
                     onClick={() => setThreadExpanded(false)}
-                    className="w-full flex items-center justify-center gap-2 py-2 rounded-2xl text-xs font-bold transition-all hover:opacity-80"
-                    style={{ color: "#687571" }}>
-                    ▲ Collapse thread
+                    className="w-full flex items-center justify-center gap-1.5 py-2 rounded-full text-xs font-bold transition-all hover:opacity-80"
+                    style={{ color: CONV.textFaint }}>
+                    <Icon name="chevron" size={13} className="rotate-180" /> Collapse thread
                   </button>
                 )}
 
@@ -1330,92 +1362,137 @@ export default function ConversationPage() {
         </div>
 
         {/* ── RIGHT: AI Draft + Send (sticky) ── */}
-        <div className="lg:sticky lg:top-[73px] space-y-4">
+        <div className="lg:sticky lg:top-[65px] space-y-4 conv-rise" style={{ animationDelay: "80ms" }}>
 
-          {/* Client details card */}
-          <div className="bg-white rounded-2xl border border-slate-100 p-5 space-y-2">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">Client Details</p>
-            {[
-              { label: "Name",    value: <span className="font-semibold text-slate-800">{inquiry.name}</span> },
-              { label: "Email",   value: (
-                <button onClick={() => copyField(inquiry.email, "Email")}
-                  className="text-left transition-colors"
-                  style={{ color: copiedField === "Email" ? "#10b981" : C.p1 }}
-                  title="Click to copy">
-                  {copiedField === "Email" ? "Copied ✓" : inquiry.email}
-                </button>
-              )},
-              inquiry.phone && { label: "Phone", value: (
-                <button onClick={() => copyField(inquiry.phone!, "Phone")}
-                  className="text-left transition-colors"
-                  style={{ color: copiedField === "Phone" ? "#10b981" : "inherit" }}
-                  title="Click to copy">
-                  {copiedField === "Phone" ? "Copied ✓" : inquiry.phone}
-                </button>
-              )},
-              inquiry.instagram && { label: "Instagram", value: `@${inquiry.instagram.replace(/^@/, "")}` },
-              inquiry.session_type && { label: "Session",  value: inquiry.session_type },
-              inquiry.school      && { label: "School",   value: inquiry.school },
-              inquiry.people      && { label: "People",   value: inquiry.people },
-              inquiry.date_in_mind && { label: "Date",    value: inquiry.date_in_mind },
-              inquiry.preferred_time && { label: "Time",  value: inquiry.preferred_time },
-              inquiry.location    && { label: "Location", value: inquiry.location },
-              inquiry.session_date && { label: "Booked",  value: new Date(inquiry.session_date + "T12:00:00").toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) },
-            ].filter(Boolean).map((row, i) => {
-              const r = row as { label: string; value: ReactNode };
-              return (
-                <div key={i} className="flex gap-3 items-start">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-slate-300 min-w-[60px] pt-0.5">{r.label}</span>
-                  <span className="text-sm text-slate-700">{r.value}</span>
+          {/* Client contact card */}
+          <Panel>
+            <div className="p-5">
+              <div className="flex items-center gap-3.5">
+                <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-base font-black text-white flex-shrink-0"
+                     style={{ background: CONV.gradBrand, boxShadow: `0 6px 16px ${C.p1_35}` }}>
+                  {initials}
                 </div>
-              );
-            })}
-          </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[17px] font-black leading-tight truncate" style={{ color: CONV.text }}>{inquiry.name}</p>
+                  <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                    {inquiry.session_type && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                            style={{ background: CONV.violetBg, color: CONV.violet }}>
+                        {inquiry.session_type}
+                      </span>
+                    )}
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full"
+                          style={{ background: statusMeta.bg, color: statusMeta.color }}>
+                      <span className="w-1 h-1 rounded-full" style={{ background: statusMeta.dot }} />
+                      {statusMeta.label}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Tap-to-copy contact chips */}
+              <div className="flex flex-wrap gap-1.5 mt-4">
+                <button onClick={() => copyField(inquiry.email, "Email")}
+                  className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg transition-colors max-w-full"
+                  style={copiedField === "Email"
+                    ? { background: CONV.greenBg, color: CONV.green }
+                    : { background: CONV.violetBg, color: CONV.violet }}
+                  title="Click to copy">
+                  <Icon name={copiedField === "Email" ? "check" : "mail"} size={12} />
+                  <span className="truncate">{copiedField === "Email" ? "Copied" : inquiry.email}</span>
+                </button>
+                {inquiry.phone && (
+                  <button onClick={() => copyField(inquiry.phone!, "Phone")}
+                    className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg transition-colors"
+                    style={copiedField === "Phone"
+                      ? { background: CONV.greenBg, color: CONV.green }
+                      : { background: CONV.inset, color: CONV.textSoft }}
+                    title="Click to copy">
+                    <Icon name={copiedField === "Phone" ? "check" : "phone"} size={12} />
+                    {copiedField === "Phone" ? "Copied" : inquiry.phone}
+                  </button>
+                )}
+                {inquiry.instagram && (
+                  <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg"
+                        style={{ background: CONV.inset, color: CONV.textSoft }}>
+                    <Icon name="instagram" size={12} /> @{inquiry.instagram.replace(/^@/, "")}
+                  </span>
+                )}
+              </div>
+
+              {/* Detail rows */}
+              {(() => {
+                const rows = [
+                  inquiry.school         && { icon: "cap"      as const, label: "School",   value: inquiry.school },
+                  inquiry.people         && { icon: "users"    as const, label: "People",   value: inquiry.people },
+                  inquiry.date_in_mind   && { icon: "calendar" as const, label: "Date",     value: inquiry.date_in_mind },
+                  inquiry.preferred_time && { icon: "clock"    as const, label: "Time",     value: fmt12h(inquiry.preferred_time) },
+                  inquiry.location       && { icon: "pin"      as const, label: "Location", value: inquiry.location },
+                ].filter(Boolean) as { icon: Parameters<typeof Icon>[0]["name"]; label: string; value: ReactNode }[];
+                if (!rows.length && !inquiry.session_date) return null;
+                return (
+                  <div className="mt-4">
+                    {rows.map((r, i) => (
+                      <div key={i} className="flex items-center gap-2.5 py-2" style={{ borderTop: `1px solid ${CONV.rowBorder}` }}>
+                        <Icon name={r.icon} size={13} style={{ color: CONV.textFaint }} />
+                        <span className="text-[10px] font-bold uppercase tracking-wider w-16 flex-shrink-0" style={{ color: CONV.textFaint }}>{r.label}</span>
+                        <span className="text-[13px] font-medium min-w-0" style={{ color: CONV.textSoft }}>{r.value}</span>
+                      </div>
+                    ))}
+                    {inquiry.session_date && (
+                      <div className="flex items-center gap-2.5 py-2" style={{ borderTop: `1px solid ${CONV.rowBorder}` }}>
+                        <Icon name="check" size={13} style={{ color: CONV.green }} />
+                        <span className="text-[10px] font-bold uppercase tracking-wider w-16 flex-shrink-0" style={{ color: CONV.green }}>Booked</span>
+                        <span className="text-[13px] font-bold" style={{ color: CONV.green }}>
+                          {new Date(inquiry.session_date + "T12:00:00").toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+          </Panel>
 
           {/* ── Compose + Send panel ── */}
-          <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
-            <div className="h-[3px]" style={{ background: C.grad12 }} />
+          <Panel>
             <div className="p-5 space-y-3">
 
               {/* Header row */}
               <div className="flex items-center justify-between gap-2 flex-wrap">
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-lg flex items-center justify-center text-white text-xs font-black"
-                       style={{ background: C.grad12 }}>✉</div>
-                  <p className="text-sm font-black text-slate-900">Compose Reply</p>
-                </div>
+                <PanelHead icon="send" tint={CONV.violet} bg={CONV.violetBg} title="Compose Reply" />
                 {/* AI action buttons */}
-                <div className="flex gap-2">
+                <div className="flex gap-1.5 flex-wrap">
                   <button onClick={focusComposeForDictation}
                     title="Open the keyboard — use its mic button for native voice dictation"
-                    className="sm:hidden text-xs font-bold px-2.5 py-1.5 rounded-lg transition-all hover:opacity-80 flex items-center gap-1"
-                    style={{ background: "rgba(16,185,129,0.1)", color: "#059669", border: "1px solid rgba(16,185,129,0.25)" }}>
-                    ⌨️ Keyboard
+                    className="sm:hidden text-[11px] font-bold px-2.5 py-1.5 rounded-full transition-all hover:opacity-80 flex items-center gap-1.5"
+                    style={{ background: CONV.greenBg, color: CONV.green }}>
+                    <Icon name="keyboard" size={12} /> Keyboard
                   </button>
                   <button onClick={toggleVoice}
                     title={voiceActive ? "Stop recording — will auto-polish" : "Speak your reply — auto-polishes when done"}
-                    className="text-xs font-bold px-2.5 py-1.5 rounded-lg transition-all hover:opacity-80 flex items-center gap-1"
+                    className="text-[11px] font-bold px-2.5 py-1.5 rounded-full transition-all hover:opacity-80 flex items-center gap-1.5"
                     style={voiceActive
-                      ? { background: "rgba(239,68,68,0.12)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.3)" }
-                      : { background: "rgba(99,102,241,0.1)", color: "#6366f1", border: "1px solid rgba(99,102,241,0.25)" }}>
+                      ? { background: CONV.redBg, color: CONV.red, border: `1px solid ${CONV.redBorder}` }
+                      : { background: CONV.blueBg, color: CONV.blue }}>
                     {voiceActive
-                      ? <><span className="inline-block w-2 h-2 rounded-full bg-red-500 animate-pulse" /> Stop</>
-                      : "🎤 Speak"}
+                      ? <><span className="inline-block w-2 h-2 rounded-full animate-pulse" style={{ background: CONV.red }} /> Stop</>
+                      : <><Icon name="mic" size={12} /> Speak</>}
                   </button>
                   <button onClick={() => polishDraft()} disabled={polishLoading || !draft.trim()}
                     title="Fix typos, convert bullet points to paragraphs"
-                    className="text-xs font-bold px-2.5 py-1.5 rounded-lg transition-all hover:opacity-80 disabled:opacity-30 flex items-center gap-1"
-                    style={{ background: "rgba(245,158,11,0.1)", color: "#d97706", border: "1px solid rgba(245,158,11,0.25)" }}>
+                    className="text-[11px] font-bold px-2.5 py-1.5 rounded-full transition-all hover:opacity-80 disabled:opacity-30 flex items-center gap-1.5"
+                    style={{ background: CONV.amberBg, color: CONV.amber }}>
                     {polishLoading
-                      ? <><span className="animate-spin inline-block text-[10px]">◌</span> Polishing…</>
-                      : "✨ Polish"}
+                      ? <><Spinner size={11} /> Polishing…</>
+                      : <><Icon name="sparkle" size={12} /> Polish</>}
                   </button>
                   <button onClick={() => generateDraft()} disabled={draftLoading}
-                    className="text-xs font-bold px-2.5 py-1.5 rounded-lg transition-all hover:opacity-80 disabled:opacity-50 flex items-center gap-1"
-                    style={{ background: C.grad12, color: "#fff" }}>
+                    className="text-[11px] font-bold px-3 py-1.5 rounded-full transition-all hover:opacity-80 disabled:opacity-50 flex items-center gap-1.5"
+                    style={{ background: CONV.gradBrand, color: "#fff", boxShadow: `0 4px 12px ${C.p1_30}` }}>
                     {draftLoading
-                      ? <><span className="animate-spin inline-block text-[10px]">◌</span> Writing…</>
-                      : "✦ Draft with AI"}
+                      ? <><Spinner size={11} /> Writing…</>
+                      : <><Icon name="sparkle" size={12} /> Draft with AI</>}
                   </button>
                 </div>
               </div>
@@ -1423,8 +1500,8 @@ export default function ConversationPage() {
               {/* Context indicator */}
               {messages.length > 0 && (
                 <div className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium"
-                     style={{ background: "rgba(16,185,129,0.07)", color: "#059669" }}>
-                  <span>✓</span>
+                     style={{ background: CONV.greenBg, color: CONV.green }}>
+                  <Icon name="check" size={12} className="flex-shrink-0" />
                   <span>{messages.length} prior email{messages.length > 1 ? "s" : ""} loaded — AI uses full conversation</span>
                 </div>
               )}
@@ -1432,137 +1509,135 @@ export default function ConversationPage() {
               {/* Voice recording indicator */}
               {voiceActive && (
                 <div className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium"
-                     style={{ background: "rgba(239,68,68,0.07)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.2)" }}>
-                  <span className="inline-block w-2 h-2 rounded-full bg-red-500 animate-pulse flex-shrink-0" />
+                     style={{ background: CONV.redBg, color: CONV.red, border: `1px solid ${CONV.redBorder}` }}>
+                  <span className="inline-block w-2 h-2 rounded-full animate-pulse flex-shrink-0" style={{ background: CONV.red }} />
                   <span>Recording… speak naturally. Hit Stop when done — auto-transcribes and polishes.</span>
                 </div>
               )}
               {draftLoading && !voiceActive && (
                 <div className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium"
-                     style={{ background: "rgba(99,102,241,0.07)", color: "#6366f1", border: "1px solid rgba(99,102,241,0.2)" }}>
-                  <span className="animate-spin inline-block">◌</span>
+                     style={{ background: CONV.blueBg, color: CONV.blue }}>
+                  <Spinner size={12} />
                   <span>Transcribing with Whisper…</span>
                 </div>
               )}
               {voiceError && (
                 <div className="px-3 py-2 rounded-xl text-xs font-medium"
-                     style={{ background: "rgba(239,68,68,0.07)", color: "#dc2626" }}>
+                     style={{ background: CONV.redBg, color: CONV.red }}>
                   {voiceError}
                 </div>
               )}
 
               {/* Subject — always visible */}
               <div>
-                <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 block mb-1">Subject</label>
+                <label className="text-[10px] font-bold uppercase tracking-widest block mb-1" style={{ color: CONV.textFaint }}>Subject</label>
                 <input type="text" value={subject} onChange={e => setSubject(e.target.value)}
-                  className="w-full text-slate-700 px-3 py-2 rounded-xl outline-none font-medium"
-                  style={{ border: `1px solid ${C.p1_20}`, background: "#fff", fontFamily: "inherit", fontSize: "16px" }} />
+                  className="conv-input w-full px-3 py-2 rounded-xl font-medium"
+                  style={{ border: `1px solid ${CONV.rowBorder}`, background: CONV.panelSolid, color: CONV.text, fontFamily: "inherit", fontSize: "16px" }} />
               </div>
 
               {/* Body — always visible */}
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                  <label className="text-[10px] font-bold uppercase tracking-widest" style={{ color: CONV.textFaint }}>
                     Message
-                    <span className="normal-case font-normal text-slate-300 ml-1">· type your own, paste, or use AI above</span>
+                    <span className="normal-case font-normal ml-1" style={{ color: CONV.textFaint, opacity: 0.7 }}>· type your own, paste, or use AI above</span>
                   </label>
                   <button onClick={saveDraftToCloud} disabled={draftSaving || !draft.trim()}
-                    className="text-[10px] font-bold px-2 py-1 rounded-lg transition-all disabled:opacity-30"
-                    style={{ background: draftSaved ? "rgba(16,185,129,0.12)" : "rgba(148,163,184,0.1)", color: draftSaved ? "#059669" : "#94a3b8", border: `1px solid ${draftSaved ? "rgba(16,185,129,0.25)" : "rgba(148,163,184,0.2)"}` }}>
-                    {draftSaving ? "Saving…" : draftSaved ? "✓ Saved" : "Save draft"}
+                    className="text-[10px] font-bold px-2 py-1 rounded-lg transition-all disabled:opacity-30 flex items-center gap-1"
+                    style={draftSaved
+                      ? { background: CONV.greenBg, color: CONV.green }
+                      : { background: CONV.inset, color: CONV.textFaint }}>
+                    {draftSaving ? "Saving…" : draftSaved ? <><Icon name="check" size={10} /> Saved</> : "Save draft"}
                   </button>
                 </div>
                 <textarea
                   ref={composeRef}
                   value={draft} onChange={e => setDraft(e.target.value)}
                   rows={11}
-                  placeholder={"Write your reply here…\n\nTip: type in bullet points and hit ✨ Polish to auto-format into a proper email."}
-                  className="w-full text-slate-700 leading-relaxed rounded-xl p-3 resize-none sm:resize-y outline-none"
-                  style={{ border: `1px solid ${C.p1_20}`, background: C.p1_04, fontFamily: "inherit", fontSize: "16px" }} />
+                  placeholder={"Write your reply here…\n\nTip: type in bullet points and hit Polish to auto-format into a proper email."}
+                  className="conv-input w-full leading-relaxed rounded-xl p-3 resize-none sm:resize-y"
+                  style={{ border: `1px solid ${CONV.rowBorder}`, background: C.p1_04, color: CONV.text, fontFamily: "inherit", fontSize: "16px" }} />
               </div>
 
               {/* Send */}
               <button onClick={sendEmail}
                 disabled={!subject.trim() || !draft.trim() || sendLoading}
-                className="w-full text-sm font-black py-3 rounded-xl transition-all hover:opacity-90 disabled:opacity-40 flex items-center justify-center gap-2"
-                style={{ background: "linear-gradient(135deg,#10b981,#059669)", color: "#fff" }}>
-                {sendLoading ? <><span className="animate-spin inline-block">◌</span> Sending…</> : "✉️ Send from Gmail"}
+                className="w-full text-sm font-bold py-3 rounded-xl transition-all hover:opacity-90 disabled:opacity-40 flex items-center justify-center gap-2"
+                style={{ background: CONV.green, color: "#fff", boxShadow: "0 6px 18px rgba(10,138,100,0.25)" }}>
+                {sendLoading ? <><Spinner size={14} /> Sending…</> : <><Icon name="send" size={14} /> Send from Gmail</>}
               </button>
-              <p className="text-[10px] text-slate-400 text-center">
+              <p className="text-[10px] text-center" style={{ color: CONV.textFaint }}>
                 Sends from {myEmail || "your Gmail"} · lands in Sent Mail · marks inquiry as Responded
               </p>
 
               {/* AI Refine — always visible so it never disappears after a refine */}
-              <div className="pt-1 border-t border-slate-100 space-y-2">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Refine AI draft</p>
+              <div className="pt-2 space-y-2" style={{ borderTop: `1px solid ${CONV.rowBorder}` }}>
+                <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: CONV.textFaint }}>Refine AI draft</p>
                 <div className="flex gap-2">
                   <input type="text" value={feedback} onChange={e => setFeedback(e.target.value)}
                     onKeyDown={e => { if (e.key === "Enter" && feedback.trim()) generateDraft(feedback); }}
                     placeholder='e.g. "be more direct" · "add turnaround time"'
-                    className="flex-1 px-3 py-2 rounded-xl outline-none"
-                    style={{ border: `1px solid ${C.p1_20}`, background: "#fff", fontFamily: "inherit", fontSize: "16px" }} />
+                    className="conv-input flex-1 px-3 py-2 rounded-xl"
+                    style={{ border: `1px solid ${CONV.rowBorder}`, background: CONV.panelSolid, color: CONV.text, fontFamily: "inherit", fontSize: "16px" }} />
                   <button onClick={() => { if (feedback.trim()) generateDraft(feedback); }}
                     disabled={!feedback.trim() || draftLoading}
-                    className="text-xs font-bold px-3 py-2 rounded-xl disabled:opacity-30 flex-shrink-0"
-                    style={{ background: C.grad12, color: "#fff" }}>
+                    className="text-xs font-bold px-3.5 py-2 rounded-xl disabled:opacity-30 flex-shrink-0 transition-all hover:opacity-90"
+                    style={{ background: CONV.gradBrand, color: "#fff" }}>
                     Refine
                   </button>
                 </div>
                 {refineSaved && (
-                  <div className="text-[11px] text-emerald-700 bg-emerald-50 rounded-lg px-3 py-2 leading-snug">
-                    ✓ Rule saved: &ldquo;{refineSaved}&rdquo;
+                  <div className="flex items-start gap-1.5 text-[11px] rounded-lg px-3 py-2 leading-snug"
+                       style={{ background: CONV.greenBg, color: CONV.green }}>
+                    <Icon name="check" size={11} className="flex-shrink-0 mt-0.5" /> Rule saved: &ldquo;{refineSaved}&rdquo;
                   </div>
                 )}
               </div>
             </div>
-          </div>
+          </Panel>
 
           {/* ── Train AI ── */}
-          <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
-            <div className="h-[3px]" style={{ background: "linear-gradient(90deg,#8b5cf6,#a78bfa)" }} />
-            <div className="p-4 border-b border-slate-100 flex items-center gap-2">
-              <div className="w-6 h-6 rounded-lg flex items-center justify-center text-xs"
-                   style={{ background: "rgba(139,92,246,0.12)", color: "#7c3aed" }}>💬</div>
-              <div>
-                <p className="text-sm font-black text-slate-900">Train AI</p>
-                <p className="text-[10px] text-slate-400">Rules save directly to Obsidian vault</p>
-              </div>
+          <Panel>
+            <div className="p-4" style={{ borderBottom: `1px solid ${CONV.rowBorder}` }}>
+              <PanelHead icon="chat" tint={CONV.violet} bg={CONV.violetBg}
+                title="Train AI" sub="Rules save directly to Obsidian vault" />
             </div>
             {/* Chat history */}
             <div ref={trainChatRef} className="p-4 space-y-3 max-h-72 overflow-y-auto">
               {trainMessages.length === 0 && (
-                <p className="text-xs text-slate-400 text-center py-4 leading-relaxed">
+                <p className="text-xs text-center py-4 leading-relaxed" style={{ color: CONV.textFaint }}>
                   Tell me how to handle this client or any rule you want remembered.<br/>
-                  <span className="text-slate-300">e.g. "Don't push pricing on warm leads" · "Always mention golden hour"</span>
+                  <span style={{ opacity: 0.7 }}>e.g. &ldquo;Don&apos;t push pricing on warm leads&rdquo; · &ldquo;Always mention golden hour&rdquo;</span>
                 </p>
               )}
               {trainMessages.map((m, i) => (
                 <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-                  <div className="max-w-[82%] px-3 py-2 rounded-xl text-sm leading-relaxed"
+                  <div className="max-w-[82%] px-3 py-2 text-sm leading-relaxed"
                     style={m.role === "user"
-                      ? { background: C.grad12, color: "#fff" }
-                      : { background: "rgba(139,92,246,0.08)", color: "#5b21b6", border: "1px solid rgba(139,92,246,0.15)" }}>
+                      ? { background: CONV.gradBrand, color: "#fff", borderRadius: "16px 16px 4px 16px" }
+                      : { background: CONV.inset, color: CONV.textSoft, borderRadius: "16px 16px 16px 4px" }}>
                     {m.content}
                   </div>
                 </div>
               ))}
               {trainLoading && (
                 <div className="flex justify-start">
-                  <div className="px-3 py-2 rounded-xl text-sm"
-                       style={{ background: "rgba(139,92,246,0.08)", color: "#7c3aed" }}>
-                    <span className="animate-spin inline-block mr-1">◌</span> Thinking…
+                  <div className="px-3 py-2 rounded-2xl text-sm flex items-center gap-2"
+                       style={{ background: CONV.inset, color: CONV.textFaint }}>
+                    <Spinner size={12} /> Thinking…
                   </div>
                 </div>
               )}
               {trainSaved.length > 0 && (
-                <div className="px-3 py-2 rounded-xl text-xs"
-                     style={{ background: "rgba(16,185,129,0.08)", color: "#059669", border: "1px solid rgba(16,185,129,0.2)" }}>
-                  ✓ {trainSaved.length} rule{trainSaved.length > 1 ? "s" : ""} saved to Obsidian vault
+                <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs"
+                     style={{ background: CONV.greenBg, color: CONV.green }}>
+                  <Icon name="check" size={11} /> {trainSaved.length} rule{trainSaved.length > 1 ? "s" : ""} saved to Obsidian vault
                 </div>
               )}
             </div>
             {/* Input */}
-            <div className="p-3 border-t border-slate-100 flex gap-2">
+            <div className="p-3 flex gap-2" style={{ borderTop: `1px solid ${CONV.rowBorder}` }}>
               <input
                 type="text"
                 value={trainInput}
@@ -1570,88 +1645,83 @@ export default function ConversationPage() {
                 onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendTrainMessage(); } }}
                 placeholder="e.g. Keep replies short for warm leads…"
                 disabled={trainLoading}
-                className="flex-1 text-sm px-3 py-2 rounded-xl outline-none disabled:opacity-50"
-                style={{ border: "1px solid rgba(139,92,246,0.2)", background: "rgba(139,92,246,0.03)", fontFamily: "inherit" }}
+                className="conv-input flex-1 text-sm px-3 py-2 rounded-xl disabled:opacity-50"
+                style={{ border: `1px solid ${CONV.rowBorder}`, background: CONV.panelSolid, color: CONV.text, fontFamily: "inherit" }}
               />
               <button
                 onClick={sendTrainMessage}
                 disabled={!trainInput.trim() || trainLoading}
-                className="text-xs font-bold px-3 py-2 rounded-xl disabled:opacity-30 flex-shrink-0 transition-all hover:opacity-80"
-                style={{ background: "linear-gradient(135deg,#8b5cf6,#7c3aed)", color: "#fff" }}>
+                className="text-xs font-bold px-3.5 py-2 rounded-xl disabled:opacity-30 flex-shrink-0 transition-all hover:opacity-80"
+                style={{ background: CONV.gradBrand, color: "#fff" }}>
                 Send
               </button>
             </div>
-          </div>
+          </Panel>
 
           {/* ── Sunset / golden hour card — always visible ── */}
           {inquiry && (
-            <div className="rounded-2xl px-4 py-3"
-                 style={{ background: "linear-gradient(135deg,rgba(245,158,11,0.12),rgba(251,191,36,0.08))", border: "1px solid rgba(245,158,11,0.25)" }}>
-              <div className="flex items-start gap-3">
-                <span className="text-2xl leading-none flex-shrink-0 mt-0.5">🌅</span>
+            <Panel>
+              <div className="px-4 py-3.5 flex items-start gap-3">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                     style={{ background: CONV.amberBg, color: CONV.amber }}>
+                  <Icon name="sun" size={16} />
+                </div>
                 <div className="flex-1 min-w-0">
                   {sunsetLoading ? (
-                    <div className="flex items-center gap-2 text-xs text-amber-600 mb-2">
-                      <span className="animate-spin inline-block">◌</span> Fetching sunset…
+                    <div className="flex items-center gap-2 text-xs mb-2" style={{ color: CONV.amber }}>
+                      <Spinner size={12} /> Fetching sunset…
                     </div>
                   ) : sunsetInfo ? (
                     <div className="mb-2">
-                      <p className="text-sm font-black text-amber-700">
+                      <p className="text-sm font-bold" style={{ color: CONV.text }}>
                         Sunset {sunsetInfo.sunset}
-                        {sunsetDate && <span className="text-xs font-normal text-amber-500 ml-2">{new Date(sunsetDate + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>}
+                        {sunsetDate && <span className="text-xs font-normal ml-2" style={{ color: CONV.textFaint }}>{new Date(sunsetDate + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>}
                       </p>
-                      <p className="text-xs text-amber-600 mt-0.5">
-                        Start around <span className="font-bold">{sunsetInfo.goldenStart}</span> for golden hour
+                      <p className="text-xs mt-0.5" style={{ color: CONV.textSoft }}>
+                        Start around <span className="font-bold" style={{ color: CONV.amber }}>{sunsetInfo.goldenStart}</span> for golden hour
                       </p>
                     </div>
                   ) : (
-                    <p className="text-xs font-bold text-amber-700 mb-2">Golden hour lookup</p>
+                    <p className="text-xs font-bold mb-2" style={{ color: CONV.text }}>Golden hour lookup</p>
                   )}
                   <input
                     type="date"
                     value={sunsetDate}
                     onChange={e => { if (e.target.value) fetchSunset(e.target.value); }}
-                    className="w-full text-xs rounded-lg px-2 py-1 border border-amber-200 bg-white/60 text-amber-800 focus:outline-none focus:ring-1 focus:ring-amber-300"
+                    className="conv-input w-full text-xs rounded-lg px-2 py-1.5"
+                    style={{ border: `1px solid ${CONV.amberBorder}`, background: CONV.panelSolid, color: CONV.text, fontFamily: "inherit" }}
                   />
                   {inquiry.date_in_mind && !sunsetDate && (
-                    <p className="text-[10px] text-amber-500 mt-1">Client said: {inquiry.date_in_mind}</p>
+                    <p className="text-[10px] mt-1" style={{ color: CONV.textFaint }}>Client said: {inquiry.date_in_mind}</p>
                   )}
                 </div>
               </div>
-            </div>
+            </Panel>
           )}
 
           {/* ── Payment & Booking ── */}
-          <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
-            <div className="h-[3px]" style={{ background: "linear-gradient(90deg,#10b981,#34d399)" }} />
+          <Panel>
             <div className="p-5 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-lg flex items-center justify-center text-xs"
-                       style={{ background: "rgba(16,185,129,0.12)", color: "#059669" }}>💳</div>
-                  <p className="text-sm font-black text-slate-900">Payment & Booking</p>
-                </div>
-                {/* Status badge */}
-                {inquiry.payment_status === "paid" ? (
-                  <span className="text-[11px] font-black px-2.5 py-1 rounded-lg"
-                        style={{ background: "rgba(16,185,129,0.12)", color: "#059669" }}>
-                    Paid ✓
+              <PanelHead icon="card" tint={CONV.green} bg={CONV.greenBg} title="Payment & Booking"
+                right={inquiry.payment_status === "paid" ? (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full"
+                        style={{ background: CONV.greenBg, color: CONV.green }}>
+                    <Icon name="check" size={11} /> Paid
                   </span>
                 ) : (
-                  <span className="text-[11px] font-black px-2.5 py-1 rounded-lg"
-                        style={{ background: "rgba(148,163,184,0.12)", color: "#94a3b8" }}>
+                  <span className="text-[11px] font-bold px-2.5 py-1 rounded-full"
+                        style={{ background: CONV.neutralBg, color: CONV.neutral }}>
                     Unpaid
                   </span>
-                )}
-              </div>
+                )} />
 
               {/* Payment note — compact single line */}
               {inquiry.payment_note && (
-                <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-emerald-700"
-                     style={{ background: "rgba(16,185,129,0.07)", border: "1px solid rgba(16,185,129,0.15)" }}>
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs"
+                     style={{ background: CONV.greenBg, color: CONV.green, border: `1px solid ${CONV.greenBorder}` }}>
                   <span className="flex-1 truncate">{inquiry.payment_note}</span>
                   {inquiry.payment_detected_at && (
-                    <span className="text-[10px] text-emerald-400 flex-shrink-0">
+                    <span className="text-[10px] flex-shrink-0" style={{ opacity: 0.7 }}>
                       {new Date(inquiry.payment_detected_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                     </span>
                   )}
@@ -1661,24 +1731,25 @@ export default function ConversationPage() {
               {/* Session date — compact */}
               {inquiry.session_date && !sessionDateInput ? (
                 <div className="flex items-center gap-2 px-3 py-2 rounded-lg"
-                     style={{ background: "rgba(16,185,129,0.07)", border: "1px solid rgba(16,185,129,0.15)" }}>
-                  <span className="text-emerald-600 text-xs font-black">✓</span>
-                  <span className="text-xs font-bold text-emerald-700 flex-1">
+                     style={{ background: CONV.greenBg, border: `1px solid ${CONV.greenBorder}` }}>
+                  <Icon name="check" size={12} style={{ color: CONV.green }} />
+                  <span className="text-xs font-bold flex-1" style={{ color: CONV.green }}>
                     {new Date(inquiry.session_date + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
                   </span>
                   <button onClick={() => setSessionDateInput(inquiry.session_date!)}
-                    className="text-[10px] text-slate-400 hover:text-slate-600 flex-shrink-0">edit</button>
+                    className="text-[10px] font-semibold flex-shrink-0 hover:opacity-70"
+                    style={{ color: CONV.textFaint }}>edit</button>
                 </div>
               ) : (
                 <div className="flex gap-1.5">
                   <input type="date" value={sessionDateInput}
                     onChange={e => { setSessionDateInput(e.target.value); if (e.target.value) fetchSunset(e.target.value); }}
-                    className="flex-1 px-2.5 py-1.5 rounded-lg outline-none text-slate-700 text-xs"
-                    style={{ border: "1px solid rgba(16,185,129,0.25)", background: "#fff", fontFamily: "inherit" }} />
+                    className="conv-input flex-1 px-2.5 py-1.5 rounded-lg text-xs"
+                    style={{ border: `1px solid ${CONV.greenBorder}`, background: CONV.panelSolid, color: CONV.text, fontFamily: "inherit" }} />
                   {sessionDateInput && (
                     <button onClick={() => confirmDate(sessionDateInput)} disabled={dateConfirming}
-                      className="text-xs font-black px-3 py-1.5 rounded-lg disabled:opacity-40"
-                      style={{ background: "linear-gradient(135deg,#10b981,#059669)", color: "#fff" }}>
+                      className="text-xs font-bold px-3 py-1.5 rounded-lg disabled:opacity-40 transition-all hover:opacity-90"
+                      style={{ background: CONV.green, color: "#fff" }}>
                       {dateConfirming ? "…" : "Set"}
                     </button>
                   )}
@@ -1688,16 +1759,20 @@ export default function ConversationPage() {
               {/* Detected date — compact confirm strip */}
               {detectedDate && !inquiry.session_date && (
                 <div className="flex items-center gap-2 px-3 py-2 rounded-lg"
-                     style={{ background: "rgba(99,102,241,0.07)", border: "1px solid rgba(99,102,241,0.2)" }}>
-                  <span className="text-xs text-indigo-500 flex-1 font-medium truncate">✦ {detectedDate.readable}</span>
+                     style={{ background: CONV.blueBg, border: `1px solid ${CONV.panelBorder}` }}>
+                  <span className="text-xs flex-1 font-medium truncate inline-flex items-center gap-1.5" style={{ color: CONV.blue }}>
+                    <Icon name="sparkle" size={11} className="flex-shrink-0" /> {detectedDate.readable}
+                  </span>
                   <button onClick={() => confirmDate(detectedDate.date)} disabled={dateConfirming}
-                    className="text-[11px] font-black px-2.5 py-1 rounded-md flex-shrink-0"
-                    style={{ background: "linear-gradient(135deg,#10b981,#059669)", color: "#fff" }}>
+                    className="text-[11px] font-bold px-2.5 py-1 rounded-md flex-shrink-0 transition-all hover:opacity-90"
+                    style={{ background: CONV.green, color: "#fff" }}>
                     {dateConfirming ? "…" : "Confirm"}
                   </button>
                   <button onClick={() => setDetectedDate(null)}
-                    className="text-[11px] font-bold px-2 py-1 rounded-md flex-shrink-0"
-                    style={{ background: "rgba(148,163,184,0.15)", color: "#64748b" }}>✕</button>
+                    className="flex-shrink-0 p-1 rounded-md transition-all hover:opacity-70"
+                    style={{ background: CONV.neutralBg, color: CONV.neutral }}>
+                    <Icon name="x" size={11} />
+                  </button>
                 </div>
               )}
 
@@ -1707,9 +1782,9 @@ export default function ConversationPage() {
                 {/* Scan payment */}
                 <button onClick={checkPayment} disabled={paymentLoading}
                   title="Scan Gmail for Venmo/Zelle/PayPal payment"
-                  className="flex flex-col items-center gap-1 py-3 rounded-xl text-white text-xs font-black transition-all hover:opacity-90 disabled:opacity-40"
-                  style={{ background: "linear-gradient(135deg,#10b981,#059669)" }}>
-                  {paymentLoading ? <span className="animate-spin text-base">◌</span> : <span className="text-base">💳</span>}
+                  className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-all hover:opacity-80 disabled:opacity-40"
+                  style={{ background: CONV.greenBg, color: CONV.green, border: `1px solid ${CONV.greenBorder}` }}>
+                  {paymentLoading ? <Spinner size={13} /> : <Icon name="card" size={14} />}
                   {paymentLoading ? "Scanning…" : inquiry.payment_status === "paid" ? "Re-check" : "Check Pay"}
                 </button>
 
@@ -1717,9 +1792,9 @@ export default function ConversationPage() {
                 {!inquiry.session_date && (
                   <button onClick={detectDate} disabled={detectLoading}
                     title="Scan email history to detect the session date"
-                    className="flex flex-col items-center gap-1 py-3 rounded-xl text-xs font-black transition-all hover:opacity-90 disabled:opacity-40"
-                    style={{ background: "rgba(99,102,241,0.1)", color: "#6366f1", border: "1px solid rgba(99,102,241,0.25)" }}>
-                    {detectLoading ? <span className="animate-spin text-base">◌</span> : <span className="text-base">📅</span>}
+                    className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-all hover:opacity-80 disabled:opacity-40"
+                    style={{ background: CONV.blueBg, color: CONV.blue, border: `1px solid ${CONV.panelBorder}` }}>
+                    {detectLoading ? <Spinner size={13} /> : <Icon name="calendar" size={14} />}
                     {detectLoading ? "Scanning…" : "Find Date"}
                   </button>
                 )}
@@ -1727,18 +1802,20 @@ export default function ConversationPage() {
                 {/* Schedule Reminders */}
                 <button onClick={scheduleReminders} disabled={remindersLoading}
                   title="Generate all 5 client touchpoint drafts"
-                  className="flex flex-col items-center gap-1 py-3 rounded-xl text-white text-xs font-black transition-all hover:opacity-90 disabled:opacity-40"
-                  style={{ background: remindersOpen ? "linear-gradient(135deg,#d97706,#b45309)" : "linear-gradient(135deg,#f59e0b,#d97706)" }}>
-                  {remindersLoading ? <span className="animate-spin text-base">◌</span> : <span className="text-base">🗓️</span>}
+                  className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-all hover:opacity-80 disabled:opacity-40"
+                  style={remindersOpen
+                    ? { background: CONV.amber, color: "#fff", border: `1px solid ${CONV.amber}` }
+                    : { background: CONV.amberBg, color: CONV.amber, border: `1px solid ${CONV.amberBorder}` }}>
+                  {remindersLoading ? <Spinner size={13} /> : <Icon name="bell" size={14} />}
                   {remindersLoading ? "Building…" : "Reminders"}
                 </button>
 
                 {/* Contract */}
                 <button onClick={generateContract} disabled={contractLoading}
                   title="Fill contract template with client details + agreed price"
-                  className="flex flex-col items-center gap-1 py-3 rounded-xl text-white text-xs font-black transition-all hover:opacity-90 disabled:opacity-40"
-                  style={{ background: "linear-gradient(135deg,#0ea5e9,#6366f1)" }}>
-                  {contractLoading ? <span className="animate-spin text-base">◌</span> : <span className="text-base">📄</span>}
+                  className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-all hover:opacity-80 disabled:opacity-40"
+                  style={{ background: CONV.violetBg, color: CONV.violet, border: `1px solid ${CONV.violetBorder}` }}>
+                  {contractLoading ? <Spinner size={13} /> : <Icon name="doc" size={14} />}
                   {contractLoading ? "Building…" : "Contract"}
                 </button>
 
@@ -1746,74 +1823,74 @@ export default function ConversationPage() {
                 {inquiry.payment_status === "paid" ? (
                   <button onClick={previewConfirmation} disabled={previewLoading || confirmLoading}
                     title="Preview + send payment confirmation email"
-                    className="flex flex-col items-center gap-1 py-3 rounded-xl text-white text-xs font-black transition-all hover:opacity-90 disabled:opacity-40"
-                    style={{ background: "linear-gradient(135deg,#8b5cf6,#7c3aed)" }}>
-                    {previewLoading ? <span className="animate-spin text-base">◌</span> : <span className="text-base">📧</span>}
+                    className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-all hover:opacity-80 disabled:opacity-40"
+                    style={{ background: CONV.pinkBg, color: CONV.pink, border: `1px solid ${CONV.panelBorder}` }}>
+                    {previewLoading ? <Spinner size={13} /> : <Icon name="mail" size={14} />}
                     {previewLoading ? "Building…" : "Payment Email"}
                   </button>
                 ) : (
-                  <div className="flex flex-col items-center gap-1 py-3 rounded-xl text-xs font-bold"
-                       style={{ background: "rgba(148,163,184,0.08)", color: "#cbd5e1", border: "1px dashed #e2e8f0" }}>
-                    <span className="text-base opacity-40">📧</span>
+                  <div className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold"
+                       style={{ background: CONV.inset, color: CONV.textFaint, border: `1px dashed ${CONV.panelBorderStrong}`, opacity: 0.7 }}>
+                    <Icon name="mail" size={14} className="opacity-50" />
                     <span>Unpaid</span>
                   </div>
                 )}
               </div>
             </div>
-          </div>
+          </Panel>
 
           {/* ── Session Reminders Panel ── */}
           {remindersOpen && (
-            <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
-              <div className="h-[3px]" style={{ background: "linear-gradient(90deg,#f59e0b,#d97706)" }} />
+            <Panel>
               <div className="p-5">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-lg flex items-center justify-center text-xs"
-                         style={{ background: "rgba(245,158,11,0.12)", color: "#d97706" }}>🗓️</div>
-                    <p className="text-sm font-black text-slate-900">Session Reminders</p>
-                  </div>
-                  <button onClick={() => setRemindersOpen(false)}
-                    className="text-xs font-bold text-slate-400 hover:text-slate-600">✕ Close</button>
+                <div className="mb-4">
+                  <PanelHead icon="bell" tint={CONV.amber} bg={CONV.amberBg} title="Session Reminders"
+                    right={
+                      <button onClick={() => setRemindersOpen(false)}
+                        className="flex items-center gap-1 text-xs font-bold transition-colors hover:opacity-70"
+                        style={{ color: CONV.textFaint }}>
+                        <Icon name="x" size={12} /> Close
+                      </button>
+                    } />
                 </div>
 
                 {remindersLoading ? (
-                  <div className="flex flex-col items-center gap-3 py-10 text-slate-400">
-                    <span className="animate-spin text-2xl">◌</span>
+                  <div className="flex flex-col items-center gap-3 py-10" style={{ color: CONV.textFaint }}>
+                    <Spinner size={24} />
                     <p className="text-sm font-semibold">Generating all 5 drafts…</p>
                   </div>
                 ) : reminders.length === 0 ? (
-                  <p className="text-sm text-slate-400 text-center py-6">No drafts yet — click Reminders to generate.</p>
+                  <p className="text-sm text-center py-6" style={{ color: CONV.textFaint }}>No drafts yet — click Reminders to generate.</p>
                 ) : (
                   <div className="space-y-4">
                     {reminders.map((r, i) => (
-                      <div key={r.id} className="rounded-xl overflow-hidden border border-slate-100">
-                        <div className="flex items-center justify-between px-4 py-2.5"
-                             style={{ background: "rgba(245,158,11,0.06)", borderBottom: "1px solid rgba(245,158,11,0.12)" }}>
+                      <div key={r.id} className="rounded-xl overflow-hidden" style={{ border: `1px solid ${CONV.rowBorder}` }}>
+                        <div className="flex items-center justify-between px-4 py-2.5 gap-2 flex-wrap"
+                             style={{ background: CONV.amberBg, borderBottom: `1px solid ${CONV.rowBorder}` }}>
                           <div className="flex items-center gap-2">
                             <span className="text-sm">{r.emoji}</span>
-                            <p className="text-xs font-black text-slate-800">{i + 1}. {r.label}</p>
+                            <p className="text-xs font-bold" style={{ color: CONV.text }}>{i + 1}. {r.label}</p>
                           </div>
                           <div className="flex items-center gap-1.5">
                             {r.html && (
                               <button
                                 onClick={() => previewReminderEmail(r)}
-                                className="text-[11px] font-bold px-2.5 py-1 rounded-lg transition-all hover:opacity-80"
-                                style={{ background: "rgba(157,111,232,0.10)", color: "#7c3aed" }}>
-                                👁 Preview
+                                className="flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full transition-all hover:opacity-80"
+                                style={{ background: CONV.violetBg, color: CONV.violet }}>
+                                <Icon name="eye" size={11} /> Preview
                               </button>
                             )}
                             <button
                               onClick={() => sendReminderViaGmail(r)}
                               disabled={sendingReminder === r.id}
-                              className="text-[11px] font-black px-2.5 py-1 rounded-lg text-white transition-all hover:opacity-80 disabled:opacity-60"
-                              style={{ background: "linear-gradient(135deg,#f59e0b,#d97706)" }}>
+                              className="text-[11px] font-bold px-2.5 py-1 rounded-full text-white transition-all hover:opacity-80 disabled:opacity-60"
+                              style={{ background: CONV.amber }}>
                               {sendingReminder === r.id ? "Sending…" : "Send via Gmail →"}
                             </button>
                           </div>
                         </div>
-                        <div className="px-4 py-3 bg-white">
-                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Subject</p>
+                        <div className="px-4 py-3" style={{ background: CONV.panelSolid }}>
+                          <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: CONV.textFaint }}>Subject</p>
                           <input
                             type="text"
                             value={r.subject}
@@ -1821,8 +1898,8 @@ export default function ConversationPage() {
                               const updated = e.target.value;
                               setReminders(prev => prev.map((x, j) => j === i ? { ...x, subject: updated } : x));
                             }}
-                            className="w-full text-xs font-semibold text-slate-700 rounded-lg px-2 py-1.5 mb-2 outline-none"
-                            style={{ border: "1px solid rgba(245,158,11,0.2)", background: "rgba(245,158,11,0.03)", fontFamily: "inherit" }}
+                            className="conv-input w-full text-xs font-semibold rounded-lg px-2 py-1.5 mb-2"
+                            style={{ border: `1px solid ${CONV.rowBorder}`, background: CONV.panelSolid, color: CONV.text, fontFamily: "inherit" }}
                           />
                           <textarea
                             value={r.body}
@@ -1833,97 +1910,94 @@ export default function ConversationPage() {
                               setReminders(prev => prev.map((x, j) => j === i ? { ...x, body: updated, html: newHtml } : x));
                             }}
                             rows={4}
-                            className="w-full text-xs text-slate-700 leading-relaxed rounded-lg p-2 resize-none outline-none"
-                            style={{ border: "1px solid rgba(245,158,11,0.2)", background: "rgba(245,158,11,0.03)", fontFamily: "inherit" }}
+                            className="conv-input w-full text-xs leading-relaxed rounded-lg p-2 resize-none"
+                            style={{ border: `1px solid ${CONV.rowBorder}`, background: CONV.panelSolid, color: CONV.text, fontFamily: "inherit" }}
                           />
                         </div>
                       </div>
                     ))}
                     <div className="flex items-center justify-between pt-1">
-                      <p className="text-[11px] text-slate-400">
+                      <p className="text-[11px]" style={{ color: CONV.textFaint }}>
                         Edits here are used for Preview and Send.
                       </p>
                       <button
                         onClick={saveReminderEdits}
-                        className="text-[11px] font-black px-3 py-1.5 rounded-lg text-white transition-all hover:opacity-80"
-                        style={{ background: "linear-gradient(135deg,#f59e0b,#d97706)" }}>
-                        Save drafts ✓
+                        className="flex items-center gap-1 text-[11px] font-bold px-3 py-1.5 rounded-full text-white transition-all hover:opacity-80"
+                        style={{ background: CONV.amber }}>
+                        Save drafts <Icon name="check" size={11} />
                       </button>
                     </div>
                   </div>
                 )}
               </div>
-            </div>
+            </Panel>
           )}
 
           {/* ── Learn from Reply — always visible ── */}
-          <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
-            <div className="h-[3px]" style={{ background: "linear-gradient(90deg,#f59e0b,#fbbf24)" }} />
+          <Panel>
             <div className="p-5 space-y-3">
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-lg flex items-center justify-center text-xs font-black"
-                     style={{ background: "rgba(245,158,11,0.12)", color: "#d97706" }}>✎</div>
-                <p className="text-sm font-black text-slate-900">Learn from reply</p>
-              </div>
+              <PanelHead icon="pen" tint={CONV.amber} bg={CONV.amberBg} title="Learn from reply" />
 
               {learnedRules ? (
                 /* ── Success: show extracted rules ── */
                 <div className="rounded-xl p-4 space-y-2"
-                     style={{ background: "rgba(16,185,129,0.06)", border: "1px solid rgba(16,185,129,0.2)" }}>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600">
-                    ✓ {learnedRules.length} rule{learnedRules.length === 1 ? "" : "s"} saved to Obsidian vault
+                     style={{ background: CONV.greenBg, border: `1px solid ${CONV.greenBorder}` }}>
+                  <p className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest" style={{ color: CONV.green }}>
+                    <Icon name="check" size={11} /> {learnedRules.length} rule{learnedRules.length === 1 ? "" : "s"} saved to Obsidian vault
                   </p>
                   <ul className="space-y-1.5">
                     {learnedRules.map((rule, i) => (
                       <li key={i} className="flex items-start gap-2">
-                        <span className="text-emerald-400 mt-0.5 flex-shrink-0 text-xs">–</span>
-                        <span className="text-xs text-slate-700 leading-snug">{rule}</span>
+                        <span className="mt-0.5 flex-shrink-0 text-xs" style={{ color: CONV.green, opacity: 0.6 }}>–</span>
+                        <span className="text-xs leading-snug" style={{ color: CONV.textSoft }}>{rule}</span>
                       </li>
                     ))}
                   </ul>
-                  <p className="text-[10px] text-slate-400 pt-1">Applied to all future drafts automatically.</p>
+                  <p className="text-[10px] pt-1" style={{ color: CONV.textFaint }}>Applied to all future drafts automatically.</p>
                   <button onClick={() => { setLearnedRules(null); setActualSent(""); setManualAiDraft(""); }}
-                    className="text-xs font-bold" style={{ color: C.p1 }}>
+                    className="text-xs font-bold transition-colors hover:opacity-70" style={{ color: CONV.violet }}>
                     ↩ Analyze another
                   </button>
                 </div>
               ) : (
                 <>
-                  <p className="text-xs text-slate-500 leading-relaxed">
+                  <p className="text-xs leading-relaxed" style={{ color: CONV.textSoft }}>
                     Paste what you actually sent. Claude compares it to the AI draft and saves the style differences permanently.
                   </p>
 
                   {/* If an AI draft was generated this session, show it dimmed — otherwise let them paste it */}
                   {(originalAiDraft || lastAiDraft) ? (
                     <div className="rounded-xl p-3 space-y-1"
-                         style={{ background: "rgba(148,163,184,0.07)", border: "1px solid rgba(148,163,184,0.15)" }}>
+                         style={{ background: CONV.inset, border: `1px solid ${CONV.rowBorder}` }}>
                       <div className="flex items-center justify-between">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-300">Original AI draft</p>
+                        <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: CONV.textFaint }}>Original AI draft</p>
                         <button
                           onClick={() => setAiDraftExpanded(e => !e)}
-                          className="text-[10px] text-slate-400 underline underline-offset-2 hover:text-slate-600">
+                          className="text-[10px] underline underline-offset-2 transition-colors hover:opacity-70"
+                          style={{ color: CONV.textFaint }}>
                           {aiDraftExpanded ? "Collapse" : "Show full"}
                         </button>
                       </div>
-                      <p className={`text-xs text-slate-400 leading-relaxed whitespace-pre-wrap${aiDraftExpanded ? "" : " line-clamp-3"}`}>{originalAiDraft || lastAiDraft}</p>
+                      <p className={`text-xs leading-relaxed whitespace-pre-wrap${aiDraftExpanded ? "" : " line-clamp-3"}`}
+                         style={{ color: CONV.textFaint }}>{originalAiDraft || lastAiDraft}</p>
                     </div>
                   ) : (
                     <div>
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 block mb-1">
-                        AI draft <span className="normal-case font-normal text-slate-300">(paste here if you didn&apos;t use Draft with AI)</span>
+                      <label className="text-[10px] font-bold uppercase tracking-widest block mb-1" style={{ color: CONV.textFaint }}>
+                        AI draft <span className="normal-case font-normal" style={{ opacity: 0.7 }}>(paste here if you didn&apos;t use Draft with AI)</span>
                       </label>
                       <textarea
                         value={manualAiDraft}
                         onChange={e => setManualAiDraft(e.target.value)}
                         rows={4}
                         placeholder="Paste the AI-generated draft here…"
-                        className="w-full text-slate-500 leading-relaxed rounded-xl p-3 resize-none sm:resize-y outline-none"
-                        style={{ border: "1px solid rgba(148,163,184,0.25)", background: "rgba(148,163,184,0.04)", fontFamily: "inherit", fontSize: "16px" }} />
+                        className="conv-input w-full leading-relaxed rounded-xl p-3 resize-none sm:resize-y"
+                        style={{ border: `1px solid ${CONV.rowBorder}`, background: CONV.panelSolid, color: CONV.textSoft, fontFamily: "inherit", fontSize: "16px" }} />
                     </div>
                   )}
 
                   <div>
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 block mb-1">
+                    <label className="text-[10px] font-bold uppercase tracking-widest block mb-1" style={{ color: CONV.textFaint }}>
                       What you actually sent
                     </label>
                     <textarea
@@ -1931,31 +2005,32 @@ export default function ConversationPage() {
                       onChange={e => setActualSent(e.target.value)}
                       rows={6}
                       placeholder="Paste the email you sent here…"
-                      className="w-full text-slate-700 leading-relaxed rounded-xl p-3 resize-none sm:resize-y outline-none"
-                      style={{ border: "1px solid rgba(245,158,11,0.3)", background: "rgba(245,158,11,0.03)", fontFamily: "inherit", fontSize: "16px" }} />
+                      className="conv-input w-full leading-relaxed rounded-xl p-3 resize-none sm:resize-y"
+                      style={{ border: `1px solid ${CONV.amberBorder}`, background: CONV.panelSolid, color: CONV.text, fontFamily: "inherit", fontSize: "16px" }} />
                   </div>
 
                   <button
                     onClick={learnFromReply}
                     disabled={(!originalAiDraft && !lastAiDraft && !manualAiDraft.trim()) || !actualSent.trim() || learnLoading}
-                    className="w-full text-sm font-black py-2.5 rounded-xl transition-all hover:opacity-90 disabled:opacity-40 flex items-center justify-center gap-2"
-                    style={{ background: "linear-gradient(135deg,#f59e0b,#d97706)", color: "#fff" }}>
+                    className="w-full text-sm font-bold py-2.5 rounded-xl transition-all hover:opacity-90 disabled:opacity-40 flex items-center justify-center gap-2"
+                    style={{ background: CONV.amber, color: "#fff", boxShadow: "0 6px 18px rgba(185,115,9,0.25)" }}>
                     {learnLoading
-                      ? <><span className="animate-spin inline-block">◌</span> Analyzing…</>
-                      : "✎ Analyze & save to Obsidian"}
+                      ? <><Spinner size={13} /> Analyzing…</>
+                      : <><Icon name="pen" size={13} /> Analyze & save to Obsidian</>}
                   </button>
                 </>
               )}
             </div>
-          </div>
+          </Panel>
 
         </div>
       </div>
 
       {/* ── Toast ── */}
       {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-2xl shadow-xl text-sm font-bold text-white transition-all"
-             style={{ background: toast.ok ? "#10b981" : "#ef4444" }}>
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-full text-[13px] font-semibold text-white flex items-center gap-2 transition-all"
+             style={{ background: "rgba(28,28,30,0.92)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", boxShadow: CONV.shadowLg }}>
+          <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: toast.ok ? "#34d399" : "#f87171" }} />
           {toast.msg}
         </div>
       )}
@@ -1963,36 +2038,36 @@ export default function ConversationPage() {
       {/* ── Email preview modal ── */}
       {previewHtml && inquiry && (
         <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-10 overflow-y-auto"
-             style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)" }}>
-          <div className="w-full max-w-2xl rounded-2xl overflow-hidden shadow-2xl flex flex-col"
-               style={{ background: "#f4f4f0", maxHeight: "calc(100vh - 80px)" }}>
+             style={{ background: CONV.scrim, backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" }}>
+          <div className="w-full max-w-2xl rounded-2xl overflow-hidden flex flex-col conv-rise"
+               style={{ background: CONV.overlay, maxHeight: "calc(100vh - 80px)", boxShadow: CONV.shadowLg }}>
 
             {/* Modal header */}
-            <div className="flex items-center justify-between px-5 py-4 bg-white border-b border-slate-100 flex-shrink-0">
-              <div>
-                <p className="text-sm font-black text-slate-900">Booking Confirmation Email</p>
-                <p className="text-xs text-slate-400 mt-0.5">To: {inquiry.name} &lt;{inquiry.email}&gt;</p>
-              </div>
+            <div className="flex items-center justify-between px-5 py-4 flex-shrink-0"
+                 style={{ background: CONV.panelSolid, borderBottom: `1px solid ${CONV.rowBorder}` }}>
+              <PanelHead icon="mail" tint={CONV.pink} bg={CONV.pinkBg}
+                title="Booking Confirmation Email" sub={`To: ${inquiry.name} <${inquiry.email}>`} />
               <button onClick={() => setPreviewHtml(null)}
-                className="text-slate-400 hover:text-slate-700 text-xl font-bold leading-none px-2">×</button>
+                className="p-2 rounded-full transition-colors hover:bg-black/5" style={{ color: CONV.textFaint }}>
+                <Icon name="x" size={16} />
+              </button>
             </div>
 
             {/* Custom note input */}
-            <div className="px-5 py-3 border-b border-slate-100 flex-shrink-0 bg-slate-50">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 block mb-1.5">
-                Add a personal note <span className="normal-case font-normal text-slate-300">(optional — appears in the email)</span>
+            <div className="px-5 py-3 flex-shrink-0" style={{ background: CONV.inset, borderBottom: `1px solid ${CONV.rowBorder}` }}>
+              <label className="text-[10px] font-bold uppercase tracking-widest block mb-1.5" style={{ color: CONV.textFaint }}>
+                Add a personal note <span className="normal-case font-normal" style={{ opacity: 0.7 }}>(optional — appears in the email)</span>
               </label>
               <textarea
                 value={customComment}
                 onChange={e => setCustomComment(e.target.value)}
                 rows={2}
                 placeholder={"e.g. \"Can't wait to shoot with you! Feel free to text me if anything comes up.\""}
-
-                className="w-full text-slate-700 rounded-lg px-3 py-2 outline-none resize-none text-sm leading-relaxed"
-                style={{ border: "1px solid rgba(16,185,129,0.25)", background: "#fff", fontFamily: "inherit" }}
+                className="conv-input w-full rounded-lg px-3 py-2 resize-none text-sm leading-relaxed"
+                style={{ border: `1px solid ${CONV.greenBorder}`, background: CONV.panelSolid, color: CONV.text, fontFamily: "inherit" }}
               />
               {customComment.trim() && (
-                <p className="text-[10px] text-emerald-600 mt-1 font-medium">↓ Preview will update when you resend</p>
+                <p className="text-[10px] mt-1 font-medium" style={{ color: CONV.green }}>↓ Preview will update when you resend</p>
               )}
             </div>
 
@@ -2003,20 +2078,21 @@ export default function ConversationPage() {
             </div>
 
             {/* Action bar */}
-            <div className="flex gap-3 px-5 py-4 bg-white border-t border-slate-100 flex-shrink-0">
+            <div className="flex gap-3 px-5 py-4 flex-shrink-0"
+                 style={{ background: CONV.panelSolid, borderTop: `1px solid ${CONV.rowBorder}` }}>
               <button onClick={() => setPreviewHtml(null)}
                 className="flex-1 text-sm font-bold py-2.5 rounded-xl transition-all hover:opacity-80"
-                style={{ background: "rgba(148,163,184,0.12)", color: "#64748b" }}>
+                style={{ background: CONV.neutralBg, color: CONV.neutral }}>
                 Cancel
               </button>
               <button
                 onClick={sendConfirmation}
                 disabled={confirmLoading}
-                className="flex-1 text-sm font-black py-2.5 rounded-xl transition-all hover:opacity-90 disabled:opacity-40 flex items-center justify-center gap-2"
-                style={{ background: "linear-gradient(135deg,#6366f1,#8b5cf6)", color: "#fff" }}>
+                className="flex-1 text-sm font-bold py-2.5 rounded-xl transition-all hover:opacity-90 disabled:opacity-40 flex items-center justify-center gap-2"
+                style={{ background: CONV.gradBrand, color: "#fff", boxShadow: `0 4px 14px ${C.p1_30}` }}>
                 {confirmLoading
-                  ? <><span className="animate-spin inline-block">◌</span> Sending…</>
-                  : "Send from Gmail"}
+                  ? <><Spinner size={13} /> Sending…</>
+                  : <><Icon name="send" size={13} /> Send from Gmail</>}
               </button>
             </div>
           </div>
@@ -2026,33 +2102,37 @@ export default function ConversationPage() {
       {/* ── Contract modal ── */}
       {contractText && (
         <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-10 overflow-y-auto"
-             style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)" }}>
-          <div className="w-full max-w-2xl rounded-2xl overflow-hidden shadow-2xl flex flex-col"
-               style={{ background: "#f8fafc", maxHeight: "calc(100vh - 80px)" }}>
+             style={{ background: CONV.scrim, backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" }}>
+          <div className="w-full max-w-2xl rounded-2xl overflow-hidden flex flex-col conv-rise"
+               style={{ background: CONV.overlay, maxHeight: "calc(100vh - 80px)", boxShadow: CONV.shadowLg }}>
 
             {/* Header */}
-            <div className="flex items-center justify-between px-5 py-4 bg-white border-b border-slate-100 flex-shrink-0">
-              <div>
-                <p className="text-sm font-black text-slate-900">Photography Contract</p>
-                <p className="text-xs text-slate-400 mt-0.5">Copy and paste into Pixieset to send</p>
-              </div>
+            <div className="flex items-center justify-between px-5 py-4 flex-shrink-0"
+                 style={{ background: CONV.panelSolid, borderBottom: `1px solid ${CONV.rowBorder}` }}>
+              <PanelHead icon="doc" tint={CONV.violet} bg={CONV.violetBg}
+                title="Photography Contract" sub="Copy and paste into Pixieset to send" />
               <button onClick={() => setContractText(null)}
-                className="text-slate-400 hover:text-slate-700 text-xl font-bold leading-none px-2">×</button>
+                className="p-2 rounded-full transition-colors hover:bg-black/5" style={{ color: CONV.textFaint }}>
+                <Icon name="x" size={16} />
+              </button>
             </div>
 
             {/* Copy button */}
-            <div className="px-5 py-3 border-b border-slate-100 flex-shrink-0 bg-slate-50">
+            <div className="px-5 py-3 flex-shrink-0" style={{ background: CONV.inset, borderBottom: `1px solid ${CONV.rowBorder}` }}>
               <button
                 onClick={() => {
                   navigator.clipboard.writeText(contractText);
                   setContractCopied(true);
                   setTimeout(() => setContractCopied(false), 2500);
                 }}
-                className="w-full text-sm font-black py-2.5 rounded-xl transition-all hover:opacity-90 flex items-center justify-center gap-2"
-                style={{ background: contractCopied ? "linear-gradient(135deg,#10b981,#059669)" : "linear-gradient(135deg,#0ea5e9,#6366f1)", color: "#fff" }}>
-                {contractCopied ? "✓ Copied to clipboard!" : "📋 Copy entire contract"}
+                className="w-full text-sm font-bold py-2.5 rounded-xl transition-all hover:opacity-90 flex items-center justify-center gap-2"
+                style={contractCopied
+                  ? { background: CONV.green, color: "#fff" }
+                  : { background: CONV.gradBrand, color: "#fff", boxShadow: `0 4px 14px ${C.p1_30}` }}>
+                <Icon name={contractCopied ? "check" : "copy"} size={13} />
+                {contractCopied ? "Copied to clipboard!" : "Copy entire contract"}
               </button>
-              <p className="text-[10px] text-slate-400 text-center mt-2">
+              <p className="text-[10px] text-center mt-2" style={{ color: CONV.textFaint }}>
                 Placeholders in [brackets] need to be filled in manually
               </p>
             </div>
@@ -2063,15 +2143,15 @@ export default function ConversationPage() {
                 readOnly
                 value={contractText}
                 rows={30}
-                className="w-full text-xs text-slate-700 leading-relaxed rounded-xl p-4 resize-none outline-none font-mono"
-                style={{ background: "#fff", border: "1px solid #e2e8f0" }}
+                className="w-full text-xs leading-relaxed rounded-xl p-4 resize-none outline-none font-mono"
+                style={{ background: CONV.panelSolid, border: `1px solid ${CONV.rowBorder}`, color: CONV.textSoft }}
               />
             </div>
 
-            <div className="px-5 py-4 bg-white border-t border-slate-100 flex-shrink-0">
+            <div className="px-5 py-4 flex-shrink-0" style={{ background: CONV.panelSolid, borderTop: `1px solid ${CONV.rowBorder}` }}>
               <button onClick={() => setContractText(null)}
                 className="w-full text-sm font-bold py-2.5 rounded-xl transition-all hover:opacity-80"
-                style={{ background: "rgba(148,163,184,0.12)", color: "#64748b" }}>
+                style={{ background: CONV.neutralBg, color: CONV.neutral }}>
                 Done
               </button>
             </div>

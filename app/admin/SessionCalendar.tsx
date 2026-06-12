@@ -1,6 +1,5 @@
 "use client";
 import { useState } from "react";
-import { C } from "@/lib/colors";
 
 type Session = {
   id: number;
@@ -104,42 +103,42 @@ export default function SessionCalendar({
     <div
       className="rounded-3xl overflow-hidden"
       style={{
-        background: "linear-gradient(145deg,rgba(255,255,255,0.85),rgba(248,247,255,0.95))",
-        backdropFilter: "blur(24px)",
-        border: "1px solid rgba(167,139,250,0.2)",
-        boxShadow: "0 8px 32px rgba(124,58,237,0.08), 0 1px 0 rgba(255,255,255,0.8) inset",
+        background: "rgba(255,255,255,0.82)",
+        border: "1px solid rgba(28,28,32,0.08)",
+        boxShadow: "0 1px 2px rgba(16,18,22,0.04), 0 10px 30px rgba(16,18,22,0.06)",
       }}>
-
-      <div className="h-[3px]" style={{ background: "linear-gradient(90deg,#a78bfa,#7c3aed,#6366f1)" }} />
 
       <div className="p-5">
         {/* Header */}
         <div className="flex items-center justify-between mb-5">
           <div>
-            <p className="text-xs font-black uppercase tracking-widest mb-0.5" style={{ color: "#7c3aed" }}>
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] mb-1" style={{ color: "#7c3aed" }}>
               📸 Session Calendar
             </p>
-            <p className="text-lg font-black text-slate-900">{monthName}</p>
+            <p className="text-lg font-black leading-none" style={{ color: "#1c1c20" }}>{monthName}</p>
           </div>
-          <div className="flex items-center gap-1">
-            <span className="text-xs font-bold text-slate-400 mr-1">{thisMonthSessions.length} session{thisMonthSessions.length !== 1 ? "s" : ""}</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-bold mr-1" style={{ color: "#8e8e95" }}>{thisMonthSessions.length} session{thisMonthSessions.length !== 1 ? "s" : ""}</span>
             {onAddEvent && (
               <button
                 onClick={() => onAddEvent()}
-                className="text-[10px] font-black px-2.5 py-1 rounded-lg transition-colors text-white mr-1"
+                className="text-[10px] font-black px-2.5 py-1.5 rounded-lg transition-all hover:opacity-90 text-white"
                 style={{ background: "linear-gradient(135deg,#a78bfa,#7c3aed)" }}
                 title="Add event">
                 + Add
               </button>
             )}
-            <button onClick={prevMonth} className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-500 hover:bg-violet-50 transition-colors font-bold">‹</button>
-            <button
-              onClick={() => { setViewYear(today.getFullYear()); setViewMonth(today.getMonth()); setSelected(null); }}
-              className="text-[10px] font-black px-2.5 py-1 rounded-lg transition-colors"
-              style={{ background: "rgba(124,58,237,0.08)", color: "#7c3aed" }}>
-              Today
-            </button>
-            <button onClick={nextMonth} className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-500 hover:bg-violet-50 transition-colors font-bold">›</button>
+            {/* Month nav — segmented control */}
+            <div className="flex items-center rounded-xl overflow-hidden" style={{ border: "1px solid rgba(28,28,32,0.08)", background: "rgba(28,28,32,0.03)" }}>
+              <button onClick={prevMonth} className="w-8 h-7 flex items-center justify-center font-bold transition-colors hover:bg-violet-50" style={{ color: "#55555c" }}>‹</button>
+              <button
+                onClick={() => { setViewYear(today.getFullYear()); setViewMonth(today.getMonth()); setSelected(null); }}
+                className="text-[10px] font-black px-2.5 h-7 transition-colors hover:bg-violet-50"
+                style={{ color: "#7c3aed", borderLeft: "1px solid rgba(28,28,32,0.07)", borderRight: "1px solid rgba(28,28,32,0.07)" }}>
+                Today
+              </button>
+              <button onClick={nextMonth} className="w-8 h-7 flex items-center justify-center font-bold transition-colors hover:bg-violet-50" style={{ color: "#55555c" }}>›</button>
+            </div>
           </div>
         </div>
 

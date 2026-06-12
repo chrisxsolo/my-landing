@@ -1,9 +1,36 @@
 "use client";
 import { supabase } from '@/lib/supabase'
 import Link from "next/link";
-import { useEffect, useRef, useState, useCallback, Suspense } from "react";
+import { useEffect, useRef, useState, useCallback, useSyncExternalStore, Suspense } from "react";
 import { useRouter } from "next/navigation";
 import { C } from "@/lib/colors";
+import { T, INQ_STATUS } from "@/app/admin/adminTheme";
+
+function subscribeReducedMotion(onChange:()=>void){
+  const mq=window.matchMedia("(prefers-reduced-motion: reduce)");
+  mq.addEventListener("change",onChange);
+  return()=>mq.removeEventListener("change",onChange);
+}
+
+// Animated integer counter for the home stat tiles (reduced-motion aware).
+function CountUpNumber({value,prefix=""}:{value:number;prefix?:string}){
+  const reduced=useSyncExternalStore(subscribeReducedMotion,()=>window.matchMedia("(prefers-reduced-motion: reduce)").matches,()=>false);
+  const [v,setV]=useState(0);
+  const prev=useRef(0);
+  useEffect(()=>{
+    if(reduced){prev.current=value;return;}
+    const from=prev.current;const t0=performance.now();const dur=500;let raf=0;
+    const tick=(now:number)=>{
+      const t=Math.min((now-t0)/dur,1);
+      const ease=1-Math.pow(1-t,3);
+      setV(Math.round(from+(value-from)*ease));
+      if(t<1)raf=requestAnimationFrame(tick);else prev.current=value;
+    };
+    raf=requestAnimationFrame(tick);
+    return()=>cancelAnimationFrame(raf);
+  },[value,reduced]);
+  return <>{prefix}{(reduced?value:v).toLocaleString("en-US")}</>;
+}
 
 // Stable inline editor — lives outside the IIFE so autoFocus isn't killed by re-renders
 function SessionTypeEditor({id,value,onSave,onCancel}:{id:number;value:string;onSave:(id:number,v:string)=>void;onCancel:()=>void}){
@@ -250,6 +277,7 @@ function AdminDashboard() {
   const [clientFilter,setClientFilter]=useState<"all"|"paid"|"unpaid">("all");
   const [clientSort,setClientSort]=useState<"recent_activity"|"newest_inquiry"|"oldest_inquiry"|"session_date"|"alpha"|"paid_recently">("recent_activity");
   const [inquirySort,setInquirySort]=useState<"needs_reply"|"newest"|"oldest"|"session_date"|"alpha"|"paid_recently">("needs_reply");
+  const [inquiryFilter,setInquiryFilter]=useState<"all"|"needs_reply"|"new"|"responded"|"archived"|"not_interested">("all");
   const [editingSessionType,setEditingSessionType]=useState<number|null>(null);
   const EMPTY_CLIENT={name:"",email:"",phone:"",session_type:"",session_date:"",message:""};
   const EMPTY_EVENT={name:"",email:"",phone:"",session_type:"",session_date:"",session_time:"",location:"",notes:"",payment_received:false};
@@ -1296,7 +1324,12 @@ function AdminDashboard() {
   }
 
   return(
-    <div className="min-h-screen font-sans" style={{background:"#f8f7ff"}}>
+    <div className="min-h-screen font-sans" style={{background:T.page}}>
+      <style>{`
+        @keyframes adm-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+        .adm-rise { animation: adm-rise 0.45s cubic-bezier(0.22,1,0.36,1) both; }
+        @media (prefers-reduced-motion: reduce) { .adm-rise { animation-duration: 0.01ms; } }
+      `}</style>
       {toast&&<div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 rounded-full text-white text-sm font-bold shadow-xl" style={{background:toast.ok?C.grad12:"#be123c"}}>{toast.msg}</div>}
 
       {addEventOpen&&(
@@ -1472,56 +1505,75 @@ function AdminDashboard() {
             return new Date(d+"T12:00:00").toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"}).toUpperCase();
           };
 
+          const pillStyle={background:T.panel,border:`1px solid ${T.border}`,color:T.inkSoft} as const;
+          const pillCls="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all hover:-translate-y-px hover:shadow-sm active:translate-y-0";
           return(
             <div>
-              {/* Greeting */}
-              <div className="mb-5">
-                <h1 className="text-2xl font-black text-slate-900">Hey Chris 👋</h1>
-                <p className="text-sm text-slate-400 mt-0.5">{now.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})}</p>
+              {/* Greeting + quick actions */}
+              <div className="adm-rise flex flex-wrap items-end justify-between gap-4 mb-6">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.22em] mb-1.5" style={{color:T.inkFaint}}>Soloxsnaps Studio</p>
+                  <h1 className="text-[26px] font-black leading-none" style={{color:T.ink}}>
+                    {now.getHours()<12?"Good morning":now.getHours()<17?"Good afternoon":"Good evening"}, Chris
+                  </h1>
+                  <p className="text-sm mt-2 font-medium" style={{color:T.inkSoft}}>
+                    {now.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})}
+                    <span style={{color:T.inkFaint}}> · </span>
+                    {pendingInquiries>0?(
+                      <button onClick={()=>setTab("inquiries")} className="font-bold hover:underline" style={{color:T.amber}}>
+                        {pendingInquiries} {pendingInquiries===1?"inquiry needs":"inquiries need"} a reply
+                      </button>
+                    ):(
+                      <span className="font-bold" style={{color:T.green}}>inbox clear ✓</span>
+                    )}
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button onClick={()=>{setTab("clients");setAddClientOpen(true);}}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all hover:-translate-y-px active:translate-y-0"
+                    style={{background:T.action,color:T.actionText,boxShadow:T.shadow}}>
+                    + New Client
+                  </button>
+                  <button onClick={()=>router.push("/admin/reminder-templates")} className={pillCls} style={pillStyle}>
+                    🔔 Reminders
+                  </button>
+                  <Link href="/admin/sessions" className={pillCls} style={pillStyle}>
+                    🗂️ Portal Sessions
+                  </Link>
+                  <a href={`webcal://soloxsnaps.com/api/calendar/sessions?token=${process.env.NEXT_PUBLIC_ICS_TOKEN??""}`} className={pillCls} style={pillStyle}>
+                    📅 Subscribe
+                  </a>
+                  <a href="/admin/availability" className={pillCls} style={pillStyle}>
+                    📆 Availability
+                  </a>
+                </div>
               </div>
 
-              {/* Quick actions bar */}
-              <div className="flex flex-wrap gap-2 mb-5 p-3 rounded-2xl border bg-white" style={{borderColor:"rgba(0,0,0,0.07)"}}>
-                <button onClick={()=>{setTab("clients");setAddClientOpen(true);}}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-white transition-all hover:opacity-90 active:scale-[0.98]"
-                  style={{background:C.grad12}}>
-                  + New Client
-                </button>
-                <button onClick={()=>router.push("/admin/reminder-templates")}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all hover:opacity-80"
-                  style={{background:"rgba(245,158,11,0.08)",color:"#d97706",border:"1px solid rgba(245,158,11,0.2)"}}>
-                  🔔 Reminder Templates
-                </button>
-                <Link href="/admin/sessions"
-                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all hover:opacity-80"
-                  style={{background:"rgba(99,102,241,0.08)",color:"#6366f1",border:"1px solid rgba(99,102,241,0.15)"}}>
-                  🗂️ Portal Sessions
-                </Link>
-                <a href={`webcal://soloxsnaps.com/api/calendar/sessions?token=${process.env.NEXT_PUBLIC_ICS_TOKEN??""}`}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all hover:opacity-80"
-                  style={{background:"rgba(16,185,129,0.08)",color:"#059669",border:"1px solid rgba(16,185,129,0.2)"}}>
-                  📅 Subscribe Calendar
-                </a>
-                <a href="/admin/availability"
-                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all hover:opacity-80"
-                  style={{background:"rgba(148,163,184,0.08)",color:"#64748b",border:"1px solid rgba(148,163,184,0.15)"}}>
-                  📆 Availability
-                </a>
-              </div>
-
-              {/* Stats */}
+              {/* Stats — clickable, animated */}
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 mb-5">
-                {[
-                  {label:"This Month",value:monthRevenue>0?`$${monthRevenue.toLocaleString("en-US",{minimumFractionDigits:0})}`:pendingInquiries>0?"—":"$0",sub:"revenue",accent:"#10b981",bg:"rgba(16,185,129,0.06)",border:"rgba(16,185,129,0.2)"},
-                  {label:"Confirmed",value:String(confirmedSessions),sub:"sessions booked",accent:C.p1,bg:C.p1_04,border:C.p1_20},
-                  {label:"New",value:String(newThisMonth),sub:"inquiries this month",accent:"#f59e0b",bg:"rgba(245,158,11,0.06)",border:"rgba(245,158,11,0.2)"},
-                  {label:"Clients",value:String(totalClients),sub:"total",accent:"#6366f1",bg:"rgba(99,102,241,0.06)",border:"rgba(99,102,241,0.2)"},
-                ].map(s=>(
-                  <div key={s.label} className="rounded-2xl p-4 border" style={{background:s.bg,borderColor:s.border}}>
-                    <p className="text-[10px] font-black uppercase tracking-widest mb-1" style={{color:s.accent}}>{s.label}</p>
-                    <p className="text-2xl font-black text-slate-900 leading-none">{s.value}</p>
-                    <p className="text-[11px] text-slate-400 mt-1">{s.sub}</p>
-                  </div>
+                {([
+                  {label:"Revenue",value:Math.round(monthRevenue),prefix:"$",sub:"collected this month",accent:T.green,go:"payments" as Tab},
+                  {label:"Booked",value:confirmedSessions,prefix:"",sub:"confirmed sessions",accent:T.violet,go:"clients" as Tab},
+                  {label:"New",value:newThisMonth,prefix:"",sub:"inquiries this month",accent:T.amber,go:"inquiries" as Tab},
+                  {label:"Clients",value:totalClients,prefix:"",sub:"all-time clients",accent:T.blue,go:"clients" as Tab},
+                ]).map((s,i)=>(
+                  <button key={s.label} onClick={()=>setTab(s.go)}
+                    className="adm-rise group rounded-2xl p-4 text-left transition-all duration-200 hover:-translate-y-0.5"
+                    style={{background:T.panel,border:`1px solid ${T.border}`,boxShadow:T.shadow,animationDelay:`${60+i*50}ms`}}
+                    onMouseEnter={e=>{e.currentTarget.style.background=T.panelHover;e.currentTarget.style.borderColor=T.borderStrong;}}
+                    onMouseLeave={e=>{e.currentTarget.style.background=T.panel;e.currentTarget.style.borderColor=T.border;}}>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-[10px] font-black uppercase tracking-[0.16em]" style={{color:T.inkSoft}}>{s.label}</p>
+                      <span className="w-1.5 h-1.5 rounded-full" style={{background:s.accent}}/>
+                    </div>
+                    <p className="text-[26px] font-black leading-none tabular-nums" style={{color:T.ink}}>
+                      <CountUpNumber value={s.value} prefix={s.prefix}/>
+                    </p>
+                    <p className="text-[11px] mt-1.5 font-medium flex items-center" style={{color:T.inkFaint}}>
+                      {s.sub}
+                      <span className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity text-[10px] font-bold" style={{color:T.inkSoft}}>Open →</span>
+                    </p>
+                  </button>
                 ))}
               </div>
 
@@ -1544,39 +1596,41 @@ function AdminDashboard() {
                 {/* Right column: upcoming + needs reply */}
                 <div className="space-y-4">
                   {/* Upcoming sessions */}
-                  <div className="rounded-2xl overflow-hidden border" style={{borderColor:"rgba(16,185,129,0.2)",background:"white"}}>
-                    <div className="h-[3px]" style={{background:"linear-gradient(90deg,#10b981,#059669)"}}/>
+                  <div className="adm-rise rounded-2xl overflow-hidden" style={{background:T.panel,border:`1px solid ${T.border}`,boxShadow:T.shadow,animationDelay:"160ms"}}>
                     <div className="p-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <p className="text-xs font-black uppercase tracking-widest text-emerald-600">📅 Upcoming</p>
-                        <button onClick={()=>setTab("clients")} className="text-[11px] font-bold text-slate-400 hover:text-slate-600">All →</button>
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-[10px] font-black uppercase tracking-[0.16em]" style={{color:T.green}}>Up Next</p>
+                        <button onClick={()=>setTab("clients")} className="text-[11px] font-bold transition-opacity hover:opacity-70" style={{color:T.inkFaint}}>All →</button>
                       </div>
                       {upcoming.length===0?(
-                        <p className="text-sm text-slate-400 py-1">No confirmed sessions yet.</p>
+                        <p className="text-sm py-1" style={{color:T.inkFaint}}>No confirmed sessions yet.</p>
                       ):(
-                        <div className="flex flex-col gap-1.5">
-                          {upcoming.map(inq=>{
+                        <div className="flex flex-col">
+                          {upcoming.map((inq,idx)=>{
                             const isToday=inq.session_date===todayStr;const isTomorrow=inq.session_date===tomorrowStr;
                             return(
-                              <div key={inq.id} className="flex items-center gap-2 p-2.5 rounded-xl" style={{background:"rgba(16,185,129,0.04)",border:"1px solid rgba(16,185,129,0.1)"}}>
-                                <div className="flex-shrink-0 w-[52px] text-center">
-                                  <span className={`text-[9px] font-black tracking-wide block leading-tight ${isToday?"text-rose-500":isTomorrow?"text-amber-500":"text-emerald-600"}`}>{dayLabel(inq.session_date!)}</span>
+                              <div key={inq.id} className="group flex items-center gap-2 py-2.5 -mx-2 px-2 rounded-xl transition-colors"
+                                   style={idx>0?{borderTop:`1px solid ${T.rowBorder}`}:undefined}
+                                   onMouseEnter={e=>{e.currentTarget.style.background=T.inset;}}
+                                   onMouseLeave={e=>{e.currentTarget.style.background="transparent";}}>
+                                <div className="flex-shrink-0 w-[52px]">
+                                  <span className="text-[9px] font-black tracking-wide block leading-tight" style={{color:isToday?T.red:isTomorrow?T.amber:T.inkFaint}}>{dayLabel(inq.session_date!)}</span>
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <p className="text-xs font-bold text-slate-900 truncate">{inq.name}</p>
-                                  <p className="text-[10px] text-slate-400 truncate">{inq.session_type||"Session"}</p>
+                                  <p className="text-xs font-bold truncate" style={{color:T.ink}}>{inq.name}</p>
+                                  <p className="text-[10px] truncate" style={{color:T.inkFaint}}>{inq.session_type||"Session"}</p>
                                 </div>
                                 <div className="flex items-center gap-1 flex-shrink-0">
-                                  {inq.payment_status==="paid"&&<span className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full">✓</span>}
+                                  {inq.payment_status==="paid"&&<span className="text-[9px] font-black px-1.5 py-0.5 rounded-full" style={{background:T.greenBg,color:T.green}}>✓</span>}
                                   <button onClick={()=>router.push(`/admin/reminders/${inq.id}`)}
                                     className="px-1.5 py-0.5 rounded-lg transition-all hover:opacity-80 text-[11px]"
-                                    style={{background:"rgba(245,158,11,0.08)",color:"#d97706"}} title="Send reminder">🔔</button>
+                                    style={{background:T.amberBg,color:T.amber}} title="Send reminder">🔔</button>
                                   <button onClick={()=>router.push(`/admin/reminders/${inq.id}?focus=thank-you`)}
-                                    className="px-1.5 py-0.5 rounded-lg text-white transition-all hover:opacity-80 text-[11px]"
-                                    style={{background:"linear-gradient(135deg,#9d6fe8,#e879a0)"}} title="Thank you">🙏</button>
+                                    className="px-1.5 py-0.5 rounded-lg transition-all hover:opacity-80 text-[11px]"
+                                    style={{background:T.violetBg,color:T.violet}} title="Thank you">🙏</button>
                                   <button onClick={()=>router.push(`/admin/conversation/${inq.id}`)}
                                     className="text-[10px] px-2 py-0.5 rounded-lg transition-all hover:opacity-80 font-bold"
-                                    style={{background:C.p1_08,color:C.p1}}>→</button>
+                                    style={{background:T.action,color:T.actionText}}>→</button>
                                 </div>
                               </div>
                             );
@@ -1598,30 +1652,32 @@ function AdminDashboard() {
                       const d=Math.round(h/24);return d===1?"1d ago":`${d}d ago`;
                     };
                     return(
-                      <div className="rounded-2xl overflow-hidden border" style={{borderColor:"rgba(245,158,11,0.3)",background:"white"}}>
-                        <div className="h-[3px]" style={{background:"linear-gradient(90deg,#f59e0b,#d97706)"}}/>
+                      <div className="adm-rise rounded-2xl overflow-hidden" style={{background:T.panel,border:`1px solid ${T.amberBorder}`,boxShadow:T.shadow,animationDelay:"220ms"}}>
                         <div className="p-4">
-                          <div className="flex items-center justify-between mb-3">
-                            <p className="text-xs font-black uppercase tracking-widest text-amber-600">📬 Needs Reply</p>
-                            <button onClick={()=>setTab("inquiries")} className="text-[11px] font-bold text-slate-400 hover:text-slate-600">
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-[10px] font-black uppercase tracking-[0.16em] flex items-center gap-1.5" style={{color:T.amber}}>
+                              <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{background:T.amber}}/>
+                              Needs Reply
+                            </p>
+                            <button onClick={()=>setTab("inquiries")} className="text-[11px] font-bold transition-opacity hover:opacity-70" style={{color:T.inkFaint}}>
                               {pendingInquiries>4?`+${pendingInquiries-4} more →`:"All →"}
                             </button>
                           </div>
                           <div className="flex flex-col gap-1.5">
                             {newInqs.map(inq=>(
-                              <div key={inq.id} className="flex items-center gap-2 p-2 rounded-xl border" style={{borderColor:"#fef3c7",background:"#fffbeb"}}>
+                              <div key={inq.id} className="flex items-center gap-2 p-2 rounded-xl" style={{background:T.amberBg}}>
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-1.5 flex-wrap">
-                                    <p className="text-xs font-bold text-slate-900">{inq.name}</p>
-                                    <span className="text-[9px] text-amber-600 font-bold">{hoursAgo(inq.created_at)}</span>
+                                    <p className="text-xs font-bold" style={{color:T.ink}}>{inq.name}</p>
+                                    <span className="text-[9px] font-bold" style={{color:T.amber}}>{hoursAgo(inq.created_at)}</span>
                                   </div>
-                                  <p className="text-[10px] text-slate-500 truncate">
+                                  <p className="text-[10px] truncate" style={{color:T.inkSoft}}>
                                     {inq.session_type||"Session"}{inq.date_in_mind?` · ${inq.date_in_mind}`:""}
                                   </p>
                                 </div>
                                 <button onClick={()=>setTab("inquiries")}
-                                  className="flex-shrink-0 text-[10px] font-bold px-2 py-1 rounded-lg text-white"
-                                  style={{background:"linear-gradient(135deg,#f59e0b,#d97706)"}}>
+                                  className="flex-shrink-0 text-[10px] font-bold px-2 py-1 rounded-lg transition-all hover:opacity-85"
+                                  style={{background:T.action,color:T.actionText}}>
                                   Reply →
                                 </button>
                               </div>
@@ -1650,36 +1706,35 @@ function AdminDashboard() {
                   return(name[0]??"?").toUpperCase();
                 };
                 return(
-                  <div className="rounded-2xl overflow-hidden border border-slate-200 bg-white">
-                    <div className="h-[3px]" style={{background:"linear-gradient(90deg,#6366f1,#8b5cf6)"}}/>
+                  <div className="adm-rise rounded-2xl overflow-hidden" style={{background:T.panel,border:`1px solid ${T.border}`,boxShadow:T.shadow,animationDelay:"260ms"}}>
                     <div className="p-4">
                       {/* Header */}
                       <div className="flex items-center justify-between mb-3">
-                        <p className="text-xs font-black uppercase tracking-widest text-slate-500">✉️ Client Emails</p>
+                        <p className="text-[10px] font-black uppercase tracking-[0.16em]" style={{color:T.inkSoft}}>✉️ Inbox</p>
                         <div className="flex items-center gap-3">
                           <button onClick={()=>setFreeComposeOpen(p=>!p)}
                             className="text-[11px] font-bold px-2.5 py-1 rounded-lg transition-all"
-                            style={freeComposeOpen?{background:C.grad12,color:"#fff"}:{background:C.p1_04,color:C.p1,border:`1px solid ${C.p1_20}`}}>
+                            style={freeComposeOpen?{background:T.action,color:T.actionText}:{background:T.inset,color:T.inkSoft,border:`1px solid ${T.border}`}}>
                             {freeComposeOpen?"✕ Cancel":"+ Compose"}
                           </button>
-                          <button onClick={fetchInbox} className="text-[11px] font-bold text-slate-400 hover:text-slate-600">Refresh</button>
+                          <button onClick={fetchInbox} className="text-[11px] font-bold transition-opacity hover:opacity-70" style={{color:T.inkFaint}}>↻ Refresh</button>
                         </div>
                       </div>
 
-                      <div className="mb-3 rounded-xl border" style={{borderColor:"rgba(99,102,241,0.12)",background:"rgba(99,102,241,0.04)"}}>
+                      <div className="mb-3 rounded-xl" style={{border:`1px solid ${T.border}`,background:T.inset}}>
                         <button
                           onClick={()=>setBlockedSendersOpen(o=>!o)}
                           className="w-full flex items-center justify-between gap-3 px-3 py-2 text-left"
                         >
-                          <span className="text-[11px] font-bold text-slate-500">
-                            🚫 Blocked senders {blockedSenders.length>0&&<span className="ml-1 rounded-full px-1.5 py-0.5 text-[10px]" style={{background:"rgba(99,102,241,0.12)",color:C.p1}}>{blockedSenders.length}</span>}
+                          <span className="text-[11px] font-bold" style={{color:T.inkSoft}}>
+                            🚫 Blocked senders {blockedSenders.length>0&&<span className="ml-1 rounded-full px-1.5 py-0.5 text-[10px]" style={{background:T.insetStrong,color:T.inkSoft}}>{blockedSenders.length}</span>}
                           </span>
-                          <span className="text-[10px] text-slate-400">{blockedSendersOpen?"▲ hide":"▼ show"}</span>
+                          <span className="text-[10px]" style={{color:T.inkFaint}}>{blockedSendersOpen?"▲ hide":"▼ show"}</span>
                         </button>
                         {blockedSendersOpen&&(
-                          <div className="px-3 pb-2.5 border-t" style={{borderColor:"rgba(99,102,241,0.1)"}}>
-                            <p className="text-[10px] text-slate-400 mt-2 mb-2">Dashboard-only. Hidden here, untouched in Gmail.</p>
-                            {blockedSendersLoading&&<span className="text-[10px] font-bold text-slate-400">Loading…</span>}
+                          <div className="px-3 pb-2.5" style={{borderTop:`1px solid ${T.rowBorder}`}}>
+                            <p className="text-[10px] mt-2 mb-2" style={{color:T.inkFaint}}>Dashboard-only. Hidden here, untouched in Gmail.</p>
+                            {blockedSendersLoading&&<span className="text-[10px] font-bold" style={{color:T.inkFaint}}>Loading…</span>}
                             {blockedSenders.length>0?(
                               <div className="flex flex-wrap gap-2">
                                 {blockedSenders.map(email=>(
@@ -1687,15 +1742,15 @@ function AdminDashboard() {
                                     key={email}
                                     onClick={()=>unblockInboxSender(email)}
                                     disabled={blockingSender===email}
-                                    className="rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] transition-all disabled:opacity-50"
-                                    style={{borderColor:C.p1_20,background:"white",color:C.p1}}
+                                    className="rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] transition-all disabled:opacity-50"
+                                    style={{border:`1px solid ${T.borderStrong}`,background:T.panelSolid,color:T.inkSoft}}
                                   >
                                     {blockingSender===email?`Restoring…`:`Unblock ${email}`}
                                   </button>
                                 ))}
                               </div>
                             ):(
-                              !blockedSendersLoading&&<p className="text-[10px] text-slate-400">No blocked senders.</p>
+                              !blockedSendersLoading&&<p className="text-[10px]" style={{color:T.inkFaint}}>No blocked senders.</p>
                             )}
                           </div>
                         )}
@@ -1703,20 +1758,20 @@ function AdminDashboard() {
 
                       {/* Freeform compose panel */}
                       {freeComposeOpen&&(
-                        <div className="mb-4 p-3 rounded-xl border border-slate-200 bg-slate-50 space-y-2">
-                          <p className="text-xs font-black text-slate-700">New Email</p>
-                          <input className="w-full px-3 py-2 rounded-lg text-sm outline-none border border-slate-200 bg-white text-slate-700" placeholder="To (email address)" value={freeComposeTo} onChange={e=>setFreeComposeTo(e.target.value)} style={{fontFamily:"inherit"}}/>
-                          <input className="w-full px-3 py-2 rounded-lg text-sm outline-none border border-slate-200 bg-white text-slate-700" placeholder="Subject" value={freeComposeSubject} onChange={e=>setFreeComposeSubject(e.target.value)} style={{fontFamily:"inherit"}}/>
-                          <textarea rows={4} className="w-full px-3 py-2 rounded-lg text-sm outline-none border border-slate-200 bg-white text-slate-700 resize-none" placeholder="Write your message — or jot rough notes and hit AI Polish…" value={freeComposeBody} onChange={e=>setFreeComposeBody(e.target.value)} style={{fontFamily:"inherit"}}/>
+                        <div className="mb-4 p-3 rounded-xl space-y-2" style={{border:`1px solid ${T.border}`,background:T.inset}}>
+                          <p className="text-xs font-black" style={{color:T.ink}}>New Email</p>
+                          <input className="w-full px-3 py-2 rounded-lg text-sm outline-none" placeholder="To (email address)" value={freeComposeTo} onChange={e=>setFreeComposeTo(e.target.value)} style={{fontFamily:"inherit",border:`1px solid ${T.border}`,background:T.panelSolid,color:T.ink}}/>
+                          <input className="w-full px-3 py-2 rounded-lg text-sm outline-none" placeholder="Subject" value={freeComposeSubject} onChange={e=>setFreeComposeSubject(e.target.value)} style={{fontFamily:"inherit",border:`1px solid ${T.border}`,background:T.panelSolid,color:T.ink}}/>
+                          <textarea rows={4} className="w-full px-3 py-2 rounded-lg text-sm outline-none resize-none" placeholder="Write your message — or jot rough notes and hit AI Polish…" value={freeComposeBody} onChange={e=>setFreeComposeBody(e.target.value)} style={{fontFamily:"inherit",border:`1px solid ${T.border}`,background:T.panelSolid,color:T.ink}}/>
                           <div className="flex gap-2">
                             <button onClick={polishFreeCompose} disabled={freeComposePolishing||!freeComposeBody.trim()}
                               className="flex-1 py-2 rounded-lg text-xs font-bold transition-all disabled:opacity-50"
-                              style={{background:C.p1_08,color:C.p1,border:`1px solid ${C.p1_20}`}}>
+                              style={{background:T.violetBg,color:T.violet,border:`1px solid ${T.violetBorder}`}}>
                               {freeComposePolishing?"Polishing…":"✨ AI Polish"}
                             </button>
                             <button onClick={sendFreeCompose} disabled={freeComposeSending||!freeComposeTo.trim()||!freeComposeBody.trim()}
-                              className="flex-1 py-2 rounded-lg text-xs font-bold text-white transition-all disabled:opacity-50"
-                              style={{background:C.grad12}}>
+                              className="flex-1 py-2 rounded-lg text-xs font-bold transition-all disabled:opacity-50"
+                              style={{background:T.action,color:T.actionText}}>
                               {freeComposeSending?"Sending…":"Send →"}
                             </button>
                           </div>
@@ -1725,9 +1780,9 @@ function AdminDashboard() {
 
                       {/* Thread list */}
                       {inboxLoading?(
-                        <p className="text-xs text-slate-400 py-2">Loading…</p>
+                        <p className="text-xs py-2" style={{color:T.inkFaint}}>Loading…</p>
                       ):inboxThreads.length===0&&!freeComposeOpen?(
-                        <p className="text-xs text-slate-400 py-2">No new client emails.</p>
+                        <p className="text-xs py-2" style={{color:T.inkFaint}}>No new client emails.</p>
                       ):(
                         <div className="flex flex-col gap-3">
                           {inboxThreads.map(t=>{
@@ -1737,33 +1792,36 @@ function AdminDashboard() {
                             const isSending=inboxSendLoading[t.threadId]??false;
                             const name=t.fromName||t.fromEmail;
                             return(
-                              <div key={t.threadId} className={`rounded-xl overflow-hidden ${t.isUnread?"border-2 border-violet-400 bg-violet-50 shadow-md shadow-violet-100":"border border-slate-200 bg-white"}`}>
+                              <div key={t.threadId} className="rounded-xl overflow-hidden transition-shadow"
+                                   style={t.isUnread
+                                     ?{background:T.panelSolid,border:`1px solid ${T.amberBorder}`,borderLeft:`3px solid ${T.amber}`,boxShadow:T.shadow}
+                                     :{background:T.panelSolid,border:`1px solid ${T.border}`}}>
                                 {/* Sender row */}
                                 <div className="flex items-center gap-3 px-3 pt-3 pb-2">
-                                  <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-black text-white flex-shrink-0"
-                                    style={{background:"linear-gradient(135deg,#6366f1,#8b5cf6)"}}>
+                                  <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-black flex-shrink-0"
+                                    style={{background:T.insetStrong,color:T.ink}}>
                                     {initials(name)}
                                   </div>
                                   <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2 flex-wrap">
-                                      <p className={`text-sm font-black ${t.isUnread?"text-violet-900":"text-slate-900"}`}>{name}</p>
-                                      {t.isUnread&&<span className="text-[10px] font-black text-white bg-violet-500 rounded-full px-1.5 py-0.5 leading-none">NEW</span>}
-                                      {t.messageCount>1&&<span className="text-[10px] font-bold text-slate-400">{t.messageCount} msgs</span>}
-                                      <span className={`text-[10px] font-bold ml-auto ${t.isUnread?"text-violet-600":"text-violet-500"}`}>{timeAgo(t.timestamp)}</span>
+                                      <p className="text-sm font-black" style={{color:T.ink}}>{name}</p>
+                                      {t.isUnread&&<span className="text-[10px] font-black rounded-full px-1.5 py-0.5 leading-none" style={{background:T.amber,color:T.actionText}}>NEW</span>}
+                                      {t.messageCount>1&&<span className="text-[10px] font-bold" style={{color:T.inkFaint}}>{t.messageCount} msgs</span>}
+                                      <span className="text-[10px] font-bold ml-auto" style={{color:t.isUnread?T.amber:T.inkFaint}}>{timeAgo(t.timestamp)}</span>
                                     </div>
-                                    <p className={`text-[11px] truncate ${t.isUnread?"text-violet-500":"text-slate-400"}`}>{t.fromEmail}</p>
+                                    <p className="text-[11px] truncate" style={{color:T.inkFaint}}>{t.fromEmail}</p>
                                   </div>
                                 </div>
                                 {/* Subject + snippet */}
                                 <div className="px-3 pb-3">
-                                  <p className={`text-xs font-bold mb-1 ${t.isUnread?"text-violet-800":"text-slate-700"}`}>{t.subject}</p>
-                                  <p className={`text-[12px] leading-relaxed line-clamp-3 ${t.isUnread?"text-violet-700":"text-slate-500"}`}>{decodeSnippet(t.snippet)}</p>
+                                  <p className="text-xs font-bold mb-1" style={{color:T.ink}}>{t.subject}</p>
+                                  <p className="text-[12px] leading-relaxed line-clamp-3" style={{color:T.inkSoft}}>{decodeSnippet(t.snippet)}</p>
                                 </div>
                                 {/* Action buttons */}
                                 {(()=>{
                                   const matchedInquiry=inquiries.find(i=>i.email.toLowerCase()===t.fromEmail.toLowerCase());
                                   return(
-                                    <div className="flex border-t border-slate-100">
+                                    <div className="flex" style={{borderTop:`1px solid ${T.rowBorder}`}}>
                                       <button
                                         onClick={async()=>{
                                           if(matchedInquiry){
@@ -1773,46 +1831,46 @@ function AdminDashboard() {
                                             if(created)router.push(`/admin/conversation/${created.id}`);
                                           }
                                         }}
-                                        className="flex-1 py-2 text-[11px] font-bold text-slate-600 hover:bg-slate-50 transition-colors">
+                                        className="flex-1 py-2 text-[11px] font-bold transition-colors hover:bg-black/[0.03]" style={{color:T.inkSoft}}>
                                         ✏️ Draft Reply
                                       </button>
-                                      <div className="w-px bg-slate-100"/>
+                                      <div className="w-px" style={{background:T.rowBorder}}/>
                                       <button
                                         onClick={()=>blockInboxSender(t)}
                                         disabled={blockingSender===t.fromEmail.toLowerCase()}
-                                        className="flex-1 py-2 text-[11px] font-bold text-rose-500 hover:bg-rose-50 transition-colors disabled:opacity-50"
+                                        className="flex-1 py-2 text-[11px] font-bold transition-colors hover:bg-black/[0.03] disabled:opacity-50" style={{color:T.red}}
                                       >
                                         {blockingSender===t.fromEmail.toLowerCase()?"Blocking…":"🚫 Block Sender"}
                                       </button>
-                                      <div className="w-px bg-slate-100"/>
+                                      <div className="w-px" style={{background:T.rowBorder}}/>
                                       <a href={`https://mail.google.com/mail/u/0/#inbox/${t.threadId}`}
                                         target="_blank" rel="noopener noreferrer"
-                                        className="flex-1 py-2 text-[11px] font-bold text-slate-600 hover:bg-slate-50 transition-colors text-center">
+                                        className="flex-1 py-2 text-[11px] font-bold transition-colors hover:bg-black/[0.03] text-center" style={{color:T.inkSoft}}>
                                         Open in Gmail ↗
                                       </a>
                                     </div>
                                   );
                                 })()}
                                 {isOpen&&(
-                                  <div className="border-t border-slate-100 p-3 bg-slate-50 space-y-2">
-                                    <textarea rows={2} className="w-full px-3 py-2 rounded-lg text-xs outline-none border border-slate-200 bg-white text-slate-600 resize-none" placeholder="Add context for the AI (optional) — e.g. 'Tell them SFSU spots are available May 18'" value={inboxContext[t.threadId]??""} onChange={e=>setInboxContext(p=>({...p,[t.threadId]:e.target.value}))} style={{fontFamily:"inherit"}}/>
+                                  <div className="p-3 space-y-2" style={{borderTop:`1px solid ${T.rowBorder}`,background:T.inset}}>
+                                    <textarea rows={2} className="w-full px-3 py-2 rounded-lg text-xs outline-none resize-none" placeholder="Add context for the AI (optional) — e.g. 'Tell them SFSU spots are available May 18'" value={inboxContext[t.threadId]??""} onChange={e=>setInboxContext(p=>({...p,[t.threadId]:e.target.value}))} style={{fontFamily:"inherit",border:`1px solid ${T.border}`,background:T.panelSolid,color:T.inkSoft}}/>
                                     <button onClick={()=>generateInboxDraft(t)} disabled={isGenerating}
                                       className="w-full py-2 rounded-lg text-xs font-bold transition-all disabled:opacity-50"
-                                      style={{background:C.p1_08,color:C.p1,border:`1px solid ${C.p1_20}`}}>
+                                      style={{background:T.violetBg,color:T.violet,border:`1px solid ${T.violetBorder}`}}>
                                       {isGenerating?"Drafting…":"✨ AI Draft"}
                                     </button>
                                     {draft&&(
                                       <>
-                                        <textarea rows={6} className="w-full px-3 py-2 rounded-lg text-xs outline-none border border-slate-200 bg-white text-slate-700 resize-y" value={draft} onChange={e=>setInboxDraft(p=>({...p,[t.threadId]:e.target.value}))} style={{fontFamily:"inherit"}}/>
+                                        <textarea rows={6} className="w-full px-3 py-2 rounded-lg text-xs outline-none resize-y" value={draft} onChange={e=>setInboxDraft(p=>({...p,[t.threadId]:e.target.value}))} style={{fontFamily:"inherit",border:`1px solid ${T.border}`,background:T.panelSolid,color:T.ink}}/>
                                         <div className="flex gap-2">
                                           <button onClick={()=>navigator.clipboard.writeText(draft).then(()=>showToast("Copied ✓"))}
                                             className="flex-1 py-2 rounded-lg text-xs font-bold transition-all"
-                                            style={{background:"rgba(148,163,184,0.12)",color:"#64748b"}}>
+                                            style={{background:T.neutralBg,color:T.inkSoft}}>
                                             Copy
                                           </button>
                                           <button onClick={()=>sendInboxReply(t)} disabled={isSending}
-                                            className="flex-1 py-2 rounded-lg text-xs font-bold text-white transition-all disabled:opacity-50"
-                                            style={{background:C.grad12}}>
+                                            className="flex-1 py-2 rounded-lg text-xs font-bold transition-all disabled:opacity-50"
+                                            style={{background:T.action,color:T.actionText}}>
                                             {isSending?"Sending…":"Send →"}
                                           </button>
                                         </div>
@@ -2385,53 +2443,15 @@ function AdminDashboard() {
 
         {/* ── INQUIRIES ── */}
         {tab==="inquiries"&&(
-          <div className="space-y-6">
+          <div className="space-y-4">
 
-            {/* ── Gmail connection card ── */}
-            <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
-              <div className="h-[3px]" style={{background:gmailConnected?"linear-gradient(90deg,#34d399,#10b981)":C.grad90_12}}/>
-              <div className="p-5 flex items-center justify-between gap-4 flex-wrap">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg flex-shrink-0"
-                       style={{background:gmailConnected?"rgba(16,185,129,0.1)":C.p1_08}}>
-                    {gmailConnected?"✉️":"🔗"}
-                  </div>
-                  <div>
-                    <p className="text-sm font-black text-slate-900">
-                      {gmailConnected?"Gmail Connected":"Connect Gmail"}
-                    </p>
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      {gmailConnected
-                        ?<>Sending as <span className="font-semibold text-slate-600">{gmailEmail}</span> · emails send directly from your inbox</>
-                        :"Link your Gmail to send replies without leaving this page"}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  {gmailConnected?(
-                    <button onClick={disconnectGmail}
-                      className="text-xs font-bold px-3 py-1.5 rounded-lg transition-all hover:opacity-80"
-                      style={{background:"rgba(239,68,68,0.08)",color:"#dc2626"}}>
-                      Disconnect
-                    </button>
-                  ):(
-                    <a href="/api/gmail/auth"
-                      className="text-xs font-bold px-4 py-2 rounded-xl transition-all hover:opacity-80 flex items-center gap-1.5"
-                      style={{background:C.grad12,color:"#fff"}}>
-                      Connect Gmail →
-                    </a>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Inquiry list */}
-            <div className="space-y-3">
-              {/* Header row */}
-              <div className="flex items-center justify-between px-1">
+            {/* ── Header / toolbar ── */}
+            <div className="adm-rise rounded-2xl p-4 sm:p-5" style={{background:T.panel,border:`1px solid ${T.border}`,boxShadow:T.shadow}}>
+              <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div>
-                  <h2 className="text-base font-black text-slate-900">Contact Inquiries</h2>
-                  <p className="text-xs font-medium text-slate-400 mt-0.5">
+                  <p className="text-[10px] font-black uppercase tracking-[0.22em] mb-1" style={{color:T.inkFaint}}>Client Work</p>
+                  <h2 className="text-xl font-black leading-none" style={{color:T.ink}}>Inquiries</h2>
+                  <p className="text-xs font-medium mt-1.5" style={{color:T.inkSoft}}>
                     {inquiries.filter(i=>i.status==="new").length} new · {inquiries.length} total
                   </p>
                 </div>
@@ -2439,8 +2459,8 @@ function AdminDashboard() {
                   <select
                     value={inquirySort}
                     onChange={e=>setInquirySort(e.target.value as typeof inquirySort)}
-                    className="text-[11px] font-bold px-2.5 py-1.5 rounded-lg outline-none cursor-pointer"
-                    style={{border:`1px solid ${C.p1_20}`,background:C.p1_04,color:C.p1,fontFamily:"inherit"}}>
+                    className="text-[11px] font-bold px-2.5 py-2 rounded-xl outline-none cursor-pointer"
+                    style={{border:`1px solid ${T.border}`,background:T.panelSolid,color:T.inkSoft,fontFamily:"inherit"}}>
                     <option value="needs_reply">Needs reply first</option>
                     <option value="paid_recently">Paid recently</option>
                     <option value="newest">Newest inquiry</option>
@@ -2449,62 +2469,129 @@ function AdminDashboard() {
                     <option value="alpha">A → Z</option>
                   </select>
                   <button onClick={syncPayments} disabled={syncLoading}
-                    className="text-xs font-bold px-3 py-1.5 rounded-lg transition-all hover:opacity-80 flex items-center gap-1.5 disabled:opacity-50"
-                    style={{background:"linear-gradient(135deg,#10b981,#059669)",color:"#fff"}}>
+                    className="text-xs font-bold px-3 py-2 rounded-xl transition-all hover:-translate-y-px disabled:opacity-50 flex items-center gap-1.5"
+                    style={{background:T.greenBg,color:T.green,border:`1px solid ${T.greenBorder}`}}>
                     {syncLoading?<><span className="animate-spin inline-block">◌</span> Scanning…</>:"💳 Sync Payments"}
                   </button>
                   <button onClick={syncTimeline} disabled={timelineSyncLoading}
-                    className="text-xs font-bold px-3 py-1.5 rounded-lg transition-all hover:opacity-80 flex items-center gap-1.5 disabled:opacity-50"
-                    style={{background:"linear-gradient(135deg,#7c3aed,#6d28d9)",color:"#fff"}}>
+                    className="text-xs font-bold px-3 py-2 rounded-xl transition-all hover:-translate-y-px disabled:opacity-50 flex items-center gap-1.5"
+                    style={{background:T.violetBg,color:T.violet,border:`1px solid ${T.violetBorder}`}}>
                     {timelineSyncLoading?<><span className="animate-spin inline-block">◌</span> Syncing…</>:"📬 Sync Timeline"}
                   </button>
                   <button onClick={fetchInquiries} disabled={inquiriesLoading}
-                    className="text-xs font-bold px-3 py-1.5 rounded-lg transition-all hover:opacity-80 flex items-center gap-1.5"
-                    style={{background:C.grad12,color:"#fff"}}>
+                    className="text-xs font-bold px-3 py-2 rounded-xl transition-all hover:-translate-y-px flex items-center gap-1.5"
+                    style={{background:T.action,color:T.actionText}}>
                     {inquiriesLoading?"Loading…":"↻ Refresh"}
                   </button>
                 </div>
               </div>
 
+              {/* Gmail status row */}
+              <div className="flex items-center justify-between gap-3 flex-wrap mt-4 pt-3" style={{borderTop:`1px solid ${T.rowBorder}`}}>
+                <p className="text-xs font-medium flex items-center gap-2" style={{color:T.inkSoft}}>
+                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{background:gmailConnected?T.green:T.inkFaint}}/>
+                  {gmailConnected
+                    ?<>Gmail connected — sending as <span className="font-bold" style={{color:T.ink}}>{gmailEmail}</span></>
+                    :"Gmail not connected — link it to send replies without leaving this page"}
+                </p>
+                {gmailConnected?(
+                  <button onClick={disconnectGmail}
+                    className="text-[11px] font-bold px-2.5 py-1 rounded-lg transition-all hover:opacity-80"
+                    style={{background:T.redBg,color:T.red}}>
+                    Disconnect
+                  </button>
+                ):(
+                  <a href="/api/gmail/auth"
+                    className="text-[11px] font-bold px-3 py-1.5 rounded-lg transition-all hover:opacity-85"
+                    style={{background:T.action,color:T.actionText}}>
+                    Connect Gmail →
+                  </a>
+                )}
+              </div>
+            </div>
+
+            {/* ── Filter chips ── */}
+            {(()=>{
+              const needsReplyFn=(i:Inquiry)=>!i.reply_sent_at&&i.status!=="archived"&&i.status!=="not_interested"&&i.status!=="responded"&&i.status!=="manual";
+              const chips=[
+                {key:"all" as const,label:"All",count:inquiries.length},
+                {key:"needs_reply" as const,label:"Needs reply",count:inquiries.filter(needsReplyFn).length},
+                {key:"new" as const,label:"New",count:inquiries.filter(i=>i.status==="new").length},
+                {key:"responded" as const,label:"Responded",count:inquiries.filter(i=>i.status==="responded").length},
+                {key:"archived" as const,label:"Archived",count:inquiries.filter(i=>i.status==="archived").length},
+                {key:"not_interested" as const,label:"Not interested",count:inquiries.filter(i=>i.status==="not_interested").length},
+              ];
+              return(
+                <div className="adm-rise flex gap-1.5 flex-wrap" style={{animationDelay:"80ms"}}>
+                  {chips.map(c=>{
+                    const active=inquiryFilter===c.key;
+                    return(
+                      <button key={c.key} onClick={()=>setInquiryFilter(c.key)}
+                        className="text-[11px] font-bold px-3 py-1.5 rounded-full transition-all"
+                        style={active
+                          ?{background:T.action,color:T.actionText}
+                          :{background:T.panel,color:T.inkSoft,border:`1px solid ${T.border}`}}>
+                        {c.label} <span style={{color:active?"rgba(255,255,255,0.65)":T.inkFaint}}>{c.count}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+
+            {/* Inquiry list */}
+            <div className="space-y-3">
+
               {/* Sync result banner */}
               {(syncResult!==null||syncMsg)&&(
                 <div className="rounded-xl px-4 py-3 text-sm"
-                     style={syncResult?.length?{background:"rgba(16,185,129,0.08)",border:"1px solid rgba(16,185,129,0.2)"}:{background:"rgba(148,163,184,0.08)",border:"1px solid rgba(148,163,184,0.2)"}}>
-                  {syncMsg&&<p className="text-slate-500 text-xs">{syncMsg}</p>}
+                     style={syncResult?.length?{background:T.greenBg,border:`1px solid ${T.greenBorder}`}:{background:T.inset,border:`1px solid ${T.border}`}}>
+                  {syncMsg&&<p className="text-xs" style={{color:T.inkSoft}}>{syncMsg}</p>}
                   {syncResult?.length?(
                     <div className="space-y-1">
-                      <p className="text-xs font-black text-emerald-600 mb-2">✓ {syncResult.length} payment{syncResult.length===1?"":"s"} found — review &amp; approve in the Payments tab</p>
+                      <p className="text-xs font-black mb-2" style={{color:T.green}}>✓ {syncResult.length} payment{syncResult.length===1?"":"s"} found — review &amp; approve in the Payments tab</p>
                       {syncResult.map((r,i)=>(
-                        <div key={i} className="flex items-center gap-3 text-xs text-slate-600 flex-wrap">
+                        <div key={i} className="flex items-center gap-3 text-xs flex-wrap" style={{color:T.inkSoft}}>
                           <span className="font-semibold">{r.name}</span>
-                          {r.email&&<span className="text-slate-400">{r.email}</span>}
-                          {r.amount&&<span className="text-emerald-600 font-bold">{r.amount}</span>}
-                          {r.method&&<span className="text-slate-400">via {r.method}</span>}
-                          {r.paidAt&&<span className="text-slate-400">{new Date(r.paidAt).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}</span>}
-                          {r.paymentType&&r.paymentType!=="deposit_1"&&<span className="text-amber-600 font-semibold capitalize">{r.paymentType.replace("_"," ")}</span>}
-                          {r.orphan&&<span className="text-orange-500 font-bold">no inquiry</span>}
+                          {r.email&&<span style={{color:T.inkFaint}}>{r.email}</span>}
+                          {r.amount&&<span className="font-bold" style={{color:T.green}}>{r.amount}</span>}
+                          {r.method&&<span style={{color:T.inkFaint}}>via {r.method}</span>}
+                          {r.paidAt&&<span style={{color:T.inkFaint}}>{new Date(r.paidAt).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}</span>}
+                          {r.paymentType&&r.paymentType!=="deposit_1"&&<span className="font-semibold capitalize" style={{color:T.amber}}>{r.paymentType.replace("_"," ")}</span>}
+                          {r.orphan&&<span className="font-bold" style={{color:T.red}}>no inquiry</span>}
                         </div>
                       ))}
                     </div>
                   ):syncResult?.length===0&&!syncMsg?(
-                    <p className="text-slate-500 text-xs">No new Pixieset payments found in Gmail.</p>
+                    <p className="text-xs" style={{color:T.inkSoft}}>No new Pixieset payments found in Gmail.</p>
                   ):null}
                 </div>
               )}
 
               {inquiriesLoading?(
-                <div className="text-center py-16 text-slate-400 text-sm bg-white rounded-2xl border border-slate-100">Loading inquiries…</div>
+                <div className="text-center py-16 text-sm rounded-2xl" style={{color:T.inkFaint,background:T.panel,border:`1px solid ${T.border}`}}>Loading inquiries…</div>
               ):inquiries.length===0?(
-                <div className="text-center py-16 bg-white rounded-2xl border border-slate-100">
+                <div className="text-center py-16 rounded-2xl" style={{background:T.panel,border:`1px solid ${T.border}`}}>
                   <p className="text-2xl mb-2">📭</p>
-                  <p className="text-slate-500 font-semibold">No inquiries yet</p>
-                  <p className="text-xs text-slate-400 mt-1">New contact form submissions will appear here</p>
+                  <p className="font-semibold" style={{color:T.inkSoft}}>No inquiries yet</p>
+                  <p className="text-xs mt-1" style={{color:T.inkFaint}}>New contact form submissions will appear here</p>
                 </div>
               ):(()=>{
                 const needsReply=(i:Inquiry)=>!i.reply_sent_at&&i.status!=="archived"&&i.status!=="not_interested"&&i.status!=="responded"&&i.status!=="manual";
                 const hasUnread=(i:Inquiry)=>!!inboxThreads.find(t=>t.fromEmail.toLowerCase()===i.email.toLowerCase()&&t.isUnread);
                 const todayMs=new Date().setHours(0,0,0,0);
-                const sortedInquiries=[...inquiries].sort((a,b)=>{
+                const filteredInquiries=inquiries.filter(i=>{
+                  if(inquiryFilter==="all")return true;
+                  if(inquiryFilter==="needs_reply")return needsReply(i);
+                  return i.status===inquiryFilter;
+                });
+                if(filteredInquiries.length===0)return(
+                  <div className="text-center py-12 rounded-2xl" style={{background:T.panel,border:`1px solid ${T.border}`}}>
+                    <p className="text-sm font-semibold" style={{color:T.inkSoft}}>Nothing matches this filter</p>
+                    <button onClick={()=>setInquiryFilter("all")} className="text-xs font-bold mt-1 hover:underline" style={{color:T.inkFaint}}>Show all →</button>
+                  </div>
+                );
+                const sortedInquiries=[...filteredInquiries].sort((a,b)=>{
                   if(inquirySort==="needs_reply"){
                     const aPriority=(hasUnread(a)?0:1)*2+(needsReply(a)?0:1);
                     const bPriority=(hasUnread(b)?0:1)*2+(needsReply(b)?0:1);
@@ -2532,47 +2619,54 @@ function AdminDashboard() {
                 });
                 return sortedInquiries.map(inq=>{
                   const isOpen=editingInquiry?.id===inq.id;
-                  const statusColor=inq.status==="new"?"#10b981":inq.status==="responded"?"#3b82f6":inq.status==="not_interested"?"#ef4444":"#94a3b8";
-                  const statusBg=inq.status==="new"?"rgba(16,185,129,0.08)":inq.status==="responded"?"rgba(59,130,246,0.08)":inq.status==="not_interested"?"rgba(239,68,68,0.08)":"rgba(148,163,184,0.08)";
+                  const statusMeta=INQ_STATUS[inq.status as keyof typeof INQ_STATUS]??INQ_STATUS.archived;
                   const hasDraft=!!drafts[inq.id];
                   const unreadThread=inboxThreads.find(t=>t.fromEmail.toLowerCase()===inq.email.toLowerCase()&&t.isUnread&&!dismissedThreadIds.has(t.threadId));
 
                   const highlighted=!!unreadThread||needsReply(inq);
                   return(
                     <div key={inq.id}
-                         className={`rounded-2xl overflow-hidden transition-shadow hover:shadow-md ${highlighted?"border-2 shadow-md shadow-amber-100":"bg-white border border-slate-100"}`}
-                         style={highlighted?{background:"#fffbeb"}:{borderLeftWidth:"3px",borderLeftStyle:"solid",borderLeftColor:statusColor,background:"#fff"}}>
+                         className="rounded-2xl overflow-hidden transition-shadow hover:shadow-md"
+                         style={highlighted
+                           ?{background:T.panelSolid,border:`1px solid ${T.amberBorder}`,borderLeft:`3px solid ${T.amber}`,boxShadow:T.shadow}
+                           :{background:T.panelSolid,border:`1px solid ${T.border}`,borderLeft:`3px solid ${statusMeta.color}`}}>
 
                       {/* ── Card header (always visible) ── */}
                       <div className="flex items-stretch">
                         {/* Clickable info area — div so links inside remain functional */}
                         <div
                           onClick={()=>setEditingInquiry(isOpen?null:inq)}
-                          className={`flex-1 min-w-0 p-4 sm:p-5 transition-colors duration-150 cursor-pointer ${highlighted?"hover:bg-amber-50/70":"hover:bg-slate-50/70"}`}>
+                          className="flex-1 min-w-0 p-4 sm:p-5 transition-colors duration-150 cursor-pointer hover:bg-black/[0.02]">
                           <div className="flex items-center gap-2 flex-wrap mb-1">
                             <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full"
-                                  style={{background:statusBg,color:statusColor}}>
-                              {inq.status==="new"?"● New":inq.status==="responded"?"✓ Responded":inq.status==="not_interested"?"✕ Not Interested":"○ Archived"}
+                                  style={{background:statusMeta.bg,color:statusMeta.color}}>
+                              {statusMeta.label}
                             </span>
+                            {highlighted&&!unreadThread&&(
+                              <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full"
+                                    style={{background:T.amberBg,color:T.amber}}>
+                                Needs reply
+                              </span>
+                            )}
                             {unreadThread&&(
                               <span className="flex items-center gap-0.5">
                                 <button
                                   onClick={e=>{e.stopPropagation();router.push(`/admin/conversation/${inq.id}`);}}
                                   className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-l-full animate-pulse"
-                                  style={{background:"#f59e0b",color:"#fff"}}>
+                                  style={{background:T.amber,color:T.actionText}}>
                                   ✉ New Reply
                                 </button>
                                 <button
                                   onClick={e=>{e.stopPropagation();dismissUnreadThread(unreadThread.threadId);}}
                                   className="flex items-center justify-center text-[10px] font-black px-1.5 py-0.5 rounded-r-full leading-none"
                                   title="Dismiss new reply"
-                                  style={{background:"#ef4444",color:"#fff"}}>
+                                  style={{background:T.red,color:T.actionText}}>
                                   ✕
                                 </button>
                               </span>
                             )}
-                            <p className="text-sm font-black text-slate-900">{inq.name}</p>
-                            <p className="text-xs text-slate-400">
+                            <p className="text-sm font-black" style={{color:T.ink}}>{inq.name}</p>
+                            <p className="text-xs" style={{color:T.inkFaint}}>
                               {new Date(inq.created_at).toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"})}
                             </p>
                           </div>
@@ -2580,8 +2674,8 @@ function AdminDashboard() {
                           <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs mb-2.5">
                             <a href={`mailto:${inq.email}`}
                                onClick={e=>e.stopPropagation()}
-                               className="font-semibold hover:underline"
-                               style={{color:C.p1}}>{inq.email}</a>
+                               className="font-semibold underline decoration-dotted underline-offset-2 hover:opacity-70 transition-opacity"
+                               style={{color:T.inkSoft}}>{inq.email}</a>
                             {inq.phone&&(
                               <>
                                 <span className="text-slate-300">·</span>
@@ -2690,15 +2784,15 @@ function AdminDashboard() {
                           {/* Message preview */}
                           {!isOpen?(
                             <div>
-                              <p className="text-xs text-slate-700 leading-relaxed line-clamp-2 font-medium">
+                              <p className="text-xs leading-relaxed line-clamp-2 font-medium" style={{color:T.inkSoft}}>
                                 &ldquo;{inq.message}&rdquo;
                               </p>
                               {inq.message.length>120&&(
-                                <p className="text-[10px] font-bold mt-1" style={{color:C.p1}}>Read full message ↓</p>
+                                <p className="text-[10px] font-bold mt-1" style={{color:T.inkFaint}}>Read full message ↓</p>
                               )}
                             </div>
                           ):(
-                            <p className="text-[10px] font-bold" style={{color:C.p1}}>▲ Collapse</p>
+                            <p className="text-[10px] font-bold" style={{color:T.inkFaint}}>▲ Collapse</p>
                           )}
                           {/* Quick status buttons — always visible */}
                           <div className="flex items-center gap-1 mt-2 flex-wrap" onClick={e=>e.stopPropagation()}>
@@ -2707,8 +2801,8 @@ function AdminDashboard() {
                                 onClick={()=>updateInquiryStatus(inq.id,s)}
                                 className="text-[10px] font-bold px-2 py-0.5 rounded-lg transition-all hover:opacity-80"
                                 style={inq.status===s
-                                  ?{background:s==="new"?"rgba(16,185,129,0.15)":s==="responded"?"rgba(59,130,246,0.12)":s==="not_interested"?"rgba(239,68,68,0.15)":"rgba(148,163,184,0.15)",color:s==="new"?"#10b981":s==="responded"?"#3b82f6":s==="not_interested"?"#ef4444":"#94a3b8",fontWeight:800}
-                                  :{background:"rgba(0,0,0,0.04)",color:"#94a3b8"}}>
+                                  ?{background:INQ_STATUS[s].bg,color:INQ_STATUS[s].color,fontWeight:800,boxShadow:`inset 0 0 0 1px ${INQ_STATUS[s].color}33`}
+                                  :{background:T.inset,color:T.inkFaint}}>
                                 {s==="new"?"● New":s==="responded"?"✓ Replied":s==="not_interested"?"✕ Not Int.":"○ Archive"}
                               </button>
                             ))}
@@ -2716,12 +2810,12 @@ function AdminDashboard() {
                         </div>
 
                         {/* Right: action buttons */}
-                        <div className="flex flex-col justify-center gap-2 p-3 sm:p-4 flex-shrink-0 border-l border-slate-100">
+                        <div className="flex flex-col justify-center gap-2 p-3 sm:p-4 flex-shrink-0" style={{borderLeft:`1px solid ${T.rowBorder}`}}>
                           {/* Primary: open full conversation page */}
                           <a href={`/admin/conversation/${inq.id}`}
                             onClick={e=>e.stopPropagation()}
-                            className="text-xs font-bold px-3 py-2 rounded-xl transition-all hover:opacity-80 flex items-center gap-1.5 whitespace-nowrap text-center justify-center"
-                            style={{background:C.grad12,color:"#fff"}}>
+                            className="text-xs font-bold px-3 py-2 rounded-xl transition-all hover:opacity-85 flex items-center gap-1.5 whitespace-nowrap text-center justify-center"
+                            style={{background:T.action,color:T.actionText}}>
                             💬 Open Thread
                           </a>
                           {/* Secondary: quick draft without leaving admin */}
@@ -2729,7 +2823,7 @@ function AdminDashboard() {
                             onClick={e=>{e.stopPropagation();if(!isOpen)setEditingInquiry(inq);generateDraft(inq);}}
                             disabled={draftLoading===inq.id}
                             className="text-xs font-bold px-3 py-2 rounded-xl transition-all hover:opacity-80 disabled:opacity-50 flex items-center gap-1.5 whitespace-nowrap justify-center"
-                            style={{background:C.p1_08,color:C.p1}}>
+                            style={{background:T.violetBg,color:T.violet,border:`1px solid ${T.violetBorder}`}}>
                             {draftLoading===inq.id?(
                               <><span className="animate-spin inline-block">◌</span> Writing…</>
                             ):hasDraft?(
@@ -2742,7 +2836,7 @@ function AdminDashboard() {
                             <button
                               onClick={e=>{e.stopPropagation();if(!isOpen)setEditingInquiry(inq);copyDraft(inq.id);}}
                               className="text-[11px] font-bold px-3 py-1.5 rounded-xl transition-all hover:opacity-80 flex items-center gap-1 justify-center"
-                              style={draftCopied===inq.id?{background:"#10b981",color:"#fff"}:{background:C.p1_08,color:C.p1}}>
+                              style={draftCopied===inq.id?{background:T.green,color:T.actionText}:{background:T.inset,color:T.inkSoft}}>
                               {draftCopied===inq.id?"✓ Copied":"📋 Copy"}
                             </button>
                           )}
@@ -2751,41 +2845,41 @@ function AdminDashboard() {
 
                       {/* ── Expanded detail panel ── */}
                       {isOpen&&(
-                        <div className="border-t border-slate-100">
+                        <div style={{borderTop:`1px solid ${T.rowBorder}`}}>
 
                           {/* Session details */}
                           {(inq.school||inq.instagram||inq.people||inq.preferred_time||inq.location)&&(
-                            <div className="p-4 sm:p-5" style={{background:"rgba(248,250,252,0.6)"}}>
-                              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Session Details</p>
+                            <div className="p-4 sm:p-5" style={{background:T.inset}}>
+                              <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{color:T.inkFaint}}>Session Details</p>
                               <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-xs">
-                                {inq.school&&<div><span className="font-bold text-slate-400 uppercase tracking-wide text-[10px]">School / Campus </span><span className="text-slate-700 font-medium">{inq.school}</span></div>}
-                                {inq.people&&<div><span className="font-bold text-slate-400 uppercase tracking-wide text-[10px]">People </span><span className="text-slate-700 font-medium">{inq.people}</span></div>}
-                                {inq.preferred_time&&<div><span className="font-bold text-slate-400 uppercase tracking-wide text-[10px]">Preferred time </span><span className="text-slate-700 font-medium">{fmt12h(inq.preferred_time)}</span></div>}
-                                {inq.location&&<div><span className="font-bold text-slate-400 uppercase tracking-wide text-[10px]">Desired location </span><span className="text-slate-700 font-medium">{inq.location}</span></div>}
-                                {inq.instagram&&<div><span className="font-bold text-slate-400 uppercase tracking-wide text-[10px]">Instagram </span><span className="text-slate-700 font-medium">@{inq.instagram.replace(/^@/,"")}</span></div>}
+                                {inq.school&&<div><span className="font-bold uppercase tracking-wide text-[10px]" style={{color:T.inkFaint}}>School / Campus </span><span className="font-medium" style={{color:T.ink}}>{inq.school}</span></div>}
+                                {inq.people&&<div><span className="font-bold uppercase tracking-wide text-[10px]" style={{color:T.inkFaint}}>People </span><span className="font-medium" style={{color:T.ink}}>{inq.people}</span></div>}
+                                {inq.preferred_time&&<div><span className="font-bold uppercase tracking-wide text-[10px]" style={{color:T.inkFaint}}>Preferred time </span><span className="font-medium" style={{color:T.ink}}>{fmt12h(inq.preferred_time)}</span></div>}
+                                {inq.location&&<div><span className="font-bold uppercase tracking-wide text-[10px]" style={{color:T.inkFaint}}>Desired location </span><span className="font-medium" style={{color:T.ink}}>{inq.location}</span></div>}
+                                {inq.instagram&&<div><span className="font-bold uppercase tracking-wide text-[10px]" style={{color:T.inkFaint}}>Instagram </span><span className="font-medium" style={{color:T.ink}}>@{inq.instagram.replace(/^@/,"")}</span></div>}
                               </div>
                             </div>
                           )}
 
                           {/* Full message */}
-                          <div className="p-4 sm:p-5 border-t border-slate-100" style={{background:"rgba(248,250,252,0.6)"}}>
-                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Message</p>
-                            <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{inq.message}</p>
+                          <div className="p-4 sm:p-5" style={{background:T.inset,borderTop:`1px solid ${T.rowBorder}`}}>
+                            <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{color:T.inkFaint}}>Message</p>
+                            <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{color:T.ink}}>{inq.message}</p>
                           </div>
 
                           {/* ── AI Draft section ── */}
-                          <div className="p-4 sm:p-5 space-y-4 border-t border-slate-100">
+                          <div className="p-4 sm:p-5 space-y-4" style={{borderTop:`1px solid ${T.rowBorder}`}}>
                             {/* Section header */}
                             <div className="flex items-center justify-between gap-3">
                               <div className="flex items-center gap-2">
-                                <div className="w-6 h-6 rounded-lg flex items-center justify-center text-xs" style={{background:C.grad12}}>✦</div>
-                                <p className="text-sm font-black text-slate-900">AI Draft Reply</p>
+                                <div className="w-6 h-6 rounded-lg flex items-center justify-center text-xs" style={{background:T.violetBg,color:T.violet}}>✦</div>
+                                <p className="text-sm font-black" style={{color:T.ink}}>AI Draft Reply</p>
                               </div>
                               <button
                                 onClick={()=>generateDraft(inq)}
                                 disabled={draftLoading===inq.id}
                                 className="text-xs font-bold px-3 py-1.5 rounded-lg transition-all hover:opacity-80 disabled:opacity-50 flex items-center gap-1.5"
-                                style={{background:C.p1_08,color:C.p1}}>
+                                style={{background:T.violetBg,color:T.violet}}>
                                 {draftLoading===inq.id?<><span className="animate-spin inline-block">◌</span> Writing…</>:"↻ Regenerate"}
                               </button>
                             </div>
@@ -2798,13 +2892,13 @@ function AdminDashboard() {
                                     value={drafts[inq.id]}
                                     onChange={e=>setDrafts(p=>({...p,[inq.id]:e.target.value}))}
                                     rows={9}
-                                    className="w-full text-slate-700 leading-relaxed rounded-xl p-4 resize-none sm:resize-y outline-none"
-                                    style={{border:`1px solid ${C.p1_20}`,background:C.p1_04,fontFamily:"inherit",fontSize:"16px"}}
+                                    className="w-full leading-relaxed rounded-xl p-4 resize-none sm:resize-y outline-none"
+                                    style={{border:`1px solid ${T.border}`,background:T.panelSolid,color:T.ink,fontFamily:"inherit",fontSize:"16px"}}
                                   />
                                   <button
                                     onClick={()=>copyDraft(inq.id)}
                                     className="absolute top-2.5 right-2.5 text-xs font-bold px-2.5 py-1 rounded-lg transition-all flex items-center gap-1"
-                                    style={draftCopied===inq.id?{background:"#10b981",color:"#fff"}:{background:"rgba(255,255,255,0.95)",color:C.p1,border:`1px solid ${C.p1_20}`,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
+                                    style={draftCopied===inq.id?{background:T.green,color:T.actionText}:{background:T.panelSolid,color:T.inkSoft,border:`1px solid ${T.border}`,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
                                     {draftCopied===inq.id?"✓ Copied":"📋 Copy"}
                                   </button>
                                 </div>
@@ -2813,31 +2907,31 @@ function AdminDashboard() {
                                   <button
                                     onClick={()=>openCompose(inq)}
                                     className="w-full text-sm font-bold py-2.5 rounded-xl transition-all hover:opacity-90 flex items-center justify-center gap-2"
-                                    style={{background:"linear-gradient(135deg,#10b981,#059669)",color:"#fff"}}>
+                                    style={{background:T.action,color:T.actionText}}>
                                     ✉️ Send from Gmail
                                   </button>
                                 ):(
                                   <div className="flex items-center justify-between flex-wrap gap-2">
-                                    <p className="text-[11px] text-slate-400 font-medium">Copy → paste into Gmail → send to {inq.email}</p>
+                                    <p className="text-[11px] font-medium" style={{color:T.inkFaint}}>Copy → paste into Gmail → send to {inq.email}</p>
                                     <a href={`mailto:${inq.email}?subject=Re: Your inquiry&body=${encodeURIComponent(drafts[inq.id])}`}
                                        className="text-[11px] font-bold px-2.5 py-1 rounded-lg transition-all hover:opacity-80"
-                                       style={{background:C.p2_08,color:C.p2}}>
+                                       style={{background:T.inset,color:T.inkSoft}}>
                                       Open in Gmail →
                                     </a>
                                   </div>
                                 )}
                               </div>
                             ):(
-                              <div className="rounded-xl p-6 text-center" style={{border:`1px dashed ${C.p1_20}`,background:C.p1_04}}>
-                                <p className="text-sm text-slate-500">Click <strong>✦ Draft Reply</strong> to generate a personalized email</p>
-                                <p className="text-xs text-slate-400 mt-1">Uses your Obsidian vault + live availability data</p>
+                              <div className="rounded-xl p-6 text-center" style={{border:`1px dashed ${T.borderStrong}`,background:T.inset}}>
+                                <p className="text-sm" style={{color:T.inkSoft}}>Click <strong>✦ Quick Draft</strong> to generate a personalized email</p>
+                                <p className="text-xs mt-1" style={{color:T.inkFaint}}>Uses your Obsidian vault + live availability data</p>
                               </div>
                             )}
 
                             {/* Refine row */}
                             {hasDraft&&(
                               <div className="space-y-2">
-                                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Refine draft</p>
+                                <p className="text-[10px] font-bold uppercase tracking-widest" style={{color:T.inkFaint}}>Refine draft</p>
                                 <div className="flex gap-2">
                                   <input
                                     type="text"
@@ -2846,13 +2940,13 @@ function AdminDashboard() {
                                     onKeyDown={e=>{if(e.key==="Enter"&&draftFeedback[inq.id]?.trim())generateDraft(inq,draftFeedback[inq.id]);}}
                                     placeholder='e.g. "be more direct" · "remove the pricing mention" · "add turnaround time"'
                                     className="flex-1 px-3 py-2.5 rounded-xl outline-none"
-                                    style={{border:`1px solid ${C.p1_20}`,background:"#fff",color:"#334155",fontFamily:"inherit",fontSize:"16px"}}
+                                    style={{border:`1px solid ${T.border}`,background:T.panelSolid,color:T.ink,fontFamily:"inherit",fontSize:"16px"}}
                                   />
                                   <button
                                     onClick={()=>{if(draftFeedback[inq.id]?.trim())generateDraft(inq,draftFeedback[inq.id]);}}
                                     disabled={!draftFeedback[inq.id]?.trim()||draftLoading===inq.id}
                                     className="text-xs font-bold px-4 py-2.5 rounded-xl transition-all hover:opacity-80 disabled:opacity-30 flex-shrink-0"
-                                    style={{background:C.grad12,color:"#fff"}}>
+                                    style={{background:T.action,color:T.actionText}}>
                                     {draftLoading===inq.id?"…":"Refine"}
                                   </button>
                                 </div>
@@ -2860,7 +2954,7 @@ function AdminDashboard() {
                                   <button
                                     onClick={()=>saveRuleFromFeedback(inq.id)}
                                     className="text-[11px] font-bold px-3 py-1.5 rounded-lg transition-all hover:opacity-80 flex items-center gap-1.5"
-                                    style={ruleSaved===inq.id?{background:"#10b981",color:"#fff"}:{background:"rgba(255,255,255,0.9)",color:C.p1,border:`1px solid ${C.p1_20}`}}>
+                                    style={ruleSaved===inq.id?{background:T.green,color:T.actionText}:{background:T.panelSolid,color:T.violet,border:`1px solid ${T.violetBorder}`}}>
                                     {ruleSaved===inq.id?"✓ Saved to Obsidian":"➕ Always remember this"}
                                   </button>
                                 )}
@@ -2869,49 +2963,49 @@ function AdminDashboard() {
 
                             {/* Learn from actual email */}
                             {hasDraft&&(
-                              <div className="rounded-xl overflow-hidden" style={{border:`1px solid ${C.p1_12}`}}>
+                              <div className="rounded-xl overflow-hidden" style={{border:`1px solid ${T.border}`}}>
                                 <button
                                   onClick={()=>setShowLearnPanel(p=>({...p,[inq.id]:!p[inq.id]}))}
-                                  className="w-full flex items-center justify-between px-4 py-3 transition-colors hover:bg-slate-50 text-left"
-                                  style={{background:showLearnPanel[inq.id]?C.p1_04:"transparent"}}>
+                                  className="w-full flex items-center justify-between px-4 py-3 transition-colors hover:bg-black/[0.02] text-left"
+                                  style={{background:showLearnPanel[inq.id]?T.inset:"transparent"}}>
                                   <div className="flex items-center gap-2">
                                     <span className="text-base">🧠</span>
                                     <div>
-                                      <p className="text-xs font-bold text-slate-700">What did you actually send?</p>
-                                      <p className="text-[10px] text-slate-400">Paste your email → Claude extracts style rules automatically</p>
+                                      <p className="text-xs font-bold" style={{color:T.ink}}>What did you actually send?</p>
+                                      <p className="text-[10px]" style={{color:T.inkFaint}}>Paste your email → Claude extracts style rules automatically</p>
                                     </div>
                                   </div>
-                                  <span className="text-slate-400 text-xs">{showLearnPanel[inq.id]?"▲":"▼"}</span>
+                                  <span className="text-xs" style={{color:T.inkFaint}}>{showLearnPanel[inq.id]?"▲":"▼"}</span>
                                 </button>
                                 {showLearnPanel[inq.id]&&(
-                                  <div className="p-4 space-y-3 border-t border-slate-100" style={{background:C.p1_04}}>
+                                  <div className="p-4 space-y-3" style={{background:T.inset,borderTop:`1px solid ${T.rowBorder}`}}>
                                     <textarea
                                       value={actualSent[inq.id]??""}
                                       onChange={e=>setActualSent(p=>({...p,[inq.id]:e.target.value}))}
                                       placeholder="Paste the final email you sent here…"
                                       rows={6}
-                                      className="w-full text-slate-700 leading-relaxed rounded-xl p-3 resize-none sm:resize-y outline-none"
-                                      style={{border:`1px solid ${C.p1_20}`,background:"#fff",fontFamily:"inherit",fontSize:"16px"}}
+                                      className="w-full leading-relaxed rounded-xl p-3 resize-none sm:resize-y outline-none"
+                                      style={{border:`1px solid ${T.border}`,background:T.panelSolid,color:T.ink,fontFamily:"inherit",fontSize:"16px"}}
                                     />
                                     <button
                                       onClick={()=>analyzeAndLearn(inq)}
                                       disabled={!actualSent[inq.id]?.trim()||learnLoading===inq.id}
                                       className="text-xs font-bold px-4 py-2 rounded-xl transition-all hover:opacity-80 disabled:opacity-30 flex items-center gap-1.5"
-                                      style={{background:C.grad12,color:"#fff"}}>
+                                      style={{background:T.action,color:T.actionText}}>
                                       {learnLoading===inq.id?<><span className="animate-spin inline-block">◌</span> Analyzing…</>:"🧠 Learn from this →"}
                                     </button>
                                     {learnedRules[inq.id]?.length>0&&(
-                                      <div className="rounded-xl p-3 space-y-2.5" style={{background:"rgba(16,185,129,0.06)",border:"1px solid rgba(16,185,129,0.18)"}}>
-                                        <p className="text-[10px] font-bold uppercase tracking-widest" style={{color:"#10b981"}}>Rules extracted from your edits</p>
+                                      <div className="rounded-xl p-3 space-y-2.5" style={{background:T.greenBg,border:`1px solid ${T.greenBorder}`}}>
+                                        <p className="text-[10px] font-bold uppercase tracking-widest" style={{color:T.green}}>Rules extracted from your edits</p>
                                         <ul className="space-y-1.5">
                                           {learnedRules[inq.id].map((rule,i)=>(
-                                            <li key={i} className="text-xs text-slate-700 flex gap-2 items-start">
-                                              <span className="mt-0.5 flex-shrink-0" style={{color:"#10b981"}}>✓</span>
+                                            <li key={i} className="text-xs flex gap-2 items-start" style={{color:T.ink}}>
+                                              <span className="mt-0.5 flex-shrink-0" style={{color:T.green}}>✓</span>
                                               <span>{rule}</span>
                                             </li>
                                           ))}
                                         </ul>
-                                        <p className="text-[10px] text-slate-400">Saved to Obsidian vault automatically</p>
+                                        <p className="text-[10px]" style={{color:T.inkFaint}}>Saved to Obsidian vault automatically</p>
                                       </div>
                                     )}
                                   </div>
@@ -2922,40 +3016,40 @@ function AdminDashboard() {
 
                           {/* ── Compose & send panel (Gmail connected) ── */}
                           {composeOpen[inq.id]&&(
-                            <div className="border-t border-slate-100 p-4 sm:p-5 space-y-3" style={{background:"rgba(16,185,129,0.03)"}}>
+                            <div className="p-4 sm:p-5 space-y-3" style={{background:T.greenBg,borderTop:`1px solid ${T.rowBorder}`}}>
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                   <span className="text-base">✉️</span>
-                                  <p className="text-sm font-black text-slate-900">Send Email</p>
-                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{background:"rgba(16,185,129,0.1)",color:"#10b981"}}>via {gmailEmail}</span>
+                                  <p className="text-sm font-black" style={{color:T.ink}}>Send Email</p>
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{background:T.panelSolid,color:T.green,border:`1px solid ${T.greenBorder}`}}>via {gmailEmail}</span>
                                 </div>
-                                <button onClick={()=>setComposeOpen(p=>({...p,[inq.id]:false}))} className="text-slate-400 hover:text-slate-600 text-lg leading-none">×</button>
+                                <button onClick={()=>setComposeOpen(p=>({...p,[inq.id]:false}))} className="text-lg leading-none transition-opacity hover:opacity-70" style={{color:T.inkFaint}}>×</button>
                               </div>
                               {/* To (read-only) */}
-                              <div className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm" style={{background:"rgba(0,0,0,0.03)",border:"1px solid rgba(0,0,0,0.06)"}}>
-                                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 flex-shrink-0">To</span>
-                                <span className="text-slate-700 font-medium">{inq.name} &lt;{inq.email}&gt;</span>
+                              <div className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm" style={{background:T.inset,border:`1px solid ${T.border}`}}>
+                                <span className="text-[10px] font-bold uppercase tracking-widest flex-shrink-0" style={{color:T.inkFaint}}>To</span>
+                                <span className="font-medium" style={{color:T.ink}}>{inq.name} &lt;{inq.email}&gt;</span>
                               </div>
                               {/* Subject */}
                               <div>
-                                <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 block mb-1">Subject</label>
+                                <label className="text-[10px] font-bold uppercase tracking-widest block mb-1" style={{color:T.inkFaint}}>Subject</label>
                                 <input
                                   type="text"
                                   value={composeSubject[inq.id]??""}
                                   onChange={e=>setComposeSubject(p=>({...p,[inq.id]:e.target.value}))}
-                                  className="w-full text-slate-700 px-3 py-2 rounded-xl outline-none font-medium"
-                                  style={{border:`1px solid ${C.p1_20}`,background:"#fff",fontFamily:"inherit",fontSize:"16px"}}
+                                  className="w-full px-3 py-2 rounded-xl outline-none font-medium"
+                                  style={{border:`1px solid ${T.border}`,background:T.panelSolid,color:T.ink,fontFamily:"inherit",fontSize:"16px"}}
                                 />
                               </div>
                               {/* Body */}
                               <div>
-                                <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 block mb-1">Message</label>
+                                <label className="text-[10px] font-bold uppercase tracking-widest block mb-1" style={{color:T.inkFaint}}>Message</label>
                                 <textarea
                                   value={composeBody[inq.id]??""}
                                   onChange={e=>setComposeBody(p=>({...p,[inq.id]:e.target.value}))}
                                   rows={10}
-                                  className="w-full text-slate-700 leading-relaxed rounded-xl p-3 resize-none sm:resize-y outline-none"
-                                  style={{border:`1px solid ${C.p1_20}`,background:"#fff",fontFamily:"inherit",fontSize:"16px"}}
+                                  className="w-full leading-relaxed rounded-xl p-3 resize-none sm:resize-y outline-none"
+                                  style={{border:`1px solid ${T.border}`,background:T.panelSolid,color:T.ink,fontFamily:"inherit",fontSize:"16px"}}
                                 />
                               </div>
                               {/* Send button */}
@@ -2964,7 +3058,7 @@ function AdminDashboard() {
                                   onClick={()=>sendEmail(inq)}
                                   disabled={!composeSubject[inq.id]?.trim()||!composeBody[inq.id]?.trim()||sendLoading===inq.id}
                                   className="flex-1 text-sm font-black py-3 rounded-xl transition-all hover:opacity-90 disabled:opacity-40 flex items-center justify-center gap-2"
-                                  style={{background:"linear-gradient(135deg,#10b981,#059669)",color:"#fff"}}>
+                                  style={{background:T.action,color:T.actionText}}>
                                   {sendLoading===inq.id?(
                                     <><span className="animate-spin inline-block">◌</span> Sending…</>
                                   ):(
@@ -2973,25 +3067,25 @@ function AdminDashboard() {
                                 </button>
                                 <button onClick={()=>setComposeOpen(p=>({...p,[inq.id]:false}))}
                                   className="text-xs font-bold px-4 py-3 rounded-xl transition-all hover:opacity-80"
-                                  style={{background:"rgba(0,0,0,0.05)",color:"#64748b"}}>
+                                  style={{background:T.inset,color:T.inkSoft}}>
                                   Cancel
                                 </button>
                               </div>
-                              <p className="text-[10px] text-slate-400 text-center">Sends from your Gmail · goes into Sent Mail · client sees your real address</p>
+                              <p className="text-[10px] text-center" style={{color:T.inkFaint}}>Sends from your Gmail · goes into Sent Mail · client sees your real address</p>
                             </div>
                           )}
 
                           {/* ── Footer: status + delete ── */}
-                          <div className="px-4 sm:px-5 py-3 border-t border-slate-100 flex items-center justify-between gap-3 flex-wrap" style={{background:"rgba(248,250,252,0.6)"}}>
+                          <div className="px-4 sm:px-5 py-3 flex items-center justify-between gap-3 flex-wrap" style={{background:T.inset,borderTop:`1px solid ${T.rowBorder}`}}>
                             <div className="flex items-center gap-2">
-                              <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mr-1">Status</span>
+                              <span className="text-[10px] font-bold uppercase tracking-widest mr-1" style={{color:T.inkFaint}}>Status</span>
                               {(["new","responded","archived","not_interested"] as const).map(s=>(
                                 <button key={s}
                                   onClick={()=>updateInquiryStatus(inq.id,s)}
                                   className="text-[11px] font-bold px-2.5 py-1 rounded-lg transition-all hover:opacity-80 capitalize"
                                   style={inq.status===s
-                                    ?{background:s==="new"?"rgba(16,185,129,0.15)":s==="responded"?"rgba(59,130,246,0.12)":s==="not_interested"?"rgba(239,68,68,0.15)":"rgba(148,163,184,0.15)",color:s==="new"?"#10b981":s==="responded"?"#3b82f6":s==="not_interested"?"#ef4444":"#94a3b8",fontWeight:800}
-                                    :{background:"rgba(0,0,0,0.04)",color:"#94a3b8"}}>
+                                    ?{background:INQ_STATUS[s].bg,color:INQ_STATUS[s].color,fontWeight:800,boxShadow:`inset 0 0 0 1px ${INQ_STATUS[s].color}33`}
+                                    :{background:T.neutralBg,color:T.inkFaint}}>
                                   {s==="new"?"● New":s==="responded"?"✓ Responded":s==="not_interested"?"✕ Not Interested":"○ Archive"}
                                 </button>
                               ))}
@@ -2999,12 +3093,12 @@ function AdminDashboard() {
                             <div className="flex items-center gap-2">
                               {inquiryDeleteConfirm===inq.id?(
                                 <div className="flex gap-1.5 items-center">
-                                  <span className="text-xs text-slate-500">Delete?</span>
-                                  <button onClick={()=>deleteInquiry(inq.id)} className="text-xs font-bold px-2.5 py-1 rounded-lg bg-red-500 text-white">Yes</button>
-                                  <button onClick={()=>setInquiryDeleteConfirm(null)} className="text-xs font-bold px-2.5 py-1 rounded-lg bg-slate-200 text-slate-600">No</button>
+                                  <span className="text-xs" style={{color:T.inkSoft}}>Delete?</span>
+                                  <button onClick={()=>deleteInquiry(inq.id)} className="text-xs font-bold px-2.5 py-1 rounded-lg" style={{background:T.red,color:T.actionText}}>Yes</button>
+                                  <button onClick={()=>setInquiryDeleteConfirm(null)} className="text-xs font-bold px-2.5 py-1 rounded-lg" style={{background:T.neutralBg,color:T.inkSoft}}>No</button>
                                 </div>
                               ):(
-                                <button onClick={()=>setInquiryDeleteConfirm(inq.id)} className="text-xs font-medium px-2.5 py-1 rounded-lg transition-all hover:bg-red-50 hover:text-red-500 text-slate-400">🗑 Delete</button>
+                                <button onClick={()=>setInquiryDeleteConfirm(inq.id)} className="text-xs font-medium px-2.5 py-1 rounded-lg transition-all hover:opacity-70" style={{color:T.inkFaint}}>🗑 Delete</button>
                               )}
                             </div>
                           </div>
