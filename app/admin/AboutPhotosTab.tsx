@@ -31,11 +31,10 @@ function isHeicFile(file: File) {
   return ["image/heic", "image/heif"].includes(file.type.toLowerCase()) || HEIC_PATTERN.test(file.name);
 }
 
-/** Convert a HEIC file to JPEG in the browser (heic2any is loaded on demand). */
+/** Convert a HEIC file to JPEG in the browser (heic-to is loaded on demand). */
 async function heicToJpeg(file: File): Promise<File> {
-  const heic2any = (await import("heic2any")).default;
-  const out = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.9 });
-  const blob = Array.isArray(out) ? out[0] : out;
+  const { heicTo } = await import("heic-to/next");
+  const blob = await heicTo({ blob: file, type: "image/jpeg", quality: 0.9 });
   return new File([blob], file.name.replace(HEIC_PATTERN, "") + ".jpg", { type: "image/jpeg" });
 }
 
@@ -134,7 +133,9 @@ export default function AboutPhotosTab({ showToast }: Props) {
       try {
         staged = await heicToJpeg(file);
       } catch (err) {
-        console.error("[AboutPhotosTab] HEIC conversion failed", err);
+        // Some converters reject with plain {code,message} objects that log as
+        // "{}" — stringify so the console always shows the real reason.
+        console.error("[AboutPhotosTab] HEIC conversion failed:", err instanceof Error ? err : JSON.stringify(err));
         showToast("Couldn't convert that HEIC file — try exporting it as JPEG first.", false);
         return;
       } finally {
