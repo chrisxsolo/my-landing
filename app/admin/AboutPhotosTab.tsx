@@ -34,6 +34,8 @@ export default function AboutPhotosTab({ showToast }: Props) {
   const [fileDrafts, setFileDrafts] = useState<Record<string, File | null>>({});
   // which fact slug is currently busy (upload / patch / delete)
   const [busySlug, setBusySlug] = useState<string | null>(null);
+  // which fact card a file is being dragged over (drop-target highlight)
+  const [dragSlug, setDragSlug] = useState<string | null>(null);
   // one ref per fact for resetting the file input
   const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
@@ -104,6 +106,22 @@ export default function AboutPhotosTab({ showToast }: Props) {
     } finally {
       setBusySlug(null);
     }
+  }
+
+  function handleDrop(slug: string, e: React.DragEvent) {
+    e.preventDefault();
+    setDragSlug(null);
+    if (busySlug) return;
+    const file = e.dataTransfer.files?.[0] ?? null;
+    const fileCheck = validateAdminPhotoFile(file);
+    if (!fileCheck.ok) { showToast(fileCheck.error, false); return; }
+    setFileDrafts((prev) => ({ ...prev, [slug]: file }));
+  }
+
+  function handleDragLeave(e: React.DragEvent) {
+    // Ignore dragleave events fired when moving over child elements.
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+    setDragSlug(null);
   }
 
   async function handleSaveAlt(slug: string) {
@@ -184,11 +202,15 @@ export default function AboutPhotosTab({ showToast }: Props) {
             const busy = busySlug === fact.slug;
             const altVal = altDrafts[fact.slug] ?? "";
             const fileVal = fileDrafts[fact.slug] ?? null;
+            const dragging = dragSlug === fact.slug;
 
             return (
               <li
                 key={fact.slug}
-                className={`rounded-xl border bg-white p-4 transition-opacity ${busy ? "opacity-60" : ""} ${hasPhoto ? "border-emerald-300" : "border-slate-200"}`}
+                onDragOver={(e) => { e.preventDefault(); if (!busy) setDragSlug(fact.slug); }}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => handleDrop(fact.slug, e)}
+                className={`rounded-xl border bg-white p-4 transition-opacity ${busy ? "opacity-60" : ""} ${dragging ? "border-emerald-400 border-dashed bg-emerald-50" : hasPhoto ? "border-emerald-300" : "border-slate-200"}`}
               >
                 {/* Fact header */}
                 <div className="flex items-start gap-3 mb-3">
@@ -253,6 +275,10 @@ export default function AboutPhotosTab({ showToast }: Props) {
                     <span className="text-xs text-slate-500 font-mono truncate max-w-[180px]" title={fileVal.name}>
                       {fileVal.name}
                     </span>
+                  )}
+
+                  {!fileVal && !busy && (
+                    <span className="text-xs text-slate-400">or drag &amp; drop an image here</span>
                   )}
 
                   {hasPhoto && (
