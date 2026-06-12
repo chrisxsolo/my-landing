@@ -6,6 +6,7 @@ import { T } from "@/app/admin/adminTheme";
 import { engineApi } from "@/app/admin/content-engine/engineApi";
 import { SERVICE_TYPES, SCHOOL_SLUGS, LIGHTING_CONDITIONS } from "@/lib/contentEngine/taxonomy";
 import { btn, card, input, label, sectionTitle } from "./ui";
+import DictationTextarea from "./DictationTextarea";
 
 interface Props {
   session: Record<string, unknown>;
@@ -95,9 +96,11 @@ export default function FactsSection({ session, sessionId, onSaved }: Props) {
       </div>
       <div style={{ marginTop: 10 }}>
         <span style={label}>Public session summary (may be sent to AI)</span>
-        <textarea style={{ ...input, minHeight: 56 }} value={form.public_session_summary} onChange={set("public_session_summary")} />
+        <DictationTextarea value={form.public_session_summary}
+          onValueChange={(v) => setForm((f) => ({ ...f, public_session_summary: v }))} />
         <span style={label}>Internal notes (never sent to AI, never published)</span>
-        <textarea style={{ ...input, minHeight: 56 }} value={form.internal_notes} onChange={set("internal_notes")} />
+        <DictationTextarea value={form.internal_notes}
+          onValueChange={(v) => setForm((f) => ({ ...f, internal_notes: v }))} />
       </div>
       <div style={{ marginTop: 10, display: "flex", gap: 10, alignItems: "center" }}>
         <button style={btn(true)} onClick={() => void save()} disabled={saving}>
