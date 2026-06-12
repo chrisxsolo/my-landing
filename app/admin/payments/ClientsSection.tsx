@@ -131,8 +131,8 @@ export default function ClientsSection({ loading, periodRows, inquiries, receiva
                 <tbody>
                   {visible.map((c, i) => (
                     <tr key={c.key} className="cursor-pointer transition-colors"
-                      style={{ borderBottom: `1px solid rgba(255,255,255,0.04)` }}
-                      onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
+                      style={{ borderBottom: `1px solid ${REV.rowBorder}` }}
+                      onMouseEnter={e => { e.currentTarget.style.background = REV.inset; }}
                       onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}>
                       <td className="px-3 py-2.5">
                         <button type="button" onClick={() => setOpenClient(c.key)}
@@ -238,10 +238,10 @@ function ClientDrawer({ client, receivables, onClose }: {
   return (
     <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true" aria-label={`Client details: ${client.name}`}>
       <button type="button" aria-label="Close client details" onClick={onClose}
-        className="absolute inset-0 cursor-default" style={{ background: "rgba(4,8,16,0.65)", backdropFilter: "blur(2px)" }} />
+        className="absolute inset-0 cursor-default" style={{ background: REV.scrim }} />
       <div className="relative w-full max-w-md h-full overflow-y-auto p-5"
         style={{
-          background: "linear-gradient(180deg,#0c1626,#0a141f)",
+          background: REV.overlay,
           borderLeft: `1px solid ${REV.panelBorderStrong}`,
           animation: reduced ? undefined : "rev-rise 0.25s cubic-bezier(0.22,1,0.36,1) both",
         }}>

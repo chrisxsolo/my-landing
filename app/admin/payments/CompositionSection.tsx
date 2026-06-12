@@ -93,7 +93,11 @@ export default function CompositionSection({ loading, periodRows, compRows, comp
           right={<InfoTip text="Share of the period's collected revenue from the top source in each dimension. Sustained shares above 60% mean one cancellation or season can sink the period." />} />
         <div className="space-y-3">
           <ConcentrationRow label="Top 5 clients" share={topShare(clients, 5)} detail={`${Math.min(5, clients.length)} of ${clients.length} payers`} />
-          <ConcentrationRow label={`Top school — ${schools[0] ? schoolLabel(schools[0].key) : "n/a"}`} share={schools[0]?.share ?? 0} detail={schools[0] ? fmtMoney(schools[0].cents) : "no data"} />
+          {(() => {
+            // "Top school" means a real school — unattributed buckets don't count.
+            const top = schools.find(s => s.key !== "unlinked" && s.key !== "other");
+            return <ConcentrationRow label={`Top school — ${top ? schoolLabel(top.key) : "n/a"}`} share={top?.share ?? 0} detail={top ? fmtMoney(top.cents) : "no data"} />;
+          })()}
           <ConcentrationRow label={`Top service — ${services[0] ? SERVICE_LABELS[services[0].key as ServiceKey] ?? services[0].key : "n/a"}`} share={services[0]?.share ?? 0} detail={services[0] ? fmtMoney(services[0].cents) : "no data"} />
           <ConcentrationRow label={`Top platform — ${methods[0] ? (METHOD_META[methods[0].key]?.label ?? methods[0].key) : "n/a"}`} share={methods[0]?.share ?? 0} detail={methods[0] ? fmtMoney(methods[0].cents) : "no data"} />
         </div>

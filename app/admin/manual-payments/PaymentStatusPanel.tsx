@@ -1,16 +1,19 @@
 "use client";
+// Client payment status cards: per-client total / method / paid date with
+// one-click deposit recording. Totals pre-fill from saved deposits, payment
+// notes, or session pricing — editable before saving.
 
 import { useMemo, useState } from "react";
-import { C } from "@/lib/colors";
+import { GlassPanel, SectionHeader } from "@/app/admin/payments/Glass";
+import { REV } from "@/app/admin/payments/palette";
 import { inferTotalFromRetainer } from "@/lib/pricingCatalog";
 import {
   inferSessionTotalCents,
   parseKnownMoneyCents,
   parseLoosePaymentCents,
 } from "@/lib/paymentTotalInference";
+import { METHODS } from "./helpers";
 import type { InquiryOption, SavedPayment } from "./types";
-
-const METHODS = ["Venmo", "Zelle", "PayPal", "Cash App", "Pixieset", "Cash", "manual", "other"];
 
 type Props = {
   inquiries: InquiryOption[];
@@ -62,6 +65,9 @@ function inferTotal(payments: SavedPayment[], note: string | null) {
   const noteCents = parseKnownMoneyCents(note);
   return { cents: noteCents, source: noteCents > 0 ? "client note" : "manual" };
 }
+
+const FIELD = "mt-1 h-9 w-full rounded-lg px-2 text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-500/50";
+const LABEL = "text-[9px] font-black uppercase tracking-[0.14em]";
 
 export default function PaymentStatusPanel({ inquiries, payments, onSaved, onError }: Props) {
   const [query, setQuery] = useState("");
@@ -134,20 +140,20 @@ export default function PaymentStatusPanel({ inquiries, payments, onSaved, onErr
     }
   }
 
+  const fieldStyle = { border: `1px solid ${REV.panelBorder}`, background: "rgba(255,255,255,0.85)", color: REV.text };
+
   return (
-    <section className="rounded-2xl border p-4" style={{ background: C.white, borderColor: C.borderSubtle }}>
+    <GlassPanel className="p-5">
       <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div>
-          <p className="text-xs font-black uppercase tracking-widest" style={{ color: C.p1 }}>Client payment status</p>
-          <p className="text-xs font-semibold" style={{ color: C.muted }}>Total auto-fills from saved deposits or payment notes; edit it when needed.</p>
-        </div>
+        <SectionHeader kicker="Manual review" title="Client payment status" accent={REV.violet} />
         <input
           type="search"
           value={query}
           onChange={event => setQuery(event.target.value)}
-          placeholder="Search clients..."
-          className="h-10 min-w-[240px] rounded-xl border px-3 text-xs font-bold outline-none"
-          style={{ borderColor: C.borderSubtle, background: C.surfaceSoft, color: C.ink }}
+          placeholder="Search clients…"
+          aria-label="Search client payment status"
+          className="h-9 min-w-[240px] rounded-xl px-3 text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-500/50"
+          style={{ border: `1px solid ${REV.panelBorder}`, background: REV.inset, color: REV.text }}
         />
       </div>
 
@@ -159,68 +165,76 @@ export default function PaymentStatusPanel({ inquiries, payments, onSaved, onErr
           const fullyPaid = plan.paid1 && plan.paid2;
           const canTrySave = total > 0 || plan.email.includes("@");
           return (
-            <div key={plan.id} className="rounded-xl border p-3" style={{ borderColor: C.borderSubtle, background: fullyPaid ? C.p1_04 : C.surfaceSoft }}>
+            <div key={plan.id} className="rounded-xl p-3.5"
+              style={{
+                background: fullyPaid ? "rgba(16,185,129,0.06)" : REV.panel,
+                border: `1px solid ${fullyPaid ? "rgba(16,185,129,0.25)" : REV.panelBorder}`,
+              }}>
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <a href={`/admin/conversation/${plan.id}`} className="block truncate text-sm font-black" style={{ color: C.ink }}>{plan.name}</a>
-                  <p className="truncate text-[11px] font-semibold" style={{ color: C.muted }}>{plan.email}</p>
-                  <p className="mt-1 truncate text-[10px] font-black uppercase tracking-wider" style={{ color: C.mutedSoft }}>
-                    {plan.sessionType || "Session"}{plan.sessionDate ? ` | ${new Date(`${plan.sessionDate}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}` : ""}
+                  <a href={`/admin/conversation/${plan.id}`} className="block truncate text-sm font-black hover:underline" style={{ color: REV.text }}>{plan.name}</a>
+                  <p className="truncate text-[11px] font-semibold" style={{ color: REV.textFaint }}>{plan.email}</p>
+                  <p className="mt-1 truncate text-[9px] font-black uppercase tracking-widest" style={{ color: REV.textFaint }}>
+                    {plan.sessionType || "Session"}{plan.sessionDate ? ` · ${new Date(`${plan.sessionDate}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}` : ""}
                   </p>
                 </div>
-                <span className="rounded-full px-2 py-1 text-[10px] font-black" style={fullyPaid ? { background: C.p1_12, color: C.success } : { background: C.p3_10, color: C.muted }}>
-                  {fullyPaid ? "Paid full" : plan.paid1 ? "Deposit 1" : "Unpaid"}
+                <span className="rounded-md px-2 py-1 text-[9px] font-black whitespace-nowrap"
+                  style={fullyPaid
+                    ? { background: REV.accentBg, color: REV.accent }
+                    : plan.paid1
+                      ? { background: REV.amberBg, color: REV.amber }
+                      : { background: REV.neutralBg, color: REV.textSoft }}>
+                  {fullyPaid ? "✓ Paid full" : plan.paid1 ? "Deposit 1 in" : "Unpaid"}
                 </span>
               </div>
 
               <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">
-                <label className="text-[10px] font-black uppercase tracking-widest" style={{ color: C.muted }}>
+                <label className={LABEL} style={{ color: REV.textFaint }}>
                   Total
                   <input value={totalFor(plan)} onChange={event => setTotals(prev => ({ ...prev, [plan.id]: event.target.value }))}
-                    inputMode="decimal" className="mt-1 h-9 w-full rounded-lg border px-2 text-xs font-bold outline-none"
-                    style={{ borderColor: C.borderSubtle, background: C.white, color: C.ink }} />
+                    inputMode="decimal" className={`${FIELD} tabular-nums`} style={fieldStyle} />
                 </label>
-                <label className="text-[10px] font-black uppercase tracking-widest" style={{ color: C.muted }}>
+                <label className={LABEL} style={{ color: REV.textFaint }}>
                   Method
                   <select value={methods[plan.id] ?? "manual"} onChange={event => setMethods(prev => ({ ...prev, [plan.id]: event.target.value }))}
-                    className="mt-1 h-9 w-full rounded-lg border px-2 text-xs font-bold outline-none"
-                    style={{ borderColor: C.borderSubtle, background: C.white, color: C.ink }}>
+                    className={FIELD} style={fieldStyle}>
                     {METHODS.map(method => <option key={method} value={method}>{method}</option>)}
                   </select>
                 </label>
-                <label className="col-span-2 text-[10px] font-black uppercase tracking-widest md:col-span-2" style={{ color: C.muted }}>
+                <label className={`${LABEL} col-span-2 md:col-span-2`} style={{ color: REV.textFaint }}>
                   Paid date
                   <input type="date" value={paidDates[plan.id] ?? new Date().toISOString().slice(0, 10)}
                     onChange={event => setPaidDates(prev => ({ ...prev, [plan.id]: event.target.value }))}
-                    className="mt-1 h-9 w-full rounded-lg border px-2 text-xs font-bold outline-none"
-                    style={{ borderColor: C.borderSubtle, background: C.white, color: C.ink }} />
+                    className={FIELD} style={fieldStyle} />
                 </label>
               </div>
 
               <div className="mt-3 flex flex-wrap items-center gap-2">
-                <span className="text-[11px] font-bold" style={{ color: C.muted }}>
-                  D1 {first ? displayCents(first) : "--"} {plan.paid1 ? "paid" : "open"} | D2 {second ? displayCents(second) : "--"} {plan.paid2 ? "paid" : "open"} | {plan.source}
+                <span className="text-[10px] font-bold" style={{ color: REV.textFaint }}>
+                  D1 {first ? displayCents(first) : "—"} {plan.paid1 ? "✓" : "open"} · D2 {second ? displayCents(second) : "—"} {plan.paid2 ? "✓" : "open"} · {plan.source}
                 </span>
-                <button onClick={() => markPaid(plan, "deposit_1")} disabled={plan.paid1 || !canTrySave || busyKey !== null}
-                  className="rounded-lg px-2.5 py-1.5 text-[10px] font-black disabled:opacity-40"
-                  style={{ background: C.p1_08, color: C.p1 }}>
-                  {busyKey === `${plan.id}:deposit_1` ? "Saving..." : "First deposit paid"}
-                </button>
-                <button onClick={() => markPaid(plan, "deposit_2")} disabled={plan.paid2 || !canTrySave || busyKey !== null}
-                  className="rounded-lg px-2.5 py-1.5 text-[10px] font-black disabled:opacity-40"
-                  style={{ background: C.p2_08, color: C.p2 }}>
-                  {busyKey === `${plan.id}:deposit_2` ? "Saving..." : "Second deposit paid"}
-                </button>
-                <button onClick={() => markPaid(plan, "full")} disabled={fullyPaid || !canTrySave || busyKey !== null}
-                  className="rounded-lg px-2.5 py-1.5 text-[10px] font-black text-white disabled:opacity-40"
-                  style={{ background: C.grad12 }}>
-                  {busyKey === `${plan.id}:full` ? "Saving..." : "Paid in full"}
-                </button>
+                <span className="ml-auto flex gap-1.5">
+                  <button onClick={() => markPaid(plan, "deposit_1")} disabled={plan.paid1 || !canTrySave || busyKey !== null}
+                    className="rounded-lg px-2.5 py-1.5 text-[10px] font-black transition-opacity hover:opacity-80 disabled:opacity-35"
+                    style={{ background: REV.violetBg, color: REV.violet }}>
+                    {busyKey === `${plan.id}:deposit_1` ? "Saving…" : "Deposit 1 paid"}
+                  </button>
+                  <button onClick={() => markPaid(plan, "deposit_2")} disabled={plan.paid2 || !canTrySave || busyKey !== null}
+                    className="rounded-lg px-2.5 py-1.5 text-[10px] font-black transition-opacity hover:opacity-80 disabled:opacity-35"
+                    style={{ background: REV.blueBg, color: REV.blue }}>
+                    {busyKey === `${plan.id}:deposit_2` ? "Saving…" : "Deposit 2 paid"}
+                  </button>
+                  <button onClick={() => markPaid(plan, "full")} disabled={fullyPaid || !canTrySave || busyKey !== null}
+                    className="rounded-lg px-2.5 py-1.5 text-[10px] font-black text-white transition-opacity hover:opacity-80 disabled:opacity-35"
+                    style={{ background: REV.accent }}>
+                    {busyKey === `${plan.id}:full` ? "Saving…" : "Paid in full"}
+                  </button>
+                </span>
               </div>
             </div>
           );
         })}
       </div>
-    </section>
+    </GlassPanel>
   );
 }

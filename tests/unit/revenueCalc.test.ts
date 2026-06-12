@@ -177,6 +177,17 @@ describe("series", () => {
     expect(autoGranularity(period)).toBe("day");
     expect(autoGranularity(buildPresetPeriod("all", new Date()))).toBe("month");
   });
+  it("keeps weekly buckets aligned across the March DST transition", () => {
+    const ytd = buildPresetPeriod("custom", new Date(2026, 5, 11), { start: "2026-01-01", end: "2026-06-11" });
+    const dstRows = [
+      row({ id: 1, paid_at: "2026-02-05T20:00:00.000Z", amount_cents: 10000 }),
+      row({ id: 2, paid_at: "2026-05-18T19:00:00.000Z", amount_cents: 50000 }), // after DST change
+    ];
+    const pts = bucketSeries(dstRows, ytd, "week");
+    // Revenue paid after the DST change must still land in a rendered bucket.
+    expect(pts.reduce((s, p) => s + p.cents, 0)).toBe(60000);
+    expect(Math.max(...pts.map(p => p.cents))).toBe(50000);
+  });
   it("builds a month×year heatmap", () => {
     const cells = monthlyHeatmap(rows);
     expect(cells).toEqual([{ year: 2026, month: 4, cents: 30000, count: 2 }]);

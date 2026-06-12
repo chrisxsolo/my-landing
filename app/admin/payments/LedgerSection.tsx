@@ -84,7 +84,7 @@ export default function LedgerSection({ loading, rows, periodLabel, issues, onRe
     <select aria-label={label} value={value} onChange={e => onSel(e.target.value)}
       className="text-[10px] font-bold px-2 py-1.5 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
       style={{ background: REV.inset, border: `1px solid ${REV.panelBorder}`, color: REV.textSoft }}>
-      {options.map(([v, l]) => <option key={v} value={v} style={{ background: "#0c1626" }}>{l}</option>)}
+      {options.map(([v, l]) => <option key={v} value={v} style={{ background: REV.optionBg }}>{l}</option>)}
     </select>
   );
 

@@ -157,7 +157,7 @@ export default function TrendSection({ loading, periodRows, compRows, period, co
                 </div>
               ) : (
                 <p className="text-[10px] font-bold" style={{ color: REV.textFaint }}>
-                  {pace.elapsed >= 1 ? "Period complete — no projection needed." : "Too early in the period to project."}
+                  {pace.elapsed > 0.95 ? "Period is complete — no projection needed." : "Too early in the period to project."}
                 </p>
               )}
             </div>
@@ -226,8 +226,8 @@ function YearRow({ year, cells, max }: { year: number; cells: { month: number; c
           <div key={m} title={cell ? `${MONTHS[m]} ${year}: ${fmtMoney(cell.cents)} (${cell.count} payments)` : `${MONTHS[m]} ${year}: no revenue`}
             className="aspect-square rounded-[4px]"
             style={{
-              background: cell ? `rgba(52,211,153,${(0.15 + intensity * 0.85).toFixed(2)})` : "rgba(148,163,184,0.07)",
-              border: `1px solid ${cell ? "rgba(52,211,153,0.25)" : "transparent"}`,
+              background: cell ? `rgba(10,138,100,${(0.12 + intensity * 0.78).toFixed(2)})` : REV.inset,
+              border: `1px solid ${cell ? "rgba(10,138,100,0.25)" : "transparent"}`,
             }} />
         );
       })}

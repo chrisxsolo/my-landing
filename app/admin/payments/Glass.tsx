@@ -28,7 +28,7 @@ export function GlassPanel({ children, className = "", hoverable = false }: {
 }) {
   return (
     <div
-      className={`rounded-2xl backdrop-blur-md transition-all duration-200 ${hoverable ? "hover:-translate-y-px" : ""} ${className}`}
+      className={`rounded-2xl transition-[background,border-color,transform] duration-200 ${hoverable ? "hover:-translate-y-px" : ""} ${className}`}
       style={{ background: REV.panel, border: `1px solid ${REV.panelBorder}`, boxShadow: REV.shadow }}
       onMouseEnter={hoverable ? e => { e.currentTarget.style.background = REV.panelHover; e.currentTarget.style.borderColor = REV.panelBorderStrong; } : undefined}
       onMouseLeave={hoverable ? e => { e.currentTarget.style.background = REV.panel; e.currentTarget.style.borderColor = REV.panelBorder; } : undefined}>
@@ -141,7 +141,7 @@ export function InfoTip({ text }: { text: string }) {
       {open && (
         <span role="tooltip"
           className="absolute z-30 bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-52 px-2.5 py-2 rounded-lg text-[10px] font-medium leading-snug normal-case tracking-normal text-left"
-          style={{ background: "rgba(10,16,30,0.97)", border: `1px solid ${REV.panelBorderStrong}`, color: REV.textSoft, boxShadow: REV.shadow }}>
+          style={{ background: REV.overlay, border: `1px solid ${REV.panelBorderStrong}`, color: REV.textSoft, boxShadow: REV.shadow }}>
           {text}
         </span>
       )}
@@ -151,7 +151,7 @@ export function InfoTip({ text }: { text: string }) {
 
 // ── Loading / empty states ──────────────────────────────────────────────────
 export function Skeleton({ className = "h-4 w-24" }: { className?: string }) {
-  return <div className={`rounded-md animate-pulse ${className}`} style={{ background: "rgba(148,163,184,0.12)" }} />;
+  return <div className={`rounded-md animate-pulse ${className}`} style={{ background: REV.inset }} />;
 }
 
 export function EmptyState({ message, hint }: { message: string; hint?: string }) {

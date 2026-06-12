@@ -148,11 +148,10 @@ export default function OverviewSection({
       <div className="lg:col-span-7 grid grid-cols-2 md:grid-cols-3 gap-3">
         {kpis.map(k => {
           const delta = k.prev !== undefined && k.cents !== undefined ? safeDelta(k.cents, k.prev) : null;
-          const inner = (
+          // The tooltip is itself a <button>, so it must stay outside the
+          // drill button — nested buttons are invalid HTML.
+          const valueAndSub = (
             <>
-              <p className="text-[9px] font-black uppercase tracking-widest flex items-center gap-1 mb-1.5" style={{ color: REV.textFaint }}>
-                {k.label} <InfoTip text={k.tip} />
-              </p>
               {loading ? <Skeleton className="h-7 w-20" /> : k.cents !== undefined
                 ? <CountUp cents={k.cents} className="text-xl font-black" color={k.color ?? REV.text} />
                 : <span className="text-xl font-black" style={{ color: k.color ?? REV.text }}>{k.text}</span>}
@@ -167,11 +166,14 @@ export default function OverviewSection({
           );
           return (
             <GlassPanel key={k.label} hoverable className="p-3.5">
+              <p className="text-[9px] font-black uppercase tracking-widest flex items-center gap-1 mb-1.5" style={{ color: REV.textFaint }}>
+                {k.label} <InfoTip text={k.tip} />
+              </p>
               {k.onClick ? (
-                <button type="button" onClick={k.onClick} className="w-full text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 rounded-lg">
-                  {inner}
+                <button type="button" onClick={k.onClick} className="block w-full text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 rounded-lg">
+                  {valueAndSub}
                 </button>
-              ) : inner}
+              ) : valueAndSub}
             </GlassPanel>
           );
         })}

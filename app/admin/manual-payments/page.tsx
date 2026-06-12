@@ -1,17 +1,28 @@
 "use client";
+// Manual revenue entry: a spreadsheet that mirrors the payments table.
+// Every linked row arrives pre-populated (saved deposits verbatim, the rest
+// from the inferred session total) — edit what's wrong, then save. Bulk save
+// only touches rows you edited or selected, so the pre-filled suggestions
+// can never bulk-insert themselves.
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { checkAuth } from "@/lib/adminAuth";
-import { C } from "@/lib/colors";
 import { calculatePaymentSchedule } from "@/lib/pricingCatalog";
-import { inferSessionTotalCents } from "@/lib/paymentTotalInference";
+import { parseLoosePaymentCents } from "@/lib/paymentTotalInference";
+import { GlassPanel } from "@/app/admin/payments/Glass";
+import { REV } from "@/app/admin/payments/palette";
 import PaymentStatusPanel from "./PaymentStatusPanel";
-import RowActions from "./RowActions";
-import { INPUT, TH, TD, METHODS, PAYMENT_TYPES, emptyRows, rowsFromInquiries, displayMoney, formatCents, parseToIsoDate } from "./helpers";
+import RecentPaymentsPanel from "./RecentPaymentsPanel";
+import SpreadsheetTable, { type AmountCol } from "./SpreadsheetTable";
+import {
+  amountForType, emptyRows, formatCents, relatedPayments, rowIsReady, rowsFromInquiries, seedAmounts,
+} from "./helpers";
 import type { InquiryOption, PaymentRow, SavedPayment } from "./types";
 
 type StatusFilter = "all" | "full" | "partial" | "none";
+
+const HIDDEN_KEY = "manual_payments_hidden";
 
 export default function ManualPaymentsPage() {
   const [authed, setAuthed] = useState(false);
@@ -32,55 +43,48 @@ export default function ManualPaymentsPage() {
     if (!isAuthed) { setLoading(false); return; }
     let hidden = new Set<number>();
     try {
-      const s = localStorage.getItem("manual_payments_hidden");
+      const s = localStorage.getItem(HIDDEN_KEY);
       if (s) hidden = new Set(JSON.parse(s) as number[]);
     } catch {}
     setHiddenIds(hidden);
     void loadData(true, hidden);
   }, []);
 
-  const completeRows = useMemo(() => rows.filter(r => r.client_name.trim() && r.amount.trim() && r.paid_at), [rows]);
+  // Paid flags always derive from the freshest payments list, so a D1/D2
+  // button click locks the matching amount cell immediately.
+  const liveRows = useMemo(() => rows.map(row => {
+    if (!row.inquiry_id && !row.client_email.trim()) return row;
+    const related = relatedPayments(payments, row.inquiry_id, row.client_email);
+    const full = related.some(p => p.payment_type === "full");
+    return {
+      ...row,
+      d1Paid: full || related.some(p => p.payment_type === "deposit_1"),
+      d2Paid: full || related.some(p => p.payment_type === "deposit_2"),
+    };
+  }), [rows, payments]);
 
-  const paymentStatusMap = useMemo(() => {
-    const map = new Map<number, "full" | "partial" | "none">();
-    for (const inquiry of inquiries) {
-      const rel = payments.filter(p => p.status === "active" && (p.inquiry_id === inquiry.id || p.client_email?.toLowerCase() === inquiry.email.toLowerCase()));
-      const p1 = rel.some(p => p.payment_type === "deposit_1" || p.payment_type === "full");
-      const p2 = rel.some(p => p.payment_type === "deposit_2" || p.payment_type === "full");
-      map.set(inquiry.id, p1 && p2 ? "full" : p1 ? "partial" : "none");
-    }
-    return map;
-  }, [inquiries, payments]);
+  const readyRows = useMemo(
+    () => liveRows.filter(r => (r.touched || selectedKeys.has(r.key)) && rowIsReady(r)),
+    [liveRows, selectedKeys],
+  );
+
+  const statusOf = (row: PaymentRow): Exclude<StatusFilter, "all"> =>
+    row.d1Paid && row.d2Paid ? "full" : row.d1Paid ? "partial" : "none";
 
   const displayRows = useMemo(() => {
-    let result = rows;
+    let result = liveRows;
     if (search) result = result.filter(r => `${r.client_name} ${r.client_email}`.toLowerCase().includes(search.toLowerCase()));
-    if (statusFilter !== "all") result = result.filter(r => (r.inquiry_id ? (paymentStatusMap.get(r.inquiry_id) ?? "none") : "none") === statusFilter);
+    if (statusFilter !== "all") result = result.filter(r => statusOf(r) === statusFilter);
     return result;
-  }, [rows, search, statusFilter, paymentStatusMap]);
+  }, [liveRows, search, statusFilter]);
 
   const statusCounts = useMemo(() => {
     const c = { full: 0, partial: 0, none: 0 };
-    for (const r of rows) { const s = r.inquiry_id ? (paymentStatusMap.get(r.inquiry_id) ?? "none") : "none"; c[s]++; }
+    for (const r of liveRows) c[statusOf(r)]++;
     return c;
-  }, [rows, paymentStatusMap]);
+  }, [liveRows]);
 
   const allDisplayedSelected = displayRows.length > 0 && displayRows.every(r => selectedKeys.has(r.key));
-
-  function hideInquiries(ids: number[]) {
-    setHiddenIds(prev => {
-      const next = new Set([...prev, ...ids]);
-      localStorage.setItem("manual_payments_hidden", JSON.stringify([...next]));
-      return next;
-    });
-  }
-
-  function restoreAll() {
-    localStorage.removeItem("manual_payments_hidden");
-    const empty = new Set<number>();
-    setHiddenIds(empty);
-    void loadData(true, empty);
-  }
 
   async function loadData(seedRows = false, hidden: Set<number> = hiddenIds) {
     setLoading(true);
@@ -89,9 +93,13 @@ export default function ManualPaymentsPage() {
       const json = await res.json() as { inquiries?: InquiryOption[]; payments?: SavedPayment[]; error?: string };
       if (!res.ok) { setMessage({ text: json.error ?? "Could not load manual payment data.", ok: false }); return; }
       const loaded = (json.inquiries ?? []).filter(i => !hidden.has(i.id));
+      const loadedPayments = json.payments ?? [];
       setInquiries(loaded);
-      setPayments(json.payments ?? []);
-      if (seedRows && loaded.length > 0) setRows(rowsFromInquiries(loaded));
+      setPayments(loadedPayments);
+      if (seedRows && loaded.length > 0) {
+        setRows(rowsFromInquiries(loaded, loadedPayments));
+        setSelectedKeys(new Set());
+      }
     } catch {
       setMessage({ text: "Could not load manual payment data.", ok: false });
     } finally {
@@ -99,43 +107,70 @@ export default function ManualPaymentsPage() {
     }
   }
 
-  function patchRow(key: string, patch: Partial<PaymentRow>) {
-    setRows(prev => prev.map(r => r.key === key ? { ...r, ...patch } : r));
+  function patchRow(key: string, patch: Partial<PaymentRow>, touch = false) {
+    setRows(prev => prev.map(r => r.key === key ? { ...r, ...patch, ...(touch ? { touched: true } : {}) } : r));
+  }
+
+  // Keep the three amounts coherent while typing: editing Full re-splits the
+  // unpaid deposits; editing one deposit rebalances against the fixed total
+  // (or extends the total when the other deposit is already locked).
+  function editAmount(key: string, col: AmountCol, value: string) {
+    setRows(prev => prev.map(r => {
+      if (r.key !== key) return r;
+      const next = { ...r, [col]: value, touched: true };
+      const cents = parseLoosePaymentCents(value);
+      const d1 = parseLoosePaymentCents(next.d1);
+      const d2 = parseLoosePaymentCents(next.d2);
+      if (col === "full" && cents > 0) {
+        if (!r.d1Paid && !r.d2Paid) {
+          const schedule = calculatePaymentSchedule(cents);
+          next.d1 = formatCents(schedule.retainer);
+          next.d2 = formatCents(schedule.remainingBalance);
+        } else if (r.d1Paid && !r.d2Paid) {
+          next.d2 = formatCents(Math.max(cents - d1, 0));
+        } else if (!r.d1Paid && r.d2Paid) {
+          next.d1 = formatCents(Math.max(cents - d2, 0));
+        }
+      } else if (col === "d1" && cents >= 0) {
+        if (r.d2Paid) next.full = formatCents(cents + d2);
+        else if (parseLoosePaymentCents(next.full) > 0) next.d2 = formatCents(Math.max(parseLoosePaymentCents(next.full) - cents, 0));
+        else if (d2 > 0) next.full = formatCents(cents + d2);
+      } else if (col === "d2" && cents >= 0) {
+        if (r.d1Paid) next.full = formatCents(cents + d1);
+        else if (parseLoosePaymentCents(next.full) > 0) next.d1 = formatCents(Math.max(parseLoosePaymentCents(next.full) - cents, 0));
+        else if (d1 > 0) next.full = formatCents(cents + d1);
+      }
+      return next;
+    }));
   }
 
   function applyInquiry(key: string, value: string) {
-    const current = rows.find(r => r.key === key);
     const match = inquiries.find(i => i.name.toLowerCase() === value.toLowerCase() || i.email.toLowerCase() === value.toLowerCase() || String(i.id) === value);
-    if (!match) { patchRow(key, { client_name: value, inquiry_id: null }); return; }
-    const total = inferSessionTotalCents(match);
-    const pt = current?.payment_type ?? "deposit_1";
-    const schedule = calculatePaymentSchedule(total);
-    const suggested = total > 0
-      ? formatCents(pt === "full" ? total : pt === "deposit_2" ? schedule.remainingBalance : schedule.retainer)
-      : "";
+    if (!match) { patchRow(key, { client_name: value, inquiry_id: null }, true); return; }
+    const seed = seedAmounts(match, payments);
     patchRow(key, {
-      inquiry_id: match.id, client_name: match.name, client_email: match.email,
-      session_date: parseToIsoDate(match.session_date ?? match.date_in_mind),
-      amount: current?.amount || suggested,
+      inquiry_id: match.id,
+      client_name: match.name,
+      client_email: match.email,
+      session_date: match.session_date?.slice(0, 10) ?? "",
+      payment_type: seed.nextType,
+      ...seed,
+    }, true);
+  }
+
+  function hideInquiries(ids: number[]) {
+    setHiddenIds(prev => {
+      const next = new Set([...prev, ...ids]);
+      localStorage.setItem(HIDDEN_KEY, JSON.stringify([...next]));
+      return next;
     });
   }
 
-  function autoFill() {
-    const HINTS: [string, string][] = [["venmo","Venmo"],["zelle","Zelle"],["paypal","PayPal"],["cash app","Cash App"],["pixieset","Pixieset"],["cash","Cash"]];
-    setRows(prev => prev.map(row => {
-      if (!row.inquiry_id) return row;
-      const inq = inquiries.find(i => i.id === row.inquiry_id);
-      if (!inq) return row;
-      const total = inferSessionTotalCents(inq);
-      const amount = row.amount.trim() || (total > 0 ? formatCents(total) : "");
-      const depositDate = inq.deposit_paid_at?.slice(0, 10) ?? inq.payment_detected_at?.slice(0, 10);
-      const paid_at = depositDate ?? row.paid_at;
-      const noteText = (inq.payment_note ?? "").toLowerCase();
-      const noteMethod = HINTS.find(([k]) => noteText.includes(k))?.[1];
-      const rel = payments.filter(p => p.status === "active" && (p.inquiry_id === row.inquiry_id || p.client_email?.toLowerCase() === inq.email.toLowerCase()));
-      const method = noteMethod ?? rel.find(p => p.method && p.method !== "manual")?.method ?? row.method;
-      return { ...row, amount, paid_at, method };
-    }));
+  function restoreAll() {
+    localStorage.removeItem(HIDDEN_KEY);
+    const empty = new Set<number>();
+    setHiddenIds(empty);
+    void loadData(true, empty);
   }
 
   function deleteRow(row: PaymentRow) {
@@ -162,25 +197,30 @@ export default function ManualPaymentsPage() {
   function toggleSelectAll() {
     setSelectedKeys(prev => {
       const n = new Set(prev);
-      allDisplayedSelected ? displayRows.forEach(r => n.delete(r.key)) : displayRows.forEach(r => n.add(r.key));
+      displayRows.forEach(r => { if (allDisplayedSelected) n.delete(r.key); else n.add(r.key); });
       return n;
     });
   }
 
   function toggleRow(key: string, checked: boolean) {
-    setSelectedKeys(prev => { const n = new Set(prev); checked ? n.add(key) : n.delete(key); return n; });
+    setSelectedKeys(prev => {
+      const n = new Set(prev);
+      if (checked) n.add(key);
+      else n.delete(key);
+      return n;
+    });
   }
 
   async function saveRows() {
     setSaving(true); setMessage(null);
     try {
-      const res = await fetch("/api/admin/manual-payments", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ rows: completeRows }) });
+      const payload = readyRows.map(r => ({ ...r, amount: amountForType(r) }));
+      const res = await fetch("/api/admin/manual-payments", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ rows: payload }) });
       const json = await res.json() as { saved?: SavedPayment[]; error?: string };
       if (!res.ok) { setMessage({ text: json.error ?? "Could not save payments.", ok: false }); return; }
       const saved = json.saved ?? [];
-      setPayments(prev => [...saved, ...prev]);
-      setRows(rowsFromInquiries(inquiries));
       setMessage({ text: `${saved.length} payment${saved.length === 1 ? "" : "s"} saved.`, ok: true });
+      await loadData(true);
     } catch {
       setMessage({ text: "Could not save payments.", ok: false });
     } finally {
@@ -190,176 +230,116 @@ export default function ManualPaymentsPage() {
 
   if (!authed && !loading) {
     return (
-      <main className="min-h-screen px-4 py-10" style={{ background: C.page }}>
-        <div className="mx-auto max-w-md rounded-2xl border p-6" style={{ background: C.white, borderColor: C.borderSubtle }}>
-          <p className="text-sm font-black" style={{ color: C.ink }}>Admin session required</p>
-          <p className="mt-2 text-sm" style={{ color: C.muted }}>Sign in from the admin page, then reopen manual payments.</p>
-          <Link href="/admin" className="mt-4 inline-flex rounded-xl px-4 py-2 text-xs font-black" style={{ background: C.grad12, color: C.white }}>Open Admin</Link>
-        </div>
+      <main className="min-h-screen px-4 py-10" style={{ background: REV.canvas }}>
+        <GlassPanel className="mx-auto max-w-md p-6">
+          <p className="text-sm font-black" style={{ color: REV.text }}>Admin session required</p>
+          <p className="mt-2 text-sm" style={{ color: REV.textSoft }}>Sign in from the admin page, then reopen manual payments.</p>
+          <Link href="/admin" className="mt-4 inline-flex rounded-xl px-4 py-2 text-xs font-black text-white" style={{ background: REV.accent }}>Open Admin</Link>
+        </GlassPanel>
       </main>
     );
   }
 
-  const FILTERS: { key: StatusFilter; label: string; count: number; bg: string; active: string }[] = [
-    { key: "all", label: "All", count: rows.length, bg: C.surfaceSoft, active: C.p1_12 },
-    { key: "full", label: "Paid", count: statusCounts.full, bg: "rgba(18,128,92,0.08)", active: "rgba(18,128,92,0.18)" },
-    { key: "partial", label: "In Progress", count: statusCounts.partial, bg: C.p3_08, active: C.p3_15 },
-    { key: "none", label: "Unpaid", count: statusCounts.none, bg: "rgba(180,35,24,0.07)", active: "rgba(180,35,24,0.16)" },
+  const FILTERS: { key: StatusFilter; label: string; count: number; color: string; bg: string }[] = [
+    { key: "all", label: "All", count: liveRows.length, color: REV.textSoft, bg: REV.neutralBg },
+    { key: "full", label: "Paid", count: statusCounts.full, color: REV.accent, bg: REV.accentBg },
+    { key: "partial", label: "In progress", count: statusCounts.partial, color: REV.amber, bg: REV.amberBg },
+    { key: "none", label: "Unpaid", count: statusCounts.none, color: REV.red, bg: REV.redBg },
   ];
 
+  const pill = "rounded-xl px-3 py-2 text-xs font-black transition-opacity hover:opacity-80 disabled:opacity-45";
+
   return (
-    <main className="min-h-screen px-3 py-4 sm:px-5" style={{ background: C.page }}>
-      <div className="mx-auto max-w-[1500px] space-y-4">
-        <header className="flex flex-col gap-3 rounded-2xl border p-4 sm:flex-row sm:items-center sm:justify-between" style={{ background: C.white, borderColor: C.borderSubtle }}>
+    <main className="relative min-h-screen px-3 py-4 sm:px-5 overflow-x-hidden" style={{ background: REV.canvas }}>
+      <div aria-hidden className="absolute inset-0 pointer-events-none" style={{ backgroundImage: REV.grid, backgroundSize: "44px 44px" }} />
+      <div aria-hidden className="absolute inset-0 pointer-events-none" style={{ background: REV.glowA }} />
+      <div className="relative mx-auto max-w-[1500px] space-y-4">
+
+        <GlassPanel className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: C.p1 }}>Manual Revenue Entry</p>
-            <h1 className="text-xl font-black leading-tight" style={{ color: C.ink }}>Spreadsheet payments</h1>
-            <p className="text-xs font-semibold" style={{ color: C.muted }}>{completeRows.length} ready to save</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.18em]" style={{ color: REV.accent }}>Manual revenue entry</p>
+            <h1 className="text-xl font-black leading-tight" style={{ color: REV.text }}>Spreadsheet payments</h1>
+            <p className="text-xs font-semibold" style={{ color: REV.textFaint }}>
+              Amounts mirror the database — saved deposits are locked ✓, the rest are editable suggestions.
+            </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <button onClick={autoFill} className="rounded-xl px-3 py-2 text-xs font-black" style={{ background: C.p3_10, color: C.ink }}>Auto-fill amounts</button>
-            <button onClick={() => setRows(prev => [...prev, ...emptyRows(6)])} className="rounded-xl px-3 py-2 text-xs font-black" style={{ background: C.p1_08, color: C.p1 }}>Add rows</button>
-            <button onClick={() => loadData(false)} disabled={loading} className="rounded-xl px-3 py-2 text-xs font-black disabled:opacity-50" style={{ background: C.p2_08, color: C.p2 }}>{loading ? "Loading..." : "Refresh"}</button>
-            <button onClick={saveRows} disabled={saving || completeRows.length === 0} className="rounded-xl px-4 py-2 text-xs font-black disabled:opacity-50" style={{ background: C.grad12, color: C.white }}>{saving ? "Saving..." : "Save to database"}</button>
+            <Link href="/admin?tab=payments" className={pill} style={{ background: REV.violetBg, color: REV.violet }}>← Revenue</Link>
+            <button onClick={() => setRows(prev => [...prev, ...emptyRows(6)])} className={pill} style={{ background: REV.neutralBg, color: REV.textSoft }}>+ Add rows</button>
+            <button onClick={() => loadData(true)} disabled={loading} className={pill} style={{ background: REV.blueBg, color: REV.blue }}>
+              {loading ? "Loading…" : "↻ Refresh"}
+            </button>
+            <button onClick={saveRows} disabled={saving || readyRows.length === 0} className={`${pill} text-white`} style={{ background: REV.accent }}
+              title="Saves only the rows you edited or selected">
+              {saving ? "Saving…" : `Save ${readyRows.length || ""} edited/selected`.replace("  ", " ")}
+            </button>
           </div>
-        </header>
+        </GlassPanel>
 
         {message && (
-          <div className="rounded-xl border px-4 py-3 text-sm font-bold" style={{ background: message.ok ? C.p1_08 : C.p2_08, borderColor: message.ok ? C.p1_20 : C.p2_20, color: message.ok ? C.success : C.danger }}>
+          <div className="rounded-xl px-4 py-3 text-sm font-bold" role="status"
+            style={{
+              background: message.ok ? REV.accentBg : REV.redBg,
+              border: `1px solid ${message.ok ? "rgba(16,185,129,0.3)" : "rgba(220,60,66,0.3)"}`,
+              color: message.ok ? REV.accent : REV.red,
+            }}>
             {message.text}
           </div>
         )}
 
-        <section className="overflow-hidden rounded-2xl border" style={{ background: C.white, borderColor: C.borderSubtle }}>
-          <div className="flex flex-wrap items-center gap-2 px-3 pt-3">
+        <GlassPanel className="overflow-hidden">
+          <div className="flex flex-wrap items-center gap-2 px-3 pt-3 pb-2">
             <input type="search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search clients…"
-              className="h-9 w-full max-w-xs rounded-xl border px-3 text-xs font-bold outline-none"
-              style={{ borderColor: C.borderSubtle, background: C.surfaceSoft, color: C.ink }} />
-            <div className="flex gap-1">
+              aria-label="Search clients"
+              className="h-9 w-full max-w-xs rounded-xl px-3 text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-500/50"
+              style={{ border: `1px solid ${REV.panelBorder}`, background: REV.inset, color: REV.text }} />
+            <div className="flex gap-1" role="group" aria-label="Payment status filter">
               {FILTERS.map(f => (
-                <button key={f.key} onClick={() => setStatusFilter(f.key)}
-                  className="rounded-lg px-2.5 py-1.5 text-[10px] font-black transition-colors"
-                  style={{ background: statusFilter === f.key ? f.active : f.bg, color: C.ink }}>
-                  {f.label} <span className="opacity-60">{f.count}</span>
+                <button key={f.key} onClick={() => setStatusFilter(f.key)} aria-pressed={statusFilter === f.key}
+                  className="rounded-lg px-2.5 py-1.5 text-[10px] font-black transition-all"
+                  style={statusFilter === f.key
+                    ? { background: f.bg, color: f.color, boxShadow: `inset 0 0 0 1.5px ${f.color}44` }
+                    : { background: "transparent", color: REV.textFaint }}>
+                  {f.label} <span className="opacity-70 tabular-nums">{f.count}</span>
                 </button>
               ))}
             </div>
             <div className="ml-auto flex gap-2">
               {hiddenIds.size > 0 && (
-                <button onClick={restoreAll} className="rounded-xl px-3 py-1.5 text-xs font-black" style={{ background: C.p1_08, color: C.p1 }}>
-                  Restore all ({hiddenIds.size})
+                <button onClick={restoreAll} className="rounded-xl px-3 py-1.5 text-xs font-black" style={{ background: REV.violetBg, color: REV.violet }}>
+                  Restore hidden ({hiddenIds.size})
                 </button>
               )}
               {selectedKeys.size > 0 && (
-                <button onClick={deleteSelected} className="rounded-xl px-3 py-1.5 text-xs font-black" style={{ background: "rgba(180,35,24,0.10)", color: C.danger }}>
-                  Delete selected ({selectedKeys.size})
+                <button onClick={deleteSelected} className="rounded-xl px-3 py-1.5 text-xs font-black" style={{ background: REV.redBg, color: REV.red }}>
+                  Remove selected ({selectedKeys.size})
                 </button>
               )}
             </div>
           </div>
-          <div className="overflow-auto mt-2">
-            <table className="w-full min-w-[1120px] border-collapse">
-              <thead style={{ background: C.surfaceSoft }}>
-                <tr style={{ color: C.muted }}>
-                  <th className={`${TH} w-[40px]`} style={{ borderColor: C.borderSubtle }}>
-                    <input type="checkbox" checked={allDisplayedSelected} onChange={toggleSelectAll} className="cursor-pointer" />
-                  </th>
-                  <th className={`${TH} w-[48px]`} style={{ borderColor: C.borderSubtle }}>#</th>
-                  <th className={`${TH} w-[190px]`} style={{ borderColor: C.borderSubtle }}>Client</th>
-                  <th className={`${TH} w-[220px]`} style={{ borderColor: C.borderSubtle }}>Email</th>
-                  <th className={`${TH} w-[120px]`} style={{ borderColor: C.borderSubtle }}>Amount</th>
-                  <th className={`${TH} w-[130px]`} style={{ borderColor: C.borderSubtle }}>Method</th>
-                  <th className={`${TH} w-[120px]`} style={{ borderColor: C.borderSubtle }}>Type</th>
-                  <th className={`${TH} w-[130px]`} style={{ borderColor: C.borderSubtle }}>Paid Date</th>
-                  <th className={`${TH} w-[130px]`} style={{ borderColor: C.borderSubtle }}>Session Date</th>
-                  <th className={`${TH} w-[190px]`} style={{ borderColor: C.borderSubtle }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {displayRows.map((row, index) => {
-                  const s = row.inquiry_id ? (paymentStatusMap.get(row.inquiry_id) ?? "none") : null;
-                  const bg = s === "full" ? "rgba(18,128,92,0.10)" : s === "partial" ? C.p3_08 : s === "none" ? "rgba(180,35,24,0.07)" : index % 2 ? C.surfaceStrong : C.white;
-                  return (
-                    <tr key={row.key} className="group" style={{ background: bg }}>
-                      <td className={`${TD} px-2 text-center`} style={{ borderColor: C.borderSubtle }}>
-                        <div className="flex items-center justify-center gap-1">
-                          <input type="checkbox" checked={selectedKeys.has(row.key)} onChange={e => toggleRow(row.key, e.target.checked)} className="cursor-pointer" />
-                          <button onClick={() => deleteRow(row)} className="text-xs font-black opacity-0 transition-opacity group-hover:opacity-70" style={{ color: C.danger }} title="Remove">×</button>
-                        </div>
-                      </td>
-                      <td className={`${TD} px-2 text-center text-xs font-black`} style={{ borderColor: C.borderSubtle, color: C.mutedSoft }}>{index + 1}</td>
-                      <td className={TD} style={{ borderColor: C.borderSubtle }}>
-                        <input list="manual-payment-clients" className={INPUT} value={row.client_name} onChange={e => applyInquiry(row.key, e.target.value)} />
-                      </td>
-                      <td className={TD} style={{ borderColor: C.borderSubtle }}>
-                        <input className={INPUT} type="email" value={row.client_email} onChange={e => patchRow(row.key, { client_email: e.target.value, inquiry_id: null })} />
-                      </td>
-                      <td className={TD} style={{ borderColor: C.borderSubtle }}>
-                        <input className={INPUT} inputMode="decimal" value={row.amount} onChange={e => patchRow(row.key, { amount: e.target.value })} />
-                      </td>
-                      <td className={TD} style={{ borderColor: C.borderSubtle }}>
-                        <select className={INPUT} value={row.method} onChange={e => patchRow(row.key, { method: e.target.value })}>
-                          {METHODS.map(m => <option key={m} value={m}>{m}</option>)}
-                        </select>
-                      </td>
-                      <td className={TD} style={{ borderColor: C.borderSubtle }}>
-                        <select className={INPUT} value={row.payment_type} onChange={e => patchRow(row.key, { payment_type: e.target.value })}>
-                          {PAYMENT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                        </select>
-                      </td>
-                      <td className={TD} style={{ borderColor: C.borderSubtle }}>
-                        <input className={INPUT} type="date" value={row.paid_at} onChange={e => patchRow(row.key, { paid_at: e.target.value })} />
-                      </td>
-                      <td className={TD} style={{ borderColor: C.borderSubtle }}>
-                        <input className={INPUT} type="date" value={row.session_date} onChange={e => patchRow(row.key, { session_date: e.target.value })} />
-                      </td>
-                      <td className={TD} style={{ borderColor: C.borderSubtle }}>
-                        <RowActions row={row} payments={payments}
-                          onSaved={(saved, text) => { setPayments(prev => [...saved, ...prev]); setMessage({ text, ok: true }); }}
-                          onError={text => setMessage({ text, ok: false })}
-                          onVoided={id => setPayments(p => p.filter(p2 => p2.inquiry_id !== id))} />
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-          <datalist id="manual-payment-clients">
-            {inquiries.map(i => <option key={i.id} value={i.name}>{i.email}</option>)}
-          </datalist>
-        </section>
+          <SpreadsheetTable
+            rows={displayRows}
+            inquiries={inquiries}
+            payments={payments}
+            selectedKeys={selectedKeys}
+            allSelected={allDisplayedSelected}
+            onToggleAll={toggleSelectAll}
+            onToggleRow={toggleRow}
+            onPatch={patchRow}
+            onEditAmount={editAmount}
+            onApplyInquiry={applyInquiry}
+            onDeleteRow={deleteRow}
+            onSaved={(saved, text) => { setPayments(prev => [...saved, ...prev]); setMessage({ text, ok: true }); }}
+            onError={text => setMessage({ text, ok: false })}
+            onVoided={id => setPayments(p => p.filter(p2 => p2.inquiry_id !== id))}
+          />
+        </GlassPanel>
 
         <PaymentStatusPanel inquiries={inquiries} payments={payments}
           onSaved={(saved, text) => { setPayments(prev => [...saved, ...prev]); setMessage({ text, ok: true }); }}
           onError={text => setMessage({ text, ok: false })} />
 
-        <section className="rounded-2xl border p-4" style={{ background: C.white, borderColor: C.borderSubtle }}>
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <p className="text-xs font-black uppercase tracking-widest" style={{ color: C.p1 }}>Recent saved payments</p>
-            <p className="text-xs font-bold" style={{ color: C.muted }}>{payments.length} loaded</p>
-          </div>
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {payments.slice(0, 18).map(payment => (
-              <div key={payment.id} className="rounded-xl border p-3" style={{ borderColor: C.borderSubtle, background: C.surfaceSoft }}>
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    {payment.inquiry_id
-                      ? <Link href={`/admin/conversation/${payment.inquiry_id}`} className="block truncate text-sm font-black" style={{ color: C.ink }}>{payment.client_name}</Link>
-                      : <p className="truncate text-sm font-black" style={{ color: C.ink }}>{payment.client_name}</p>}
-                    <p className="truncate text-[11px] font-semibold" style={{ color: C.muted }}>{payment.client_email || "No email"}</p>
-                  </div>
-                  <p className="shrink-0 text-sm font-black" style={{ color: C.success }}>{displayMoney(payment.amount, payment.amount_cents)}</p>
-                </div>
-                <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] font-black uppercase tracking-wider" style={{ color: C.muted }}>
-                  <span>{payment.method || "manual"}</span>
-                  <span>{payment.payment_type?.replace("_", " ")}</span>
-                  <span>{payment.paid_at ? new Date(payment.paid_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "No date"}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
+        <RecentPaymentsPanel payments={payments} />
       </div>
     </main>
   );

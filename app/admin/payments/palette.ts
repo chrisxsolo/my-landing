@@ -1,56 +1,63 @@
-// Visual tokens for the Revenue command center. The tab renders on its own
-// dark glass canvas, so it keeps a scoped palette here (single source for the
-// whole dashboard) instead of inlining hex values in every component.
+// Visual tokens for the Revenue command center — light Apple-style
+// glassmorphism: prominent white, neutral grays, frosted translucent panels.
+// Single source for the whole dashboard; no hex values inline in components.
 
 import { C } from "@/lib/colors";
 
 export const REV = {
-  // Canvas
-  canvas: "linear-gradient(160deg,#0a101e 0%,#0c1626 45%,#0a1a1c 100%)",
-  canvasBorder: "rgba(148,163,184,0.14)",
-  grid: "linear-gradient(rgba(148,163,184,0.05) 1px,transparent 1px),linear-gradient(90deg,rgba(148,163,184,0.05) 1px,transparent 1px)",
-  glowA: "radial-gradient(600px 280px at 12% -5%, rgba(52,211,153,0.13), transparent 70%)",
-  glowB: "radial-gradient(700px 320px at 90% 0%, rgba(157,111,232,0.12), transparent 70%)",
+  // Canvas: soft white with faint pastel ambience
+  canvas: "linear-gradient(160deg,#fdfdfe 0%,#f5f6f8 55%,#f2f5f4 100%)",
+  canvasBorder: "rgba(60,60,67,0.12)",
+  grid: "linear-gradient(rgba(60,60,67,0.045) 1px,transparent 1px),linear-gradient(90deg,rgba(60,60,67,0.045) 1px,transparent 1px)",
+  glowA: "radial-gradient(600px 280px at 12% -5%, rgba(16,185,129,0.08), transparent 70%)",
+  glowB: "radial-gradient(700px 320px at 90% 0%, rgba(157,111,232,0.07), transparent 70%)",
 
-  // Glass surfaces
-  panel: "rgba(255,255,255,0.045)",
-  panelHover: "rgba(255,255,255,0.07)",
-  panelBorder: "rgba(255,255,255,0.09)",
-  panelBorderStrong: "rgba(255,255,255,0.16)",
-  inset: "rgba(8,12,22,0.45)",
-  shadow: "0 10px 32px rgba(2,6,16,0.45)",
+  // Frosted glass surfaces. NOTE: deliberately no backdrop-filter on panels —
+  // dozens of blurred surfaces re-blur on every scroll frame and tank perf.
+  // Higher-opacity white over the soft canvas reads the same at ~zero cost.
+  panel: "rgba(255,255,255,0.78)",
+  panelHover: "rgba(255,255,255,0.95)",
+  panelBorder: "rgba(60,60,67,0.10)",
+  panelBorderStrong: "rgba(60,60,67,0.18)",
+  inset: "rgba(60,60,67,0.06)",
+  shadow: "0 8px 28px rgba(17,24,39,0.08)",
+  // Opaque overlay surfaces (tooltips, drawers, sticky bar)
+  overlay: "rgba(255,255,255,0.97)",
+  scrim: "rgba(17,24,39,0.28)",
+  rowBorder: "rgba(60,60,67,0.07)",
+  optionBg: "#ffffff",
 
-  // Type
-  text: "#e8edf6",
-  textSoft: "#9aa7bd",
-  textFaint: "#5d6b84",
+  // Type (Apple neutral ink)
+  text: "#1d1d1f",
+  textSoft: "#56565c",
+  textFaint: "#8e8e93",
 
-  // Semantics
-  accent: "#34d399", // collected / positive
-  accentDeep: "#10b981",
-  accentBg: "rgba(52,211,153,0.12)",
+  // Semantics (darkened for contrast on white)
+  accent: "#0a8a64", // collected / positive
+  accentDeep: "#0a7556",
+  accentBg: "rgba(16,185,129,0.13)",
   violet: C.p1,
-  violetBg: "rgba(157,111,232,0.14)",
-  pink: C.p2,
-  amber: "#fbbf24", // estimates / outstanding
-  amberBg: "rgba(251,191,36,0.12)",
-  orange: "#fb923c",
-  orangeBg: "rgba(251,146,60,0.13)",
-  red: "#f87171",
-  redBg: "rgba(248,113,113,0.13)",
-  blue: "#60a5fa",
-  blueBg: "rgba(96,165,250,0.13)",
-  neutral: "#94a3b8",
-  neutralBg: "rgba(148,163,184,0.12)",
+  violetBg: "rgba(157,111,232,0.13)",
+  pink: "#d4537f",
+  amber: "#b97309", // estimates / outstanding
+  amberBg: "rgba(217,144,12,0.14)",
+  orange: "#d4630e",
+  orangeBg: "rgba(234,116,30,0.13)",
+  red: "#d2363c",
+  redBg: "rgba(220,60,66,0.11)",
+  blue: "#2f6fd6",
+  blueBg: "rgba(59,123,224,0.12)",
+  neutral: "#6e6e73",
+  neutralBg: "rgba(110,110,115,0.10)",
 } as const;
 
 export const METHOD_META: Record<string, { label: string; color: string; bg: string }> = {
-  Venmo: { label: "Venmo", color: "#5aa9e0", bg: "rgba(90,169,224,0.14)" },
-  Zelle: { label: "Zelle", color: "#a78bfa", bg: "rgba(167,139,250,0.14)" },
-  PayPal: { label: "PayPal", color: "#60a5fa", bg: "rgba(96,165,250,0.14)" },
-  "Cash App": { label: "Cash App", color: "#34d399", bg: "rgba(52,211,153,0.14)" },
-  Pixieset: { label: "Pixieset", color: "#818cf8", bg: "rgba(129,140,248,0.14)" },
-  other: { label: "Other", color: "#94a3b8", bg: "rgba(148,163,184,0.14)" },
+  Venmo: { label: "Venmo", color: "#2a7cb6", bg: "rgba(61,149,206,0.13)" },
+  Zelle: { label: "Zelle", color: "#6d28d9", bg: "rgba(124,58,237,0.11)" },
+  PayPal: { label: "PayPal", color: "#0a5f9e", bg: "rgba(0,112,186,0.11)" },
+  "Cash App": { label: "Cash App", color: "#0a8a64", bg: "rgba(16,185,129,0.13)" },
+  Pixieset: { label: "Pixieset", color: "#4f46e5", bg: "rgba(99,102,241,0.11)" },
+  other: { label: "Other", color: "#6e6e73", bg: "rgba(110,110,115,0.10)" },
 };
 
 export const SERVICE_COLORS: Record<string, string> = {

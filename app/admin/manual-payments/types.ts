@@ -16,8 +16,8 @@ export type InquiryOption = {
   created_at: string;
 };
 
-export type PaymentRow = {
-  key: string;
+// Fields shared with rows persisted in the payments table.
+type PaymentRowCore = {
   inquiry_id: number | null;
   client_name: string;
   client_email: string;
@@ -30,7 +30,22 @@ export type PaymentRow = {
   note: string;
 };
 
-export type SavedPayment = Omit<PaymentRow, "key"> & {
+export type PaymentRow = PaymentRowCore & {
+  key: string;
+  // Per-schedule amounts, pre-populated from saved payments (exact figures)
+  // or from the inferred session total (suggestions the user can edit).
+  d1: string;
+  d2: string;
+  full: string;
+  d1Paid: boolean;
+  d2Paid: boolean;
+  /** Where the full total came from: saved payments, pricing, note… */
+  totalSource: string;
+  /** True once the user edits the row — only touched/selected rows bulk-save. */
+  touched: boolean;
+};
+
+export type SavedPayment = PaymentRowCore & {
   id: number;
   amount_cents: number;
   source: string;

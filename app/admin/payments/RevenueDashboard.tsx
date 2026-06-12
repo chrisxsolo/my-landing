@@ -3,7 +3,7 @@
 // derives every section from one memoized pipeline, and owns the global
 // filter state that all sections respond to.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { loadAdminInquiries, type AdminInquiry } from "@/lib/adminInquiries";
 import { paymentMatchesPeriod } from "@/lib/paymentAnalytics";
@@ -103,19 +103,24 @@ export default function RevenueDashboard() {
   }
 
   // ── Derivation pipeline ───────────────────────────────────────────────────
+  // The controls bind to `filters` (instant), while every derived section uses
+  // the deferred copy — so typing in search never blocks on recomputing and
+  // re-rendering the whole dashboard per keystroke.
+  const activeFilters = useDeferredValue(filters);
+
   const enriched = useMemo(() => enrichPayments(payments, inquiries), [payments, inquiries]);
   const rowsById = useMemo(() => new Map(enriched.map(r => [r.id, r])), [enriched]);
 
   const dimensionRows = useMemo(
-    () => enriched.filter(p => matchesDimensions(p, filters)),
-    [enriched, filters],
+    () => enriched.filter(p => matchesDimensions(p, activeFilters)),
+    [enriched, activeFilters],
   );
 
   const period = useMemo(
-    () => buildPresetPeriod(filters.preset, new Date(), { start: filters.customStart, end: filters.customEnd }),
-    [filters.preset, filters.customStart, filters.customEnd],
+    () => buildPresetPeriod(activeFilters.preset, new Date(), { start: activeFilters.customStart, end: activeFilters.customEnd }),
+    [activeFilters.preset, activeFilters.customStart, activeFilters.customEnd],
   );
-  const compPeriod = useMemo(() => buildComparisonPeriod(period, filters.compare), [period, filters.compare]);
+  const compPeriod = useMemo(() => buildComparisonPeriod(period, activeFilters.compare), [period, activeFilters.compare]);
 
   const periodRows = useMemo(
     () => dimensionRows.filter(p => paymentMatchesPeriod(p, period)),

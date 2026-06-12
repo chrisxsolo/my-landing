@@ -41,14 +41,14 @@ export default function RevenueFilterBar({
     <label className="inline-flex items-center gap-1">
       <span className="sr-only">{label}</span>
       <select aria-label={label} value={value} onChange={e => onSel(e.target.value)} className={fieldClass} style={fieldStyle}>
-        {options.map(([v, l]) => <option key={v} value={v} style={{ background: "#0c1626" }}>{l}</option>)}
+        {options.map(([v, l]) => <option key={v} value={v} style={{ background: REV.optionBg }}>{l}</option>)}
       </select>
     </label>
   );
 
   return (
-    <div className="sticky top-2 z-40 rounded-2xl backdrop-blur-xl px-3 py-2.5"
-      style={{ background: "rgba(10,16,30,0.88)", border: `1px solid ${REV.panelBorderStrong}`, boxShadow: REV.shadow }}>
+    <div className="sticky top-2 z-40 rounded-2xl px-3 py-2.5"
+      style={{ background: REV.overlay, border: `1px solid ${REV.panelBorderStrong}`, boxShadow: REV.shadow }}>
       <div className="flex items-center gap-2 flex-wrap">
         {select("Date range", filters.preset, v => onChange({ preset: v as RevenueFilters["preset"] }),
           DATE_PRESETS.map(p => [p.value, p.label]))}

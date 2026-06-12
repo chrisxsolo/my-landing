@@ -95,7 +95,7 @@ export default function TrendChart({ points, compPoints, compareLabel, metricLab
         {/* y grid + currency ticks */}
         {ticks.map(t => (
           <g key={t}>
-            <line x1={PAD.left} x2={W - PAD.right} y1={yOf(t)} y2={yOf(t)} stroke="rgba(148,163,184,0.1)" strokeDasharray="3 5" />
+            <line x1={PAD.left} x2={W - PAD.right} y1={yOf(t)} y2={yOf(t)} stroke={REV.rowBorder} strokeDasharray="3 5" />
             <text x={PAD.left - 8} y={yOf(t) + 3} textAnchor="end" fontSize={10} fontWeight={700} fill={REV.textFaint}>
               {fmtMoney(t)}
             </text>
@@ -116,7 +116,7 @@ export default function TrendChart({ points, compPoints, compareLabel, metricLab
         {/* peak annotation */}
         {points[peakIdx].cents > 0 && (
           <g>
-            <circle cx={xOf(peakIdx)} cy={yOf(points[peakIdx].cents)} r={3.5} fill={color} stroke="#0c1626" strokeWidth={1.5} />
+            <circle cx={xOf(peakIdx)} cy={yOf(points[peakIdx].cents)} r={3.5} fill={color} stroke="#ffffff" strokeWidth={1.5} />
             <text x={xOf(peakIdx)} y={yOf(points[peakIdx].cents) - 8}
               textAnchor={peakIdx > points.length * 0.8 ? "end" : "middle"}
               fontSize={10} fontWeight={800} fill={REV.textSoft}>
@@ -137,9 +137,9 @@ export default function TrendChart({ points, compPoints, compareLabel, metricLab
         {/* crosshair */}
         {hover !== null && h && (
           <g>
-            <line x1={xOf(hover)} x2={xOf(hover)} y1={PAD.top} y2={H - PAD.bottom} stroke="rgba(232,237,246,0.35)" strokeWidth={1} />
-            <circle cx={xOf(hover)} cy={yOf(h.cents)} r={4.5} fill={color} stroke="#0c1626" strokeWidth={2} />
-            {hc && <circle cx={xOf(hover)} cy={yOf(hc.cents)} r={3.5} fill={REV.neutral} stroke="#0c1626" strokeWidth={1.5} />}
+            <line x1={xOf(hover)} x2={xOf(hover)} y1={PAD.top} y2={H - PAD.bottom} stroke={REV.panelBorderStrong} strokeWidth={1} />
+            <circle cx={xOf(hover)} cy={yOf(h.cents)} r={4.5} fill={color} stroke="#ffffff" strokeWidth={2} />
+            {hc && <circle cx={xOf(hover)} cy={yOf(hc.cents)} r={3.5} fill={REV.neutral} stroke="#ffffff" strokeWidth={1.5} />}
           </g>
         )}
 
@@ -156,7 +156,7 @@ export default function TrendChart({ points, compPoints, compareLabel, metricLab
             left: `${(xOf(hover) / W) * 100}%`,
             top: 0,
             transform: `translateX(${hover > points.length * 0.7 ? "-105%" : "8px"})`,
-            background: "rgba(8,12,22,0.96)",
+            background: REV.overlay,
             border: `1px solid ${REV.panelBorderStrong}`,
             boxShadow: REV.shadow,
           }}>

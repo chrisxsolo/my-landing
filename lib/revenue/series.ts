@@ -25,18 +25,20 @@ function rowDate(p: LedgerRow): Date | null {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+// Calendar-field arithmetic throughout: adding milliseconds drifts an hour
+// across DST transitions, which desynchronizes iterated bucket keys from
+// data bucket keys and silently zeroes every bucket after the change.
 function bucketStart(d: Date, g: "day" | "week" | "month"): Date {
   if (g === "month") return new Date(d.getFullYear(), d.getMonth(), 1);
-  const day = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  if (g === "day") return day;
+  if (g === "day") return new Date(d.getFullYear(), d.getMonth(), d.getDate());
   // Weeks start on Monday.
-  const offset = (day.getDay() + 6) % 7;
-  return new Date(day.getTime() - offset * DAY_MS);
+  const offset = (d.getDay() + 6) % 7;
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() - offset);
 }
 
 function nextBucket(d: Date, g: "day" | "week" | "month"): Date {
   if (g === "month") return new Date(d.getFullYear(), d.getMonth() + 1, 1);
-  return new Date(d.getTime() + (g === "day" ? DAY_MS : 7 * DAY_MS));
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() + (g === "day" ? 1 : 7));
 }
 
 function bucketLabel(d: Date, g: "day" | "week" | "month"): string {
@@ -159,8 +161,9 @@ export function revenuePace(
     }, 0);
   }
 
-  // Only project when the period is still running and enough of it has elapsed
-  // for a linear estimate to mean anything.
-  const projectedCents = elapsed > 0.1 && elapsed < 1 ? Math.round(soFarCents / elapsed) : null;
+  // Only project when the period is genuinely mid-flight: too early and the
+  // estimate is noise, nearly complete and it adds nothing (e.g. YTD ranges
+  // that end today are already ~100% elapsed).
+  const projectedCents = elapsed > 0.1 && elapsed < 0.95 ? Math.round(soFarCents / elapsed) : null;
   return { soFarCents, compAtSamePointCents, compTotalCents, projectedCents, elapsed };
 }

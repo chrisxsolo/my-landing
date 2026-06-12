@@ -23,7 +23,9 @@ type Props = {
 export default function QualitySection({ loading, issues, rowsById, allRows, stagingReloadToken, onLedgerChanged }: Props) {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [showAll, setShowAll] = useState(false);
   const counts = countBySeverity(issues);
+  const visibleIssues = showAll ? issues : issues.slice(0, 6);
 
   // Dismiss = mark the involved rows "reconciled" (audited via reconciled_at).
   async function dismiss(issue: QualityIssue) {
@@ -68,7 +70,7 @@ export default function QualitySection({ loading, issues, rowsById, allRows, sta
           <EmptyState message="Ledger is clean ✓" hint="No rule produced a finding. New imports are re-checked automatically." />
         ) : (
           <div className="space-y-2">
-            {issues.map(issue => {
+            {visibleIssues.map(issue => {
               const sev = SEVERITY_META[issue.severity];
               return (
                 <div key={issue.id} className="px-3.5 py-3 rounded-xl"
@@ -106,6 +108,13 @@ export default function QualitySection({ loading, issues, rowsById, allRows, sta
                 </div>
               );
             })}
+            {issues.length > 6 && (
+              <button type="button" onClick={() => setShowAll(v => !v)}
+                className="w-full text-[10px] font-black py-2 rounded-xl"
+                style={{ background: REV.neutralBg, color: REV.textSoft }}>
+                {showAll ? "Show top 6" : `Show all ${issues.length} findings`}
+              </button>
+            )}
           </div>
         )}
       </GlassPanel>

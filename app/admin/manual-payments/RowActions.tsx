@@ -1,6 +1,10 @@
 "use client";
+// Per-row quick actions: mark deposit 1 / deposit 2 / full as paid (the API
+// splits the full total per the payment schedule), plus clear-all. Same
+// behavior as before, restyled for the light glass theme.
+
 import { useState } from "react";
-import { C } from "@/lib/colors";
+import { REV } from "@/app/admin/payments/palette";
 import type { PaymentRow, SavedPayment } from "./types";
 
 type Props = {
@@ -36,7 +40,7 @@ export default function RowActions({ row, payments, onSaved, onError, onVoided }
           inquiry_id: row.inquiry_id,
           client_name: row.client_name,
           client_email: row.client_email,
-          total_amount: row.amount || "",
+          total_amount: row.full || row.amount || "",
           method: row.method,
           paid_at: row.paid_at,
           paid: type,
@@ -70,41 +74,32 @@ export default function RowActions({ row, payments, onSaved, onError, onVoided }
     }
   }
 
+  const btn = "flex-1 rounded-lg px-1.5 py-1 text-[9px] font-black transition-opacity hover:opacity-80 disabled:opacity-35";
+
   return (
     <div className="flex flex-col gap-1 px-1.5 py-1.5">
       <div className="flex gap-1">
-        <button
-          onClick={() => markPaid("deposit_1")}
-          disabled={paid1 || isBusy}
-          className="flex-1 rounded px-1 py-1 text-[9px] font-black disabled:opacity-40"
-          style={{ background: paid1 ? C.p1_12 : C.p1_08, color: C.p1 }}
-        >
+        <button onClick={() => markPaid("deposit_1")} disabled={paid1 || isBusy} className={btn}
+          title="Record deposit 1 as paid"
+          style={{ background: paid1 ? REV.accentBg : REV.violetBg, color: paid1 ? REV.accent : REV.violet }}>
           {busy === "deposit_1" ? "…" : paid1 ? "D1 ✓" : "D1"}
         </button>
-        <button
-          onClick={() => markPaid("deposit_2")}
-          disabled={paid2 || isBusy}
-          className="flex-1 rounded px-1 py-1 text-[9px] font-black disabled:opacity-40"
-          style={{ background: paid2 ? C.p2_12 : C.p2_08, color: C.p2 }}
-        >
+        <button onClick={() => markPaid("deposit_2")} disabled={paid2 || isBusy} className={btn}
+          title="Record deposit 2 as paid"
+          style={{ background: paid2 ? REV.accentBg : REV.blueBg, color: paid2 ? REV.accent : REV.blue }}>
           {busy === "deposit_2" ? "…" : paid2 ? "D2 ✓" : "D2"}
         </button>
-        <button
-          onClick={() => markPaid("full")}
-          disabled={(paid1 && paid2) || isBusy}
-          className="flex-1 rounded px-1 py-1 text-[9px] font-black text-white disabled:opacity-40"
-          style={{ background: C.grad12 }}
-        >
+        <button onClick={() => markPaid("full")} disabled={(paid1 && paid2) || isBusy} className={btn}
+          title="Record the full total as paid"
+          style={{ background: REV.accent, color: "#fff" }}>
           {busy === "full" ? "…" : "Full"}
         </button>
       </div>
       {(paid1 || paid2) && (
-        <button
-          onClick={voidPayments}
-          disabled={isBusy}
-          className="w-full rounded px-1 py-0.5 text-[9px] font-black disabled:opacity-40"
-          style={{ background: C.p3_10, color: C.danger }}
-        >
+        <button onClick={voidPayments} disabled={isBusy}
+          className="w-full rounded-lg px-1 py-0.5 text-[9px] font-black transition-opacity hover:opacity-80 disabled:opacity-35"
+          title="Void every active payment for this client"
+          style={{ background: REV.redBg, color: REV.red }}>
           {busy === "void" ? "Clearing…" : "Clear payments"}
         </button>
       )}

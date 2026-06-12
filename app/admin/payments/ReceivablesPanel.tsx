@@ -56,7 +56,7 @@ export default function ReceivablesPanel({ loading, receivables }: Props) {
                   <table className="w-full text-left border-collapse min-w-[560px]">
                     <tbody>
                       {items.map(r => (
-                        <tr key={r.inquiryId} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                        <tr key={r.inquiryId} style={{ borderBottom: `1px solid ${REV.rowBorder}` }}>
                           <td className="py-2 pr-3">
                             <span className="text-xs font-black" style={{ color: REV.text }}>{r.clientName}</span>
                             <span className="block text-[10px] font-medium" style={{ color: REV.textFaint }}>{r.serviceType ?? "service unknown"}</span>
