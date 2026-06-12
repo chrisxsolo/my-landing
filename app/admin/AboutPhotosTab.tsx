@@ -27,7 +27,7 @@ const API = "/api/admin/about-photos";
 export default function AboutPhotosTab({ showToast }: Props) {
   // slug → PhotoRow for facts that already have a photo
   const [photoMap, setPhotoMap] = useState<Record<string, PhotoRow>>({});
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   // per-fact controlled alt-text draft
   const [altDrafts, setAltDrafts] = useState<Record<string, string>>({});
   // per-fact file selection
@@ -237,6 +237,7 @@ export default function AboutPhotosTab({ showToast }: Props) {
                 {/* Action buttons */}
                 <div className="flex flex-wrap gap-2">
                   <button
+                    type="button"
                     onClick={() => handleUpload(fact.slug)}
                     disabled={busy || !fileVal}
                     className="inline-flex items-center rounded-lg bg-emerald-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50"
@@ -246,6 +247,7 @@ export default function AboutPhotosTab({ showToast }: Props) {
 
                   {hasPhoto && (
                     <button
+                      type="button"
                       onClick={() => handleSaveAlt(fact.slug)}
                       disabled={busy}
                       className="inline-flex items-center rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
@@ -256,6 +258,7 @@ export default function AboutPhotosTab({ showToast }: Props) {
 
                   {hasPhoto && (
                     <button
+                      type="button"
                       onClick={() => handleRemove(fact.slug)}
                       disabled={busy}
                       className="inline-flex items-center rounded-lg border border-red-200 px-3 py-1.5 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50"
