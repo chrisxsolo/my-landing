@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
 import AdminSessionForm, {
   ADMIN_SESSION_FORM_ID,
   type AdminSessionFormPayload,
@@ -18,6 +18,10 @@ import {
 } from "@/lib/clientSessions";
 import type { ClientSessionContactOption } from "@/lib/clientSessionContacts";
 import { checkAuth } from "@/lib/adminAuth";
+import {
+  filterAdminPortalSessions,
+  resolveAdminPortalSessionFocus,
+} from "@/lib/adminPortalSessionNavigation";
 import { supabase } from "@/lib/supabase";
 
 type AdminSessionsResponse = {
@@ -31,26 +35,15 @@ type AdminSessionContactsResponse = {
   error?: string;
 };
 
-function matchesQuery(session: AdminClientSessionDTO, query: string) {
-  const haystack = [
-    session.clientName,
-    session.clientEmail,
-    session.sessionType,
-    session.location,
-    session.meetingPoint,
-    session.currentStatus,
-    session.sessionDate,
-  ].join(" ").toLowerCase();
-
-  return haystack.includes(query.toLowerCase());
-}
-
 export default function AdminSessionsDashboard() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const appliedFocusKey = useRef<string | null>(null);
   const [sessions, setSessions] = useState<AdminClientSessionDTO[]>([]);
   const [contacts, setContacts] = useState<ClientSessionContactOption[]>([]);
   const [editing, setEditing] = useState<AdminClientSessionDTO | null>(null);
   const [query, setQuery] = useState("");
+  const [focusedSessionId, setFocusedSessionId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<ClientSessionStatus | "all">("all");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -123,13 +116,31 @@ export default function AdminSessionsDashboard() {
     return () => window.cancelAnimationFrame(frame);
   }, [editing]);
 
+  useEffect(() => {
+    if (loading) return;
+    const focusKey = searchParams.toString();
+    if (appliedFocusKey.current === focusKey) return;
+
+    const focus = resolveAdminPortalSessionFocus(sessions, searchParams);
+    appliedFocusKey.current = focusKey;
+    if (!focus.clientQuery) {
+      setQuery("");
+      setFocusedSessionId(null);
+      return;
+    }
+
+    setQuery(focus.clientQuery);
+    setFocusedSessionId(focus.sessionId);
+    setStatusFilter("all");
+  }, [loading, searchParams, sessions]);
+
   const filteredSessions = useMemo(() => {
-    return sessions.filter((session) => {
-      const queryMatch = query.trim() ? matchesQuery(session, query.trim()) : true;
-      const statusMatch = statusFilter === "all" || session.currentStatus === statusFilter;
-      return queryMatch && statusMatch;
+    return filterAdminPortalSessions(sessions, {
+      query,
+      statusFilter,
+      focusedSessionId,
     });
-  }, [query, sessions, statusFilter]);
+  }, [focusedSessionId, query, sessions, statusFilter]);
 
   async function getAuthHeaders(): Promise<HeadersInit> {
     const { data } = await supabase.auth.getSession();
@@ -519,14 +530,20 @@ export default function AdminSessionsDashboard() {
               <div className="grid gap-3 md:grid-cols-[1fr_220px]">
                 <input
                   value={query}
-                  onChange={(event) => setQuery(event.target.value)}
+                  onChange={(event) => {
+                    setFocusedSessionId(null);
+                    setQuery(event.target.value);
+                  }}
                   placeholder="Search name, email, type, location, date..."
                   className="min-h-11 w-full min-w-0 rounded-lg border px-3 text-sm font-semibold outline-none"
                   style={{ background: C.surfaceStrong, borderColor: C.borderSubtle, color: C.ink }}
                 />
                 <select
                   value={statusFilter}
-                  onChange={(event) => setStatusFilter(event.target.value as ClientSessionStatus | "all")}
+                  onChange={(event) => {
+                    setFocusedSessionId(null);
+                    setStatusFilter(event.target.value as ClientSessionStatus | "all");
+                  }}
                   className="min-h-11 w-full min-w-0 rounded-lg border px-3 text-sm font-semibold outline-none"
                   style={{ background: C.surfaceStrong, borderColor: C.borderSubtle, color: C.ink }}
                 >

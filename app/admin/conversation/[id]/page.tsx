@@ -1,10 +1,12 @@
 "use client";
 // Client conversation workspace — Darkroom edition. This file owns all state
 // and API handlers; presentation lives in the sibling panel components.
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { checkAuth } from "@/lib/adminAuth";
+import { buildAdminPortalSessionHref } from "@/lib/adminPortalSessionNavigation";
 import type { GmailMessage } from "@/app/api/gmail/thread/route";
 import { buildReminderEmail, type ReminderEmailType } from "@/lib/reminderEmail";
 import {
@@ -1065,6 +1067,20 @@ export default function ConversationPage() {
             {statusMeta.label}
           </span>
         </div>
+        <Link
+          href={buildAdminPortalSessionHref({
+            clientEmail: inquiry.email,
+            sessionType: inquiry.session_type,
+            sessionDate: inquiry.session_date ?? inquiry.date_in_mind,
+          })}
+          aria-label="Open portal session"
+          title="Open portal session"
+          className="inline-flex min-h-8 items-center gap-1.5 rounded-full px-2.5 text-[11px] font-semibold transition-colors hover:bg-white/10 flex-shrink-0"
+          style={{ color: T.action, border: `1px solid ${T.amberBorder}` }}
+        >
+          <Icon name="film" size={14} />
+          <span className="hidden md:inline">Portal session</span>
+        </Link>
         {/* Status segmented control */}
         <div className="hidden sm:flex items-center gap-0.5 p-0.5 rounded-full flex-shrink-0" style={{ background: T.inset, border: `1px solid ${T.rowBorder}` }}>
           {(["new", "responded", "archived"] as const).map(s => (
