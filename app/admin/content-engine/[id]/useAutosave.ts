@@ -30,8 +30,9 @@ export function useAutosave(
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const payloadRef = useRef(payload);
   const stateRef = useRef(state);
-  payloadRef.current = payload;
-  stateRef.current = state;
+
+  useEffect(() => { payloadRef.current = payload; }, [payload]);
+  useEffect(() => { stateRef.current = state; }, [state]);
 
   const dispatch = useCallback((event: Parameters<typeof autosaveReducer>[1]) => {
     setState((s) => autosaveReducer(s, event));
