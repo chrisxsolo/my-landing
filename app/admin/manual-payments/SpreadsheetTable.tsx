@@ -4,11 +4,9 @@
 // (locked, ✓), everything else as editable schedule suggestions.
 
 import { REV } from "@/app/admin/payments/palette";
-import { displayMoney, METHODS, PAYMENT_TYPES } from "./helpers";
+import { displayMoney, METHODS, PAYMENT_TYPES, type AmountCol } from "./helpers";
 import RowActions from "./RowActions";
 import type { InquiryOption, PaymentRow, SavedPayment } from "./types";
-
-export type AmountCol = "d1" | "d2" | "full";
 
 const TH = "sticky top-0 z-10 px-2 py-2.5 text-left text-[9px] font-black uppercase tracking-[0.14em] whitespace-nowrap";
 const INPUT = "h-9 w-full min-w-0 rounded-lg border-0 bg-transparent px-2 text-xs font-semibold outline-none focus:ring-2 focus:ring-emerald-500/50";

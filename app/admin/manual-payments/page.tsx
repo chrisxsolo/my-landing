@@ -8,15 +8,14 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { checkAuth } from "@/lib/adminAuth";
-import { calculatePaymentSchedule } from "@/lib/pricingCatalog";
-import { parseLoosePaymentCents } from "@/lib/paymentTotalInference";
 import { GlassPanel } from "@/app/admin/payments/Glass";
 import { REV } from "@/app/admin/payments/palette";
 import PaymentStatusPanel from "./PaymentStatusPanel";
 import RecentPaymentsPanel from "./RecentPaymentsPanel";
-import SpreadsheetTable, { type AmountCol } from "./SpreadsheetTable";
+import SpreadsheetTable from "./SpreadsheetTable";
 import {
-  amountForType, emptyRows, formatCents, relatedPayments, rowIsReady, rowsFromInquiries, seedAmounts,
+  amountForType, emptyRows, paymentOnlyRows, rebalanceAmounts, relatedPayments, rowIsReady, rowsFromInquiries, seedAmounts,
+  type AmountCol,
 } from "./helpers";
 import type { InquiryOption, PaymentRow, SavedPayment } from "./types";
 
@@ -53,8 +52,8 @@ export default function ManualPaymentsPage() {
   // Paid flags always derive from the freshest payments list, so a D1/D2
   // button click locks the matching amount cell immediately.
   const liveRows = useMemo(() => rows.map(row => {
-    if (!row.inquiry_id && !row.client_email.trim()) return row;
-    const related = relatedPayments(payments, row.inquiry_id, row.client_email);
+    if (!row.inquiry_id && !row.client_email.trim() && !row.client_name.trim()) return row;
+    const related = relatedPayments(payments, row.inquiry_id, row.client_email, row.client_name);
     const full = related.some(p => p.payment_type === "full");
     return {
       ...row,
@@ -96,8 +95,13 @@ export default function ManualPaymentsPage() {
       const loadedPayments = json.payments ?? [];
       setInquiries(loaded);
       setPayments(loadedPayments);
-      if (seedRows && loaded.length > 0) {
-        setRows(rowsFromInquiries(loaded, loadedPayments));
+      if (seedRows && (loaded.length > 0 || loadedPayments.length > 0)) {
+        // Inquiry rows first, then ledger-only clients (payments without an
+        // inquiry) so paid clients can never disappear from the spreadsheet.
+        setRows([
+          ...rowsFromInquiries(loaded, loadedPayments),
+          ...paymentOnlyRows(loadedPayments, loaded),
+        ]);
         setSelectedKeys(new Set());
       }
     } catch {
@@ -111,36 +115,19 @@ export default function ManualPaymentsPage() {
     setRows(prev => prev.map(r => r.key === key ? { ...r, ...patch, ...(touch ? { touched: true } : {}) } : r));
   }
 
-  // Keep the three amounts coherent while typing: editing Full re-splits the
-  // unpaid deposits; editing one deposit rebalances against the fixed total
-  // (or extends the total when the other deposit is already locked).
+  // Rebalance against LIVE paid flags (not the seeded ones): after "Clear
+  // payments" voids a client's rows, typing the corrected full total must
+  // re-populate both deposits again.
   function editAmount(key: string, col: AmountCol, value: string) {
     setRows(prev => prev.map(r => {
       if (r.key !== key) return r;
-      const next = { ...r, [col]: value, touched: true };
-      const cents = parseLoosePaymentCents(value);
-      const d1 = parseLoosePaymentCents(next.d1);
-      const d2 = parseLoosePaymentCents(next.d2);
-      if (col === "full" && cents > 0) {
-        if (!r.d1Paid && !r.d2Paid) {
-          const schedule = calculatePaymentSchedule(cents);
-          next.d1 = formatCents(schedule.retainer);
-          next.d2 = formatCents(schedule.remainingBalance);
-        } else if (r.d1Paid && !r.d2Paid) {
-          next.d2 = formatCents(Math.max(cents - d1, 0));
-        } else if (!r.d1Paid && r.d2Paid) {
-          next.d1 = formatCents(Math.max(cents - d2, 0));
-        }
-      } else if (col === "d1" && cents >= 0) {
-        if (r.d2Paid) next.full = formatCents(cents + d2);
-        else if (parseLoosePaymentCents(next.full) > 0) next.d2 = formatCents(Math.max(parseLoosePaymentCents(next.full) - cents, 0));
-        else if (d2 > 0) next.full = formatCents(cents + d2);
-      } else if (col === "d2" && cents >= 0) {
-        if (r.d1Paid) next.full = formatCents(cents + d1);
-        else if (parseLoosePaymentCents(next.full) > 0) next.d1 = formatCents(Math.max(parseLoosePaymentCents(next.full) - cents, 0));
-        else if (d1 > 0) next.full = formatCents(cents + d1);
-      }
-      return next;
+      const related = relatedPayments(payments, r.inquiry_id, r.client_email, r.client_name);
+      const full = related.some(p => p.payment_type === "full");
+      const flags = {
+        d1Paid: full || related.some(p => p.payment_type === "deposit_1"),
+        d2Paid: full || related.some(p => p.payment_type === "deposit_2"),
+      };
+      return { ...r, ...rebalanceAmounts(r, col, value, flags), touched: true };
     }));
   }
 

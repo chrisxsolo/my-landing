@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   amountForType,
+  paymentOnlyRows,
+  rebalanceAmounts,
+  relatedPayments,
   rowIsReady,
   rowsFromInquiries,
   seedAmounts,
@@ -90,6 +93,73 @@ describe("seedAmounts — mirror of the database", () => {
       payment({ id: 1, status: "voided" }),
     ]);
     expect(seed.d1Paid).toBe(false);
+  });
+});
+
+describe("payment-only clients (no inquiry on record)", () => {
+  // Alexa: one $700 retainer in the ledger, no inquiry, no email.
+  const alexa = payment({
+    id: 132, inquiry_id: null, client_name: "Alexa Lee Cottrell", client_email: "",
+    amount: "700.00", amount_cents: 70000, payment_type: "deposit_1", method: "Zelle",
+  });
+
+  it("creates a searchable row seeded from the ledger", () => {
+    const [row] = paymentOnlyRows([alexa], []);
+    expect(row).toBeDefined();
+    expect(row.client_name).toBe("Alexa Lee Cottrell");
+    expect(row.d1).toBe("700.00");
+    expect(row.d1Paid).toBe(true);
+    expect(row.d2).toBe("700.00"); // retainer policy: total 1400 − 700 paid
+    expect(row.full).toBe("1400.00");
+    expect(row.payment_type).toBe("deposit_2"); // next unpaid step
+    expect(row.method).toBe("Zelle");
+  });
+
+  it("matches name-only ledger rows so the paid flag can't be lost", () => {
+    expect(relatedPayments([alexa], null, "", "alexa lee cottrell")).toHaveLength(1);
+    // but never name-matches when either side has an email
+    expect(relatedPayments([alexa], null, "someone@else.com", "Alexa Lee Cottrell")).toHaveLength(0);
+  });
+
+  it("skips clients already represented by an inquiry row", () => {
+    const linked = payment({ id: 2, inquiry_id: null, client_email: "elba@example.com" });
+    expect(paymentOnlyRows([linked], [inquiry({})])).toHaveLength(0);
+  });
+
+  it("ignores voided ledger rows and payments linked to inquiries", () => {
+    expect(paymentOnlyRows([{ ...alexa, status: "voided" }], [])).toHaveLength(0);
+    expect(paymentOnlyRows([payment({ id: 3, inquiry_id: 7 })], [])).toHaveLength(0);
+  });
+});
+
+describe("rebalanceAmounts", () => {
+  it("clear-payments flow: with nothing paid anymore, the corrected full re-splits both deposits", () => {
+    // Gabriel: stale row still shows old amounts, but his rows were voided.
+    const stale = { d1: "217.50", d2: "217.50", full: "435.00" };
+    const next = rebalanceAmounts(stale, "full", "850.00", { d1Paid: false, d2Paid: false });
+    expect(next.d1).toBe("425.00");
+    expect(next.d2).toBe("425.00");
+    expect(next.full).toBe("850.00");
+  });
+
+  it("with deposit 1 recorded, editing full only moves the open balance", () => {
+    const row = { d1: "425.00", d2: "425.00", full: "850.00" };
+    const next = rebalanceAmounts(row, "full", "950.00", { d1Paid: true, d2Paid: false });
+    expect(next.d1).toBe("425.00");
+    expect(next.d2).toBe("525.00");
+  });
+
+  it("editing one open deposit rebalances the other against the fixed total", () => {
+    const row = { d1: "425.00", d2: "425.00", full: "850.00" };
+    const next = rebalanceAmounts(row, "d1", "300.00", { d1Paid: false, d2Paid: false });
+    expect(next.d2).toBe("550.00");
+    expect(next.full).toBe("850.00");
+  });
+
+  it("extends the total when the partner deposit is already recorded", () => {
+    const row = { d1: "425.00", d2: "425.00", full: "850.00" };
+    const next = rebalanceAmounts(row, "d2", "500.00", { d1Paid: true, d2Paid: false });
+    expect(next.full).toBe("925.00");
   });
 });
 

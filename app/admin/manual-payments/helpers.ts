@@ -43,11 +43,16 @@ export function relatedPayments(
   payments: SavedPayment[],
   inquiryId: number | null,
   email: string,
+  name = "",
 ): SavedPayment[] {
-  const needle = email.trim().toLowerCase();
+  const emailNeedle = email.trim().toLowerCase();
+  // Name matching is the last resort for ledger rows recorded without an
+  // email (e.g. Zelle imports) — only used when neither side has one.
+  const nameNeedle = name.trim().toLowerCase();
   return payments.filter(p => p.status === "active" && (
     (inquiryId != null && p.inquiry_id === inquiryId)
-    || (!!needle && p.client_email?.toLowerCase() === needle)
+    || (!!emailNeedle && p.client_email?.toLowerCase() === emailNeedle)
+    || (!emailNeedle && !p.client_email && !!nameNeedle && p.client_name.trim().toLowerCase() === nameNeedle)
   ));
 }
 
@@ -72,7 +77,15 @@ export function seedAmounts(
   inquiry: InquiryOption | null,
   payments: SavedPayment[],
 ): SeededAmounts {
-  const related = inquiry ? relatedPayments(payments, inquiry.id, inquiry.email) : [];
+  const related = inquiry ? relatedPayments(payments, inquiry.id, inquiry.email, inquiry.name) : [];
+  return seedFromRelated(related, inquiry);
+}
+
+/** Same seeding rules, fed directly with a client's saved payments. */
+export function seedFromRelated(
+  related: SavedPayment[],
+  inquiry: InquiryOption | null,
+): SeededAmounts {
   const fullPayment = related.find(p => p.payment_type === "full");
   const d1Saved = related.find(p => p.payment_type === "deposit_1");
   const d2Saved = related.find(p => p.payment_type === "deposit_2");
@@ -165,6 +178,93 @@ export function rowsFromInquiries(list: InquiryOption[], payments: SavedPayment[
       touched: false,
     };
   });
+}
+
+/**
+ * Rows for clients who exist only in the payments ledger (no inquiry) — e.g.
+ * a Zelle payer recorded without an email. Without these, a paid client can
+ * "disappear" from the spreadsheet entirely. Seeded exactly like inquiry
+ * rows so the remaining balance is one edit + save away.
+ */
+export function paymentOnlyRows(payments: SavedPayment[], inquiries: InquiryOption[]): PaymentRow[] {
+  const inquiryEmails = new Set(inquiries.map(i => i.email.trim().toLowerCase()).filter(Boolean));
+  const groups = new Map<string, SavedPayment[]>();
+  for (const p of payments) {
+    if (p.status !== "active" || p.inquiry_id != null) continue;
+    const email = p.client_email?.trim().toLowerCase() ?? "";
+    if (email && inquiryEmails.has(email)) continue; // already shown via the inquiry row
+    const key = email || p.client_name.trim().toLowerCase();
+    if (!key) continue;
+    const list = groups.get(key);
+    if (list) list.push(p);
+    else groups.set(key, [p]);
+  }
+
+  return [...groups.entries()].map(([key, related]) => {
+    const seed = seedFromRelated(related, null);
+    const newest = [...related].sort((a, b) => (b.paid_at ?? "").localeCompare(a.paid_at ?? ""))[0];
+    return {
+      key: `payment-${key}`,
+      inquiry_id: null,
+      client_name: newest.client_name,
+      client_email: newest.client_email ?? "",
+      amount: "",
+      method: newest.method || "Venmo",
+      payment_type: seed.nextType,
+      paid_at: today(),
+      session_date: newest.session_date?.slice(0, 10) ?? "",
+      invoice: newest.invoice ?? "",
+      note: "",
+      ...seed,
+      touched: false,
+    };
+  }).sort((a, b) => a.client_name.localeCompare(b.client_name));
+}
+
+export type AmountCol = "d1" | "d2" | "full";
+
+/**
+ * Keep the three amounts coherent while typing. `flags` must be the LIVE
+ * paid state (derived from current payments) — after "Clear payments" voids
+ * a client's rows, the seeded flags on the row object are stale and editing
+ * the full total must re-split both deposits again.
+ *
+ *  - edit full → re-split the unpaid deposits per the schedule
+ *  - edit one deposit → rebalance the other against the fixed total
+ *    (or extend the total when the other deposit is already recorded)
+ */
+export function rebalanceAmounts(
+  row: Pick<PaymentRow, "d1" | "d2" | "full">,
+  col: AmountCol,
+  value: string,
+  flags: { d1Paid: boolean; d2Paid: boolean },
+): Pick<PaymentRow, "d1" | "d2" | "full"> {
+  const next = { d1: row.d1, d2: row.d2, full: row.full, [col]: value };
+  const cents = parseLoosePaymentCents(value);
+  const d1 = parseLoosePaymentCents(next.d1);
+  const d2 = parseLoosePaymentCents(next.d2);
+  const fullCents = parseLoosePaymentCents(next.full);
+
+  if (col === "full" && cents > 0) {
+    if (!flags.d1Paid && !flags.d2Paid) {
+      const schedule = calculatePaymentSchedule(cents);
+      next.d1 = formatCents(schedule.retainer);
+      next.d2 = formatCents(schedule.remainingBalance);
+    } else if (flags.d1Paid && !flags.d2Paid) {
+      next.d2 = formatCents(Math.max(cents - d1, 0));
+    } else if (!flags.d1Paid && flags.d2Paid) {
+      next.d1 = formatCents(Math.max(cents - d2, 0));
+    }
+  } else if (col === "d1" && cents >= 0) {
+    if (flags.d2Paid) next.full = formatCents(cents + d2);
+    else if (fullCents > 0) next.d2 = formatCents(Math.max(fullCents - cents, 0));
+    else if (d2 > 0) next.full = formatCents(cents + d2);
+  } else if (col === "d2" && cents >= 0) {
+    if (flags.d1Paid) next.full = formatCents(cents + d1);
+    else if (fullCents > 0) next.d1 = formatCents(Math.max(fullCents - cents, 0));
+    else if (d1 > 0) next.full = formatCents(cents + d1);
+  }
+  return next;
 }
 
 /** The amount the row would save, given its selected payment type. */

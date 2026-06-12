@@ -15,8 +15,10 @@ export type RevenueFilters = {
   search: string;
 };
 
+// Opens on the current month so the tab is an instant month snapshot;
+// every other range stays one click away in the preset selector.
 export const DEFAULT_REVENUE_FILTERS: RevenueFilters = {
-  preset: "ytd",
+  preset: "thisMonth",
   customStart: "",
   customEnd: "",
   compare: "prevPeriod",
