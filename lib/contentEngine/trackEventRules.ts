@@ -34,7 +34,7 @@ export function normalizeEventPath(raw: unknown): string | null {
 export function normalizeReferrer(raw: unknown): string {
   if (typeof raw !== "string" || raw.length === 0) return "direct";
   try {
-    return new URL(raw).hostname || "direct";
+    return (new URL(raw).hostname || "direct").slice(0, 255);
   } catch {
     return "direct";
   }

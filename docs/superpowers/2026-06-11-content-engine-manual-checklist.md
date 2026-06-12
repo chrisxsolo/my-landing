@@ -48,3 +48,11 @@ Run with the local stack + `npm run dev`, signed in as admin. Production is NOT 
 ## Route-level checks (4A handoff)
 - [ ] All engine routes 401 without the admin cookie (curl spot-check)
 - [ ] photos thumbnails stop working after ~1h (signed TTL) and recover on reload
+
+## Production gate addenda (from the Plans 5+6 final review)
+- [ ] Schedule/calendar the manual 15-month `content_events` purge (spec §3.6 —
+      no cron ships with v1): `delete from content_events where viewed_at < now() - interval '15 months'`
+- [ ] Note: the track-event rate limit is per-instance in-memory (30/min × instances,
+      resets on cold start) — abuse dampening, not a hard global cap
+- [ ] Post-deploy: confirm public derivative URLs resolve unauthenticated in prod
+      (school gallery <img> uses them directly)
