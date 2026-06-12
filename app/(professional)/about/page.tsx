@@ -2,11 +2,13 @@
 // ABOUT PAGE  →  soloxsnaps.com/about
 // ─────────────────────────────────────────────────────────────────────────────
 // WHAT'S ON THIS PAGE (top to bottom):
-//   1. Hero      — light gray/glass header with "I'm Chris." title
-//   2. Bio       — portrait photo (left) + bio text (right) on white
-//   3. Approach  — 2-column: label/heading left, paragraphs right
-//   4. Process   — numbered steps (Planning, Session, Delivery), glass cards
-//   5. CTA strip — "Ready to work together?" frosted glass panel
+//   1. Hero         — light gray/glass header with "I'm Chris." title
+//   2. Bio          — portrait photo (left) + bio text (right) on white
+//   3. Off the Clock — rotating personal facts card (AboutFactsCard)
+//   4. The Road Here — photography-journey timeline (AboutTimeline)
+//   5. Approach     — 2-column: label/heading left, paragraphs right
+//   6. Process      — numbered steps (Planning, Session, Delivery), glass cards
+//   7. CTA strip    — "Ready to work together?" frosted glass panel
 //
 // QUICK EDITS:
 //   → Portrait photo:   change the `portrait` URL constant below
@@ -20,6 +22,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 import { BOOKING_POLICY, PRICING_CATALOG } from "@/lib/pricingCatalog";
+import AboutFactsCard from "@/app/components/AboutFactsCard";
+import AboutTimeline from "@/app/components/AboutTimeline";
+import { ABOUT_PHOTOS_TABLE, type AboutPhotoMap } from "@/lib/aboutFacts";
+import { createSupabaseServerClient } from "@/lib/supabaseServer";
+
+// ISR: photos uploaded in the Darkroom appear within the hour, or immediately
+// via the admin revalidate ping (see /api/admin/revalidate).
+export const revalidate = 3600;
 
 export const metadata: Metadata = {
   title: "About",
@@ -346,7 +356,24 @@ const CSS = `
   }
 `;
 
-export default function ProfessionalAboutPage() {
+async function getAboutPhotos(): Promise<AboutPhotoMap> {
+  try {
+    const supabase = createSupabaseServerClient();
+    const { data, error } = await supabase
+      .from(ABOUT_PHOTOS_TABLE)
+      .select("fact_slug,image_url,alt_text");
+    if (error) throw error;
+    const map: AboutPhotoMap = {};
+    for (const row of data ?? []) map[row.fact_slug] = { url: row.image_url, alt: row.alt_text };
+    return map;
+  } catch (error) {
+    console.error("[about] failed to load fact photos, rendering text-only", error);
+    return {};
+  }
+}
+
+export default async function ProfessionalAboutPage() {
+  const aboutPhotos = await getAboutPhotos();
   return (
     <main className="about-page">
       <style>{CSS}</style>
@@ -402,6 +429,15 @@ export default function ProfessionalAboutPage() {
           </div>
         </div>
       </section>
+
+      {/* ── OFF THE CLOCK ────────────────────────────────────────────────────────
+           Rotating personal facts card. Text lives in lib/aboutFacts.ts;
+           photos are uploaded from the Darkroom "About Page" tab. */}
+      <AboutFactsCard photos={aboutPhotos} />
+
+      {/* ── THE ROAD HERE ────────────────────────────────────────────────────────
+           Photography-journey timeline. Entries live in lib/aboutFacts.ts. */}
+      <AboutTimeline />
 
       {/* ── APPROACH ─────────────────────────────────────────────────────────────
            2-column layout: sticky label (left), paragraphs (right).
