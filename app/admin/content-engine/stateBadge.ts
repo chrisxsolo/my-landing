@@ -4,11 +4,10 @@
 import { C } from "@/lib/colors";
 import type { SessionEngineState } from "@/lib/contentEngine/state";
 
-// C.dangerBg does not exist in lib/colors.ts; using a cast-safe lookup as fallback.
-const dangerBg: string = (C as unknown as Record<string, string>)["dangerBg"] ?? "#fdecea";
+
 
 export const STATE_BADGES: Record<SessionEngineState, { label: string; color: string; bg: string }> = {
-  failed:              { label: "Failed",            color: C.danger,   bg: dangerBg },
+  failed:              { label: "Failed",            color: C.danger,   bg: C.dangerBg },
   publishing:          { label: "Publishing…",       color: C.ink,      bg: C.pageAlt },
   partially_published: { label: "Partly published",  color: C.ink,      bg: C.pageAlt },
   published:           { label: "Published",         color: C.muted,    bg: C.page },

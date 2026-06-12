@@ -18,6 +18,7 @@ const inkSoft = "#2f3835"
 const muted = "#687571"
 const mutedSoft = "#8b9692"
 const danger = "#b42318"
+const dangerBg = "#fdecea"
 const success = "#12805c"
 
 // Derived rgba helpers
@@ -38,6 +39,7 @@ export const C = {
   muted,
   mutedSoft,
   danger,
+  dangerBg,
   success,
   proPage: "#f7faf8",
   proAccent: "#3d6b5e",

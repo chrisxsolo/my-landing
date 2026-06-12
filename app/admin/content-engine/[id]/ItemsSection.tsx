@@ -115,7 +115,11 @@ export default function ItemsSection({ items, photos, onChanged }: {
         </p>
       ) : (
         items.map((item) => (
-          <ItemCard key={`${item.id}:${item.payload_revision}`} item={item} photos={photos} onChanged={onChanged} />
+          // key is item.id ONLY: a remount on every revision bump would drop editor
+          // focus after each autosave and discard in-flight keystrokes. Own saves
+          // adopt the new revision via the reducer; external edits surface as the
+          // 409 conflict prompt by design.
+          <ItemCard key={item.id} item={item} photos={photos} onChanged={onChanged} />
         ))
       )}
     </section>
