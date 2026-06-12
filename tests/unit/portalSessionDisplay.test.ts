@@ -4,6 +4,7 @@ import {
   getPortalFirstName,
   selectActivePortalSession,
 } from "@/lib/portalSessionDisplay";
+import { CLIENT_SESSION_STATUS_VALUES } from "@/lib/clientSessions";
 import type { ClientSessionDTO } from "@/lib/clientSessions";
 
 const BASE: ClientSessionDTO = {
@@ -71,5 +72,12 @@ describe("buildPortalStatusPhrase", () => {
     expect(buildPortalStatusPhrase({ ...BASE, currentStatus: "booked" })).toBe(
       "your session is booked.",
     );
+  });
+
+  it("maps every status to a non-empty phrase", () => {
+    CLIENT_SESSION_STATUS_VALUES.forEach((status) => {
+      const phrase = buildPortalStatusPhrase({ ...BASE, currentStatus: status });
+      expect(phrase.length).toBeGreaterThan(0);
+    });
   });
 });

@@ -35,7 +35,9 @@ export const G = {
   redBg: "rgba(179,71,61,0.08)",
   redBorder: "rgba(179,71,61,0.25)",
 
-  // Primary button — gallery ink on paper
+  // Primary button — distinct roles that currently share ink/page values but
+  // may diverge: dark = button fill (same as ink), paperText = text on dark
+  // (same as page).
   dark: "#221f1b",
   darkHover: "#352f27",
   paperText: "#faf8f3",
