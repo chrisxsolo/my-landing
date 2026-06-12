@@ -335,6 +335,16 @@
   line-height: 1.65;
 }
 
+.finalCopy .finalSecondaryButton {
+  border-color: color-mix(in srgb, var(--home-paper) 64%, transparent);
+  color: var(--home-paper);
+}
+
+.finalCopy .finalSecondaryButton:hover {
+  background: color-mix(in srgb, var(--home-paper) 14%, transparent);
+  color: var(--home-paper);
+}
+
 .finalCopy .finalFaqLink {
   max-width: 580px;
   margin: 22px 0 0;
