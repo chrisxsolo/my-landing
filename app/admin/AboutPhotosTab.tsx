@@ -1,28 +1,27 @@
 "use client";
 
-// Admin → About Page — Fact Photos. Manage the optional photo for each fact
-// card on /about. Fact text lives in lib/aboutFacts.ts (edit in code); photos
-// and alt text are managed here. Cards without a photo render text-only.
+// Admin → About Page. Manage fact text, display order, and optional photos.
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ABOUT_FACTS, orderAboutFacts } from "@/lib/aboutFacts";
 import {
-  ALLOWED_ADMIN_PHOTO_TYPES,
+  ABOUT_FACTS,
+  orderAboutFacts,
+  validateAboutFactContent,
+  type AboutFact,
+  type AboutFactContent,
+} from "@/lib/aboutFacts";
+import {
   validateAdminPhotoFile,
   validatePhotoAltText,
 } from "@/lib/photoAdminShared";
-
-type PhotoRow = {
-  id: string;
-  fact_slug: string;
-  image_url: string;
-  storage_path: string;
-  alt_text: string | null;
-};
+import AboutFactEditorCard, { type AboutPhotoRow } from "@/app/admin/AboutFactEditorCard";
 
 type Props = { showToast: (message: string, ok?: boolean) => void };
 
 const API = "/api/admin/about-photos";
+const DEFAULT_CONTENT_DRAFTS = Object.fromEntries(
+  ABOUT_FACTS.map((fact) => [fact.slug, { title: fact.title, body: fact.body }]),
+) as Record<string, AboutFactContent>;
 
 // iPhone photos arrive as HEIC, which browsers can't display and the API
 // rejects. Detect by MIME or extension (Windows often reports an empty type).
@@ -39,8 +38,10 @@ async function heicToJpeg(file: File): Promise<File> {
 }
 
 export default function AboutPhotosTab({ showToast }: Props) {
-  // slug → PhotoRow for facts that already have a photo
-  const [photoMap, setPhotoMap] = useState<Record<string, PhotoRow>>({});
+  const [facts, setFacts] = useState<readonly AboutFact[]>(ABOUT_FACTS);
+  const [contentDrafts, setContentDrafts] = useState<Record<string, AboutFactContent>>(DEFAULT_CONTENT_DRAFTS);
+  // slug → AboutPhotoRow for facts that already have a photo
+  const [photoMap, setPhotoMap] = useState<Record<string, AboutPhotoRow>>({});
   const [loading, setLoading] = useState(true);
   // per-fact controlled alt-text draft
   const [altDrafts, setAltDrafts] = useState<Record<string, string>>({});
@@ -68,15 +69,20 @@ export default function AboutPhotosTab({ showToast }: Props) {
       const res = await fetch(API);
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Failed to load photos");
-      const rows: PhotoRow[] = json.photos ?? [];
-      const map: Record<string, PhotoRow> = {};
+      const rows: AboutPhotoRow[] = json.photos ?? [];
+      const map: Record<string, AboutPhotoRow> = {};
       const drafts: Record<string, string> = {};
       for (const row of rows) {
         map[row.fact_slug] = row;
         drafts[row.fact_slug] = row.alt_text ?? "";
       }
+      const loadedFacts: AboutFact[] = Array.isArray(json.facts) ? json.facts : [...ABOUT_FACTS];
       setPhotoMap(map);
-      setOrderSlugs(orderAboutFacts(json.order).map((f) => f.slug));
+      setFacts(loadedFacts);
+      setOrderSlugs(orderAboutFacts(json.order, loadedFacts).map((f) => f.slug));
+      setContentDrafts(Object.fromEntries(
+        loadedFacts.map((fact) => [fact.slug, { title: fact.title, body: fact.body }]),
+      ));
       setAltDrafts((prev) => {
         // seed new slugs; preserve any draft the user has already typed
         const next = { ...prev };
@@ -113,7 +119,7 @@ export default function AboutPhotosTab({ showToast }: Props) {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Upload failed");
       // update local state from response
-      const updated: PhotoRow = json.photo;
+      const updated: AboutPhotoRow = json.photo;
       setPhotoMap((prev) => ({ ...prev, [slug]: updated }));
       setAltDrafts((prev) => ({ ...prev, [slug]: updated.alt_text ?? "" }));
       setFileDrafts((prev) => ({ ...prev, [slug]: null }));
@@ -192,6 +198,32 @@ export default function AboutPhotosTab({ showToast }: Props) {
     setDragSlug(null);
   }
 
+  async function handleSaveContent(slug: string) {
+    const draft = contentDrafts[slug];
+    const contentCheck = validateAboutFactContent(draft);
+    if (!contentCheck.ok) { showToast(contentCheck.error, false); return; }
+
+    setBusySlug(slug);
+    try {
+      const res = await fetch(API, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "content", fact_slug: slug, ...contentCheck.content }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Save failed");
+      const updated: AboutFact = json.fact;
+      setFacts((prev) => prev.map((fact) => fact.slug === slug ? updated : fact));
+      setContentDrafts((prev) => ({ ...prev, [slug]: { title: updated.title, body: updated.body } }));
+      showToast("Fact text saved!");
+      revalidate();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Save failed", false);
+    } finally {
+      setBusySlug(null);
+    }
+  }
+
   async function handleSaveAlt(slug: string) {
     const alt = (altDrafts[slug] ?? "").trim();
     const altCheck = validatePhotoAltText(alt);
@@ -206,7 +238,7 @@ export default function AboutPhotosTab({ showToast }: Props) {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Save failed");
-      const updated: PhotoRow = json.photo;
+      const updated: AboutPhotoRow = json.photo;
       setPhotoMap((prev) => ({ ...prev, [slug]: updated }));
       setAltDrafts((prev) => ({ ...prev, [slug]: updated.alt_text ?? "" }));
       showToast("Alt text saved!");
@@ -250,12 +282,11 @@ export default function AboutPhotosTab({ showToast }: Props) {
 
   return (
     <div className="max-w-3xl">
-      {/* Header */}
       <div className="mb-5">
-        <h2 className="text-xl font-bold text-slate-800">About page — fact photos</h2>
+        <h2 className="text-xl font-bold text-slate-800">About page facts</h2>
         <p className="text-sm text-slate-500 mt-1">
-          Fact text is edited in code (<code className="font-mono text-xs bg-slate-100 px-1 rounded">lib/aboutFacts.ts</code>).
-          Manage photos, alt text, and display order here (↑↓ — top card shows first). Cards without a photo render text-only on{" "}
+          Edit each fact&apos;s headline and description, manage its photo, and use ↑↓ to choose the display order.
+          The top card shows first on{" "}
           <a href="/about" target="_blank" rel="noopener noreferrer" className="underline text-emerald-700 hover:text-emerald-800">/about ↗</a>.
         </p>
       </div>
@@ -264,140 +295,46 @@ export default function AboutPhotosTab({ showToast }: Props) {
         <p className="text-sm text-slate-500">Loading…</p>
       ) : (
         <ul className="space-y-4">
-          {orderAboutFacts(orderSlugs).map((fact, factIndex, orderedFacts) => {
+          {orderAboutFacts(orderSlugs, facts).map((fact, factIndex, orderedFacts) => {
             const photo = photoMap[fact.slug];
-            const hasPhoto = !!photo;
             const busy = busySlug === fact.slug;
-            const altVal = altDrafts[fact.slug] ?? "";
-            const fileVal = fileDrafts[fact.slug] ?? null;
-            const dragging = dragSlug === fact.slug;
-            const converting = convertingSlug === fact.slug;
+            const contentDraft = contentDrafts[fact.slug] ?? { title: fact.title, body: fact.body };
+            const fileValue = fileDrafts[fact.slug] ?? null;
 
             return (
-              <li
+              <AboutFactEditorCard
                 key={fact.slug}
-                onDragOver={(e) => { e.preventDefault(); if (!busy) setDragSlug(fact.slug); }}
+                fact={fact}
+                factIndex={factIndex}
+                factCount={orderedFacts.length}
+                photo={photo}
+                contentDraft={contentDraft}
+                contentDirty={contentDraft.title !== fact.title || contentDraft.body !== fact.body}
+                altValue={altDrafts[fact.slug] ?? ""}
+                fileValue={fileValue}
+                busy={busy}
+                dragging={dragSlug === fact.slug}
+                converting={convertingSlug === fact.slug}
+                savingOrder={savingOrder}
+                registerFileInput={(element) => { fileRefs.current[fact.slug] = element; }}
+                onContentChange={(content) => setContentDrafts((prev) => ({ ...prev, [fact.slug]: content }))}
+                onSaveContent={() => handleSaveContent(fact.slug)}
+                onAltChange={(value) => setAltDrafts((prev) => ({ ...prev, [fact.slug]: value }))}
+                onStageFile={(file) => stageFile(fact.slug, file)}
+                onUpload={() => {
+                  if (fileValue) handleUpload(fact.slug);
+                  else fileRefs.current[fact.slug]?.click();
+                }}
+                onSaveAlt={() => handleSaveAlt(fact.slug)}
+                onRemove={() => handleRemove(fact.slug)}
+                onMove={(direction) => moveFact(fact.slug, direction)}
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  if (!busy) setDragSlug(fact.slug);
+                }}
                 onDragLeave={handleDragLeave}
-                onDrop={(e) => handleDrop(fact.slug, e)}
-                className={`rounded-xl border bg-white p-4 transition-opacity ${busy ? "opacity-60" : ""} ${dragging ? "border-emerald-400 border-dashed bg-emerald-50" : hasPhoto ? "border-emerald-300" : "border-slate-200"}`}
-              >
-                {/* Fact header */}
-                <div className="flex items-start gap-3 mb-3">
-                  {/* Thumbnail or badge */}
-                  {hasPhoto ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={photo.image_url}
-                      alt={photo.alt_text ?? ""}
-                      className="h-20 w-28 flex-shrink-0 rounded-lg object-cover bg-slate-100"
-                    />
-                  ) : (
-                    <div className="h-20 w-28 flex-shrink-0 rounded-lg bg-slate-100 flex items-center justify-center">
-                      <span className="text-[11px] font-bold text-slate-400 text-center leading-tight px-2">No photo yet</span>
-                    </div>
-                  )}
-
-                  {/* Fact meta */}
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-bold text-slate-800">
-                      <span className="font-mono text-slate-400 mr-1.5">#{factIndex + 1}</span>
-                      {fact.title}
-                    </p>
-                    <p className="text-[11px] font-mono text-slate-400 mt-0.5">{fact.slug}</p>
-                    <p className="text-xs text-slate-500 mt-1 line-clamp-2">{fact.body}</p>
-                  </div>
-
-                  {/* Reorder arrows — top card shows first on /about */}
-                  <div className="flex flex-col gap-1 flex-shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => moveFact(fact.slug, -1)}
-                      disabled={savingOrder || factIndex === 0}
-                      aria-label={`Move "${fact.title}" up`}
-                      className="rounded-lg border border-slate-300 px-2 py-0.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-30"
-                    >
-                      ↑
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => moveFact(fact.slug, 1)}
-                      disabled={savingOrder || factIndex === orderedFacts.length - 1}
-                      aria-label={`Move "${fact.title}" down`}
-                      className="rounded-lg border border-slate-300 px-2 py-0.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-30"
-                    >
-                      ↓
-                    </button>
-                  </div>
-                </div>
-
-                {/* Alt text input */}
-                <input
-                  type="text"
-                  value={altVal}
-                  onChange={(e) => setAltDrafts((prev) => ({ ...prev, [fact.slug]: e.target.value }))}
-                  placeholder="Descriptive alt text (required)"
-                  className="w-full rounded-lg border border-slate-200 bg-white text-slate-800 px-3 py-2 text-sm mb-3"
-                  disabled={busy}
-                />
-
-                {/* Hidden file input — opened by the photo button below */}
-                <input
-                  ref={(el) => { fileRefs.current[fact.slug] = el; }}
-                  type="file"
-                  accept={`${ALLOWED_ADMIN_PHOTO_TYPES.join(",")},image/heic,image/heif,.heic,.heif`}
-                  onChange={(e) => stageFile(fact.slug, e.target.files?.[0] ?? null)}
-                  className="hidden"
-                  disabled={busy}
-                />
-
-                {/* Action buttons. The photo button is two-step: no file selected
-                    yet → opens the picker; file selected → uploads it. */}
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (fileVal) handleUpload(fact.slug);
-                      else fileRefs.current[fact.slug]?.click();
-                    }}
-                    disabled={busy || converting}
-                    className="inline-flex items-center rounded-lg bg-emerald-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50"
-                  >
-                    {busy ? "Saving…" : converting ? "Converting…" : fileVal ? "Upload photo" : hasPhoto ? "Replace photo…" : "Choose photo…"}
-                  </button>
-
-                  {fileVal && !busy && (
-                    <span className="text-xs text-slate-500 font-mono truncate max-w-[180px]" title={fileVal.name}>
-                      {fileVal.name}
-                    </span>
-                  )}
-
-                  {!fileVal && !busy && (
-                    <span className="text-xs text-slate-400">or drag &amp; drop an image here</span>
-                  )}
-
-                  {hasPhoto && (
-                    <button
-                      type="button"
-                      onClick={() => handleSaveAlt(fact.slug)}
-                      disabled={busy}
-                      className="inline-flex items-center rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                    >
-                      Save alt text
-                    </button>
-                  )}
-
-                  {hasPhoto && (
-                    <button
-                      type="button"
-                      onClick={() => handleRemove(fact.slug)}
-                      disabled={busy}
-                      className="inline-flex items-center rounded-lg border border-red-200 px-3 py-1.5 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50"
-                    >
-                      Remove
-                    </button>
-                  )}
-                </div>
-              </li>
+                onDrop={(event) => handleDrop(fact.slug, event)}
+              />
             );
           })}
         </ul>

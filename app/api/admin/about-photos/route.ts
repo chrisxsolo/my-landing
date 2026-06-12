@@ -9,10 +9,13 @@ import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
 import { requireAdmin } from "@/lib/requireAdmin";
 import {
   ABOUT_FACTS,
+  ABOUT_FACT_CONTENT_KEY,
   ABOUT_FACT_ORDER_KEY,
   ABOUT_PHOTOS_BUCKET,
   ABOUT_PHOTOS_TABLE,
   isValidAboutFactSlug,
+  resolveAboutFacts,
+  validateAboutFactContent,
 } from "@/lib/aboutFacts";
 import { validateAdminPhotoFile, validatePhotoAltText, safePhotoFileName } from "@/lib/photoAdminShared";
 
@@ -27,7 +30,7 @@ function jsonError(error: unknown, fallback: string, status = 500) {
   return NextResponse.json({ error: message }, { status });
 }
 
-// ── GET: list every fact photo + the saved display order ─────────────────────
+// ── GET: list photos + saved order + editable fact content ───────────────────
 export async function GET(req: NextRequest) {
   const deny = requireAdmin(req);
   if (deny) return deny;
@@ -36,22 +39,26 @@ export async function GET(req: NextRequest) {
     const { data, error } = await supabase.from(ABOUT_PHOTOS_TABLE).select(SELECT);
     if (error) throw error;
 
-    let order: string[] | null = null;
-    const { data: setting, error: orderError } = await supabase
+    const { data: settings, error: settingsError } = await supabase
       .from(SITE_SETTINGS_TABLE)
-      .select("value")
-      .eq("key", ABOUT_FACT_ORDER_KEY)
-      .maybeSingle();
-    if (orderError) throw orderError;
-    if (setting?.value) {
+      .select("key,value")
+      .in("key", [ABOUT_FACT_ORDER_KEY, ABOUT_FACT_CONTENT_KEY]);
+    if (settingsError) throw settingsError;
+
+    let order: string[] | null = null;
+    let storedContent: unknown = null;
+    for (const setting of settings ?? []) {
       try {
         const parsed = JSON.parse(setting.value);
-        if (Array.isArray(parsed)) order = parsed.filter(isValidAboutFactSlug);
+        if (setting.key === ABOUT_FACT_ORDER_KEY && Array.isArray(parsed)) {
+          order = parsed.filter(isValidAboutFactSlug);
+        }
+        if (setting.key === ABOUT_FACT_CONTENT_KEY) storedContent = parsed;
       } catch {
-        console.error("[admin/about-photos] corrupt fact-order setting, ignoring");
+        console.error(`[admin/about-photos] corrupt ${setting.key} setting, ignoring`);
       }
     }
-    return NextResponse.json({ photos: data ?? [], order });
+    return NextResponse.json({ photos: data ?? [], order, facts: resolveAboutFacts(storedContent) });
   } catch (error) {
     return jsonError(error, "Failed to load about photos.");
   }
@@ -118,12 +125,19 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// ── PATCH (json): reorder facts | update alt text for a fact's photo ──────────
+// ── PATCH (json): edit fact content | reorder facts | update photo alt text ───
 export async function PATCH(req: NextRequest) {
   const deny = requireAdmin(req);
   if (deny) return deny;
   try {
-    const body = (await req.json()) as { action?: unknown; orderedSlugs?: unknown; fact_slug?: unknown; alt_text?: unknown };
+    const body = (await req.json()) as {
+      action?: unknown;
+      orderedSlugs?: unknown;
+      fact_slug?: unknown;
+      title?: unknown;
+      body?: unknown;
+      alt_text?: unknown;
+    };
 
     if (body.action === "reorder") {
       const slugs = Array.isArray(body.orderedSlugs) ? body.orderedSlugs.filter(isValidAboutFactSlug) : [];
@@ -135,6 +149,37 @@ export async function PATCH(req: NextRequest) {
       );
       if (error) throw error;
       return NextResponse.json({ order: slugs });
+    }
+    if (body.action === "content") {
+      if (!isValidAboutFactSlug(body.fact_slug)) throw new Error("Unknown about fact.");
+      const contentCheck = validateAboutFactContent({ title: body.title, body: body.body });
+      if (!contentCheck.ok) throw new Error(contentCheck.error);
+
+      const supabase = createSupabaseAdminClient();
+      const { data: setting, error: readError } = await supabase
+        .from(SITE_SETTINGS_TABLE)
+        .select("value")
+        .eq("key", ABOUT_FACT_CONTENT_KEY)
+        .maybeSingle();
+      if (readError) throw readError;
+
+      let storedContent: unknown = null;
+      try {
+        storedContent = setting?.value ? JSON.parse(setting.value) : null;
+      } catch {
+        console.error("[admin/about-photos] corrupt fact-content setting, replacing");
+      }
+      const contentBySlug = Object.fromEntries(
+        resolveAboutFacts(storedContent).map((fact) => [fact.slug, { title: fact.title, body: fact.body }]),
+      );
+      contentBySlug[body.fact_slug] = contentCheck.content;
+
+      const { error } = await supabase.from(SITE_SETTINGS_TABLE).upsert(
+        { key: ABOUT_FACT_CONTENT_KEY, value: JSON.stringify(contentBySlug), updated_at: new Date().toISOString() },
+        { onConflict: "key" },
+      );
+      if (error) throw error;
+      return NextResponse.json({ fact: { slug: body.fact_slug, ...contentCheck.content } });
     }
     if (!isValidAboutFactSlug(body.fact_slug)) throw new Error("Unknown about fact.");
     const altCheck = validatePhotoAltText(body.alt_text);

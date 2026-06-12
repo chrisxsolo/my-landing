@@ -24,7 +24,14 @@ import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 import { BOOKING_POLICY, PRICING_CATALOG } from "@/lib/pricingCatalog";
 import AboutFactsCard from "@/app/components/AboutFactsCard";
 import AboutTimeline from "@/app/components/AboutTimeline";
-import { ABOUT_FACT_ORDER_KEY, ABOUT_PHOTOS_TABLE, orderAboutFacts, type AboutPhotoMap } from "@/lib/aboutFacts";
+import {
+  ABOUT_FACT_CONTENT_KEY,
+  ABOUT_FACT_ORDER_KEY,
+  ABOUT_PHOTOS_TABLE,
+  orderAboutFacts,
+  resolveAboutFacts,
+  type AboutPhotoMap,
+} from "@/lib/aboutFacts";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 
 // ISR: photos uploaded in the Darkroom appear within the hour, or immediately
@@ -372,26 +379,34 @@ async function getAboutPhotos(): Promise<AboutPhotoMap> {
   }
 }
 
-// Admin-saved fact order (Darkroom → About Page tab). Falls back to the
-// default ABOUT_FACTS order when unset or unreadable.
-async function getOrderedFacts() {
+// Admin-saved fact text and order. Falls back to the defaults in aboutFacts.ts
+// when either setting is unset or unreadable.
+async function getAboutFacts() {
   try {
     const supabase = createSupabaseServerClient();
     const { data, error } = await supabase
       .from("site_settings")
-      .select("value")
-      .eq("key", ABOUT_FACT_ORDER_KEY)
-      .maybeSingle();
+      .select("key,value")
+      .in("key", [ABOUT_FACT_ORDER_KEY, ABOUT_FACT_CONTENT_KEY]);
     if (error) throw error;
-    return orderAboutFacts(data?.value ? JSON.parse(data.value) : null);
+
+    let storedOrder: unknown = null;
+    let storedContent: unknown = null;
+    for (const setting of data ?? []) {
+      if (!setting.value) continue;
+      const parsed = JSON.parse(setting.value);
+      if (setting.key === ABOUT_FACT_ORDER_KEY) storedOrder = parsed;
+      if (setting.key === ABOUT_FACT_CONTENT_KEY) storedContent = parsed;
+    }
+    return orderAboutFacts(storedOrder, resolveAboutFacts(storedContent));
   } catch (error) {
-    console.error("[about] failed to load fact order, using default", error);
+    console.error("[about] failed to load fact text/order, using defaults", error);
     return orderAboutFacts(null);
   }
 }
 
 export default async function ProfessionalAboutPage() {
-  const [aboutPhotos, orderedFacts] = await Promise.all([getAboutPhotos(), getOrderedFacts()]);
+  const [aboutPhotos, orderedFacts] = await Promise.all([getAboutPhotos(), getAboutFacts()]);
   return (
     <main className="about-page">
       <style>{CSS}</style>
@@ -449,8 +464,8 @@ export default async function ProfessionalAboutPage() {
       </section>
 
       {/* ── OFF THE CLOCK ────────────────────────────────────────────────────────
-           Rotating personal facts card. Text lives in lib/aboutFacts.ts;
-           photos are uploaded from the Darkroom "About Page" tab. */}
+           Rotating personal facts card. Text and photos are managed from the
+           Darkroom "About Page" tab, with defaults in lib/aboutFacts.ts. */}
       <AboutFactsCard facts={orderedFacts} photos={aboutPhotos} />
 
       {/* ── THE ROAD HERE ────────────────────────────────────────────────────────

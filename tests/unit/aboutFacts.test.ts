@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { ABOUT_FACTS, ABOUT_TIMELINE, isValidAboutFactSlug, orderAboutFacts } from "@/lib/aboutFacts";
+import {
+  ABOUT_FACTS,
+  ABOUT_TIMELINE,
+  isValidAboutFactSlug,
+  orderAboutFacts,
+  resolveAboutFacts,
+  validateAboutFactContent,
+} from "@/lib/aboutFacts";
 
 describe("ABOUT_FACTS", () => {
   it("has at least 3 facts with unique slugs", () => {
@@ -49,6 +56,55 @@ describe("orderAboutFacts", () => {
     const result = orderAboutFacts(dupes).map((f) => f.slug);
     expect(result).toHaveLength(defaultSlugs.length);
     expect(result[0]).toBe(defaultSlugs[1]);
+  });
+});
+
+describe("validateAboutFactContent", () => {
+  it("accepts trimmed editable fact text", () => {
+    expect(validateAboutFactContent({ title: "  New headline  ", body: "  My own fact description.  " })).toEqual({
+      ok: true,
+      content: { title: "New headline", body: "My own fact description." },
+    });
+  });
+
+  it("rejects missing or oversized text", () => {
+    expect(validateAboutFactContent({ title: "", body: "Description" }).ok).toBe(false);
+    expect(validateAboutFactContent({ title: "Headline", body: " " }).ok).toBe(false);
+    expect(validateAboutFactContent({ title: "x".repeat(101), body: "Description" }).ok).toBe(false);
+    expect(validateAboutFactContent({ title: "Headline", body: "x".repeat(801) }).ok).toBe(false);
+  });
+});
+
+describe("resolveAboutFacts", () => {
+  it("applies valid saved text without changing fact identity", () => {
+    const facts = resolveAboutFacts({
+      running: { title: "Morning miles", body: "I use my runs to find new corners of San Francisco." },
+    });
+    const running = facts.find((fact) => fact.slug === "running");
+
+    expect(running).toEqual({
+      slug: "running",
+      title: "Morning miles",
+      body: "I use my runs to find new corners of San Francisco.",
+    });
+    expect(facts.map((fact) => fact.slug)).toEqual(ABOUT_FACTS.map((fact) => fact.slug));
+  });
+
+  it("ignores unknown slugs and malformed overrides", () => {
+    expect(resolveAboutFacts({
+      running: { title: "", body: "Invalid because the title is blank." },
+      unknown: { title: "Unknown", body: "This should never become a new fact." },
+    })).toEqual(ABOUT_FACTS);
+  });
+
+  it("orders resolved facts while preserving edited content", () => {
+    const facts = resolveAboutFacts({
+      burritos: { title: "Mission burrito research", body: "I am still testing contenders across San Francisco." },
+    });
+    const ordered = orderAboutFacts(["burritos"], facts);
+
+    expect(ordered[0].slug).toBe("burritos");
+    expect(ordered[0].title).toBe("Mission burrito research");
   });
 });
 

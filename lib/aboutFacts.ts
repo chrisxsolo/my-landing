@@ -1,8 +1,7 @@
 // lib/aboutFacts.ts
 // Content + constants for the personal sections of /about: the rotating facts
-// card and the photography-journey timeline. Fact/timeline TEXT is hardcoded
-// here (same convention as the rest of the About copy); fact PHOTOS live in the
-// about_photos table and are managed from the Darkroom "About Page" tab.
+// card and the photography-journey timeline. Fact defaults live here; admin
+// text overrides live in site_settings and photos live in about_photos.
 // No server or Next imports — safe for client components, API routes, and tests.
 
 export const ABOUT_PHOTOS_BUCKET = "about-photos";
@@ -13,6 +12,8 @@ export type AboutFact = {
   title: string;
   body: string;
 };
+
+export type AboutFactContent = Pick<AboutFact, "title" | "body">;
 
 // Default display order. A custom order can be saved from the Darkroom tab
 // (site_settings key ABOUT_FACT_ORDER_KEY); see orderAboutFacts below.
@@ -41,21 +42,60 @@ export const ABOUT_FACTS: readonly AboutFact[] = [
 
 // site_settings key holding the admin-saved fact order (JSON array of slugs).
 export const ABOUT_FACT_ORDER_KEY = "about_fact_order";
+export const ABOUT_FACT_CONTENT_KEY = "about_fact_content";
+export const ABOUT_FACT_TITLE_MAX_LENGTH = 100;
+export const ABOUT_FACT_BODY_MAX_LENGTH = 800;
+
+export type AboutFactContentCheck =
+  | { ok: true; content: AboutFactContent }
+  | { ok: false; error: string };
+
+export function validateAboutFactContent(value: unknown): AboutFactContentCheck {
+  if (!value || typeof value !== "object") {
+    return { ok: false, error: "Enter a headline and description." };
+  }
+  const { title, body } = value as { title?: unknown; body?: unknown };
+  if (typeof title !== "string" || !title.trim()) {
+    return { ok: false, error: "Fact headline is required." };
+  }
+  if (typeof body !== "string" || !body.trim()) {
+    return { ok: false, error: "Fact description is required." };
+  }
+  if (title.trim().length > ABOUT_FACT_TITLE_MAX_LENGTH) {
+    return { ok: false, error: `Fact headline must be ${ABOUT_FACT_TITLE_MAX_LENGTH} characters or fewer.` };
+  }
+  if (body.trim().length > ABOUT_FACT_BODY_MAX_LENGTH) {
+    return { ok: false, error: `Fact description must be ${ABOUT_FACT_BODY_MAX_LENGTH} characters or fewer.` };
+  }
+  return { ok: true, content: { title: title.trim(), body: body.trim() } };
+}
+
+export function resolveAboutFacts(storedContent: unknown): readonly AboutFact[] {
+  if (!storedContent || typeof storedContent !== "object" || Array.isArray(storedContent)) return ABOUT_FACTS;
+  const overrides = storedContent as Record<string, unknown>;
+  return ABOUT_FACTS.map((fact) => {
+    const check = validateAboutFactContent(overrides[fact.slug]);
+    return check.ok ? { ...fact, ...check.content } : fact;
+  });
+}
 
 /**
- * Apply a stored slug order to ABOUT_FACTS. Tolerates anything: unknown slugs
+ * Apply a stored slug order to a fact list. Tolerates anything: unknown slugs
  * are dropped, missing facts are appended in default order, and a non-array
  * (no saved order yet, corrupt JSON) returns the default order unchanged.
  */
-export function orderAboutFacts(storedOrder: unknown): readonly AboutFact[] {
-  if (!Array.isArray(storedOrder)) return ABOUT_FACTS;
-  const bySlug = new Map(ABOUT_FACTS.map((f) => [f.slug, f]));
+export function orderAboutFacts(
+  storedOrder: unknown,
+  facts: readonly AboutFact[] = ABOUT_FACTS,
+): readonly AboutFact[] {
+  if (!Array.isArray(storedOrder)) return facts;
+  const bySlug = new Map(facts.map((f) => [f.slug, f]));
   const ordered: AboutFact[] = [];
   for (const slug of storedOrder) {
     const fact = typeof slug === "string" ? bySlug.get(slug) : undefined;
     if (fact && !ordered.includes(fact)) ordered.push(fact);
   }
-  for (const fact of ABOUT_FACTS) {
+  for (const fact of facts) {
     if (!ordered.includes(fact)) ordered.push(fact);
   }
   return ordered;
