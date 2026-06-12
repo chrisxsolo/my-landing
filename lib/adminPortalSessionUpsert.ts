@@ -6,6 +6,10 @@ import {
   type ClientSessionRow,
   type ClientSessionStatus,
 } from "@/lib/clientSessions";
+import {
+  buildClientSessionSyncFields,
+  type InquirySeedRow,
+} from "@/lib/clientSessionInquirySeed";
 
 type EnsureAdminPortalSessionInput = {
   id?: string;
@@ -83,4 +87,36 @@ export async function ensureAdminPortalSession(
 
   if (createError) throw createError;
   return created.id;
+}
+
+export async function syncAdminInquiryPortalSession(
+  supabase: SupabaseClient,
+  previous: InquirySeedRow,
+  next: InquirySeedRow,
+) {
+  const email = normalizeClientSessionEmail(previous.email);
+  if (!email) return;
+
+  const { data: rows, error } = await supabase
+    .from(CLIENT_SESSION_TABLE)
+    .select("id,client_email,session_type,session_date")
+    .ilike("client_email", email)
+    .returns<MatchableClientSessionRow[]>();
+  if (error) throw error;
+  if (!rows?.length) return;
+
+  const target = rows.length === 1
+    ? rows[0]
+    : findMatchingClientSession(rows, {
+        clientEmail: previous.email,
+        sessionType: previous.session_type,
+        sessionDate: previous.session_date ?? previous.date_in_mind,
+      });
+  if (!target) return;
+
+  const { error: updateError } = await supabase
+    .from(CLIENT_SESSION_TABLE)
+    .update(buildClientSessionSyncFields(next))
+    .eq("id", target.id);
+  if (updateError) throw updateError;
 }

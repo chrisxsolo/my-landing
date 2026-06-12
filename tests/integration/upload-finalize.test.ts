@@ -1,11 +1,12 @@
-// Note: the oversized (>25 MB) path is unit-tested in imageVerification with an
-// injected cap and kept out of integration tests for speed.
+// Note: the over-cap (>50 MB) rejection path is unit-tested in imageVerification
+// with an injected cap and kept out of integration tests for speed.
 import { describe, it, expect, beforeAll } from "vitest";
 import sharp from "sharp";
 import { randomUUID } from "node:crypto";
 import { service, resetDb, createTestSession } from "./helpers";
 import { finalizeUpload, UploadFinalizationError } from "@/lib/contentEngine/finalizeUpload";
-import { ORIGINALS_BUCKET, issueUploadPath } from "@/lib/contentEngine/uploadConfig";
+import { ORIGINALS_BUCKET, NORMALIZE_MAX_DIMENSION, issueUploadPath } from "@/lib/contentEngine/uploadConfig";
+import { createHash } from "node:crypto";
 
 beforeAll(() => resetDb());
 
@@ -98,6 +99,29 @@ describe("finalizeUpload (spec §4.2)", () => {
     // (TOCTOU-safe) — the deferred cleanup sweep (spec §4.4) reclaims it.
     const { data: d2 } = await service.storage.from(ORIGINALS_BUCKET).download(p2);
     expect(d2).not.toBeNull();
+  });
+
+  it("downscales an oversized original in place and records the normalized hash/dimensions", async () => {
+    const sessionId = await createTestSession();
+    const path = issueUploadPath(sessionId, "image/jpeg");
+    // 6200x6200 ≈ 38.4MP — above NORMALIZE_TRIGGER_PIXELS, below the verify cap
+    const big = await jpeg(6200, 6200);
+    await uploadRaw(path, big, "image/jpeg");
+
+    const row = await finalizeUpload({
+      client: service, sessionId, storagePath: path,
+      declared: { filename: "huge.jpg", mime: "image/jpeg", sizeBytes: big.length, contentHash: "" },
+    });
+
+    expect(row.width).toBe(NORMALIZE_MAX_DIMENSION);
+    expect(row.height).toBe(NORMALIZE_MAX_DIMENSION);
+    expect(row.storage_path).toBe(path); // same path, replaced bytes
+
+    // The stored object IS the normalized image — the row's hash must match it.
+    const { data: blob } = await service.storage.from(ORIGINALS_BUCKET).download(path);
+    const stored = Buffer.from(await blob!.arrayBuffer());
+    expect(createHash("sha256").update(stored).digest("hex")).toBe(row.content_hash);
+    expect(stored.length).toBeLessThan(big.length);
   });
 
   it("rejects a path whose object does not exist in storage", async () => {

@@ -7,6 +7,7 @@ import {
   CLIENT_SESSION_STATUS_SHORT_LABELS,
   CLIENT_SESSION_STATUS_VALUES,
   findMatchingClientSession,
+  formatClientSessionDateTime,
   getClientSessionProgress,
   isClientSessionStatus,
   normalizeClientSessionStatus,
@@ -60,6 +61,29 @@ test("match key normalizes email and session metadata", () => {
       sessionType: "graduation",
       sessionDate: "2026-06-01",
     },
+  );
+});
+
+test("session matching uses the Pacific calendar date", () => {
+  assert.deepEqual(
+    buildClientSessionMatchKey({
+      clientEmail: "client@example.com",
+      sessionType: "Graduation",
+      sessionDate: "2026-06-21T02:00:00.000Z",
+    }),
+    {
+      email: "client@example.com",
+      sessionType: "graduation",
+      sessionDate: "2026-06-20",
+    },
+  );
+});
+
+test("portal formatting keeps date-only and timed sessions on the correct Pacific day", () => {
+  assert.equal(formatClientSessionDateTime("2026-06-20"), "Jun 20, 2026");
+  assert.equal(
+    formatClientSessionDateTime("2026-06-21T02:00:00.000Z"),
+    "Jun 20, 2026, 7:00 PM",
   );
 });
 

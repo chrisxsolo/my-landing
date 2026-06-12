@@ -2,18 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { getUserFromRequest } from "@/lib/auth/get-user";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
 import { CLIENT_SESSION_TABLE } from "@/lib/clientSessions";
+import {
+  buildClientSessionInsertSeed,
+  type InquirySeedRow,
+} from "@/lib/clientSessionInquirySeed";
 
 export const dynamic = "force-dynamic";
-
-type InquiryRow = {
-  name: string;
-  session_type: string | null;
-  session_date: string | null;
-  date_in_mind: string | null;
-  location: string | null;
-  booking_confirmed: boolean | null;
-  preferred_time: string | null;
-};
 
 export async function POST(req: NextRequest) {
   const user = await getUserFromRequest(req);
@@ -45,28 +39,23 @@ export async function POST(req: NextRequest) {
   // No session found — check inquiries table for matching email
   const { data: inquiry } = await admin
     .from("inquiries")
-    .select("name, session_type, session_date, date_in_mind, location, booking_confirmed, preferred_time")
+    .select("id,name,email,session_type,session_date,date_in_mind,location,school,booking_confirmed,preferred_time,created_at")
     .ilike("email", email)
     .order("created_at", { ascending: false })
     .limit(1)
-    .maybeSingle<InquiryRow>();
+    .maybeSingle<InquirySeedRow>();
 
   const sessionRow = inquiry
-    ? {
-        client_user_id: user.id,
-        client_email: email,
-        client_name: inquiry.name ?? null,
-        session_type: inquiry.session_type ?? null,
-        session_date: inquiry.session_date ?? inquiry.date_in_mind ?? null,
-        location: inquiry.location ?? null,
-        current_status: inquiry.booking_confirmed ? "booked" : "inquiry_received",
-      }
+    ? buildClientSessionInsertSeed(user.id, inquiry)
     : {
         client_user_id: user.id,
         client_email: email,
         client_name: null,
         current_status: "inquiry_received",
       };
+  if (!sessionRow) {
+    return NextResponse.json({ error: "Inquiry email is invalid." }, { status: 400 });
+  }
 
   const { error } = await admin.from(CLIENT_SESSION_TABLE).insert(sessionRow);
   if (error) {

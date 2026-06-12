@@ -1,8 +1,9 @@
 "use client";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+// Client conversation workspace — Darkroom edition. This file owns all state
+// and API handlers; presentation lives in the sibling panel components.
+import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { C } from "@/lib/colors";
 import { checkAuth } from "@/lib/adminAuth";
 import type { GmailMessage } from "@/app/api/gmail/thread/route";
 import { buildReminderEmail, type ReminderEmailType } from "@/lib/reminderEmail";
@@ -11,86 +12,21 @@ import {
   updateAdminInquiry,
   type AdminInquiry,
 } from "@/lib/adminInquiries";
-import { CONV, STATUS_META, Icon, Spinner, Panel, PanelHead, ConvStyles } from "../ui";
-
-// ─────────────────────────────────────────────────────────────────────────────
+import { T, CONV, STATUS_META, Icon, ConvStyles } from "../ui";
+import { buildSubject, fmtDate, stripQuotes, tryParseDate, type ReminderDraft } from "./helpers";
+import PipelineRail from "./PipelineRail";
+import ThreadColumn from "./ThreadColumn";
+import ContactCard from "./ContactCard";
+import ComposePanel from "./ComposePanel";
+import TrainAiPanel from "./TrainAiPanel";
+import BookingPanel, { SunsetCard } from "./BookingPanel";
+import RemindersPanel from "./RemindersPanel";
+import LearnPanel from "./LearnPanel";
+import { ConfirmationModal, ContractModal } from "./Modals";
 
 type Inquiry = AdminInquiry;
 
-function fmt12h(t: string | null): string {
-  if (!t) return "";
-  const [h, m] = t.split(":").map(Number);
-  if (isNaN(h) || isNaN(m)) return t;
-  const ampm = h >= 12 ? "PM" : "AM";
-  const h12 = h % 12 || 12;
-  return `${h12}:${String(m).padStart(2, "0")} ${ampm}`;
-}
-
-function fmtDate(ts: number) {
-  const d = new Date(ts);
-  const now = new Date();
-  const isToday = d.toDateString() === now.toDateString();
-  const isThisYear = d.getFullYear() === now.getFullYear();
-  if (isToday) return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-  if (isThisYear) return d.toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-}
-
-// Strip Gmail quote blocks (lines starting with >) for cleaner display
-function stripQuotes(text: string): string {
-  return text
-    .split("\n")
-    .filter(line => !line.trim().startsWith(">"))
-    .join("\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-}
-
-// Detect school name from free-form text (message, session_type, etc.)
-function detectSchool(text: string): string | null {
-  const t = text.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
-  if (/\bsjsu\b|san jose state/.test(t))               return "SJSU";
-  if (/\buc berkeley\b|\bberkeley\b|cal bears/.test(t)) return "UC Berkeley";
-  if (/\bsfsu\b|sf state|san francisco state/.test(t))  return "SF State";
-  if (/\bcsueb\b|cal state east bay|eastbay/.test(t))   return "CSUEB";
-  if (/\busf\b|university of san francisco/.test(t))    return "USF";
-  if (/\bstanford\b/.test(t))                           return "Stanford";
-  if (/\bsanta clara\b|\bscu\b/.test(t))                return "Santa Clara";
-  if (/\bsacramento state\b|\bsac state\b|\bcsus\b/.test(t)) return "Sac State";
-  if (/\bchico state\b|\bcsuchico\b/.test(t))           return "Chico State";
-  if (/\bfresno state\b/.test(t))                       return "Fresno State";
-  return null;
-}
-
-// Extract a human-readable school name from a .edu email domain
-function detectSchoolFromEmail(email: string): string | null {
-  const match = email.match(/@([\w.-]+\.edu)/i);
-  if (!match) return null;
-  const domain = match[1].toLowerCase();
-  // Check known domains first
-  const known: Record<string, string> = {
-    "sjsu.edu": "SJSU", "berkeley.edu": "UC Berkeley", "sfsu.edu": "SF State",
-    "csueastbay.edu": "CSUEB", "usfca.edu": "USF", "stanford.edu": "Stanford",
-    "scu.edu": "Santa Clara", "csus.edu": "Sac State", "csuchico.edu": "Chico State",
-    "csufresno.edu": "Fresno State",
-  };
-  if (known[domain]) return known[domain];
-  // Fall back to a generic prettified name from the subdomain
-  const base = domain.replace(/\.edu$/, "").split(".").at(-1) ?? domain;
-  return base.charAt(0).toUpperCase() + base.slice(1);
-}
-
-// Build a smart default subject for a new outreach
-function buildSubject(inquiry: { session_type: string | null; message: string; date_in_mind: string | null; email?: string }): string {
-  const isGrad = (inquiry.session_type ?? "").toLowerCase().includes("grad");
-  if (!isGrad) return `Re: Your ${inquiry.session_type ?? "photography"} inquiry`;
-  const haystack = [inquiry.message, inquiry.session_type, inquiry.date_in_mind].filter(Boolean).join(" ");
-  const school   = detectSchool(haystack)
-    ?? (inquiry.email ? detectSchoolFromEmail(inquiry.email) : null);
-  return school ? `${school} Graduation Inquiry` : "Graduation Inquiry";
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
+const FONTS_HREF = "https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..900;1,9..144,400..900&family=IBM+Plex+Mono:wght@400;500;600&display=swap";
 
 export default function ConversationPage() {
   const params   = useParams();
@@ -135,14 +71,11 @@ export default function ConversationPage() {
   const [detectedDate,      setDetectedDate]      = useState<{ date: string; readable: string; confidence: string } | null>(null);
   const [detectLoading,     setDetectLoading]     = useState(false);
   const [dateConfirming,    setDateConfirming]    = useState(false);
-  // Day-before reminder
-  const [reminderLoading,   setReminderLoading]   = useState(false);
 
   // Email thread — show all messages by default
   const [threadExpanded, setThreadExpanded] = useState(true);
 
   // Session reminders panel
-  type ReminderDraft = { id: string; label: string; emoji: string; subject: string; body: string; html?: string };
   const [remindersOpen,    setRemindersOpen]    = useState(false);
   const [remindersLoading, setRemindersLoading] = useState(false);
   const [reminders,        setReminders]        = useState<ReminderDraft[]>([]);
@@ -182,43 +115,6 @@ export default function ConversationPage() {
   function showToast(msg: string, ok = true) {
     setToast({ msg, ok });
     setTimeout(() => setToast(null), 3500);
-  }
-
-  // Try to parse a free-form date string (e.g. "June 20", "June 20th") into YYYY-MM-DD.
-  // Requires a recognizable month name — rejects vague strings like "Flexible".
-  function tryParseDate(str: string): string | null {
-    if (!str) return null;
-    const year = new Date().getFullYear();
-
-    // Try each comma/semicolon/or/and-separated segment — take the first that parses
-    for (const seg of str.split(/[,;]|\bor\b|\band\b/i).map(s => s.trim()).filter(Boolean)) {
-      // Numeric M/D/YY or M/D/YYYY (e.g. "6/19/26" or "6/19/2026")
-      const num = seg.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
-      if (num) {
-        const [, m, d, y] = num;
-        const fullYear = y.length === 2 ? 2000 + parseInt(y) : parseInt(y);
-        const date = new Date(fullYear, parseInt(m) - 1, parseInt(d));
-        if (!isNaN(date.getTime())) return date.toISOString().split("T")[0];
-      }
-
-      // Month-name format (e.g. "June 19", "June 19th 2026", "June 13 afternoon/evening")
-      const hasMonth = /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|january|february|march|april|june|july|august|september|october|november|december)\b/i.test(seg);
-      if (hasMonth) {
-        const cleaned = seg
-          .replace(/(\d+)(st|nd|rd|th)/gi, "$1")
-          .replace(/\b(morning|afternoon|evening|night|am|pm|noon|midnight|early|late)\b/gi, "")
-          .replace(/[/\\]/g, " ")
-          .replace(/\s+/g, " ").trim();
-        // Check if the string already contains a 4-digit year
-        const alreadyHasYear = /\b(20\d{2})\b/.test(cleaned);
-        const attempts = alreadyHasYear ? [cleaned] : [`${cleaned} ${year}`, `${cleaned} ${year + 1}`];
-        for (const attempt of attempts) {
-          const d = new Date(attempt);
-          if (!isNaN(d.getTime())) return d.toISOString().split("T")[0];
-        }
-      }
-    }
-    return null;
   }
 
   // Fetch sunset + golden-hour start for a Bay Area date (San Jose coords)
@@ -565,7 +461,6 @@ export default function ConversationPage() {
 
       // ── Live preview via SpeechRecognition ──────────────────────────────
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const SR: (new () => any) | undefined = (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition;
       if (SR) {
         const rec = new SR();
@@ -888,34 +783,13 @@ export default function ConversationPage() {
       const updated = await loadAdminInquiry(inquiry.id);
       if (updated) setInquiry(updated);
       setDetectedDate(null);
+      setSessionDateInput("");
       fetchSunset(dateStr);
       showToast("Session date confirmed and calendar updated ✓");
     } catch {
       showToast("Failed to save date", false);
     } finally {
       setDateConfirming(false);
-    }
-  }
-
-  // ── Draft day-before reminder into the compose box ────────────────────────
-  async function draftReminder() {
-    if (!inquiry) return;
-    setReminderLoading(true);
-    try {
-      const res = await fetch("/api/draft-reminder", {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ inquiry_id: inquiry.id }),
-      });
-      const json = await res.json();
-      if (!res.ok || !json.draft) { showToast(json.error ?? "Draft failed", false); return; }
-      setDraft(json.draft);
-      setSubject(json.subject);
-      showToast("Reminder drafted — review and send when ready ✓");
-    } catch {
-      showToast("Reminder draft failed", false);
-    } finally {
-      setReminderLoading(false);
     }
   }
 
@@ -951,6 +825,19 @@ export default function ConversationPage() {
     } finally {
       setRemindersLoading(false);
     }
+  }
+
+  // ── Edit a reminder draft in place (re-render html when body changes) ─────
+  function editReminder(index: number, patch: Partial<ReminderDraft>) {
+    const firstName = inquiry?.name.split(" ")[0] || "there";
+    setReminders(prev => prev.map((r, i) => {
+      if (i !== index) return r;
+      const next = { ...r, ...patch };
+      if (patch.body !== undefined) {
+        next.html = buildReminderEmail(r.id as ReminderEmailType, firstName, patch.body);
+      }
+      return next;
+    }));
   }
 
   // ── Open styled email preview in a new tab ───────────────────────────────
@@ -1133,8 +1020,8 @@ export default function ConversationPage() {
   // ── Render ───────────────────────────────────────────────────────────────────
   if (!inquiry) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: CONV.canvas }}>
-        <div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: CONV.violet, borderTopColor: "transparent" }} />
+      <div className="min-h-screen flex items-center justify-center" style={{ background: T.page }}>
+        <div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: T.action, borderTopColor: "transparent" }} />
       </div>
     );
   }
@@ -1143,1020 +1030,219 @@ export default function ConversationPage() {
   const initials   = inquiry.name.split(" ").filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join("") || "?";
 
   return (
-    <div className="min-h-screen relative" style={{ background: CONV.canvas }}>
+    <div className="min-h-screen relative conv-shell" style={{ background: T.page, backgroundImage: T.canvasGlow }}>
+      <link rel="stylesheet" href={FONTS_HREF} />
       <ConvStyles />
-      <div className="pointer-events-none fixed inset-0" style={{ background: `${CONV.glowA}, ${CONV.glowB}` }} aria-hidden />
+
+      {/* Safelight strip */}
+      <div className="fixed top-0 left-0 right-0 h-[2px] z-50 pointer-events-none"
+        style={{ background: `linear-gradient(90deg, transparent, ${T.action}, transparent)`, animation: "conv-safelight 5s ease-in-out infinite" }}
+        aria-hidden />
 
       {/* ── Top bar ── */}
       <div className="sticky top-0 z-30 px-4 py-2.5 flex items-center gap-3"
-           style={{ background: CONV.bar, backdropFilter: CONV.barBlur, WebkitBackdropFilter: CONV.barBlur, borderBottom: `1px solid ${CONV.panelBorder}` }}>
+        style={{ background: CONV.bar, backdropFilter: CONV.barBlur, WebkitBackdropFilter: CONV.barBlur, borderBottom: `1px solid ${T.border}` }}>
         <button onClick={() => router.push("/admin?tab=inquiries")}
-          className="text-[13px] font-semibold pl-2 pr-3 py-1.5 rounded-full hover:bg-black/5 transition-colors flex items-center gap-1.5 flex-shrink-0"
-          style={{ color: CONV.textSoft }}>
+          className="text-[13px] font-semibold pl-2 pr-3 py-1.5 rounded-full hover:bg-white/5 transition-colors flex items-center gap-1.5 flex-shrink-0"
+          style={{ color: T.inkSoft }}>
           <Icon name="back" size={15} /> Inquiries
         </button>
-        <div className="h-5 w-px flex-shrink-0" style={{ background: CONV.rowBorder }} />
+        <div className="h-5 w-px flex-shrink-0" style={{ background: T.borderStrong }} />
         <div className="flex items-center gap-2.5 flex-1 min-w-0">
-          <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black text-white flex-shrink-0"
-               style={{ background: CONV.gradBrand }}>
+          <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black flex-shrink-0"
+            style={{ background: CONV.gradClient, color: "#fff" }}>
             {initials}
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-bold truncate leading-tight" style={{ color: CONV.text }}>{inquiry.name}</p>
+            <p className="text-sm font-semibold truncate leading-tight" style={{ color: T.ink, fontFamily: T.display }}>{inquiry.name}</p>
             {inquiry.session_type && (
-              <p className="text-[11px] truncate leading-tight hidden sm:block" style={{ color: CONV.textFaint }}>{inquiry.session_type}</p>
+              <p className="text-[10px] truncate leading-tight hidden sm:block uppercase tracking-[0.14em]" style={{ color: T.inkFaint, fontFamily: T.mono }}>{inquiry.session_type}</p>
             )}
           </div>
           <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full flex-shrink-0"
-                style={{ background: statusMeta.bg, color: statusMeta.color }}>
+            style={{ background: statusMeta.bg, color: statusMeta.color }}>
             <span className="w-1.5 h-1.5 rounded-full" style={{ background: statusMeta.dot }} />
             {statusMeta.label}
           </span>
         </div>
         {/* Status segmented control */}
-        <div className="hidden sm:flex items-center gap-0.5 p-0.5 rounded-full flex-shrink-0" style={{ background: CONV.inset }}>
+        <div className="hidden sm:flex items-center gap-0.5 p-0.5 rounded-full flex-shrink-0" style={{ background: T.inset, border: `1px solid ${T.rowBorder}` }}>
           {(["new", "responded", "archived"] as const).map(s => (
             <button key={s} onClick={() => updateStatus(s)}
               className="text-[11px] font-semibold px-3 py-1 rounded-full transition-all"
               style={status === s
-                ? { background: CONV.panelSolid, color: STATUS_META[s].color, boxShadow: "0 1px 4px rgba(17,24,39,0.10)" }
-                : { color: CONV.textFaint }}>
+                ? { background: T.panelSolid, color: STATUS_META[s].color, border: `1px solid ${T.borderStrong}` }
+                : { color: T.inkFaint }}>
               {s === "archived" ? "Archive" : STATUS_META[s].label}
             </button>
           ))}
         </div>
       </div>
 
+      {/* ── Pipeline rail ── */}
+      <div className="relative max-w-7xl mx-auto px-4 pt-4 conv-rise">
+        <PipelineRail inquiry={inquiry} messages={messages} />
+      </div>
+
       {/* ── Main two-column layout ── */}
-      <div className="relative max-w-7xl mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-[1fr_420px] gap-6 items-start">
+      <div className="relative max-w-7xl mx-auto px-4 py-5 grid grid-cols-1 lg:grid-cols-[1fr_420px] gap-6 items-start">
 
-        {/* ── LEFT: Gmail thread ── */}
-        <div className="space-y-3 conv-rise">
-          {/* Thread header */}
-          <div className="flex items-center justify-between px-1">
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.18em]" style={{ color: CONV.violet }}>Conversation</p>
-              <p className="text-xs mt-0.5" style={{ color: CONV.textFaint }}>
-                {threadLoading ? "Loading…" : messages.length === 0
-                  ? "No prior emails found in Gmail"
-                  : `${messages.length} message${messages.length === 1 ? "" : "s"} with ${inquiry.name}`}
-              </p>
-            </div>
-            <button onClick={() => fetchThread(inquiry.email)} disabled={threadLoading}
-              className="text-xs font-bold px-3 py-1.5 rounded-full transition-all hover:opacity-80 flex items-center gap-1.5"
-              style={{ background: C.p1_08, color: C.p1 }}>
-              {threadLoading ? <><Spinner size={12} /> Loading…</> : <><Icon name="refresh" size={12} /> Refresh</>}
-            </button>
-          </div>
+        {/* LEFT: Gmail thread */}
+        <ThreadColumn
+          inquiry={inquiry}
+          messages={messages}
+          threadLoading={threadLoading}
+          expanded={expanded}
+          bodies={bodies}
+          bodyLoading={bodyLoading}
+          threadExpanded={threadExpanded}
+          onThreadExpanded={setThreadExpanded}
+          onToggleMessage={toggleExpand}
+          onRefresh={() => fetchThread(inquiry.email)}
+          copiedField={copiedField}
+          onCopyField={copyField}
+          bottomRef={bottomRef}
+        />
 
-          {/* Original inquiry card */}
-          <Panel>
-            <div className="p-4 sm:p-5">
-              <div className="flex items-center justify-between gap-3 mb-2.5">
-                <p className="text-[10px] font-black uppercase tracking-[0.18em]" style={{ color: CONV.textFaint }}>Contact form submission</p>
-                <p className="text-[11px] flex-shrink-0" style={{ color: CONV.textFaint }}>
-                  {new Date(inquiry.created_at).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}
-                </p>
-              </div>
-              <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: CONV.textSoft }}>{inquiry.message}</p>
-              <div className="flex flex-wrap gap-1.5 mt-4 pt-3" style={{ borderTop: `1px solid ${CONV.rowBorder}` }}>
-                <button onClick={() => copyField(inquiry.email, "Email-header")}
-                  className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-1 rounded-md transition-colors"
-                  style={copiedField === "Email-header"
-                    ? { background: CONV.greenBg, color: CONV.green }
-                    : { background: CONV.violetBg, color: CONV.violet }}
-                  title="Click to copy">
-                  <Icon name={copiedField === "Email-header" ? "check" : "mail"} size={11} />
-                  {copiedField === "Email-header" ? "Copied" : inquiry.email}
-                </button>
-                {[
-                  inquiry.phone          && { icon: "phone"    as const, text: inquiry.phone },
-                  inquiry.instagram      && { icon: "instagram" as const, text: `@${inquiry.instagram.replace(/^@/, "")}` },
-                  inquiry.session_type   && { icon: "sparkle"  as const, text: inquiry.session_type },
-                  inquiry.school         && { icon: "cap"      as const, text: inquiry.school },
-                  inquiry.people         && { icon: "users"    as const, text: inquiry.people },
-                  inquiry.date_in_mind   && { icon: "calendar" as const, text: inquiry.date_in_mind },
-                  inquiry.preferred_time && { icon: "clock"    as const, text: fmt12h(inquiry.preferred_time) },
-                  inquiry.location       && { icon: "pin"      as const, text: inquiry.location },
-                ].filter(Boolean).map((chip, i) => {
-                  const c = chip as { icon: Parameters<typeof Icon>[0]["name"]; text: string };
-                  return (
-                    <span key={i} className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-1 rounded-md"
-                          style={{ background: CONV.inset, color: CONV.textSoft }}>
-                      <Icon name={c.icon} size={11} style={{ color: CONV.textFaint }} /> {c.text}
-                    </span>
-                  );
-                })}
-              </div>
-            </div>
-          </Panel>
-
-          {/* Gmail messages */}
-          {threadLoading ? (
-            <Panel className="p-12 text-center">
-              <div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin mx-auto mb-3"
-                   style={{ borderColor: CONV.violet, borderTopColor: "transparent" }} />
-              <p className="text-sm" style={{ color: CONV.textFaint }}>Loading Gmail conversation…</p>
-            </Panel>
-          ) : messages.length === 0 ? (
-            <Panel className="p-10 text-center">
-              <div className="w-11 h-11 rounded-full flex items-center justify-center mx-auto mb-3"
-                   style={{ background: CONV.inset, color: CONV.textFaint }}>
-                <Icon name="mail" size={18} />
-              </div>
-              <p className="text-sm font-semibold" style={{ color: CONV.textSoft }}>No emails found yet</p>
-              <p className="text-xs mt-1" style={{ color: CONV.textFaint }}>Emails to/from {inquiry.email} will appear here</p>
-            </Panel>
-          ) : ((() => {
-            const middleMessages = messages.length > 2 ? messages.slice(1, messages.length - 1) : [];
-            const hidden = !threadExpanded ? middleMessages : [];
-
-            function renderMsg(msg: typeof messages[0]) {
-              const isOpen  = expanded[msg.id] ?? false;
-              const body    = bodies[msg.id];
-              const loading = bodyLoading[msg.id];
-              return (
-                <div key={msg.id}
-                  className="rounded-2xl overflow-hidden transition-shadow hover:shadow-md"
-                  style={{
-                    background: msg.isMe ? "rgba(255,255,255,0.92)" : CONV.panel,
-                    border: `1px solid ${msg.isMe ? CONV.violetBorder : CONV.panelBorder}`,
-                    boxShadow: CONV.shadow,
-                  }}>
-                  <button
-                    onClick={() => toggleExpand(msg.id)}
-                    className="w-full flex items-start gap-3 p-4 text-left hover:bg-black/[0.02] transition-colors">
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-[12px] font-black flex-shrink-0 mt-0.5"
-                         style={msg.isMe ? { background: CONV.gradBrand, color: "#fff" } : { background: CONV.inset, color: CONV.textSoft }}>
-                      {msg.fromName.charAt(0).toUpperCase()}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-baseline justify-between gap-2 flex-wrap">
-                        <p className="text-[13px] font-bold" style={{ color: CONV.text }}>
-                          {msg.isMe ? "You" : msg.fromName}
-                          {msg.isMe && <span className="text-[11px] font-normal ml-1.5" style={{ color: CONV.textFaint }}>to {inquiry!.name}</span>}
-                        </p>
-                        <p className="text-[11px] flex-shrink-0" style={{ color: CONV.textFaint }}>{fmtDate(msg.timestamp)}</p>
-                      </div>
-                      {!isOpen && <p className="text-xs mt-0.5 truncate" style={{ color: CONV.textFaint }}>{msg.snippet}</p>}
-                    </div>
-                    <Icon name="chevron" size={14} className={`flex-shrink-0 mt-1.5 transition-transform ${isOpen ? "rotate-180" : ""}`}
-                          style={{ color: CONV.textFaint }} />
-                  </button>
-                  {isOpen && (
-                    <div className="px-4 pb-4 pt-3" style={{ borderTop: `1px solid ${CONV.rowBorder}` }}>
-                      {loading ? (
-                        <div className="flex items-center gap-2 py-4" style={{ color: CONV.textFaint }}>
-                          <Spinner size={14} />
-                          <span className="text-xs">Loading message…</span>
-                        </div>
-                      ) : (
-                        <pre className="text-sm leading-relaxed whitespace-pre-wrap font-sans"
-                             style={{ overflowWrap: "anywhere", color: CONV.textSoft }}>
-                          {body ? stripQuotes(body) : msg.snippet}
-                        </pre>
-                      )}
-                      <p className="text-[10px] mt-3 font-medium" style={{ color: CONV.textFaint, opacity: 0.8 }}>{msg.subject} · {msg.date}</p>
-                    </div>
-                  )}
-                </div>
-              );
-            }
-
-            return (
-              <>
-                {/* First message */}
-                {renderMsg(messages[0])}
-
-                {/* Collapsed middle messages */}
-                {hidden.length > 0 && (
-                  <button
-                    onClick={() => setThreadExpanded(true)}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-full border border-dashed text-xs font-bold transition-all hover:opacity-80"
-                    style={{ borderColor: CONV.violetBorder, color: CONV.violet, background: CONV.violetBg }}>
-                    <span style={{ background: C.p1_18, borderRadius: "999px", padding: "1px 8px" }}>{hidden.length}</span>
-                    more {hidden.length === 1 ? "message" : "messages"} — tap to expand
-                  </button>
-                )}
-
-                {/* All middle messages when expanded */}
-                {threadExpanded && middleMessages.map(msg => renderMsg(msg))}
-
-                {/* Collapse button */}
-                {threadExpanded && middleMessages.length > 0 && (
-                  <button
-                    onClick={() => setThreadExpanded(false)}
-                    className="w-full flex items-center justify-center gap-1.5 py-2 rounded-full text-xs font-bold transition-all hover:opacity-80"
-                    style={{ color: CONV.textFaint }}>
-                    <Icon name="chevron" size={13} className="rotate-180" /> Collapse thread
-                  </button>
-                )}
-
-                {/* Last message (only if more than 1 total) */}
-                {messages.length > 1 && renderMsg(messages[messages.length - 1])}
-              </>
-            );
-          })()
-          )}
-          <div ref={bottomRef} />
-        </div>
-
-        {/* ── RIGHT: AI Draft + Send (sticky) ── */}
+        {/* RIGHT: workspace panels (sticky) */}
         <div className="lg:sticky lg:top-[65px] space-y-4 conv-rise" style={{ animationDelay: "80ms" }}>
 
-          {/* Client contact card */}
-          <Panel>
-            <div className="p-5">
-              <div className="flex items-center gap-3.5">
-                <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-base font-black text-white flex-shrink-0"
-                     style={{ background: CONV.gradBrand, boxShadow: `0 6px 16px ${C.p1_35}` }}>
-                  {initials}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[17px] font-black leading-tight truncate" style={{ color: CONV.text }}>{inquiry.name}</p>
-                  <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                    {inquiry.session_type && (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-                            style={{ background: CONV.violetBg, color: CONV.violet }}>
-                        {inquiry.session_type}
-                      </span>
-                    )}
-                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full"
-                          style={{ background: statusMeta.bg, color: statusMeta.color }}>
-                      <span className="w-1 h-1 rounded-full" style={{ background: statusMeta.dot }} />
-                      {statusMeta.label}
-                    </span>
-                  </div>
-                </div>
-              </div>
+          <ContactCard
+            inquiry={inquiry}
+            status={status}
+            copiedField={copiedField}
+            onCopyField={copyField}
+          />
 
-              {/* Tap-to-copy contact chips */}
-              <div className="flex flex-wrap gap-1.5 mt-4">
-                <button onClick={() => copyField(inquiry.email, "Email")}
-                  className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg transition-colors max-w-full"
-                  style={copiedField === "Email"
-                    ? { background: CONV.greenBg, color: CONV.green }
-                    : { background: CONV.violetBg, color: CONV.violet }}
-                  title="Click to copy">
-                  <Icon name={copiedField === "Email" ? "check" : "mail"} size={12} />
-                  <span className="truncate">{copiedField === "Email" ? "Copied" : inquiry.email}</span>
-                </button>
-                {inquiry.phone && (
-                  <button onClick={() => copyField(inquiry.phone!, "Phone")}
-                    className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg transition-colors"
-                    style={copiedField === "Phone"
-                      ? { background: CONV.greenBg, color: CONV.green }
-                      : { background: CONV.inset, color: CONV.textSoft }}
-                    title="Click to copy">
-                    <Icon name={copiedField === "Phone" ? "check" : "phone"} size={12} />
-                    {copiedField === "Phone" ? "Copied" : inquiry.phone}
-                  </button>
-                )}
-                {inquiry.instagram && (
-                  <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg"
-                        style={{ background: CONV.inset, color: CONV.textSoft }}>
-                    <Icon name="instagram" size={12} /> @{inquiry.instagram.replace(/^@/, "")}
-                  </span>
-                )}
-              </div>
+          <ComposePanel
+            subject={subject}           onSubject={setSubject}
+            draft={draft}               onDraft={setDraft}
+            composeRef={composeRef}
+            messagesCount={messages.length}
+            myEmail={myEmail}
+            voiceActive={voiceActive}
+            voiceError={voiceError}
+            draftLoading={draftLoading}
+            polishLoading={polishLoading}
+            draftSaving={draftSaving}
+            draftSaved={draftSaved}
+            sendLoading={sendLoading}
+            feedback={feedback}         onFeedback={setFeedback}
+            refineSaved={refineSaved}
+            onToggleVoice={toggleVoice}
+            onFocusKeyboard={focusComposeForDictation}
+            onPolish={() => polishDraft()}
+            onGenerate={generateDraft}
+            onSaveDraft={saveDraftToCloud}
+            onSend={sendEmail}
+          />
 
-              {/* Detail rows */}
-              {(() => {
-                const rows = [
-                  inquiry.school         && { icon: "cap"      as const, label: "School",   value: inquiry.school },
-                  inquiry.people         && { icon: "users"    as const, label: "People",   value: inquiry.people },
-                  inquiry.date_in_mind   && { icon: "calendar" as const, label: "Date",     value: inquiry.date_in_mind },
-                  inquiry.preferred_time && { icon: "clock"    as const, label: "Time",     value: fmt12h(inquiry.preferred_time) },
-                  inquiry.location       && { icon: "pin"      as const, label: "Location", value: inquiry.location },
-                ].filter(Boolean) as { icon: Parameters<typeof Icon>[0]["name"]; label: string; value: ReactNode }[];
-                if (!rows.length && !inquiry.session_date) return null;
-                return (
-                  <div className="mt-4">
-                    {rows.map((r, i) => (
-                      <div key={i} className="flex items-center gap-2.5 py-2" style={{ borderTop: `1px solid ${CONV.rowBorder}` }}>
-                        <Icon name={r.icon} size={13} style={{ color: CONV.textFaint }} />
-                        <span className="text-[10px] font-bold uppercase tracking-wider w-16 flex-shrink-0" style={{ color: CONV.textFaint }}>{r.label}</span>
-                        <span className="text-[13px] font-medium min-w-0" style={{ color: CONV.textSoft }}>{r.value}</span>
-                      </div>
-                    ))}
-                    {inquiry.session_date && (
-                      <div className="flex items-center gap-2.5 py-2" style={{ borderTop: `1px solid ${CONV.rowBorder}` }}>
-                        <Icon name="check" size={13} style={{ color: CONV.green }} />
-                        <span className="text-[10px] font-bold uppercase tracking-wider w-16 flex-shrink-0" style={{ color: CONV.green }}>Booked</span>
-                        <span className="text-[13px] font-bold" style={{ color: CONV.green }}>
-                          {new Date(inquiry.session_date + "T12:00:00").toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
-            </div>
-          </Panel>
+          <TrainAiPanel
+            trainMessages={trainMessages}
+            trainInput={trainInput}
+            onTrainInput={setTrainInput}
+            trainLoading={trainLoading}
+            trainSaved={trainSaved}
+            onSend={sendTrainMessage}
+            chatRef={trainChatRef}
+          />
 
-          {/* ── Compose + Send panel ── */}
-          <Panel>
-            <div className="p-5 space-y-3">
+          <SunsetCard
+            sunsetLoading={sunsetLoading}
+            sunsetInfo={sunsetInfo}
+            sunsetDate={sunsetDate}
+            dateInMind={inquiry.date_in_mind}
+            onFetchSunset={fetchSunset}
+          />
 
-              {/* Header row */}
-              <div className="flex items-center justify-between gap-2 flex-wrap">
-                <PanelHead icon="send" tint={CONV.violet} bg={CONV.violetBg} title="Compose Reply" />
-                {/* AI action buttons */}
-                <div className="flex gap-1.5 flex-wrap">
-                  <button onClick={focusComposeForDictation}
-                    title="Open the keyboard — use its mic button for native voice dictation"
-                    className="sm:hidden text-[11px] font-bold px-2.5 py-1.5 rounded-full transition-all hover:opacity-80 flex items-center gap-1.5"
-                    style={{ background: CONV.greenBg, color: CONV.green }}>
-                    <Icon name="keyboard" size={12} /> Keyboard
-                  </button>
-                  <button onClick={toggleVoice}
-                    title={voiceActive ? "Stop recording — will auto-polish" : "Speak your reply — auto-polishes when done"}
-                    className="text-[11px] font-bold px-2.5 py-1.5 rounded-full transition-all hover:opacity-80 flex items-center gap-1.5"
-                    style={voiceActive
-                      ? { background: CONV.redBg, color: CONV.red, border: `1px solid ${CONV.redBorder}` }
-                      : { background: CONV.blueBg, color: CONV.blue }}>
-                    {voiceActive
-                      ? <><span className="inline-block w-2 h-2 rounded-full animate-pulse" style={{ background: CONV.red }} /> Stop</>
-                      : <><Icon name="mic" size={12} /> Speak</>}
-                  </button>
-                  <button onClick={() => polishDraft()} disabled={polishLoading || !draft.trim()}
-                    title="Fix typos, convert bullet points to paragraphs"
-                    className="text-[11px] font-bold px-2.5 py-1.5 rounded-full transition-all hover:opacity-80 disabled:opacity-30 flex items-center gap-1.5"
-                    style={{ background: CONV.amberBg, color: CONV.amber }}>
-                    {polishLoading
-                      ? <><Spinner size={11} /> Polishing…</>
-                      : <><Icon name="sparkle" size={12} /> Polish</>}
-                  </button>
-                  <button onClick={() => generateDraft()} disabled={draftLoading}
-                    className="text-[11px] font-bold px-3 py-1.5 rounded-full transition-all hover:opacity-80 disabled:opacity-50 flex items-center gap-1.5"
-                    style={{ background: CONV.gradBrand, color: "#fff", boxShadow: `0 4px 12px ${C.p1_30}` }}>
-                    {draftLoading
-                      ? <><Spinner size={11} /> Writing…</>
-                      : <><Icon name="sparkle" size={12} /> Draft with AI</>}
-                  </button>
-                </div>
-              </div>
+          <BookingPanel
+            inquiry={inquiry}
+            paymentLoading={paymentLoading}
+            sessionDateInput={sessionDateInput}
+            onSessionDateInput={setSessionDateInput}
+            detectedDate={detectedDate}
+            onDismissDetected={() => setDetectedDate(null)}
+            detectLoading={detectLoading}
+            dateConfirming={dateConfirming}
+            remindersLoading={remindersLoading}
+            remindersOpen={remindersOpen}
+            contractLoading={contractLoading}
+            previewLoading={previewLoading}
+            confirmLoading={confirmLoading}
+            onCheckPayment={checkPayment}
+            onDetectDate={detectDate}
+            onConfirmDate={confirmDate}
+            onScheduleReminders={scheduleReminders}
+            onGenerateContract={generateContract}
+            onPreviewConfirmation={previewConfirmation}
+            onFetchSunset={fetchSunset}
+          />
 
-              {/* Context indicator */}
-              {messages.length > 0 && (
-                <div className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium"
-                     style={{ background: CONV.greenBg, color: CONV.green }}>
-                  <Icon name="check" size={12} className="flex-shrink-0" />
-                  <span>{messages.length} prior email{messages.length > 1 ? "s" : ""} loaded — AI uses full conversation</span>
-                </div>
-              )}
-
-              {/* Voice recording indicator */}
-              {voiceActive && (
-                <div className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium"
-                     style={{ background: CONV.redBg, color: CONV.red, border: `1px solid ${CONV.redBorder}` }}>
-                  <span className="inline-block w-2 h-2 rounded-full animate-pulse flex-shrink-0" style={{ background: CONV.red }} />
-                  <span>Recording… speak naturally. Hit Stop when done — auto-transcribes and polishes.</span>
-                </div>
-              )}
-              {draftLoading && !voiceActive && (
-                <div className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium"
-                     style={{ background: CONV.blueBg, color: CONV.blue }}>
-                  <Spinner size={12} />
-                  <span>Transcribing with Whisper…</span>
-                </div>
-              )}
-              {voiceError && (
-                <div className="px-3 py-2 rounded-xl text-xs font-medium"
-                     style={{ background: CONV.redBg, color: CONV.red }}>
-                  {voiceError}
-                </div>
-              )}
-
-              {/* Subject — always visible */}
-              <div>
-                <label className="text-[10px] font-bold uppercase tracking-widest block mb-1" style={{ color: CONV.textFaint }}>Subject</label>
-                <input type="text" value={subject} onChange={e => setSubject(e.target.value)}
-                  className="conv-input w-full px-3 py-2 rounded-xl font-medium"
-                  style={{ border: `1px solid ${CONV.rowBorder}`, background: CONV.panelSolid, color: CONV.text, fontFamily: "inherit", fontSize: "16px" }} />
-              </div>
-
-              {/* Body — always visible */}
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-[10px] font-bold uppercase tracking-widest" style={{ color: CONV.textFaint }}>
-                    Message
-                    <span className="normal-case font-normal ml-1" style={{ color: CONV.textFaint, opacity: 0.7 }}>· type your own, paste, or use AI above</span>
-                  </label>
-                  <button onClick={saveDraftToCloud} disabled={draftSaving || !draft.trim()}
-                    className="text-[10px] font-bold px-2 py-1 rounded-lg transition-all disabled:opacity-30 flex items-center gap-1"
-                    style={draftSaved
-                      ? { background: CONV.greenBg, color: CONV.green }
-                      : { background: CONV.inset, color: CONV.textFaint }}>
-                    {draftSaving ? "Saving…" : draftSaved ? <><Icon name="check" size={10} /> Saved</> : "Save draft"}
-                  </button>
-                </div>
-                <textarea
-                  ref={composeRef}
-                  value={draft} onChange={e => setDraft(e.target.value)}
-                  rows={11}
-                  placeholder={"Write your reply here…\n\nTip: type in bullet points and hit Polish to auto-format into a proper email."}
-                  className="conv-input w-full leading-relaxed rounded-xl p-3 resize-none sm:resize-y"
-                  style={{ border: `1px solid ${CONV.rowBorder}`, background: C.p1_04, color: CONV.text, fontFamily: "inherit", fontSize: "16px" }} />
-              </div>
-
-              {/* Send */}
-              <button onClick={sendEmail}
-                disabled={!subject.trim() || !draft.trim() || sendLoading}
-                className="w-full text-sm font-bold py-3 rounded-xl transition-all hover:opacity-90 disabled:opacity-40 flex items-center justify-center gap-2"
-                style={{ background: CONV.green, color: "#fff", boxShadow: "0 6px 18px rgba(10,138,100,0.25)" }}>
-                {sendLoading ? <><Spinner size={14} /> Sending…</> : <><Icon name="send" size={14} /> Send from Gmail</>}
-              </button>
-              <p className="text-[10px] text-center" style={{ color: CONV.textFaint }}>
-                Sends from {myEmail || "your Gmail"} · lands in Sent Mail · marks inquiry as Responded
-              </p>
-
-              {/* AI Refine — always visible so it never disappears after a refine */}
-              <div className="pt-2 space-y-2" style={{ borderTop: `1px solid ${CONV.rowBorder}` }}>
-                <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: CONV.textFaint }}>Refine AI draft</p>
-                <div className="flex gap-2">
-                  <input type="text" value={feedback} onChange={e => setFeedback(e.target.value)}
-                    onKeyDown={e => { if (e.key === "Enter" && feedback.trim()) generateDraft(feedback); }}
-                    placeholder='e.g. "be more direct" · "add turnaround time"'
-                    className="conv-input flex-1 px-3 py-2 rounded-xl"
-                    style={{ border: `1px solid ${CONV.rowBorder}`, background: CONV.panelSolid, color: CONV.text, fontFamily: "inherit", fontSize: "16px" }} />
-                  <button onClick={() => { if (feedback.trim()) generateDraft(feedback); }}
-                    disabled={!feedback.trim() || draftLoading}
-                    className="text-xs font-bold px-3.5 py-2 rounded-xl disabled:opacity-30 flex-shrink-0 transition-all hover:opacity-90"
-                    style={{ background: CONV.gradBrand, color: "#fff" }}>
-                    Refine
-                  </button>
-                </div>
-                {refineSaved && (
-                  <div className="flex items-start gap-1.5 text-[11px] rounded-lg px-3 py-2 leading-snug"
-                       style={{ background: CONV.greenBg, color: CONV.green }}>
-                    <Icon name="check" size={11} className="flex-shrink-0 mt-0.5" /> Rule saved: &ldquo;{refineSaved}&rdquo;
-                  </div>
-                )}
-              </div>
-            </div>
-          </Panel>
-
-          {/* ── Train AI ── */}
-          <Panel>
-            <div className="p-4" style={{ borderBottom: `1px solid ${CONV.rowBorder}` }}>
-              <PanelHead icon="chat" tint={CONV.violet} bg={CONV.violetBg}
-                title="Train AI" sub="Rules save directly to Obsidian vault" />
-            </div>
-            {/* Chat history */}
-            <div ref={trainChatRef} className="p-4 space-y-3 max-h-72 overflow-y-auto">
-              {trainMessages.length === 0 && (
-                <p className="text-xs text-center py-4 leading-relaxed" style={{ color: CONV.textFaint }}>
-                  Tell me how to handle this client or any rule you want remembered.<br/>
-                  <span style={{ opacity: 0.7 }}>e.g. &ldquo;Don&apos;t push pricing on warm leads&rdquo; · &ldquo;Always mention golden hour&rdquo;</span>
-                </p>
-              )}
-              {trainMessages.map((m, i) => (
-                <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-                  <div className="max-w-[82%] px-3 py-2 text-sm leading-relaxed"
-                    style={m.role === "user"
-                      ? { background: CONV.gradBrand, color: "#fff", borderRadius: "16px 16px 4px 16px" }
-                      : { background: CONV.inset, color: CONV.textSoft, borderRadius: "16px 16px 16px 4px" }}>
-                    {m.content}
-                  </div>
-                </div>
-              ))}
-              {trainLoading && (
-                <div className="flex justify-start">
-                  <div className="px-3 py-2 rounded-2xl text-sm flex items-center gap-2"
-                       style={{ background: CONV.inset, color: CONV.textFaint }}>
-                    <Spinner size={12} /> Thinking…
-                  </div>
-                </div>
-              )}
-              {trainSaved.length > 0 && (
-                <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs"
-                     style={{ background: CONV.greenBg, color: CONV.green }}>
-                  <Icon name="check" size={11} /> {trainSaved.length} rule{trainSaved.length > 1 ? "s" : ""} saved to Obsidian vault
-                </div>
-              )}
-            </div>
-            {/* Input */}
-            <div className="p-3 flex gap-2" style={{ borderTop: `1px solid ${CONV.rowBorder}` }}>
-              <input
-                type="text"
-                value={trainInput}
-                onChange={e => setTrainInput(e.target.value)}
-                onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendTrainMessage(); } }}
-                placeholder="e.g. Keep replies short for warm leads…"
-                disabled={trainLoading}
-                className="conv-input flex-1 text-sm px-3 py-2 rounded-xl disabled:opacity-50"
-                style={{ border: `1px solid ${CONV.rowBorder}`, background: CONV.panelSolid, color: CONV.text, fontFamily: "inherit" }}
-              />
-              <button
-                onClick={sendTrainMessage}
-                disabled={!trainInput.trim() || trainLoading}
-                className="text-xs font-bold px-3.5 py-2 rounded-xl disabled:opacity-30 flex-shrink-0 transition-all hover:opacity-80"
-                style={{ background: CONV.gradBrand, color: "#fff" }}>
-                Send
-              </button>
-            </div>
-          </Panel>
-
-          {/* ── Sunset / golden hour card — always visible ── */}
-          {inquiry && (
-            <Panel>
-              <div className="px-4 py-3.5 flex items-start gap-3">
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                     style={{ background: CONV.amberBg, color: CONV.amber }}>
-                  <Icon name="sun" size={16} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  {sunsetLoading ? (
-                    <div className="flex items-center gap-2 text-xs mb-2" style={{ color: CONV.amber }}>
-                      <Spinner size={12} /> Fetching sunset…
-                    </div>
-                  ) : sunsetInfo ? (
-                    <div className="mb-2">
-                      <p className="text-sm font-bold" style={{ color: CONV.text }}>
-                        Sunset {sunsetInfo.sunset}
-                        {sunsetDate && <span className="text-xs font-normal ml-2" style={{ color: CONV.textFaint }}>{new Date(sunsetDate + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>}
-                      </p>
-                      <p className="text-xs mt-0.5" style={{ color: CONV.textSoft }}>
-                        Start around <span className="font-bold" style={{ color: CONV.amber }}>{sunsetInfo.goldenStart}</span> for golden hour
-                      </p>
-                    </div>
-                  ) : (
-                    <p className="text-xs font-bold mb-2" style={{ color: CONV.text }}>Golden hour lookup</p>
-                  )}
-                  <input
-                    type="date"
-                    value={sunsetDate}
-                    onChange={e => { if (e.target.value) fetchSunset(e.target.value); }}
-                    className="conv-input w-full text-xs rounded-lg px-2 py-1.5"
-                    style={{ border: `1px solid ${CONV.amberBorder}`, background: CONV.panelSolid, color: CONV.text, fontFamily: "inherit" }}
-                  />
-                  {inquiry.date_in_mind && !sunsetDate && (
-                    <p className="text-[10px] mt-1" style={{ color: CONV.textFaint }}>Client said: {inquiry.date_in_mind}</p>
-                  )}
-                </div>
-              </div>
-            </Panel>
-          )}
-
-          {/* ── Payment & Booking ── */}
-          <Panel>
-            <div className="p-5 space-y-3">
-              <PanelHead icon="card" tint={CONV.green} bg={CONV.greenBg} title="Payment & Booking"
-                right={inquiry.payment_status === "paid" ? (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full"
-                        style={{ background: CONV.greenBg, color: CONV.green }}>
-                    <Icon name="check" size={11} /> Paid
-                  </span>
-                ) : (
-                  <span className="text-[11px] font-bold px-2.5 py-1 rounded-full"
-                        style={{ background: CONV.neutralBg, color: CONV.neutral }}>
-                    Unpaid
-                  </span>
-                )} />
-
-              {/* Payment note — compact single line */}
-              {inquiry.payment_note && (
-                <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs"
-                     style={{ background: CONV.greenBg, color: CONV.green, border: `1px solid ${CONV.greenBorder}` }}>
-                  <span className="flex-1 truncate">{inquiry.payment_note}</span>
-                  {inquiry.payment_detected_at && (
-                    <span className="text-[10px] flex-shrink-0" style={{ opacity: 0.7 }}>
-                      {new Date(inquiry.payment_detected_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                    </span>
-                  )}
-                </div>
-              )}
-
-              {/* Session date — compact */}
-              {inquiry.session_date && !sessionDateInput ? (
-                <div className="flex items-center gap-2 px-3 py-2 rounded-lg"
-                     style={{ background: CONV.greenBg, border: `1px solid ${CONV.greenBorder}` }}>
-                  <Icon name="check" size={12} style={{ color: CONV.green }} />
-                  <span className="text-xs font-bold flex-1" style={{ color: CONV.green }}>
-                    {new Date(inquiry.session_date + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
-                  </span>
-                  <button onClick={() => setSessionDateInput(inquiry.session_date!)}
-                    className="text-[10px] font-semibold flex-shrink-0 hover:opacity-70"
-                    style={{ color: CONV.textFaint }}>edit</button>
-                </div>
-              ) : (
-                <div className="flex gap-1.5">
-                  <input type="date" value={sessionDateInput}
-                    onChange={e => { setSessionDateInput(e.target.value); if (e.target.value) fetchSunset(e.target.value); }}
-                    className="conv-input flex-1 px-2.5 py-1.5 rounded-lg text-xs"
-                    style={{ border: `1px solid ${CONV.greenBorder}`, background: CONV.panelSolid, color: CONV.text, fontFamily: "inherit" }} />
-                  {sessionDateInput && (
-                    <button onClick={() => confirmDate(sessionDateInput)} disabled={dateConfirming}
-                      className="text-xs font-bold px-3 py-1.5 rounded-lg disabled:opacity-40 transition-all hover:opacity-90"
-                      style={{ background: CONV.green, color: "#fff" }}>
-                      {dateConfirming ? "…" : "Set"}
-                    </button>
-                  )}
-                </div>
-              )}
-
-              {/* Detected date — compact confirm strip */}
-              {detectedDate && !inquiry.session_date && (
-                <div className="flex items-center gap-2 px-3 py-2 rounded-lg"
-                     style={{ background: CONV.blueBg, border: `1px solid ${CONV.panelBorder}` }}>
-                  <span className="text-xs flex-1 font-medium truncate inline-flex items-center gap-1.5" style={{ color: CONV.blue }}>
-                    <Icon name="sparkle" size={11} className="flex-shrink-0" /> {detectedDate.readable}
-                  </span>
-                  <button onClick={() => confirmDate(detectedDate.date)} disabled={dateConfirming}
-                    className="text-[11px] font-bold px-2.5 py-1 rounded-md flex-shrink-0 transition-all hover:opacity-90"
-                    style={{ background: CONV.green, color: "#fff" }}>
-                    {dateConfirming ? "…" : "Confirm"}
-                  </button>
-                  <button onClick={() => setDetectedDate(null)}
-                    className="flex-shrink-0 p-1 rounded-md transition-all hover:opacity-70"
-                    style={{ background: CONV.neutralBg, color: CONV.neutral }}>
-                    <Icon name="x" size={11} />
-                  </button>
-                </div>
-              )}
-
-              {/* ── Action buttons grid ── */}
-              <div className="grid grid-cols-2 gap-2">
-
-                {/* Scan payment */}
-                <button onClick={checkPayment} disabled={paymentLoading}
-                  title="Scan Gmail for Venmo/Zelle/PayPal payment"
-                  className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-all hover:opacity-80 disabled:opacity-40"
-                  style={{ background: CONV.greenBg, color: CONV.green, border: `1px solid ${CONV.greenBorder}` }}>
-                  {paymentLoading ? <Spinner size={13} /> : <Icon name="card" size={14} />}
-                  {paymentLoading ? "Scanning…" : inquiry.payment_status === "paid" ? "Re-check" : "Check Pay"}
-                </button>
-
-                {/* Find Date (if no session date yet) */}
-                {!inquiry.session_date && (
-                  <button onClick={detectDate} disabled={detectLoading}
-                    title="Scan email history to detect the session date"
-                    className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-all hover:opacity-80 disabled:opacity-40"
-                    style={{ background: CONV.blueBg, color: CONV.blue, border: `1px solid ${CONV.panelBorder}` }}>
-                    {detectLoading ? <Spinner size={13} /> : <Icon name="calendar" size={14} />}
-                    {detectLoading ? "Scanning…" : "Find Date"}
-                  </button>
-                )}
-
-                {/* Schedule Reminders */}
-                <button onClick={scheduleReminders} disabled={remindersLoading}
-                  title="Generate all 5 client touchpoint drafts"
-                  className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-all hover:opacity-80 disabled:opacity-40"
-                  style={remindersOpen
-                    ? { background: CONV.amber, color: "#fff", border: `1px solid ${CONV.amber}` }
-                    : { background: CONV.amberBg, color: CONV.amber, border: `1px solid ${CONV.amberBorder}` }}>
-                  {remindersLoading ? <Spinner size={13} /> : <Icon name="bell" size={14} />}
-                  {remindersLoading ? "Building…" : "Reminders"}
-                </button>
-
-                {/* Contract */}
-                <button onClick={generateContract} disabled={contractLoading}
-                  title="Fill contract template with client details + agreed price"
-                  className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-all hover:opacity-80 disabled:opacity-40"
-                  style={{ background: CONV.violetBg, color: CONV.violet, border: `1px solid ${CONV.violetBorder}` }}>
-                  {contractLoading ? <Spinner size={13} /> : <Icon name="doc" size={14} />}
-                  {contractLoading ? "Building…" : "Contract"}
-                </button>
-
-                {/* Confirmation email — only if paid, else placeholder */}
-                {inquiry.payment_status === "paid" ? (
-                  <button onClick={previewConfirmation} disabled={previewLoading || confirmLoading}
-                    title="Preview + send payment confirmation email"
-                    className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-all hover:opacity-80 disabled:opacity-40"
-                    style={{ background: CONV.pinkBg, color: CONV.pink, border: `1px solid ${CONV.panelBorder}` }}>
-                    {previewLoading ? <Spinner size={13} /> : <Icon name="mail" size={14} />}
-                    {previewLoading ? "Building…" : "Payment Email"}
-                  </button>
-                ) : (
-                  <div className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold"
-                       style={{ background: CONV.inset, color: CONV.textFaint, border: `1px dashed ${CONV.panelBorderStrong}`, opacity: 0.7 }}>
-                    <Icon name="mail" size={14} className="opacity-50" />
-                    <span>Unpaid</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </Panel>
-
-          {/* ── Session Reminders Panel ── */}
           {remindersOpen && (
-            <Panel>
-              <div className="p-5">
-                <div className="mb-4">
-                  <PanelHead icon="bell" tint={CONV.amber} bg={CONV.amberBg} title="Session Reminders"
-                    right={
-                      <button onClick={() => setRemindersOpen(false)}
-                        className="flex items-center gap-1 text-xs font-bold transition-colors hover:opacity-70"
-                        style={{ color: CONV.textFaint }}>
-                        <Icon name="x" size={12} /> Close
-                      </button>
-                    } />
-                </div>
-
-                {remindersLoading ? (
-                  <div className="flex flex-col items-center gap-3 py-10" style={{ color: CONV.textFaint }}>
-                    <Spinner size={24} />
-                    <p className="text-sm font-semibold">Generating all 5 drafts…</p>
-                  </div>
-                ) : reminders.length === 0 ? (
-                  <p className="text-sm text-center py-6" style={{ color: CONV.textFaint }}>No drafts yet — click Reminders to generate.</p>
-                ) : (
-                  <div className="space-y-4">
-                    {reminders.map((r, i) => (
-                      <div key={r.id} className="rounded-xl overflow-hidden" style={{ border: `1px solid ${CONV.rowBorder}` }}>
-                        <div className="flex items-center justify-between px-4 py-2.5 gap-2 flex-wrap"
-                             style={{ background: CONV.amberBg, borderBottom: `1px solid ${CONV.rowBorder}` }}>
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm">{r.emoji}</span>
-                            <p className="text-xs font-bold" style={{ color: CONV.text }}>{i + 1}. {r.label}</p>
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            {r.html && (
-                              <button
-                                onClick={() => previewReminderEmail(r)}
-                                className="flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full transition-all hover:opacity-80"
-                                style={{ background: CONV.violetBg, color: CONV.violet }}>
-                                <Icon name="eye" size={11} /> Preview
-                              </button>
-                            )}
-                            <button
-                              onClick={() => sendReminderViaGmail(r)}
-                              disabled={sendingReminder === r.id}
-                              className="text-[11px] font-bold px-2.5 py-1 rounded-full text-white transition-all hover:opacity-80 disabled:opacity-60"
-                              style={{ background: CONV.amber }}>
-                              {sendingReminder === r.id ? "Sending…" : "Send via Gmail →"}
-                            </button>
-                          </div>
-                        </div>
-                        <div className="px-4 py-3" style={{ background: CONV.panelSolid }}>
-                          <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: CONV.textFaint }}>Subject</p>
-                          <input
-                            type="text"
-                            value={r.subject}
-                            onChange={e => {
-                              const updated = e.target.value;
-                              setReminders(prev => prev.map((x, j) => j === i ? { ...x, subject: updated } : x));
-                            }}
-                            className="conv-input w-full text-xs font-semibold rounded-lg px-2 py-1.5 mb-2"
-                            style={{ border: `1px solid ${CONV.rowBorder}`, background: CONV.panelSolid, color: CONV.text, fontFamily: "inherit" }}
-                          />
-                          <textarea
-                            value={r.body}
-                            onChange={e => {
-                              const updated = e.target.value;
-                              const firstName = inquiry?.name.split(" ")[0] || "there";
-                              const newHtml = buildReminderEmail(r.id as ReminderEmailType, firstName, updated);
-                              setReminders(prev => prev.map((x, j) => j === i ? { ...x, body: updated, html: newHtml } : x));
-                            }}
-                            rows={4}
-                            className="conv-input w-full text-xs leading-relaxed rounded-lg p-2 resize-none"
-                            style={{ border: `1px solid ${CONV.rowBorder}`, background: CONV.panelSolid, color: CONV.text, fontFamily: "inherit" }}
-                          />
-                        </div>
-                      </div>
-                    ))}
-                    <div className="flex items-center justify-between pt-1">
-                      <p className="text-[11px]" style={{ color: CONV.textFaint }}>
-                        Edits here are used for Preview and Send.
-                      </p>
-                      <button
-                        onClick={saveReminderEdits}
-                        className="flex items-center gap-1 text-[11px] font-bold px-3 py-1.5 rounded-full text-white transition-all hover:opacity-80"
-                        style={{ background: CONV.amber }}>
-                        Save drafts <Icon name="check" size={11} />
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </Panel>
+            <RemindersPanel
+              loading={remindersLoading}
+              reminders={reminders}
+              sendingReminder={sendingReminder}
+              onClose={() => setRemindersOpen(false)}
+              onEdit={editReminder}
+              onPreview={previewReminderEmail}
+              onSend={sendReminderViaGmail}
+              onSaveEdits={saveReminderEdits}
+            />
           )}
 
-          {/* ── Learn from Reply — always visible ── */}
-          <Panel>
-            <div className="p-5 space-y-3">
-              <PanelHead icon="pen" tint={CONV.amber} bg={CONV.amberBg} title="Learn from reply" />
-
-              {learnedRules ? (
-                /* ── Success: show extracted rules ── */
-                <div className="rounded-xl p-4 space-y-2"
-                     style={{ background: CONV.greenBg, border: `1px solid ${CONV.greenBorder}` }}>
-                  <p className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest" style={{ color: CONV.green }}>
-                    <Icon name="check" size={11} /> {learnedRules.length} rule{learnedRules.length === 1 ? "" : "s"} saved to Obsidian vault
-                  </p>
-                  <ul className="space-y-1.5">
-                    {learnedRules.map((rule, i) => (
-                      <li key={i} className="flex items-start gap-2">
-                        <span className="mt-0.5 flex-shrink-0 text-xs" style={{ color: CONV.green, opacity: 0.6 }}>–</span>
-                        <span className="text-xs leading-snug" style={{ color: CONV.textSoft }}>{rule}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <p className="text-[10px] pt-1" style={{ color: CONV.textFaint }}>Applied to all future drafts automatically.</p>
-                  <button onClick={() => { setLearnedRules(null); setActualSent(""); setManualAiDraft(""); }}
-                    className="text-xs font-bold transition-colors hover:opacity-70" style={{ color: CONV.violet }}>
-                    ↩ Analyze another
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <p className="text-xs leading-relaxed" style={{ color: CONV.textSoft }}>
-                    Paste what you actually sent. Claude compares it to the AI draft and saves the style differences permanently.
-                  </p>
-
-                  {/* If an AI draft was generated this session, show it dimmed — otherwise let them paste it */}
-                  {(originalAiDraft || lastAiDraft) ? (
-                    <div className="rounded-xl p-3 space-y-1"
-                         style={{ background: CONV.inset, border: `1px solid ${CONV.rowBorder}` }}>
-                      <div className="flex items-center justify-between">
-                        <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: CONV.textFaint }}>Original AI draft</p>
-                        <button
-                          onClick={() => setAiDraftExpanded(e => !e)}
-                          className="text-[10px] underline underline-offset-2 transition-colors hover:opacity-70"
-                          style={{ color: CONV.textFaint }}>
-                          {aiDraftExpanded ? "Collapse" : "Show full"}
-                        </button>
-                      </div>
-                      <p className={`text-xs leading-relaxed whitespace-pre-wrap${aiDraftExpanded ? "" : " line-clamp-3"}`}
-                         style={{ color: CONV.textFaint }}>{originalAiDraft || lastAiDraft}</p>
-                    </div>
-                  ) : (
-                    <div>
-                      <label className="text-[10px] font-bold uppercase tracking-widest block mb-1" style={{ color: CONV.textFaint }}>
-                        AI draft <span className="normal-case font-normal" style={{ opacity: 0.7 }}>(paste here if you didn&apos;t use Draft with AI)</span>
-                      </label>
-                      <textarea
-                        value={manualAiDraft}
-                        onChange={e => setManualAiDraft(e.target.value)}
-                        rows={4}
-                        placeholder="Paste the AI-generated draft here…"
-                        className="conv-input w-full leading-relaxed rounded-xl p-3 resize-none sm:resize-y"
-                        style={{ border: `1px solid ${CONV.rowBorder}`, background: CONV.panelSolid, color: CONV.textSoft, fontFamily: "inherit", fontSize: "16px" }} />
-                    </div>
-                  )}
-
-                  <div>
-                    <label className="text-[10px] font-bold uppercase tracking-widest block mb-1" style={{ color: CONV.textFaint }}>
-                      What you actually sent
-                    </label>
-                    <textarea
-                      value={actualSent}
-                      onChange={e => setActualSent(e.target.value)}
-                      rows={6}
-                      placeholder="Paste the email you sent here…"
-                      className="conv-input w-full leading-relaxed rounded-xl p-3 resize-none sm:resize-y"
-                      style={{ border: `1px solid ${CONV.amberBorder}`, background: CONV.panelSolid, color: CONV.text, fontFamily: "inherit", fontSize: "16px" }} />
-                  </div>
-
-                  <button
-                    onClick={learnFromReply}
-                    disabled={(!originalAiDraft && !lastAiDraft && !manualAiDraft.trim()) || !actualSent.trim() || learnLoading}
-                    className="w-full text-sm font-bold py-2.5 rounded-xl transition-all hover:opacity-90 disabled:opacity-40 flex items-center justify-center gap-2"
-                    style={{ background: CONV.amber, color: "#fff", boxShadow: "0 6px 18px rgba(185,115,9,0.25)" }}>
-                    {learnLoading
-                      ? <><Spinner size={13} /> Analyzing…</>
-                      : <><Icon name="pen" size={13} /> Analyze & save to Obsidian</>}
-                  </button>
-                </>
-              )}
-            </div>
-          </Panel>
+          <LearnPanel
+            originalAiDraft={originalAiDraft}
+            lastAiDraft={lastAiDraft}
+            manualAiDraft={manualAiDraft}
+            onManualAiDraft={setManualAiDraft}
+            actualSent={actualSent}
+            onActualSent={setActualSent}
+            aiDraftExpanded={aiDraftExpanded}
+            onAiDraftExpanded={setAiDraftExpanded}
+            learnedRules={learnedRules}
+            learnLoading={learnLoading}
+            onAnalyze={learnFromReply}
+            onReset={() => { setLearnedRules(null); setActualSent(""); setManualAiDraft(""); }}
+          />
 
         </div>
       </div>
 
       {/* ── Toast ── */}
       {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-full text-[13px] font-semibold text-white flex items-center gap-2 transition-all"
-             style={{ background: "rgba(28,28,30,0.92)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", boxShadow: CONV.shadowLg }}>
-          <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: toast.ok ? "#34d399" : "#f87171" }} />
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-full text-[13px] font-semibold flex items-center gap-2 transition-all"
+          style={{ background: T.panelSolid, color: T.ink, border: `1px solid ${T.borderStrong}`, boxShadow: T.shadowHover }}>
+          <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: toast.ok ? T.green : T.red }} />
           {toast.msg}
         </div>
       )}
 
       {/* ── Email preview modal ── */}
-      {previewHtml && inquiry && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-10 overflow-y-auto"
-             style={{ background: CONV.scrim, backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" }}>
-          <div className="w-full max-w-2xl rounded-2xl overflow-hidden flex flex-col conv-rise"
-               style={{ background: CONV.overlay, maxHeight: "calc(100vh - 80px)", boxShadow: CONV.shadowLg }}>
-
-            {/* Modal header */}
-            <div className="flex items-center justify-between px-5 py-4 flex-shrink-0"
-                 style={{ background: CONV.panelSolid, borderBottom: `1px solid ${CONV.rowBorder}` }}>
-              <PanelHead icon="mail" tint={CONV.pink} bg={CONV.pinkBg}
-                title="Booking Confirmation Email" sub={`To: ${inquiry.name} <${inquiry.email}>`} />
-              <button onClick={() => setPreviewHtml(null)}
-                className="p-2 rounded-full transition-colors hover:bg-black/5" style={{ color: CONV.textFaint }}>
-                <Icon name="x" size={16} />
-              </button>
-            </div>
-
-            {/* Custom note input */}
-            <div className="px-5 py-3 flex-shrink-0" style={{ background: CONV.inset, borderBottom: `1px solid ${CONV.rowBorder}` }}>
-              <label className="text-[10px] font-bold uppercase tracking-widest block mb-1.5" style={{ color: CONV.textFaint }}>
-                Add a personal note <span className="normal-case font-normal" style={{ opacity: 0.7 }}>(optional — appears in the email)</span>
-              </label>
-              <textarea
-                value={customComment}
-                onChange={e => setCustomComment(e.target.value)}
-                rows={2}
-                placeholder={"e.g. \"Can't wait to shoot with you! Feel free to text me if anything comes up.\""}
-                className="conv-input w-full rounded-lg px-3 py-2 resize-none text-sm leading-relaxed"
-                style={{ border: `1px solid ${CONV.greenBorder}`, background: CONV.panelSolid, color: CONV.text, fontFamily: "inherit" }}
-              />
-              {customComment.trim() && (
-                <p className="text-[10px] mt-1 font-medium" style={{ color: CONV.green }}>↓ Preview will update when you resend</p>
-              )}
-            </div>
-
-            {/* Email preview */}
-            <div className="flex-1 overflow-y-auto p-4">
-              <div className="rounded-xl overflow-hidden shadow-sm"
-                   dangerouslySetInnerHTML={{ __html: previewHtml }} />
-            </div>
-
-            {/* Action bar */}
-            <div className="flex gap-3 px-5 py-4 flex-shrink-0"
-                 style={{ background: CONV.panelSolid, borderTop: `1px solid ${CONV.rowBorder}` }}>
-              <button onClick={() => setPreviewHtml(null)}
-                className="flex-1 text-sm font-bold py-2.5 rounded-xl transition-all hover:opacity-80"
-                style={{ background: CONV.neutralBg, color: CONV.neutral }}>
-                Cancel
-              </button>
-              <button
-                onClick={sendConfirmation}
-                disabled={confirmLoading}
-                className="flex-1 text-sm font-bold py-2.5 rounded-xl transition-all hover:opacity-90 disabled:opacity-40 flex items-center justify-center gap-2"
-                style={{ background: CONV.gradBrand, color: "#fff", boxShadow: `0 4px 14px ${C.p1_30}` }}>
-                {confirmLoading
-                  ? <><Spinner size={13} /> Sending…</>
-                  : <><Icon name="send" size={13} /> Send from Gmail</>}
-              </button>
-            </div>
-          </div>
-        </div>
+      {previewHtml && (
+        <ConfirmationModal
+          inquiry={inquiry}
+          previewHtml={previewHtml}
+          customComment={customComment}
+          onCustomComment={setCustomComment}
+          confirmLoading={confirmLoading}
+          onClose={() => setPreviewHtml(null)}
+          onSend={sendConfirmation}
+        />
       )}
 
       {/* ── Contract modal ── */}
       {contractText && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-10 overflow-y-auto"
-             style={{ background: CONV.scrim, backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" }}>
-          <div className="w-full max-w-2xl rounded-2xl overflow-hidden flex flex-col conv-rise"
-               style={{ background: CONV.overlay, maxHeight: "calc(100vh - 80px)", boxShadow: CONV.shadowLg }}>
-
-            {/* Header */}
-            <div className="flex items-center justify-between px-5 py-4 flex-shrink-0"
-                 style={{ background: CONV.panelSolid, borderBottom: `1px solid ${CONV.rowBorder}` }}>
-              <PanelHead icon="doc" tint={CONV.violet} bg={CONV.violetBg}
-                title="Photography Contract" sub="Copy and paste into Pixieset to send" />
-              <button onClick={() => setContractText(null)}
-                className="p-2 rounded-full transition-colors hover:bg-black/5" style={{ color: CONV.textFaint }}>
-                <Icon name="x" size={16} />
-              </button>
-            </div>
-
-            {/* Copy button */}
-            <div className="px-5 py-3 flex-shrink-0" style={{ background: CONV.inset, borderBottom: `1px solid ${CONV.rowBorder}` }}>
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(contractText);
-                  setContractCopied(true);
-                  setTimeout(() => setContractCopied(false), 2500);
-                }}
-                className="w-full text-sm font-bold py-2.5 rounded-xl transition-all hover:opacity-90 flex items-center justify-center gap-2"
-                style={contractCopied
-                  ? { background: CONV.green, color: "#fff" }
-                  : { background: CONV.gradBrand, color: "#fff", boxShadow: `0 4px 14px ${C.p1_30}` }}>
-                <Icon name={contractCopied ? "check" : "copy"} size={13} />
-                {contractCopied ? "Copied to clipboard!" : "Copy entire contract"}
-              </button>
-              <p className="text-[10px] text-center mt-2" style={{ color: CONV.textFaint }}>
-                Placeholders in [brackets] need to be filled in manually
-              </p>
-            </div>
-
-            {/* Contract text */}
-            <div className="flex-1 overflow-y-auto p-4">
-              <textarea
-                readOnly
-                value={contractText}
-                rows={30}
-                className="w-full text-xs leading-relaxed rounded-xl p-4 resize-none outline-none font-mono"
-                style={{ background: CONV.panelSolid, border: `1px solid ${CONV.rowBorder}`, color: CONV.textSoft }}
-              />
-            </div>
-
-            <div className="px-5 py-4 flex-shrink-0" style={{ background: CONV.panelSolid, borderTop: `1px solid ${CONV.rowBorder}` }}>
-              <button onClick={() => setContractText(null)}
-                className="w-full text-sm font-bold py-2.5 rounded-xl transition-all hover:opacity-80"
-                style={{ background: CONV.neutralBg, color: CONV.neutral }}>
-                Done
-              </button>
-            </div>
-          </div>
-        </div>
+        <ContractModal
+          contractText={contractText}
+          copied={contractCopied}
+          onCopy={() => {
+            navigator.clipboard.writeText(contractText);
+            setContractCopied(true);
+            setTimeout(() => setContractCopied(false), 2500);
+          }}
+          onClose={() => setContractText(null)}
+        />
       )}
     </div>
   );

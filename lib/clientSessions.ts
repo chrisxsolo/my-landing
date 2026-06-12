@@ -1,5 +1,6 @@
 export const CLIENT_SESSION_TABLE = "client_sessions";
 export const ADMIN_USERS_TABLE = "admin_users";
+export const CLIENT_SESSION_TIME_ZONE = "America/Los_Angeles";
 
 export const CLIENT_SESSION_STATUS_VALUES = [
   "inquiry_received",
@@ -141,7 +142,29 @@ export function normalizeClientSessionDate(value: string | null | undefined) {
 
   const date = new Date(trimmed);
   if (Number.isNaN(date.getTime())) return null;
-  return date.toISOString().slice(0, 10);
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: CLIENT_SESSION_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+export function formatClientSessionDateTime(value: string | null) {
+  if (!value) return "—";
+  const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value);
+  const date = new Date(dateOnly ? `${value}T12:00:00Z` : value);
+  if (Number.isNaN(date.getTime())) return "—";
+
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: CLIENT_SESSION_TIME_ZONE,
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    ...(dateOnly ? {} : { hour: "numeric", minute: "2-digit" }),
+  }).format(date);
 }
 
 export function buildClientSessionMatchKey(input: ClientSessionMatchInput) {

@@ -2,6 +2,8 @@ import { type NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/requireAdmin";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { INQUIRY_SELECT } from "@/lib/adminInquiries";
+import { syncAdminInquiryPortalSession } from "@/lib/adminPortalSessionUpsert";
+import type { InquirySeedRow } from "@/lib/clientSessionInquirySeed";
 import {
   parseInquiryId,
   validateInquiryCreate,
@@ -88,14 +90,23 @@ export async function PATCH(req: NextRequest) {
 
   try {
     const supabase = createSupabaseServerClient();
+    const { data: previous, error: previousError } = await supabase
+      .from(INQUIRIES_TABLE)
+      .select(INQUIRY_SELECT)
+      .eq("id", input.data.id)
+      .maybeSingle<InquirySeedRow>();
+    if (previousError) throw previousError;
+    if (!previous) return NextResponse.json({ error: "Inquiry not found." }, { status: 404 });
+
     const { data, error } = await supabase
       .from(INQUIRIES_TABLE)
       .update(input.data.updates)
       .eq("id", input.data.id)
       .select(INQUIRY_SELECT)
-      .maybeSingle();
+      .maybeSingle<InquirySeedRow>();
     if (error) throw error;
     if (!data) return NextResponse.json({ error: "Inquiry not found." }, { status: 404 });
+    await syncAdminInquiryPortalSession(supabase, previous, data);
     return NextResponse.json({ inquiry: data });
   } catch (error) {
     console.error("[admin/inquiries] PATCH failed:", error);

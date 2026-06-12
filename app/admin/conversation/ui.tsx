@@ -1,66 +1,34 @@
 "use client";
-// Shared visual primitives for the client conversation workspace — light
-// Apple-style glass that matches the Revenue command center (payments/palette.ts).
-// No hex values inline in the page component; everything routes through CONV.
+// Shared visual primitives for the client conversation workspace — Darkroom
+// edition. Warm near-black canvas, amber safelight as the single action color,
+// paper-white ink, Fraunces display type, mono EXIF-style labels. Every
+// surface routes through adminTheme.T so this page stays in lockstep with the
+// rest of the Darkroom shell.
 
 import type { CSSProperties, ReactNode } from "react";
-import { C } from "@/lib/colors";
+import { T } from "@/app/admin/adminTheme";
 
+export { T };
+
+// Conversation-specific extras layered on top of the shared Darkroom theme
 export const CONV = {
-  // Canvas: soft white with faint brand ambience
-  canvas: "linear-gradient(168deg,#fdfdfe 0%,#f6f5f9 52%,#f3f4f7 100%)",
-  glowA: "radial-gradient(640px 300px at 10% -6%, rgba(157,111,232,0.09), transparent 70%)",
-  glowB: "radial-gradient(720px 340px at 92% 0%, rgba(232,121,160,0.07), transparent 70%)",
-
-  // Surfaces. Panels skip backdrop-filter (perf) — only the sticky bar blurs.
-  panel: "rgba(255,255,255,0.82)",
-  panelSolid: "#ffffff",
-  panelBorder: "rgba(60,60,67,0.10)",
-  panelBorderStrong: "rgba(60,60,67,0.18)",
-  inset: "rgba(60,60,67,0.055)",
-  rowBorder: "rgba(60,60,67,0.08)",
-  shadow: "0 8px 28px rgba(17,24,39,0.06)",
-  shadowLg: "0 24px 60px rgba(17,24,39,0.18)",
-  overlay: "rgba(255,255,255,0.97)",
-  scrim: "rgba(17,24,39,0.45)",
-  bar: "rgba(255,255,255,0.72)",
-  barBlur: "saturate(1.8) blur(16px)",
-
-  // Type (neutral ink)
-  text: "#1d1d1f",
-  textSoft: "#56565c",
-  textFaint: "#8e8e93",
-
-  // Semantics (darkened for contrast on white)
-  violet: C.p1,
-  violetBg: "rgba(157,111,232,0.10)",
-  violetBorder: "rgba(157,111,232,0.22)",
-  pink: "#d4537f",
-  pinkBg: "rgba(232,121,160,0.11)",
-  green: "#0a8a64",
-  greenBg: "rgba(16,185,129,0.11)",
-  greenBorder: "rgba(16,185,129,0.25)",
-  blue: "#2f6fd6",
-  blueBg: "rgba(59,123,224,0.11)",
-  amber: "#b97309",
-  amberBg: "rgba(217,144,12,0.12)",
-  amberBorder: "rgba(217,144,12,0.28)",
-  red: "#d2363c",
-  redBg: "rgba(220,60,66,0.10)",
-  redBorder: "rgba(220,60,66,0.30)",
-  neutral: "#6e6e73",
-  neutralBg: "rgba(110,110,115,0.10)",
-
-  gradBrand: C.grad12,
+  bar: "rgba(19,17,20,0.85)",
+  barBlur: "saturate(1.4) blur(20px)",
+  // Avatar gradients — amber safelight for me, violet for the client
+  gradMe: `linear-gradient(135deg, ${T.actionHover}, #c97a2e)`,
+  gradClient: "linear-gradient(135deg, #ab95e0, #7a64b8)",
+  // My outgoing messages carry a faint safelight wash
+  meBubble: "rgba(232,160,76,0.07)",
+  meBubbleBorder: "rgba(232,160,76,0.22)",
 } as const;
 
-export const STATUS_META: Record<string, { label: string; color: string; bg: string; dot: string }> = {
-  new:       { label: "New",       color: CONV.green,   bg: CONV.greenBg,   dot: "#10b981" },
-  responded: { label: "Responded", color: CONV.blue,    bg: CONV.blueBg,    dot: "#3b82f6" },
-  archived:  { label: "Archived",  color: CONV.neutral, bg: CONV.neutralBg, dot: "#a1a1a6" },
+export const STATUS_META: Record<string, { label: string; color: string; bg: string; border: string; dot: string }> = {
+  new:       { label: "New",       color: T.green,    bg: T.greenBg,   border: T.greenBorder,  dot: T.green },
+  responded: { label: "Responded", color: T.blue,     bg: T.blueBg,    border: T.blueBorder,   dot: T.blue },
+  archived:  { label: "Archived",  color: T.inkFaint, bg: T.neutralBg, border: T.border,       dot: T.inkFaint },
 };
 
-// ── Icons (lucide-style strokes — replaces emoji throughout the page) ───────
+// ── Icons (lucide-style strokes) ─────────────────────────────────────────────
 const PATHS = {
   back:      <><path d="M19 12H5" /><path d="m12 19-7-7 7-7" /></>,
   refresh:   <><path d="M21 12a9 9 0 1 1-2.64-6.36" /><path d="M21 3v6h-6" /></>,
@@ -87,6 +55,9 @@ const PATHS = {
   chevron:   <path d="m6 9 6 6 6-6" />,
   x:         <path d="M18 6 6 18M6 6l12 12" />,
   eye:       <><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></>,
+  zap:       <path d="M13 2 3 14h8l-1 8 11-13h-9l1-7Z" />,
+  film:      <><rect x="2" y="3" width="20" height="18" rx="2" /><path d="M7 3v18M17 3v18M2 8h5M2 16h5M17 8h5M17 16h5" /></>,
+  arrow:     <><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></>,
 } as const;
 
 export type IconName = keyof typeof PATHS;
@@ -103,7 +74,7 @@ export function Icon({ name, size = 14, className, style }: {
   );
 }
 
-/** Inline ring spinner — replaces the old "◌" glyph. */
+/** Inline ring spinner. */
 export function Spinner({ size = 14 }: { size?: number }) {
   return (
     <span className="inline-block rounded-full border-2 border-current border-t-transparent animate-spin flex-shrink-0"
@@ -115,7 +86,7 @@ export function Spinner({ size = 14 }: { size?: number }) {
 export function Panel({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
     <div className={`rounded-2xl overflow-hidden ${className}`}
-      style={{ background: CONV.panel, border: `1px solid ${CONV.panelBorder}`, boxShadow: CONV.shadow }}>
+      style={{ background: T.panel, border: `1px solid ${T.border}`, boxShadow: T.shadow }}>
       {children}
     </div>
   );
@@ -131,8 +102,8 @@ export function PanelHead({ icon, tint, bg, title, sub, right }: {
           <Icon name={icon} size={14} />
         </div>
         <div className="min-w-0">
-          <p className="text-sm font-bold leading-tight" style={{ color: CONV.text }}>{title}</p>
-          {sub && <p className="text-[11px] leading-tight mt-0.5" style={{ color: CONV.textFaint }}>{sub}</p>}
+          <p className="text-[15px] font-semibold leading-tight" style={{ color: T.ink, fontFamily: T.display }}>{title}</p>
+          {sub && <p className="text-[11px] leading-tight mt-0.5" style={{ color: T.inkFaint }}>{sub}</p>}
         </div>
       </div>
       {right}
@@ -140,14 +111,31 @@ export function PanelHead({ icon, tint, bg, title, sub, right }: {
   );
 }
 
-/** Entrance keyframes + input focus ring; rendered once by the page. */
+/** Mono uppercase micro-label — the EXIF-data look used across the Darkroom. */
+export function MonoLabel({ children, color = T.inkFaint, className = "" }: {
+  children: ReactNode; color?: string; className?: string;
+}) {
+  return (
+    <span className={`text-[10px] font-bold uppercase tracking-[0.14em] ${className}`}
+      style={{ color, fontFamily: T.mono }}>
+      {children}
+    </span>
+  );
+}
+
+/** Entrance keyframes, safelight pulse, dark input chrome; rendered once by the page. */
 export function ConvStyles() {
   return (
     <style>{`
       @keyframes conv-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
-      .conv-rise { animation: conv-rise 0.45s cubic-bezier(0.22,1,0.36,1) both; }
-      .conv-input { transition: border-color 0.15s, box-shadow 0.15s; outline: none; }
-      .conv-input:focus { border-color: ${C.p1_35} !important; box-shadow: 0 0 0 3px ${C.p1_12}; }
+      @keyframes conv-safelight { 0%,100% { opacity: 0.5; } 50% { opacity: 1; } }
+      @keyframes conv-pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(232,160,76,0.35); } 50% { box-shadow: 0 0 0 5px rgba(232,160,76,0); } }
+      .conv-rise { animation: conv-rise 0.4s cubic-bezier(0.22,1,0.36,1) both; }
+      .conv-input { transition: border-color 0.15s, box-shadow 0.15s; outline: none; color-scheme: dark; }
+      .conv-input:focus { border-color: rgba(232,160,76,0.55) !important; box-shadow: 0 0 0 3px rgba(232,160,76,0.14); }
+      .conv-shell input, .conv-shell select, .conv-shell textarea { color-scheme: dark; }
+      .conv-shell ::placeholder { color: rgba(184,178,168,0.42); }
+      .conv-shell option { background: ${T.panelSolid}; color: ${T.ink}; }
       @media (prefers-reduced-motion: reduce) { .conv-rise { animation: none; } }
     `}</style>
   );

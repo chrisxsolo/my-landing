@@ -9,7 +9,7 @@ const SESSION = "11111111-1111-4111-8111-111111111111";
 describe("upload config", () => {
   it("uses the private bucket and sane caps", () => {
     expect(ORIGINALS_BUCKET).toBe("session-content-originals");
-    expect(MAX_UPLOAD_BYTES).toBe(25 * 1024 * 1024);
+    expect(MAX_UPLOAD_BYTES).toBe(50 * 1024 * 1024);
     expect(MAX_IMAGE_PIXELS).toBeGreaterThan(0);
     expect(ALLOWED_UPLOAD_MIME).toEqual(["image/jpeg", "image/png", "image/webp"]);
   });

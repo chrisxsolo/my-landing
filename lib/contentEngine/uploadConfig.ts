@@ -4,8 +4,16 @@
 import { randomUUID } from "node:crypto";
 
 export const ORIGINALS_BUCKET = "session-content-originals";
-export const MAX_UPLOAD_BYTES = 25 * 1024 * 1024; // 25 MB (spec §4.2)
-export const MAX_IMAGE_PIXELS = 50_000_000;       // decompression-bomb guard (sharp limitInputPixels)
+export const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;  // 50 MB (spec §4.2)
+export const MAX_IMAGE_PIXELS = 150_000_000;       // decompression-bomb guard (sharp limitInputPixels); covers 100MP+ medium format
+
+// Oversized-but-valid uploads are downscaled in place at finalize time instead
+// of rejected. Targets stay far above MAX_DERIVATIVE_DIMENSION (2400px), so
+// published output is unaffected.
+export const NORMALIZE_TRIGGER_PIXELS = 36_000_000;          // ~36 MP — modern high-res bodies exceed this
+export const NORMALIZE_TRIGGER_BYTES = 25 * 1024 * 1024;
+export const NORMALIZE_MAX_DIMENSION = 5000;                 // long-edge cap for stored originals
+export const NORMALIZE_QUALITY = 90;
 export const ALLOWED_UPLOAD_MIME = ["image/jpeg", "image/png", "image/webp"] as const;
 export type AllowedUploadMime = (typeof ALLOWED_UPLOAD_MIME)[number];
 

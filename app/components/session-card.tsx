@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { C } from "@/lib/colors";
 import {
+  CLIENT_SESSION_TIME_ZONE,
   CLIENT_SESSION_STATUS_LABELS,
+  formatClientSessionDateTime,
   getClientSessionProgress,
   type ClientSessionDTO,
 } from "@/lib/clientSessions";
@@ -11,20 +12,10 @@ type SessionCardProps = {
   session: ClientSessionDTO;
 };
 
-function formatDateTime(value: string | null) {
-  if (!value) return "—";
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(new Date(value));
-}
-
 function formatDate(value: string | null) {
   if (!value) return "—";
   return new Intl.DateTimeFormat("en-US", {
+    timeZone: CLIENT_SESSION_TIME_ZONE,
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -229,7 +220,7 @@ export default function SessionCard({ session }: SessionCardProps) {
         <div className="mt-5 grid gap-2 sm:grid-cols-3">
           {[
             { label: "Type", value: session.sessionType },
-            { label: "Date", value: formatDateTime(session.sessionDate) },
+            { label: "Date", value: formatClientSessionDateTime(session.sessionDate) },
             { label: "Location", value: session.location },
           ].map(({ label, value }) => (
             <div key={label} className="sc-detail">

@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserFromRequest } from "@/lib/auth/get-user";
 import {
+  buildClientSessionMatchKey,
   CLIENT_SESSION_TABLE,
   type ClientSessionRow,
   toClientSessionDTO,
 } from "@/lib/clientSessions";
 import {
+  buildClientSessionSyncFields,
   buildClientSessionInsertSeed,
   INQUIRIES_TABLE,
   normalizeClientEmail,
@@ -52,12 +54,60 @@ async function fetchMatchingInquiries(email: string) {
   const supabase = createSupabaseAdminClient();
   const { data, error } = await supabase
     .from(INQUIRIES_TABLE)
-    .select("id,name,email,session_type,session_date,date_in_mind,location,school,created_at")
+    .select("id,name,email,session_type,session_date,date_in_mind,location,school,preferred_time,booking_confirmed,created_at")
     .ilike("email", email)
     .returns<InquirySeedRow[]>();
 
   if (error) throw error;
   return data ?? [];
+}
+
+function datesMatch(stored: string | null, expected: string | null) {
+  if (!stored || !expected) return stored === expected;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(expected)) {
+    return buildClientSessionMatchKey({
+      clientEmail: "match@example.com",
+      sessionDate: stored,
+    }).sessionDate === expected;
+  }
+  return new Date(stored).getTime() === new Date(expected).getTime();
+}
+
+function matchingInquiry(row: ClientSessionRow, inquiries: InquirySeedRow[]) {
+  if (inquiries.length === 1) return inquiries[0];
+  const target = buildClientSessionMatchKey({
+    clientEmail: row.client_email,
+    sessionType: row.session_type,
+    sessionDate: row.session_date,
+  });
+  return inquiries.find((inquiry) => {
+    const candidate = buildClientSessionMatchKey({
+      clientEmail: inquiry.email,
+      sessionType: inquiry.session_type,
+      sessionDate: inquiry.session_date ?? inquiry.date_in_mind,
+    });
+    return candidate.sessionDate === target.sessionDate
+      && candidate.sessionType === target.sessionType;
+  }) ?? null;
+}
+
+async function reconcileRows(rows: ClientSessionRow[], inquiries: InquirySeedRow[]) {
+  const supabase = createSupabaseAdminClient();
+  return Promise.all(rows.map(async (row) => {
+    const inquiry = matchingInquiry(row, inquiries);
+    if (!inquiry) return row;
+
+    const details = buildClientSessionSyncFields(inquiry);
+    const changed = row.client_name !== details.client_name
+      || row.session_type !== details.session_type
+      || row.location !== details.location
+      || !datesMatch(row.session_date, details.session_date);
+    if (changed) {
+      const { error } = await supabase.from(CLIENT_SESSION_TABLE).update(details).eq("id", row.id);
+      if (error) throw error;
+    }
+    return { ...row, ...details };
+  }));
 }
 
 async function linkEmailMatches(userId: string, email: string) {
@@ -107,9 +157,10 @@ export async function GET(req: NextRequest) {
     const email = normalizeClientEmail(user.email);
     if (email) await linkEmailMatches(user.id, email);
 
-    const [byUserId, byEmail] = await Promise.all([
+    const [byUserId, byEmail, inquiries] = await Promise.all([
       fetchRowsByUserId(user.id),
       email ? fetchRowsByEmail(email) : Promise.resolve([]),
+      email ? fetchMatchingInquiries(email) : Promise.resolve([]),
     ]);
 
     const rowsById = new Map<string, ClientSessionRow>();
@@ -120,7 +171,8 @@ export async function GET(req: NextRequest) {
       if (created) rowsById.set(created.id, created);
     }
 
-    const sessions = sortSessions([...rowsById.values()]).map(toClientSessionDTO);
+    const reconciledRows = await reconcileRows([...rowsById.values()], inquiries);
+    const sessions = sortSessions(reconciledRows).map(toClientSessionDTO);
     return NextResponse.json({ sessions });
   } catch (err) {
     console.error("[client-sessions]", err);

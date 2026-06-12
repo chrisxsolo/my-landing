@@ -3,6 +3,7 @@
 // verifies. On any failure it deletes the object it owns and throws.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { verifyImageBuffer, ImageVerificationError } from "@/lib/contentEngine/imageVerification";
+import { needsNormalization, normalizeOriginal } from "@/lib/contentEngine/normalizeOriginal";
 import { ORIGINALS_BUCKET, isOwnedUploadPath } from "@/lib/contentEngine/uploadConfig";
 
 export type UploadFinalizationErrorKind =
@@ -79,6 +80,25 @@ export async function finalizeUpload(args: FinalizeUploadArgs): Promise<SessionP
     await removeOwnedObject(client, storagePath);
     const reason = err instanceof ImageVerificationError ? err.message : String(err);
     throw new UploadFinalizationError(`image verification failed: ${reason}`, "verification");
+  }
+
+  // Oversized originals are downscaled and re-stored over the SAME path before
+  // the row is inserted, so hash/dimensions below always describe the stored
+  // bytes. The upsert must succeed before re-verification — a row must never
+  // reference bytes that aren't in storage.
+  if (needsNormalization(verified)) {
+    try {
+      const normalized = await normalizeOriginal(buffer, verified.format);
+      const contentType = verified.format === "jpeg" ? "image/jpeg" : `image/${verified.format}`;
+      const { error: upErr } = await client.storage.from(ORIGINALS_BUCKET)
+        .upload(storagePath, normalized, { contentType, upsert: true });
+      if (upErr) throw new Error(`re-upload failed: ${upErr.message}`);
+      verified = await verifyImageBuffer(normalized);
+    } catch (err) {
+      await removeOwnedObject(client, storagePath);
+      const reason = err instanceof Error ? err.message : String(err);
+      throw new UploadFinalizationError(`oversized image normalization failed: ${reason}`, "verification");
+    }
   }
 
   const format = verified.format === "jpeg" ? "image/jpeg" : `image/${verified.format}`;
