@@ -1349,6 +1349,52 @@ function AdminDashboard() {
         .adm-grain { position: fixed; inset: 0; pointer-events: none; z-index: 90; opacity: 0.04; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
         ::selection { background: rgba(232,160,76,0.35); }
         @media (prefers-reduced-motion: reduce) { .adm-rise, .adm-pop { animation-duration: 0.01ms; } }
+
+        /* ── Legacy dark layer ──────────────────────────────────────────────
+           The website/tools tabs were built on light Tailwind utilities.
+           Rather than hand-editing ~5k lines, remap those utilities to the
+           Darkroom palette inside the .admx content scope. New surfaces use
+           T tokens inline and are unaffected. */
+        .admx .bg-white { background-color: ${T.panelSolid} !important; }
+        .admx .bg-slate-50 { background-color: rgba(255,255,255,0.04) !important; }
+        .admx .bg-slate-100 { background-color: rgba(255,255,255,0.08) !important; }
+        .admx .bg-slate-200 { background-color: rgba(255,255,255,0.12) !important; }
+        .admx .bg-emerald-50, .admx .bg-emerald-100, .admx .bg-green-50, .admx .bg-green-100 { background-color: ${T.greenBg} !important; }
+        .admx .bg-amber-50, .admx .bg-amber-100, .admx .bg-yellow-50, .admx .bg-orange-50 { background-color: ${T.amberBg} !important; }
+        .admx .bg-violet-50, .admx .bg-violet-100, .admx .bg-purple-50, .admx .bg-indigo-50 { background-color: ${T.violetBg} !important; }
+        .admx .bg-red-50, .admx .bg-rose-50 { background-color: ${T.redBg} !important; }
+        .admx .bg-blue-50, .admx .bg-sky-50 { background-color: ${T.blueBg} !important; }
+        .admx .text-emerald-800, .admx .text-emerald-900, .admx .text-green-700, .admx .text-green-800 { color: ${T.green} !important; }
+        .admx .text-indigo-600, .admx .text-indigo-700, .admx .text-purple-600, .admx .text-purple-700 { color: ${T.violet} !important; }
+        .admx .text-blue-600, .admx .text-blue-700, .admx .text-sky-600 { color: ${T.blue} !important; }
+        .admx .text-orange-600, .admx .text-yellow-700 { color: ${T.amber} !important; }
+        .admx .border-emerald-200, .admx .border-emerald-300, .admx .border-green-200 { border-color: ${T.greenBorder} !important; }
+        .admx .border-violet-200, .admx .border-violet-100, .admx .border-indigo-200, .admx .border-purple-200 { border-color: ${T.violetBorder} !important; }
+        .admx .border-amber-200, .admx .border-yellow-200 { border-color: ${T.amberBorder} !important; }
+        .admx .text-slate-950, .admx .text-slate-900, .admx .text-slate-800, .admx .text-black { color: ${T.ink} !important; }
+        .admx .text-slate-700, .admx .text-slate-600, .admx .text-slate-500 { color: ${T.inkSoft} !important; }
+        .admx .text-slate-400, .admx .text-slate-300 { color: ${T.inkFaint} !important; }
+        .admx .text-emerald-700, .admx .text-emerald-600 { color: ${T.green} !important; }
+        .admx .text-amber-700, .admx .text-amber-600 { color: ${T.amber} !important; }
+        .admx .text-red-600, .admx .text-red-500 { color: ${T.red} !important; }
+        .admx .text-violet-600, .admx .text-violet-700 { color: ${T.violet} !important; }
+        .admx .border-slate-50, .admx .border-slate-100, .admx .border-slate-200, .admx .border-slate-300, .admx .border-white { border-color: ${T.border} !important; }
+        .admx .border-emerald-400 { border-color: ${T.greenBorder} !important; }
+        .admx .border-red-200 { border-color: ${T.redBorder} !important; }
+        .admx .hover\\:bg-slate-50:hover, .admx .hover\\:bg-slate-100:hover, .admx .hover\\:bg-slate-200:hover { background-color: rgba(255,255,255,0.08) !important; }
+        .admx .hover\\:bg-red-50:hover { background-color: ${T.redBg} !important; }
+        .admx .hover\\:bg-indigo-50:hover { background-color: ${T.violetBg} !important; }
+        .admx .hover\\:text-slate-700:hover, .admx .hover\\:text-slate-600:hover { color: ${T.ink} !important; }
+        .admx .shadow-xl, .admx .shadow-lg, .admx .shadow-md, .admx .shadow-sm, .admx .shadow { box-shadow: ${T.shadow} !important; }
+        .admx input, .admx select, .admx textarea { color-scheme: dark; }
+        .admx ::placeholder { color: rgba(184,178,168,0.45) !important; }
+        .admx [style*="background:white"], .admx [style*="background: white"],
+        .admx [style*="background:#fff"], .admx [style*="background: #fff"],
+        .admx [style*="background-color:white"], .admx [style*="background-color: white"],
+        .admx [style*="background:rgba(255,255,255,0.8"], .admx [style*="background: rgba(255,255,255,0.8"],
+        .admx [style*="background:rgba(255,255,255,0.9"], .admx [style*="background: rgba(255,255,255,0.9"] {
+          background-color: ${T.panelSolid} !important; background-image: none !important;
+        }
       `}</style>
       <div className="adm-grain" aria-hidden="true"/>
       <CommandPalette
@@ -1451,7 +1497,7 @@ function AdminDashboard() {
           </Link>
           <a href="/bay-area-locations" className="hidden md:block text-xs font-bold transition-colors" style={{color:T.inkFaint}} onMouseEnter={e=>{e.currentTarget.style.color=T.ink;}} onMouseLeave={e=>{e.currentTarget.style.color=T.inkFaint;}}>🗺️ Bay Guide</a>
           <a href="/admin/availability" className="hidden md:block text-xs font-bold transition-colors" style={{color:T.inkFaint}} onMouseEnter={e=>{e.currentTarget.style.color=T.ink;}} onMouseLeave={e=>{e.currentTarget.style.color=T.inkFaint;}}>📅 Availability</a>
-          <a href="/" className="hidden md:block text-xs font-bold transition-colors" style={{color:T.inkFaint}} onMouseEnter={e=>{e.currentTarget.style.color=T.ink;}} onMouseLeave={e=>{e.currentTarget.style.color=T.inkFaint;}}>← Site</a>
+          <Link href="/" className="hidden md:block text-xs font-bold transition-colors" style={{color:T.inkFaint}} onMouseEnter={e=>{e.currentTarget.style.color=T.ink;}} onMouseLeave={e=>{e.currentTarget.style.color=T.inkFaint;}}>← Site</Link>
         </div>
       </div>
 
@@ -1460,7 +1506,8 @@ function AdminDashboard() {
         {(()=>{
           const cancelAll=()=>{cancelEditPortfolioImage();cancelEditCategory();setEditingInquiry(null);setInquiryDeleteConfirm(null);};
           const go=(t:Tab)=>{cancelAll();setTab(t);};
-          const NavBtn=({t,icon,label}:{t:Tab;icon:string;label:string})=>(
+          const pendingNavCount=inquiries.filter(i=>!i.reply_sent_at&&i.status!=="archived"&&i.status!=="not_interested"&&i.status!=="responded"&&i.status!=="manual").length;
+          const NavBtn=({t,icon,label,badge}:{t:Tab;icon:string;label:string;badge?:number})=>(
             <button onClick={()=>go(t)}
               className="w-full flex items-center gap-2.5 px-3 py-[7px] rounded-xl text-[13px] font-semibold transition-all text-left group"
               style={tab===t
@@ -1470,6 +1517,12 @@ function AdminDashboard() {
               onMouseLeave={e=>{if(tab!==t)e.currentTarget.style.background="transparent";}}>
               <span className="w-5 flex-shrink-0 text-center text-base leading-none">{icon}</span>
               <span className="truncate">{label}</span>
+              {(badge??0)>0&&(
+                <span className="ml-auto flex-shrink-0 text-[9px] font-black px-1.5 py-0.5 rounded-full leading-none tabular-nums"
+                      style={tab===t?{background:"rgba(0,0,0,0.22)",color:T.actionText}:{background:T.amberBg,color:T.amber}}>
+                  {badge}
+                </span>
+              )}
             </button>
           );
           return(
@@ -1480,7 +1533,7 @@ function AdminDashboard() {
                 <div className="h-px my-2 mx-1" style={{background:T.rowBorder}}/>
                 <p className="text-[10px] font-black uppercase tracking-[0.13em] px-3 pt-0.5 pb-1" style={{color:T.inkFaint}}>Client Work</p>
                 {(["inquiries","clients","testimonials","analytics","payments","funnel"] as Tab[]).map(t=>(
-                  <NavBtn key={t} t={t} icon={t==="inquiries"?"📬":t==="clients"?"👥":t==="testimonials"?"💬":t==="analytics"?"📊":t==="payments"?"💵":"📈"} label={TAB_LABELS[t].replace(/^[^\s]+\s/,"")}/>
+                  <NavBtn key={t} t={t} icon={t==="inquiries"?"📬":t==="clients"?"👥":t==="testimonials"?"💬":t==="analytics"?"📊":t==="payments"?"💵":"📈"} label={TAB_LABELS[t].replace(/^[^\s]+\s/,"")} badge={t==="inquiries"?pendingNavCount:undefined}/>
                 ))}
                 <div className="h-px my-2 mx-1" style={{background:T.rowBorder}}/>
                 <p className="text-[10px] font-black uppercase tracking-[0.13em] px-3 pt-0.5 pb-1" style={{color:T.inkFaint}}>Website</p>
@@ -1534,7 +1587,7 @@ function AdminDashboard() {
         })()}
 
         {/* ── MAIN CONTENT — key={tab} re-runs the rise animation on every tab switch ── */}
-        <div key={tab} className="flex-1 px-4 py-4 md:px-8 md:py-8 adm-rise">
+        <div key={tab} className="admx flex-1 px-4 py-4 md:px-8 md:py-8 adm-rise">
 
         {/* ── HOME ── */}
         {tab==="home"&&(()=>{
@@ -1578,6 +1631,15 @@ function AdminDashboard() {
             return new Date(d+"T12:00:00").toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"}).toUpperCase();
           };
 
+          // Daily brief numbers. Gallery tracking only exists for recent work, so
+          // cap "to deliver" at sessions shot in the last 60 days — older paid
+          // sessions were delivered before the timeline feature existed.
+          const weekEnd=new Date(today);weekEnd.setDate(weekEnd.getDate()+7);
+          const weekSessions=inquiries.filter(i=>i.booking_confirmed&&i.session_date&&new Date(i.session_date+"T12:00:00")>=today&&new Date(i.session_date+"T12:00:00")<weekEnd).length;
+          const galleryCutoff=(()=>{const d=new Date(today);d.setDate(d.getDate()-60);return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;})();
+          const isGalleryDue=(i:Inquiry)=>i.payment_status==="paid"&&!!i.session_date&&i.session_date<todayStr&&i.session_date>=galleryCutoff&&!i.gallery_delivered_at;
+          const galleriesDue=inquiries.filter(isGalleryDue).length;
+
           const pillStyle={background:T.panel,border:`1px solid ${T.border}`,color:T.inkSoft} as const;
           const pillCls="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all hover:-translate-y-px hover:shadow-sm active:translate-y-0";
           return(
@@ -1598,6 +1660,20 @@ function AdminDashboard() {
                       </button>
                     ):(
                       <span className="font-bold" style={{color:T.green}}>inbox clear ✓</span>
+                    )}
+                    {weekSessions>0&&(
+                      <>
+                        <span style={{color:T.inkFaint}}> · </span>
+                        <span><b style={{color:T.ink}}>{weekSessions}</b> session{weekSessions===1?"":"s"} this week</span>
+                      </>
+                    )}
+                    {galleriesDue>0&&(
+                      <>
+                        <span style={{color:T.inkFaint}}> · </span>
+                        <button onClick={()=>setTab("clients")} className="font-bold hover:underline" style={{color:T.violet}}>
+                          {galleriesDue} galler{galleriesDue===1?"y":"ies"} to deliver
+                        </button>
+                      </>
                     )}
                   </p>
                 </div>
@@ -1733,18 +1809,30 @@ function AdminDashboard() {
                       .filter(i=>!i.reply_sent_at&&active(i)&&i.status!=="responded"&&i.status!=="manual")
                       .sort((a,b)=>new Date(b.created_at).getTime()-new Date(a.created_at).getTime());
                     const galleries=inquiries
-                      .filter(i=>i.payment_status==="paid"&&i.session_date&&i.session_date<todayStr&&!i.gallery_delivered_at)
+                      .filter(isGalleryDue)
                       .sort((a,b)=>a.session_date!.localeCompare(b.session_date!));
+                    const leadCutoff=Date.now()-90*24*60*60*1000;
                     const leads=inquiries
-                      .filter(i=>i.payment_status!=="paid"&&active(i)&&(i.reply_sent_at||i.status==="responded"))
+                      .filter(i=>i.payment_status!=="paid"&&active(i)&&(i.reply_sent_at||i.status==="responded")&&new Date(i.created_at).getTime()>=leadCutoff)
                       .sort((a,b)=>new Date(b.created_at).getTime()-new Date(a.created_at).getTime());
                     const paidAmounts=inquiries.filter(i=>i.payment_status==="paid").map(parsePayment).filter(n=>n>0);
                     const avgPaid=paidAmounts.length?paidAmounts.reduce((a,b)=>a+b,0)/paidAmounts.length:350;
                     const atStake=Math.round(leads.length*avgPaid);
-                    type QItem={key:string;inq:Inquiry;chip:string;chipColor:string;chipBg:string;note:string;act:()=>void;cta:string};
+                    const markDelivered=async(i:Inquiry)=>{
+                      const ts=new Date().toISOString();
+                      try{
+                        await updateAdminInquiry(i.id,{gallery_delivered_at:ts});
+                        setInquiries(prev=>prev.map(x=>x.id===i.id?{...x,gallery_delivered_at:ts}:x));
+                        showToast("Gallery marked delivered ✓");
+                      }catch(err){
+                        console.error("[ActionQueue] mark delivered failed:",err);
+                        showToast("Could not mark delivered",false);
+                      }
+                    };
+                    type QItem={key:string;inq:Inquiry;chip:string;chipColor:string;chipBg:string;note:string;act:()=>void;cta:string;done?:()=>void};
                     const queue:QItem[]=[
                       ...replies.map(i=>({key:`r${i.id}`,inq:i,chip:"REPLY",chipColor:T.amber,chipBg:T.amberBg,note:`${i.session_type||"Session"} · ${hoursAgo(i.created_at)}`,act:()=>setTab("inquiries"),cta:"Reply →"})),
-                      ...galleries.map(i=>({key:`g${i.id}`,inq:i,chip:"DELIVER",chipColor:T.violet,chipBg:T.violetBg,note:`shot ${new Date(i.session_date!+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric"})} · gallery not sent`,act:()=>router.push(`/admin/conversation/${i.id}`),cta:"Open →"})),
+                      ...galleries.map(i=>({key:`g${i.id}`,inq:i,chip:"DELIVER",chipColor:T.violet,chipBg:T.violetBg,note:`shot ${new Date(i.session_date!+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric"})} · gallery not sent`,act:()=>router.push(`/admin/conversation/${i.id}`),cta:"Open →",done:()=>{markDelivered(i);}})),
                       ...leads.map(i=>({key:`l${i.id}`,inq:i,chip:`~$${Math.round(avgPaid)}`,chipColor:T.green,chipBg:T.greenBg,note:`${i.session_type||"Session"} · warm, unpaid`,act:()=>router.push(`/admin/conversation/${i.id}`),cta:"Nudge →"})),
                     ];
                     const shown=queue.slice(0,6);
@@ -1776,6 +1864,13 @@ function AdminDashboard() {
                                     <p className="text-xs font-bold truncate" style={{color:T.ink}}>{q.inq.name}</p>
                                     <p className="text-[10px] truncate" style={{color:T.inkFaint}}>{q.note}</p>
                                   </div>
+                                  {q.done&&(
+                                    <button onClick={q.done} title="Mark gallery delivered"
+                                      className="flex-shrink-0 text-[10px] font-bold px-2 py-1 rounded-lg transition-all opacity-80 group-hover/q:opacity-100 hover:-translate-y-px"
+                                      style={{background:T.greenBg,color:T.green,border:`1px solid ${T.greenBorder}`}}>
+                                      ✓ Done
+                                    </button>
+                                  )}
                                   <button onClick={q.act}
                                     className="flex-shrink-0 text-[10px] font-bold px-2 py-1 rounded-lg transition-all opacity-80 group-hover/q:opacity-100"
                                     style={{background:T.action,color:T.actionText}}>
@@ -2025,7 +2120,7 @@ function AdminDashboard() {
                       <button onClick={()=>portfolioFileRef.current?.click()} className="absolute bottom-2 right-2 text-xs font-bold text-white px-3 py-1.5 rounded-full bg-black/70">Change</button>
                     </div>
                   ):(
-                    <button onClick={()=>portfolioFileRef.current?.click()} className="w-full h-44 rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-2" style={{borderColor:"rgba(15,23,42,0.16)",background:"#f8fafc"}}>
+                    <button onClick={()=>portfolioFileRef.current?.click()} className="w-full h-44 rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-2" style={{borderColor:T.borderStrong,background:T.inset}}>
                       <span className="text-3xl">🖼️</span>
                       <span className="text-xs font-bold text-slate-800">Tap to upload portfolio photo</span>
                       <span className="text-xs text-slate-400">Saved in grad-photos/portfolio</span>
@@ -2429,7 +2524,7 @@ function AdminDashboard() {
                                   onClick={()=>toggleCarousel(image.id, image.hero_carousel)}
                                   title={image.hero_carousel?"Remove from carousel":"Add to carousel"}
                                   className="text-xs font-black px-2.5 py-1.5 rounded-lg transition-colors"
-                                  style={image.hero_carousel?{background:"#111827",color:"#fff"}:{background:"#f1f5f9",color:"#64748b"}}>
+                                  style={image.hero_carousel?{background:T.action,color:T.actionText}:{background:T.inset,color:T.inkSoft}}>
                                   {image.hero_carousel?"★":"☆"}
                                 </button>
                                 {isGradImage&&<button onClick={()=>startPortfolioSeo(image)} className="text-xs font-bold px-3 py-1.5 rounded-lg" style={{background:C.p3_10,color:C.ink}}>SEO</button>}
@@ -3575,10 +3670,10 @@ function AdminDashboard() {
                                     )}
                                   </div>
                                 </div>
-                                <div className="mt-3 rounded-xl p-3" style={{background:T.panelSolid,border:`1px solid ${T.violetBorder}`}}>
+                                <div className="mt-3 rounded-xl p-3" style={{background:T.panelSolid,border:`1px solid ${T.border}`}}>
                                   <div className="flex items-center justify-between gap-3 flex-wrap">
                                     <div>
-                                      <p className="text-[10px] font-black uppercase tracking-[0.16em]" style={{color:T.violet}}>Client Portal Progress</p>
+                                      <p className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{color:T.amber,fontFamily:T.mono}}>Client Portal Progress</p>
                                       <p className="mt-1 text-[11px]" style={{color:T.inkFaint}}>
                                         {portalSessionsLoading
                                           ?"Loading portal state..."
@@ -3598,6 +3693,7 @@ function AdminDashboard() {
                                     <div className="mt-3">
                                       <AdminSessionStatusStrip
                                         compact
+                                        appearance="dark"
                                         currentStatus={effectivePortalStatus}
                                         savingStatus={portalSavingStatus}
                                         onSelect={status=>updatePortalStatusFromInquiry(s,status)}
@@ -3696,7 +3792,7 @@ function AdminDashboard() {
                   style={{borderColor:C.p1_20,background:"#fff"}}>
                   {categories.map(c=><option key={c.slug} value={c.slug}>{c.name}</option>)}
                 </select>
-                <span className="text-slate-400 text-xs">Select a category, then click "Add to Portfolio" on any image below.</span>
+                <span className="text-slate-400 text-xs">Select a category, then click &ldquo;Add to Portfolio&rdquo; on any image below.</span>
               </div>
 
               {libraryLoading?(

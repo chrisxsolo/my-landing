@@ -113,7 +113,7 @@ export default function AccountsTab({ showToast }: Props) {
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 4 }}>
                   <span style={{
                     fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase",
-                    background: user.provider === "email" ? "#f0fdf4" : "#f0f9ff",
+                    background: user.provider === "email" ? "rgba(111,194,150,0.12)" : "rgba(133,174,222,0.12)",
                     color: user.provider === "email" ? "#16a34a" : "#0369a1",
                     border: `1px solid ${user.provider === "email" ? "#bbf7d0" : "#bae6fd"}`,
                     borderRadius: 6, padding: "2px 6px",

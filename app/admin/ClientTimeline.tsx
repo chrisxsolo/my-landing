@@ -1,5 +1,5 @@
 "use client";
-import { C } from "@/lib/colors";
+import { T } from "@/app/admin/adminTheme";
 import { updateAdminInquiry } from "@/lib/adminInquiries";
 import { useState } from "react";
 
@@ -72,16 +72,21 @@ export default function ClientTimeline({ inq, onUpdate }: Props) {
   const pct = Math.round((completedCount / STEPS.length) * 100);
 
   return (
-    <div className="mt-3 pt-3" style={{ borderTop: "1px solid rgba(148,163,184,0.12)" }}>
+    <div className="mt-3 pt-3" style={{ borderTop: `1px solid ${T.rowBorder}` }}>
       {/* Progress bar */}
       <div className="flex items-center gap-2 mb-3">
-        <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(148,163,184,0.15)" }}>
+        <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: T.inset }}>
           <div
-            className="h-full rounded-full transition-all duration-500"
-            style={{ width: `${pct}%`, background: pct === 100 ? "linear-gradient(90deg,#10b981,#34d399)" : C.grad12 }}
+            className="h-full rounded-full"
+            style={{
+              width: `${pct}%`,
+              background: pct === 100 ? T.green : `linear-gradient(90deg, ${T.green}, ${T.amber})`,
+              boxShadow: pct === 100 ? `0 0 8px ${T.green}` : `0 0 8px rgba(232,160,76,0.4)`,
+              transition: "width 0.6s cubic-bezier(0.22,1,0.36,1)",
+            }}
           />
         </div>
-        <span className="text-[10px] font-bold text-slate-400 flex-shrink-0">{pct}%</span>
+        <span className="text-[10px] font-bold flex-shrink-0 tabular-nums" style={{ color: pct === 100 ? T.green : T.inkFaint, fontFamily: T.mono }}>{pct}%</span>
       </div>
 
       {/* Steps */}
@@ -100,11 +105,11 @@ export default function ClientTimeline({ inq, onUpdate }: Props) {
                   onClick={() => toggleStep(step)}
                   disabled={isFixed || isSaving}
                   title={isFixed ? fmt(dateVal) : done ? `Mark as not done` : `Mark as done`}
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-sm transition-all duration-200 border-2"
+                  className="w-9 h-9 rounded-full flex items-center justify-center text-sm transition-all duration-200 border-2 hover:scale-110 active:scale-95 disabled:hover:scale-100"
                   style={
                     done
-                      ? { background: "#10b981", borderColor: "#10b981", color: "#fff" }
-                      : { background: "#fff", borderColor: "rgba(148,163,184,0.3)", color: "rgba(148,163,184,0.6)" }
+                      ? { background: T.greenBg, borderColor: T.green, color: T.green, boxShadow: `0 0 8px rgba(111,194,150,0.3)` }
+                      : { background: T.inset, borderColor: T.borderStrong, color: T.inkFaint, cursor: isFixed ? "default" : "pointer" }
                   }
                 >
                   {isSaving ? (
@@ -112,17 +117,17 @@ export default function ClientTimeline({ inq, onUpdate }: Props) {
                   ) : done ? (
                     <span className="text-xs">{step.icon}</span>
                   ) : (
-                    <span className="text-[10px] text-slate-300">●</span>
+                    <span className="text-[10px]" style={{ color: T.inkFaint }}>●</span>
                   )}
                 </button>
                 <p
                   className="text-[9px] font-bold text-center mt-1 leading-tight"
-                  style={{ color: done ? "#059669" : "#94a3b8", maxWidth: 56 }}
+                  style={{ color: done ? T.green : T.inkFaint, maxWidth: 56 }}
                 >
                   {step.label}
                 </p>
                 {done && dateVal && (
-                  <p className="text-[8px] text-slate-400 text-center mt-0.5 leading-tight">
+                  <p className="text-[8px] text-center mt-0.5 leading-tight tabular-nums" style={{ color: T.inkFaint, fontFamily: T.mono }}>
                     {fmt(dateVal)}
                   </p>
                 )}
@@ -130,7 +135,7 @@ export default function ClientTimeline({ inq, onUpdate }: Props) {
               {!isLast && (
                 <div
                   className="flex-shrink-0 mt-4 w-4 h-0.5 transition-all duration-300"
-                  style={{ background: done ? "#10b981" : "rgba(148,163,184,0.2)" }}
+                  style={{ background: done ? T.green : T.inset }}
                 />
               )}
             </div>

@@ -116,7 +116,7 @@ export default function TrendChart({ points, compPoints, compareLabel, metricLab
         {/* peak annotation */}
         {points[peakIdx].cents > 0 && (
           <g>
-            <circle cx={xOf(peakIdx)} cy={yOf(points[peakIdx].cents)} r={3.5} fill={color} stroke="#ffffff" strokeWidth={1.5} />
+            <circle cx={xOf(peakIdx)} cy={yOf(points[peakIdx].cents)} r={3.5} fill={color} stroke={REV.overlay} strokeWidth={1.5} />
             <text x={xOf(peakIdx)} y={yOf(points[peakIdx].cents) - 8}
               textAnchor={peakIdx > points.length * 0.8 ? "end" : "middle"}
               fontSize={10} fontWeight={800} fill={REV.textSoft}>
@@ -138,8 +138,8 @@ export default function TrendChart({ points, compPoints, compareLabel, metricLab
         {hover !== null && h && (
           <g>
             <line x1={xOf(hover)} x2={xOf(hover)} y1={PAD.top} y2={H - PAD.bottom} stroke={REV.panelBorderStrong} strokeWidth={1} />
-            <circle cx={xOf(hover)} cy={yOf(h.cents)} r={4.5} fill={color} stroke="#ffffff" strokeWidth={2} />
-            {hc && <circle cx={xOf(hover)} cy={yOf(hc.cents)} r={3.5} fill={REV.neutral} stroke="#ffffff" strokeWidth={1.5} />}
+            <circle cx={xOf(hover)} cy={yOf(h.cents)} r={4.5} fill={color} stroke={REV.overlay} strokeWidth={2} />
+            {hc && <circle cx={xOf(hover)} cy={yOf(hc.cents)} r={3.5} fill={REV.neutral} stroke={REV.overlay} strokeWidth={1.5} />}
           </g>
         )}
 

@@ -291,14 +291,14 @@ export default function BlogTab({ showToast }: Props) {
           {editingPost && <div className="mb-4 px-3 py-2 rounded-xl text-xs font-bold" style={{ background: C.p1_08, color: C.p1, border: `1px solid ${C.p1_20}` }}>✏️ Editing existing post.</div>}
 
           {/* AI Photo Drop */}
-          <div className="mb-5 rounded-xl p-4" style={{ background: "#f0fdf4", border: "1.5px dashed #22c55e" }}>
+          <div className="mb-5 rounded-xl p-4" style={{ background: "rgba(111,194,150,0.08)", border: "1.5px dashed rgba(111,194,150,0.45)" }}>
             <div className="flex items-center gap-2 mb-1.5">
               <span className="text-base">✨</span>
-              <label className="block text-xs font-bold uppercase tracking-widest" style={{ color: "#16a34a" }}>AI: Drop Photos → Auto-Post</label>
+              <label className="block text-xs font-bold uppercase tracking-widest" style={{ color: "#6fc296" }}>AI: Drop Photos → Auto-Post</label>
             </div>
             <p className="text-xs text-slate-400 mb-3">Drop 10–30 photos. Claude picks the best 10, writes the post, and publishes it instantly.</p>
             <div className="w-full rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-2 cursor-pointer transition-all"
-              style={{ minHeight: "100px", borderColor: aiDropDragging ? "#16a34a" : "#86efac", background: aiDropDragging ? "#dcfce7" : "#f0fdf4" }}
+              style={{ minHeight: "100px", borderColor: aiDropDragging ? "#6fc296" : "rgba(111,194,150,0.35)", background: aiDropDragging ? "rgba(111,194,150,0.16)" : "rgba(111,194,150,0.06)" }}
               onClick={() => aiDropRef.current?.click()}
               onDragOver={e => { e.preventDefault(); setAiDropDragging(true); }}
               onDragLeave={() => setAiDropDragging(false)}
@@ -306,7 +306,7 @@ export default function BlogTab({ showToast }: Props) {
               {aiDropFiles.length === 0 ? (
                 <>
                   <span className="text-2xl">📷</span>
-                  <span className="text-xs font-bold" style={{ color: "#16a34a" }}>Drop photos here or tap to select</span>
+                  <span className="text-xs font-bold" style={{ color: "#6fc296" }}>Drop photos here or tap to select</span>
                   <span className="text-xs text-slate-400">Up to 30 photos · JPG, PNG, HEIC</span>
                 </>
               ) : (

@@ -138,7 +138,8 @@ export default function AnalyticsTab() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  // Deferred so the sync setLoading inside load() doesn't run during the effect
+  useEffect(() => { const t = setTimeout(load, 0); return () => clearTimeout(t); }, [load]);
 
   // ── Derive date boundaries ────────────────────────────────────────────
   const now = new Date();

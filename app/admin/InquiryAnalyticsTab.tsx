@@ -113,7 +113,8 @@ export default function InquiryAnalyticsTab() {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  // Deferred so the sync setLoading inside load() doesn't run during the effect
+  useEffect(() => { const t = setTimeout(load, 0); return () => clearTimeout(t); }, [load]);
 
   // ── Skip obvious spam ────────────────────────────────────────────────────
   const real = inquiries.filter(i => !i.name.match(/^[A-Z]{10,}$/) && i.email.includes("@"));
