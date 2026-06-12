@@ -213,7 +213,7 @@ export default function CouplesLocationsTab({ showToast }: Props) {
             value={caption}
             onChange={(e) => setCaption(e.target.value)}
             placeholder="Caption (optional)"
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            className="rounded-lg border border-slate-300 px-3 py-2 text-sm bg-white text-slate-800"
           />
         </div>
         <input
@@ -221,7 +221,7 @@ export default function CouplesLocationsTab({ showToast }: Props) {
           value={alt}
           onChange={(e) => setAlt(e.target.value)}
           placeholder="Descriptive alt text (required) — e.g. Couple walking near the Palace of Fine Arts"
-          className="mt-3 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+          className="mt-3 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm bg-white text-slate-800"
         />
         <button
           type="submit"
@@ -256,14 +256,14 @@ export default function CouplesLocationsTab({ showToast }: Props) {
                   defaultValue={p.alt_text ?? ""}
                   onBlur={(e) => { if (e.target.value.trim() && e.target.value.trim() !== (p.alt_text ?? "")) patch({ id: p.id, alt_text: e.target.value }, "Alt text saved."); }}
                   placeholder="Alt text"
-                  className="w-full rounded border border-slate-200 px-2 py-1 text-xs mb-1"
+                  className="w-full rounded border border-slate-200 px-2 py-1 text-xs mb-1 bg-white text-slate-800"
                 />
                 <input
                   type="text"
                   defaultValue={p.caption ?? ""}
                   onBlur={(e) => { if (e.target.value.trim() !== (p.caption ?? "")) patch({ id: p.id, caption: e.target.value }, "Caption saved."); }}
                   placeholder="Caption (optional)"
-                  className="w-full rounded border border-slate-200 px-2 py-1 text-xs"
+                  className="w-full rounded border border-slate-200 px-2 py-1 text-xs bg-white text-slate-800"
                 />
                 <div className="mt-2 flex flex-wrap gap-2 text-xs">
                   <button onClick={() => patch({ id: p.id, published: !p.published }, p.published ? "Unpublished." : "Published.")} className="rounded border border-slate-300 px-2 py-1 font-semibold text-slate-700 hover:bg-slate-50">
