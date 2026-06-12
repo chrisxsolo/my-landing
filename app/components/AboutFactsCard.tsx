@@ -171,7 +171,7 @@ export default function AboutFactsCard({ photos }: { photos: AboutPhotoMap }) {
             )}
           </div>
           <div className="afc-nav">
-            <div className="afc-dots" role="tablist" aria-label="Choose a fact">
+            <div className="afc-dots" role="group" aria-label="Choose a fact">
               {ABOUT_FACTS.map((f, i) => (
                 <button
                   key={f.slug}
@@ -179,7 +179,7 @@ export default function AboutFactsCard({ photos }: { photos: AboutPhotoMap }) {
                   className="afc-dot"
                   data-active={i === index ? "true" : "false"}
                   aria-label={`Fact ${i + 1}: ${f.title}`}
-                  aria-current={i === index}
+                  aria-pressed={i === index}
                   onClick={() => go(i)}
                 />
               ))}
