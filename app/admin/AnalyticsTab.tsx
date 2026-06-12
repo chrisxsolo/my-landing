@@ -1,9 +1,10 @@
 "use client";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
-import { C } from "@/lib/colors";
+import { T } from "@/app/admin/adminTheme";
 
-const card = "bg-white rounded-2xl border border-slate-100 overflow-hidden";
+const panel = { background: T.panel, border: `1px solid ${T.border}`, boxShadow: T.shadow } as const;
+const card = "rounded-2xl overflow-hidden";
 
 type ViewEvent  = { user_id:string|null; viewed_at:string; referrer:string|null; device:string|null };
 type ClickEvent = { link_id:number|null; user_id:string|null; clicked_at:string; referrer:string|null; device:string|null };
@@ -22,10 +23,13 @@ const SOURCES = [
 ] as const;
 
 const DEV_COLORS: Record<string, string> = {
-  mobile: "#9d6fe8",
-  tablet: "#e879a0",
-  desktop: "#22d3ee",
+  mobile: T.violet,
+  tablet: T.amber,
+  desktop: T.blue,
 };
+
+// T.violet as rgb, for the hour-heatmap intensity ramp
+const HEAT_RGB = "109,91,196";
 
 const fmtNum = (n: number) => new Intl.NumberFormat("en-US").format(n);
 const fmtPct = (n: number) => `${n.toFixed(1)}%`;
@@ -100,7 +104,7 @@ function TrendBadge({ curr, prev, label }: { curr: number; prev: number; label?:
   return (
     <span
       className="inline-flex items-center gap-0.5 text-[11px] font-bold px-1.5 py-0.5 rounded-full"
-      style={{ background: up ? "rgba(16,185,129,0.1)" : "rgba(239,68,68,0.1)", color: up ? "#10b981" : "#ef4444" }}
+      style={{ background: up ? T.greenBg : T.redBg, color: up ? T.green : T.red }}
       title={label}
     >
       {up ? "↑" : "↓"}{Math.abs(Math.round(pct))}%
@@ -240,16 +244,15 @@ export default function AnalyticsTab() {
     : `vs. previous ${viewMode === "7d" ? 7 : 30} days`;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
 
       {/* ── Header ─────────────────────────────────────────────────────── */}
-      <div className={card}>
-        <div className="h-[3px]" style={{ background: C.grad90 }} />
+      <div className={`adm-rise ${card}`} style={panel}>
         <div className="p-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <p className="text-xs font-black uppercase tracking-widest mb-1.5" style={{ color: C.p1 }}>Linktree Analytics</p>
-            <h2 className="text-2xl font-black text-slate-900 leading-tight">Views, clicks, and where people come from.</h2>
-            <p className="mt-1.5 text-sm font-medium text-slate-400">
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] mb-1.5" style={{ color: T.inkSoft }}>Linktree Analytics</p>
+            <h2 className="text-2xl font-black leading-tight" style={{ color: T.ink }}>Views, clicks, and where people come from.</h2>
+            <p className="mt-1.5 text-sm font-medium" style={{ color: T.inkFaint }}>
               Trend arrows compare to {trendLabel}.
             </p>
           </div>
@@ -258,19 +261,19 @@ export default function AnalyticsTab() {
           <div className="flex flex-col gap-2 lg:items-end">
             {/* Mode picker + Refresh on same row */}
             <div className="flex items-center gap-2">
-              <div className="flex gap-1 p-1 rounded-xl bg-slate-50 border border-slate-100">
+              <div className="flex gap-1 p-1 rounded-xl" style={{ background: T.inset }}>
                 {(["today", "7d", "30d", "week"] as ViewMode[]).map(m => (
                   <button key={m} onClick={() => { setViewMode(m); if (m !== "week") setWeeksBack(0); }}
                     className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
-                    style={viewMode === m ? { background: C.p1_10, color: C.p1 } : { color: "#94a3b8" }}>
+                    style={viewMode === m ? { background: T.panelSolid, color: T.ink, boxShadow: T.shadow } : { color: T.inkFaint }}>
                     {m === "today" ? "Today" : m === "7d" ? "7d" : m === "30d" ? "30d" : "Week"}
                   </button>
                 ))}
               </div>
               <button onClick={load} disabled={loading}
-                className="text-xs font-bold px-3 py-2 rounded-lg transition-all hover:opacity-80 disabled:opacity-50"
-                style={{ background: C.p2_08, color: C.p2 }}>
-                {loading ? "…" : "Refresh"}
+                className="text-xs font-bold px-3 py-2 rounded-lg transition-all hover:-translate-y-px disabled:opacity-50"
+                style={{ background: T.action, color: T.actionText }}>
+                {loading ? "…" : "↻ Refresh"}
               </button>
             </div>
 
@@ -281,13 +284,13 @@ export default function AnalyticsTab() {
                   onClick={() => setWeeksBack(w => Math.min(w + 1, MAX_WEEKS_BACK))}
                   disabled={weeksBack >= MAX_WEEKS_BACK}
                   className="w-7 h-7 rounded-lg flex items-center justify-center text-sm font-bold transition-all disabled:opacity-30"
-                  style={{ background: C.p1_10, color: C.p1 }}>‹</button>
-                <span className="text-xs font-bold text-slate-600 min-w-[130px] text-center">{periodLabel}</span>
+                  style={{ background: T.inset, color: T.inkSoft, border: `1px solid ${T.border}` }}>‹</button>
+                <span className="text-xs font-bold min-w-[130px] text-center" style={{ color: T.inkSoft }}>{periodLabel}</span>
                 <button
                   onClick={() => setWeeksBack(w => Math.max(w - 1, 0))}
                   disabled={weeksBack === 0}
                   className="w-7 h-7 rounded-lg flex items-center justify-center text-sm font-bold transition-all disabled:opacity-30"
-                  style={{ background: C.p1_10, color: C.p1 }}>›</button>
+                  style={{ background: T.inset, color: T.inkSoft, border: `1px solid ${T.border}` }}>›</button>
               </div>
             )}
           </div>
@@ -295,52 +298,53 @@ export default function AnalyticsTab() {
       </div>
 
       {/* ── Stat cards ─────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { label: "Total Views",     val: totalViews,     prev: prevTotalViews,     color: C.p1, grad: C.grad12  },
-          { label: "Unique Visitors", val: uniqueVisitors, prev: prevUniqueVisitors, color: C.p3, grad: C.grad321 },
-          { label: "Total Clicks",    val: totalClicks,    prev: prevTotalClicks,    color: C.p2, grad: C.grad23  },
-          { label: "Unique Clickers", val: uniqueClickers, prev: prevUniqueClickers, color: C.p1, grad: C.grad90  },
-        ].map(({ label, val, prev, color, grad }) => (
-          <div key={label} className={card}>
-            <div className="h-[3px]" style={{ background: grad }} />
+          { label: "Total Views",     val: totalViews,     prev: prevTotalViews,     accent: T.blue   },
+          { label: "Unique Visitors", val: uniqueVisitors, prev: prevUniqueVisitors, accent: T.violet },
+          { label: "Total Clicks",    val: totalClicks,    prev: prevTotalClicks,    accent: T.green  },
+          { label: "Unique Clickers", val: uniqueClickers, prev: prevUniqueClickers, accent: T.amber  },
+        ].map(({ label, val, prev, accent }, i) => (
+          <div key={label} className={`adm-rise ${card} transition-all duration-200 hover:-translate-y-0.5`} style={{ ...panel, animationDelay: `${60 + i * 50}ms` }}>
             <div className="p-5">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">{label}</p>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-[10px] font-black uppercase tracking-[0.16em]" style={{ color: T.inkSoft }}>{label}</p>
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: accent }} />
+              </div>
               <div className="flex items-end justify-between gap-2 mb-1">
-                <CountUp target={val} color={color} className="text-3xl font-black" />
+                <CountUp target={val} color={T.ink} className="text-3xl font-black tabular-nums" />
                 {!loading && <TrendBadge curr={val} prev={prev} label={trendLabel} />}
               </div>
-              <p className="text-[10px] text-slate-300">prev: {fmtNum(prev)}</p>
+              <p className="text-[10px]" style={{ color: T.inkFaint }}>prev: {fmtNum(prev)}</p>
             </div>
           </div>
         ))}
       </div>
 
       {/* ── Sources + Devices ───────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
 
         {/* Traffic sources */}
-        <div className={card}>
-          <div className="h-[3px]" style={{ background: C.grad321 }} />
+        <div className={`adm-rise ${card}`} style={{ ...panel, animationDelay: "160ms" }}>
           <div className="p-6">
-            <p className="text-xs font-black uppercase tracking-widest mb-4" style={{ color: C.p2 }}>Traffic Sources</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] mb-4" style={{ color: T.inkSoft }}>Traffic Sources</p>
             {loading ? (
-              <div className="py-6 text-center text-sm text-slate-400">Loading…</div>
+              <div className="py-6 text-center text-sm" style={{ color: T.inkFaint }}>Loading…</div>
             ) : sourceData.length === 0 ? (
-              <p className="text-sm text-slate-400">No referrer data yet.</p>
+              <p className="text-sm" style={{ color: T.inkFaint }}>No referrer data yet.</p>
             ) : (
               <div className="space-y-3.5">
                 {sourceData.map(s => (
                   <div key={s.key}>
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-bold text-slate-700">{s.label}</span>
-                      <span className="text-sm font-black" style={{ color: s.color }}>{fmtPct(s.pct)}</span>
+                      <span className="text-sm font-bold" style={{ color: T.ink }}>{s.label}</span>
+                      <span className="text-sm font-black tabular-nums" style={{ color: s.color }}>{fmtPct(s.pct)}</span>
                     </div>
-                    <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
+                    <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: T.inset }}>
                       <div className="h-full rounded-full transition-all duration-700"
                         style={{ width: `${s.pct}%`, background: s.color }} />
                     </div>
-                    <p className="text-[10px] text-slate-400 mt-0.5">{fmtNum(s.count)} visit{s.count !== 1 ? "s" : ""}</p>
+                    <p className="text-[10px] mt-0.5" style={{ color: T.inkFaint }}>{fmtNum(s.count)} visit{s.count !== 1 ? "s" : ""}</p>
                   </div>
                 ))}
               </div>
@@ -349,17 +353,16 @@ export default function AnalyticsTab() {
         </div>
 
         {/* Device breakdown */}
-        <div className={card}>
-          <div className="h-[3px]" style={{ background: C.grad12 }} />
+        <div className={`adm-rise ${card}`} style={{ ...panel, animationDelay: "200ms" }}>
           <div className="p-6">
-            <p className="text-xs font-black uppercase tracking-widest mb-4" style={{ color: C.p1 }}>Device Breakdown</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] mb-4" style={{ color: T.inkSoft }}>Device Breakdown</p>
             {loading ? (
-              <div className="py-6 text-center text-sm text-slate-400">Loading…</div>
+              <div className="py-6 text-center text-sm" style={{ color: T.inkFaint }}>Loading…</div>
             ) : devTotal === 0 ? (
-              <p className="text-sm text-slate-400">No device data yet.</p>
+              <p className="text-sm" style={{ color: T.inkFaint }}>No device data yet.</p>
             ) : (
               <>
-                <div className="flex rounded-full overflow-hidden h-5 mb-5">
+                <div className="flex rounded-full overflow-hidden h-5 mb-5" style={{ background: T.inset }}>
                   {(["mobile", "desktop", "tablet"] as const).map(key => {
                     const pct = devTotal > 0 ? (devMap[key] ?? 0) / devTotal * 100 : 0;
                     if (pct === 0) return null;
@@ -380,11 +383,11 @@ export default function AnalyticsTab() {
                       <div key={key} className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: DEV_COLORS[key] }} />
-                          <span className="text-sm font-medium text-slate-600">{emoji} {label}</span>
+                          <span className="text-sm font-medium" style={{ color: T.inkSoft }}>{emoji} {label}</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className="text-xs text-slate-400">{fmtNum(count)}</span>
-                          <span className="text-sm font-black w-12 text-right" style={{ color: DEV_COLORS[key] }}>{fmtPct(pct)}</span>
+                          <span className="text-xs" style={{ color: T.inkFaint }}>{fmtNum(count)}</span>
+                          <span className="text-sm font-black w-12 text-right tabular-nums" style={{ color: DEV_COLORS[key] }}>{fmtPct(pct)}</span>
                         </div>
                       </div>
                     );
@@ -397,16 +400,15 @@ export default function AnalyticsTab() {
       </div>
 
       {/* ── Hour heatmap ────────────────────────────────────────────────── */}
-      <div className={card}>
-        <div className="h-[3px]" style={{ background: C.grad90_23 }} />
+      <div className={`adm-rise ${card}`} style={{ ...panel, animationDelay: "240ms" }}>
         <div className="p-6">
           <div className="flex items-end justify-between mb-5 flex-wrap gap-2">
             <div>
-              <p className="text-xs font-black uppercase tracking-widest mb-1" style={{ color: C.p1 }}>Traffic by Hour</p>
-              <p className="text-sm font-medium text-slate-400">When does your page get the most traffic?</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] mb-1" style={{ color: T.inkSoft }}>Traffic by Hour</p>
+              <p className="text-sm font-medium" style={{ color: T.inkFaint }}>When does your page get the most traffic?</p>
             </div>
             {totalViews > 0 && (
-              <p className="text-xs font-bold text-slate-400">
+              <p className="text-xs font-bold" style={{ color: T.inkSoft }}>
                 Peak: {fmt12h(peakHour)}–{fmt12h(peakHour + 1 === 24 ? 0 : peakHour + 1)} · {fmtNum(hourData[peakHour])} views
               </p>
             )}
@@ -420,8 +422,8 @@ export default function AnalyticsTab() {
                     className="rounded-md w-full aspect-square transition-transform duration-150 group-hover:scale-110 cursor-default"
                     style={{
                       background: count > 0
-                        ? `rgba(157,111,232,${(0.12 + intensity * 0.88).toFixed(2)})`
-                        : "rgba(241,245,249,0.8)",
+                        ? `rgba(${HEAT_RGB},${(0.12 + intensity * 0.88).toFixed(2)})`
+                        : T.inset,
                     }}
                     onMouseEnter={() => setHoverHour(h)}
                     onMouseLeave={() => setHoverHour(null)}
@@ -429,7 +431,7 @@ export default function AnalyticsTab() {
                   {hoverHour === h && (
                     <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 z-10 pointer-events-none">
                       <div className="rounded-lg px-2.5 py-1.5 text-[10px] font-bold whitespace-nowrap shadow-xl"
-                        style={{ background: "rgba(15,15,25,0.92)", color: "white" }}>
+                        style={{ background: T.ink, color: T.actionText }}>
                         {fmt12h(h)} · {fmtNum(count)} view{count !== 1 ? "s" : ""}
                       </div>
                     </div>
@@ -439,37 +441,36 @@ export default function AnalyticsTab() {
             })}
           </div>
           {/* Time labels — 12-hour */}
-          <div className="flex justify-between mt-2 select-none text-[10px] font-bold text-slate-300">
+          <div className="flex justify-between mt-2 select-none text-[10px] font-bold" style={{ color: T.inkFaint }}>
             {[0, 6, 12, 18, 23].map(h => <span key={h}>{fmt12h(h)}</span>)}
           </div>
           {/* Color scale */}
           <div className="flex items-center gap-2 mt-3">
-            <span className="text-[10px] font-bold text-slate-300">Less</span>
+            <span className="text-[10px] font-bold" style={{ color: T.inkFaint }}>Less</span>
             <div className="flex gap-0.5">
               {[0.12, 0.3, 0.5, 0.7, 1.0].map(op => (
-                <div key={op} className="w-4 h-4 rounded-sm" style={{ background: `rgba(157,111,232,${op})` }} />
+                <div key={op} className="w-4 h-4 rounded-sm" style={{ background: `rgba(${HEAT_RGB},${op})` }} />
               ))}
             </div>
-            <span className="text-[10px] font-bold text-slate-300">More</span>
+            <span className="text-[10px] font-bold" style={{ color: T.inkFaint }}>More</span>
           </div>
         </div>
       </div>
 
       {/* ── Engagement snapshot ─────────────────────────────────────────── */}
-      <div className={card}>
-        <div className="h-[3px]" style={{ background: C.grad321 }} />
+      <div className={`adm-rise ${card}`} style={{ ...panel, animationDelay: "280ms" }}>
         <div className="p-6">
-          <p className="text-xs font-black uppercase tracking-widest mb-4" style={{ color: C.p2 }}>Engagement Snapshot</p>
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] mb-4" style={{ color: T.inkSoft }}>Engagement Snapshot</p>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
-              { label: "Click-through Rate", val: `${overallCtr.toFixed(1)}%`,                                                              color: C.p1 },
-              { label: "Clicks per Visitor", val: (uniqueVisitors > 0 ? totalClicks / uniqueVisitors : 0).toFixed(2),                      color: C.p2 },
-              { label: "Visitor → Clicker",  val: uniqueVisitors > 0 ? `${((uniqueClickers / uniqueVisitors) * 100).toFixed(1)}%` : "0.0%", color: "#d97706" },
-              { label: "Active Links",        val: fmtNum(links.length),                                                                    color: C.p3 },
+              { label: "Click-through Rate", val: `${overallCtr.toFixed(1)}%`,                                                              color: T.violet },
+              { label: "Clicks per Visitor", val: (uniqueVisitors > 0 ? totalClicks / uniqueVisitors : 0).toFixed(2),                      color: T.blue },
+              { label: "Visitor → Clicker",  val: uniqueVisitors > 0 ? `${((uniqueClickers / uniqueVisitors) * 100).toFixed(1)}%` : "0.0%", color: T.amber },
+              { label: "Active Links",        val: fmtNum(links.length),                                                                    color: T.green },
             ].map(item => (
-              <div key={item.label} className="rounded-xl border border-slate-100 p-4" style={{ background: "rgba(248,250,252,0.8)" }}>
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">{item.label}</p>
-                <p className="text-2xl font-black" style={{ color: item.color }}>{item.val}</p>
+              <div key={item.label} className="rounded-xl p-4" style={{ background: T.inset, border: `1px solid ${T.rowBorder}` }}>
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] mb-2" style={{ color: T.inkFaint }}>{item.label}</p>
+                <p className="text-2xl font-black tabular-nums" style={{ color: item.color }}>{item.val}</p>
               </div>
             ))}
           </div>
@@ -477,24 +478,23 @@ export default function AnalyticsTab() {
       </div>
 
       {/* ── Activity over time (hidden for Today — heatmap is sufficient) ── */}
-      {viewMode !== "today" && <div className="bg-white rounded-2xl border border-slate-100">
-        <div className="h-[3px]" style={{ background: C.grad90 }} />
+      {viewMode !== "today" && <div className={`adm-rise ${card}`} style={panel}>
         <div className="p-6">
           <div className="flex flex-col gap-1 mb-6 md:flex-row md:items-end md:justify-between">
             <div>
-              <h3 className="text-base font-black text-slate-900">Activity Over Time</h3>
-              <p className="text-xs font-medium text-slate-400">
+              <h3 className="text-base font-black" style={{ color: T.ink }}>Activity Over Time</h3>
+              <p className="text-xs font-medium" style={{ color: T.inkFaint }}>
                 {viewMode === "week" ? `${periodLabel}` : `Views and clicks per day.`}
               </p>
             </div>
             {busiestDay && busiestDay.views + busiestDay.clicks > 0 && (
-              <p className="text-xs font-bold text-slate-400">
+              <p className="text-xs font-bold" style={{ color: T.inkSoft }}>
                 Busiest: {dateFromKey(busiestDay.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })} · {fmtNum(busiestDay.views + busiestDay.clicks)} events
               </p>
             )}
           </div>
           {loading ? (
-            <div className="h-64 flex items-center justify-center text-slate-400 text-sm">Loading chart…</div>
+            <div className="h-64 flex items-center justify-center text-sm" style={{ color: T.inkFaint }}>Loading chart…</div>
           ) : (
             <div style={{ overflowX: "auto", paddingBottom: 8 }}>
               <div className="relative" style={{ minWidth: viewMode === "week" ? 280 : 520 }}>
@@ -509,17 +509,17 @@ export default function AnalyticsTab() {
                       <div className="absolute top-1 z-20 transition-all duration-100"
                         style={{ left: `${leftPct}%`, transform: col > 0.7 ? "translateX(-90%)" : col < 0.2 ? "translateX(-5%)" : "translateX(-50%)" }}>
                         <div className="rounded-xl px-3 py-2 shadow-xl whitespace-nowrap"
-                          style={{ background: "rgba(15,15,25,0.92)", backdropFilter: "blur(8px)" }}>
-                          <p className="text-xs font-bold text-white mb-1">
+                          style={{ background: T.ink }}>
+                          <p className="text-xs font-bold mb-1" style={{ color: T.actionText }}>
                             {d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
                           </p>
                           <div className="flex gap-3">
-                            <span className="text-xs" style={{ color: "rgba(157,111,232,0.9)" }}>👁 {s.views}</span>
-                            <span className="text-xs" style={{ color: "rgba(232,121,160,0.9)" }}>🔗 {s.clicks}</span>
-                            <span className="text-xs text-white/60">{s.ctr.toFixed(1)}% CTR</span>
+                            <span className="text-xs" style={{ color: "rgba(255,255,255,0.85)" }}>👁 {s.views}</span>
+                            <span className="text-xs" style={{ color: "rgba(255,255,255,0.85)" }}>🔗 {s.clicks}</span>
+                            <span className="text-xs" style={{ color: "rgba(255,255,255,0.6)" }}>{s.ctr.toFixed(1)}% CTR</span>
                           </div>
                         </div>
-                        <div className="w-2 h-2 rotate-45 mt-[-4px] mx-auto" style={{ background: "rgba(15,15,25,0.92)" }} />
+                        <div className="w-2 h-2 rotate-45 mt-[-4px] mx-auto" style={{ background: T.ink }} />
                       </div>
                     );
                   })()}
@@ -539,13 +539,13 @@ export default function AnalyticsTab() {
                           <div className="w-full flex gap-0.5 items-end"
                             style={{ height: 168, transform: isHov ? "scaleY(1.04)" : "scaleY(1)", transformOrigin: "bottom", transition: "transform 0.15s" }}>
                             <div className="flex-1 rounded-t-md transition-all duration-300"
-                              style={{ height: `${vh}%`, minHeight: vh > 0 ? 4 : 0, background: isHov ? `linear-gradient(180deg,${C.p1},${C.p1}88)` : `linear-gradient(180deg,${C.p1}50,${C.p1}28)` }} />
+                              style={{ height: `${vh}%`, minHeight: vh > 0 ? 4 : 0, background: isHov ? T.blue : `${T.blue}55` }} />
                             <div className="flex-1 rounded-t-md transition-all duration-300"
-                              style={{ height: `${ch}%`, minHeight: ch > 0 ? 4 : 0, background: isHov ? `linear-gradient(180deg,${C.p2},${C.p2}88)` : `linear-gradient(180deg,${C.p2}50,${C.p2}28)` }} />
+                              style={{ height: `${ch}%`, minHeight: ch > 0 ? 4 : 0, background: isHov ? T.violet : `${T.violet}55` }} />
                           </div>
                           <div className="text-center">
-                            <p className="text-[9px] font-black" style={{ color: isHov ? C.p1 : "#1e293b" }}>{date.getDate()}</p>
-                            <p className="text-[8px] font-bold uppercase" style={{ color: isHov ? C.p1 : "#cbd5e1" }}>
+                            <p className="text-[9px] font-black" style={{ color: isHov ? T.ink : T.inkSoft }}>{date.getDate()}</p>
+                            <p className="text-[8px] font-bold uppercase" style={{ color: isHov ? T.inkSoft : T.inkFaint }}>
                               {date.toLocaleDateString("en-US", { weekday: "short" })}
                             </p>
                           </div>
@@ -557,19 +557,19 @@ export default function AnalyticsTab() {
                 {/* Grid lines */}
                 <div className="absolute pointer-events-none flex flex-col justify-between px-2"
                   style={{ top: 48, left: 0, right: 0, bottom: 40 }}>
-                  {[...Array(4)].map((_, i) => <div key={i} className="w-full h-px" style={{ background: "rgba(0,0,0,0.04)" }} />)}
+                  {[...Array(4)].map((_, i) => <div key={i} className="w-full h-px" style={{ background: T.rowBorder }} />)}
                 </div>
               </div>
             </div>
           )}
-          <div className="flex items-center justify-center gap-8 mt-4 pt-4 border-t" style={{ borderColor: C.p1_08 }}>
+          <div className="flex items-center justify-center gap-8 mt-4 pt-4 border-t" style={{ borderColor: T.rowBorder }}>
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-sm" style={{ background: C.p1 }} />
-              <span className="text-xs font-bold text-slate-500">Page Views</span>
+              <div className="w-3 h-3 rounded-sm" style={{ background: T.blue }} />
+              <span className="text-xs font-bold" style={{ color: T.inkSoft }}>Page Views</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-sm" style={{ background: C.p2 }} />
-              <span className="text-xs font-bold text-slate-500">Link Clicks</span>
+              <div className="w-3 h-3 rounded-sm" style={{ background: T.violet }} />
+              <span className="text-xs font-bold" style={{ color: T.inkSoft }}>Link Clicks</span>
             </div>
           </div>
         </div>
@@ -578,21 +578,20 @@ export default function AnalyticsTab() {
       }
 
       {/* ── Link performance ────────────────────────────────────────────── */}
-      <div className={card}>
-        <div className="h-[3px]" style={{ background: C.grad90_23 }} />
+      <div className={`adm-rise ${card}`} style={panel}>
         <div className="p-6">
           <div className="flex items-end justify-between mb-5 flex-wrap gap-2">
             <div>
-              <h2 className="text-base font-black text-slate-900">Link Performance</h2>
-              <p className="text-xs font-medium text-slate-400">Ranked by clicks. Zero-click links are flagged.</p>
+              <h2 className="text-base font-black" style={{ color: T.ink }}>Link Performance</h2>
+              <p className="text-xs font-medium" style={{ color: T.inkFaint }}>Ranked by clicks. Zero-click links are flagged.</p>
             </div>
-            <a href="/admin/links" className="text-xs font-bold transition-colors hover:opacity-70" style={{ color: C.p2 }}>Manage links →</a>
+            <a href="/admin/links" className="text-xs font-bold transition-opacity hover:opacity-70" style={{ color: T.inkSoft }}>Manage links →</a>
           </div>
           {loading ? (
-            <div className="py-10 text-center text-sm text-slate-400">Loading…</div>
+            <div className="py-10 text-center text-sm" style={{ color: T.inkFaint }}>Loading…</div>
           ) : linkStats.length === 0 ? (
             <div className="py-10 text-center">
-              <p className="text-sm text-slate-400">No links found.</p>
+              <p className="text-sm" style={{ color: T.inkFaint }}>No links found.</p>
             </div>
           ) : (
             <div className="space-y-2.5">
@@ -600,40 +599,40 @@ export default function AnalyticsTab() {
                 const maxClicks = linkStats.find(s => !s.isDead)?.clicks || 1;
                 const barW = (stat.clicks / maxClicks) * 100;
                 return (
-                  <div key={stat.id} className="p-4 rounded-xl border relative overflow-hidden transition-shadow hover:shadow-sm"
-                    style={{ borderColor: stat.isDead ? "rgba(239,68,68,0.2)" : "rgba(241,245,249,1)" }}>
+                  <div key={stat.id} className="p-4 rounded-xl relative overflow-hidden transition-all hover:-translate-y-px"
+                    style={{ background: T.panelSolid, border: `1px solid ${stat.isDead ? T.redBorder : T.rowBorder}` }}>
                     <div className="absolute inset-0 rounded-xl"
-                      style={{ background: `linear-gradient(90deg,${C.p1_06} ${barW}%,transparent ${barW}%)` }} />
+                      style={{ background: `linear-gradient(90deg,${T.insetStrong} ${barW}%,transparent ${barW}%)` }} />
                     <div className="relative flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div className="flex items-center gap-3 flex-1 min-w-0">
                         <div className="flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-black flex-shrink-0"
-                          style={{ background: idx === 0 ? C.p1_15 : idx === 1 ? C.p2_10 : idx === 2 ? C.p3_10 : C.p1_06, color: idx < 3 ? C.p1 : "#94a3b8" }}>
+                          style={idx < 3 ? { background: T.action, color: T.actionText } : { background: T.inset, color: T.inkFaint }}>
                           #{idx + 1}
                         </div>
                         <span className="text-xl flex-shrink-0">{stat.emoji || "🔗"}</span>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <p className="font-black text-sm text-slate-900 truncate">{stat.label}</p>
+                            <p className="font-black text-sm truncate" style={{ color: T.ink }}>{stat.label}</p>
                             {stat.isDead && (
                               <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0"
-                                style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444" }}>
+                                style={{ background: T.redBg, color: T.red }}>
                                 no clicks
                               </span>
                             )}
                           </div>
-                          <p className="text-xs text-slate-400 truncate">{stat.url}</p>
+                          <p className="text-xs truncate" style={{ color: T.inkFaint }}>{stat.url}</p>
                         </div>
                       </div>
                       <div className="grid grid-cols-4 gap-3 flex-shrink-0 text-right">
                         {[
-                          { val: fmtNum(stat.clicks),          label: "clicks", color: stat.isDead ? "#94a3b8" : C.p1 },
-                          { val: fmtNum(stat.uniqueClickers),  label: "uniq",   color: C.p3 },
-                          { val: `${stat.ctr.toFixed(1)}%`,    label: "CTR",    color: C.p2 },
-                          { val: `${stat.clickShare.toFixed(1)}%`, label: "share", color: C.p1 },
+                          { val: fmtNum(stat.clicks),          label: "clicks", color: stat.isDead ? T.inkFaint : T.ink },
+                          { val: fmtNum(stat.uniqueClickers),  label: "uniq",   color: T.violet },
+                          { val: `${stat.ctr.toFixed(1)}%`,    label: "CTR",    color: T.blue },
+                          { val: `${stat.clickShare.toFixed(1)}%`, label: "share", color: T.green },
                         ].map(({ val, label, color }) => (
                           <div key={label}>
-                            <p className="text-lg font-black" style={{ color }}>{val}</p>
-                            <p className="text-[9px] font-bold uppercase text-slate-300">{label}</p>
+                            <p className="text-lg font-black tabular-nums" style={{ color }}>{val}</p>
+                            <p className="text-[9px] font-bold uppercase" style={{ color: T.inkFaint }}>{label}</p>
                           </div>
                         ))}
                       </div>
@@ -647,15 +646,15 @@ export default function AnalyticsTab() {
       </div>
 
       {/* ── Danger zone ─────────────────────────────────────────────────── */}
-      <div className={card}>
+      <div className={card} style={{ background: T.panel, border: `1px solid ${T.border}` }}>
         <div className="p-5 flex items-center justify-between gap-4">
           <div>
-            <p className="text-sm font-bold text-slate-700">Clear all analytics</p>
-            <p className="text-xs text-slate-400">Permanently deletes all view and click records.</p>
+            <p className="text-sm font-bold" style={{ color: T.ink }}>Clear all analytics</p>
+            <p className="text-xs" style={{ color: T.inkFaint }}>Permanently deletes all view and click records.</p>
           </div>
           <button onClick={clearAll}
             className="text-xs font-bold px-4 py-2 rounded-lg transition-all hover:opacity-80"
-            style={{ background: "rgba(239,68,68,0.08)", color: "#dc2626" }}>
+            style={{ background: T.redBg, color: T.red, border: `1px solid ${T.redBorder}` }}>
             Clear all
           </button>
         </div>

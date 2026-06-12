@@ -1,9 +1,10 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { C } from "@/lib/colors";
+import { T } from "@/app/admin/adminTheme";
 import { loadAdminInquiries, type AdminInquiry } from "@/lib/adminInquiries";
 
-const card = "bg-white rounded-2xl border border-slate-100 overflow-hidden";
+const panel = { background: T.panel, border: `1px solid ${T.border}`, boxShadow: T.shadow } as const;
+const card = "rounded-2xl overflow-hidden";
 
 type Inquiry = AdminInquiry;
 
@@ -88,7 +89,7 @@ function Bar({ pct, color, delay = 0 }: { pct: number; color: string; delay?: nu
   const [w, setW] = useState(0);
   useEffect(() => { const t = setTimeout(() => setW(pct), delay + 60); return () => clearTimeout(t); }, [pct, delay]);
   return (
-    <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
+    <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: T.inset }}>
       <div className="h-full rounded-full" style={{ width: `${w}%`, background: color, transition: "width 0.65s cubic-bezier(0.22,1,0.36,1)" }} />
     </div>
   );
@@ -185,85 +186,85 @@ export default function InquiryAnalyticsTab() {
   // ── Warm unpaid leads list ───────────────────────────────────────────────
   const warmUnpaidList = warmUnpaid.slice(0, 8);
 
-  const FUNNEL_COLORS = [C.p1, C.p2, C.p3, "#f59e0b", "#10b981", "#6366f1"];
+  const FUNNEL_COLORS = [T.violet, T.blue, T.green, T.amber, T.red, T.inkSoft];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
 
       {/* Header */}
-      <div className={card}>
-        <div className="h-[3px]" style={{ background: C.grad321 }} />
+      <div className={`adm-rise ${card}`} style={panel}>
         <div className="p-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
-            <p className="text-xs font-black uppercase tracking-widest mb-1.5" style={{ color: C.p1 }}>Funnel Analytics</p>
-            <h2 className="text-2xl font-black text-slate-900 leading-tight">Where your clients come from — and where they drop.</h2>
-            <p className="mt-1.5 text-sm font-medium text-slate-400">Based on {total} real inquiries.</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] mb-1.5" style={{ color: T.inkSoft }}>Funnel Analytics</p>
+            <h2 className="text-2xl font-black leading-tight" style={{ color: T.ink }}>Where your clients come from — and where they drop.</h2>
+            <p className="mt-1.5 text-sm font-medium" style={{ color: T.inkFaint }}>Based on {total} real inquiries.</p>
           </div>
           <button onClick={load} disabled={loading}
-            className="text-xs font-bold px-4 py-2 rounded-lg transition-all hover:opacity-80 disabled:opacity-50 self-start"
-            style={{ background: C.p1_10, color: C.p1 }}>
+            className="text-xs font-bold px-4 py-2 rounded-lg transition-all hover:-translate-y-px disabled:opacity-50 self-start"
+            style={{ background: T.action, color: T.actionText }}>
             {loading ? "Loading…" : "↻ Refresh"}
           </button>
         </div>
       </div>
 
       {/* Funnel stat row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { label: "Total Inquiries",    val: total,              suffix: "",   color: C.p1,      grad: C.grad12,  sub: "all time" },
-          { label: "Reply Rate",         val: replyRate,          suffix: "%",  color: C.p2,      grad: C.grad23,  sub: `${replied} replied` },
-          { label: "Booking Conversion", val: conversionRate,     suffix: "%",  color: "#10b981", grad: "linear-gradient(90deg,#10b981,#34d399)", sub: `${paid} paid` },
-          { label: "Avg Response Time",  val: 0, suffix: "",      color: "#f59e0b", grad: "linear-gradient(90deg,#f59e0b,#fbbf24)", sub: responseTimes.length ? `from ${responseTimes.length} replies` : "no data", custom: avgResponseMin > 0 ? fmtDuration(avgResponseMin) : "—" },
-        ].map(({ label, val, suffix, color, grad, sub, custom }) => (
-          <div key={label} className={card}>
-            <div className="h-[3px]" style={{ background: grad }} />
+          { label: "Total Inquiries",    val: total,          suffix: "",  accent: T.blue,   sub: "all time" },
+          { label: "Reply Rate",         val: replyRate,      suffix: "%", accent: T.violet, sub: `${replied} replied` },
+          { label: "Booking Conversion", val: conversionRate, suffix: "%", accent: T.green,  sub: `${paid} paid` },
+          { label: "Avg Response Time",  val: 0, suffix: "",  accent: T.amber,  sub: responseTimes.length ? `from ${responseTimes.length} replies` : "no data", custom: avgResponseMin > 0 ? fmtDuration(avgResponseMin) : "—" },
+        ].map(({ label, val, suffix, accent, sub, custom }, i) => (
+          <div key={label} className={`adm-rise ${card} transition-all duration-200 hover:-translate-y-0.5`} style={{ ...panel, animationDelay: `${60 + i * 50}ms` }}>
             <div className="p-5">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">{label}</p>
-              <p className="text-3xl font-black mb-1" style={{ color }}>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-[10px] font-black uppercase tracking-[0.16em]" style={{ color: T.inkSoft }}>{label}</p>
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: accent }} />
+              </div>
+              <p className="text-3xl font-black mb-1 tabular-nums" style={{ color: T.ink }}>
                 {custom ?? <CountUp target={val} decimals={suffix === "%" ? 1 : 0} suffix={suffix} />}
               </p>
-              <p className="text-[10px] text-slate-400">{sub}</p>
+              <p className="text-[10px]" style={{ color: T.inkFaint }}>{sub}</p>
             </div>
           </div>
         ))}
       </div>
 
       {/* Revenue at stake + conversion */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
 
         {/* Warm unpaid leads */}
-        <div className={card}>
-          <div className="h-[3px]" style={{ background: "linear-gradient(90deg,#f59e0b,#fbbf24)" }} />
+        <div className={`adm-rise ${card}`} style={{ background: T.panel, border: `1px solid ${T.amberBorder}`, boxShadow: T.shadow, animationDelay: "160ms" }}>
           <div className="p-6">
             <div className="flex items-start justify-between mb-4 flex-wrap gap-2">
               <div>
-                <p className="text-xs font-black uppercase tracking-widest mb-1" style={{ color: "#d97706" }}>Warm Unpaid Leads</p>
-                <p className="text-sm text-slate-400">Replied but never paid — potential revenue sitting untouched.</p>
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] mb-1" style={{ color: T.amber }}>Warm Unpaid Leads</p>
+                <p className="text-sm" style={{ color: T.inkFaint }}>Replied but never paid — potential revenue sitting untouched.</p>
               </div>
               <div className="text-right flex-shrink-0">
-                <p className="text-2xl font-black" style={{ color: "#d97706" }}>{fmtMoney(unpaidRevenueAtStake)}</p>
-                <p className="text-[10px] text-slate-400">est. at stake</p>
+                <p className="text-2xl font-black tabular-nums" style={{ color: T.amber }}>{fmtMoney(unpaidRevenueAtStake)}</p>
+                <p className="text-[10px]" style={{ color: T.inkFaint }}>est. at stake</p>
               </div>
             </div>
             {loading ? (
-              <div className="py-4 text-center text-sm text-slate-400">Loading…</div>
+              <div className="py-4 text-center text-sm" style={{ color: T.inkFaint }}>Loading…</div>
             ) : warmUnpaidList.length === 0 ? (
-              <p className="text-sm text-slate-400 text-center py-4">No warm unpaid leads 🎉</p>
+              <p className="text-sm text-center py-4" style={{ color: T.inkFaint }}>No warm unpaid leads 🎉</p>
             ) : (
               <div className="space-y-2">
                 {warmUnpaidList.map(i => (
                   <a key={i.id} href={`/admin/conversation/${i.id}`}
-                     className="flex items-center justify-between px-3 py-2 rounded-xl transition-all hover:opacity-80"
-                     style={{ background: "rgba(245,158,11,0.05)", border: "1px solid rgba(245,158,11,0.12)" }}>
+                     className="group flex items-center justify-between px-3 py-2 rounded-xl transition-all hover:-translate-y-px"
+                     style={{ background: T.amberBg }}>
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-bold text-slate-800 truncate">{i.name}</p>
-                      <p className="text-[10px] text-slate-400 truncate">{i.session_type ?? "No type"} · {new Date(i.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</p>
+                      <p className="text-sm font-bold truncate" style={{ color: T.ink }}>{i.name}</p>
+                      <p className="text-[10px] truncate" style={{ color: T.inkFaint }}>{i.session_type ?? "No type"} · {new Date(i.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</p>
                     </div>
-                    <span className="text-xs font-black ml-3 flex-shrink-0" style={{ color: "#d97706" }}>Open →</span>
+                    <span className="text-xs font-black ml-3 flex-shrink-0 transition-transform group-hover:translate-x-0.5" style={{ color: T.amber }}>Open →</span>
                   </a>
                 ))}
                 {warmUnpaid.length > 8 && (
-                  <p className="text-[10px] text-slate-400 text-center pt-1">+{warmUnpaid.length - 8} more</p>
+                  <p className="text-[10px] text-center pt-1" style={{ color: T.inkFaint }}>+{warmUnpaid.length - 8} more</p>
                 )}
               </div>
             )}
@@ -271,14 +272,13 @@ export default function InquiryAnalyticsTab() {
         </div>
 
         {/* Funnel visual */}
-        <div className={card}>
-          <div className="h-[3px]" style={{ background: C.grad12 }} />
+        <div className={`adm-rise ${card}`} style={{ ...panel, animationDelay: "200ms" }}>
           <div className="p-6">
-            <p className="text-xs font-black uppercase tracking-widest mb-5" style={{ color: C.p1 }}>Booking Funnel</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] mb-5" style={{ color: T.inkSoft }}>Booking Funnel</p>
             {[
-              { label: "Inquiries received", val: total,   color: C.p1 },
-              { label: "Replied to",         val: replied, color: C.p2 },
-              { label: "Booked & paid",      val: paid,    color: "#10b981" },
+              { label: "Inquiries received", val: total,   color: T.blue },
+              { label: "Replied to",         val: replied, color: T.violet },
+              { label: "Booked & paid",      val: paid,    color: T.green },
             ].map((step, i, arr) => {
               const pct = arr[0].val > 0 ? (step.val / arr[0].val) * 100 : 0;
               const dropPct = i > 0 && arr[i - 1].val > 0
@@ -287,21 +287,19 @@ export default function InquiryAnalyticsTab() {
               return (
                 <div key={step.label} className="mb-4">
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-sm font-bold text-slate-700">{step.label}</span>
+                    <span className="text-sm font-bold" style={{ color: T.ink }}>{step.label}</span>
                     <div className="flex items-center gap-2">
                       {dropPct !== null && dropPct > 0 && (
                         <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
-                          style={{ background: "rgba(239,68,68,0.08)", color: "#ef4444" }}>
+                          style={{ background: T.redBg, color: T.red }}>
                           -{dropPct.toFixed(0)}% drop
                         </span>
                       )}
-                      <span className="text-sm font-black" style={{ color: step.color }}>{step.val}</span>
+                      <span className="text-sm font-black tabular-nums" style={{ color: step.color }}>{step.val}</span>
                     </div>
                   </div>
-                  <div className="w-full h-3 rounded-full bg-slate-100 overflow-hidden">
-                    <Bar pct={pct} color={step.color} delay={i * 120} />
-                  </div>
-                  <p className="text-[10px] text-slate-400 mt-1">{pct.toFixed(1)}% of inquiries</p>
+                  <Bar pct={pct} color={step.color} delay={i * 120} />
+                  <p className="text-[10px] mt-1" style={{ color: T.inkFaint }}>{pct.toFixed(1)}% of inquiries</p>
                 </div>
               );
             })}
@@ -310,17 +308,16 @@ export default function InquiryAnalyticsTab() {
       </div>
 
       {/* School breakdown + Lead source */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
 
         {/* By school */}
-        <div className={card}>
-          <div className="h-[3px]" style={{ background: C.grad321 }} />
+        <div className={`adm-rise ${card}`} style={{ ...panel, animationDelay: "240ms" }}>
           <div className="p-6">
-            <p className="text-xs font-black uppercase tracking-widest mb-4" style={{ color: C.p2 }}>Inquiries by School</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] mb-4" style={{ color: T.inkSoft }}>Inquiries by School</p>
             {loading ? (
-              <div className="py-6 text-center text-sm text-slate-400">Loading…</div>
+              <div className="py-6 text-center text-sm" style={{ color: T.inkFaint }}>Loading…</div>
             ) : schoolData.length === 0 ? (
-              <p className="text-sm text-slate-400">No data yet.</p>
+              <p className="text-sm" style={{ color: T.inkFaint }}>No data yet.</p>
             ) : (
               <div className="space-y-4">
                 {schoolData.map((s, i) => {
@@ -330,18 +327,18 @@ export default function InquiryAnalyticsTab() {
                       <div className="flex items-center justify-between mb-1.5">
                         <div className="flex items-center gap-2">
                           <span className="text-base">{s.emoji}</span>
-                          <span className="text-sm font-bold text-slate-700">{s.label}</span>
+                          <span className="text-sm font-bold" style={{ color: T.ink }}>{s.label}</span>
                           <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
-                            style={{ background: "rgba(16,185,129,0.08)", color: "#10b981" }}>
+                            style={{ background: T.greenBg, color: T.green }}>
                             {convRate.toFixed(0)}% conv
                           </span>
                         </div>
-                        <span className="text-sm font-black" style={{ color: FUNNEL_COLORS[i % FUNNEL_COLORS.length] }}>
+                        <span className="text-sm font-black tabular-nums" style={{ color: FUNNEL_COLORS[i % FUNNEL_COLORS.length] }}>
                           {s.count}
                         </span>
                       </div>
                       <Bar pct={(s.count / maxSchool) * 100} color={FUNNEL_COLORS[i % FUNNEL_COLORS.length]} delay={i * 60} />
-                      <p className="text-[10px] text-slate-400 mt-1">{s.paid} paid · {s.count - s.paid} unpaid</p>
+                      <p className="text-[10px] mt-1" style={{ color: T.inkFaint }}>{s.paid} paid · {s.count - s.paid} unpaid</p>
                     </div>
                   );
                 })}
@@ -350,11 +347,11 @@ export default function InquiryAnalyticsTab() {
                     <div className="flex items-center justify-between mb-1.5">
                       <div className="flex items-center gap-2">
                         <span className="text-base">🎓</span>
-                        <span className="text-sm font-bold text-slate-400">Other / Unknown</span>
+                        <span className="text-sm font-bold" style={{ color: T.inkFaint }}>Other / Unknown</span>
                       </div>
-                      <span className="text-sm font-black text-slate-400">{otherSchool.count}</span>
+                      <span className="text-sm font-black tabular-nums" style={{ color: T.inkFaint }}>{otherSchool.count}</span>
                     </div>
-                    <Bar pct={(otherSchool.count / maxSchool) * 100} color="#cbd5e1" />
+                    <Bar pct={(otherSchool.count / maxSchool) * 100} color={T.insetStrong} />
                   </div>
                 )}
               </div>
@@ -363,15 +360,14 @@ export default function InquiryAnalyticsTab() {
         </div>
 
         {/* By lead source */}
-        <div className={card}>
-          <div className="h-[3px]" style={{ background: C.grad12 }} />
+        <div className={`adm-rise ${card}`} style={{ ...panel, animationDelay: "280ms" }}>
           <div className="p-6">
-            <p className="text-xs font-black uppercase tracking-widest mb-1" style={{ color: C.p1 }}>Lead Source</p>
-            <p className="text-xs text-slate-400 mb-4">Detected from inquiry message text.</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] mb-1" style={{ color: T.inkSoft }}>Lead Source</p>
+            <p className="text-xs mb-4" style={{ color: T.inkFaint }}>Detected from inquiry message text.</p>
             {loading ? (
-              <div className="py-6 text-center text-sm text-slate-400">Loading…</div>
+              <div className="py-6 text-center text-sm" style={{ color: T.inkFaint }}>Loading…</div>
             ) : knownSources.length === 0 && unknownSource.count === 0 ? (
-              <p className="text-sm text-slate-400">No data yet.</p>
+              <p className="text-sm" style={{ color: T.inkFaint }}>No data yet.</p>
             ) : (
               <div className="space-y-4">
                 {knownSources.map((s, i) => {
@@ -381,16 +377,16 @@ export default function InquiryAnalyticsTab() {
                       <div className="flex items-center justify-between mb-1.5">
                         <div className="flex items-center gap-2">
                           <span className="text-base">{s.emoji}</span>
-                          <span className="text-sm font-bold text-slate-700">{s.label}</span>
+                          <span className="text-sm font-bold" style={{ color: T.ink }}>{s.label}</span>
                           <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
-                            style={{ background: "rgba(16,185,129,0.08)", color: "#10b981" }}>
+                            style={{ background: T.greenBg, color: T.green }}>
                             {convRate.toFixed(0)}% conv
                           </span>
                         </div>
-                        <span className="text-sm font-black" style={{ color: s.color }}>{s.count}</span>
+                        <span className="text-sm font-black tabular-nums" style={{ color: s.color }}>{s.count}</span>
                       </div>
                       <Bar pct={(s.count / maxSource) * 100} color={s.color} delay={i * 60} />
-                      <p className="text-[10px] text-slate-400 mt-1">{s.paid} paid · {s.count - s.paid} unpaid</p>
+                      <p className="text-[10px] mt-1" style={{ color: T.inkFaint }}>{s.paid} paid · {s.count - s.paid} unpaid</p>
                     </div>
                   );
                 })}
@@ -399,12 +395,12 @@ export default function InquiryAnalyticsTab() {
                     <div className="flex items-center justify-between mb-1.5">
                       <div className="flex items-center gap-2">
                         <span className="text-base">❓</span>
-                        <span className="text-sm font-bold text-slate-400">Unknown / Direct</span>
+                        <span className="text-sm font-bold" style={{ color: T.inkFaint }}>Unknown / Direct</span>
                       </div>
-                      <span className="text-sm font-black text-slate-400">{unknownSource.count}</span>
+                      <span className="text-sm font-black tabular-nums" style={{ color: T.inkFaint }}>{unknownSource.count}</span>
                     </div>
-                    <Bar pct={(unknownSource.count / maxSource) * 100} color="#cbd5e1" />
-                    <p className="text-[10px] text-slate-400 mt-1">{unknownSource.paid} paid</p>
+                    <Bar pct={(unknownSource.count / maxSource) * 100} color={T.insetStrong} />
+                    <p className="text-[10px] mt-1" style={{ color: T.inkFaint }}>{unknownSource.paid} paid</p>
                   </div>
                 )}
               </div>
@@ -414,15 +410,14 @@ export default function InquiryAnalyticsTab() {
       </div>
 
       {/* Session type volume */}
-      <div className={card}>
-        <div className="h-[3px]" style={{ background: C.grad90 }} />
+      <div className={`adm-rise ${card}`} style={{ ...panel, animationDelay: "320ms" }}>
         <div className="p-6">
-          <p className="text-xs font-black uppercase tracking-widest mb-1" style={{ color: C.p1 }}>Inquiries by Session Type</p>
-          <p className="text-xs text-slate-400 mb-5">Volume of inquiries + conversion per type.</p>
+          <p className="text-[10px] font-black uppercase tracking-[0.16em] mb-1" style={{ color: T.inkSoft }}>Inquiries by Session Type</p>
+          <p className="text-xs mb-5" style={{ color: T.inkFaint }}>Volume of inquiries + conversion per type.</p>
           {loading ? (
-            <div className="py-6 text-center text-sm text-slate-400">Loading…</div>
+            <div className="py-6 text-center text-sm" style={{ color: T.inkFaint }}>Loading…</div>
           ) : typeData.length === 0 ? (
-            <p className="text-sm text-slate-400">No data yet.</p>
+            <p className="text-sm" style={{ color: T.inkFaint }}>No data yet.</p>
           ) : (
             <div className="space-y-3">
               {typeData.map(([type, stats], i) => {
@@ -432,13 +427,13 @@ export default function InquiryAnalyticsTab() {
                   <div key={type} className="flex items-center gap-4">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm font-bold text-slate-700 truncate">{type}</span>
+                        <span className="text-sm font-bold truncate" style={{ color: T.ink }}>{type}</span>
                         <div className="flex items-center gap-2 ml-2 flex-shrink-0">
                           <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
-                            style={{ background: convRate > 50 ? "rgba(16,185,129,0.1)" : "rgba(148,163,184,0.1)", color: convRate > 50 ? "#10b981" : "#94a3b8" }}>
+                            style={convRate > 50 ? { background: T.greenBg, color: T.green } : { background: T.neutralBg, color: T.inkFaint }}>
                             {convRate.toFixed(0)}% booked
                           </span>
-                          <span className="text-sm font-black" style={{ color }}>{stats.count}</span>
+                          <span className="text-sm font-black tabular-nums" style={{ color }}>{stats.count}</span>
                         </div>
                       </div>
                       <Bar pct={(stats.count / maxTypeCount) * 100} color={color} delay={i * 60} />

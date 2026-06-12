@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { C } from "@/lib/colors";
+import { T } from "@/app/admin/adminTheme";
 import {
   type AdminTestimonialUpdates,
   buildTestimonialDisplayName,
@@ -43,11 +43,13 @@ const SOURCE_LABELS: Record<TestimonialSource, string> = {
   direct_link: "Direct link", gallery: "Gallery", email: "Email", manual: "Manual",
 };
 const STATUS_COLORS: Record<TestimonialStatus, { background: string; color: string }> = {
-  pending: { background: C.p3_15, color: C.inkSoft },
-  approved: { background: C.p1_10, color: C.success },
-  rejected: { background: C.p2_10, color: C.danger },
-  archived: { background: C.p1_06, color: C.muted },
+  pending: { background: T.amberBg, color: T.amber },
+  approved: { background: T.greenBg, color: T.green },
+  rejected: { background: T.redBg, color: T.red },
+  archived: { background: T.neutralBg, color: T.inkFaint },
 };
+
+const inputStyle = { color: T.ink, background: T.panelSolid, border: `1px solid ${T.border}` } as const;
 
 function formatDate(value: string | null): string {
   if (!value) return "Not set";
@@ -170,31 +172,31 @@ export default function TestimonialsTab({ showToast }: Props) {
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
   return (
     <div className="mx-auto max-w-6xl space-y-5">
-      <header className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
+      <header className="adm-rise flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
         <div>
-          <p className="text-xs font-black uppercase tracking-[0.16em]" style={{ color: C.p1 }}>Client feedback</p>
-          <h2 className="mt-1 text-2xl font-black" style={{ color: C.ink }}>Testimonials</h2>
-          <p className="mt-1 text-sm" style={{ color: C.muted }}>{total} submission{total === 1 ? "" : "s"}</p>
+          <p className="text-[10px] font-black uppercase tracking-[0.16em]" style={{ color: T.inkFaint }}>Client feedback</p>
+          <h2 className="mt-1 text-2xl font-black" style={{ color: T.ink }}>Testimonials</h2>
+          <p className="mt-1 text-sm" style={{ color: T.inkSoft }}>{total} submission{total === 1 ? "" : "s"}</p>
         </div>
-        <a href="/testimonial" target="_blank" rel="noreferrer" className="inline-flex self-start rounded-full px-4 py-2 text-xs font-black" style={{ background: C.grad12, color: C.white }}>
-          Open public form
+        <a href="/testimonial" target="_blank" rel="noreferrer" className="inline-flex self-start rounded-full px-4 py-2 text-xs font-black transition-all hover:-translate-y-px" style={{ background: T.action, color: T.actionText, boxShadow: T.shadow }}>
+          Open public form ↗
         </a>
       </header>
 
-      <section className="grid gap-3 rounded-2xl p-4 md:grid-cols-[1fr_180px_180px]" style={{ background: C.white, border: `1px solid ${C.warmEdge}` }}>
+      <section className="adm-rise grid gap-3 rounded-2xl p-4 md:grid-cols-[1fr_180px_180px]" style={{ background: T.panel, border: `1px solid ${T.border}`, boxShadow: T.shadow, animationDelay: "60ms" }}>
         <input
           type="search"
           placeholder="Search name, email, or feedback..."
           value={search}
           onChange={(event) => { setSearch(event.target.value); setPage(1); }}
           className="rounded-xl px-3 py-2.5 text-sm outline-none"
-          style={{ color: C.ink, border: `1px solid ${C.warmEdge}` }}
+          style={inputStyle}
         />
         <select
           value={statusFilter}
           onChange={(event) => { setStatusFilter(event.target.value); setPage(1); }}
-          className="rounded-xl px-3 py-2.5 text-sm outline-none"
-          style={{ color: C.ink, border: `1px solid ${C.warmEdge}`, background: C.white }}
+          className="rounded-xl px-3 py-2.5 text-sm outline-none cursor-pointer"
+          style={inputStyle}
         >
           <option value="">All statuses</option>
           {TESTIMONIAL_STATUSES.map((status) => <option key={status} value={status}>{STATUS_LABELS[status]}</option>)}
@@ -202,8 +204,8 @@ export default function TestimonialsTab({ showToast }: Props) {
         <select
           value={sourceFilter}
           onChange={(event) => { setSourceFilter(event.target.value); setPage(1); }}
-          className="rounded-xl px-3 py-2.5 text-sm outline-none"
-          style={{ color: C.ink, border: `1px solid ${C.warmEdge}`, background: C.white }}
+          className="rounded-xl px-3 py-2.5 text-sm outline-none cursor-pointer"
+          style={inputStyle}
         >
           <option value="">All sources</option>
           {TESTIMONIAL_SOURCES.map((source) => <option key={source} value={source}>{SOURCE_LABELS[source]}</option>)}
@@ -211,27 +213,36 @@ export default function TestimonialsTab({ showToast }: Props) {
       </section>
 
       {loading ? (
-        <div className="rounded-2xl p-12 text-center text-sm" style={{ color: C.muted, background: C.white }}>Loading testimonials...</div>
+        <div className="rounded-2xl p-12 text-center text-sm" style={{ color: T.inkFaint, background: T.panel, border: `1px solid ${T.border}` }}>Loading testimonials...</div>
       ) : rows.length === 0 ? (
-        <div className="rounded-2xl p-12 text-center" style={{ background: C.white, border: `1px solid ${C.warmEdge}` }}>
-          <p className="font-black" style={{ color: C.ink }}>No testimonials found</p>
-          <p className="mt-1 text-sm" style={{ color: C.muted }}>New direct-link submissions will appear here.</p>
+        <div className="rounded-2xl p-12 text-center" style={{ background: T.panel, border: `1px solid ${T.border}` }}>
+          <p className="font-black" style={{ color: T.ink }}>No testimonials found</p>
+          <p className="mt-1 text-sm" style={{ color: T.inkFaint }}>New direct-link submissions will appear here.</p>
         </div>
       ) : (
         <div className="space-y-3">
-          {rows.map((row) => (
-            <button key={row.id} type="button" onClick={() => openDetail(row)} className="w-full rounded-2xl p-4 text-left transition hover:-translate-y-0.5" style={{ background: C.white, border: `1px solid ${C.warmEdge}`, boxShadow: C.shadowWarmSm }}>
+          {rows.map((row, i) => (
+            <button key={row.id} type="button" onClick={() => openDetail(row)}
+              className="adm-rise w-full rounded-2xl p-4 text-left transition-all duration-200 hover:-translate-y-0.5"
+              style={{ background: T.panel, border: `1px solid ${T.border}`, boxShadow: T.shadow, animationDelay: `${Math.min(i, 8) * 40}ms` }}
+              onMouseEnter={e => { e.currentTarget.style.boxShadow = T.shadowHover; e.currentTarget.style.borderColor = T.borderStrong; }}
+              onMouseLeave={e => { e.currentTarget.style.boxShadow = T.shadow; e.currentTarget.style.borderColor = T.border; }}>
               <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-black" style={{ color: C.ink }}>{row.first_name} {row.last_name}</p>
+                    <p className="font-black" style={{ color: T.ink }}>{row.first_name} {row.last_name}</p>
                     <StatusBadge status={row.status} />
-                    <span className="text-[11px] font-bold" style={{ color: C.muted }}>{SOURCE_LABELS[row.source]}</span>
+                    {row.featured && (
+                      <span className="rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wider" style={{ background: T.violetBg, color: T.violet }}>
+                        ★ Featured
+                      </span>
+                    )}
+                    <span className="text-[11px] font-bold" style={{ color: T.inkFaint }}>{SOURCE_LABELS[row.source]}</span>
                   </div>
-                  {row.email && <p className="mt-1 text-xs" style={{ color: C.mutedSoft }}>{row.email}</p>}
-                  <p className="mt-3 line-clamp-2 text-sm leading-6" style={{ color: C.inkSoft }}>{row.message}</p>
+                  {row.email && <p className="mt-1 text-xs" style={{ color: T.inkFaint }}>{row.email}</p>}
+                  <p className="mt-3 line-clamp-2 text-sm leading-6" style={{ color: T.inkSoft }}>{row.message}</p>
                 </div>
-                <p className="shrink-0 text-xs" style={{ color: C.mutedSoft }}>{formatDate(row.submitted_at)}</p>
+                <p className="shrink-0 text-xs" style={{ color: T.inkFaint }}>{formatDate(row.submitted_at)}</p>
               </div>
             </button>
           ))}
@@ -239,9 +250,9 @@ export default function TestimonialsTab({ showToast }: Props) {
       )}
 
       <div className="flex items-center justify-between">
-        <button type="button" disabled={page <= 1} onClick={() => setPage((value) => value - 1)} className="rounded-full px-4 py-2 text-xs font-black disabled:opacity-40" style={{ color: C.inkSoft, border: `1px solid ${C.warmEdge}` }}>Previous</button>
-        <span className="text-xs" style={{ color: C.muted }}>Page {page} of {pageCount}</span>
-        <button type="button" disabled={page >= pageCount} onClick={() => setPage((value) => value + 1)} className="rounded-full px-4 py-2 text-xs font-black disabled:opacity-40" style={{ color: C.inkSoft, border: `1px solid ${C.warmEdge}` }}>Next</button>
+        <button type="button" disabled={page <= 1} onClick={() => setPage((value) => value - 1)} className="rounded-full px-4 py-2 text-xs font-black transition-all disabled:opacity-40 hover:-translate-y-px" style={{ color: T.inkSoft, background: T.panelSolid, border: `1px solid ${T.border}` }}>← Previous</button>
+        <span className="text-xs font-bold" style={{ color: T.inkFaint }}>Page {page} of {pageCount}</span>
+        <button type="button" disabled={page >= pageCount} onClick={() => setPage((value) => value + 1)} className="rounded-full px-4 py-2 text-xs font-black transition-all disabled:opacity-40 hover:-translate-y-px" style={{ color: T.inkSoft, background: T.panelSolid, border: `1px solid ${T.border}` }}>Next →</button>
       </div>
 
       {selected && (
@@ -294,9 +305,9 @@ function HomepageControls({ row, saving, onUpdate }: { row: Testimonial; saving:
   const orderInvalid = displayOrder.trim() !== "" && !/^\d{1,4}$/.test(displayOrder.trim());
 
   return (
-    <div className="mt-6 rounded-2xl p-5" style={{ background: C.white, border: `1px solid ${C.warmEdge}` }}>
-      <p className="text-sm font-black" style={{ color: C.ink }}>Homepage visibility</p>
-      <p className="mt-1 text-xs" style={{ color: C.muted }}>
+    <div className="mt-6 rounded-2xl p-5" style={{ background: T.panelSolid, border: `1px solid ${T.border}` }}>
+      <p className="text-sm font-black" style={{ color: T.ink }}>Homepage visibility</p>
+      <p className="mt-1 text-xs" style={{ color: T.inkFaint }}>
         Approved, published, and featured testimonials appear in the homepage testimonials section.
       </p>
 
@@ -305,8 +316,8 @@ function HomepageControls({ row, saving, onUpdate }: { row: Testimonial; saving:
           type="button"
           disabled={saving}
           onClick={() => onUpdate({ published: !published })}
-          className="rounded-full px-4 py-2 text-xs font-black disabled:opacity-40"
-          style={{ color: published ? C.muted : C.success, background: published ? C.p1_06 : C.p1_10 }}
+          className="rounded-full px-4 py-2 text-xs font-black transition-all disabled:opacity-40"
+          style={published ? { color: T.inkSoft, background: T.neutralBg } : { color: T.actionText, background: T.action }}
         >
           {published ? "Unpublish" : "Publish"}
         </button>
@@ -314,19 +325,19 @@ function HomepageControls({ row, saving, onUpdate }: { row: Testimonial; saving:
           type="button"
           disabled={saving || !isApproved}
           onClick={() => onUpdate({ featured: !row.featured })}
-          className="rounded-full px-4 py-2 text-xs font-black disabled:opacity-40"
-          style={{ color: row.featured ? C.muted : C.p1, background: row.featured ? C.p1_06 : C.p1_15 }}
+          className="rounded-full px-4 py-2 text-xs font-black transition-all disabled:opacity-40"
+          style={row.featured ? { color: T.inkSoft, background: T.neutralBg } : { color: T.violet, background: T.violetBg, border: `1px solid ${T.violetBorder}` }}
         >
-          {row.featured ? "Remove from featured" : "Feature on homepage"}
+          {row.featured ? "Remove from featured" : "★ Feature on homepage"}
         </button>
       </div>
       {!isApproved && (
-        <p className="mt-2 text-xs" style={{ color: C.mutedSoft }}>Approve this testimonial before featuring it.</p>
+        <p className="mt-2 text-xs" style={{ color: T.inkFaint }}>Approve this testimonial before featuring it.</p>
       )}
 
       <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_120px]">
         <div>
-          <label htmlFor="testimonial-session-type" className="text-[11px] font-black uppercase tracking-wider" style={{ color: C.mutedSoft }}>Session badge</label>
+          <label htmlFor="testimonial-session-type" className="text-[11px] font-black uppercase tracking-wider" style={{ color: T.inkFaint }}>Session badge</label>
           <input
             id="testimonial-session-type"
             type="text"
@@ -335,11 +346,11 @@ function HomepageControls({ row, saving, onUpdate }: { row: Testimonial; saving:
             placeholder="e.g. SJSU Graduation Session"
             onChange={(event) => setSessionType(event.target.value)}
             className="mt-1 w-full rounded-xl px-3 py-2.5 text-sm outline-none"
-            style={{ color: C.ink, background: C.white, border: `1px solid ${C.warmEdge}` }}
+            style={inputStyle}
           />
         </div>
         <div>
-          <label htmlFor="testimonial-display-order" className="text-[11px] font-black uppercase tracking-wider" style={{ color: C.mutedSoft }}>Order</label>
+          <label htmlFor="testimonial-display-order" className="text-[11px] font-black uppercase tracking-wider" style={{ color: T.inkFaint }}>Order</label>
           <input
             id="testimonial-display-order"
             type="number"
@@ -349,7 +360,7 @@ function HomepageControls({ row, saving, onUpdate }: { row: Testimonial; saving:
             placeholder="1"
             onChange={(event) => setDisplayOrder(event.target.value)}
             className="mt-1 w-full rounded-xl px-3 py-2.5 text-sm outline-none"
-            style={{ color: C.ink, background: C.white, border: `1px solid ${C.warmEdge}` }}
+            style={inputStyle}
           />
         </div>
       </div>
@@ -357,8 +368,8 @@ function HomepageControls({ row, saving, onUpdate }: { row: Testimonial; saving:
         type="button"
         disabled={saving || orderInvalid}
         onClick={saveDetails}
-        className="mt-3 rounded-full px-4 py-2 text-xs font-black disabled:opacity-50"
-        style={{ background: C.grad12, color: C.white }}
+        className="mt-3 rounded-full px-4 py-2 text-xs font-black transition-all disabled:opacity-50"
+        style={{ background: T.action, color: T.actionText }}
       >
         Save homepage details
       </button>
@@ -370,17 +381,17 @@ function PublicPreview({ row }: { row: Testimonial }) {
   const displayName = buildTestimonialDisplayName(row.first_name, row.last_name, row.display_name_preference);
   return (
     <div className="mt-6">
-      <p className="text-sm font-black" style={{ color: C.ink }}>Public preview</p>
-      <figure className="mt-2 flex flex-col gap-4 rounded-2xl p-5" style={{ background: C.page, border: `1px solid ${C.warmEdge}` }}>
+      <p className="text-sm font-black" style={{ color: T.ink }}>Public preview</p>
+      <figure className="mt-2 flex flex-col gap-4 rounded-2xl p-5" style={{ background: T.inset, border: `1px solid ${T.border}` }}>
         {row.session_type && (
-          <span className="self-start rounded-full px-3 py-1.5 text-[10px] font-black uppercase tracking-wider" style={{ background: C.proAccentSoft, color: C.proAccentDark }}>
+          <span className="self-start rounded-full px-3 py-1.5 text-[10px] font-black uppercase tracking-wider" style={{ background: T.violetBg, color: T.violet }}>
             {row.session_type}
           </span>
         )}
-        <blockquote className="m-0 text-[15px] leading-7" style={{ color: C.ink }}>{`“${row.message}”`}</blockquote>
+        <blockquote className="m-0 text-[15px] leading-7" style={{ color: T.ink }}>{`“${row.message}”`}</blockquote>
         <figcaption className="flex flex-col">
-          <span className="text-sm font-black" style={{ color: C.ink }}>{displayName}</span>
-          <span className="text-xs font-semibold" style={{ color: C.muted }}>SoloXSnaps Client</span>
+          <span className="text-sm font-black" style={{ color: T.ink }}>{displayName}</span>
+          <span className="text-xs font-semibold" style={{ color: T.inkFaint }}>SoloXSnaps Client</span>
         </figcaption>
       </figure>
     </div>
@@ -391,20 +402,20 @@ function TestimonialDetail(props: DetailProps) {
   const row = props.testimonial;
   const displayName = buildTestimonialDisplayName(row.first_name, row.last_name, row.display_name_preference);
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-5" style={{ background: C.modalOverlay }} onMouseDown={props.onClose}>
-      <section className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-t-[2rem] p-5 sm:rounded-[2rem] sm:p-7" style={{ background: C.page }} onMouseDown={(event) => event.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-5" style={{ background: T.scrim }} onMouseDown={props.onClose}>
+      <section className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-t-[2rem] p-5 sm:rounded-[2rem] sm:p-7" style={{ background: T.page, boxShadow: T.shadowHover }} onMouseDown={(event) => event.stopPropagation()}>
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h3 className="text-xl font-black" style={{ color: C.ink }}>{row.first_name} {row.last_name}</h3>
+              <h3 className="text-xl font-black" style={{ color: T.ink }}>{row.first_name} {row.last_name}</h3>
               <StatusBadge status={row.status} />
             </div>
-            <p className="mt-1 text-sm" style={{ color: C.muted }}>Public display: {displayName}</p>
+            <p className="mt-1 text-sm" style={{ color: T.inkSoft }}>Public display: {displayName}</p>
           </div>
-          <button type="button" onClick={props.onClose} className="h-9 w-9 rounded-full text-lg font-black" style={{ color: C.muted, background: C.p1_06 }}>×</button>
+          <button type="button" onClick={props.onClose} className="h-9 w-9 rounded-full text-lg font-black transition-colors" style={{ color: T.inkSoft, background: T.inset }}>×</button>
         </div>
 
-        <blockquote className="mt-6 whitespace-pre-wrap rounded-2xl p-5 text-[15px] leading-7" style={{ color: C.inkSoft, background: C.white, border: `1px solid ${C.warmEdge}` }}>{row.message}</blockquote>
+        <blockquote className="mt-6 whitespace-pre-wrap rounded-2xl p-5 text-[15px] leading-7" style={{ color: T.inkSoft, background: T.panelSolid, border: `1px solid ${T.border}` }}>{row.message}</blockquote>
         <dl className="mt-5 grid gap-3 text-sm sm:grid-cols-2">
           <Detail label="Email" value={row.email ?? "Not provided"} />
           <Detail label="Consent" value={`${row.consent_to_marketing ? "Granted" : "Not granted"} (${row.consent_version})`} />
@@ -418,14 +429,14 @@ function TestimonialDetail(props: DetailProps) {
         </dl>
 
         <div className="mt-6">
-          <label htmlFor="testimonial-admin-notes" className="text-sm font-black" style={{ color: C.ink }}>Private admin notes</label>
-          <textarea id="testimonial-admin-notes" rows={4} maxLength={2000} value={props.notes} onChange={(event) => props.onNotesChange(event.target.value)} className="mt-2 w-full resize-y rounded-2xl p-4 text-sm outline-none" style={{ color: C.ink, background: C.white, border: `1px solid ${C.warmEdge}` }} />
-          <button type="button" disabled={props.saving} onClick={props.onSaveNotes} className="mt-2 rounded-full px-4 py-2 text-xs font-black disabled:opacity-50" style={{ background: C.grad12, color: C.white }}>Save notes</button>
+          <label htmlFor="testimonial-admin-notes" className="text-sm font-black" style={{ color: T.ink }}>Private admin notes</label>
+          <textarea id="testimonial-admin-notes" rows={4} maxLength={2000} value={props.notes} onChange={(event) => props.onNotesChange(event.target.value)} className="mt-2 w-full resize-y rounded-2xl p-4 text-sm outline-none" style={inputStyle} />
+          <button type="button" disabled={props.saving} onClick={props.onSaveNotes} className="mt-2 rounded-full px-4 py-2 text-xs font-black transition-all disabled:opacity-50" style={{ background: T.action, color: T.actionText }}>Save notes</button>
         </div>
 
         <div className="mt-6 flex flex-wrap gap-2">
           {TESTIMONIAL_STATUSES.map((status) => (
-            <button key={status} type="button" disabled={props.saving || row.status === status} onClick={() => props.onStatus(status)} className="rounded-full px-4 py-2 text-xs font-black disabled:opacity-40" style={{ color: STATUS_COLORS[status].color, background: STATUS_COLORS[status].background }}>
+            <button key={status} type="button" disabled={props.saving || row.status === status} onClick={() => props.onStatus(status)} className="rounded-full px-4 py-2 text-xs font-black transition-all disabled:opacity-40" style={{ color: STATUS_COLORS[status].color, background: STATUS_COLORS[status].background }}>
               {status === "pending" ? "Return to Pending" : STATUS_LABELS[status]}
             </button>
           ))}
@@ -434,15 +445,15 @@ function TestimonialDetail(props: DetailProps) {
         <HomepageControls row={row} saving={props.saving} onUpdate={props.onUpdate} />
         <PublicPreview row={row} />
 
-        <div className="mt-7 border-t pt-5" style={{ borderColor: C.warmEdge }}>
+        <div className="mt-7 border-t pt-5" style={{ borderColor: T.border }}>
           {props.deleteConfirm ? (
             <div className="flex flex-wrap items-center gap-3">
-              <p className="text-sm font-bold" style={{ color: C.danger }}>Permanently delete this testimonial?</p>
-              <button type="button" disabled={props.saving} onClick={props.onDelete} className="rounded-full px-4 py-2 text-xs font-black disabled:opacity-50" style={{ background: C.danger, color: C.white }}>Yes, delete</button>
-              <button type="button" onClick={() => props.onDeleteConfirm(false)} className="text-xs font-black" style={{ color: C.muted }}>Cancel</button>
+              <p className="text-sm font-bold" style={{ color: T.red }}>Permanently delete this testimonial?</p>
+              <button type="button" disabled={props.saving} onClick={props.onDelete} className="rounded-full px-4 py-2 text-xs font-black disabled:opacity-50" style={{ background: T.red, color: T.actionText }}>Yes, delete</button>
+              <button type="button" onClick={() => props.onDeleteConfirm(false)} className="text-xs font-black" style={{ color: T.inkSoft }}>Cancel</button>
             </div>
           ) : (
-            <button type="button" onClick={() => props.onDeleteConfirm(true)} className="text-xs font-black" style={{ color: C.danger }}>Delete testimonial</button>
+            <button type="button" onClick={() => props.onDeleteConfirm(true)} className="text-xs font-black transition-opacity hover:opacity-70" style={{ color: T.red }}>Delete testimonial</button>
           )}
         </div>
       </section>
@@ -452,9 +463,9 @@ function TestimonialDetail(props: DetailProps) {
 
 function Detail({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl p-3" style={{ background: C.white }}>
-      <dt className="text-[10px] font-black uppercase tracking-wider" style={{ color: C.mutedSoft }}>{label}</dt>
-      <dd className="mt-1 break-words font-bold capitalize" style={{ color: C.inkSoft }}>{value}</dd>
+    <div className="rounded-xl p-3" style={{ background: T.panelSolid, border: `1px solid ${T.rowBorder}` }}>
+      <dt className="text-[10px] font-black uppercase tracking-wider" style={{ color: T.inkFaint }}>{label}</dt>
+      <dd className="mt-1 break-words font-bold capitalize" style={{ color: T.inkSoft }}>{value}</dd>
     </div>
   );
 }

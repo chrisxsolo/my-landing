@@ -1324,7 +1324,7 @@ function AdminDashboard() {
   }
 
   return(
-    <div className="min-h-screen font-sans" style={{background:T.page}}>
+    <div className="min-h-screen font-sans" style={{backgroundColor:T.page,backgroundImage:T.canvasGlow,backgroundAttachment:"fixed"}}>
       <style>{`
         @keyframes adm-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
         .adm-rise { animation: adm-rise 0.45s cubic-bezier(0.22,1,0.36,1) both; }
@@ -1375,19 +1375,22 @@ function AdminDashboard() {
       )}
 
 
-      <div className="sticky top-0 z-40 border-b border-black/[0.06] px-3 md:px-6 h-14 flex items-center justify-between" style={{background:"rgba(255,255,255,0.95)",backdropFilter:"blur(20px)"}}>
-        <span className="font-black text-sm md:text-lg shrink-0" style={C.text}>Chris. Studio Admin</span>
+      <div className="sticky top-0 z-40 px-3 md:px-6 h-14 flex items-center justify-between" style={{background:"rgba(246,246,244,0.88)",backdropFilter:"blur(20px)",borderBottom:`1px solid ${T.border}`}}>
+        <span className="font-black text-sm md:text-base shrink-0 flex items-center gap-2" style={{color:T.ink}}>
+          <span className="w-2 h-2 rounded-full" style={{background:T.action}}/>
+          Chris<span style={{color:T.inkFaint}}>·</span>Studio
+        </span>
         <div className="flex items-center gap-2 md:gap-3">
           <Link
             href="/admin/sessions"
-            className="inline-flex items-center rounded-full px-2 md:px-3 py-1.5 text-[10px] md:text-[11px] font-black uppercase tracking-[0.12em] transition-all hover:opacity-90 whitespace-nowrap"
-            style={{background:C.p1_08,color:C.p1,border:`1px solid ${C.p1_20}`}}
+            className="inline-flex items-center rounded-full px-2 md:px-3 py-1.5 text-[10px] md:text-[11px] font-black uppercase tracking-[0.12em] transition-all hover:-translate-y-px whitespace-nowrap"
+            style={{background:T.panelSolid,color:T.inkSoft,border:`1px solid ${T.border}`,boxShadow:T.shadow}}
           >
             Portal Sessions
           </Link>
-          <a href="/bay-area-locations" className="hidden md:block text-xs font-bold text-slate-400 hover:text-slate-700 transition-colors">🗺️ Bay Guide</a>
-          <a href="/admin/availability" className="hidden md:block text-xs font-bold text-slate-400 hover:text-slate-700 transition-colors">📅 Availability</a>
-          <a href="/" className="hidden md:block text-xs font-bold text-slate-400 hover:text-slate-700 transition-colors">← Site</a>
+          <a href="/bay-area-locations" className="hidden md:block text-xs font-bold transition-colors" style={{color:T.inkFaint}} onMouseEnter={e=>{e.currentTarget.style.color=T.ink;}} onMouseLeave={e=>{e.currentTarget.style.color=T.inkFaint;}}>🗺️ Bay Guide</a>
+          <a href="/admin/availability" className="hidden md:block text-xs font-bold transition-colors" style={{color:T.inkFaint}} onMouseEnter={e=>{e.currentTarget.style.color=T.ink;}} onMouseLeave={e=>{e.currentTarget.style.color=T.inkFaint;}}>📅 Availability</a>
+          <a href="/" className="hidden md:block text-xs font-bold transition-colors" style={{color:T.inkFaint}} onMouseEnter={e=>{e.currentTarget.style.color=T.ink;}} onMouseLeave={e=>{e.currentTarget.style.color=T.inkFaint;}}>← Site</a>
         </div>
       </div>
 
@@ -1400,36 +1403,41 @@ function AdminDashboard() {
             <button onClick={()=>go(t)}
               className="w-full flex items-center gap-2.5 px-3 py-[7px] rounded-xl text-[13px] font-semibold transition-all text-left group"
               style={tab===t
-                ?{background:C.grad12,color:"#fff",boxShadow:"0 2px 10px rgba(157,111,232,0.25)"}
-                :{color:"#4b5563",background:"transparent"}}>
+                ?{background:T.action,color:T.actionText,boxShadow:T.shadow}
+                :{color:T.inkSoft,background:"transparent"}}
+              onMouseEnter={e=>{if(tab!==t)e.currentTarget.style.background=T.inset;}}
+              onMouseLeave={e=>{if(tab!==t)e.currentTarget.style.background="transparent";}}>
               <span className="w-5 flex-shrink-0 text-center text-base leading-none">{icon}</span>
               <span className="truncate">{label}</span>
             </button>
           );
           return(
-            <div className="hidden md:flex sticky top-14 flex-shrink-0 w-[200px] h-[calc(100vh-56px)] overflow-y-auto flex-col border-r py-3 px-2"
-                 style={{background:"white",borderColor:"rgba(0,0,0,0.07)"}}>
+            <div className="hidden md:flex sticky top-14 flex-shrink-0 w-[200px] h-[calc(100vh-56px)] overflow-y-auto flex-col py-3 px-2"
+                 style={{background:"rgba(255,255,255,0.55)",borderRight:`1px solid ${T.border}`}}>
               <div className="flex-1 space-y-0.5 pb-3">
                 <NavBtn t="home" icon="🏠" label="Home"/>
-                <div className="h-px my-2 mx-1" style={{background:"rgba(0,0,0,0.06)"}}/>
-                <p className="text-[10px] font-black uppercase tracking-[0.13em] px-3 pt-0.5 pb-1" style={{color:C.mutedSoft}}>Client Work</p>
+                <div className="h-px my-2 mx-1" style={{background:T.rowBorder}}/>
+                <p className="text-[10px] font-black uppercase tracking-[0.13em] px-3 pt-0.5 pb-1" style={{color:T.inkFaint}}>Client Work</p>
                 {(["inquiries","clients","testimonials","analytics","payments","funnel"] as Tab[]).map(t=>(
                   <NavBtn key={t} t={t} icon={t==="inquiries"?"📬":t==="clients"?"👥":t==="testimonials"?"💬":t==="analytics"?"📊":t==="payments"?"💵":"📈"} label={TAB_LABELS[t].replace(/^[^\s]+\s/,"")}/>
                 ))}
-                <div className="h-px my-2 mx-1" style={{background:"rgba(0,0,0,0.06)"}}/>
-                <p className="text-[10px] font-black uppercase tracking-[0.13em] px-3 pt-0.5 pb-1" style={{color:C.mutedSoft}}>Website</p>
+                <div className="h-px my-2 mx-1" style={{background:T.rowBorder}}/>
+                <p className="text-[10px] font-black uppercase tracking-[0.13em] px-3 pt-0.5 pb-1" style={{color:T.inkFaint}}>Website</p>
                 {WEBSITE_TABS.map(t=>(
                   <NavBtn key={t} t={t} icon={t==="poses"?"📸":t==="couplesGuide"?"💞":t==="couplesLocations"?"💑":t==="locations"?"📍":t==="bayGuide"?"🗺️":t==="portfolio"?"🖼️":t==="categories"?"🏷️":t==="blog"?"✍️":t==="navigation"?"🧭":"🗄️"} label={TAB_LABELS[t].replace(/^[^\s]+\s/,"")}/>
                 ))}
-                <div className="h-px my-2 mx-1" style={{background:"rgba(0,0,0,0.06)"}}/>
-                <p className="text-[10px] font-black uppercase tracking-[0.13em] px-3 pt-0.5 pb-1" style={{color:C.mutedSoft}}>Tools</p>
+                <div className="h-px my-2 mx-1" style={{background:T.rowBorder}}/>
+                <p className="text-[10px] font-black uppercase tracking-[0.13em] px-3 pt-0.5 pb-1" style={{color:T.inkFaint}}>Tools</p>
                 {(["ai","chat","format","vault","accounts"] as Tab[]).map(t=>(
                   <NavBtn key={t} t={t} icon={t==="ai"?"🤖":t==="chat"?"💬":t==="format"?"✨":t==="vault"?"📓":"👤"} label={TAB_LABELS[t].replace(/^[^\s]+\s/,"")}/>
                 ))}
               </div>
-              <div className="border-t pt-2.5 px-1" style={{borderColor:"rgba(0,0,0,0.06)"}}>
+              <div className="border-t pt-2.5 px-1" style={{borderColor:T.rowBorder}}>
                 <button onClick={()=>adminLogout().then(()=>{setAuthed(false);setPw("");})}
-                  className="w-full flex items-center gap-2 px-3 py-[7px] rounded-xl text-[13px] font-semibold text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors">
+                  className="w-full flex items-center gap-2 px-3 py-[7px] rounded-xl text-[13px] font-semibold transition-colors"
+                  style={{color:T.inkFaint}}
+                  onMouseEnter={e=>{e.currentTarget.style.color=T.inkSoft;e.currentTarget.style.background=T.inset;}}
+                  onMouseLeave={e=>{e.currentTarget.style.color=T.inkFaint;e.currentTarget.style.background="transparent";}}>
                   ← Sign out
                 </button>
               </div>
@@ -1451,11 +1459,11 @@ function AdminDashboard() {
             {t:"ai",icon:"🤖",label:"AI Training"},{t:"chat",icon:"💬",label:"AI Chat"},{t:"format",icon:"✨",label:"Format"},{t:"vault",icon:"📓",label:"Vault"},{t:"accounts",icon:"👤",label:"Accounts"},
           ];
           return(
-            <div className="md:hidden sticky top-14 z-30 border-b overflow-x-auto flex items-center gap-1.5 px-3 py-2 [&::-webkit-scrollbar]:hidden" style={{background:"white",borderColor:"rgba(0,0,0,0.06)"}}>
+            <div className="md:hidden sticky top-14 z-30 overflow-x-auto flex items-center gap-1.5 px-3 py-2 [&::-webkit-scrollbar]:hidden" style={{background:"rgba(246,246,244,0.92)",backdropFilter:"blur(16px)",borderBottom:`1px solid ${T.border}`}}>
               {all.map(({t,icon,label})=>(
                 <button key={t} onClick={()=>go(t)}
                   className="flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[12px] font-semibold whitespace-nowrap transition-all"
-                  style={tab===t?{background:C.grad12,color:"#fff",boxShadow:"0 2px 8px rgba(157,111,232,0.25)"}:{color:"#6b7280",background:"rgba(0,0,0,0.04)"}}>
+                  style={tab===t?{background:T.action,color:T.actionText,boxShadow:T.shadow}:{color:T.inkSoft,background:T.inset}}>
                   <span className="text-sm leading-none">{icon}</span>
                   <span>{label}</span>
                 </button>
@@ -3169,29 +3177,31 @@ function AdminDashboard() {
             <div className="space-y-6">
               {/* New inquiries section */}
               {pendingOnClients.length>0&&(
-                <div className="rounded-2xl overflow-hidden border" style={{borderColor:"rgba(245,158,11,0.3)",background:"white"}}>
-                  <div className="h-[3px]" style={{background:"linear-gradient(90deg,#f59e0b,#d97706)"}}/>
+                <div className="adm-rise rounded-2xl overflow-hidden" style={{background:T.panel,border:`1px solid ${T.amberBorder}`,boxShadow:T.shadow}}>
                   <div className="p-4">
                     <div className="flex items-center justify-between mb-3">
-                      <p className="text-xs font-black uppercase tracking-widest text-amber-600">📬 New Inquiries — Needs Reply</p>
-                      <button onClick={()=>setTab("inquiries")} className="text-[11px] font-bold text-slate-400 hover:text-slate-600">Open Inquiries tab →</button>
+                      <p className="text-[10px] font-black uppercase tracking-[0.16em] flex items-center gap-1.5" style={{color:T.amber}}>
+                        <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{background:T.amber}}/>
+                        New Inquiries — Needs Reply
+                      </p>
+                      <button onClick={()=>setTab("inquiries")} className="text-[11px] font-bold transition-opacity hover:opacity-70" style={{color:T.inkFaint}}>Open Inquiries tab →</button>
                     </div>
                     <div className="flex flex-col gap-2">
                       {pendingOnClients.map(inq=>(
-                        <div key={inq.id} className="flex items-center gap-3 p-2.5 rounded-xl border" style={{borderColor:"#fef3c7",background:"#fffbeb"}}>
+                        <div key={inq.id} className="flex items-center gap-3 p-2.5 rounded-xl" style={{background:T.amberBg}}>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <p className="text-sm font-bold text-slate-900">{inq.name}</p>
-                              <span className="text-[10px] text-amber-600 font-bold">{hoursAgoClient(inq.created_at)}</span>
+                              <p className="text-sm font-bold" style={{color:T.ink}}>{inq.name}</p>
+                              <span className="text-[10px] font-bold" style={{color:T.amber}}>{hoursAgoClient(inq.created_at)}</span>
                             </div>
-                            <p className="text-xs text-slate-500 truncate">
+                            <p className="text-xs truncate" style={{color:T.inkSoft}}>
                               {inq.session_type||"Session"}{inq.date_in_mind?` · ${inq.date_in_mind}`:""}
                             </p>
-                            <p className="text-[11px] text-slate-400 truncate mt-0.5">{inq.email}</p>
+                            <p className="text-[11px] truncate mt-0.5" style={{color:T.inkFaint}}>{inq.email}</p>
                           </div>
                           <button onClick={()=>setTab("inquiries")}
-                            className="flex-shrink-0 text-[11px] font-bold px-2.5 py-1 rounded-lg text-white"
-                            style={{background:"linear-gradient(135deg,#f59e0b,#d97706)"}}>
+                            className="flex-shrink-0 text-[11px] font-bold px-2.5 py-1 rounded-lg transition-all hover:-translate-y-px"
+                            style={{background:T.action,color:T.actionText}}>
                             Reply →
                           </button>
                         </div>
@@ -3202,9 +3212,8 @@ function AdminDashboard() {
               )}
 
               {/* Search bar */}
-              <div className={card}>
-                <div className="h-[3px]" style={{background:C.grad12}}/>
-                <div className="p-5">
+              <div className="adm-rise rounded-2xl overflow-hidden" style={{background:T.panel,border:`1px solid ${T.border}`,boxShadow:T.shadow,animationDelay:"60ms"}}>
+                <div className="p-4">
                   <div className="flex items-center gap-3 flex-wrap">
                     <div className="flex-1 min-w-[220px]">
                       <input
@@ -3212,21 +3221,23 @@ function AdminDashboard() {
                         value={clientSearch}
                         onChange={e=>setClientSearch(e.target.value)}
                         placeholder="Search by name or email…"
-                        className="w-full px-4 py-2.5 rounded-xl outline-none text-slate-700 text-sm"
-                        style={{border:`1px solid ${C.p1_20}`,background:C.p1_04,fontFamily:"inherit"}}
+                        className="w-full px-4 py-2.5 rounded-xl outline-none text-sm transition-colors"
+                        style={{border:`1px solid ${T.border}`,background:T.panelSolid,color:T.ink,fontFamily:"inherit"}}
+                        onFocus={e=>{e.currentTarget.style.borderColor=T.borderStrong;}}
+                        onBlur={e=>{e.currentTarget.style.borderColor=T.border;}}
                       />
                     </div>
                     <div className="flex items-center gap-3 flex-wrap">
                       {/* Payment filter pills */}
-                      <div className="flex gap-1.5">
+                      <div className="flex gap-1 p-1 rounded-xl" style={{background:T.inset}}>
                         {(["all","paid","unpaid"] as const).map(f=>(
                           <button key={f} onClick={()=>setClientFilter(f)}
                             className="text-[11px] font-bold px-3 py-1 rounded-lg capitalize transition-all"
                             style={clientFilter===f
-                              ?f==="paid"?{background:"rgba(16,185,129,0.15)",color:"#059669"}
-                                :f==="unpaid"?{background:"rgba(148,163,184,0.18)",color:"#64748b"}
-                                :{background:C.grad12,color:"#fff"}
-                              :{background:"rgba(148,163,184,0.1)",color:"#94a3b8"}}>
+                              ?f==="paid"?{background:T.greenBg,color:T.green}
+                                :f==="unpaid"?{background:T.panelSolid,color:T.inkSoft,boxShadow:T.shadow}
+                                :{background:T.action,color:T.actionText}
+                              :{background:"transparent",color:T.inkFaint}}>
                             {f==="paid"?"✓ Paid":f==="unpaid"?"Unpaid":"All"}
                           </button>
                         ))}
@@ -3235,8 +3246,8 @@ function AdminDashboard() {
                       <select
                         value={clientSort}
                         onChange={e=>setClientSort(e.target.value as typeof clientSort)}
-                        className="text-[11px] font-bold px-2.5 py-1 rounded-lg outline-none cursor-pointer"
-                        style={{border:`1px solid ${C.p1_20}`,background:C.p1_04,color:C.p1,fontFamily:"inherit"}}>
+                        className="text-[11px] font-bold px-2.5 py-1.5 rounded-lg outline-none cursor-pointer"
+                        style={{border:`1px solid ${T.border}`,background:T.panelSolid,color:T.inkSoft,fontFamily:"inherit"}}>
                         <option value="recent_activity">Most recent message</option>
                         <option value="paid_recently">Paid recently</option>
                         <option value="newest_inquiry">Newest inquiry</option>
@@ -3244,24 +3255,24 @@ function AdminDashboard() {
                         <option value="session_date">Session date</option>
                         <option value="alpha">A → Z</option>
                       </select>
-                      <p className="text-xs text-slate-400 font-medium">
+                      <p className="text-xs font-medium" style={{color:T.inkFaint}}>
                         {filtered.length} client{filtered.length===1?"":"s"}
                         {q?` matching "${q}"`:""}
                         {" · "}{inquiries.length} total session{inquiries.length===1?"":"s"}
                       </p>
                       <button onClick={syncPayments} disabled={syncLoading}
-                        className="text-xs font-bold px-3 py-1.5 rounded-lg transition-all hover:opacity-80 flex items-center gap-1.5 disabled:opacity-50 flex-shrink-0"
-                        style={{background:"linear-gradient(135deg,#10b981,#059669)",color:"#fff"}}>
+                        className="text-xs font-bold px-3 py-1.5 rounded-lg transition-all hover:-translate-y-px flex items-center gap-1.5 disabled:opacity-50 flex-shrink-0"
+                        style={{background:T.greenBg,color:T.green,border:`1px solid ${T.greenBorder}`}}>
                         {syncLoading?<><span className="animate-spin inline-block">◌</span> Scanning…</>:"💳 Sync Payments"}
                       </button>
                       <button onClick={syncTimeline} disabled={timelineSyncLoading}
-                        className="text-xs font-bold px-3 py-1.5 rounded-lg transition-all hover:opacity-80 flex items-center gap-1.5 disabled:opacity-50 flex-shrink-0"
-                        style={{background:"linear-gradient(135deg,#7c3aed,#6d28d9)",color:"#fff"}}>
+                        className="text-xs font-bold px-3 py-1.5 rounded-lg transition-all hover:-translate-y-px flex items-center gap-1.5 disabled:opacity-50 flex-shrink-0"
+                        style={{background:T.violetBg,color:T.violet,border:`1px solid ${T.violetBorder}`}}>
                         {timelineSyncLoading?<><span className="animate-spin inline-block">◌</span> Syncing…</>:"📬 Sync Timeline"}
                       </button>
                       <button onClick={()=>setAddClientOpen(o=>!o)}
-                        className="text-xs font-bold px-3 py-1.5 rounded-lg transition-all hover:opacity-80 flex items-center gap-1.5 flex-shrink-0"
-                        style={addClientOpen?{background:C.grad12,color:"#fff"}:{background:C.p1_04,color:C.p1,border:`1px solid ${C.p1_20}`}}>
+                        className="text-xs font-bold px-3 py-1.5 rounded-lg transition-all hover:-translate-y-px flex items-center gap-1.5 flex-shrink-0"
+                        style={addClientOpen?{background:T.inset,color:T.inkSoft,border:`1px solid ${T.border}`}:{background:T.action,color:T.actionText,boxShadow:T.shadow}}>
                         {addClientOpen?"✕ Cancel":"+ Add Client"}
                       </button>
                     </div>
@@ -3271,10 +3282,9 @@ function AdminDashboard() {
 
               {/* Add client form */}
               {addClientOpen&&(
-                <div className={card}>
-                  <div className="h-[3px]" style={{background:C.grad12}}/>
+                <div className="adm-rise rounded-2xl overflow-hidden" style={{background:T.panel,border:`1px solid ${T.borderStrong}`,boxShadow:T.shadowHover}}>
                   <div className="p-5 space-y-3">
-                    <p className="text-sm font-black text-slate-900">Add Client from Instagram DM</p>
+                    <p className="text-sm font-black" style={{color:T.ink}}>Add Client from Instagram DM</p>
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <div><label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">Name *</label><input className={inp} placeholder="e.g. Karina Lopez" value={addClientForm.name} onChange={e=>setAddClientForm(f=>({...f,name:e.target.value}))}/></div>
                       <div><label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">Email *</label><input className={inp} type="email" placeholder="e.g. karina@gmail.com" value={addClientForm.email} onChange={e=>setAddClientForm(f=>({...f,email:e.target.value}))}/></div>
@@ -3284,8 +3294,8 @@ function AdminDashboard() {
                       <div className="sm:col-span-2"><label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">Notes</label><textarea className={ta} rows={2} placeholder="Anything from the DM — location, time, vibe, etc." value={addClientForm.message} onChange={e=>setAddClientForm(f=>({...f,message:e.target.value}))}/></div>
                     </div>
                     <button onClick={saveManualClient} disabled={addClientSaving}
-                      className="w-full py-3 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90 active:scale-95"
-                      style={{background:C.grad,opacity:addClientSaving?0.7:1}}>
+                      className="w-full py-3 rounded-xl font-bold text-sm transition-all hover:opacity-90 active:scale-[0.99]"
+                      style={{background:T.action,color:T.actionText,opacity:addClientSaving?0.7:1,boxShadow:T.shadow}}>
                       {addClientSaving?"Adding…":"Add Client →"}
                     </button>
                   </div>
@@ -3294,61 +3304,70 @@ function AdminDashboard() {
 
               {/* Sync result banner */}
               {(syncResult!==null||syncMsg)&&(
-                <div className="rounded-xl px-4 py-3 text-sm"
-                     style={syncResult?.length?{background:"rgba(16,185,129,0.08)",border:"1px solid rgba(16,185,129,0.2)"}:{background:"rgba(148,163,184,0.08)",border:"1px solid rgba(148,163,184,0.2)"}}>
-                  {syncMsg&&<p className="text-slate-500 text-xs">{syncMsg}</p>}
+                <div className="adm-rise rounded-xl px-4 py-3 text-sm"
+                     style={syncResult?.length?{background:T.greenBg,border:`1px solid ${T.greenBorder}`}:{background:T.inset,border:`1px solid ${T.border}`}}>
+                  {syncMsg&&<p className="text-xs" style={{color:T.inkSoft}}>{syncMsg}</p>}
                   {syncResult?.length?(
                     <div className="space-y-1">
-                      <p className="text-xs font-black text-emerald-600 mb-2">✓ {syncResult.length} payment{syncResult.length===1?"":"s"} found — review &amp; approve in the Payments tab</p>
+                      <p className="text-xs font-black mb-2" style={{color:T.green}}>✓ {syncResult.length} payment{syncResult.length===1?"":"s"} found — review &amp; approve in the Payments tab</p>
                       {syncResult.map((r,i)=>(
-                        <div key={i} className="flex items-center gap-3 text-xs text-slate-600 flex-wrap">
+                        <div key={i} className="flex items-center gap-3 text-xs flex-wrap" style={{color:T.inkSoft}}>
                           <span className="font-semibold">{r.name}</span>
-                          {r.email&&<span className="text-slate-400">{r.email}</span>}
-                          {r.amount&&<span className="text-emerald-600 font-bold">{r.amount}</span>}
-                          {r.method&&<span className="text-slate-400">via {r.method}</span>}
-                          {r.paidAt&&<span className="text-slate-400">{new Date(r.paidAt).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}</span>}
-                          {r.paymentType&&r.paymentType!=="deposit_1"&&<span className="text-amber-600 font-semibold capitalize">{r.paymentType.replace("_"," ")}</span>}
-                          {r.orphan&&<span className="text-orange-500 font-bold">no inquiry</span>}
+                          {r.email&&<span style={{color:T.inkFaint}}>{r.email}</span>}
+                          {r.amount&&<span className="font-bold" style={{color:T.green}}>{r.amount}</span>}
+                          {r.method&&<span style={{color:T.inkFaint}}>via {r.method}</span>}
+                          {r.paidAt&&<span style={{color:T.inkFaint}}>{new Date(r.paidAt).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}</span>}
+                          {r.paymentType&&r.paymentType!=="deposit_1"&&<span className="font-semibold capitalize" style={{color:T.amber}}>{r.paymentType.replace("_"," ")}</span>}
+                          {r.orphan&&<span className="font-bold" style={{color:T.red}}>no inquiry</span>}
                         </div>
                       ))}
                     </div>
                   ):syncResult?.length===0&&!syncMsg?(
-                    <p className="text-slate-500 text-xs">No new Pixieset payments found in Gmail.</p>
+                    <p className="text-xs" style={{color:T.inkSoft}}>No new Pixieset payments found in Gmail.</p>
                   ):null}
                 </div>
               )}
 
               {/* Client cards */}
               {inquiriesLoading?(
-                <div className="text-center py-12 text-slate-400 text-sm">Loading clients…</div>
+                <div className="text-center py-12 text-sm" style={{color:T.inkFaint}}>Loading clients…</div>
               ):filtered.length===0?(
-                <div className="text-center py-12 text-slate-400 text-sm">{q?"No clients match that search.":"No clients yet."}</div>
+                <div className="text-center py-12 text-sm" style={{color:T.inkFaint}}>{q?"No clients match that search.":"No clients yet."}</div>
               ):(
                 <div className="space-y-3">
-                  {filtered.map(client=>{
+                  {filtered.map((client,cardIdx)=>{
                     const paid=client.sessions.some(s=>s.payment_status==="paid");
+                    const initials=(()=>{const parts=client.name.trim().split(/\s+/);return parts.length>=2?(parts[0][0]+parts[parts.length-1][0]).toUpperCase():(client.name[0]??"?").toUpperCase();})();
                     return(
-                      <div key={client.email} className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
-                        <div className="h-[3px]" style={{background:paid?"linear-gradient(90deg,#10b981,#34d399)":C.grad12}}/>
+                      <div key={client.email} className="adm-rise rounded-2xl overflow-hidden transition-all duration-200 hover:-translate-y-0.5"
+                           style={{background:T.panel,border:`1px solid ${T.border}`,boxShadow:T.shadow,animationDelay:`${Math.min(cardIdx,8)*40}ms`}}
+                           onMouseEnter={e=>{e.currentTarget.style.boxShadow=T.shadowHover;e.currentTarget.style.borderColor=T.borderStrong;}}
+                           onMouseLeave={e=>{e.currentTarget.style.boxShadow=T.shadow;e.currentTarget.style.borderColor=T.border;}}>
                         <div className="p-5">
                           {/* Client header */}
                           <div className="flex items-start justify-between gap-3 flex-wrap mb-4">
-                            <div>
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <button className="text-base font-black text-slate-900 cursor-pointer select-none hover:opacity-70 transition-opacity text-left" title="View client profile" onClick={()=>{const latest=client.sessions.slice().sort((a,b)=>new Date(b.created_at).getTime()-new Date(a.created_at).getTime())[0];if(latest)router.push(`/admin/conversation/${latest.id}`)}}>{client.name}</button>
-                                {paid&&(
-                                  <span className="text-[10px] font-black px-2 py-0.5 rounded-lg"
-                                        style={{background:"rgba(16,185,129,0.12)",color:"#059669"}}>
-                                    Paid ✓
-                                  </span>
-                                )}
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-black flex-shrink-0"
+                                   style={{background:paid?T.greenBg:T.insetStrong,color:paid?T.green:T.ink,border:`1px solid ${paid?T.greenBorder:T.border}`}}>
+                                {initials}
                               </div>
-                              <div className="flex gap-3 mt-0.5 flex-wrap">
-                                <a href={`mailto:${client.email}`} className="text-xs hover:underline font-medium" style={{color:C.p1}}>{client.email}</a>
-                                {client.phone&&<a href={`tel:${client.phone}`} className="text-xs text-slate-400 hover:underline">{client.phone}</a>}
+                              <div>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <button className="text-base font-black cursor-pointer select-none hover:opacity-70 transition-opacity text-left" style={{color:T.ink}} title="View client profile" onClick={()=>{const latest=client.sessions.slice().sort((a,b)=>new Date(b.created_at).getTime()-new Date(a.created_at).getTime())[0];if(latest)router.push(`/admin/conversation/${latest.id}`)}}>{client.name}</button>
+                                  {paid&&(
+                                    <span className="text-[10px] font-black px-2 py-0.5 rounded-full"
+                                          style={{background:T.greenBg,color:T.green}}>
+                                      Paid ✓
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex gap-3 mt-0.5 flex-wrap">
+                                  <a href={`mailto:${client.email}`} className="text-xs hover:underline font-medium" style={{color:T.blue}}>{client.email}</a>
+                                  {client.phone&&<a href={`tel:${client.phone}`} className="text-xs hover:underline" style={{color:T.inkFaint}}>{client.phone}</a>}
+                                </div>
                               </div>
                             </div>
-                            <span className="text-xs text-slate-400 font-medium flex-shrink-0">
+                            <span className="text-xs font-medium flex-shrink-0" style={{color:T.inkFaint}}>
                               {client.sessions.length} session{client.sessions.length===1?"":"s"}
                             </span>
                           </div>
@@ -3369,7 +3388,7 @@ function AdminDashboard() {
                               return(
                               <div key={s.id}
                                    className="px-3 py-2.5 rounded-xl"
-                                   style={{background:"rgba(148,163,184,0.06)",border:"1px solid rgba(148,163,184,0.12)"}}>
+                                   style={{background:T.inset,border:`1px solid ${T.rowBorder}`}}>
                                 <div className="flex items-center gap-3 flex-wrap">
                                   <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2 flex-wrap">
@@ -3383,85 +3402,81 @@ function AdminDashboard() {
                                       ):(
                                         <button
                                           onClick={()=>setEditingSessionType(s.id)}
-                                          className="text-xs font-semibold text-slate-700 hover:text-violet-600 transition-colors group flex items-center gap-1"
+                                          className="text-xs font-semibold transition-colors group flex items-center gap-1"
+                                          style={{color:T.ink}}
                                           title="Edit session type">
-                                          {s.session_type||<span className="text-slate-300 italic">No session type</span>}
-                                          <span className="opacity-0 group-hover:opacity-100 text-[9px] text-slate-400 transition-opacity">✏️</span>
+                                          {s.session_type||<span className="italic" style={{color:T.inkFaint}}>No session type</span>}
+                                          <span className="opacity-0 group-hover:opacity-100 text-[9px] transition-opacity" style={{color:T.inkFaint}}>✏️</span>
                                         </button>
                                       )}
-                                      {s.date_in_mind&&!s.session_date&&<span className="text-xs text-slate-400">{s.date_in_mind}</span>}
-                                      {s.session_date&&<span className="text-xs font-bold text-emerald-600">{new Date(s.session_date+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}{s.preferred_time?` · ${fmt12h(s.preferred_time)}`:""}</span>}
+                                      {s.date_in_mind&&!s.session_date&&<span className="text-xs" style={{color:T.inkFaint}}>{s.date_in_mind}</span>}
+                                      {s.session_date&&<span className="text-xs font-bold" style={{color:T.green}}>{new Date(s.session_date+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}{s.preferred_time?` · ${fmt12h(s.preferred_time)}`:""}</span>}
                                     </div>
-                                    <p className="text-[11px] text-slate-400 mt-0.5 truncate">{s.message.slice(0,80)}{s.message.length>80?"…":""}</p>
+                                    <p className="text-[11px] mt-0.5 truncate" style={{color:T.inkFaint}}>{s.message.slice(0,80)}{s.message.length>80?"…":""}</p>
                                     {(s.deposit_paid_at||s.invoice_sent_at||s.contract_sent_at||s.confirmation_sent_at||s.gallery_delivered_at)&&(
                                       <div className="flex flex-wrap gap-1 mt-1">
-                                        {s.invoice_sent_at&&<span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full" style={{background:"rgba(99,102,241,0.1)",color:"#6366f1"}}>📄 Invoice {new Date(s.invoice_sent_at).toLocaleDateString("en-US",{month:"short",day:"numeric"})}</span>}
-                                        {s.contract_sent_at&&<span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full" style={{background:"rgba(139,92,246,0.1)",color:"#7c3aed"}}>📝 Contract {new Date(s.contract_sent_at).toLocaleDateString("en-US",{month:"short",day:"numeric"})}</span>}
-                                        {s.deposit_paid_at&&<span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full inline-flex items-center gap-1" style={{background:"rgba(16,185,129,0.12)",color:"#059669"}}>💳 Paid {new Date(s.deposit_paid_at).toLocaleDateString("en-US",{month:"short",day:"numeric"})}{s.confirmation_sent_at?<span style={{color:"#059669"}}>· ✉ Confirmed</span>:<span style={{color:"#d97706"}}>· ✉ Not confirmed</span>}</span>}
-                                        {s.gallery_delivered_at&&<span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full" style={{background:"rgba(251,146,60,0.12)",color:"#ea580c"}}>🖼 Gallery {new Date(s.gallery_delivered_at).toLocaleDateString("en-US",{month:"short",day:"numeric"})}</span>}
+                                        {s.invoice_sent_at&&<span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full" style={{background:T.blueBg,color:T.blue}}>📄 Invoice {new Date(s.invoice_sent_at).toLocaleDateString("en-US",{month:"short",day:"numeric"})}</span>}
+                                        {s.contract_sent_at&&<span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full" style={{background:T.violetBg,color:T.violet}}>📝 Contract {new Date(s.contract_sent_at).toLocaleDateString("en-US",{month:"short",day:"numeric"})}</span>}
+                                        {s.deposit_paid_at&&<span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full inline-flex items-center gap-1" style={{background:T.greenBg,color:T.green}}>💳 Paid {new Date(s.deposit_paid_at).toLocaleDateString("en-US",{month:"short",day:"numeric"})}{s.confirmation_sent_at?<span style={{color:T.green}}>· ✉ Confirmed</span>:<span style={{color:T.amber}}>· ✉ Not confirmed</span>}</span>}
+                                        {s.gallery_delivered_at&&<span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full" style={{background:T.amberBg,color:T.amber}}>🖼 Gallery {new Date(s.gallery_delivered_at).toLocaleDateString("en-US",{month:"short",day:"numeric"})}</span>}
                                       </div>
                                     )}
                                   </div>
                                   <div className="flex items-center gap-2 flex-shrink-0">
                                     {/* Payment badge */}
-                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg"
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
                                           style={s.payment_status==="paid"
-                                            ?{background:"rgba(16,185,129,0.12)",color:"#059669"}
-                                            :{background:"rgba(148,163,184,0.12)",color:"#94a3b8"}}>
+                                            ?{background:T.greenBg,color:T.green}
+                                            :{background:T.neutralBg,color:T.inkFaint}}>
                                       {s.payment_status==="paid"?"Paid":"Unpaid"}
                                     </span>
                                     {/* Status picker */}
                                     <div className="relative group">
-                                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg cursor-pointer hover:opacity-80 transition-opacity"
-                                            style={s.status==="new"
-                                              ?{background:"rgba(16,185,129,0.1)",color:"#10b981"}
-                                              :s.status==="responded"
-                                                ?{background:"rgba(59,130,246,0.1)",color:"#3b82f6"}
-                                                :s.status==="not_interested"
-                                                  ?{background:"rgba(239,68,68,0.1)",color:"#ef4444"}
-                                                  :{background:"rgba(148,163,184,0.1)",color:"#94a3b8"}}>
+                                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full cursor-pointer hover:opacity-80 transition-opacity"
+                                            style={{background:INQ_STATUS[(s.status==="new"||s.status==="responded"||s.status==="not_interested")?s.status:"archived"].bg,color:INQ_STATUS[(s.status==="new"||s.status==="responded"||s.status==="not_interested")?s.status:"archived"].color}}>
                                         {s.status==="new"?"● New":s.status==="responded"?"✓ Replied":s.status==="not_interested"?"✕ Not Int.":"○ Archive"} ▾
                                       </span>
-                                      <div className="absolute right-0 top-full mt-1 z-20 hidden group-hover:flex flex-col gap-0.5 bg-white rounded-xl shadow-lg border border-slate-100 p-1.5 min-w-[120px]">
+                                      <div className="absolute right-0 top-full mt-1 z-20 hidden group-hover:flex flex-col gap-0.5 rounded-xl p-1.5 min-w-[130px]"
+                                           style={{background:T.panelSolid,border:`1px solid ${T.border}`,boxShadow:T.shadowHover}}>
                                         {(["new","responded","archived","not_interested"] as const).map(st=>(
                                           <button key={st}
                                             onClick={e=>{e.stopPropagation();updateInquiryStatus(s.id,st);}}
                                             className="text-left text-[11px] font-bold px-2.5 py-1 rounded-lg transition-all hover:opacity-80"
                                             style={s.status===st
-                                              ?{background:st==="new"?"rgba(16,185,129,0.15)":st==="responded"?"rgba(59,130,246,0.12)":st==="not_interested"?"rgba(239,68,68,0.15)":"rgba(148,163,184,0.15)",color:st==="new"?"#10b981":st==="responded"?"#3b82f6":st==="not_interested"?"#ef4444":"#94a3b8"}
-                                              :{background:"transparent",color:"#64748b"}}>
+                                              ?{background:INQ_STATUS[st].bg,color:INQ_STATUS[st].color}
+                                              :{background:"transparent",color:T.inkSoft}}>
                                             {st==="new"?"● New":st==="responded"?"✓ Replied":st==="not_interested"?"✕ Not Interested":"○ Archive"}
                                           </button>
                                         ))}
                                       </div>
                                     </div>
                                     <a href={`/admin/conversation/${s.id}`}
-                                       className="text-[11px] font-black px-2.5 py-1 rounded-lg transition-all hover:opacity-80"
-                                       style={{background:C.grad12,color:"#fff"}}>
+                                       className="text-[11px] font-black px-2.5 py-1 rounded-lg transition-all hover:opacity-85"
+                                       style={{background:T.action,color:T.actionText}}>
                                       Open →
                                     </a>
                                     {/* Delete duplicate */}
                                     {inquiryDeleteConfirm===s.id?(
                                       <span className="flex items-center gap-1">
-                                        <span className="text-[10px] text-slate-500">Delete?</span>
-                                        <button onClick={()=>deleteInquiry(s.id)} className="text-[10px] font-black px-2 py-0.5 rounded-lg bg-red-500 text-white">Yes</button>
-                                        <button onClick={()=>setInquiryDeleteConfirm(null)} className="text-[10px] font-black px-2 py-0.5 rounded-lg bg-slate-200 text-slate-600">No</button>
+                                        <span className="text-[10px]" style={{color:T.inkSoft}}>Delete?</span>
+                                        <button onClick={()=>deleteInquiry(s.id)} className="text-[10px] font-black px-2 py-0.5 rounded-lg" style={{background:T.red,color:T.actionText}}>Yes</button>
+                                        <button onClick={()=>setInquiryDeleteConfirm(null)} className="text-[10px] font-black px-2 py-0.5 rounded-lg" style={{background:T.neutralBg,color:T.inkSoft}}>No</button>
                                       </span>
                                     ):(
                                       <button onClick={()=>setInquiryDeleteConfirm(s.id)}
                                         className="text-[11px] px-2 py-0.5 rounded-lg transition-all hover:opacity-80"
-                                        style={{background:"rgba(239,68,68,0.08)",color:"#ef4444"}}
+                                        style={{background:T.redBg,color:T.red}}
                                         title="Delete duplicate inquiry">
                                         🗑
                                       </button>
                                     )}
                                   </div>
                                 </div>
-                                <div className="mt-3 rounded-xl border p-3" style={{background:"rgba(255,255,255,0.8)",borderColor:"rgba(139,92,246,0.14)"}}>
+                                <div className="mt-3 rounded-xl p-3" style={{background:T.panelSolid,border:`1px solid ${T.violetBorder}`}}>
                                   <div className="flex items-center justify-between gap-3 flex-wrap">
                                     <div>
-                                      <p className="text-[10px] font-black uppercase tracking-widest" style={{color:C.p1}}>Client Portal Progress</p>
-                                      <p className="mt-1 text-[11px] text-slate-400">
+                                      <p className="text-[10px] font-black uppercase tracking-[0.16em]" style={{color:T.violet}}>Client Portal Progress</p>
+                                      <p className="mt-1 text-[11px]" style={{color:T.inkFaint}}>
                                         {portalSessionsLoading
                                           ?"Loading portal state..."
                                           :portalSession
@@ -3471,7 +3486,7 @@ function AdminDashboard() {
                                     </div>
                                     {portalAmbiguous&&(
                                       <a href="/admin/sessions" className="text-[11px] font-black px-2.5 py-1 rounded-lg"
-                                         style={{background:C.p1_04,color:C.p1,border:`1px solid ${C.p1_20}`}}>
+                                         style={{background:T.violetBg,color:T.violet,border:`1px solid ${T.violetBorder}`}}>
                                         Open Client Sessions →
                                       </a>
                                     )}
