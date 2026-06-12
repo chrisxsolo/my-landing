@@ -224,26 +224,36 @@ export default function AboutPhotosTab({ showToast }: Props) {
                   disabled={busy}
                 />
 
-                {/* File input */}
+                {/* Hidden file input — opened by the photo button below */}
                 <input
                   ref={(el) => { fileRefs.current[fact.slug] = el; }}
                   type="file"
                   accept={ALLOWED_ADMIN_PHOTO_TYPES.join(",")}
                   onChange={(e) => setFileDrafts((prev) => ({ ...prev, [fact.slug]: e.target.files?.[0] ?? null }))}
-                  className="block text-sm text-slate-600 mb-3"
+                  className="hidden"
                   disabled={busy}
                 />
 
-                {/* Action buttons */}
-                <div className="flex flex-wrap gap-2">
+                {/* Action buttons. The photo button is two-step: no file selected
+                    yet → opens the picker; file selected → uploads it. */}
+                <div className="flex flex-wrap items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => handleUpload(fact.slug)}
-                    disabled={busy || !fileVal}
+                    onClick={() => {
+                      if (fileVal) handleUpload(fact.slug);
+                      else fileRefs.current[fact.slug]?.click();
+                    }}
+                    disabled={busy}
                     className="inline-flex items-center rounded-lg bg-emerald-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50"
                   >
-                    {busy ? "Saving…" : hasPhoto ? "Replace photo" : "Upload photo"}
+                    {busy ? "Saving…" : fileVal ? "Upload photo" : hasPhoto ? "Replace photo…" : "Choose photo…"}
                   </button>
+
+                  {fileVal && !busy && (
+                    <span className="text-xs text-slate-500 font-mono truncate max-w-[180px]" title={fileVal.name}>
+                      {fileVal.name}
+                    </span>
+                  )}
 
                   {hasPhoto && (
                     <button
