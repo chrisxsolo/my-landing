@@ -55,12 +55,26 @@ export default function ClientTimeline({ inq, onUpdate }: Props) {
     if (!step.dateField || step.key === "created_at" || step.key === "session_date") return;
     const field = step.dateField as string;
     const alreadyDone = inq[step.dateField] !== null;
-    const newVal = alreadyDone ? null : new Date().toISOString();
+
+    // Marking a step done implies every earlier stage happened too — backfill
+    // any unfinished toggleable steps before it in the same save. Un-marking
+    // only clears the clicked step.
+    const patch: Record<string, string | null> = {};
+    if (alreadyDone) {
+      patch[field] = null;
+    } else {
+      const ts = new Date().toISOString();
+      const stepIdx = STEPS.findIndex(s => s.key === step.key);
+      STEPS.slice(0, stepIdx + 1).forEach(s => {
+        if (!s.dateField || s.key === "created_at" || s.key === "session_date") return;
+        if (inq[s.dateField] === null) patch[s.dateField as string] = ts;
+      });
+    }
 
     setSaving(field);
     try {
-      await updateAdminInquiry(inq.id, { [field]: newVal });
-      onUpdate({ [field]: newVal } as Partial<TimelineInquiry>);
+      await updateAdminInquiry(inq.id, patch);
+      onUpdate(patch as Partial<TimelineInquiry>);
     } catch (error) {
       console.error("[ClientTimeline] update failed:", error);
     } finally {

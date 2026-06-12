@@ -275,7 +275,7 @@ function AdminDashboard() {
 
   // ── Clients ───────────────────────────────────────────────────────────────
   const [clientSearch,setClientSearch]=useState("");
-  const [clientFilter,setClientFilter]=useState<"all"|"paid"|"unpaid">("all");
+  const [clientFilter,setClientFilter]=useState<"all"|"in_progress"|"delivered"|"paid"|"unpaid">("all");
   const [clientSort,setClientSort]=useState<"recent_activity"|"newest_inquiry"|"oldest_inquiry"|"session_date"|"alpha"|"paid_recently">("recent_activity");
   const [inquirySort,setInquirySort]=useState<"needs_reply"|"newest"|"oldest"|"session_date"|"alpha"|"paid_recently">("needs_reply");
   const [inquiryFilter,setInquiryFilter]=useState<"all"|"needs_reply"|"new"|"responded"|"archived"|"not_interested">("all");
@@ -3352,10 +3352,22 @@ function AdminDashboard() {
             return nearestSessionDate(a.sessions)-nearestSessionDate(b.sessions);
           });
           const q=clientSearch.toLowerCase().trim();
+          // Pipeline state per client: a session is "done" once its gallery is
+          // delivered; it's "in progress" while active (not archived/declined)
+          // and not yet delivered.
+          const sessionDone=(s:Inquiry)=>!!s.gallery_delivered_at;
+          const sessionInProgress=(s:Inquiry)=>!sessionDone(s)&&s.status!=="archived"&&s.status!=="not_interested";
+          const clientInProgress=(c:{sessions:Inquiry[]})=>c.sessions.some(sessionInProgress);
+          const clientDelivered=(c:{sessions:Inquiry[]})=>c.sessions.some(sessionDone)&&!clientInProgress(c);
           const filtered=clients.filter(c=>{
             const matchesSearch=!q||c.name.toLowerCase().includes(q)||c.email.toLowerCase().includes(q);
             const hasPaid=c.sessions.some(s=>s.payment_status==="paid");
-            const matchesFilter=clientFilter==="all"||(clientFilter==="paid"&&hasPaid)||(clientFilter==="unpaid"&&!hasPaid);
+            const matchesFilter=
+              clientFilter==="all"||
+              (clientFilter==="paid"&&hasPaid)||
+              (clientFilter==="unpaid"&&!hasPaid)||
+              (clientFilter==="in_progress"&&clientInProgress(c))||
+              (clientFilter==="delivered"&&clientDelivered(c));
             return matchesSearch&&matchesFilter;
           });
           const pendingOnClients=inquiries.filter(i=>!i.reply_sent_at&&i.status!=="archived"&&i.status!=="not_interested"&&i.status!=="responded"&&i.status!=="manual").sort((a,b)=>new Date(b.created_at).getTime()-new Date(a.created_at).getTime());
@@ -3419,17 +3431,19 @@ function AdminDashboard() {
                       />
                     </div>
                     <div className="flex items-center gap-3 flex-wrap">
-                      {/* Payment filter pills */}
-                      <div className="flex gap-1 p-1 rounded-xl" style={{background:T.inset}}>
-                        {(["all","paid","unpaid"] as const).map(f=>(
+                      {/* Pipeline + payment filter pills */}
+                      <div className="flex gap-1 p-1 rounded-xl flex-wrap" style={{background:T.inset}}>
+                        {(["all","in_progress","delivered","paid","unpaid"] as const).map(f=>(
                           <button key={f} onClick={()=>setClientFilter(f)}
-                            className="text-[11px] font-bold px-3 py-1 rounded-lg capitalize transition-all"
+                            className="text-[11px] font-bold px-3 py-1 rounded-lg transition-all whitespace-nowrap"
                             style={clientFilter===f
-                              ?f==="paid"?{background:T.greenBg,color:T.green}
+                              ?f==="paid"?{background:T.blueBg,color:T.blue}
                                 :f==="unpaid"?{background:T.panelSolid,color:T.inkSoft,boxShadow:T.shadow}
+                                :f==="in_progress"?{background:T.amberBg,color:T.amber}
+                                :f==="delivered"?{background:T.greenBg,color:T.green}
                                 :{background:T.action,color:T.actionText}
                               :{background:"transparent",color:T.inkFaint}}>
-                            {f==="paid"?"✓ Paid":f==="unpaid"?"Unpaid":"All"}
+                            {f==="all"?"All":f==="in_progress"?"● In Progress":f==="delivered"?"✓ Delivered":f==="paid"?"$ Paid":"Unpaid"}
                           </button>
                         ))}
                       </div>
@@ -3558,6 +3572,17 @@ function AdminDashboard() {
                                       Paid ✓
                                     </span>
                                   )}
+                                  {clientDelivered(client)?(
+                                    <span className="text-[10px] font-black px-2 py-0.5 rounded-full"
+                                          style={{background:T.greenBg,color:T.green,border:`1px solid ${T.greenBorder}`}}>
+                                      ✓ Delivered
+                                    </span>
+                                  ):clientInProgress(client)?(
+                                    <span className="text-[10px] font-black px-2 py-0.5 rounded-full"
+                                          style={{background:T.amberBg,color:T.amber}}>
+                                      ● In Progress
+                                    </span>
+                                  ):null}
                                 </div>
                                 <div className="flex gap-3 mt-0.5 flex-wrap">
                                   <a href={`mailto:${client.email}`} className="text-xs hover:underline font-medium" style={{color:T.blue}}>{client.email}</a>
