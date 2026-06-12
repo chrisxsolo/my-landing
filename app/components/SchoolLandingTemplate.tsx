@@ -3,6 +3,7 @@ import Link from "next/link";
 import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
 import { PRICING_CATALOG, getGraduationTravelNote } from "@/lib/pricingCatalog";
 import SchoolLandingDetails from "./SchoolLandingDetails";
+import SchoolGallery from "./SchoolGallery";
 
 // ── TYPES ─────────────────────────────────────────────────────────────────────
 
@@ -196,6 +197,13 @@ const CSS = `
     line-height: 1.6;
   }
 
+  /* Gallery */
+  .school-gallery {
+    background: #ffffff;
+    padding: 80px 0 88px;
+    border-top: 1px solid rgba(18,24,22,0.06);
+  }
+
   /* Info row */
   .school-info {
     background: #ffffff;
@@ -362,6 +370,8 @@ export default function SchoolLandingTemplate({ data }: { data: SchoolLandingDat
         sessionNote={data.sessionNote}
         spots={data.spots}
       />
+
+      <SchoolGallery slug={data.slug} school={data.schoolShort} />
 
       {/* ── CTA ───────────────────────────────────────────────────────────────── */}
       <section className="school-cta">

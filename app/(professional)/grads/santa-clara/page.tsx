@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import SchoolLandingTemplate, { buildSchoolMetadata, type SchoolLandingData } from "@/app/components/SchoolLandingTemplate";
 
+export const revalidate = 3600; // hourly ISR backstop; publish revalidates /grads/<slug> directly
+
 const data: SchoolLandingData = {
   school: "Santa Clara University",
   schoolShort: "Santa Clara",
