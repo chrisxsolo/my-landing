@@ -2,7 +2,6 @@
 
 import { useState, useMemo } from "react"
 import Link from "next/link"
-import { C } from "@/lib/colors"
 import {
   COUPLES_PACKAGES,
   COUPLES_LOCATIONS,
@@ -12,55 +11,12 @@ import {
   type CouplesLocationValue,
 } from "@/lib/pricing"
 import { BOOKING_POLICY, PRICING_CATALOG } from "@/lib/pricingCatalog"
+import styles from "@/app/components/RateEstimator.module.css"
 
 const couplesPricing = PRICING_CATALOG.couples
 
-// ── SHARED STYLE HELPERS ──────────────────────────────────────────────────────
-
-const toggleStyle = (on: boolean): React.CSSProperties => ({
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 6,
-  padding: "9px 18px",
-  borderRadius: 999,
-  border: `1.5px solid ${on ? C.p1 : C.warmEdge}`,
-  background: on ? C.p1_08 : "transparent",
-  color: on ? C.p1 : "#4b5a55",
-  fontSize: 14,
-  fontWeight: on ? 600 : 400,
-  cursor: "pointer",
-  transition: "all 0.15s ease",
-  userSelect: "none",
-})
-
-const SELECT_STYLE: React.CSSProperties = {
-  width: "100%",
-  padding: "11px 14px",
-  borderRadius: 10,
-  border: `1.5px solid ${C.warmEdge}`,
-  background: "#fff",
-  fontSize: 15,
-  color: "#101412",
-  cursor: "pointer",
-  appearance: "none",
-  WebkitAppearance: "none",
-  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b7280' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E")`,
-  backgroundRepeat: "no-repeat",
-  backgroundPosition: "right 14px center",
-  paddingRight: 36,
-}
-
-const LABEL_STYLE: React.CSSProperties = {
-  display: "block",
-  fontSize: 12,
-  fontWeight: 700,
-  color: "#4b5a55",
-  letterSpacing: "0.07em",
-  textTransform: "uppercase",
-  marginBottom: 8,
-}
-
-// ── COMPONENT ─────────────────────────────────────────────────────────────────
+// Styles live in RateEstimator.module.css — shared with GraduationRateEstimator
+// and matched to the pricing detail-page design system (Pricing.module.css).
 
 export default function CouplesRateEstimator() {
   const [packageKey, setPackageKey]     = useState<CouplesPackageKey>("1hr")
@@ -99,37 +55,30 @@ export default function CouplesRateEstimator() {
   const showTravelNote = estimate.travelMethod === "tbd" || estimate.travelMethod === "flat"
 
   return (
-    <section style={{ maxWidth: 860, margin: "0 auto" }}>
+    <section className={styles.estimator}>
 
       {/* ── INTRO ─────────────────────────────────────────────────────────── */}
-      <div style={{ textAlign: "center", marginBottom: 36 }}>
-        <p style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: C.p1, marginBottom: 10 }}>
-          Session Estimator
-        </p>
-        <h2 style={{ fontSize: 26, fontWeight: 700, color: "#101412", margin: "0 0 12px", lineHeight: 1.3 }}>
+      <div className={styles.estimatorHeader}>
+        <p className={styles.estimatorKicker}>Session estimator</p>
+        <h2 className={styles.estimatorHeading}>
           Want a quick estimate before reaching out?
         </h2>
-        <p style={{ fontSize: 15, color: "#4b5a55", maxWidth: 500, margin: "0 auto", lineHeight: 1.65 }}>
+        <p className={styles.estimatorCopy}>
           Pick your session type, location, and any add-ons to get a rough idea of what your couples session will cost.
           No commitment — just clarity before you inquire.
         </p>
       </div>
 
       {/* ── CARD WRAPPER ─────────────────────────────────────────────────── */}
-      <div style={{
-        background: C.surfaceSoft,
-        borderRadius: 20,
-        padding: "40px 36px 36px",
-        border: `1px solid ${C.warmEdge}`,
-      }}>
+      <div className={styles.estimatorCard}>
 
         {/* ── INPUTS ──────────────────────────────────────────────────────── */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 20, marginBottom: 28 }}>
+        <div className={styles.estimatorInputs}>
 
           <div>
-            <label style={LABEL_STYLE}>Session Type</label>
+            <label className={styles.estimatorLabel}>Session Type</label>
             <select
-              style={SELECT_STYLE}
+              className={styles.estimatorSelect}
               value={packageKey}
               onChange={e => setPackageKey(e.target.value as CouplesPackageKey)}
             >
@@ -144,9 +93,9 @@ export default function CouplesRateEstimator() {
           </div>
 
           <div>
-            <label style={LABEL_STYLE}>Location / Area</label>
+            <label className={styles.estimatorLabel}>Location / Area</label>
             <select
-              style={SELECT_STYLE}
+              className={styles.estimatorSelect}
               value={location}
               onChange={e => setLocation(e.target.value as CouplesLocationValue)}
             >
@@ -159,83 +108,66 @@ export default function CouplesRateEstimator() {
         </div>
 
         {/* ── ADD-ONS ─────────────────────────────────────────────────────── */}
-        <div style={{ marginBottom: 32 }}>
-          <label style={{ ...LABEL_STYLE, marginBottom: 12 }}>Add-ons</label>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-            <button style={toggleStyle(extraLocation)}  onClick={() => setExtraLoc(v => !v)}>
+        <div className={styles.estimatorAddons}>
+          <label className={styles.estimatorLabel}>Add-ons</label>
+          <div className={styles.estimatorToggleRow}>
+            <button className={styles.estimatorToggle} data-on={extraLocation}  onClick={() => setExtraLoc(v => !v)}>
               {extraLocation ? "✓ " : ""}{couplesPricing.addOns.extraLocation.shortLabel} +{formatCurrency(couplesPricing.addOns.extraLocation.price)}
             </button>
-            <button style={toggleStyle(extraOutfit)}    onClick={() => setExtraOutfit(v => !v)}>
+            <button className={styles.estimatorToggle} data-on={extraOutfit}    onClick={() => setExtraOutfit(v => !v)}>
               {extraOutfit ? "✓ " : ""}{couplesPricing.addOns.extraOutfit.shortLabel} +{formatCurrency(couplesPricing.addOns.extraOutfit.price)}
             </button>
-            <button style={toggleStyle(extra30Min)}     onClick={() => setExtra30Min(v => !v)}>
+            <button className={styles.estimatorToggle} data-on={extra30Min}     onClick={() => setExtra30Min(v => !v)}>
               {extra30Min ? "✓ " : ""}{couplesPricing.addOns.extra30Minutes.shortLabel} +{formatCurrency(couplesPricing.addOns.extra30Minutes.price)}
             </button>
-            <button style={toggleStyle(proofingGallery)} onClick={() => setProofing(v => !v)}>
+            <button className={styles.estimatorToggle} data-on={proofingGallery} onClick={() => setProofing(v => !v)}>
               {proofingGallery ? "✓ " : ""}{couplesPricing.addOns.proofingGallery.shortLabel} +{formatCurrency(couplesPricing.addOns.proofingGallery.price)}
             </button>
-            <button style={toggleStyle(rushPreview)}    onClick={() => setRushPreview(v => !v)}>
+            <button className={styles.estimatorToggle} data-on={rushPreview}    onClick={() => setRushPreview(v => !v)}>
               {rushPreview ? "✓ " : ""}{couplesPricing.addOns.rushPreview.shortLabel} +{formatCurrency(couplesPricing.addOns.rushPreview.price)}
             </button>
-            <button style={toggleStyle(expedited)}      onClick={() => setExpedited(v => !v)}>
+            <button className={styles.estimatorToggle} data-on={expedited}      onClick={() => setExpedited(v => !v)}>
               {expedited ? "✓ " : ""}{couplesPricing.addOns.expedited.shortLabel} +{formatCurrency(couplesPricing.addOns.expedited.price)}
             </button>
           </div>
         </div>
 
         {/* ── ESTIMATE RESULT ─────────────────────────────────────────────── */}
-        <div style={{
-          background: "#fff",
-          border: `1.5px solid ${C.warmEdge}`,
-          borderRadius: 16,
-          padding: "28px 28px 24px",
-          marginBottom: 10,
-        }}>
+        <div className={styles.estimatorResult}>
 
           {/* Deposit-first hero number */}
-          <div style={{ marginBottom: 20 }}>
-            <p style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: C.p1, marginBottom: 6 }}>
-              Reserve your date with
-            </p>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
-              <span style={{ fontSize: 42, fontWeight: 800, color: "#101412", lineHeight: 1 }}>
+          <div>
+            <p className={styles.estimatorLabel}>Reserve your date with</p>
+            <div className={styles.estimatorDeposit}>
+              <span className={styles.estimatorDepositAmount}>
                 {formatCurrency(estimate.deposit)}
               </span>
-              <span style={{ fontSize: 15, color: "#667f79" }}>{BOOKING_POLICY.retainerRefundability} retainer</span>
+              <span className={styles.estimatorDepositUnit}>{BOOKING_POLICY.retainerRefundability} retainer</span>
             </div>
-            <p style={{ fontSize: 13, color: "#667f79", marginTop: 6 }}>
+            <p className={styles.estimatorDepositMeta}>
               {formatCurrency(estimate.remainingBalance)} remaining balance due {BOOKING_POLICY.remainingBalanceDeadline}
             </p>
           </div>
 
           {/* Divider */}
-          <div style={{ borderTop: `1px solid ${C.warmEdge}`, margin: "20px 0" }} />
+          <div className={styles.estimatorDivider} />
 
           {/* Breakdown */}
-          <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#4b5a55", marginBottom: 12 }}>
-            Estimate Breakdown
-          </p>
+          <p className={styles.estimatorLabel}>Estimate Breakdown</p>
           <BreakdownRow label="Session Fee" value={formatCurrency(estimate.sessionBase)} />
           <BreakdownRow label="Travel Fee"  value={travelDisplay} />
           {estimate.addons > 0 && <BreakdownRow label="Add-ons" value={formatCurrency(estimate.addons)} />}
 
           {/* Total line */}
-          <div style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "baseline",
-            marginTop: 14,
-            paddingTop: 14,
-            borderTop: `1px solid ${C.warmEdge}`,
-          }}>
-            <span style={{ fontSize: 14, fontWeight: 700, color: "#101412" }}>Estimated Total</span>
-            <span style={{ fontSize: 22, fontWeight: 800, color: "#101412" }}>{formatCurrency(estimate.subtotal)}</span>
+          <div className={styles.estimatorTotalRow}>
+            <span className={styles.estimatorTotalLabel}>Estimated Total</span>
+            <span className={styles.estimatorTotalValue}>{formatCurrency(estimate.subtotal)}</span>
           </div>
         </div>
 
         {/* Travel fee note */}
         {showTravelNote && (
-          <p style={{ fontSize: 12, color: "#667f79", marginBottom: 20, lineHeight: 1.6 }}>
+          <p className={styles.estimatorNote}>
             {estimate.travelMethod === "tbd"
               ? "Travel fee may apply and will be confirmed after your exact location is reviewed."
               : "Travel fees are included where applicable. Final pricing may vary slightly depending on exact location."}
@@ -243,42 +175,21 @@ export default function CouplesRateEstimator() {
         )}
 
         {/* Disclaimer */}
-        <p style={{ fontSize: 12, color: "#aaa", lineHeight: 1.6, marginBottom: 28 }}>
+        <p className={styles.estimatorNote}>
           Rough estimate only — final quote confirmed after date, time, and location are set.
           Invoice and contract sent once everything is confirmed.
         </p>
 
         {/* ── CTAs ──────────────────────────────────────────────────────────── */}
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-          <Link
-            href={`/contact?${contactParams.toString()}`}
-            style={{
-              padding: "13px 28px",
-              borderRadius: 999,
-              background: C.grad12,
-              color: "#fff",
-              fontWeight: 700,
-              fontSize: 14,
-              textDecoration: "none",
-              letterSpacing: "0.01em",
-            }}
-          >
+        <div className={styles.estimatorCtas}>
+          <Link href={`/contact?${contactParams.toString()}`} className={styles.estimatorCtaPrimary}>
             Inquire About This Estimate
           </Link>
           <Link
             href="https://www.soloxsnaps.com/availability"
             target="_blank"
             rel="noopener noreferrer"
-            style={{
-              padding: "13px 28px",
-              borderRadius: 999,
-              border: `1.5px solid ${C.p1}`,
-              color: C.p1,
-              fontWeight: 600,
-              fontSize: 14,
-              textDecoration: "none",
-              transition: "all 0.15s ease",
-            }}
+            className={styles.estimatorCtaSecondary}
           >
             Check Availability
           </Link>
@@ -290,15 +201,9 @@ export default function CouplesRateEstimator() {
 
 function BreakdownRow({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{
-      display: "flex",
-      justifyContent: "space-between",
-      fontSize: 14,
-      color: "#4b5a55",
-      marginBottom: 8,
-    }}>
+    <div className={styles.estimatorRow}>
       <span>{label}</span>
-      <span style={{ fontWeight: 500, color: "#101412" }}>{value}</span>
+      <span>{value}</span>
     </div>
   )
 }
