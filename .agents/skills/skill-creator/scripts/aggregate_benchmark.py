@@ -84,11 +84,14 @@ def load_run_results(benchmark_dir: Path) -> dict:
     results: dict[str, list] = {}
 
     for eval_idx, eval_dir in enumerate(sorted(search_dir.glob("eval-*"))):
+        eval_name = eval_dir.name
         metadata_path = eval_dir / "eval_metadata.json"
         if metadata_path.exists():
             try:
                 with open(metadata_path) as mf:
-                    eval_id = json.load(mf).get("eval_id", eval_idx)
+                    metadata = json.load(mf)
+                eval_id = metadata.get("eval_id", eval_idx)
+                eval_name = metadata.get("eval_name", eval_name)
             except (json.JSONDecodeError, OSError):
                 eval_id = eval_idx
         else:
@@ -126,6 +129,7 @@ def load_run_results(benchmark_dir: Path) -> dict:
                 # Extract metrics
                 result = {
                     "eval_id": eval_id,
+                    "eval_name": eval_name,
                     "run_number": run_number,
                     "pass_rate": grading.get("summary", {}).get("pass_rate", 0.0),
                     "passed": grading.get("summary", {}).get("passed", 0),
@@ -180,7 +184,10 @@ def aggregate_results(results: dict) -> dict:
     Returns run_summary with stats for each configuration and delta.
     """
     run_summary = {}
-    configs = list(results.keys())
+    # Order known baseline configs last so the delta (first minus second)
+    # is always skill-minus-baseline regardless of directory iteration order.
+    BASELINE_CONFIGS = {"without_skill", "old_skill"}
+    configs = sorted(results.keys(), key=lambda c: c in BASELINE_CONFIGS)
 
     for config in configs:
         runs = results.get(config, [])
@@ -237,6 +244,7 @@ def generate_benchmark(benchmark_dir: Path, skill_name: str = "", skill_path: st
         for result in results[config]:
             runs.append({
                 "eval_id": result["eval_id"],
+                "eval_name": result.get("eval_name", f"Eval {result['eval_id']}"),
                 "configuration": config,
                 "run_number": result["run_number"],
                 "result": {

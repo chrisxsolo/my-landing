@@ -36,50 +36,27 @@ Defines the evals for a skill. Located at `evals/evals.json` within the skill di
 
 ---
 
-## history.json
+## eval_metadata.json
 
-Tracks version progression in Improve mode. Located at workspace root.
+Describes one eval (test case). Located at `<workspace>/iteration-N/eval-<name>/eval_metadata.json`.
 
 ```json
 {
-  "started_at": "2026-01-15T10:30:00Z",
-  "skill_name": "pdf",
-  "current_best": "v2",
-  "iterations": [
-    {
-      "version": "v0",
-      "parent": null,
-      "expectation_pass_rate": 0.65,
-      "grading_result": "baseline",
-      "is_current_best": false
-    },
-    {
-      "version": "v1",
-      "parent": "v0",
-      "expectation_pass_rate": 0.75,
-      "grading_result": "won",
-      "is_current_best": false
-    },
-    {
-      "version": "v2",
-      "parent": "v1",
-      "expectation_pass_rate": 0.85,
-      "grading_result": "won",
-      "is_current_best": true
-    }
+  "eval_id": 0,
+  "eval_name": "descriptive-name-here",
+  "prompt": "The user's task prompt",
+  "expectations": [
+    "The output includes X",
+    "The skill used script Y"
   ]
 }
 ```
 
 **Fields:**
-- `started_at`: ISO timestamp of when improvement started
-- `skill_name`: Name of the skill being improved
-- `current_best`: Version identifier of the best performer
-- `iterations[].version`: Version identifier (v0, v1, ...)
-- `iterations[].parent`: Parent version this was derived from
-- `iterations[].expectation_pass_rate`: Pass rate from grading
-- `iterations[].grading_result`: "baseline", "won", "lost", or "tie"
-- `iterations[].is_current_best`: Whether this is the current best version
+- `eval_id`: Unique integer identifier (matches `evals.json`)
+- `eval_name`: Human-readable name (shown as the section header in the viewer)
+- `prompt`: The task that was executed
+- `expectations`: List of verifiable assertions (may be empty until drafted)
 
 ---
 
@@ -204,13 +181,7 @@ Wall clock timing for a run. Located at `<run-dir>/timing.json`.
 {
   "total_tokens": 84852,
   "duration_ms": 23332,
-  "total_duration_seconds": 23.3,
-  "executor_start": "2026-01-15T10:30:00Z",
-  "executor_end": "2026-01-15T10:32:45Z",
-  "executor_duration_seconds": 165.0,
-  "grader_start": "2026-01-15T10:32:46Z",
-  "grader_end": "2026-01-15T10:33:12Z",
-  "grader_duration_seconds": 26.0
+  "total_duration_seconds": 23.3
 }
 ```
 
@@ -218,7 +189,7 @@ Wall clock timing for a run. Located at `<run-dir>/timing.json`.
 
 ## benchmark.json
 
-Output from Benchmark mode. Located at `benchmarks/<timestamp>/benchmark.json`.
+Aggregated benchmark results, produced by `scripts/aggregate_benchmark.py`. Located at `<workspace>/iteration-N/benchmark.json`.
 
 ```json
 {
