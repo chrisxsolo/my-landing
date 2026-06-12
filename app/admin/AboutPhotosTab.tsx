@@ -24,6 +24,21 @@ type Props = { showToast: (message: string, ok?: boolean) => void };
 
 const API = "/api/admin/about-photos";
 
+// iPhone photos arrive as HEIC, which browsers can't display and the API
+// rejects. Detect by MIME or extension (Windows often reports an empty type).
+const HEIC_PATTERN = /\.(heic|heif)$/i;
+function isHeicFile(file: File) {
+  return ["image/heic", "image/heif"].includes(file.type.toLowerCase()) || HEIC_PATTERN.test(file.name);
+}
+
+/** Convert a HEIC file to JPEG in the browser (heic2any is loaded on demand). */
+async function heicToJpeg(file: File): Promise<File> {
+  const heic2any = (await import("heic2any")).default;
+  const out = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.9 });
+  const blob = Array.isArray(out) ? out[0] : out;
+  return new File([blob], file.name.replace(HEIC_PATTERN, "") + ".jpg", { type: "image/jpeg" });
+}
+
 export default function AboutPhotosTab({ showToast }: Props) {
   // slug → PhotoRow for facts that already have a photo
   const [photoMap, setPhotoMap] = useState<Record<string, PhotoRow>>({});
@@ -36,6 +51,8 @@ export default function AboutPhotosTab({ showToast }: Props) {
   const [busySlug, setBusySlug] = useState<string | null>(null);
   // which fact card a file is being dragged over (drop-target highlight)
   const [dragSlug, setDragSlug] = useState<string | null>(null);
+  // which fact card is converting a HEIC file to JPEG
+  const [convertingSlug, setConvertingSlug] = useState<string | null>(null);
   // one ref per fact for resetting the file input
   const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
@@ -108,14 +125,32 @@ export default function AboutPhotosTab({ showToast }: Props) {
     }
   }
 
+  /** Stage a picked or dropped file: convert HEIC to JPEG, validate, hold for upload. */
+  async function stageFile(slug: string, file: File | null) {
+    if (!file) return;
+    let staged = file;
+    if (isHeicFile(file)) {
+      setConvertingSlug(slug);
+      try {
+        staged = await heicToJpeg(file);
+      } catch (err) {
+        console.error("[AboutPhotosTab] HEIC conversion failed", err);
+        showToast("Couldn't convert that HEIC file — try exporting it as JPEG first.", false);
+        return;
+      } finally {
+        setConvertingSlug(null);
+      }
+    }
+    const fileCheck = validateAdminPhotoFile(staged);
+    if (!fileCheck.ok) { showToast(fileCheck.error, false); return; }
+    setFileDrafts((prev) => ({ ...prev, [slug]: staged }));
+  }
+
   function handleDrop(slug: string, e: React.DragEvent) {
     e.preventDefault();
     setDragSlug(null);
-    if (busySlug) return;
-    const file = e.dataTransfer.files?.[0] ?? null;
-    const fileCheck = validateAdminPhotoFile(file);
-    if (!fileCheck.ok) { showToast(fileCheck.error, false); return; }
-    setFileDrafts((prev) => ({ ...prev, [slug]: file }));
+    if (busySlug || convertingSlug) return;
+    stageFile(slug, e.dataTransfer.files?.[0] ?? null);
   }
 
   function handleDragLeave(e: React.DragEvent) {
@@ -203,6 +238,7 @@ export default function AboutPhotosTab({ showToast }: Props) {
             const altVal = altDrafts[fact.slug] ?? "";
             const fileVal = fileDrafts[fact.slug] ?? null;
             const dragging = dragSlug === fact.slug;
+            const converting = convertingSlug === fact.slug;
 
             return (
               <li
@@ -242,7 +278,7 @@ export default function AboutPhotosTab({ showToast }: Props) {
                   value={altVal}
                   onChange={(e) => setAltDrafts((prev) => ({ ...prev, [fact.slug]: e.target.value }))}
                   placeholder="Descriptive alt text (required)"
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm mb-3"
+                  className="w-full rounded-lg border border-slate-200 bg-white text-slate-800 px-3 py-2 text-sm mb-3"
                   disabled={busy}
                 />
 
@@ -250,8 +286,8 @@ export default function AboutPhotosTab({ showToast }: Props) {
                 <input
                   ref={(el) => { fileRefs.current[fact.slug] = el; }}
                   type="file"
-                  accept={ALLOWED_ADMIN_PHOTO_TYPES.join(",")}
-                  onChange={(e) => setFileDrafts((prev) => ({ ...prev, [fact.slug]: e.target.files?.[0] ?? null }))}
+                  accept={`${ALLOWED_ADMIN_PHOTO_TYPES.join(",")},image/heic,image/heif,.heic,.heif`}
+                  onChange={(e) => stageFile(fact.slug, e.target.files?.[0] ?? null)}
                   className="hidden"
                   disabled={busy}
                 />
@@ -265,10 +301,10 @@ export default function AboutPhotosTab({ showToast }: Props) {
                       if (fileVal) handleUpload(fact.slug);
                       else fileRefs.current[fact.slug]?.click();
                     }}
-                    disabled={busy}
+                    disabled={busy || converting}
                     className="inline-flex items-center rounded-lg bg-emerald-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50"
                   >
-                    {busy ? "Saving…" : fileVal ? "Upload photo" : hasPhoto ? "Replace photo…" : "Choose photo…"}
+                    {busy ? "Saving…" : converting ? "Converting…" : fileVal ? "Upload photo" : hasPhoto ? "Replace photo…" : "Choose photo…"}
                   </button>
 
                   {fileVal && !busy && (
