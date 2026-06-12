@@ -24,6 +24,7 @@ export default function Workspace({ sessionId }: { sessionId: string }) {
   const [data, setData] = useState<WorkspaceData | null>(null);
   const [photos, setPhotos] = useState<EnginePhoto[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [analytics, setAnalytics] = useState<{ views: number; ctaClicks: number; perItem: Record<string, number> } | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -37,6 +38,7 @@ export default function Workspace({ sessionId }: { sessionId: string }) {
     } catch (err) {
       setError(err instanceof Error ? err.message : "could not load session");
     }
+    engineApi.analytics(sessionId).then(setAnalytics).catch(() => setAnalytics(null));
   }, [sessionId]);
 
   useEffect(() => {
@@ -75,7 +77,12 @@ export default function Workspace({ sessionId }: { sessionId: string }) {
             {data.activePackage ? ` · package #${data.activePackage.generation_number}` : ""}
           </span>
         </div>
-        <span style={chip(badge.color, badge.bg)}>{badge.label}</span>
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          {analytics !== null && (
+            <span style={{ color: C.muted, fontSize: 12 }}>{analytics.views} views · {analytics.ctaClicks} CTA</span>
+          )}
+          <span style={chip(badge.color, badge.bg)}>{badge.label}</span>
+        </div>
       </header>
 
       <ReconcileBanner sessionId={sessionId} onChanged={refresh} />
@@ -87,7 +94,7 @@ export default function Workspace({ sessionId }: { sessionId: string }) {
         items={data.items} aiAllowed={session.ai_processing_allowed as boolean}
         photos={photos} onChanged={refresh} />
       <ItemsSection items={data.items} photos={photos} onChanged={refresh} />
-      <PublicationHistory published={data.published} onChanged={refresh} />
+      <PublicationHistory published={data.published} onChanged={refresh} viewCounts={analytics?.perItem ?? {}} />
       <ActionBar items={data.items}
         marketingPermission={session.marketing_permission as boolean} onChanged={refresh} />
     </main>

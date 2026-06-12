@@ -12,9 +12,10 @@ import { btn, card, sectionTitle } from "./ui";
 interface Props {
   published: EngineItem[];
   onChanged: () => void;
+  viewCounts: Record<string, number>;
 }
 
-export default function PublicationHistory({ published, onChanged }: Props) {
+export default function PublicationHistory({ published, onChanged, viewCounts }: Props) {
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   if (published.length === 0) return null;
@@ -70,6 +71,7 @@ export default function PublicationHistory({ published, onChanged }: Props) {
               <span>
                 {CONTENT_TYPE_LABELS[item.content_type] ?? item.content_type}
                 {" · "}{item.published_at ? new Date(item.published_at).toLocaleDateString() : ""}
+                {viewCounts[item.id] !== undefined && <> · {viewCounts[item.id]} views</>}
                 {takenDown && " · taken down"}
                 {livePath && !takenDown && (
                   <> · <a href={livePath} target="_blank" rel="noreferrer" style={{ color: C.ink }}>{livePath}</a></>

@@ -112,4 +112,8 @@ export const engineApi = {
       method: "POST", body: JSON.stringify(body),
     }),
   revalidateAll: () => request<{ revalidated: boolean }>("/api/admin/revalidate", { method: "POST" }),
+  analytics: (sessionId: string) =>
+    request<{ views: number; ctaClicks: number; perItem: Record<string, number> }>(
+      `/api/admin/session-content/analytics?sessionId=${sessionId}`,
+    ),
 };
