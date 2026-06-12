@@ -7,12 +7,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
 import { requireAdmin } from "@/lib/requireAdmin";
-import { ABOUT_PHOTOS_BUCKET, ABOUT_PHOTOS_TABLE, isValidAboutFactSlug } from "@/lib/aboutFacts";
+import {
+  ABOUT_FACTS,
+  ABOUT_FACT_ORDER_KEY,
+  ABOUT_PHOTOS_BUCKET,
+  ABOUT_PHOTOS_TABLE,
+  isValidAboutFactSlug,
+} from "@/lib/aboutFacts";
 import { validateAdminPhotoFile, validatePhotoAltText, safePhotoFileName } from "@/lib/photoAdminShared";
 
 export const dynamic = "force-dynamic";
 
 const SELECT = "id,fact_slug,image_url,storage_path,alt_text,created_at,updated_at";
+const SITE_SETTINGS_TABLE = "site_settings";
 
 function jsonError(error: unknown, fallback: string, status = 500) {
   console.error(`[admin/about-photos] ${fallback}`, error);
@@ -20,7 +27,7 @@ function jsonError(error: unknown, fallback: string, status = 500) {
   return NextResponse.json({ error: message }, { status });
 }
 
-// ── GET: list every fact photo ────────────────────────────────────────────────
+// ── GET: list every fact photo + the saved display order ─────────────────────
 export async function GET(req: NextRequest) {
   const deny = requireAdmin(req);
   if (deny) return deny;
@@ -28,7 +35,23 @@ export async function GET(req: NextRequest) {
     const supabase = createSupabaseAdminClient();
     const { data, error } = await supabase.from(ABOUT_PHOTOS_TABLE).select(SELECT);
     if (error) throw error;
-    return NextResponse.json({ photos: data ?? [] });
+
+    let order: string[] | null = null;
+    const { data: setting, error: orderError } = await supabase
+      .from(SITE_SETTINGS_TABLE)
+      .select("value")
+      .eq("key", ABOUT_FACT_ORDER_KEY)
+      .maybeSingle();
+    if (orderError) throw orderError;
+    if (setting?.value) {
+      try {
+        const parsed = JSON.parse(setting.value);
+        if (Array.isArray(parsed)) order = parsed.filter(isValidAboutFactSlug);
+      } catch {
+        console.error("[admin/about-photos] corrupt fact-order setting, ignoring");
+      }
+    }
+    return NextResponse.json({ photos: data ?? [], order });
   } catch (error) {
     return jsonError(error, "Failed to load about photos.");
   }
@@ -95,12 +118,24 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// ── PATCH (json): update alt text for a fact's photo ──────────────────────────
+// ── PATCH (json): reorder facts | update alt text for a fact's photo ──────────
 export async function PATCH(req: NextRequest) {
   const deny = requireAdmin(req);
   if (deny) return deny;
   try {
-    const body = (await req.json()) as { fact_slug?: unknown; alt_text?: unknown };
+    const body = (await req.json()) as { action?: unknown; orderedSlugs?: unknown; fact_slug?: unknown; alt_text?: unknown };
+
+    if (body.action === "reorder") {
+      const slugs = Array.isArray(body.orderedSlugs) ? body.orderedSlugs.filter(isValidAboutFactSlug) : [];
+      if (new Set(slugs).size !== ABOUT_FACTS.length) throw new Error("Reorder must include every fact exactly once.");
+      const supabase = createSupabaseAdminClient();
+      const { error } = await supabase.from(SITE_SETTINGS_TABLE).upsert(
+        { key: ABOUT_FACT_ORDER_KEY, value: JSON.stringify(slugs), updated_at: new Date().toISOString() },
+        { onConflict: "key" },
+      );
+      if (error) throw error;
+      return NextResponse.json({ order: slugs });
+    }
     if (!isValidAboutFactSlug(body.fact_slug)) throw new Error("Unknown about fact.");
     const altCheck = validatePhotoAltText(body.alt_text);
     if (!altCheck.ok) throw new Error(altCheck.error);

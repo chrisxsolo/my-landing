@@ -5,7 +5,7 @@
 // and alt text are managed here. Cards without a photo render text-only.
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ABOUT_FACTS } from "@/lib/aboutFacts";
+import { ABOUT_FACTS, orderAboutFacts } from "@/lib/aboutFacts";
 import {
   ALLOWED_ADMIN_PHOTO_TYPES,
   validateAdminPhotoFile,
@@ -52,6 +52,9 @@ export default function AboutPhotosTab({ showToast }: Props) {
   const [dragSlug, setDragSlug] = useState<string | null>(null);
   // which fact card is converting a HEIC file to JPEG
   const [convertingSlug, setConvertingSlug] = useState<string | null>(null);
+  // display order of the fact cards on /about (slugs, top = shown first)
+  const [orderSlugs, setOrderSlugs] = useState<string[]>(ABOUT_FACTS.map((f) => f.slug));
+  const [savingOrder, setSavingOrder] = useState(false);
   // one ref per fact for resetting the file input
   const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
@@ -73,6 +76,7 @@ export default function AboutPhotosTab({ showToast }: Props) {
         drafts[row.fact_slug] = row.alt_text ?? "";
       }
       setPhotoMap(map);
+      setOrderSlugs(orderAboutFacts(json.order).map((f) => f.slug));
       setAltDrafts((prev) => {
         // seed new slugs; preserve any draft the user has already typed
         const next = { ...prev };
@@ -121,6 +125,34 @@ export default function AboutPhotosTab({ showToast }: Props) {
       showToast(err instanceof Error ? err.message : "Upload failed", false);
     } finally {
       setBusySlug(null);
+    }
+  }
+
+  /** Move a fact up or down in the display order and persist immediately. */
+  async function moveFact(slug: string, direction: -1 | 1) {
+    const from = orderSlugs.indexOf(slug);
+    const to = from + direction;
+    if (from < 0 || to < 0 || to >= orderSlugs.length) return;
+    const next = [...orderSlugs];
+    [next[from], next[to]] = [next[to], next[from]];
+    const previous = orderSlugs;
+    setOrderSlugs(next); // optimistic — revert on failure
+    setSavingOrder(true);
+    try {
+      const res = await fetch(API, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "reorder", orderedSlugs: next }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Reorder failed");
+      showToast("Order saved!");
+      revalidate();
+    } catch (err) {
+      setOrderSlugs(previous);
+      showToast(err instanceof Error ? err.message : "Reorder failed", false);
+    } finally {
+      setSavingOrder(false);
     }
   }
 
@@ -223,7 +255,7 @@ export default function AboutPhotosTab({ showToast }: Props) {
         <h2 className="text-xl font-bold text-slate-800">About page — fact photos</h2>
         <p className="text-sm text-slate-500 mt-1">
           Fact text is edited in code (<code className="font-mono text-xs bg-slate-100 px-1 rounded">lib/aboutFacts.ts</code>).
-          Manage photos and alt text here. Cards without a photo render text-only on{" "}
+          Manage photos, alt text, and display order here (↑↓ — top card shows first). Cards without a photo render text-only on{" "}
           <a href="/about" target="_blank" rel="noopener noreferrer" className="underline text-emerald-700 hover:text-emerald-800">/about ↗</a>.
         </p>
       </div>
@@ -232,7 +264,7 @@ export default function AboutPhotosTab({ showToast }: Props) {
         <p className="text-sm text-slate-500">Loading…</p>
       ) : (
         <ul className="space-y-4">
-          {ABOUT_FACTS.map((fact) => {
+          {orderAboutFacts(orderSlugs).map((fact, factIndex, orderedFacts) => {
             const photo = photoMap[fact.slug];
             const hasPhoto = !!photo;
             const busy = busySlug === fact.slug;
@@ -267,9 +299,34 @@ export default function AboutPhotosTab({ showToast }: Props) {
 
                   {/* Fact meta */}
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-bold text-slate-800">{fact.title}</p>
+                    <p className="text-sm font-bold text-slate-800">
+                      <span className="font-mono text-slate-400 mr-1.5">#{factIndex + 1}</span>
+                      {fact.title}
+                    </p>
                     <p className="text-[11px] font-mono text-slate-400 mt-0.5">{fact.slug}</p>
                     <p className="text-xs text-slate-500 mt-1 line-clamp-2">{fact.body}</p>
+                  </div>
+
+                  {/* Reorder arrows — top card shows first on /about */}
+                  <div className="flex flex-col gap-1 flex-shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => moveFact(fact.slug, -1)}
+                      disabled={savingOrder || factIndex === 0}
+                      aria-label={`Move "${fact.title}" up`}
+                      className="rounded-lg border border-slate-300 px-2 py-0.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-30"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveFact(fact.slug, 1)}
+                      disabled={savingOrder || factIndex === orderedFacts.length - 1}
+                      aria-label={`Move "${fact.title}" down`}
+                      className="rounded-lg border border-slate-300 px-2 py-0.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-30"
+                    >
+                      ↓
+                    </button>
                   </div>
                 </div>
 

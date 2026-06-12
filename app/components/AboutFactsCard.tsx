@@ -9,7 +9,7 @@
 
 import { useRef, useState } from "react";
 import OptimizedPhoto from "@/app/components/OptimizedPhoto";
-import { ABOUT_FACTS, type AboutPhotoMap } from "@/lib/aboutFacts";
+import type { AboutFact, AboutPhotoMap } from "@/lib/aboutFacts";
 
 const SWIPE_THRESHOLD_PX = 40;
 
@@ -125,12 +125,14 @@ const CSS = `
   }
 `;
 
-export default function AboutFactsCard({ photos }: { photos: AboutPhotoMap }) {
+// `facts` arrives pre-ordered from the page (default order, or the custom
+// order saved in the Darkroom tab — see orderAboutFacts in lib/aboutFacts).
+export default function AboutFactsCard({ facts, photos }: { facts: readonly AboutFact[]; photos: AboutPhotoMap }) {
   const [index, setIndex] = useState(0);
   const touchX = useRef<number | null>(null);
 
-  const count = ABOUT_FACTS.length;
-  const fact = ABOUT_FACTS[index];
+  const count = facts.length;
+  const fact = facts[index];
   const photo = photos[fact.slug];
 
   function go(next: number) {
@@ -172,7 +174,7 @@ export default function AboutFactsCard({ photos }: { photos: AboutPhotoMap }) {
           </div>
           <div className="afc-nav">
             <div className="afc-dots" role="group" aria-label="Choose a fact">
-              {ABOUT_FACTS.map((f, i) => (
+              {facts.map((f, i) => (
                 <button
                   key={f.slug}
                   type="button"

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ABOUT_FACTS, ABOUT_TIMELINE, isValidAboutFactSlug } from "@/lib/aboutFacts";
+import { ABOUT_FACTS, ABOUT_TIMELINE, isValidAboutFactSlug, orderAboutFacts } from "@/lib/aboutFacts";
 
 describe("ABOUT_FACTS", () => {
   it("has at least 3 facts with unique slugs", () => {
@@ -23,6 +23,32 @@ describe("isValidAboutFactSlug", () => {
     expect(isValidAboutFactSlug("nope")).toBe(false);
     expect(isValidAboutFactSlug(null)).toBe(false);
     expect(isValidAboutFactSlug(42)).toBe(false);
+  });
+});
+
+describe("orderAboutFacts", () => {
+  const defaultSlugs = ABOUT_FACTS.map((f) => f.slug);
+
+  it("returns the default order for null / non-array input", () => {
+    expect(orderAboutFacts(null).map((f) => f.slug)).toEqual(defaultSlugs);
+    expect(orderAboutFacts("junk").map((f) => f.slug)).toEqual(defaultSlugs);
+  });
+  it("applies a complete stored order", () => {
+    const reversed = [...defaultSlugs].reverse();
+    expect(orderAboutFacts(reversed).map((f) => f.slug)).toEqual(reversed);
+  });
+  it("drops unknown slugs and appends missing facts in default order", () => {
+    const partial = [defaultSlugs[2], "bogus", defaultSlugs[0]];
+    const result = orderAboutFacts(partial).map((f) => f.slug);
+    expect(result.slice(0, 2)).toEqual([defaultSlugs[2], defaultSlugs[0]]);
+    expect(new Set(result)).toEqual(new Set(defaultSlugs));
+    expect(result).toHaveLength(defaultSlugs.length);
+  });
+  it("ignores duplicate slugs", () => {
+    const dupes = [defaultSlugs[1], defaultSlugs[1], defaultSlugs[1]];
+    const result = orderAboutFacts(dupes).map((f) => f.slug);
+    expect(result).toHaveLength(defaultSlugs.length);
+    expect(result[0]).toBe(defaultSlugs[1]);
   });
 });
 

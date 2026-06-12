@@ -24,7 +24,7 @@ import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 import { BOOKING_POLICY, PRICING_CATALOG } from "@/lib/pricingCatalog";
 import AboutFactsCard from "@/app/components/AboutFactsCard";
 import AboutTimeline from "@/app/components/AboutTimeline";
-import { ABOUT_PHOTOS_TABLE, type AboutPhotoMap } from "@/lib/aboutFacts";
+import { ABOUT_FACT_ORDER_KEY, ABOUT_PHOTOS_TABLE, orderAboutFacts, type AboutPhotoMap } from "@/lib/aboutFacts";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 
 // ISR: photos uploaded in the Darkroom appear within the hour, or immediately
@@ -372,8 +372,26 @@ async function getAboutPhotos(): Promise<AboutPhotoMap> {
   }
 }
 
+// Admin-saved fact order (Darkroom → About Page tab). Falls back to the
+// default ABOUT_FACTS order when unset or unreadable.
+async function getOrderedFacts() {
+  try {
+    const supabase = createSupabaseServerClient();
+    const { data, error } = await supabase
+      .from("site_settings")
+      .select("value")
+      .eq("key", ABOUT_FACT_ORDER_KEY)
+      .maybeSingle();
+    if (error) throw error;
+    return orderAboutFacts(data?.value ? JSON.parse(data.value) : null);
+  } catch (error) {
+    console.error("[about] failed to load fact order, using default", error);
+    return orderAboutFacts(null);
+  }
+}
+
 export default async function ProfessionalAboutPage() {
-  const aboutPhotos = await getAboutPhotos();
+  const [aboutPhotos, orderedFacts] = await Promise.all([getAboutPhotos(), getOrderedFacts()]);
   return (
     <main className="about-page">
       <style>{CSS}</style>
@@ -433,7 +451,7 @@ export default async function ProfessionalAboutPage() {
       {/* ── OFF THE CLOCK ────────────────────────────────────────────────────────
            Rotating personal facts card. Text lives in lib/aboutFacts.ts;
            photos are uploaded from the Darkroom "About Page" tab. */}
-      <AboutFactsCard photos={aboutPhotos} />
+      <AboutFactsCard facts={orderedFacts} photos={aboutPhotos} />
 
       {/* ── THE ROAD HERE ────────────────────────────────────────────────────────
            Photography-journey timeline. Entries live in lib/aboutFacts.ts. */}

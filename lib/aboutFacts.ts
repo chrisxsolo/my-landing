@@ -14,28 +14,52 @@ export type AboutFact = {
   body: string;
 };
 
+// Default display order. A custom order can be saved from the Darkroom tab
+// (site_settings key ABOUT_FACT_ORDER_KEY); see orderAboutFacts below.
 export const ABOUT_FACTS: readonly AboutFact[] = [
-  {
-    slug: "burritos",
-    title: "Powered by El Farolito",
-    body: "I keep a running, citywide ranking of San Francisco burritos, and I take the research seriously. After years of field testing across every neighborhood, El Farolito holds the crown. Always accepting challengers.",
-  },
   {
     slug: "running",
     title: "Runner's high, ocean views",
     body: "You'll usually find me looping Lake Merced or running the coast from the SF Zoo up to Sutro Baths — easily my favorite stretch in the city. It doubles as location scouting; some of my best session spots showed up mid-run.",
   },
   {
-    slug: "skateboard",
-    title: "Scouting on four wheels",
-    body: "I ride my electric skateboard all over San Francisco hunting for photo spots you wouldn't normally think of. Half of my favorite shoot locations started as a random detour on the board.",
-  },
-  {
     slug: "mt-tam",
     title: "Across the bridge to Mount Tam",
     body: "When I want big views, I head across the Golden Gate to hike Mount Tamalpais. The camera always comes along — sunrise above the fog line never gets old.",
   },
+  {
+    slug: "burritos",
+    title: "Powered by El Farolito",
+    body: "I keep a running, citywide ranking of San Francisco burritos, and I take the research seriously. After years of field testing across every neighborhood, El Farolito holds the crown. Always accepting challengers.",
+  },
+  {
+    slug: "skateboard",
+    title: "Scouting on four wheels",
+    body: "I ride my electric skateboard all over San Francisco hunting for photo spots you wouldn't normally think of. Half of my favorite shoot locations started as a random detour on the board.",
+  },
 ];
+
+// site_settings key holding the admin-saved fact order (JSON array of slugs).
+export const ABOUT_FACT_ORDER_KEY = "about_fact_order";
+
+/**
+ * Apply a stored slug order to ABOUT_FACTS. Tolerates anything: unknown slugs
+ * are dropped, missing facts are appended in default order, and a non-array
+ * (no saved order yet, corrupt JSON) returns the default order unchanged.
+ */
+export function orderAboutFacts(storedOrder: unknown): readonly AboutFact[] {
+  if (!Array.isArray(storedOrder)) return ABOUT_FACTS;
+  const bySlug = new Map(ABOUT_FACTS.map((f) => [f.slug, f]));
+  const ordered: AboutFact[] = [];
+  for (const slug of storedOrder) {
+    const fact = typeof slug === "string" ? bySlug.get(slug) : undefined;
+    if (fact && !ordered.includes(fact)) ordered.push(fact);
+  }
+  for (const fact of ABOUT_FACTS) {
+    if (!ordered.includes(fact)) ordered.push(fact);
+  }
+  return ordered;
+}
 
 export type AboutTimelineEntry = {
   year: string;
