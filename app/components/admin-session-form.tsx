@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { C } from "@/lib/colors";
+import { T } from "@/app/admin/adminTheme";
 import {
   CLIENT_SESSION_STATUS_LABELS,
   CLIENT_SESSION_STATUS_VALUES,
@@ -34,7 +34,6 @@ type AdminSessionFormProps = {
   contacts: ClientSessionContactOption[];
   saving: boolean;
   onSubmit: (payload: AdminSessionFormPayload) => Promise<void>;
-  onCancelEdit?: () => void;
 };
 
 const BLANK_FORM: AdminSessionFormPayload = {
@@ -57,6 +56,8 @@ const BLANK_FORM: AdminSessionFormPayload = {
 const INVOICE_OPTS = ["Not Sent", "Sent", "Paid", "Overdue"];
 const CONTRACT_OPTS = ["Not Sent", "Sent", "Signed"];
 const BACKUP_OPTS = ["Not Started", "In Progress", "Done"];
+
+const INPUT_STYLE = { background: T.inset, borderColor: T.border, color: T.ink } as const;
 
 function toDateTimeInput(value: string | null) {
   if (!value) return "";
@@ -88,7 +89,10 @@ function toForm(session: AdminClientSessionDTO | null | undefined): AdminSession
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
-    <label className="text-[11px] font-black uppercase tracking-[0.14em]" style={{ color: C.p1 }}>
+    <label
+      className="text-[10px] font-bold uppercase tracking-[0.18em]"
+      style={{ color: T.action, fontFamily: T.mono }}
+    >
       {children}
     </label>
   );
@@ -100,7 +104,11 @@ function StatusBtns({ value, onChange, opts }: { value: string; onChange: (v: st
       {opts.map((opt) => (
         <button key={opt} type="button" onClick={() => onChange(value === opt ? "" : opt)}
           className="rounded-lg border px-3 py-1.5 text-xs font-black transition-colors"
-          style={{ background: value === opt ? C.p1 : C.surfaceStrong, borderColor: value === opt ? C.p1 : C.borderSubtle, color: value === opt ? C.white : C.muted }}>
+          style={{
+            background: value === opt ? T.action : T.inset,
+            borderColor: value === opt ? T.action : T.border,
+            color: value === opt ? T.actionText : T.inkSoft,
+          }}>
           {opt}
         </button>
       ))}
@@ -113,16 +121,13 @@ export default function AdminSessionForm({
   contacts,
   saving,
   onSubmit,
-  onCancelEdit,
 }: AdminSessionFormProps) {
   const [form, setForm] = useState<AdminSessionFormPayload>(toForm(initialSession));
-  const [open, setOpen] = useState(false);
   const [notesLoading, setNotesLoading] = useState(false);
   const editing = Boolean(initialSession);
 
   useEffect(() => {
     setForm(toForm(initialSession));
-    if (initialSession) setOpen(true);
   }, [initialSession]);
 
   function update<K extends keyof AdminSessionFormPayload>(key: K, value: AdminSessionFormPayload[K]) {
@@ -165,65 +170,16 @@ export default function AdminSessionForm({
   }
 
   return (
-    <form
-      id={ADMIN_SESSION_FORM_ID}
-      onSubmit={handleSubmit}
-      className="w-full overflow-hidden rounded-xl border"
-      style={{ background: C.surfaceSoft, borderColor: C.borderWarm, boxShadow: C.shadowWarmSm }}
-    >
-      {/* Header — always visible, click to toggle when not editing */}
-      <button
-        type="button"
-        onClick={() => { if (!editing) setOpen((o) => !o); }}
-        className="w-full p-5 text-left"
-        style={{ cursor: editing ? "default" : "pointer" }}
-      >
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text-xl font-black" style={{ color: C.ink }}>
-              {editing ? "Edit session" : "Create session"}
-            </h2>
-            {!open && !editing && (
-              <p className="mt-0.5 text-xs font-semibold" style={{ color: C.muted }}>
-                Tap to expand
-              </p>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            {editing && onCancelEdit && (
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); onCancelEdit(); }}
-                className="min-h-10 rounded-lg border px-3 py-2 text-xs font-black"
-                style={{ background: C.surfaceStrong, borderColor: C.borderSubtle, color: C.muted }}
-              >
-                Cancel
-              </button>
-            )}
-            {!editing && (
-              <span
-                className="text-lg font-black transition-transform"
-                style={{ color: C.p1, display: "inline-block", transform: open ? "rotate(45deg)" : "rotate(0deg)" }}
-              >
-                +
-              </span>
-            )}
-          </div>
-        </div>
-      </button>
-
-      {(open || editing) && (
-      <div className="px-5 pb-5">
-
+    <form id={ADMIN_SESSION_FORM_ID} onSubmit={handleSubmit}>
       {editing && (
-        <div className="mt-4 rounded-lg border p-4" style={{ background: C.surfaceStrong, borderColor: C.borderSubtle }}>
-          <div className="text-[11px] font-black uppercase tracking-[0.14em]" style={{ color: C.p1 }}>
+        <div className="mb-5 rounded-lg border p-4" style={{ background: T.inset, borderColor: T.border }}>
+          <div className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: T.action, fontFamily: T.mono }}>
             Editing now
           </div>
-          <p className="mt-1 break-words text-sm font-bold" style={{ color: C.ink }}>
+          <p className="mt-1 break-words text-sm font-bold" style={{ color: T.ink }}>
             {initialSession?.clientName || "Unnamed client"} {initialSession?.clientEmail ? `(${initialSession.clientEmail})` : ""}
           </p>
-          <p className="mt-2 text-xs font-semibold leading-5" style={{ color: C.muted }}>
+          <p className="mt-2 text-xs font-semibold leading-5" style={{ color: T.inkFaint }}>
             {initialSession?.clientUserId
               ? "This session is already linked to a Google account. That link will stay intact unless you change the client email."
               : "This session will link to the client automatically the first time they sign in with the matching Google email."}
@@ -231,7 +187,7 @@ export default function AdminSessionForm({
         </div>
       )}
 
-      <div className="mt-5 grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2">
         {contacts.length > 0 && (
           <div className="grid gap-2 md:col-span-2">
             <FieldLabel>Choose existing client</FieldLabel>
@@ -239,7 +195,7 @@ export default function AdminSessionForm({
               defaultValue=""
               onChange={(event) => selectContact(event.target.value)}
               className="min-h-11 rounded-lg border px-3 text-sm font-semibold outline-none"
-              style={{ background: C.surfaceStrong, borderColor: C.borderSubtle, color: C.ink }}
+              style={INPUT_STYLE}
             >
               <option value="">Select from inquiries or past sessions</option>
               {contacts.map((contact) => (
@@ -260,7 +216,7 @@ export default function AdminSessionForm({
             onChange={(event) => update("clientEmail", event.target.value)}
             data-admin-session-primary
             className="min-h-11 w-full min-w-0 rounded-lg border px-3 text-sm font-semibold outline-none"
-            style={{ background: C.surfaceStrong, borderColor: C.borderSubtle, color: C.ink }}
+            style={INPUT_STYLE}
           />
         </div>
 
@@ -270,7 +226,7 @@ export default function AdminSessionForm({
             value={form.clientName}
             onChange={(event) => update("clientName", event.target.value)}
             className="min-h-11 w-full min-w-0 rounded-lg border px-3 text-sm font-semibold outline-none"
-            style={{ background: C.surfaceStrong, borderColor: C.borderSubtle, color: C.ink }}
+            style={INPUT_STYLE}
           />
         </div>
 
@@ -281,7 +237,7 @@ export default function AdminSessionForm({
             onChange={(event) => update("sessionType", event.target.value)}
             placeholder="Graduation, family, couples..."
             className="min-h-11 w-full min-w-0 rounded-lg border px-3 text-sm font-semibold outline-none"
-            style={{ background: C.surfaceStrong, borderColor: C.borderSubtle, color: C.ink }}
+            style={INPUT_STYLE}
           />
         </div>
 
@@ -292,7 +248,7 @@ export default function AdminSessionForm({
             value={form.sessionDate}
             onChange={(event) => update("sessionDate", event.target.value)}
             className="min-h-11 w-full min-w-0 rounded-lg border px-3 text-sm font-semibold outline-none"
-            style={{ background: C.surfaceStrong, borderColor: C.borderSubtle, color: C.ink }}
+            style={INPUT_STYLE}
           />
         </div>
 
@@ -302,7 +258,7 @@ export default function AdminSessionForm({
             value={form.location}
             onChange={(event) => update("location", event.target.value)}
             className="min-h-11 w-full min-w-0 rounded-lg border px-3 text-sm font-semibold outline-none"
-            style={{ background: C.surfaceStrong, borderColor: C.borderSubtle, color: C.ink }}
+            style={INPUT_STYLE}
           />
         </div>
 
@@ -312,7 +268,7 @@ export default function AdminSessionForm({
             value={form.meetingPoint}
             onChange={(event) => update("meetingPoint", event.target.value)}
             className="min-h-11 w-full min-w-0 rounded-lg border px-3 text-sm font-semibold outline-none"
-            style={{ background: C.surfaceStrong, borderColor: C.borderSubtle, color: C.ink }}
+            style={INPUT_STYLE}
           />
         </div>
 
@@ -322,7 +278,7 @@ export default function AdminSessionForm({
             value={form.currentStatus}
             onChange={(event) => update("currentStatus", event.target.value as ClientSessionStatus)}
             className="min-h-11 w-full min-w-0 rounded-lg border px-3 text-sm font-semibold outline-none"
-            style={{ background: C.surfaceStrong, borderColor: C.borderSubtle, color: C.ink }}
+            style={INPUT_STYLE}
           >
             {CLIENT_SESSION_STATUS_VALUES.map((status) => (
               <option key={status} value={status}>{CLIENT_SESSION_STATUS_LABELS[status]}</option>
@@ -337,7 +293,7 @@ export default function AdminSessionForm({
             value={form.estimatedDeliveryDate}
             onChange={(event) => update("estimatedDeliveryDate", event.target.value)}
             className="min-h-11 w-full min-w-0 rounded-lg border px-3 text-sm font-semibold outline-none"
-            style={{ background: C.surfaceStrong, borderColor: C.borderSubtle, color: C.ink }}
+            style={INPUT_STYLE}
           />
         </div>
 
@@ -349,7 +305,7 @@ export default function AdminSessionForm({
             onChange={(event) => update("galleryUrl", event.target.value)}
             placeholder="https://..."
             className="min-h-11 w-full min-w-0 rounded-lg border px-3 text-sm font-semibold outline-none"
-            style={{ background: C.surfaceStrong, borderColor: C.borderSubtle, color: C.ink }}
+            style={INPUT_STYLE}
           />
         </div>
 
@@ -377,7 +333,7 @@ export default function AdminSessionForm({
                 onClick={fetchNotes}
                 disabled={notesLoading}
                 className="rounded-lg border px-2 py-1 text-[10px] font-black disabled:opacity-50"
-                style={{ background: C.p1_08, borderColor: C.p1_20, color: C.p1 }}
+                style={{ background: T.amberBg, borderColor: T.amberBorder, color: T.amber }}
               >
                 {notesLoading ? "Pulling..." : "Pull from Gmail"}
               </button>
@@ -388,7 +344,7 @@ export default function AdminSessionForm({
             onChange={(event) => update("clientNotes", event.target.value)}
             rows={3}
             className="w-full min-w-0 rounded-lg border px-3 py-3 text-sm font-semibold outline-none"
-            style={{ background: C.surfaceStrong, borderColor: C.borderSubtle, color: C.ink }}
+            style={INPUT_STYLE}
           />
         </div>
 
@@ -399,7 +355,7 @@ export default function AdminSessionForm({
             onChange={(event) => update("internalNotes", event.target.value)}
             rows={3}
             className="w-full min-w-0 rounded-lg border px-3 py-3 text-sm font-semibold outline-none"
-            style={{ background: C.surfaceStrong, borderColor: C.borderSubtle, color: C.ink }}
+            style={INPUT_STYLE}
           />
         </div>
       </div>
@@ -407,13 +363,11 @@ export default function AdminSessionForm({
       <button
         type="submit"
         disabled={saving}
-        className="mt-5 min-h-12 w-full rounded-lg px-5 text-sm font-black disabled:opacity-60"
-        style={{ background: C.grad12, color: C.white, boxShadow: C.shadowWarmSm }}
+        className="mt-6 min-h-12 w-full rounded-lg px-5 text-sm font-black disabled:opacity-60"
+        style={{ background: T.action, color: T.actionText, boxShadow: T.glow }}
       >
         {saving ? "Saving..." : editing ? "Save session" : "Create session"}
       </button>
-      </div>
-      )}
     </form>
   );
 }
