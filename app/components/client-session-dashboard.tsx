@@ -40,6 +40,11 @@ const DASHBOARD_STYLES = `
     border-bottom-left-radius: 0;
     border-bottom-right-radius: 0;
   }
+  .pd-row[data-open="true"] + div > article.gp-panel {
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+    border-top: none;
+  }
 `;
 
 export default function ClientSessionDashboard() {
@@ -209,6 +214,7 @@ export default function ClientSessionDashboard() {
                           data-open={open}
                           onClick={() => setExpandedId(open ? null : session.id)}
                           aria-expanded={open}
+                          aria-controls={`session-detail-${session.id}`}
                         >
                           <div className="flex flex-wrap items-center justify-between gap-3">
                             <div className="min-w-0">
@@ -229,7 +235,11 @@ export default function ClientSessionDashboard() {
                             </div>
                           </div>
                         </button>
-                        {open && <SessionCard session={session} />}
+                        {open && (
+                          <div id={`session-detail-${session.id}`}>
+                            <SessionCard session={session} />
+                          </div>
+                        )}
                       </div>
                     );
                   })}

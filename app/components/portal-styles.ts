@@ -110,6 +110,12 @@ export const PORTAL_STYLES = `
   }
   .gp-ghost:hover { border-color: ${G.borderStrong}; color: ${G.ink}; }
 
+  .gp-btn:focus-visible,
+  .gp-ghost:focus-visible {
+    outline: 2px solid ${G.accent};
+    outline-offset: 2px;
+  }
+
   .gp-input {
     width: 100%;
     min-height: 46px;
