@@ -75,8 +75,8 @@ describe("recordContentEvent (spec §10 attribution)", () => {
 
   it("rejects bad event types, bad content types, and unknown paths", async () => {
     expect((await recordContentEvent(service, {
-      event: "inquiry_submit", path: "/", contentType: "page", contentId: null, referrer: "", target: null,
-    })).recorded).toBe(false); // v1 allowlist
+      event: "purchase", path: "/", contentType: "page", contentId: null, referrer: "", target: null,
+    })).recorded).toBe(false); // not in TRACKED_EVENT_TYPES
     expect((await recordContentEvent(service, {
       event: "page_view", path: "/admin/content-engine", contentType: "page", contentId: null, referrer: "", target: null,
     })).recorded).toBe(false);

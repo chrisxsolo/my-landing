@@ -44,6 +44,8 @@ yarn-error.log*
 next-env.d.ts
 .superpowers
 
-# local test database (never commit prod schema or local secrets)
-supabase/test/prod-baseline.sql
+# local test database
+# supabase/test/prod-baseline.sql is committed (schema-only, zero data rows) so
+# CI can rebuild the test DB for integration tests. It carries no data/secrets.
+# (Local secrets like .env.test stay ignored via the .env* rule above.)
 .env.test

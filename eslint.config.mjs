@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Build output from `next dev --webpack` — generated artifacts, not source.
+    ".next-dev/**",
+    // Standalone browser extension with its own (non-Next) conventions.
+    "pixieset-extension/**",
   ]),
 ]);
 

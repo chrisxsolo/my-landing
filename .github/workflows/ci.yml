@@ -1,0 +1,118 @@
+name: CI
+
+# Runs the project's own commands (build · unit · legacy · integration · lint) so
+# a regression — a pricing page drifting from the catalog, a broken attribution
+# stitch, a build failure — is caught here before it can reach clients.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# A newer push to the same ref supersedes in-flight runs.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── Hard gate: no database needed. Make this a required status check. ────────
+  checks:
+    name: Build & tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Unit tests (vitest)
+        run: npm test
+
+      - name: Legacy tests (node:test — includes pricing catalog locks)
+        run: npm run test:legacy
+
+      - name: Production build
+        run: npm run build
+        env:
+          # The data layer falls back to bundled placeholders when Supabase is
+          # unreachable (every fetch is wrapped in try/catch), so the build needs
+          # no live database — only syntactically valid placeholders.
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
+
+  # ── Hard gate: spins up Supabase for the DB-backed integration + e2e tests. ──
+  integration:
+    name: Integration & e2e (Supabase)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install psql (used by the test-DB reset script)
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start Supabase (bare — schema is rebuilt manually below)
+        run: |
+          # This project's migrations layer on top of a production baseline and
+          # cannot replay onto an empty database. So start the stack WITHOUT
+          # applying them, then rebuild the schema with reset-test-db.sh
+          # (baseline + content-engine-era migrations).
+          mv supabase/migrations supabase/.migrations-hold
+          supabase start
+          mv supabase/.migrations-hold supabase/migrations
+
+      - name: Export local Supabase connection into the environment
+        run: |
+          set -a
+          source <(supabase status -o env \
+            --override-name api.url=SUPABASE_TEST_URL \
+            --override-name auth.anon_key=SUPABASE_TEST_ANON_KEY \
+            --override-name auth.service_role_key=SUPABASE_TEST_SERVICE_KEY \
+            --override-name db.url=SUPABASE_TEST_DB_URL)
+          set +a
+          {
+            echo "SUPABASE_TEST_URL=$SUPABASE_TEST_URL"
+            echo "SUPABASE_TEST_ANON_KEY=$SUPABASE_TEST_ANON_KEY"
+            echo "SUPABASE_TEST_SERVICE_KEY=$SUPABASE_TEST_SERVICE_KEY"
+            echo "SUPABASE_TEST_DB_URL=$SUPABASE_TEST_DB_URL"
+          } >> "$GITHUB_ENV"
+
+      - name: Rebuild test database (baseline + content-engine migrations)
+        run: ./scripts/content-engine/reset-test-db.sh
+
+      - name: Integration & e2e tests
+        run: npm run test:integration
+
+  # ── Advisory: surfaces lint output without blocking. The repo carries
+  #    pre-existing lint debt (admin/api React-hooks + escaping errors), so this
+  #    is NOT yet a required check — promote it to one once that debt is paid. ──
+  lint:
+    name: Lint (advisory)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: ESLint
+        run: npm run lint
