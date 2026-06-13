@@ -10,8 +10,6 @@ import {
 } from "@/lib/clientSessions";
 import type { ClientSessionContactOption } from "@/lib/clientSessionContacts";
 
-export const ADMIN_SESSION_FORM_ID = "admin-session-form";
-
 export type AdminSessionFormPayload = {
   clientEmail: string;
   clientName: string;
@@ -170,7 +168,7 @@ export default function AdminSessionForm({
   }
 
   return (
-    <form id={ADMIN_SESSION_FORM_ID} onSubmit={handleSubmit}>
+    <form onSubmit={handleSubmit}>
       {editing && (
         <div className="mb-5 rounded-lg border p-4" style={{ background: T.inset, borderColor: T.border }}>
           <div className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: T.action, fontFamily: T.mono }}>
