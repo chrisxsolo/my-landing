@@ -62,7 +62,7 @@ export const DEFAULT_NAV_CONFIG: NavConfig = {
     { id: "home", type: "link", label: "Home", href: "/", visible: true },
     { id: "dates", type: "link", label: "Dates", href: "/availability", visible: true },
     { id: "about", type: "link", label: "About", href: "/about", visible: true },
-    { id: "blog", type: "link", label: "Blog", href: "/blog", visible: true },
+    { id: "blog", type: "link", label: "Journal", href: "/blog", visible: true },
     {
       id: "guides",
       type: "group",

@@ -9,6 +9,7 @@ type OptimizedPhotoProps = {
   priority?: boolean;
   quality?: 75 | 85 | 90;
   objectPosition?: string;
+  unoptimized?: boolean;
 };
 
 export default function OptimizedPhoto({
@@ -19,6 +20,7 @@ export default function OptimizedPhoto({
   priority = false,
   quality = 85,
   objectPosition,
+  unoptimized = false,
 }: OptimizedPhotoProps) {
   const style: CSSProperties = {
     objectFit: "cover",
@@ -35,6 +37,7 @@ export default function OptimizedPhoto({
       priority={priority}
       quality={quality}
       style={style}
+      unoptimized={unoptimized}
     />
   );
 }

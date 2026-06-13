@@ -21,12 +21,12 @@ export const FAQS: FAQGroup[] = [
         a: "The sooner the better. Weekends and golden-hour slots fill up fastest, and seasonal sessions (spring graduations, fall family photos, holiday minis) book out weeks ahead. If you have a specific date in mind, reach out at least 3–4 weeks early so we can lock it in.",
       },
       {
-        q: "What's the deposit and when is it due?",
-        a: `The retainer is ${BOOKING_POLICY.retainerPercent}% of the session total and is due when you confirm your date. It's ${BOOKING_POLICY.retainerRefundability} but transferable - it can be applied toward rescheduling or a future session with advance notice.`,
+        q: "What's the retainer and when is it due?",
+        a: `The retainer is ${BOOKING_POLICY.retainerPercent}% of the session total and is due when you confirm your date. It's ${BOOKING_POLICY.retainerRefundability} but transferable - it can be applied toward rescheduling or a future session with advance notice. The remaining balance is due ${BOOKING_POLICY.remainingBalanceDeadline}.`,
       },
       {
         q: "What happens if I need to reschedule?",
-        a: "Life happens. If you need to move your session, reach out as early as possible and your deposit transfers to the new date as long as I have availability. Last-minute cancellations (same day or the day before) aren't eligible for rescheduling.",
+        a: "Life happens. If you need to move your session, reach out as early as possible and your retainer transfers to the new date as long as I have availability. Last-minute cancellations (same day or the day before) aren't eligible for rescheduling.",
       },
       {
         q: "What if the weather is bad?",

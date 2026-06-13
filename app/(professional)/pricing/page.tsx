@@ -21,7 +21,7 @@ export const revalidate = 3600;
 
 export const metadata: Metadata = {
   title: "Rates",
-  description: "Photography pricing by Chris Solorzano — graduation and family sessions in the Bay Area.",
+  description: "Photography pricing by Chris Solorzano — graduation and couples sessions in the Bay Area, with family and portrait sessions also available.",
   alternates: { canonical: "/pricing" },
 };
 

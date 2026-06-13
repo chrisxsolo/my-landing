@@ -92,25 +92,38 @@ run_psql -f supabase/test/prod-baseline.sql
 echo "Applying local test grants..."
 run_psql -f supabase/test/test-grants.sql
 
-# Apply only content-engine migrations (20260611* prefix), skipping rollbacks.
+# Apply every content-engine-era migration: those whose YYYYMMDD prefix is on or
+# after 2026-06-11 (when the engine schema starts layering on top of the baseline).
+# Earlier migrations ALTER tables the baseline already created and must NOT replay.
+# Date-bounding (rather than a fixed 20260611* glob) means later migrations — e.g.
+# 20260613 funnel attribution, which adds inquiries.anonymous_session_id — are
+# picked up automatically. Skips rollback/verify scripts; sorted for correct order.
+CE_MIGRATION_FLOOR=20260611
 shopt -s nullglob
 COUNT=0
-for f in supabase/migrations/20260611*.sql; do
-  case "$f" in
+for f in $(printf '%s\n' supabase/migrations/*.sql | sort); do
+  base=$(basename "$f")
+  case "$base" in
     *_rollback.sql|*_verify.sql) continue ;;
   esac
+  prefix=${base:0:8}
+  [[ "$prefix" =~ ^[0-9]{8}$ ]] || continue
+  (( 10#$prefix >= CE_MIGRATION_FLOOR )) || continue
   echo "applying $f"
   run_psql -f "$f"
   (( COUNT++ )) || true
 done
 
 if [[ $COUNT -eq 0 ]]; then
-  echo "WARNING: no 20260611* migrations found — baseline only" >&2
+  echo "WARNING: no content-engine migrations (>= $CE_MIGRATION_FLOOR) found — baseline only" >&2
 fi
 
-# Run verify scripts for content-engine migrations.
-for f in supabase/migrations/20260611*_verify.sql; do
-  [[ -e "$f" ]] || continue
+# Run verify scripts for the same content-engine-era migrations.
+for f in $(printf '%s\n' supabase/migrations/*_verify.sql | sort); do
+  base=$(basename "$f")
+  prefix=${base:0:8}
+  [[ "$prefix" =~ ^[0-9]{8}$ ]] || continue
+  (( 10#$prefix >= CE_MIGRATION_FLOOR )) || continue
   echo "verifying $f"
   run_psql -f "$f"
 done

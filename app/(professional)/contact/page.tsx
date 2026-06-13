@@ -117,6 +117,7 @@ export default function ContactPage() {
             alt="Graduate celebrating during a Bay Area portrait session by Chris Solorzano"
             sizes="(max-width: 920px) 90vw, 360px"
             quality={90}
+            unoptimized
           />
         </div>
       </section>

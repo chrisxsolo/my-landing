@@ -12,11 +12,11 @@ import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 export const revalidate = 3600;
 
 export const metadata: Metadata = {
-  title: "Blog",
+  title: "Journal",
   description: "Session notes and case studies from soloxsnaps in San Francisco and the Bay Area.",
   alternates: { canonical: "/blog" },
   openGraph: {
-    title: "Blog | soloxsnaps",
+    title: "Journal | soloxsnaps",
     description: "Professional photography case studies and session notes from soloxsnaps.",
     type: "website",
   },
@@ -442,7 +442,7 @@ export default async function ProfessionalBlogPage() {
         <div className="blog-shell">
           <div className="blog-hero-kicker">
             <span className="blog-hero-kicker-dot" />
-            Blog
+            Journal
           </div>
 
           <h1 className="blog-hero-heading">

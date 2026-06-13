@@ -36,3 +36,30 @@ export async function getFeaturedTestimonials(limit = 6): Promise<FeaturedTestim
     session_type: row.session_type,
   }));
 }
+
+// Maps a free-text testimonial session_type (e.g. "SJSU Graduation Session",
+// "Maternity Session") onto a normalized portfolio category slug. Returns null
+// when it doesn't clearly belong to a portfolio category.
+export function testimonialCategorySlug(sessionType: string | null): string | null {
+  if (!sessionType) return null;
+  const value = sessionType.toLowerCase();
+  if (value.includes("grad")) return "grads";
+  if (value.includes("family") || value.includes("maternity") || value.includes("newborn")) {
+    return "families";
+  }
+  if (value.includes("couple") || value.includes("engage")) return "couples";
+  return null;
+}
+
+// Portfolio category proof. Reuses the homepage testimonial query, then keeps
+// only the testimonials whose session_type maps to the requested category.
+// Returns [] when none match, so the proof block renders nothing.
+export async function getFeaturedTestimonialsForCategory(
+  categorySlug: string,
+  limit = 3,
+): Promise<FeaturedTestimonial[]> {
+  const all = await getFeaturedTestimonials(12);
+  return all
+    .filter((testimonial) => testimonialCategorySlug(testimonial.session_type) === categorySlug)
+    .slice(0, Math.max(limit, 1));
+}

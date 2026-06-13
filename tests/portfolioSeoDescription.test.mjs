@@ -16,6 +16,10 @@ test("normalizePortfolioSeoTags keeps only supported quick-tag values", () => {
     {
       school: "UC Berkeley",
       location: "Legion of Honor",
+      session: null,
+      degree: null,
+      year: null,
+      attire: null,
       goldenHour: true,
     },
   );
@@ -29,6 +33,10 @@ test("normalizePortfolioSeoTags keeps only supported quick-tag values", () => {
     {
       school: null,
       location: null,
+      session: null,
+      degree: null,
+      year: null,
+      attire: null,
       goldenHour: false,
     },
   );
@@ -56,6 +64,6 @@ test("buildPortfolioSeoDescription handles on-campus photos without awkward loca
     goldenHour: false,
   });
 
-  assert.equal(description.title, "SF State on-campus grad portrait");
-  assert.equal(description.alt, "SF State graduation portrait taken on campus in the Bay Area");
+  assert.equal(description.title, "SF State grad portrait on campus");
+  assert.equal(description.alt, "SF State graduation portrait on campus in the Bay Area");
 });

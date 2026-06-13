@@ -307,7 +307,7 @@ export default function ThanksPage() {
               <div className="thanks-card">
                 <p className="thanks-kicker">Then</p>
                 <h2>We lock the session.</h2>
-                <p>Once the date works, I send the contract, deposit step, and any prep notes you need.</p>
+                <p>Once the date works, I send the contract, retainer step, and any prep notes you need.</p>
               </div>
             </div>
 

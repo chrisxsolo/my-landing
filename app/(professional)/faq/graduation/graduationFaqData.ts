@@ -23,12 +23,12 @@ export const FAQS: FAQGroup[] = [
         a: "As early as possible — especially for May graduation season. Spring dates at UC Berkeley, SJSU, SF State, USF, and CSUEB fill up fast. If you have a specific date near your ceremony, reach out at least 3–4 weeks ahead.",
       },
       {
-        q: "What's the deposit and when is it due?",
-        a: `The retainer is ${BOOKING_POLICY.retainerPercent}% of the session total. It's due when you confirm your date and is ${BOOKING_POLICY.retainerRefundability} but transferable - it can be applied toward rescheduling or a future session with advance notice.`,
+        q: "What's the retainer and when is it due?",
+        a: `The retainer is ${BOOKING_POLICY.retainerPercent}% of the session total. It's due when you confirm your date and is ${BOOKING_POLICY.retainerRefundability} but transferable - it can be applied toward rescheduling or a future session with advance notice. The remaining balance is due ${BOOKING_POLICY.remainingBalanceDeadline}.`,
       },
       {
         q: "What happens if I need to reschedule?",
-        a: "Life happens. If you need to reschedule, reach out as early as possible. Your deposit transfers to the new date as long as I have availability. Last-minute cancellations (same day or day before) are not eligible for rescheduling.",
+        a: "Life happens. If you need to reschedule, reach out as early as possible. Your retainer transfers to the new date as long as I have availability. Last-minute cancellations (same day or day before) are not eligible for rescheduling.",
       },
       {
         q: "What if the weather is bad?",
