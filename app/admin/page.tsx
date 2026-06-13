@@ -60,6 +60,7 @@ import QuickFormatTool from "@/app/admin/QuickFormatTool";
 import PaymentAnalyticsTab from "@/app/admin/PaymentAnalyticsTab";
 import ClientTimeline from "@/app/admin/ClientTimeline";
 import InquiryAnalyticsTab from "@/app/admin/InquiryAnalyticsTab";
+import AttributionTab from "@/app/admin/AttributionTab";
 import VaultTab from "@/app/admin/VaultTab";
 import AiTab from "@/app/admin/AiTab";
 import ChatTab from "@/app/admin/ChatTab";
@@ -102,7 +103,7 @@ import {
 
 export const dynamic = 'force-dynamic'
 
-type Tab = "home"|"poses"|"couplesGuide"|"couplesLocations"|"locations"|"bayGuide"|"familyGuide"|"portfolio"|"categories"|"blog"|"library"|"navigation"|"aboutPage"|"analytics"|"payments"|"inquiries"|"clients"|"testimonials"|"funnel"|"vault"|"ai"|"chat"|"format"|"accounts";
+type Tab = "home"|"poses"|"couplesGuide"|"couplesLocations"|"locations"|"bayGuide"|"familyGuide"|"portfolio"|"categories"|"blog"|"library"|"navigation"|"aboutPage"|"analytics"|"payments"|"inquiries"|"clients"|"testimonials"|"funnel"|"attribution"|"vault"|"ai"|"chat"|"format"|"accounts";
 type ImageLibraryRow = { id:number; title:string; alt:string|null; image_url:string; source_type:string; source_post_id:number|null; source_post_slug:string|null; source_role:string; in_portfolio:boolean; created_at:string; };
 type Inquiry = AdminInquiry;
 type AdminSessionsResponse = { sessions?: AdminClientSessionDTO[]; session?: AdminClientSessionDTO; error?: string; };
@@ -124,9 +125,9 @@ const EMPTY_CATEGORY = {name:"",slug:"",description:"",sort_order:"1",active:tru
 const EMPTY_PORTFOLIO = {title:"",alt:"",category_slug:"graduation",featured:false,sort_order:""};
 const EMPTY_PORTFOLIO_SEO_DRAFT: PortfolioSeoDraft = {school:null,location:null,session:null,degree:null,year:null,attire:null,goldenHour:false};
 const WEBSITE_TABS:Tab[]=["poses","couplesGuide","couplesLocations","locations","bayGuide","familyGuide","portfolio","categories","blog","library","navigation","aboutPage"];
-const CLIENT_TABS:Tab[]=["inquiries","clients","testimonials","analytics","payments","funnel","ai","chat","format"];
+const CLIENT_TABS:Tab[]=["inquiries","clients","testimonials","analytics","payments","funnel","attribution","ai","chat","format"];
 const VAULT_TABS:Tab[]=["vault"];
-const TAB_LABELS:Record<Tab,string>={home:"🏠 Home",poses:"📸 Grad Poses",couplesGuide:"💞 Couples Posing Guide",couplesLocations:"💑 Couples Locations",locations:"📍 Campus Spots",bayGuide:"🗺️ Bay Guide",familyGuide:"👨‍👩‍👧 Family Guide",portfolio:"🖼️ Portfolio",categories:"🏷️ Categories",blog:"✍️ Blog",library:"🗄️ Image Library",navigation:"🧭 Navigation",aboutPage:"🙋 About Page",analytics:"📊 Analytics",payments:"💵 Revenue",funnel:"📈 Funnel",inquiries:"📬 Inquiries",clients:"👥 Clients",testimonials:"💬 Testimonials",vault:"📓 Vault",ai:"🤖 AI Training",chat:"💬 AI Chat",format:"✨ Quick Format",accounts:"👤 Accounts"};
+const TAB_LABELS:Record<Tab,string>={home:"🏠 Home",poses:"📸 Grad Poses",couplesGuide:"💞 Couples Posing Guide",couplesLocations:"💑 Couples Locations",locations:"📍 Campus Spots",bayGuide:"🗺️ Bay Guide",familyGuide:"👨‍👩‍👧 Family Guide",portfolio:"🖼️ Portfolio",categories:"🏷️ Categories",blog:"✍️ Blog",library:"🗄️ Image Library",navigation:"🧭 Navigation",aboutPage:"🙋 About Page",analytics:"📊 Analytics",payments:"💵 Revenue",funnel:"📈 Funnel",attribution:"🎯 Attribution",inquiries:"📬 Inquiries",clients:"👥 Clients",testimonials:"💬 Testimonials",vault:"📓 Vault",ai:"🤖 AI Training",chat:"💬 AI Chat",format:"✨ Quick Format",accounts:"👤 Accounts"};
 // The six home-page "work grid" slots, in display order — used for the batch picker.
 const WORK_GRID_KEYS=["home_story_1","home_story_2","home_story_3","home_story_4","home_story_5","home_story_6"] as const;
 
@@ -1555,8 +1556,8 @@ function AdminDashboard() {
                 <NavBtn t="home" icon="🏠" label="Home"/>
                 <div className="h-px my-2 mx-1" style={{background:T.rowBorder}}/>
                 <p className="text-[10px] font-black uppercase tracking-[0.13em] px-3 pt-0.5 pb-1" style={{color:T.inkFaint}}>Client Work</p>
-                {(["inquiries","clients","testimonials","analytics","payments","funnel"] as Tab[]).map(t=>(
-                  <NavBtn key={t} t={t} icon={t==="inquiries"?"📬":t==="clients"?"👥":t==="testimonials"?"💬":t==="analytics"?"📊":t==="payments"?"💵":"📈"} label={TAB_LABELS[t].replace(/^[^\s]+\s/,"")} badge={t==="inquiries"?pendingNavCount:undefined}/>
+                {(["inquiries","clients","testimonials","analytics","payments","funnel","attribution"] as Tab[]).map(t=>(
+                  <NavBtn key={t} t={t} icon={t==="inquiries"?"📬":t==="clients"?"👥":t==="testimonials"?"💬":t==="analytics"?"📊":t==="payments"?"💵":t==="attribution"?"🎯":"📈"} label={TAB_LABELS[t].replace(/^[^\s]+\s/,"")} badge={t==="inquiries"?pendingNavCount:undefined}/>
                 ))}
                 <div className="h-px my-2 mx-1" style={{background:T.rowBorder}}/>
                 <p className="text-[10px] font-black uppercase tracking-[0.13em] px-3 pt-0.5 pb-1" style={{color:T.inkFaint}}>Website</p>
@@ -1607,7 +1608,7 @@ function AdminDashboard() {
           const go=(t:Tab)=>{cancelAll();setTab(t);};
           type MobileNavItem={t:Tab;icon:string;label:string};
           const all:MobileNavItem[]=[
-            {t:"home",icon:"🏠",label:"Home"},{t:"inquiries",icon:"📬",label:"Inquiries"},{t:"clients",icon:"👥",label:"Clients"},{t:"testimonials",icon:"💬",label:"Testimonials"},{t:"analytics",icon:"📊",label:"Analytics"},{t:"payments",icon:"💵",label:"Revenue"},{t:"funnel",icon:"📈",label:"Funnel"},
+            {t:"home",icon:"🏠",label:"Home"},{t:"inquiries",icon:"📬",label:"Inquiries"},{t:"clients",icon:"👥",label:"Clients"},{t:"testimonials",icon:"💬",label:"Testimonials"},{t:"analytics",icon:"📊",label:"Analytics"},{t:"payments",icon:"💵",label:"Revenue"},{t:"funnel",icon:"📈",label:"Funnel"},{t:"attribution",icon:"🎯",label:"Attribution"},
             {t:"poses",icon:"📸",label:"Poses"},{t:"couplesGuide",icon:"💞",label:"Couples Guide"},{t:"locations",icon:"📍",label:"Spots"},{t:"bayGuide",icon:"🗺️",label:"Bay Guide"},{t:"portfolio",icon:"🖼️",label:"Portfolio"},{t:"categories",icon:"🏷️",label:"Categories"},{t:"blog",icon:"✍️",label:"Blog"},{t:"library",icon:"🗄️",label:"Library"},{t:"navigation",icon:"🧭",label:"Navigation"},
             {t:"ai",icon:"🤖",label:"AI Training"},{t:"chat",icon:"💬",label:"AI Chat"},{t:"format",icon:"✨",label:"Format"},{t:"vault",icon:"📓",label:"Vault"},{t:"accounts",icon:"👤",label:"Accounts"},
           ];
@@ -2716,6 +2717,10 @@ function AdminDashboard() {
 
         {tab==="funnel"&&(
           <InquiryAnalyticsTab/>
+        )}
+
+        {tab==="attribution"&&(
+          <AttributionTab/>
         )}
 
         {/* ── INQUIRIES ── */}
