@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(sed -n '105,120p')",
+      "Bash(sed -n '110,125p' /Users/chrissolo/Documents/github/my-landing/app/components/admin-sessions-dashboard.tsx)",
+      "Bash(git -C /Users/chrissolo/Documents/github/my-landing diff 7fa740f..HEAD -- lib/adminPortalSessionNavigation.ts tests/unit/adminPortalSessionNavigation.test.ts)"
+    ]
+  }
+}
