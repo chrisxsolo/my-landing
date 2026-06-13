@@ -11,6 +11,7 @@ import {
   type CouplesLocationValue,
 } from "@/lib/pricing"
 import { BOOKING_POLICY, PRICING_CATALOG } from "@/lib/pricingCatalog"
+import { buildBookingIntentParams } from "@/lib/bookingIntent"
 import styles from "@/app/components/RateEstimator.module.css"
 
 const couplesPricing = PRICING_CATALOG.couples
@@ -35,16 +36,21 @@ export default function CouplesRateEstimator() {
 
   const pkgLabel  = COUPLES_PACKAGES[packageKey].label
   const locLabel  = COUPLES_LOCATIONS.find(l => l.value === location)?.label ?? location
-  const contactParams = new URLSearchParams({
+  const selectedAddOns = [
+    extraLocation   && couplesPricing.addOns.extraLocation.shortLabel,
+    extraOutfit     && couplesPricing.addOns.extraOutfit.shortLabel,
+    extra30Min      && couplesPricing.addOns.extra30Minutes.shortLabel,
+    proofingGallery && couplesPricing.addOns.proofingGallery.shortLabel,
+    rushPreview     && couplesPricing.addOns.rushPreview.shortLabel,
+    expedited       && couplesPricing.addOns.expedited.shortLabel,
+  ].filter(Boolean) as string[]
+  const contactParams = buildBookingIntentParams({
+    sourcePage: "couples-estimator",
+    sessionType: "Couples Session",
     package: pkgLabel,
     location: locLabel,
-    ...(extraLocation  && { extraLocation: "yes" }),
-    ...(extraOutfit    && { extraOutfit: "yes" }),
-    ...(extra30Min     && { extra30Min: "yes" }),
-    ...(proofingGallery && { proofingGallery: "yes" }),
-    ...(rushPreview    && { rushPreview: "yes" }),
-    ...(expedited      && { expedited: "yes" }),
-    estimatedTotal: String(estimate.subtotal),
+    addOns: selectedAddOns,
+    estimatedTotal: estimate.subtotal,
   })
 
   const travelDisplay =

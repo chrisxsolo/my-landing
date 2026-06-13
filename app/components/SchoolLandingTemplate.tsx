@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
 import { PRICING_CATALOG, getGraduationTravelNote } from "@/lib/pricingCatalog";
+import { buildBookingIntentParams } from "@/lib/bookingIntent";
 import SchoolLandingDetails from "./SchoolLandingDetails";
 import SchoolGallery from "./SchoolGallery";
 import ContentEventBeacon from "@/app/components/ContentEventBeacon";
@@ -309,7 +310,11 @@ const CSS = `
 
 export default function SchoolLandingTemplate({ data }: { data: SchoolLandingData }) {
   const travelNote = getGraduationTravelNote(data.slug);
-  const contactParams = new URLSearchParams({ school: data.school });
+  const contactParams = buildBookingIntentParams({
+    sourcePage: "school-page",
+    sessionType: "Graduation Portrait",
+    school: data.school,
+  });
 
   return (
     <main className="school-page">

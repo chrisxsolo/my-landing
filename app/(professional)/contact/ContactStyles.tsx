@@ -255,6 +255,75 @@ const CSS = `
     font-size: 13px;
     font-weight: 760;
   }
+  .booking-intent {
+    margin: 0 0 24px;
+    padding: 18px 20px;
+    border: 1px solid ${C.proAccentBorder};
+    border-radius: 8px;
+    background: ${C.proAccentSoft};
+  }
+  .booking-intent .contact-kicker {
+    margin-bottom: 8px;
+    color: ${C.proAccent};
+  }
+  .booking-intent-headline {
+    margin: 0;
+    color: var(--ink);
+    font-size: 20px;
+    font-weight: 860;
+    line-height: 1.15;
+  }
+  .booking-intent-meta {
+    margin: 6px 0 0;
+    color: var(--ink-muted);
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  .booking-intent-addons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+    margin-top: 12px;
+  }
+  .booking-intent-tag {
+    display: inline-flex;
+    align-items: center;
+    min-height: 30px;
+    padding: 0 10px;
+    border: 1px solid ${C.proBorder};
+    border-radius: 8px;
+    background: ${C.surface};
+    color: var(--ink);
+    font-size: 13px;
+    font-weight: 760;
+  }
+  .booking-intent-total {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid ${C.proAccentBorder};
+  }
+  .booking-intent-total span {
+    color: var(--ink-dim);
+    font-size: 12px;
+    font-weight: 820;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .booking-intent-total strong {
+    color: var(--ink);
+    font-size: 22px;
+    font-weight: 880;
+  }
+  .booking-intent-note {
+    margin: 12px 0 0;
+    color: var(--ink-muted);
+    font-size: 13px;
+    line-height: 1.5;
+  }
   .contact-form-loading {
     display: grid;
     gap: 14px;

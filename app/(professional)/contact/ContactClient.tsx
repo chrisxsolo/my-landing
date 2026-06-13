@@ -1,8 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import ContactFormFields from "./ContactFormFields";
+import BookingIntentSummary from "./BookingIntentSummary";
+import {
+  parseBookingIntent,
+  headcountToSelectValue,
+  hasBookingIntent,
+  formatBookingIntentSummary,
+  type BookingIntent,
+} from "@/lib/bookingIntent";
 
 export type ContactFormValues = {
   name: string;
@@ -32,14 +40,14 @@ const INITIAL_FORM: ContactFormValues = {
   message: "",
 };
 
-function getInitialForm(searchParams: ReturnType<typeof useSearchParams>): ContactFormValues {
-  const graduates = searchParams.get("graduates");
+function getInitialForm(intent: BookingIntent): ContactFormValues {
   return {
     ...INITIAL_FORM,
-    date: searchParams.get("date") ?? "",
-    school: searchParams.get("school") ?? "",
-    people: graduates ? (graduates === "1" ? "Just me" : `${graduates} people`) : "",
-    sessionType: searchParams.get("sessionType") ?? "",
+    sessionType: intent.sessionType ?? "",
+    school: intent.school ?? "",
+    people: intent.headcount ? headcountToSelectValue(intent.headcount) : "",
+    date: intent.date ?? "",
+    location: intent.location ?? "",
   };
 }
 
@@ -75,7 +83,8 @@ function HoneypotField({ value, onChange }: { value: string; onChange: (value: s
 export default function ContactClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [form, setForm] = useState(() => getInitialForm(searchParams));
+  const intent = useMemo(() => parseBookingIntent(searchParams), [searchParams]);
+  const [form, setForm] = useState(() => getInitialForm(intent));
   const [status, setStatus] = useState<"idle" | "sending" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
   const [website, setWebsite] = useState("");
@@ -96,8 +105,15 @@ export default function ContactClient() {
     setErrorMsg("");
 
     try {
-      await sendInquiry(form, website, startedAt);
-      sessionStorage.setItem("inquiry_submitted", JSON.stringify(form));
+      // Fold the configured session details into the message so the add-ons,
+      // duration, and estimated total reach the photographer — the inquiries
+      // table has no dedicated columns for them.
+      const summary = formatBookingIntentSummary(intent);
+      const message = summary ? `${summary}\n\n${form.message}`.trim() : form.message;
+      const payload = { ...form, message };
+
+      await sendInquiry(payload, website, startedAt);
+      sessionStorage.setItem("inquiry_submitted", JSON.stringify(payload));
       router.push("/contact/thanks");
     } catch (error) {
       setErrorMsg(error instanceof Error ? error.message : "Something went wrong. Please try again.");
@@ -107,6 +123,7 @@ export default function ContactClient() {
 
   return (
     <form onSubmit={handleSubmit}>
+      {hasBookingIntent(intent) ? <BookingIntentSummary intent={intent} /> : null}
       <HoneypotField value={website} onChange={setWebsite} />
       <ContactFormFields form={form} onChange={handleChange} />
 

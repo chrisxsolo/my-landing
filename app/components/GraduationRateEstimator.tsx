@@ -10,6 +10,7 @@ import {
   type SessionLengthKey,
 } from "@/lib/pricing"
 import { BOOKING_POLICY, PRICING_CATALOG } from "@/lib/pricingCatalog"
+import { buildBookingIntentParams } from "@/lib/bookingIntent"
 import styles from "@/app/components/RateEstimator.module.css"
 
 const graduationPricing = PRICING_CATALOG.graduation
@@ -35,15 +36,20 @@ export default function GraduationRateEstimator() {
   const sessionLabelMap: Record<SessionLengthKey, string> = {
     "1hr": "1 hour", "1.5hr": "90 minutes", "2hr": "2 hours",
   }
-  const contactParams = new URLSearchParams({
+  const selectedAddOns = [
+    extraOutfit    && graduationPricing.addOns.extraOutfit.shortLabel,
+    secondLocation && graduationPricing.addOns.secondLocation.shortLabel,
+    expedited      && graduationPricing.addOns.expedited.shortLabel,
+    champagne      && graduationPricing.addOns.champagne.shortLabel,
+  ].filter(Boolean) as string[]
+  const contactParams = buildBookingIntentParams({
+    sourcePage: "grad-estimator",
+    sessionType: "Graduation Portrait",
     school: schoolLabel,
-    graduates: String(people),
-    sessionLength: sessionLabelMap[sessionLength],
-    ...(extraOutfit    && { extraOutfit: "yes" }),
-    ...(secondLocation && { secondLocation: "yes" }),
-    ...(expedited      && { expedited: "yes" }),
-    ...(champagne      && { champagne: "yes" }),
-    estimatedTotal: String(estimate.subtotal),
+    headcount: people,
+    duration: sessionLabelMap[sessionLength],
+    addOns: selectedAddOns,
+    estimatedTotal: estimate.subtotal,
   })
 
   const travelDisplay =
