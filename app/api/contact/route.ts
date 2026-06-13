@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { rateLimit } from "@/lib/rateLimit";
+import { normalizeVisitorId } from "@/lib/contentEngine/trackEventRules";
+import { recordContentEvent } from "@/lib/contentEngine/recordEvent";
 
 const DEFAULT_CONTACT_EMAIL_TO = "chrisxsolo2@gmail.com";
 const DEFAULT_CONTACT_EMAIL_FROM = "soloxsnaps contact <onboarding@resend.dev>";
@@ -125,6 +127,7 @@ export async function POST(req: NextRequest) {
     const preferredTime = cleanText(body.preferredTime);
     const people = cleanText(body.people);
     const location = cleanText(body.location);
+    const visitorId = normalizeVisitorId(body.anonymousSessionId);
 
     if (!name || !email || !message) {
       return NextResponse.json({ error: "Name, email, and message are required." }, { status: 400 });
@@ -191,6 +194,7 @@ export async function POST(req: NextRequest) {
         preferred_time: preferredTime || null,
         people: people || null,
         location: location || null,
+        anonymous_session_id: visitorId,
       })
       .select("id")
       .single();
@@ -198,6 +202,26 @@ export async function POST(req: NextRequest) {
     if (dbError) {
       console.error("Failed to save inquiry to DB:", dbError);
       // Don't fail the request — still try to send email
+    }
+
+    // Funnel event: inquiry_submit. Emitted server-side so it can't be lost to
+    // the client's post-submit redirect. recordContentEvent shares the same
+    // service-role client and is fail-soft (logs, never throws).
+    if (!dbError) {
+      try {
+        await recordContentEvent(supabase, {
+          event: "inquiry_submit",
+          path: "/contact",
+          contentType: "page",
+          contentId: null,
+          referrer: req.headers.get("referer") ?? "",
+          target: null,
+          anonymousSessionId: visitorId,
+          meta: sessionType ? { sessionType } : null,
+        });
+      } catch (eventError) {
+        console.error("Failed to record inquiry_submit event:", eventError);
+      }
     }
 
     let emailSent = false;

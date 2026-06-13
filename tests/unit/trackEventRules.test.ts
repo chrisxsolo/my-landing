@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   normalizeEventPath, normalizeReferrer, isLikelyBot,
+  normalizeVisitorId, sanitizeMeta,
   TRACKED_EVENT_TYPES, TRACKED_CONTENT_TYPES,
 } from "@/lib/contentEngine/trackEventRules";
 
@@ -41,9 +42,43 @@ describe("isLikelyBot", () => {
   });
 });
 
-describe("allowlists (v1 records page_view + cta_click only)", () => {
+describe("normalizeVisitorId", () => {
+  it("accepts a UUID-shaped token", () => {
+    expect(normalizeVisitorId("a1b2c3d4-e5f6-4789-abcd-1234567890ef"))
+      .toBe("a1b2c3d4-e5f6-4789-abcd-1234567890ef");
+  });
+  it("rejects non-strings, empties, oversized, and unsafe characters", () => {
+    expect(normalizeVisitorId(null)).toBeNull();
+    expect(normalizeVisitorId("")).toBeNull();
+    expect(normalizeVisitorId("a".repeat(65))).toBeNull();
+    expect(normalizeVisitorId("drop;--table")).toBeNull();
+    expect(normalizeVisitorId("has spaces")).toBeNull();
+  });
+});
+
+describe("sanitizeMeta", () => {
+  it("keeps whitelisted keys with primitive values", () => {
+    expect(sanitizeMeta({ sessionType: "Couples Session", estimatedTotalCents: 45000 }))
+      .toEqual({ sessionType: "Couples Session", estimatedTotalCents: 45000 });
+  });
+  it("drops unknown keys, bad types, and returns null when empty", () => {
+    expect(sanitizeMeta({ evil: "x", note: "free text" })).toBeNull();
+    expect(sanitizeMeta({ estimatedTotalCents: Number.NaN })).toBeNull();
+    expect(sanitizeMeta(null)).toBeNull();
+    expect(sanitizeMeta([1, 2, 3])).toBeNull();
+  });
+  it("caps string length at 120 chars", () => {
+    const out = sanitizeMeta({ school: "x".repeat(200) });
+    expect(out?.school).toHaveLength(120);
+  });
+});
+
+describe("allowlists (page/cta + booking funnel events)", () => {
   it("limits event and content types", () => {
-    expect([...TRACKED_EVENT_TYPES]).toEqual(["page_view", "cta_click"]);
+    expect([...TRACKED_EVENT_TYPES]).toEqual([
+      "page_view", "cta_click", "pricing_view", "estimator_start",
+      "estimator_complete", "availability_selected", "inquiry_start", "inquiry_submit",
+    ]);
     expect(TRACKED_CONTENT_TYPES).toContain("blog_post");
     expect(TRACKED_CONTENT_TYPES).toContain("school_page");
   });

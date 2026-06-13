@@ -43,6 +43,8 @@ export async function POST(req: NextRequest) {
           && typeof (body.target as Record<string, unknown>).id === "string"
           ? { type: (body.target as Record<string, string>).type, id: (body.target as Record<string, string>).id }
           : null,
+      anonymousSessionId: typeof body.anonymousSessionId === "string" ? body.anonymousSessionId : null,
+      meta: body.meta && typeof body.meta === "object" ? (body.meta as Record<string, unknown>) : null,
     });
   } catch (err) {
     console.error("track-event failed", err);

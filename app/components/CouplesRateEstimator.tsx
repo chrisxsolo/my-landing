@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useRef } from "react"
 import Link from "next/link"
 import {
   COUPLES_PACKAGES,
@@ -12,6 +12,7 @@ import {
 } from "@/lib/pricing"
 import { BOOKING_POLICY, PRICING_CATALOG } from "@/lib/pricingCatalog"
 import { buildBookingIntentParams } from "@/lib/bookingIntent"
+import { trackEvent } from "@/lib/analytics/visitor"
 import styles from "@/app/components/RateEstimator.module.css"
 
 const couplesPricing = PRICING_CATALOG.couples
@@ -53,6 +54,26 @@ export default function CouplesRateEstimator() {
     estimatedTotal: estimate.subtotal,
   })
 
+  // Funnel events: estimator_start once on first interaction; estimator_complete
+  // on click-through to inquire, carrying the configured quote.
+  const startedRef = useRef(false)
+  const markStarted = () => {
+    if (startedRef.current) return
+    startedRef.current = true
+    trackEvent({ event: "estimator_start", meta: { sessionType: "Couples Session" } })
+  }
+  const markComplete = () => {
+    trackEvent({
+      event: "estimator_complete",
+      meta: {
+        sessionType: "Couples Session",
+        package: pkgLabel,
+        addOnCount: selectedAddOns.length,
+        estimatedTotalCents: Math.round(estimate.subtotal * 100),
+      },
+    })
+  }
+
   const travelDisplay =
     estimate.travelMethod === "none" ? "Included" :
     estimate.travelMethod === "tbd"  ? "TBD" :
@@ -86,7 +107,7 @@ export default function CouplesRateEstimator() {
             <select
               className={styles.estimatorSelect}
               value={packageKey}
-              onChange={e => setPackageKey(e.target.value as CouplesPackageKey)}
+              onChange={e => { markStarted(); setPackageKey(e.target.value as CouplesPackageKey) }}
             >
               {(Object.entries(COUPLES_PACKAGES) as [CouplesPackageKey, { label: string; price: number }][]).map(
                 ([key, pkg]) => (
@@ -103,7 +124,7 @@ export default function CouplesRateEstimator() {
             <select
               className={styles.estimatorSelect}
               value={location}
-              onChange={e => setLocation(e.target.value as CouplesLocationValue)}
+              onChange={e => { markStarted(); setLocation(e.target.value as CouplesLocationValue) }}
             >
               {COUPLES_LOCATIONS.map(loc => (
                 <option key={loc.value} value={loc.value}>{loc.label}</option>
@@ -117,22 +138,22 @@ export default function CouplesRateEstimator() {
         <div className={styles.estimatorAddons}>
           <label className={styles.estimatorLabel}>Add-ons</label>
           <div className={styles.estimatorToggleRow}>
-            <button className={styles.estimatorToggle} data-on={extraLocation}  onClick={() => setExtraLoc(v => !v)}>
+            <button className={styles.estimatorToggle} data-on={extraLocation}  onClick={() => { markStarted(); setExtraLoc(v => !v) }}>
               {extraLocation ? "✓ " : ""}{couplesPricing.addOns.extraLocation.shortLabel} +{formatCurrency(couplesPricing.addOns.extraLocation.price)}
             </button>
-            <button className={styles.estimatorToggle} data-on={extraOutfit}    onClick={() => setExtraOutfit(v => !v)}>
+            <button className={styles.estimatorToggle} data-on={extraOutfit}    onClick={() => { markStarted(); setExtraOutfit(v => !v) }}>
               {extraOutfit ? "✓ " : ""}{couplesPricing.addOns.extraOutfit.shortLabel} +{formatCurrency(couplesPricing.addOns.extraOutfit.price)}
             </button>
-            <button className={styles.estimatorToggle} data-on={extra30Min}     onClick={() => setExtra30Min(v => !v)}>
+            <button className={styles.estimatorToggle} data-on={extra30Min}     onClick={() => { markStarted(); setExtra30Min(v => !v) }}>
               {extra30Min ? "✓ " : ""}{couplesPricing.addOns.extra30Minutes.shortLabel} +{formatCurrency(couplesPricing.addOns.extra30Minutes.price)}
             </button>
-            <button className={styles.estimatorToggle} data-on={proofingGallery} onClick={() => setProofing(v => !v)}>
+            <button className={styles.estimatorToggle} data-on={proofingGallery} onClick={() => { markStarted(); setProofing(v => !v) }}>
               {proofingGallery ? "✓ " : ""}{couplesPricing.addOns.proofingGallery.shortLabel} +{formatCurrency(couplesPricing.addOns.proofingGallery.price)}
             </button>
-            <button className={styles.estimatorToggle} data-on={rushPreview}    onClick={() => setRushPreview(v => !v)}>
+            <button className={styles.estimatorToggle} data-on={rushPreview}    onClick={() => { markStarted(); setRushPreview(v => !v) }}>
               {rushPreview ? "✓ " : ""}{couplesPricing.addOns.rushPreview.shortLabel} +{formatCurrency(couplesPricing.addOns.rushPreview.price)}
             </button>
-            <button className={styles.estimatorToggle} data-on={expedited}      onClick={() => setExpedited(v => !v)}>
+            <button className={styles.estimatorToggle} data-on={expedited}      onClick={() => { markStarted(); setExpedited(v => !v) }}>
               {expedited ? "✓ " : ""}{couplesPricing.addOns.expedited.shortLabel} +{formatCurrency(couplesPricing.addOns.expedited.price)}
             </button>
           </div>
@@ -188,7 +209,7 @@ export default function CouplesRateEstimator() {
 
         {/* ── CTAs ──────────────────────────────────────────────────────────── */}
         <div className={styles.estimatorCtas}>
-          <Link href={`/contact?${contactParams.toString()}`} className={styles.estimatorCtaPrimary}>
+          <Link href={`/contact?${contactParams.toString()}`} className={styles.estimatorCtaPrimary} onClick={markComplete}>
             Inquire About This Estimate
           </Link>
           <Link

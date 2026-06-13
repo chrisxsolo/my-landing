@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import ContactFormFields from "./ContactFormFields";
 import BookingIntentSummary from "./BookingIntentSummary";
+import { getVisitorId, trackEvent } from "@/lib/analytics/visitor";
 import {
   parseBookingIntent,
   headcountToSelectValue,
@@ -55,7 +56,9 @@ async function sendInquiry(form: ContactFormValues, website: string, startedAt: 
   const response = await fetch("/api/contact", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...form, website, renderedAt: startedAt }),
+    // anonymousSessionId is the stitch: it ties this inquiry back to the visitor
+    // session (landing page, referrer, UTM) that first brought them in.
+    body: JSON.stringify({ ...form, website, renderedAt: startedAt, anonymousSessionId: getVisitorId() }),
   });
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
@@ -89,10 +92,15 @@ export default function ContactClient() {
   const [errorMsg, setErrorMsg] = useState("");
   const [website, setWebsite] = useState("");
   const [startedAt] = useState(() => Date.now());
+  const inquiryStartedRef = useRef(false);
 
   function handleChange(
     event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>,
   ) {
+    if (!inquiryStartedRef.current) {
+      inquiryStartedRef.current = true;
+      trackEvent({ event: "inquiry_start", path: "/contact" });
+    }
     const { name, value } = event.target;
     setForm((current) => ({ ...current, [name]: value }));
   }

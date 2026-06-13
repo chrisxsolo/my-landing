@@ -5,7 +5,7 @@
 // session. Server timestamps only — content_events.viewed_at defaults to now().
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
-  normalizeEventPath, normalizeReferrer,
+  normalizeEventPath, normalizeReferrer, normalizeVisitorId, sanitizeMeta,
   TRACKED_EVENT_TYPES, TRACKED_CONTENT_TYPES, type TrackedEventType,
 } from "@/lib/contentEngine/trackEventRules";
 
@@ -16,6 +16,8 @@ export interface TrackEventInput {
   contentId: string | null;
   referrer: string;
   target: { type: string; id: string } | null;
+  anonymousSessionId?: string | null;
+  meta?: Record<string, unknown> | null;
 }
 
 export interface RecordResult {
@@ -66,6 +68,8 @@ export async function recordContentEvent(
     content_id: input.contentId === null ? null : String(input.contentId).slice(0, 120),
     photography_session_id: attribution?.sessionId ?? null,
     content_item_id: attribution?.contentItemId ?? null,
+    anonymous_session_id: normalizeVisitorId(input.anonymousSessionId),
+    meta: sanitizeMeta(input.meta),
   });
   if (error) {
     console.error("content event insert failed:", error.message);

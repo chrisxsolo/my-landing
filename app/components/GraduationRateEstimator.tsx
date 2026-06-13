@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useRef } from "react"
 import Link from "next/link"
 import {
   SCHOOLS,
@@ -11,6 +11,7 @@ import {
 } from "@/lib/pricing"
 import { BOOKING_POLICY, PRICING_CATALOG } from "@/lib/pricingCatalog"
 import { buildBookingIntentParams } from "@/lib/bookingIntent"
+import { trackEvent } from "@/lib/analytics/visitor"
 import styles from "@/app/components/RateEstimator.module.css"
 
 const graduationPricing = PRICING_CATALOG.graduation
@@ -52,6 +53,29 @@ export default function GraduationRateEstimator() {
     estimatedTotal: estimate.subtotal,
   })
 
+  // Funnel events: estimator_start fires once on first interaction;
+  // estimator_complete fires when the visitor clicks through to inquire,
+  // carrying the configured quote so completion→inquiry can be measured.
+  const startedRef = useRef(false)
+  const markStarted = () => {
+    if (startedRef.current) return
+    startedRef.current = true
+    trackEvent({ event: "estimator_start", meta: { sessionType: "Graduation Portrait" } })
+  }
+  const markComplete = () => {
+    trackEvent({
+      event: "estimator_complete",
+      meta: {
+        sessionType: "Graduation Portrait",
+        school: schoolLabel,
+        headcount: people,
+        duration: sessionLabelMap[sessionLength],
+        addOnCount: selectedAddOns.length,
+        estimatedTotalCents: Math.round(estimate.subtotal * 100),
+      },
+    })
+  }
+
   const travelDisplay =
     estimate.travelMethod === "none" ? "Included" :
     estimate.travelMethod === "tbd"  ? "TBD" :
@@ -85,7 +109,7 @@ export default function GraduationRateEstimator() {
             <select
               className={styles.estimatorSelect}
               value={school}
-              onChange={e => setSchool(e.target.value as SchoolValue)}
+              onChange={e => { markStarted(); setSchool(e.target.value as SchoolValue) }}
             >
               {SCHOOLS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
             </select>
@@ -96,7 +120,7 @@ export default function GraduationRateEstimator() {
             <select
               className={styles.estimatorSelect}
               value={people}
-              onChange={e => setPeople(Number(e.target.value))}
+              onChange={e => { markStarted(); setPeople(Number(e.target.value)) }}
             >
               {[1, 2, 3, 4, 5].map(n => (
                 <option key={n} value={n}>{n === 5 ? "5 or more" : String(n)}</option>
@@ -109,7 +133,7 @@ export default function GraduationRateEstimator() {
             <select
               className={styles.estimatorSelect}
               value={sessionLength}
-              onChange={e => setSessionLen(e.target.value as SessionLengthKey)}
+              onChange={e => { markStarted(); setSessionLen(e.target.value as SessionLengthKey) }}
             >
               <option value="1hr">1 hour</option>
               <option value="1.5hr">90 minutes</option>
@@ -127,16 +151,16 @@ export default function GraduationRateEstimator() {
         <div className={styles.estimatorAddons}>
           <label className={styles.estimatorLabel}>Add-ons</label>
           <div className={styles.estimatorToggleRow}>
-            <button className={styles.estimatorToggle} data-on={extraOutfit}    onClick={() => setExtraOutfit(v => !v)}>
+            <button className={styles.estimatorToggle} data-on={extraOutfit}    onClick={() => { markStarted(); setExtraOutfit(v => !v) }}>
               {extraOutfit ? "✓ " : ""}{graduationPricing.addOns.extraOutfit.shortLabel} +{formatCurrency(graduationPricing.addOns.extraOutfit.price)}
             </button>
-            <button className={styles.estimatorToggle} data-on={secondLocation} onClick={() => setSecondLoc(v => !v)}>
+            <button className={styles.estimatorToggle} data-on={secondLocation} onClick={() => { markStarted(); setSecondLoc(v => !v) }}>
               {secondLocation ? "✓ " : ""}{graduationPricing.addOns.secondLocation.shortLabel} +{formatCurrency(graduationPricing.addOns.secondLocation.price)}
             </button>
-            <button className={styles.estimatorToggle} data-on={expedited}      onClick={() => setExpedited(v => !v)}>
+            <button className={styles.estimatorToggle} data-on={expedited}      onClick={() => { markStarted(); setExpedited(v => !v) }}>
               {expedited ? "✓ " : ""}{graduationPricing.addOns.expedited.shortLabel} +{formatCurrency(graduationPricing.addOns.expedited.price)}
             </button>
-            <button className={styles.estimatorToggle} data-on={champagne}      onClick={() => setChampagne(v => !v)}>
+            <button className={styles.estimatorToggle} data-on={champagne}      onClick={() => { markStarted(); setChampagne(v => !v) }}>
               {champagne ? "✓ " : ""}{graduationPricing.addOns.champagne.shortLabel} +{formatCurrency(graduationPricing.addOns.champagne.price)}
             </button>
           </div>
@@ -199,7 +223,7 @@ export default function GraduationRateEstimator() {
 
         {/* ── CTAs ──────────────────────────────────────────────────────────── */}
         <div className={styles.estimatorCtas}>
-          <Link href={`/contact?${contactParams.toString()}`} className={styles.estimatorCtaPrimary}>
+          <Link href={`/contact?${contactParams.toString()}`} className={styles.estimatorCtaPrimary} onClick={markComplete}>
             Inquire About This Estimate
           </Link>
           <Link

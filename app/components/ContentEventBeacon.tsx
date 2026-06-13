@@ -1,7 +1,10 @@
 "use client";
 // Page-view beacon + delegated /contact CTA tracking (spec §10). Renders
-// nothing. CTA clicks carry NO target — they attribute to the page only.
+// nothing. CTA clicks carry NO content target — they attribute to the page only.
+// Every event also carries the anonymous visitor id so content views/clicks
+// stitch into the same funnel journey as estimator and inquiry events.
 import { useEffect } from "react";
+import { getVisitorId } from "@/lib/analytics/visitor";
 
 export interface BeaconTarget {
   type: string;
@@ -16,7 +19,7 @@ interface Props {
 
 function send(payload: Record<string, unknown>) {
   try {
-    const body = JSON.stringify(payload);
+    const body = JSON.stringify({ ...payload, anonymousSessionId: getVisitorId() });
     if (body.length > 1900) return; // stay under the route's 2KB cap
     navigator.sendBeacon("/api/track-event", new Blob([body], { type: "application/json" }));
   } catch { /* analytics must never break the page */ }

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import ProNav from "@/app/components/ProNav";
 import ScrollReveal from "@/app/components/ScrollReveal";
+import VisitorTracker from "@/app/components/VisitorTracker";
 import { getNavConfig } from "@/lib/professionalData";
 import styles from "@/app/(professional)/ProfessionalLayout.module.css";
 
@@ -17,6 +18,7 @@ export default async function ProfessionalLayout({ children }: Readonly<{ childr
   const navConfig = await getNavConfig();
   return (
     <div className={styles.professionalShell}>
+      <VisitorTracker />
       <ScrollReveal />
       <ProNav config={navConfig} />
       {children}

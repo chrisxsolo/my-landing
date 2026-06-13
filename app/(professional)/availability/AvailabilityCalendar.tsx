@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { trackEvent } from "@/lib/analytics/visitor";
 
 export type AvailDate = {
   date: string;
@@ -427,6 +428,9 @@ export default function AvailabilityCalendar({ initialDates }: { initialDates: A
   const selectDate = (dateStr: string) => {
     moveActive(dateStr, false);
     if (!isClickable(dateStr)) return;
+    if (selected?.date !== dateStr) {
+      trackEvent({ event: "availability_selected", meta: { date: dateStr } });
+    }
     setSelected((prev) => (prev?.date === dateStr ? null : dateMap[dateStr]));
   };
 
@@ -610,7 +614,12 @@ export default function AvailabilityCalendar({ initialDates }: { initialDates: A
                 <div className="avail-upcoming">
                   {upcomingDates.map((date) => (
                     <button key={date.date} type="button"
-                      onClick={() => { moveActive(date.date, false); setSelected(date); }}>
+                      onClick={() => {
+                        if (selected?.date !== date.date) {
+                          trackEvent({ event: "availability_selected", meta: { date: date.date } });
+                        }
+                        moveActive(date.date, false); setSelected(date);
+                      }}>
                       <span>{formatDate(date.date)}</span>
                       <span>{date.status === "available" ? "Open" : "Hold"}</span>
                     </button>
