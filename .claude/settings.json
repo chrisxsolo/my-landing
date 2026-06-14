@@ -13,7 +13,13 @@
       "Bash(curl -s 'https://soloxsnaps.com/_next/image?url=https%3A%2F%2Fdmtslzwglpezympptqls.supabase.co%2Fstorage%2Fv1%2Fobject%2Fpublic%2Fabout-photos%2Fmt-tam%2Fafb9cd18-cc13-4802-a003-0f6aa31b0e41-img_0686.jpg&w=640&q=85')",
       "Bash(curl -s -D - -o /dev/null 'https://soloxsnaps.com/_next/image?url=https%3A%2F%2Fdmtslzwglpezympptqls.supabase.co%2Fstorage%2Fv1%2Fobject%2Fpublic%2Fabout-photos%2Fmt-tam%2Fafb9cd18-cc13-4802-a003-0f6aa31b0e41-img_0686.jpg&w=640&q=85')",
       "Bash(curl -s -D - -o /dev/null 'https://www.soloxsnaps.com/_next/image?url=https%3A%2F%2Fdmtslzwglpezympptqls.supabase.co%2Fstorage%2Fv1%2Fobject%2Fpublic%2Fabout-photos%2Fmt-tam%2Fafb9cd18-cc13-4802-a003-0f6aa31b0e41-img_0686.jpg&w=640&q=85')",
-      "Bash(curl -s \"https://www.soloxsnaps.com/about\")"
+      "Bash(curl -s \"https://www.soloxsnaps.com/about\")",
+      "Bash(grep -o 'afc-photo-wrap.\\\\{0,400\\\\}')",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" \"http://localhost:3000/about\")",
+      "Bash(ps -o command= -p 64539)",
+      "Bash(awk '{print $NF}')",
+      "Bash(gh pr *)",
+      "Bash(gh pr create --base main --head consistency-and-ci --title 'Fix About-facts photos + branch consistency/CI work' --body ' *)"
     ]
   }
 }
