@@ -5,7 +5,7 @@
 // Upsert semantics keep FIRST-TOUCH attribution: landing_page, first_referrer,
 // and utm_* are written once (insert) and never overwritten; only latest_referrer
 // and last_seen_at refresh on return visits.
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
 import { rateLimit } from "@/lib/rateLimit";
 import {
@@ -15,8 +15,11 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const ACCEPTED = NextResponse.json({ ok: true }, { status: 202 });
 const MAX_BODY_BYTES = 1024;
+
+function acceptedResponse() {
+  return Response.json({ ok: true }, { status: 202 });
+}
 
 function utm(raw: unknown): string | null {
   if (typeof raw !== "string") return null;
@@ -25,25 +28,25 @@ function utm(raw: unknown): string | null {
 }
 
 export async function POST(req: NextRequest) {
-  if (process.env.VERCEL_ENV !== "production") return ACCEPTED;          // fail closed off-prod
-  if (isLikelyBot(req.headers.get("user-agent"))) return ACCEPTED;       // bots dropped
-  if (req.cookies.get("admin_session")?.value) return ACCEPTED;          // admin visits skipped
+  if (process.env.VERCEL_ENV !== "production") return acceptedResponse();          // fail closed off-prod
+  if (isLikelyBot(req.headers.get("user-agent"))) return acceptedResponse();       // bots dropped
+  if (req.cookies.get("admin_session")?.value) return acceptedResponse();          // admin visits skipped
 
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-  if (!rateLimit(`visitor:${ip}`, 30, 60_000).ok) return ACCEPTED;
+  if (!rateLimit(`visitor:${ip}`, 30, 60_000).ok) return acceptedResponse();
 
   let raw: string;
   try {
     raw = await req.text();
   } catch {
-    return ACCEPTED;
+    return acceptedResponse();
   }
-  if (raw.length === 0 || raw.length > MAX_BODY_BYTES) return ACCEPTED;
+  if (raw.length === 0 || raw.length > MAX_BODY_BYTES) return acceptedResponse();
 
   try {
     const body = JSON.parse(raw) as Record<string, unknown>;
     const id = normalizeVisitorId(body.id);
-    if (!id) return ACCEPTED; // no valid visitor key → nothing to upsert
+    if (!id) return acceptedResponse(); // no valid visitor key → nothing to upsert
 
     const referrer = normalizeReferrer(typeof body.referrer === "string" ? body.referrer : "");
     const landingPage = normalizeEventPath(typeof body.landingPage === "string" ? body.landingPage : "");
@@ -75,5 +78,5 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     console.error("track-visitor failed", err);
   }
-  return ACCEPTED;
+  return acceptedResponse();
 }

@@ -168,7 +168,10 @@ export default function AboutFactsCard({ facts, photos }: { facts: readonly Abou
             </div>
             {photo && (
               <div className="afc-photo-wrap" key={`photo-${fact.slug}`}>
-                <OptimizedPhoto src={photo.url} alt={photo.alt} sizes="(max-width: 900px) 90vw, 38vw" quality={85} />
+                {/* unoptimized: load directly from Supabase storage and skip Vercel's
+                    /_next/image optimizer, which 402s once the account's image-
+                    optimization quota is exhausted. */}
+                <OptimizedPhoto src={photo.url} alt={photo.alt} sizes="(max-width: 900px) 90vw, 38vw" quality={85} unoptimized />
               </div>
             )}
           </div>

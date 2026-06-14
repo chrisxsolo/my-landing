@@ -3,7 +3,17 @@
     "allow": [
       "Bash(sed -n '105,120p')",
       "Bash(sed -n '110,125p' /Users/chrissolo/Documents/github/my-landing/app/components/admin-sessions-dashboard.tsx)",
-      "Bash(git -C /Users/chrissolo/Documents/github/my-landing diff 7fa740f..HEAD -- lib/adminPortalSessionNavigation.ts tests/unit/adminPortalSessionNavigation.test.ts)"
+      "Bash(git -C /Users/chrissolo/Documents/github/my-landing diff 7fa740f..HEAD -- lib/adminPortalSessionNavigation.ts tests/unit/adminPortalSessionNavigation.test.ts)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" \"https://dmtslzwglpezympptqls.supabase.co/storage/v1/object/public/about-photos/mt-tam/afb9cd18-cc13-4802-a003-0f6aa31b0e41-img_0686.jpg\")",
+      "Bash(curl -s -o /dev/null -w '%{http_code}\\\\n' 'http://localhost:3000/_next/image?url=https%3A%2F%2Fdmtslzwglpezympptqls.supabase.co%2Fstorage%2Fv1%2Fobject%2Fpublic%2Fabout-photos%2Fmt-tam%2Fafb9cd18-cc13-4802-a003-0f6aa31b0e41-img_0686.jpg&w=640&q=85')",
+      "Bash(curl -s -o /dev/null -w '%{http_code}\\\\n' 'http://localhost:3000/_next/image?url=https%3A%2F%2Fdmtslzwglpezympptqls.supabase.co%2Fstorage%2Fv1%2Fobject%2Fpublic%2Fabout-photos%2Fmt-tam%2Fafb9cd18-cc13-4802-a003-0f6aa31b0e41-img_0686.jpg&w=640&q=75')",
+      "Bash(curl -s 'http://localhost:3000/_next/image?url=https%3A%2F%2Fdmtslzwglpezympptqls.supabase.co%2Fstorage%2Fv1%2Fobject%2Fpublic%2Fabout-photos%2Fmt-tam%2Fafb9cd18-cc13-4802-a003-0f6aa31b0e41-img_0686.jpg&w=640&q=85')",
+      "Bash(curl -s -o /dev/null -w '%{http_code}\\\\n' 'https://soloxsnaps.com/_next/image?url=https%3A%2F%2Fdmtslzwglpezympptqls.supabase.co%2Fstorage%2Fv1%2Fobject%2Fpublic%2Fabout-photos%2Fmt-tam%2Fafb9cd18-cc13-4802-a003-0f6aa31b0e41-img_0686.jpg&w=640&q=85')",
+      "Bash(curl -s -o /dev/null -w '%{http_code}\\\\n' 'https://soloxsnaps.com/_next/image?url=https%3A%2F%2Fdmtslzwglpezympptqls.supabase.co%2Fstorage%2Fv1%2Fobject%2Fpublic%2Fabout-photos%2Fmt-tam%2Fafb9cd18-cc13-4802-a003-0f6aa31b0e41-img_0686.jpg&w=1080&q=85')",
+      "Bash(curl -s 'https://soloxsnaps.com/_next/image?url=https%3A%2F%2Fdmtslzwglpezympptqls.supabase.co%2Fstorage%2Fv1%2Fobject%2Fpublic%2Fabout-photos%2Fmt-tam%2Fafb9cd18-cc13-4802-a003-0f6aa31b0e41-img_0686.jpg&w=640&q=85')",
+      "Bash(curl -s -D - -o /dev/null 'https://soloxsnaps.com/_next/image?url=https%3A%2F%2Fdmtslzwglpezympptqls.supabase.co%2Fstorage%2Fv1%2Fobject%2Fpublic%2Fabout-photos%2Fmt-tam%2Fafb9cd18-cc13-4802-a003-0f6aa31b0e41-img_0686.jpg&w=640&q=85')",
+      "Bash(curl -s -D - -o /dev/null 'https://www.soloxsnaps.com/_next/image?url=https%3A%2F%2Fdmtslzwglpezympptqls.supabase.co%2Fstorage%2Fv1%2Fobject%2Fpublic%2Fabout-photos%2Fmt-tam%2Fafb9cd18-cc13-4802-a003-0f6aa31b0e41-img_0686.jpg&w=640&q=85')",
+      "Bash(curl -s \"https://www.soloxsnaps.com/about\")"
     ]
   }
 }

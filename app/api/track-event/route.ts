@@ -1,7 +1,7 @@
 // Public, FAIL-CLOSED analytics intake (spec §10): production-only, bot-UA
 // filter, admin-cookie skip, rate-limited, 2KB body cap, allowlist-validated,
 // server timestamps. Always 202 — the beacon never learns why a hit dropped.
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
 import { rateLimit } from "@/lib/rateLimit";
 import { isLikelyBot } from "@/lib/contentEngine/trackEventRules";
@@ -10,24 +10,27 @@ import { recordContentEvent } from "@/lib/contentEngine/recordEvent";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const ACCEPTED = NextResponse.json({ ok: true }, { status: 202 });
 const MAX_BODY_BYTES = 2048;
 
+function acceptedResponse() {
+  return Response.json({ ok: true }, { status: 202 });
+}
+
 export async function POST(req: NextRequest) {
-  if (process.env.VERCEL_ENV !== "production") return ACCEPTED;          // fail closed off-prod
-  if (isLikelyBot(req.headers.get("user-agent"))) return ACCEPTED;       // bots dropped
-  if (req.cookies.get("admin_session")?.value) return ACCEPTED;          // admin visits skipped
+  if (process.env.VERCEL_ENV !== "production") return acceptedResponse();          // fail closed off-prod
+  if (isLikelyBot(req.headers.get("user-agent"))) return acceptedResponse();       // bots dropped
+  if (req.cookies.get("admin_session")?.value) return acceptedResponse();          // admin visits skipped
 
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-  if (!rateLimit(`track:${ip}`, 30, 60_000).ok) return ACCEPTED;
+  if (!rateLimit(`track:${ip}`, 30, 60_000).ok) return acceptedResponse();
 
   let raw: string;
   try {
     raw = await req.text();
   } catch {
-    return ACCEPTED;
+    return acceptedResponse();
   }
-  if (raw.length === 0 || raw.length > MAX_BODY_BYTES) return ACCEPTED;
+  if (raw.length === 0 || raw.length > MAX_BODY_BYTES) return acceptedResponse();
 
   try {
     const body = JSON.parse(raw) as Record<string, unknown>;
@@ -49,5 +52,5 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     console.error("track-event failed", err);
   }
-  return ACCEPTED;
+  return acceptedResponse();
 }

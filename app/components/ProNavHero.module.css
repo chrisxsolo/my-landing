@@ -1,34 +1,5 @@
 .hero.hero {
   border-color: var(--nav-hero-border);
-  background: color-mix(in srgb, var(--nav-hero-ink) 18%, transparent);
-  box-shadow: 0 10px 34px color-mix(in srgb, var(--nav-hero-ink) 16%, transparent);
-}
-
-.hero :global(.pro-nav-brand),
-.hero :global(.pro-nav-link),
-.hero :global(.pro-nav-button) {
-  color: var(--nav-hero-paper);
-}
-
-.hero :global(.pro-desktop-nav) {
-  background: color-mix(in srgb, var(--nav-hero-ink) 14%, transparent);
-}
-
-.hero :global(.pro-nav-link:hover),
-.hero :global(.pro-nav-button:hover),
-.hero :global(.pro-nav-link[aria-current="page"]),
-.hero :global(.pro-nav-button[aria-current="page"]) {
-  border-color: var(--nav-hero-border);
-  background: color-mix(in srgb, var(--nav-hero-paper) 14%, transparent);
-  color: var(--nav-hero-paper);
-}
-
-.hero :global(.pro-nav-caret) {
-  color: color-mix(in srgb, var(--nav-hero-paper) 78%, transparent);
-}
-
-.hero :global(.pro-nav-cta) {
-  border-color: var(--nav-hero-paper);
-  background: var(--nav-hero-paper);
-  color: var(--nav-hero-ink);
+  background: color-mix(in srgb, var(--nav-hero-paper) 88%, transparent);
+  box-shadow: 0 10px 34px color-mix(in srgb, var(--nav-hero-ink) 12%, transparent);
 }
