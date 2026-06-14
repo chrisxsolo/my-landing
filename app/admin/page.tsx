@@ -85,6 +85,8 @@ import {
   type GradAttireOption,
 } from "@/lib/portfolioSeoDescription";
 import PortfolioSeoPanel from "@/app/admin/PortfolioSeoPanel";
+import CaseStudiesTab from "@/app/admin/CaseStudiesTab";
+import { GRAD_SCHOOLS } from "@/lib/portfolioCategoryContent";
 import {
   findMatchingClientSession,
   getClientSessionEmailMatches,
@@ -103,7 +105,7 @@ import {
 
 export const dynamic = 'force-dynamic'
 
-type Tab = "home"|"poses"|"couplesGuide"|"couplesLocations"|"locations"|"bayGuide"|"familyGuide"|"portfolio"|"categories"|"blog"|"library"|"navigation"|"aboutPage"|"analytics"|"payments"|"inquiries"|"clients"|"testimonials"|"funnel"|"attribution"|"vault"|"ai"|"chat"|"format"|"accounts";
+type Tab = "home"|"poses"|"couplesGuide"|"couplesLocations"|"locations"|"bayGuide"|"familyGuide"|"portfolio"|"caseStudies"|"categories"|"blog"|"library"|"navigation"|"aboutPage"|"analytics"|"payments"|"inquiries"|"clients"|"testimonials"|"funnel"|"attribution"|"vault"|"ai"|"chat"|"format"|"accounts";
 type ImageLibraryRow = { id:number; title:string; alt:string|null; image_url:string; source_type:string; source_post_id:number|null; source_post_slug:string|null; source_role:string; in_portfolio:boolean; created_at:string; };
 type Inquiry = AdminInquiry;
 type AdminSessionsResponse = { sessions?: AdminClientSessionDTO[]; session?: AdminClientSessionDTO; error?: string; };
@@ -118,16 +120,16 @@ function fmt12h(t:string|null):string{
   return `${h12}:${String(m).padStart(2,"0")} ${ampm}`;
 }
 type PortfolioCategory = { id:number; name:string; slug:string; description:string|null; sort_order:number; active:boolean; };
-type PortfolioImage = { id:number; title:string; alt:string|null; image_url:string; category_id:number|null; category_slug:string; featured:boolean; hero_carousel:boolean; sort_order:number; created_at:string|null; location?:string|null; content_hash?:string|null; };
+type PortfolioImage = { id:number; title:string; alt:string|null; image_url:string; category_id:number|null; category_slug:string; featured:boolean; hero_carousel:boolean; sort_order:number; created_at:string|null; location?:string|null; school?:string|null; content_hash?:string|null; };
 type PortfolioSeoDraft = { school: GradSchoolOption|null; location: GradLocationOption|null; session: GradSessionOption|null; degree: GradDegreeOption|null; year: GradYearOption|null; attire: GradAttireOption|null; goldenHour: boolean; };
 
 const EMPTY_CATEGORY = {name:"",slug:"",description:"",sort_order:"1",active:true};
-const EMPTY_PORTFOLIO = {title:"",alt:"",category_slug:"graduation",featured:false,sort_order:""};
+const EMPTY_PORTFOLIO = {title:"",alt:"",category_slug:"graduation",school:"",featured:false,sort_order:""};
 const EMPTY_PORTFOLIO_SEO_DRAFT: PortfolioSeoDraft = {school:null,location:null,session:null,degree:null,year:null,attire:null,goldenHour:false};
-const WEBSITE_TABS:Tab[]=["poses","couplesGuide","couplesLocations","locations","bayGuide","familyGuide","portfolio","categories","blog","library","navigation","aboutPage"];
+const WEBSITE_TABS:Tab[]=["poses","couplesGuide","couplesLocations","locations","bayGuide","familyGuide","portfolio","caseStudies","categories","blog","library","navigation","aboutPage"];
 const CLIENT_TABS:Tab[]=["inquiries","clients","testimonials","analytics","payments","funnel","attribution","ai","chat","format"];
 const VAULT_TABS:Tab[]=["vault"];
-const TAB_LABELS:Record<Tab,string>={home:"🏠 Home",poses:"📸 Grad Poses",couplesGuide:"💞 Couples Posing Guide",couplesLocations:"💑 Couples Locations",locations:"📍 Campus Spots",bayGuide:"🗺️ Bay Guide",familyGuide:"👨‍👩‍👧 Family Guide",portfolio:"🖼️ Portfolio",categories:"🏷️ Categories",blog:"✍️ Blog",library:"🗄️ Image Library",navigation:"🧭 Navigation",aboutPage:"🙋 About Page",analytics:"📊 Analytics",payments:"💵 Revenue",funnel:"📈 Funnel",attribution:"🎯 Attribution",inquiries:"📬 Inquiries",clients:"👥 Clients",testimonials:"💬 Testimonials",vault:"📓 Vault",ai:"🤖 AI Training",chat:"💬 AI Chat",format:"✨ Quick Format",accounts:"👤 Accounts"};
+const TAB_LABELS:Record<Tab,string>={home:"🏠 Home",poses:"📸 Grad Poses",couplesGuide:"💞 Couples Posing Guide",couplesLocations:"💑 Couples Locations",locations:"📍 Campus Spots",bayGuide:"🗺️ Bay Guide",familyGuide:"👨‍👩‍👧 Family Guide",portfolio:"🖼️ Portfolio",caseStudies:"📖 Case Studies",categories:"🏷️ Categories",blog:"✍️ Blog",library:"🗄️ Image Library",navigation:"🧭 Navigation",aboutPage:"🙋 About Page",analytics:"📊 Analytics",payments:"💵 Revenue",funnel:"📈 Funnel",attribution:"🎯 Attribution",inquiries:"📬 Inquiries",clients:"👥 Clients",testimonials:"💬 Testimonials",vault:"📓 Vault",ai:"🤖 AI Training",chat:"💬 AI Chat",format:"✨ Quick Format",accounts:"👤 Accounts"};
 // The six home-page "work grid" slots, in display order — used for the batch picker.
 const WORK_GRID_KEYS=["home_story_1","home_story_2","home_story_3","home_story_4","home_story_5","home_story_6"] as const;
 
@@ -1217,7 +1219,7 @@ function AdminDashboard() {
   }
   async function deleteCategory(id:number){await supabase.from('portfolio_categories').delete().eq('id',id);setCategories(p=>p.filter(x=>x.id!==id));setCategoryDeleteConfirm(null);if(editingCategory?.id===id)cancelEditCategory();revalidatePublicSite();showToast("Category deleted");}
 
-  function startEditPortfolioImage(image:PortfolioImage){setEditingPortfolioImage(image);setPortfolioForm({title:image.title,alt:image.alt??"",category_slug:image.category_slug,featured:image.featured,sort_order:String(image.sort_order)});setPortfolioFile(null);setPortfolioPreview(image.image_url);window.scrollTo({top:0,behavior:"smooth"});}
+  function startEditPortfolioImage(image:PortfolioImage){setEditingPortfolioImage(image);setPortfolioForm({title:image.title,alt:image.alt??"",category_slug:image.category_slug,school:image.school??"",featured:image.featured,sort_order:String(image.sort_order)});setPortfolioFile(null);setPortfolioPreview(image.image_url);window.scrollTo({top:0,behavior:"smooth"});}
   function cancelEditPortfolioImage(){setEditingPortfolioImage(null);setPortfolioForm(EMPTY_PORTFOLIO);setPortfolioFile(null);setPortfolioPreview(null);if(portfolioFileRef.current)portfolioFileRef.current.value="";}
   function onPortfolioFile(e:React.ChangeEvent<HTMLInputElement>){const f=e.target.files?.[0];if(!f)return;setPortfolioFile(f);setPortfolioPreview(URL.createObjectURL(f));}
   function startPortfolioSeo(image:PortfolioImage){setPortfolioSeoEditorId(image.id);setPortfolioSeoDraft(EMPTY_PORTFOLIO_SEO_DRAFT);}
@@ -1303,7 +1305,7 @@ function AdminDashboard() {
     let image_url=editingPortfolioImage?.image_url??"";
     if(portfolioFile){const url=await uploadImage(portfolioFile,"portfolio",showToast);if(!url){setPortfolioSaving(false);return;}image_url=url;}
     const category=categories.find(c=>c.slug===portfolioForm.category_slug);
-    const payload={title:portfolioForm.title,alt:portfolioForm.alt||portfolioForm.title,image_url,category_id:category?.id??null,category_slug:portfolioForm.category_slug,featured:portfolioForm.featured,sort_order:parseInt(portfolioForm.sort_order)||editingPortfolioImage?.sort_order||portfolioImages.length+1};
+    const payload={title:portfolioForm.title,alt:portfolioForm.alt||portfolioForm.title,image_url,category_id:category?.id??null,category_slug:portfolioForm.category_slug,school:portfolioForm.school||null,featured:portfolioForm.featured,sort_order:parseInt(portfolioForm.sort_order)||editingPortfolioImage?.sort_order||portfolioImages.length+1};
     if(editingPortfolioImage){
       const{error}=await supabase.from('portfolio_images').update(payload).eq('id',editingPortfolioImage.id);
       if(error)showToast("Portfolio update failed — "+error.message,false);else{showToast("Portfolio image updated!");cancelEditPortfolioImage();fetchPortfolioImages();revalidatePublicSite();}
@@ -2213,6 +2215,7 @@ function AdminDashboard() {
                   <div><label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1.5">Title</label><input className={inp} placeholder="e.g. Golden hour grad portrait" value={portfolioForm.title} onChange={e=>setPortfolioForm(f=>({...f,title:e.target.value}))}/></div>
                   <div><label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1.5">Alt Text</label><input className={inp} placeholder="Describe the image for SEO and accessibility" value={portfolioForm.alt} onChange={e=>setPortfolioForm(f=>({...f,alt:e.target.value}))}/></div>
                   <div><label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1.5">Category</label><select className={inp} value={portfolioForm.category_slug} onChange={e=>setPortfolioForm(f=>({...f,category_slug:e.target.value}))}>{categories.length>0?categories.map(c=><option key={c.slug} value={c.slug}>{c.name}</option>):<option value="grads">Grads</option>}</select></div>
+                  <div><label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1.5">School <span className="text-slate-300 normal-case">(grads only)</span></label><select className={inp} value={portfolioForm.school} onChange={e=>setPortfolioForm(f=>({...f,school:e.target.value}))}><option value="">— None —</option>{GRAD_SCHOOLS.map(s=><option key={s.slug} value={s.slug}>{s.label}</option>)}</select></div>
                   <div><label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1.5">Order #</label><input className={inp} type="number" placeholder="e.g. 1" value={portfolioForm.sort_order} onChange={e=>setPortfolioForm(f=>({...f,sort_order:e.target.value}))}/></div>
                   <label className="flex items-center gap-2 text-sm font-bold text-slate-700"><input type="checkbox" checked={portfolioForm.featured} onChange={e=>setPortfolioForm(f=>({...f,featured:e.target.checked}))}/> Featured on homepage</label>
                   <button onClick={savePortfolioImage} disabled={portfolioSaving} className="w-full py-3 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90 active:scale-95 mt-2" style={{background:"#111827",opacity:portfolioSaving?0.7:1}}>
@@ -2639,6 +2642,9 @@ function AdminDashboard() {
             </div>
           </div>
         )}
+
+        {/* ── CASE STUDIES ── */}
+        {tab==="caseStudies"&&<CaseStudiesTab showToast={showToast} categories={categories} />}
 
         {/* ── CATEGORIES ── */}
         {tab==="categories"&&(

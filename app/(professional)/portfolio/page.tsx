@@ -33,8 +33,11 @@ import {
   type FeaturedTestimonial,
 } from "@/lib/testimonialsData";
 import { getPortfolioCategoryContent } from "@/lib/portfolioCategoryContent";
+import { getPortfolioCaseStudies } from "@/lib/portfolioCaseStudies";
 import CategoryProof from "@/app/(professional)/portfolio/_components/CategoryProof";
 import PortfolioSchoolLinks from "@/app/(professional)/portfolio/_components/PortfolioSchoolLinks";
+import PortfolioSchoolFilter from "@/app/(professional)/portfolio/_components/PortfolioSchoolFilter";
+import CaseStudies from "@/app/(professional)/portfolio/_components/CaseStudies";
 import PortfolioCtaPair from "@/app/(professional)/portfolio/_components/PortfolioCtaPair";
 import styles from "@/app/(professional)/portfolio/Portfolio.module.css";
 import ContentEventBeacon from "@/app/components/ContentEventBeacon";
@@ -59,24 +62,37 @@ export const metadata: Metadata = {
 export default async function PortfolioPage({
   searchParams,
 }: {
-  searchParams: Promise<{ category?: string }>;
+  searchParams: Promise<{ category?: string; school?: string }>;
 }) {
   // ── DATA FETCHING ───────────────────────────────────────────────────────────
   // categories → the filter tabs (All, Grads, Families, etc.) from Supabase
   // images     → all portfolio photos from Supabase (featured-first, sort_order)
   const { categories, images } = await getPortfolioData();
-  const requestedCategory = (await searchParams).category;
+  const params = await searchParams;
+  const requestedCategory = params.category;
   const selected = categories.find((category) => category.slug === requestedCategory);
   if (requestedCategory && !selected) redirect("/portfolio");
   const selectedCategory = selected?.slug;
 
+  // Grad school sub-filter — only meaningful on the grads view. Slugs that
+  // actually have tagged photos drive the chip row; an unknown ?school is ignored.
+  const isGrads = selectedCategory === "grads";
+  const availableSchoolSlugs = isGrads
+    ? Array.from(
+        new Set(images.filter((img) => img.category_slug === "grads" && img.school).map((img) => img.school as string)),
+      )
+    : [];
+  const activeSchool =
+    isGrads && params.school && availableSchoolSlugs.includes(params.school) ? params.school : undefined;
+
   // ── CURATION ──────────────────────────────────────────────────────────────
-  // Selected category: cap that category to CURATED_LIMIT.
+  // Selected category: cap that category to CURATED_LIMIT (after any school filter).
   // "All" view: take an even share from each visible category so both grads and
   // families are represented, then cap the combined set at CURATED_LIMIT.
-  const categoryImages = selectedCategory
+  let categoryImages = selectedCategory
     ? images.filter((img) => img.category_slug === selectedCategory)
     : images;
+  if (activeSchool) categoryImages = categoryImages.filter((img) => img.school === activeSchool);
   const totalInView = categoryImages.length;
 
   let displayImages = categoryImages.slice(0, CURATED_LIMIT);
@@ -91,11 +107,12 @@ export default async function PortfolioPage({
   const heroImage = displayImages[0] ?? null;
   const heroBg = heroImage?.image_url ?? null;
 
-  // ── COPY + PROOF ────────────────────────────────────────────────────────────
+  // ── COPY + PROOF + CASE STUDIES ───────────────────────────────────────────
   const content = getPortfolioCategoryContent(selectedCategory);
   const testimonials: FeaturedTestimonial[] = selectedCategory
     ? await getFeaturedTestimonialsForCategory(selectedCategory, 3)
     : await getFeaturedTestimonials(3);
+  const caseStudies = await getPortfolioCaseStudies(selectedCategory);
 
   return (
     <main className={styles.portfolioPage}>
@@ -177,6 +194,12 @@ export default async function PortfolioPage({
         </div>
       </section>
 
+      {/* ── GRAD SCHOOL FILTER ────────────────────────────────────────────────
+           Filters the wall by campus. Renders nothing until photos are tagged. */}
+      {isGrads && (
+        <PortfolioSchoolFilter availableSlugs={availableSchoolSlugs} activeSchool={activeSchool} />
+      )}
+
       {/* ── CURATED HIGHLIGHTS GRID ─────────────────────────────────────────
            4-column grid (2-col on mobile), aspect-ratio 4:5, staggered entrance. */}
       <section className={styles.portGallery} aria-label={`${selected?.name ?? "Selected work"} photos`}>
@@ -198,6 +221,13 @@ export default async function PortfolioPage({
           <div className={styles.portEmpty}>No photos in this category yet.</div>
         )}
       </section>
+
+      {/* ── CASE STUDIES (renders nothing when none are active) ────────────── */}
+      <CaseStudies
+        studies={caseStudies}
+        pricingHref={content.pricingHref}
+        pricingLabel={content.pricingLabel}
+      />
 
       {/* ── GRAD SCHOOL LINKS (grads only) ─────────────────────────────────── */}
       {selectedCategory === "grads" && <PortfolioSchoolLinks />}

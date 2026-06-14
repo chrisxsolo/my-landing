@@ -463,6 +463,212 @@
   border-color: rgba(61, 107, 94, 0.5);
 }
 
+/* ── GRAD SCHOOL FILTER (in-wall) ──────────────────────────────────────────
+   Chip row above the grid; filters the wall by ?school=<slug>. */
+.portSchoolFilter {
+  width: min(1500px, 100%);
+  margin: 0 auto;
+  padding: 0 20px 4px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.portSchoolFilterChip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 16px;
+  border: 1px solid rgba(61, 107, 94, 0.24);
+  border-radius: 100px;
+  background: #fff;
+  color: #2f554b;
+  font-family: var(--font-dm-sans), sans-serif;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+.portSchoolFilterChip:hover {
+  background: rgba(61, 107, 94, 0.08);
+  border-color: rgba(61, 107, 94, 0.45);
+}
+.portSchoolFilterChip[aria-current="true"] {
+  background: #3d6b5e;
+  border-color: #3d6b5e;
+  color: #fff;
+}
+
+/* ── CASE STUDIES ──────────────────────────────────────────────────────────
+   Per-session story blocks: cover + session details + previews + testimonial. */
+.portCases {
+  background: #f5f6f4;
+  padding: 12px 20px 88px;
+}
+.portCasesInner {
+  width: min(1100px, 100%);
+  margin: 0 auto;
+}
+.portCasesEyebrow {
+  margin: 0 0 10px;
+  color: #3d6b5e;
+  font-family: var(--font-dm-sans), sans-serif;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+.portCasesHeading {
+  margin: 0 0 28px;
+  color: #111;
+  font-family: var(--font-dm-sans), sans-serif;
+  font-size: clamp(1.7rem, 3.4vw, 2.6rem);
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+.portCasesList {
+  display: grid;
+  gap: 24px;
+}
+.portCase {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0;
+  border: 1px solid rgba(18, 24, 22, 0.1);
+  border-radius: 16px;
+  background: #fff;
+  overflow: hidden;
+  box-shadow: 0 14px 34px rgba(18, 24, 22, 0.06);
+}
+.portCaseCover {
+  position: relative;
+  min-height: 320px;
+  background: #dde4e0;
+}
+.portCaseCoverImg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.portCaseBody {
+  padding: 32px;
+}
+.portCaseTitle {
+  margin: 0 0 4px;
+  color: #111;
+  font-family: var(--font-dm-sans), sans-serif;
+  font-size: clamp(1.3rem, 2.4vw, 1.7rem);
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+.portCaseClient {
+  margin: 0 0 18px;
+  color: #687571;
+  font-family: var(--font-dm-sans), sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+}
+.portCaseDetails {
+  margin: 0 0 18px;
+  display: grid;
+  gap: 12px;
+}
+.portCaseDetail {
+  padding-left: 14px;
+  border-left: 2px solid rgba(61, 107, 94, 0.3);
+}
+.portCaseDetailLabel {
+  margin: 0 0 2px;
+  color: #3d6b5e;
+  font-family: var(--font-dm-sans), sans-serif;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.portCaseDetailValue {
+  margin: 0;
+  color: #2f3835;
+  font-family: var(--font-dm-sans), sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+.portCaseSummary {
+  margin: 0 0 18px;
+  color: #4a5550;
+  font-family: var(--font-dm-sans), sans-serif;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.6;
+}
+.portCasePreviews {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 18px;
+}
+.portCasePreview {
+  position: relative;
+  width: 96px;
+  aspect-ratio: 4 / 5;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #dde4e0;
+}
+.portCasePreviewImg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.portCaseQuote {
+  margin: 0 0 22px;
+  padding: 16px 18px;
+  border-radius: 12px;
+  background: rgba(61, 107, 94, 0.07);
+  color: #2f3835;
+  font-family: var(--font-dm-sans), sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  font-style: italic;
+  line-height: 1.55;
+}
+.portCaseQuoteCite {
+  display: block;
+  margin-top: 8px;
+  color: #2f554b;
+  font-size: 12px;
+  font-weight: 800;
+  font-style: normal;
+  letter-spacing: 0.02em;
+}
+.portCaseCta {
+  display: inline-flex;
+  align-items: center;
+  min-height: 46px;
+  padding: 0 22px;
+  border: 1px solid rgba(61, 107, 94, 0.28);
+  border-radius: 8px;
+  background: rgba(61, 107, 94, 0.06);
+  color: #2f554b;
+  font-family: var(--font-dm-sans), sans-serif;
+  font-size: 13px;
+  font-weight: 820;
+  letter-spacing: 0.03em;
+  text-decoration: none;
+  text-transform: uppercase;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+.portCaseCta:hover {
+  transform: translateY(-2px);
+  background: rgba(61, 107, 94, 0.12);
+  border-color: rgba(61, 107, 94, 0.5);
+}
+
 /* ── CLIENT PROOF ────────────────────────────────────────────────────────── */
 .portProof {
   background: #eef1ef;
@@ -594,5 +800,17 @@
   }
   .portProof {
     padding: 56px 16px;
+  }
+  .portCases {
+    padding: 8px 16px 64px;
+  }
+  .portCase {
+    grid-template-columns: 1fr;
+  }
+  .portCaseCover {
+    min-height: 240px;
+  }
+  .portCaseBody {
+    padding: 24px;
   }
 }

@@ -73,17 +73,31 @@ export function getPortfolioCategoryContent(slug?: string | null): PortfolioCate
   return PORTFOLIO_CATEGORY_CONTENT[slug] ?? DEFAULT_PORTFOLIO_CONTENT;
 }
 
-// Grad school links → existing per-school landing pages. Only schools that have
-// a live /grads/<slug> route are listed (e.g. "UC Law" from GRAD_SCHOOL_OPTIONS
-// has no page, so it's intentionally omitted).
+// Single source of truth for grad schools that have a live /grads/<slug> route
+// (e.g. "UC Law" from GRAD_SCHOOL_OPTIONS has no page, so it's omitted). The
+// `slug` is what gets stored in portfolio_images.school and used in the
+// ?school= filter; the per-school landing links derive from it.
+export type GradSchool = { slug: string; label: string };
+
+export const GRAD_SCHOOLS: GradSchool[] = [
+  { slug: "uc-berkeley", label: "UC Berkeley" },
+  { slug: "sjsu", label: "SJSU" },
+  { slug: "usf", label: "USF" },
+  { slug: "sf-state", label: "SF State" },
+  { slug: "csueb", label: "CSU East Bay" },
+  { slug: "stanford", label: "Stanford" },
+  { slug: "santa-clara", label: "Santa Clara" },
+];
+
+export function gradSchoolLabel(slug?: string | null): string | null {
+  if (!slug) return null;
+  return GRAD_SCHOOLS.find((school) => school.slug === slug)?.label ?? null;
+}
+
+// Grad school links → existing per-school landing pages, derived from GRAD_SCHOOLS.
 export type GradSchoolLink = { label: string; href: string };
 
-export const GRAD_SCHOOL_LINKS: GradSchoolLink[] = [
-  { label: "UC Berkeley", href: "/grads/uc-berkeley" },
-  { label: "SJSU", href: "/grads/sjsu" },
-  { label: "USF", href: "/grads/usf" },
-  { label: "SF State", href: "/grads/sf-state" },
-  { label: "CSU East Bay", href: "/grads/csueb" },
-  { label: "Stanford", href: "/grads/stanford" },
-  { label: "Santa Clara", href: "/grads/santa-clara" },
-];
+export const GRAD_SCHOOL_LINKS: GradSchoolLink[] = GRAD_SCHOOLS.map((school) => ({
+  label: school.label,
+  href: `/grads/${school.slug}`,
+}));

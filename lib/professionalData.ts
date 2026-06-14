@@ -33,6 +33,7 @@ export type PortfolioImage = {
   sort_order: number;
   created_at: string | null;
   location?: string | null;
+  school?: string | null;
   content_hash?: string | null;
 };
 
@@ -56,7 +57,7 @@ export type BlogPost = {
 // Exactly the columns normalizeImage reads — avoids select("*") pulling future
 // columns (e.g. updated_at) the public pages never use.
 const PORTFOLIO_IMAGE_COLUMNS =
-  "id,title,alt,image_url,category_id,category_slug,featured,sort_order,created_at,hero_carousel";
+  "id,title,alt,image_url,category_id,category_slug,featured,sort_order,created_at,hero_carousel,school";
 
 // Blog listing/sitemap never render the full article, so omit the heavy `body`
 // column. /blog/[slug] uses getBlogPostBySlug, which still selects everything.
@@ -174,6 +175,7 @@ function normalizeImage(
     hero_carousel: raw.hero_carousel ?? false,
     sort_order: Number(raw.sort_order ?? raw.order ?? index + 1),
     created_at: raw.created_at ?? null,
+    school: raw.school ?? null,
   };
 }
 
