@@ -186,8 +186,9 @@ export default function AboutFactsCard({ facts, photos }: { facts: readonly Abou
             </div>
             {photo && (
               <div className="afc-photo-wrap" key={`photo-${fact.slug}`}>
-                {/* Optimizer bypass is handled centrally (images.unoptimized in
-                    next.config.ts); FactPhoto adds a graceful load-error fallback. */}
+                {/* Images are transformed centrally via the Supabase image
+                    loader (next.config.ts); FactPhoto adds a graceful
+                    load-error fallback. */}
                 <FactPhoto src={photo.url} alt={photo.alt} />
               </div>
             )}
