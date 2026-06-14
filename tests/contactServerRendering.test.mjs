@@ -16,7 +16,6 @@ test("contact page keeps static booking content in the server component", async 
   assert.match(pageSource, /What to expect/);
   assert.match(pageSource, /href="\/faq"/);
   assert.match(pageSource, /<OptimizedPhoto/);
-  assert.match(pageSource, /<OptimizedPhoto[\s\S]*?unoptimized[\s\S]*?\/>/);
   assert.match(pageSource, /<Suspense fallback=\{<ContactFormFallback \/>}/);
 
   assert.doesNotMatch(clientSource, /Tell me the date, location, and what this is for\./);

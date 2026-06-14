@@ -19,6 +19,11 @@ jobs:
   checks:
     name: Build & tests
     runs-on: ubuntu-latest
+    # Revenue period bucketing (lib/paymentAnalytics) runs only in the admin's
+    # Pacific-time browser, so its tests assume PT. Pin the runner's timezone to
+    # match; the default UTC runner shifts month boundaries by the PT offset.
+    env:
+      TZ: America/Los_Angeles
     steps:
       - uses: actions/checkout@v4
 
