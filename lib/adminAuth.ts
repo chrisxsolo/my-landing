@@ -6,12 +6,27 @@
 // shown the authed state. Never used to gate API access.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { useSyncExternalStore } from "react";
+
 const AUTH_KEY = "chris_admin_authed";
 
 /** Client-side UI check only — not a security boundary */
 export function checkAuth(): boolean {
   if (typeof window === "undefined") return false;
   return localStorage.getItem(AUTH_KEY) === "true";
+}
+
+// The local auth flag never changes during a page's life (login/logout navigate
+// away), so there is nothing to subscribe to.
+const noopSubscribe = () => () => {};
+
+/**
+ * Hydration-safe read of the client auth flag. Returns false during SSR and the
+ * first hydration render (matching server output), then the real value — without
+ * a synchronous setState inside an effect.
+ */
+export function useAdminAuthed(): boolean {
+  return useSyncExternalStore(noopSubscribe, checkAuth, () => false);
 }
 
 function setLocalAuth(authed: boolean) {

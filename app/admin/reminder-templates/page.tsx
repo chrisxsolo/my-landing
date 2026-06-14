@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { C } from "@/lib/colors";
-import { checkAuth } from "@/lib/adminAuth";
+import { checkAuth, useAdminAuthed } from "@/lib/adminAuth";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -74,7 +74,7 @@ const TEMPLATES: TemplateConfig[] = [
 
 export default function ReminderTemplatesPage() {
   const router = useRouter();
-  const [authed, setAuthed] = useState(false);
+  const authed = useAdminAuthed();
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
 
@@ -90,10 +90,9 @@ export default function ReminderTemplatesPage() {
     setTimeout(() => setToast(null), 3000);
   }
 
-  // Auth check
+  // Redirect away if not authed (live check — runs only on the client).
   useEffect(() => {
-    if (!checkAuth()) { router.push("/admin"); return; }
-    setAuthed(true);
+    if (!checkAuth()) router.push("/admin");
   }, [router]);
 
   // Load saved templates
@@ -222,7 +221,7 @@ export default function ReminderTemplatesPage() {
         <div className="rounded-2xl p-4 text-sm" style={{ background: C.p1_06, border: `1px solid ${C.p1_15}` }}>
           <p className="font-black text-slate-800 mb-1">How this works</p>
           <p className="text-slate-600 leading-relaxed text-xs">
-            Edit the <strong>instructions</strong> below to change how the AI writes each email. Be specific — include exact phrases, things to mention, things to avoid, timing notes ("within two weeks"), or your personal style. The AI will follow your notes on top of the base behavior. Changes save to the database and apply to every future reminder generated.
+            Edit the <strong>instructions</strong> below to change how the AI writes each email. Be specific — include exact phrases, things to mention, things to avoid, timing notes (&ldquo;within two weeks&rdquo;), or your personal style. The AI will follow your notes on top of the base behavior. Changes save to the database and apply to every future reminder generated.
           </p>
         </div>
 
@@ -293,7 +292,7 @@ export default function ReminderTemplatesPage() {
                       placeholder={t.defaultInstructions}
                     />
                     <p className="text-[10px] text-slate-400 mt-1.5 leading-relaxed">
-                      Write exactly what you want the AI to say, avoid, or include. Example: <em>"Say I'll be backing up and editing your photos, and that the gallery will be ready within two weeks."</em>
+                      Write exactly what you want the AI to say, avoid, or include. Example: <em>&ldquo;Say I&rsquo;ll be backing up and editing your photos, and that the gallery will be ready within two weeks.&rdquo;</em>
                     </p>
                   </div>
                 </div>

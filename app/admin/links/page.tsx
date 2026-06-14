@@ -2,7 +2,7 @@
 import { supabase } from '@/lib/supabase'
 import { useEffect, useRef, useState } from "react";
 import { C } from "@/lib/colors";
-import { checkAuth } from "@/lib/adminAuth";
+import { checkAuth, useAdminAuthed } from "@/lib/adminAuth";
 import { useRouter } from "next/navigation";
 
 export const dynamic = 'force-dynamic'
@@ -27,9 +27,9 @@ const EMPTY_FORM = { label:"", url:"https://", emoji:"🔗", description:"", ord
 
 export default function AdminLinksPage() {
   const router = useRouter();
-  const [authed, setAuthed]   = useState(false);
+  const authed                = useAdminAuthed();
   const [links, setLinks]     = useState<Link[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [form, setForm]       = useState(EMPTY_FORM);
   const [saving, setSaving]   = useState(false);
   const [editing, setEditing] = useState<Link|null>(null);
@@ -37,22 +37,19 @@ export default function AdminLinksPage() {
   const [toast, setToast]     = useState<{msg:string;ok:boolean}|null>(null);
   const [toggling, setToggling] = useState<number|null>(null);
 
-  // Check auth on mount, redirect if not authed
+  // Redirect away if not authed (live check — runs only on the client).
   useEffect(() => {
-    if (!checkAuth()) {
-      router.push('/admin');
-    } else {
-      setAuthed(true);
-    }
+    if (!checkAuth()) router.push('/admin');
   }, [router]);
 
   function showToast(msg:string, ok=true) { setToast({msg,ok}); setTimeout(()=>setToast(null),3000); }
 
-  async function fetchLinks() {
-    setLoading(true);
-    const { data } = await supabase.from('links').select('*').order('order',{ascending:true});
-    if (data) setLinks(data);
-    setLoading(false);
+  function fetchLinks() {
+    supabase.from('links').select('*').order('order',{ascending:true})
+      .then(({ data }) => {
+        if (data) setLinks(data);
+        setLoading(false);
+      });
   }
   useEffect(() => { if (authed) fetchLinks(); }, [authed]);
 

@@ -443,7 +443,7 @@ After the revised draft, on a new line output exactly:
         }
       }
 
-      let draft = stripSignoff(raw);
+      const draft = stripSignoff(raw);
       return NextResponse.json({ draft, ...(savedRule ? { saved_rule: savedRule } : {}) });
     } catch (err) {
       console.error("Claude refinement error:", err);
@@ -520,7 +520,7 @@ Write the reply now.`;
       ],
     });
 
-    let raw = (response.choices[0]?.message?.content ?? "").trim();
+    const raw = (response.choices[0]?.message?.content ?? "").trim();
 
     let draft = raw;
     draft = draft.replace(

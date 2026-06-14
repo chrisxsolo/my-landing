@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useSyncExternalStore } from "react";
 import Link from "next/link";
 
 type Submission = {
@@ -11,6 +11,11 @@ type Submission = {
   date: string;
   message: string;
 };
+
+const SUBMISSION_KEY = "inquiry_submitted";
+// The submission is written once by the contact form before navigating here; it
+// never changes while this page is mounted, so there is nothing to subscribe to.
+const noopSubscribe = () => () => {};
 
 const CSS = `
   @keyframes thanksFadeUp {
@@ -242,20 +247,30 @@ const CSS = `
 `;
 
 export default function ThanksPage() {
-  const [data, setData] = useState<Submission | null>(null);
-  const [loaded, setLoaded] = useState(false);
+  // Render nothing until we're on the client, so the first paint matches the
+  // server (avoids a hydration mismatch) before reading the client-only store.
+  const isClient = useSyncExternalStore(noopSubscribe, () => true, () => false);
 
-  useEffect(() => {
+  const data = useMemo<Submission | null>(() => {
+    if (!isClient) return null;
     try {
-      const raw = sessionStorage.getItem("inquiry_submitted");
-      if (raw) {
-        setData(JSON.parse(raw));
-        sessionStorage.removeItem("inquiry_submitted");
-      }
+      const raw = sessionStorage.getItem(SUBMISSION_KEY);
+      return raw ? (JSON.parse(raw) as Submission) : null;
     } catch {
       // Ignore missing or malformed session data.
+      return null;
     }
-    setLoaded(true);
+  }, [isClient]);
+
+  // Clear the one-shot payload when leaving so a later visit doesn't show it again.
+  useEffect(() => {
+    return () => {
+      try {
+        sessionStorage.removeItem(SUBMISSION_KEY);
+      } catch {
+        // Best-effort cleanup.
+      }
+    };
   }, []);
 
   const fields = data
@@ -269,7 +284,7 @@ export default function ThanksPage() {
       ].filter(Boolean) as { label: string; value: string }[]
     : [];
 
-  if (!loaded) return null;
+  if (!isClient) return null;
 
   return (
     <main className="thanks-page">

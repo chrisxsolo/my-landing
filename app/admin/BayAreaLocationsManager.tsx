@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { uploadImage } from "@/lib/uploadImage";
 import { C } from "@/lib/colors";
 import {
   BAY_AREA_REGION_OPTIONS,
@@ -22,7 +23,7 @@ function getRegionLabel(region: string) {
 
 export default function BayAreaLocationsManager() {
   const [locations, setLocations] = useState<BayAreaLocationEntry[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editingLocation, setEditingLocation] = useState<BayAreaLocationEntry | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
@@ -42,41 +43,26 @@ export default function BayAreaLocationsManager() {
     window.setTimeout(() => setNotice(null), 3000);
   }
 
-  async function fetchLocations() {
-    setLoading(true);
-    const { data, error } = await supabase
+  function fetchLocations() {
+    supabase
       .from("bay_area_locations")
       .select("*")
       .order("region", { ascending: true })
-      .order("order", { ascending: true });
-
-    if (error) {
-      showNotice(`Failed to load locations: ${error.message}`, false);
-      setLoading(false);
-      return;
-    }
-
-    setLocations((data ?? []) as BayAreaLocationEntry[]);
-    setLoading(false);
+      .order("order", { ascending: true })
+      .then(({ data, error }) => {
+        if (error) {
+          showNotice(`Failed to load locations: ${error.message}`, false);
+          setLoading(false);
+          return;
+        }
+        setLocations((data ?? []) as BayAreaLocationEntry[]);
+        setLoading(false);
+      });
   }
 
   useEffect(() => {
     fetchLocations();
   }, []);
-
-  async function uploadImage(file: File) {
-    const ext = file.name.split(".").pop();
-    const name = `bay-area-locations/${Date.now()}.${ext}`;
-    const { error } = await supabase.storage.from("grad-photos").upload(name, file, { upsert: true });
-
-    if (error) {
-      showNotice(`Image upload failed: ${error.message}`, false);
-      return null;
-    }
-
-    const { data } = supabase.storage.from("grad-photos").getPublicUrl(name);
-    return data.publicUrl;
-  }
 
   function startEdit(location: BayAreaLocationEntry) {
     setEditingLocation(location);
@@ -136,7 +122,7 @@ export default function BayAreaLocationsManager() {
     let imageUrl = editingLocation?.image_url ?? null;
 
     if (imageFile) {
-      const uploadedUrl = await uploadImage(imageFile);
+      const uploadedUrl = await uploadImage(imageFile, "bay-area-locations", showNotice);
       if (!uploadedUrl) {
         setSaving(false);
         return;

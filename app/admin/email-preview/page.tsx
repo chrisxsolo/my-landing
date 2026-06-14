@@ -161,7 +161,7 @@ export default function EmailPreviewPage() {
               <p style={{ fontSize: 32, marginBottom: 12 }}>📭</p>
               <p style={{ color: "#64748b", fontWeight: 600 }}>No email to preview</p>
               <p style={{ color: "#94a3b8", fontSize: 13, marginTop: 6 }}>
-                Open this page from the reminders panel by clicking "👁 Preview"
+                Open this page from the reminders panel by clicking &ldquo;👁 Preview&rdquo;
               </p>
             </div>
           )}

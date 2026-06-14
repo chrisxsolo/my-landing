@@ -14,7 +14,7 @@ const ta = `${inp} resize-none`;
 
 export default function PosesTab({ showToast }: Props) {
   const [poses, setPoses] = useState<Pose[]>([]);
-  const [posesLoading, setPosesLoading] = useState(false);
+  const [posesLoading, setPosesLoading] = useState(true);
   const [poseForm, setPoseForm] = useState(EMPTY_POSE);
   const [poseImg, setPoseImg] = useState<File | null>(null);
   const [poseImgPreview, setPoseImgPreview] = useState<string | null>(null);
@@ -23,14 +23,15 @@ export default function PosesTab({ showToast }: Props) {
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
   const poseFileRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { fetchPoses(); }, []);
-
-  async function fetchPoses() {
-    setPosesLoading(true);
-    const { data } = await supabase.from("grad_poses").select("*").order("order", { ascending: true });
-    if (data) setPoses(data);
-    setPosesLoading(false);
+  function fetchPoses() {
+    supabase.from("grad_poses").select("*").order("order", { ascending: true })
+      .then(({ data }) => {
+        if (data) setPoses(data);
+        setPosesLoading(false);
+      });
   }
+
+  useEffect(() => { fetchPoses(); }, []);
 
   function startEditPose(pose: Pose) {
     setEditingPose(pose);

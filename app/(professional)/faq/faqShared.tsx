@@ -6,7 +6,7 @@
 // styling identical across them.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 
 export type FAQGroup = {
   topic: string;
@@ -18,13 +18,6 @@ export type FAQGroup = {
 
 export function AccordionItem({ q, a, index }: { q: string; a: string; index: number }) {
   const [open, setOpen] = useState(false);
-  const bodyRef = useRef<HTMLDivElement>(null);
-  const [height, setHeight] = useState(0);
-
-  useEffect(() => {
-    if (!bodyRef.current) return;
-    setHeight(open ? bodyRef.current.scrollHeight : 0);
-  }, [open]);
 
   return (
     <div className="faq-item" style={{ animationDelay: `${index * 0.045}s` }}>
@@ -41,12 +34,8 @@ export function AccordionItem({ q, a, index }: { q: string; a: string; index: nu
           </svg>
         </span>
       </button>
-      <div
-        className="faq-item-body"
-        style={{ height, overflow: "hidden", transition: "height 0.32s cubic-bezier(0.4,0,0.2,1)" }}
-        aria-hidden={!open}
-      >
-        <div ref={bodyRef} className="faq-item-body-inner">
+      <div className={`faq-item-body${open ? " faq-item-body--open" : ""}`} aria-hidden={!open}>
+        <div className="faq-item-body-inner">
           <p className="faq-item-a">{a}</p>
         </div>
       </div>
@@ -378,13 +367,21 @@ export const FAQ_CSS = `
     transform: rotate(180deg);
   }
 
-  .faq-item-body-inner { padding: 0 16px 18px 16px; }
+  .faq-item-body {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.32s cubic-bezier(0.4,0,0.2,1);
+  }
+  .faq-item-body--open { grid-template-rows: 1fr; }
+  /* Padding lives on the inner content (not the grid item) so the row collapses
+     fully to 0 — padding on the grid item itself would never shrink. */
+  .faq-item-body-inner { overflow: hidden; min-height: 0; }
   .faq-item-a {
     margin: 0;
     font-size: 15px;
     color: #4b5a55;
     line-height: 1.74;
-    padding-right: 46px;
+    padding: 0 62px 18px 16px;
   }
 
   /* ── CTA ───────────────────────────────────────────────────────────────────── */
@@ -512,7 +509,7 @@ export const FAQ_CSS = `
     .faq-hero-ring { display: none; }
     .faq-hero-sub { font-size: 16px; }
     .faq-body   { padding: 52px 0 72px; }
-    .faq-item-a { padding-right: 0; }
+    .faq-item-a { padding-right: 16px; }
     .faq-cta-card { padding: 36px 24px; }
     .faq-pills { gap: 6px; }
     .faq-grad-banner { padding: 14px 16px; }

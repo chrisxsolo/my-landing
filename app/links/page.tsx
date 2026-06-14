@@ -1,3 +1,4 @@
+import NextLink from "next/link";
 import { C } from "@/lib/colors";
 import TrackedLink from "./TrackedLink";
 import LinksAnalytics from "./LinksAnalytics";
@@ -263,10 +264,10 @@ export default async function LinksPage() {
 
         {/* FOOTER */}
         <div className="mt-8 text-center">
-          <a href="/" className="text-xs font-semibold" style={{ color:"#94a3b8", textDecoration:"none" }}>
+          <NextLink href="/" className="text-xs font-semibold" style={{ color:"#94a3b8", textDecoration:"none" }}>
             <span style={C.text12}>Chris Solorzano</span>
             <span style={{ color:"#94a3b8" }}> · Bay Area Photography</span>
-          </a>
+          </NextLink>
         </div>
       </div>
     </div>

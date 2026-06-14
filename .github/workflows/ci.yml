@@ -97,13 +97,12 @@ jobs:
       - name: Integration & e2e tests
         run: npm run test:integration
 
-  # ── Advisory: surfaces lint output without blocking. The repo carries
-  #    pre-existing lint debt (admin/api React-hooks + escaping errors), so this
-  #    is NOT yet a required check — promote it to one once that debt is paid. ──
+  # ── Hard gate: ESLint must pass. The pre-existing lint debt (admin/api
+  #    React-hooks + escaping errors) has been paid down, so this is a required
+  #    status check — a new lint error fails the build. ──
   lint:
-    name: Lint (advisory)
+    name: Lint
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 

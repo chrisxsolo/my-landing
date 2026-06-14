@@ -23,7 +23,7 @@ const ta = `${inp} resize-none`;
 
 export default function LocationsTab({ showToast }: Props) {
   const [spots, setSpots] = useState<Spot[]>([]);
-  const [spotsLoading, setSpotsLoading] = useState(false);
+  const [spotsLoading, setSpotsLoading] = useState(true);
   const [spotForm, setSpotForm] = useState(EMPTY_SPOT);
   const [spotImg, setSpotImg] = useState<File | null>(null);
   const [spotImgPreview, setSpotImgPreview] = useState<string | null>(null);
@@ -32,14 +32,15 @@ export default function LocationsTab({ showToast }: Props) {
   const [spotDeleteConfirm, setSpotDeleteConfirm] = useState<number | null>(null);
   const spotFileRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { fetchSpots(); }, []);
-
-  async function fetchSpots() {
-    setSpotsLoading(true);
-    const { data } = await supabase.from("location_spots").select("*").order("school_id").order("order", { ascending: true });
-    if (data) setSpots(data);
-    setSpotsLoading(false);
+  function fetchSpots() {
+    supabase.from("location_spots").select("*").order("school_id").order("order", { ascending: true })
+      .then(({ data }) => {
+        if (data) setSpots(data);
+        setSpotsLoading(false);
+      });
   }
+
+  useEffect(() => { fetchSpots(); }, []);
 
   function startEditSpot(spot: Spot) {
     setEditingSpot(spot);

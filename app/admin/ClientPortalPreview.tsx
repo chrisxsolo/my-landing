@@ -151,7 +151,6 @@ export default function ClientPortalPreview({ email, onClose }: Props) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setLoading(true);
     fetch("/api/admin/sessions")
       .then(r => r.json())
       .then(json => {

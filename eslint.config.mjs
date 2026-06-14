@@ -16,6 +16,9 @@ const eslintConfig = defineConfig([
     ".next-dev/**",
     // Standalone browser extension with its own (non-Next) conventions.
     "pixieset-extension/**",
+    // Skill/agent tooling scripts — Node CommonJS, not part of the app build.
+    ".agents/**",
+    ".claude/**",
   ]),
 ]);
 

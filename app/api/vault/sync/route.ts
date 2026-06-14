@@ -19,10 +19,12 @@ function getVaultPath() {
 
 function getNodeFs(): NodeFs {
   // Load builtins at runtime so Turbopack does not trace the external vault path into the build.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   return require(/* turbopackIgnore: true */ "node:fs");
 }
 
 function getNodePath(): NodePath {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   return require(/* turbopackIgnore: true */ "node:path");
 }
 
