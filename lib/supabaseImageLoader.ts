@@ -41,5 +41,10 @@ export default function supabaseImageLoader({ src, width, quality }: LoaderArgs)
   url.pathname = url.pathname.replace(OBJECT_PREFIX, RENDER_PREFIX);
   url.searchParams.set("width", String(Math.min(width, MAX_TRANSFORM_WIDTH)));
   url.searchParams.set("quality", String(quality ?? 75));
+  // Without an explicit resize mode Supabase defaults to "cover", which keeps the
+  // source height and crops the sides when only a width is supplied (e.g. a
+  // 1000x1500 source returns 640x1500). "contain" scales proportionally to the
+  // requested width, preserving aspect ratio; CSS object-fit then frames each tile.
+  url.searchParams.set("resize", "contain");
   return url.toString();
 }
