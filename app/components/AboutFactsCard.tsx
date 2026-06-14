@@ -74,6 +74,24 @@ const CSS = `
     background: #dfe8e4;
     width: 100%;
   }
+  .afc-photo-fallback {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    color: #8aa39c;
+    background: linear-gradient(135deg, #e7efeb, #d7e3dd);
+  }
+  .afc-photo-fallback-label {
+    font-size: 12.5px;
+    font-weight: 760;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #7d968f;
+  }
   .afc-nav {
     display: flex;
     align-items: center;
@@ -168,10 +186,9 @@ export default function AboutFactsCard({ facts, photos }: { facts: readonly Abou
             </div>
             {photo && (
               <div className="afc-photo-wrap" key={`photo-${fact.slug}`}>
-                {/* unoptimized: load directly from Supabase storage and skip Vercel's
-                    /_next/image optimizer, which 402s once the account's image-
-                    optimization quota is exhausted. */}
-                <OptimizedPhoto src={photo.url} alt={photo.alt} sizes="(max-width: 900px) 90vw, 38vw" quality={85} unoptimized />
+                {/* Optimizer bypass is handled centrally (images.unoptimized in
+                    next.config.ts); FactPhoto adds a graceful load-error fallback. */}
+                <FactPhoto src={photo.url} alt={photo.alt} />
               </div>
             )}
           </div>
@@ -196,5 +213,36 @@ export default function AboutFactsCard({ facts, photos }: { facts: readonly Abou
         </div>
       </div>
     </section>
+  );
+}
+
+// Renders a fact photo, falling back to an intentional placeholder if the image
+// fails to load — so a broken request never shows raw alt text over an empty
+// box. The fallback is a safety net, not a substitute for a valid source URL.
+function FactPhoto({ src, alt }: { src: string; alt: string }) {
+  const [failed, setFailed] = useState(false);
+
+  if (failed) {
+    return (
+      <div className="afc-photo-fallback" role="img" aria-label={alt}>
+        <svg viewBox="0 0 24 24" width="34" height="34" aria-hidden focusable="false">
+          <path
+            fill="currentColor"
+            d="M9 3 7.17 5H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-3.17L15 3H9zm3 5a5 5 0 1 1 0 10 5 5 0 0 1 0-10zm0 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"
+          />
+        </svg>
+        <span className="afc-photo-fallback-label">Photo coming soon</span>
+      </div>
+    );
+  }
+
+  return (
+    <OptimizedPhoto
+      src={src}
+      alt={alt}
+      sizes="(max-width: 900px) 90vw, 38vw"
+      quality={85}
+      onError={() => setFailed(true)}
+    />
   );
 }

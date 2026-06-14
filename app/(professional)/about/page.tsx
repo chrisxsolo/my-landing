@@ -33,6 +33,7 @@ import {
   type AboutPhotoMap,
 } from "@/lib/aboutFacts";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
+import { resolveAboutPhotoUrl } from "@/lib/aboutPhotoUrl";
 
 // ISR: photos uploaded in the Darkroom appear within the hour, or immediately
 // via the admin revalidate ping (see /api/admin/revalidate).
@@ -371,7 +372,10 @@ async function getAboutPhotos(): Promise<AboutPhotoMap> {
       .select("fact_slug,image_url,alt_text");
     if (error) throw error;
     const map: AboutPhotoMap = {};
-    for (const row of data ?? []) map[row.fact_slug] = { url: row.image_url, alt: row.alt_text };
+    for (const row of data ?? []) {
+      const url = resolveAboutPhotoUrl(row.image_url);
+      if (url) map[row.fact_slug] = { url, alt: row.alt_text };
+    }
     return map;
   } catch (error) {
     console.error("[about] failed to load fact photos, rendering text-only", error);

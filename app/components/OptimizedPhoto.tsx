@@ -10,6 +10,7 @@ type OptimizedPhotoProps = {
   quality?: 75 | 85 | 90;
   objectPosition?: string;
   unoptimized?: boolean;
+  onError?: () => void;
 };
 
 export default function OptimizedPhoto({
@@ -21,6 +22,7 @@ export default function OptimizedPhoto({
   quality = 85,
   objectPosition,
   unoptimized = false,
+  onError,
 }: OptimizedPhotoProps) {
   const style: CSSProperties = {
     objectFit: "cover",
@@ -38,6 +40,7 @@ export default function OptimizedPhoto({
       quality={quality}
       style={style}
       unoptimized={unoptimized}
+      onError={onError}
     />
   );
 }

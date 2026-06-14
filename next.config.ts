@@ -5,6 +5,15 @@ const nextConfig: NextConfig = {
   // which has been getting into a corrupted state on this machine.
   distDir: process.env.NODE_ENV === "development" ? ".next-dev" : ".next",
   images: {
+    // Vercel's hosted image optimizer (/_next/image) returns HTTP 402
+    // (OPTIMIZED_IMAGE_REQUEST_PAYMENT_REQUIRED) once the account's
+    // optimization quota is exhausted, which breaks EVERY next/image on the
+    // site in production while working fine in local dev (the dev server
+    // optimizes locally with no quota). Bypass the optimizer entirely: images
+    // render as plain <img> pointing straight at their public Supabase URLs.
+    // Re-enable optimization (remove this line) only after the Vercel plan /
+    // quota can serve /_next/image again.
+    unoptimized: true,
     qualities: [75, 85, 90],
     remotePatterns: [
       {
