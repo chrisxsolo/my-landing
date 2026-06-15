@@ -3,7 +3,6 @@ import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { C } from "@/lib/colors";
 import { uploadImage } from "@/lib/uploadImage";
-import { buildJournalImageLibraryRows } from "@/lib/imageLibraryShared";
 import { GRAD_SCHOOL_OPTIONS, GRAD_LOCATION_OPTIONS, GRAD_SESSION_OPTIONS } from "@/lib/portfolioSeoDescription";
 
 type BlogCategory = "journal" | "professional";
@@ -105,12 +104,9 @@ export default function BlogTab({ showToast }: Props) {
 
   async function fetchPosts() {
     setPostsLoading(true);
-    let { data, error } = await supabase.from("blog_posts").select("*").contains("sites", ["professional"]).order("published_at", { ascending: false });
-    if (error) {
-      const fallback = await supabase.from("blog_posts").select("*").eq("category", "professional").order("published_at", { ascending: false });
-      data = fallback.data; error = fallback.error;
-    }
-    if (data) setPosts(data);
+    const res = await fetch("/api/admin/blog-posts", { credentials: "include" });
+    const json = await res.json().catch(() => ({}));
+    if (res.ok && Array.isArray(json.posts)) setPosts(json.posts);
     setPostsLoading(false);
   }
 
@@ -158,9 +154,13 @@ export default function BlogTab({ showToast }: Props) {
   function onExtraDrop(e: React.DragEvent) { e.preventDefault(); setExtraDragging(false); const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith("image/")); if (!files.length) return; setExtraImgs(prev => [...prev, ...files]); setExtraPreviews(prev => [...prev, ...files.map(f => URL.createObjectURL(f))]); }
 
   async function syncImagesToLibrary(postId: number, postSlug: string, postTitle: string, cover_image_url: string | null, extra_image_urls: string[]) {
-    const rows = buildJournalImageLibraryRows({ postId, postSlug, postTitle, coverImageUrl: cover_image_url, extraImageUrls: extra_image_urls });
-    if (!rows.length) return;
-    await supabase.from("image_library").upsert(rows, { onConflict: "source_post_id,source_role,image_url", ignoreDuplicates: true });
+    // Server-side (service-role) sync — mirrors buildJournalImageLibraryRows + upsert.
+    await fetch("/api/admin/image-library", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ mode: "sync-post", postId, postSlug, postTitle, coverImageUrl: cover_image_url, extraImageUrls: extra_image_urls }),
+    }).catch(err => console.error("[blog] image library sync error:", err));
   }
 
   async function generateBlogFromPhotos() {
@@ -229,19 +229,21 @@ export default function BlogTab({ showToast }: Props) {
     const sites = ["professional"];
     const payload = { title: postForm.title, body: postForm.body, slug, category: "professional", sites, cover_image_url, extra_image_urls, published_at: new Date(postForm.published_at).toISOString(), meta_description: postForm.meta_description.trim() || null, meta_keywords: postForm.meta_keywords.trim() || null };
     if (editingPost) {
-      const { error } = await supabase.from("blog_posts").update(payload).eq("id", editingPost.id);
-      if (error) showToast("Update failed", false);
+      const res = await fetch("/api/admin/blog-posts", { method: "PATCH", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ id: editingPost.id, updates: payload }) });
+      if (!res.ok) showToast("Update failed", false);
       else { await syncImagesToLibrary(editingPost.id, slug, postForm.title, cover_image_url, extra_image_urls); showToast("Post updated!"); cancelEditPost(); fetchPosts(); revalidatePublicSite(); }
     } else {
-      const { data: inserted, error } = await supabase.from("blog_posts").insert(payload).select("id").single();
-      if (error || !inserted) showToast("Save failed — " + (error?.message ?? ""), false);
-      else { await syncImagesToLibrary(inserted.id, slug, postForm.title, cover_image_url, extra_image_urls); showToast("Post published!"); cancelEditPost(); fetchPosts(); revalidatePublicSite(); }
+      const res = await fetch("/api/admin/blog-posts", { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify(payload) });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.id) showToast("Save failed — " + (json.error ?? ""), false);
+      else { await syncImagesToLibrary(json.id, slug, postForm.title, cover_image_url, extra_image_urls); showToast("Post published!"); cancelEditPost(); fetchPosts(); revalidatePublicSite(); }
     }
     setPostSaving(false);
   }
 
   async function deletePost(id: number) {
-    await supabase.from("blog_posts").delete().eq("id", id);
+    const res = await fetch(`/api/admin/blog-posts?id=${id}`, { method: "DELETE", credentials: "include" });
+    if (!res.ok) { showToast("Delete failed", false); return; }
     setPosts(p => p.filter(x => x.id !== id));
     setPostDeleteConfirm(null);
     if (editingPost?.id === id) cancelEditPost();

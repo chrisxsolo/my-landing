@@ -1022,9 +1022,9 @@ function AdminDashboard() {
     });
     let saved=0;
     if(rows.length){
-      // Single bulk insert instead of one request per photo.
-      const{error}=await supabase.from('portfolio_images').insert(rows);
-      if(error)showToast("Some photos failed to save — "+error.message,false);else saved=rows.length;
+      // Single bulk insert instead of one request per photo (service-role API).
+      const res=await fetch('/api/admin/portfolio-images',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(rows)});
+      if(!res.ok){const j=await res.json().catch(()=>({}));showToast("Some photos failed to save — "+(j.error||""),false);}else saved=rows.length;
     }
     if(saved<batchItems.length)showToast(`${batchItems.length-saved} photo${batchItems.length-saved!==1?"s":""} failed to upload`,false);
     setBatchSaving(false);
@@ -1045,8 +1045,8 @@ function AdminDashboard() {
     let count=0;
     for(let i=0;i<toImport.length;i++){
       const p=toImport[i];
-      const{error}=await supabase.from('portfolio_images').insert({title:p.caption||"Graduation portrait",alt:p.caption||"Bay Area graduation portrait by Chris Solorzano",image_url:p.image_url,category_id:gradCat?.id??null,category_slug:"grads",featured:i<6,sort_order:portfolioImages.length+count+1});
-      if(!error)count++;
+      const res=await fetch('/api/admin/portfolio-images',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({title:p.caption||"Graduation portrait",alt:p.caption||"Bay Area graduation portrait by Chris Solorzano",image_url:p.image_url,category_id:gradCat?.id??null,category_slug:"grads",featured:i<6,sort_order:portfolioImages.length+count+1})});
+      if(res.ok)count++;
     }
     setImporting(false);
     showToast(`${count} grad photo${count!==1?"s":""} imported`);
@@ -1150,11 +1150,11 @@ function AdminDashboard() {
       const url=await uploadImage(file,"library",showToast);
       if(!url)continue;
       const title=file.name.replace(/\.[^.]+$/,"").replace(/[-_]/g," ")||"Library photo";
-      const{error}=await supabase.from('image_library').insert({
+      const res=await fetch('/api/admin/library-images',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({
         title,alt:title,image_url:url,
         source_type:"manual",source_role:"gallery",in_portfolio:false,
-      });
-      if(!error)saved++;
+      })});
+      if(res.ok)saved++;
     }
     setLibraryUploadPreviews([]);
     setLibraryUploading(false);
@@ -1164,15 +1164,16 @@ function AdminDashboard() {
 
   async function fetchLibraryImages(){
     setLibraryLoading(true);
-    const{data,error}=await supabase.from('image_library').select('*').order('created_at',{ascending:false});
-    if(error)console.error(error);
-    if(data)setLibraryImages(data);
+    const res=await fetch('/api/admin/library-images',{credentials:'include'});
+    const json=await res.json().catch(()=>({}));
+    if(res.ok&&Array.isArray(json.images))setLibraryImages(json.images);
+    else if(!res.ok)console.error(json.error);
     setLibraryLoading(false);
   }
   async function pushLibraryImageToPortfolio(row:ImageLibraryRow){
     setLibraryPushingId(row.id);
     const cat=categories.find(c=>c.slug===libraryPushCategory);
-    const{error}=await supabase.from('portfolio_images').insert({
+    const res=await fetch('/api/admin/portfolio-images',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({
       title:row.title,
       alt:row.alt||row.title,
       image_url:row.image_url,
@@ -1180,9 +1181,9 @@ function AdminDashboard() {
       category_slug:libraryPushCategory,
       featured:false,
       sort_order:portfolioImages.length+1,
-    });
-    if(error){showToast("Failed to add to portfolio",false);}else{
-      await supabase.from('image_library').update({in_portfolio:true}).eq('id',row.id);
+    })});
+    if(!res.ok){showToast("Failed to add to portfolio",false);}else{
+      await fetch('/api/admin/library-images',{method:'PATCH',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({id:row.id,updates:{in_portfolio:true}})});
       setLibraryImages(p=>p.map(x=>x.id===row.id?{...x,in_portfolio:true}:x));
       fetchPortfolioImages();
       revalidatePublicSite();
@@ -1209,15 +1210,15 @@ function AdminDashboard() {
     setCategorySaving(true);
     const payload={name:categoryForm.name,slug:slugify(categoryForm.slug),description:categoryForm.description||null,sort_order:parseInt(categoryForm.sort_order)||categories.length+1,active:categoryForm.active};
     if(editingCategory){
-      const{error}=await supabase.from('portfolio_categories').update(payload).eq('id',editingCategory.id);
-      if(error)showToast("Category update failed — "+error.message,false);else{showToast("Category updated!");cancelEditCategory();fetchCategories();revalidatePublicSite();}
+      const res=await fetch('/api/admin/portfolio-categories',{method:'PATCH',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({id:editingCategory.id,updates:payload})});
+      if(!res.ok){const j=await res.json().catch(()=>({}));showToast("Category update failed — "+(j.error||""),false);}else{showToast("Category updated!");cancelEditCategory();fetchCategories();revalidatePublicSite();}
     }else{
-      const{error}=await supabase.from('portfolio_categories').insert(payload);
-      if(error)showToast("Category save failed — "+error.message,false);else{showToast("Category added!");setCategoryForm(EMPTY_CATEGORY);fetchCategories();revalidatePublicSite();}
+      const res=await fetch('/api/admin/portfolio-categories',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(payload)});
+      if(!res.ok){const j=await res.json().catch(()=>({}));showToast("Category save failed — "+(j.error||""),false);}else{showToast("Category added!");setCategoryForm(EMPTY_CATEGORY);fetchCategories();revalidatePublicSite();}
     }
     setCategorySaving(false);
   }
-  async function deleteCategory(id:number){await supabase.from('portfolio_categories').delete().eq('id',id);setCategories(p=>p.filter(x=>x.id!==id));setCategoryDeleteConfirm(null);if(editingCategory?.id===id)cancelEditCategory();revalidatePublicSite();showToast("Category deleted");}
+  async function deleteCategory(id:number){await fetch(`/api/admin/portfolio-categories?id=${id}`,{method:'DELETE',credentials:'include'});setCategories(p=>p.filter(x=>x.id!==id));setCategoryDeleteConfirm(null);if(editingCategory?.id===id)cancelEditCategory();revalidatePublicSite();showToast("Category deleted");}
 
   function startEditPortfolioImage(image:PortfolioImage){setEditingPortfolioImage(image);setPortfolioForm({title:image.title,alt:image.alt??"",category_slug:image.category_slug,school:image.school??"",featured:image.featured,sort_order:String(image.sort_order)});setPortfolioFile(null);setPortfolioPreview(image.image_url);window.scrollTo({top:0,behavior:"smooth"});}
   function cancelEditPortfolioImage(){setEditingPortfolioImage(null);setPortfolioForm(EMPTY_PORTFOLIO);setPortfolioFile(null);setPortfolioPreview(null);if(portfolioFileRef.current)portfolioFileRef.current.value="";}
@@ -1307,20 +1308,20 @@ function AdminDashboard() {
     const category=categories.find(c=>c.slug===portfolioForm.category_slug);
     const payload={title:portfolioForm.title,alt:portfolioForm.alt||portfolioForm.title,image_url,category_id:category?.id??null,category_slug:portfolioForm.category_slug,school:portfolioForm.school||null,featured:portfolioForm.featured,sort_order:parseInt(portfolioForm.sort_order)||editingPortfolioImage?.sort_order||portfolioImages.length+1};
     if(editingPortfolioImage){
-      const{error}=await supabase.from('portfolio_images').update(payload).eq('id',editingPortfolioImage.id);
-      if(error)showToast("Portfolio update failed — "+error.message,false);else{showToast("Portfolio image updated!");cancelEditPortfolioImage();fetchPortfolioImages();revalidatePublicSite();}
+      const res=await fetch('/api/admin/portfolio-images',{method:'PATCH',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({id:editingPortfolioImage.id,updates:payload})});
+      if(!res.ok){const j=await res.json().catch(()=>({}));showToast("Portfolio update failed — "+(j.error||""),false);}else{showToast("Portfolio image updated!");cancelEditPortfolioImage();fetchPortfolioImages();revalidatePublicSite();}
     }else{
-      const{error}=await supabase.from('portfolio_images').insert(payload);
-      if(error)showToast("Portfolio save failed — "+error.message,false);else{showToast("Portfolio image added!");cancelEditPortfolioImage();fetchPortfolioImages();revalidatePublicSite();}
+      const res=await fetch('/api/admin/portfolio-images',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(payload)});
+      if(!res.ok){const j=await res.json().catch(()=>({}));showToast("Portfolio save failed — "+(j.error||""),false);}else{showToast("Portfolio image added!");cancelEditPortfolioImage();fetchPortfolioImages();revalidatePublicSite();}
     }
     setPortfolioSaving(false);
   }
-  async function deletePortfolioImage(id:number){await supabase.from('portfolio_images').delete().eq('id',id);setPortfolioImages(p=>p.filter(x=>x.id!==id));setPortfolioDeleteConfirm(null);if(editingPortfolioImage?.id===id)cancelEditPortfolioImage();revalidatePublicSite();showToast("Portfolio image deleted");}
+  async function deletePortfolioImage(id:number){await fetch(`/api/admin/portfolio-images?id=${id}`,{method:'DELETE',credentials:'include'});setPortfolioImages(p=>p.filter(x=>x.id!==id));setPortfolioDeleteConfirm(null);if(editingPortfolioImage?.id===id)cancelEditPortfolioImage();revalidatePublicSite();showToast("Portfolio image deleted");}
 
   async function toggleCarousel(id:number, current:boolean){
     const carouselCount = portfolioImages.filter(i=>i.hero_carousel).length;
     if(!current && carouselCount>=5){showToast("Max 5 carousel images — remove one first",false);return;}
-    await supabase.from('portfolio_images').update({hero_carousel:!current}).eq('id',id);
+    await fetch('/api/admin/portfolio-images',{method:'PATCH',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({id,updates:{hero_carousel:!current}})});
     setPortfolioImages(p=>p.map(x=>x.id===id?{...x,hero_carousel:!current}:x));
     revalidatePublicSite();
     showToast(!current?"Added to carousel":"Removed from carousel");

@@ -147,23 +147,32 @@ export default function BayAreaLocationsManager() {
     };
 
     if (editingLocation) {
-      const { error } = await supabase
-        .from("bay_area_locations")
-        .update(payload)
-        .eq("id", editingLocation.id);
+      const res = await fetch("/api/admin/bay-area-locations", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ id: editingLocation.id, updates: payload }),
+      });
 
-      if (error) {
-        showNotice(`Update failed: ${error.message}`, false);
+      if (!res.ok) {
+        const { error } = await res.json().catch(() => ({ error: "Update failed." }));
+        showNotice(`Update failed: ${error}`, false);
       } else {
         showNotice("Bay Area location updated.");
         cancelEdit();
         fetchLocations();
       }
     } else {
-      const { error } = await supabase.from("bay_area_locations").insert(payload);
+      const res = await fetch("/api/admin/bay-area-locations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(payload),
+      });
 
-      if (error) {
-        showNotice(`Save failed: ${error.message}`, false);
+      if (!res.ok) {
+        const { error } = await res.json().catch(() => ({ error: "Save failed." }));
+        showNotice(`Save failed: ${error}`, false);
       } else {
         showNotice("Bay Area location saved.");
         cancelEdit();
@@ -175,10 +184,14 @@ export default function BayAreaLocationsManager() {
   }
 
   async function deleteLocation(id: number) {
-    const { error } = await supabase.from("bay_area_locations").delete().eq("id", id);
+    const res = await fetch(`/api/admin/bay-area-locations?id=${id}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
 
-    if (error) {
-      showNotice(`Delete failed: ${error.message}`, false);
+    if (!res.ok) {
+      const { error } = await res.json().catch(() => ({ error: "Delete failed." }));
+      showNotice(`Delete failed: ${error}`, false);
       return;
     }
 

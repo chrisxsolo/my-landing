@@ -1,6 +1,5 @@
 "use client";
 import { useState, useEffect, useRef, useCallback } from "react";
-import { supabase } from "@/lib/supabase";
 import { T } from "@/app/admin/adminTheme";
 
 const panel = { background: T.panel, border: `1px solid ${T.border}`, boxShadow: T.shadow } as const;
@@ -127,14 +126,11 @@ export default function AnalyticsTab() {
   const load = useCallback(async () => {
     setLoading(true);
     const since = periodStart(MAX_WEEKS_BACK * 7 + 7).toISOString();
-    const [{ data: v }, { data: c }, { data: l }] = await Promise.all([
-      supabase.from("link_views").select("user_id,viewed_at,referrer,device").gte("viewed_at", since),
-      supabase.from("link_clicks").select("link_id,user_id,clicked_at,referrer,device").gte("clicked_at", since),
-      supabase.from("links").select("id,label,emoji,url").eq("active", true).order("order", { ascending: true }),
-    ]);
-    setViews((v ?? []) as ViewEvent[]);
-    setClicks((c ?? []) as ClickEvent[]);
-    setLinks((l ?? []) as LinkRow[]);
+    const res = await fetch(`/api/admin/analytics?since=${encodeURIComponent(since)}`, { credentials: "include" });
+    const json = await res.json().catch(() => ({}));
+    setViews((json.views ?? []) as ViewEvent[]);
+    setClicks((json.clicks ?? []) as ClickEvent[]);
+    setLinks((json.links ?? []) as LinkRow[]);
     setLoading(false);
   }, []);
 
@@ -231,10 +227,8 @@ export default function AnalyticsTab() {
 
   async function clearAll() {
     if (!confirm("⚠️ Permanently delete ALL analytics data (views + clicks)?")) return;
-    await Promise.all([
-      supabase.from("link_clicks").delete().neq("id", 0),
-      supabase.from("link_views").delete().neq("id", 0),
-    ]);
+    const res = await fetch("/api/admin/analytics", { method: "DELETE", credentials: "include" });
+    if (!res.ok) { alert("Failed to clear analytics."); return; }
     load();
   }
 
