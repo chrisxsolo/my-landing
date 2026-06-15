@@ -76,19 +76,21 @@ export default function LocationsTab({ showToast }: Props) {
     }
     const school = SCHOOLS.find(s => s.id === spotForm.school_id)!;
     if (editingSpot) {
-      const { error } = await supabase.from("location_spots").update({ school_id: school.id, school_name: school.name, school_short: school.short, name: spotForm.name, description: spotForm.description, tip: spotForm.tip, icon: spotForm.icon, image_url, order: parseInt(spotForm.order) || editingSpot.order }).eq("id", editingSpot.id);
-      if (error) showToast("Update failed", false);
+      const updates = { school_id: school.id, school_name: school.name, school_short: school.short, name: spotForm.name, description: spotForm.description, tip: spotForm.tip, icon: spotForm.icon, image_url, order: parseInt(spotForm.order) || editingSpot.order };
+      const res = await fetch("/api/admin/location-spots", { method: "PATCH", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ id: editingSpot.id, updates }) });
+      if (!res.ok) showToast("Update failed", false);
       else { showToast("Location updated!"); cancelEditSpot(); fetchSpots(); }
     } else {
-      const { error } = await supabase.from("location_spots").insert({ school_id: school.id, school_name: school.name, school_short: school.short, name: spotForm.name, description: spotForm.description, tip: spotForm.tip, icon: spotForm.icon, image_url, order: parseInt(spotForm.order) || spots.filter(s => s.school_id === school.id).length + 1 });
-      if (error) showToast("Save failed", false);
+      const spot = { school_id: school.id, school_name: school.name, school_short: school.short, name: spotForm.name, description: spotForm.description, tip: spotForm.tip, icon: spotForm.icon, image_url, order: parseInt(spotForm.order) || spots.filter(s => s.school_id === school.id).length + 1 };
+      const res = await fetch("/api/admin/location-spots", { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify(spot) });
+      if (!res.ok) showToast("Save failed", false);
       else { showToast("Location added!"); setSpotForm(EMPTY_SPOT); setSpotImg(null); setSpotImgPreview(null); if (spotFileRef.current) spotFileRef.current.value = ""; fetchSpots(); }
     }
     setSpotSaving(false);
   }
 
   async function deleteSpot(id: number) {
-    await supabase.from("location_spots").delete().eq("id", id);
+    await fetch(`/api/admin/location-spots?id=${id}`, { method: "DELETE", headers: { "Content-Type": "application/json" }, credentials: "include" });
     setSpots(p => p.filter(x => x.id !== id));
     setSpotDeleteConfirm(null);
     if (editingSpot?.id === id) cancelEditSpot();

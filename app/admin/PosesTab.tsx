@@ -66,19 +66,20 @@ export default function PosesTab({ showToast }: Props) {
       image_url = url;
     }
     if (editingPose) {
-      const { error } = await supabase.from("grad_poses").update({ title: poseForm.title, instructions: poseForm.instructions, image_url, order: parseInt(poseForm.order) || editingPose.order }).eq("id", editingPose.id);
-      if (error) showToast("Update failed", false);
+      const res = await fetch("/api/admin/grad-poses", { method: "PATCH", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ id: editingPose.id, updates: { title: poseForm.title, instructions: poseForm.instructions, image_url, order: parseInt(poseForm.order) || editingPose.order } }) });
+      if (!res.ok) showToast("Update failed", false);
       else { showToast("Pose updated!"); cancelEditPose(); fetchPoses(); }
     } else {
-      const { error } = await supabase.from("grad_poses").insert({ title: poseForm.title, instructions: poseForm.instructions, image_url, order: parseInt(poseForm.order) || poses.length + 1 });
-      if (error) showToast("Save failed", false);
+      const res = await fetch("/api/admin/grad-poses", { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ title: poseForm.title, instructions: poseForm.instructions, image_url, order: parseInt(poseForm.order) || poses.length + 1 }) });
+      if (!res.ok) showToast("Save failed", false);
       else { showToast("Pose added!"); setPoseForm(EMPTY_POSE); setPoseImg(null); setPoseImgPreview(null); if (poseFileRef.current) poseFileRef.current.value = ""; fetchPoses(); }
     }
     setPoseSaving(false);
   }
 
   async function deletePose(id: number) {
-    await supabase.from("grad_poses").delete().eq("id", id);
+    const res = await fetch(`/api/admin/grad-poses?id=${id}`, { method: "DELETE", credentials: "include" });
+    if (!res.ok) { showToast("Delete failed", false); return; }
     setPoses(p => p.filter(x => x.id !== id));
     setDeleteConfirm(null);
     if (editingPose?.id === id) cancelEditPose();

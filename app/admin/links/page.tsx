@@ -72,12 +72,12 @@ export default function AdminLinksPage() {
       active: editing ? editing.active : true,
     };
     if (editing) {
-      const { error } = await supabase.from('links').update(payload).eq('id', editing.id);
-      if (error) showToast("Update failed", false);
+      const res = await fetch('/api/admin/links', { method:'PATCH', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify({ id: editing.id, updates: payload }) });
+      if (!res.ok) showToast("Update failed", false);
       else { showToast("Link updated!"); cancelEdit(); fetchLinks(); }
     } else {
-      const { error } = await supabase.from('links').insert(payload);
-      if (error) showToast("Save failed", false);
+      const res = await fetch('/api/admin/links', { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify(payload) });
+      if (!res.ok) showToast("Save failed", false);
       else { showToast("Link added!"); setForm(EMPTY_FORM); fetchLinks(); }
     }
     setSaving(false);
@@ -85,7 +85,7 @@ export default function AdminLinksPage() {
 
   async function toggleActive(link: Link) {
     setToggling(link.id);
-    await supabase.from('links').update({ active: !link.active }).eq('id', link.id);
+    await fetch('/api/admin/links', { method:'PATCH', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify({ id: link.id, updates: { active: !link.active } }) });
     setLinks(prev => prev.map(l => l.id===link.id ? {...l,active:!l.active} : l));
     setToggling(null);
     showToast(link.active ? "Link hidden" : "Link visible");
@@ -96,13 +96,13 @@ export default function AdminLinksPage() {
     const idx = sorted.findIndex(l=>l.id===link.id);
     const swap = dir==="up" ? sorted[idx-1] : sorted[idx+1];
     if (!swap) return;
-    await supabase.from('links').update({ order: swap.order }).eq('id', link.id);
-    await supabase.from('links').update({ order: link.order }).eq('id', swap.id);
+    await fetch('/api/admin/links', { method:'PATCH', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify({ id: link.id, updates: { order: swap.order } }) });
+    await fetch('/api/admin/links', { method:'PATCH', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify({ id: swap.id, updates: { order: link.order } }) });
     fetchLinks();
   }
 
   async function deleteLink(id: number) {
-    await supabase.from('links').delete().eq('id', id);
+    await fetch(`/api/admin/links?id=${id}`, { method:'DELETE', credentials:'include' });
     setLinks(prev => prev.filter(l=>l.id!==id));
     setDeleteConfirm(null);
     if (editing?.id===id) cancelEdit();

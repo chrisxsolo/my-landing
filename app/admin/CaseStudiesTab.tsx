@@ -165,11 +165,22 @@ export default function CaseStudiesTab({ showToast, categories }: Props) {
       sort_order: parseInt(form.sort_order) || 0,
       active: form.active,
     };
-    const result = editing
-      ? await supabase.from("portfolio_case_studies").update(payload).eq("id", editing.id)
-      : await supabase.from("portfolio_case_studies").insert(payload);
-    if (result.error) {
-      showToast("Save failed — " + result.error.message, false);
+    const res = editing
+      ? await fetch("/api/admin/case-studies", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ id: editing.id, updates: payload }),
+        })
+      : await fetch("/api/admin/case-studies", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify(payload),
+        });
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      showToast("Save failed — " + (body?.error ?? res.statusText), false);
     } else {
       showToast(editing ? "Case study updated!" : "Case study added!");
       cancelEdit();
@@ -181,9 +192,14 @@ export default function CaseStudiesTab({ showToast, categories }: Props) {
 
   async function remove(study: CaseStudy) {
     if (!window.confirm(`Delete case study "${study.title}"?`)) return;
-    const { error } = await supabase.from("portfolio_case_studies").delete().eq("id", study.id);
-    if (error) {
-      showToast("Delete failed — " + error.message, false);
+    const res = await fetch(`/api/admin/case-studies?id=${study.id}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      showToast("Delete failed — " + (body?.error ?? res.statusText), false);
       return;
     }
     showToast("Case study deleted");
