@@ -1,6 +1,5 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
-import { supabase } from "@/lib/supabase";
 import { C } from "@/lib/colors";
 import { uploadImage } from "@/lib/uploadImage";
 import { GRAD_SCHOOL_OPTIONS, GRAD_LOCATION_OPTIONS, GRAD_SESSION_OPTIONS } from "@/lib/portfolioSeoDescription";
@@ -180,12 +179,15 @@ export default function BlogTab({ showToast }: Props) {
       const [res, storageUrlResults] = await Promise.all([
         fetch("/api/ai-blog-from-photos", { method: "POST", body: fd }),
         Promise.all(compressedForStorage.map((blob, i) => {
-          const path = `blog/${ts}_${i}.jpg`;
-          return supabase.storage.from("grad-photos")
-            .upload(path, blob, { upsert: true, contentType: "image/jpeg" })
-            .then(({ error }) => {
-              if (error) { console.error("[ai-blog] upload:", error); return null; }
-              return supabase.storage.from("grad-photos").getPublicUrl(path).data.publicUrl;
+          // Upload via the requireAdmin-gated service-role route, not the anon client.
+          const form = new FormData();
+          form.append("file", new File([blob], `blog-${ts}-${i}.jpg`, { type: "image/jpeg" }));
+          form.append("folder", "blog");
+          return fetch("/api/admin/upload-image", { method: "POST", credentials: "include", body: form })
+            .then(async (r) => {
+              const d = (await r.json().catch(() => null)) as { url?: string; error?: string } | null;
+              if (!r.ok || !d?.url) { console.error("[ai-blog] upload:", d?.error); return null; }
+              return d.url;
             });
         })),
       ]);
