@@ -37,6 +37,16 @@ const cards = [
   { href: FAMILY_CONTACT, title: "Book a Family Session", desc: "Send your date, location, and who's joining — I reply with availability and next steps.", emoji: "📅" },
 ];
 
+// Why a family session is different — the specialist skills behind the photos,
+// not just the color grading. Each is a concrete reason to hire over a generalist.
+const differentiators = [
+  { emoji: "⏱️", title: "Child pacing", text: "Kids set the tempo. I read the room and shoot in short, playful bursts so little ones never hit a wall." },
+  { emoji: "🧩", title: "Group arrangement", text: "From toddlers to grandparents, I arrange everyone so the spacing looks natural and every face is clearly seen." },
+  { emoji: "👀", title: "Attention management", text: "Getting four people looking good at once is its own skill. I know how to earn real smiles instead of forced “cheese.”" },
+  { emoji: "🔄", title: "Shorter pose cycles", text: "We work in quick sets with built-in breaks, so the session stays fun and the photos stay relaxed." },
+  { emoji: "🧰", title: "Backup strategies", text: "A meltdown, a surprise nap, or fog rolling in — I always have a plan B so the session still delivers." },
+];
+
 const marquee = [...FG_MARQUEE, ...FG_MARQUEE];
 
 export default function FamilyGuideContent({
@@ -138,6 +148,29 @@ export default function FamilyGuideContent({
                 <Link href={FAMILY_CONTACT} className="fg-inline-link">reach out about a Bay Area family session</Link>.
               </p>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── WHY A FAMILY SESSION IS DIFFERENT ──────────────────────────────── */}
+      <section className="fg-section">
+        <div className="fg-shell">
+          <p className="fg-sec-kicker" data-reveal>Why hire a family specialist</p>
+          <h2 className="fg-sec-title" data-reveal>What makes a family session different</h2>
+          <p className="fg-prose-lead" data-reveal>
+            Photographing a family well isn&rsquo;t the same as photographing one person. The
+            real work is keeping kids engaged, arranging the group, and rolling with whatever the
+            day brings — the things that turn a chaotic afternoon into photos that feel like you.
+          </p>
+          <div className="fg-diff">
+            {differentiators.map((d) => (
+              <div key={d.title} className="fg-diff-item" data-reveal data-delay="1">
+                <span className="fg-diff-bar" aria-hidden="true" />
+                <span className="fg-diff-emoji" aria-hidden="true">{d.emoji}</span>
+                <h3 className="fg-diff-title">{d.title}</h3>
+                <p className="fg-diff-text">{d.text}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>

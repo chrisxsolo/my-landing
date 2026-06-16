@@ -63,6 +63,15 @@ const schools: Array<{ name: string; href: string; blurb: string }> = [
   },
 ];
 
+// Why a grad session is different — the specialist skills behind the photos, not
+// just the color grading. Each is a concrete reason to hire a grad photographer.
+const differentiators = [
+  { emoji: "🗺️", title: "Campus route knowledge", text: "I know which gates, halls, and lawns photograph best at each school — and how to move between them before the foot traffic builds." },
+  { emoji: "🎓", title: "Cap-and-gown posing", text: "Caps, tassels, hoods, and stoles all have their own tricks. I direct every frame so the regalia sits right and reads sharp on camera." },
+  { emoji: "👪", title: "Family & friend coordination", text: "Parents, partners, and friends almost always come along. I keep the group shots quick and organized so no one stands around waiting." },
+  { emoji: "📍", title: "School-specific landmarks", text: "Every campus has signature backdrops worth getting — Sather Gate, Tower Hall, the Mission — and I plan the session around them." },
+];
+
 const marquee = [...GG_MARQUEE, ...GG_MARQUEE];
 
 export default function GradGuideContent() {
@@ -205,8 +214,31 @@ export default function GradGuideContent() {
         </div>
       </section>
 
-      {/* ── BY CAMPUS (hub-and-spoke H2 sections) ──────────────────────────── */}
+      {/* ── WHY A GRAD SESSION IS DIFFERENT ────────────────────────────────── */}
       <section className="gg-section">
+        <div className="gg-shell">
+          <p className="gg-sec-kicker" data-reveal>Why hire a grad specialist</p>
+          <h2 className="gg-sec-title" data-reveal>What makes a graduation session different</h2>
+          <p className="gg-prose-lead" data-reveal>
+            A grad shoot isn&rsquo;t just a portrait session in a cap and gown. Doing it well
+            takes campus know-how, regalia-specific direction, and a calm hand with the family
+            and friends who come along — the parts you can&rsquo;t see in a feed of pretty photos.
+          </p>
+          <div className="gg-diff">
+            {differentiators.map((d) => (
+              <div key={d.title} className="gg-diff-item" data-reveal data-delay="1">
+                <span className="gg-diff-bar" aria-hidden="true" />
+                <span className="gg-diff-emoji" aria-hidden="true">{d.emoji}</span>
+                <h3 className="gg-diff-title">{d.title}</h3>
+                <p className="gg-diff-text">{d.text}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── BY CAMPUS (hub-and-spoke H2 sections) ──────────────────────────── */}
+      <section className="gg-section gg-section--alt">
         <div className="gg-shell">
           <p className="gg-sec-kicker" data-reveal>By campus</p>
           <h2 className="gg-sec-title" data-reveal>Graduation photos by Bay Area campus</h2>
@@ -227,7 +259,7 @@ export default function GradGuideContent() {
       </section>
 
       {/* ── PORTFOLIO (client island) ──────────────────────────────────────── */}
-      <section className="gg-section gg-section--alt">
+      <section className="gg-section">
         <div className="gg-shell" style={{ textAlign: "center" }}>
           <p className="gg-kicker" style={{ margin: "0 auto 14px" }} data-reveal>
             <span className="gg-kicker-dot gg-dot" /> Portfolio

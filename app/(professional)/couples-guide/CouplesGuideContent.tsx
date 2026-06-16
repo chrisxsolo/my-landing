@@ -37,6 +37,15 @@ const cards = [
   { href: COUPLES_CONTACT, title: "Book a Couples Session", desc: "Send your date, location idea, and session type — I reply with availability and next steps.", emoji: "📅" },
 ];
 
+// Why a couples session is different — the specialist skills behind the photos,
+// not just the color grading. Each is a concrete reason to hire over a generalist.
+const differentiators = [
+  { emoji: "🎬", title: "Movement-led prompts", text: "Instead of stiff “stand here and smile” poses, I use walking, motion, and real interaction so you look like yourselves." },
+  { emoji: "💞", title: "Emotional storytelling", text: "I watch for the in-between moments — a laugh, a quiet glance — that make a gallery feel like your relationship, not a catalog." },
+  { emoji: "🌿", title: "Low-pressure posing", text: "Most couples aren’t models, and that’s the point. Clear, gentle direction means you always know what to do with your hands." },
+  { emoji: "🎨", title: "Location & outfit pairing", text: "I help match your outfits to the scenery you choose, so colors, light, and mood work together instead of competing." },
+];
+
 const marquee = [...COUPLES_MARQUEE, ...COUPLES_MARQUEE];
 
 export default function CouplesGuideContent({
@@ -139,6 +148,29 @@ export default function CouplesGuideContent({
                 <Link href={COUPLES_CONTACT} className="fg-inline-link">reach out about a Bay Area couples session</Link>.
               </p>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── WHY A COUPLES SESSION IS DIFFERENT ─────────────────────────────── */}
+      <section className="fg-section">
+        <div className="fg-shell">
+          <p className="fg-sec-kicker" data-reveal>Why hire a couples specialist</p>
+          <h2 className="fg-sec-title" data-reveal>What makes a couples session different</h2>
+          <p className="fg-prose-lead" data-reveal>
+            A great couples gallery isn&rsquo;t about a nice preset — it comes from how the
+            session is directed. These are the things I bring beyond the edit that make the two
+            of you look natural and connected on camera.
+          </p>
+          <div className="fg-diff">
+            {differentiators.map((d) => (
+              <div key={d.title} className="fg-diff-item" data-reveal data-delay="1">
+                <span className="fg-diff-bar" aria-hidden="true" />
+                <span className="fg-diff-emoji" aria-hidden="true">{d.emoji}</span>
+                <h3 className="fg-diff-title">{d.title}</h3>
+                <p className="fg-diff-text">{d.text}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>

@@ -136,6 +136,20 @@ export const GRAD_GUIDE_CSS = `
   .gg-card-arrow { position:absolute; top:20px; right:20px; color:rgba(112,139,133,0.5); font-size:16px; transition:color .2s ease, transform .2s ease; }
   .gg-card:hover .gg-card-arrow { color:var(--accent, #3d6b5e); transform:translate(2px,-2px); }
 
+  /* ── DIFFERENTIATORS (why this session is different) ─────────────────────── */
+  .gg-diff { display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:14px; margin-top:30px; }
+  .gg-diff-item {
+    position:relative; overflow:hidden; padding:22px 22px 22px 24px; border-radius:14px;
+    background:var(--glass, rgba(255,255,255,0.86)); border:1px solid rgba(18,24,22,0.08);
+    box-shadow:0 6px 20px rgba(18,24,22,0.05);
+    transition:transform .2s ease, box-shadow .2s ease;
+  }
+  .gg-diff-item:hover { transform:translateY(-3px); box-shadow:0 14px 32px rgba(18,24,22,0.09); }
+  .gg-diff-bar { position:absolute; left:0; top:0; bottom:0; width:3px; background:linear-gradient(180deg, #5b8a7a, #82b9af); }
+  .gg-diff-emoji { display:block; font-size:26px; margin:0 0 12px; }
+  .gg-diff-title { margin:0 0 6px; color:var(--ink, #101412); font-size:16px; font-weight:860; letter-spacing:-0.01em; line-height:1.2; }
+  .gg-diff-text { margin:0; color:var(--ink-muted, #4b5a55); font-size:14px; line-height:1.62; }
+
   /* ── PHOTO GALLERY ───────────────────────────────────────────────────────── */
   .gg-gallery { display:grid; grid-template-columns:repeat(3, 1fr); gap:12px; margin-top:30px; }
   @media (max-width:620px) { .gg-gallery { grid-template-columns:repeat(2, 1fr); } }
