@@ -159,9 +159,56 @@ export type AdminTestimonialUpdates = {
   featured?: boolean;
   display_order?: number | null;
   session_type?: string | null;
+  // Contextual-matching metadata (spec §8)
+  school?: string | null;
+  location?: string | null;
+  session_year?: number | null;
+  client_image_url?: string | null;
+  gallery_url?: string | null;
+  google_review_url?: string | null;
+  tags?: string[];
 };
 
-const ADMIN_PATCH_KEYS = ["status", "admin_notes", "published", "featured", "display_order", "session_type"];
+const ADMIN_PATCH_KEYS = [
+  "status", "admin_notes", "published", "featured", "display_order", "session_type",
+  "school", "location", "session_year", "client_image_url", "gallery_url", "google_review_url", "tags",
+];
+
+// Accepts an http(s) URL or null. Rejects other protocols (e.g. javascript:) so
+// these links are safe to render as anchors on public pages.
+function cleanUrl(value: unknown): ValidationResult<string | null> {
+  const cleaned = cleanText(value);
+  if (!cleaned) return { ok: true, data: null };
+  if (cleaned.length > 500) return { ok: false, error: "URL is too long." };
+  let url: URL;
+  try {
+    url = new URL(cleaned);
+  } catch {
+    return { ok: false, error: "Please enter a full URL including https://." };
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    return { ok: false, error: "URLs must start with http:// or https://." };
+  }
+  return { ok: true, data: url.toString() };
+}
+
+// Normalizes free-text tags to deduped lowercase kebab-case slugs (e.g.
+// "Nervous client" → "nervous-client"). Caps at 12 tags so the UI stays sane.
+function cleanTags(value: unknown): ValidationResult<string[]> {
+  if (value === null || value === undefined) return { ok: true, data: [] };
+  if (!Array.isArray(value)) return { ok: false, error: "tags must be an array of strings." };
+  const seen = new Set<string>();
+  const tags: string[] = [];
+  for (const raw of value) {
+    if (typeof raw !== "string") return { ok: false, error: "Each tag must be a string." };
+    const tag = raw.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40);
+    if (!tag || seen.has(tag)) continue;
+    seen.add(tag);
+    tags.push(tag);
+    if (tags.length >= 12) break;
+  }
+  return { ok: true, data: tags };
+}
 
 export function validateAdminTestimonialPatch(value: unknown): ValidationResult<{
   id: string;
@@ -212,6 +259,44 @@ export function validateAdminTestimonialPatch(value: unknown): ValidationResult<
       return { ok: false, error: "session_type must be a string or null." };
     }
     updates.session_type = sanitizeContext(value.updates.session_type, 120, /[^a-zA-Z0-9 &'()./-]/g);
+  }
+  if (value.updates.school !== undefined) {
+    if (typeof value.updates.school !== "string" && value.updates.school !== null) {
+      return { ok: false, error: "school must be a string or null." };
+    }
+    updates.school = sanitizeContext(value.updates.school, 120, /[^a-zA-Z0-9 &'()./-]/g);
+  }
+  if (value.updates.location !== undefined) {
+    if (typeof value.updates.location !== "string" && value.updates.location !== null) {
+      return { ok: false, error: "location must be a string or null." };
+    }
+    updates.location = sanitizeContext(value.updates.location, 120, /[^a-zA-Z0-9 ,&'()./-]/g);
+  }
+  if (value.updates.session_year !== undefined) {
+    if (value.updates.session_year === null) {
+      updates.session_year = null;
+    } else if (
+      typeof value.updates.session_year !== "number" ||
+      !Number.isInteger(value.updates.session_year) ||
+      value.updates.session_year < 1990 ||
+      value.updates.session_year > 2100
+    ) {
+      return { ok: false, error: "session_year must be a year between 1990 and 2100." };
+    } else {
+      updates.session_year = value.updates.session_year;
+    }
+  }
+  for (const key of ["client_image_url", "gallery_url", "google_review_url"] as const) {
+    if (value.updates[key] !== undefined) {
+      const url = cleanUrl(value.updates[key]);
+      if (!url.ok) return url;
+      updates[key] = url.data;
+    }
+  }
+  if (value.updates.tags !== undefined) {
+    const tags = cleanTags(value.updates.tags);
+    if (!tags.ok) return tags;
+    updates.tags = tags.data;
   }
   return { ok: true, data: { id: value.id, updates } };
 }

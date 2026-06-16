@@ -24,6 +24,12 @@ vi.mock("@/lib/professionalData", () => ({
 // Keep next/image out of the server render.
 vi.mock("@/app/components/OptimizedPhoto", () => ({ default: () => null }));
 
+// Contextual testimonials hit Supabase; mock the data layer to return none so
+// the render exercises only the catalog-driven copy.
+vi.mock("@/lib/testimonialsData", () => ({
+  getContextualTestimonials: async () => [],
+}));
+
 async function renderPage(
   importer: () => Promise<{ default: (props?: unknown) => unknown }>,
 ): Promise<string> {

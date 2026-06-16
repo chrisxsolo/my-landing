@@ -25,6 +25,8 @@ import { anim } from "@/lib/proStyles";
 import styles from "@/app/(professional)/pricing/Pricing.module.css";
 import { formatCurrency } from "@/lib/pricing";
 import { PRICING_CATALOG, getBookingPolicyItems } from "@/lib/pricingCatalog";
+import ContextualTestimonials from "@/app/components/ContextualTestimonials";
+import { getContextualTestimonials } from "@/lib/testimonialsData";
 
 // Cached/ISR: refreshed at most hourly, or immediately on admin content saves
 // (POST /api/admin/revalidate).
@@ -82,7 +84,11 @@ export default async function FamilyPricingPage() {
   // Images come from Supabase. Falls back through options until it finds one.
   // To set a specific image: go to Supabase → Table Editor → site_settings
   //   and set pricing_family_session_image or pricing_family_extended_image to a URL.
-  const [{ images }, siteSettings] = await Promise.all([getPortfolioData(), getSiteSettings()]);
+  const [{ images }, siteSettings, testimonials] = await Promise.all([
+    getPortfolioData(),
+    getSiteSettings(),
+    getContextualTestimonials({ category: "families" }, 2),
+  ]);
   const familyImages = images.filter((img) => img.category_slug === "families");
 
   // sessionImage  = photo in the "Family Session" package (right column)
@@ -286,6 +292,12 @@ export default async function FamilyPricingPage() {
           </div>
         </div>
       </section>
+
+      <ContextualTestimonials
+        testimonials={testimonials}
+        heading="Families who booked a session"
+        subheading="Parents and grandparents on how the session actually went."
+      />
 
       {/* ── BOTTOM CTA STRIP ──────────────────────────────────────────────────
            The panel at the very bottom before the footer.

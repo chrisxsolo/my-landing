@@ -6,6 +6,8 @@ import { buildBookingIntentParams } from "@/lib/bookingIntent";
 import SchoolLandingDetails from "./SchoolLandingDetails";
 import SchoolGallery from "./SchoolGallery";
 import ContentEventBeacon from "@/app/components/ContentEventBeacon";
+import ContextualTestimonials from "@/app/components/ContextualTestimonials";
+import { getContextualTestimonials } from "@/lib/testimonialsData";
 
 // ── TYPES ─────────────────────────────────────────────────────────────────────
 
@@ -308,13 +310,17 @@ const CSS = `
 
 // ── TEMPLATE COMPONENT ────────────────────────────────────────────────────────
 
-export default function SchoolLandingTemplate({ data }: { data: SchoolLandingData }) {
+export default async function SchoolLandingTemplate({ data }: { data: SchoolLandingData }) {
   const travelNote = getGraduationTravelNote(data.slug);
   const contactParams = buildBookingIntentParams({
     sourcePage: "school-page",
     sessionType: "Graduation Portrait",
     school: data.school,
   });
+  const testimonials = await getContextualTestimonials(
+    { category: "grads", school: data.schoolShort },
+    2,
+  );
 
   return (
     <main className="school-page">
@@ -379,6 +385,15 @@ export default function SchoolLandingTemplate({ data }: { data: SchoolLandingDat
       />
 
       <SchoolGallery slug={data.slug} school={data.schoolShort} />
+
+      {/* School-matched social proof — shows nothing until a matching, featured
+          testimonial exists for this campus (or grads generally). */}
+      <ContextualTestimonials
+        testimonials={testimonials}
+        heading={`${data.schoolShort} grads on working with me`}
+        subheading={`What recent ${data.school} graduates say about their session.`}
+        tint
+      />
 
       {/* ── CTA ───────────────────────────────────────────────────────────────── */}
       <section className="school-cta">

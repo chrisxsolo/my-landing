@@ -6,6 +6,8 @@ import { getPortfolioData, getSiteSettings } from "@/lib/professionalData";
 import { anim } from "@/lib/proStyles";
 import styles from "@/app/(professional)/pricing/Pricing.module.css";
 import CouplesRateEstimator from "@/app/components/CouplesRateEstimator";
+import ContextualTestimonials from "@/app/components/ContextualTestimonials";
+import { getContextualTestimonials } from "@/lib/testimonialsData";
 import { formatCurrency } from "@/lib/pricing";
 import { PRICING_CATALOG, getBookingPolicyItems } from "@/lib/pricingCatalog";
 
@@ -87,7 +89,11 @@ const infoCards = [
 ] as const;
 
 export default async function CouplesPricingPage() {
-  const [{ images }, siteSettings] = await Promise.all([getPortfolioData(), getSiteSettings()]);
+  const [{ images }, siteSettings, testimonials] = await Promise.all([
+    getPortfolioData(),
+    getSiteSettings(),
+    getContextualTestimonials({ category: "couples" }, 2),
+  ]);
   const coupleImages = images.filter((img) => img.category_slug === "couples");
   const fallback = images[0]?.image_url ?? null;
   const heroImage = siteSettings.pricing_couples_standard_image || coupleImages[0]?.image_url || fallback;
@@ -230,6 +236,12 @@ export default async function CouplesPricingPage() {
       <section className={styles.pricingShell} style={{ paddingTop: 0, paddingBottom: 64 }}>
         <CouplesRateEstimator />
       </section>
+
+      <ContextualTestimonials
+        testimonials={testimonials}
+        heading="Couples who booked a session"
+        subheading="Real Bay Area couples on what the experience was like."
+      />
 
       <section className={`${styles.pricingShell} ${styles.pricingCta}`}>
         <div className={styles.pricingCtaPanel}>

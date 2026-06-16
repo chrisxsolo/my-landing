@@ -13,6 +13,8 @@ import {
 } from "@/lib/couplesPosingGuide";
 import { C } from "@/lib/colors";
 import CouplesPosingGuideClient from "./CouplesPosingGuideClient";
+import ContextualTestimonials from "@/app/components/ContextualTestimonials";
+import { getContextualTestimonials } from "@/lib/testimonialsData";
 import styles from "./couplesPosingGuide.module.css";
 
 export const dynamic = "force-dynamic";
@@ -81,6 +83,7 @@ export default async function CouplesPosingGuidePage({ searchParams }: PageProps
     }
   }
 
+  const testimonials = await getContextualTestimonials({ category: "couples", tag: "nervous" }, 1);
   const loadedPrompts = await listCouplesPosingPrompts(dataMode, true);
   const prompts = displayMode === "photographer"
     ? loadedPrompts
@@ -101,6 +104,14 @@ export default async function CouplesPosingGuidePage({ searchParams }: PageProps
         images={images}
         promptCategories={[...COUPLES_PROMPT_CATEGORIES]}
         inspirationCategories={[...COUPLES_INSPIRATION_CATEGORIES]}
+      />
+      {/* Reassurance for couples worried about feeling awkward while posing. */}
+      <ContextualTestimonials
+        testimonials={testimonials}
+        eyebrow="Worried it'll feel awkward?"
+        heading="No experience needed — I guide every pose"
+        subheading="How the session felt for a couple who wasn't used to being in front of a camera."
+        tint
       />
     </main>
   );

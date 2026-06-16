@@ -17,6 +17,7 @@ const TESTIMONIAL_SELECT = [
   "consent_version", "display_name_preference", "status", "source", "gallery_id",
   "session_type", "featured", "display_order", "admin_notes", "submitted_at",
   "reviewed_at", "published_at", "updated_at",
+  "school", "location", "session_year", "client_image_url", "gallery_url", "google_review_url", "tags",
 ].join(",");
 const STATUS_SET = new Set<string>(TESTIMONIAL_STATUSES);
 const SOURCE_SET = new Set<string>(TESTIMONIAL_SOURCES);
@@ -96,6 +97,13 @@ export async function PATCH(req: NextRequest) {
     if (patch.featured !== undefined) updates.featured = patch.featured;
     if (patch.display_order !== undefined) updates.display_order = patch.display_order;
     if (patch.session_type !== undefined) updates.session_type = patch.session_type;
+    if (patch.school !== undefined) updates.school = patch.school;
+    if (patch.location !== undefined) updates.location = patch.location;
+    if (patch.session_year !== undefined) updates.session_year = patch.session_year;
+    if (patch.client_image_url !== undefined) updates.client_image_url = patch.client_image_url;
+    if (patch.gallery_url !== undefined) updates.gallery_url = patch.gallery_url;
+    if (patch.google_review_url !== undefined) updates.google_review_url = patch.google_review_url;
+    if (patch.tags !== undefined) updates.tags = patch.tags;
     if (patch.published !== undefined) {
       updates.published_at = patch.published ? current.published_at ?? now : null;
     }

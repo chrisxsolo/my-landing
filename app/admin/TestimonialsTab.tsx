@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { T } from "@/app/admin/adminTheme";
 import {
   type AdminTestimonialUpdates,
@@ -33,6 +33,13 @@ type Testimonial = {
   reviewed_at: string | null;
   published_at: string | null;
   updated_at: string;
+  school: string | null;
+  location: string | null;
+  session_year: number | null;
+  client_image_url: string | null;
+  gallery_url: string | null;
+  google_review_url: string | null;
+  tags: string[];
 };
 
 const PAGE_SIZE = 20;
@@ -63,6 +70,11 @@ function messageForUpdate(updates: AdminTestimonialUpdates): string {
   if (updates.published !== undefined) return updates.published ? "Testimonial published" : "Testimonial unpublished";
   if (updates.featured !== undefined) return updates.featured ? "Added to homepage" : "Removed from homepage";
   if (updates.session_type !== undefined || updates.display_order !== undefined) return "Homepage details saved";
+  if (
+    updates.school !== undefined || updates.location !== undefined || updates.session_year !== undefined ||
+    updates.client_image_url !== undefined || updates.gallery_url !== undefined ||
+    updates.google_review_url !== undefined || updates.tags !== undefined
+  ) return "Context details saved";
   return "Notes saved";
 }
 
@@ -377,6 +389,89 @@ function HomepageControls({ row, saving, onUpdate }: { row: Testimonial; saving:
   );
 }
 
+function ContextControls({ row, saving, onUpdate }: { row: Testimonial; saving: boolean; onUpdate: (updates: AdminTestimonialUpdates) => void }) {
+  const [school, setSchool] = useState(row.school ?? "");
+  const [location, setLocation] = useState(row.location ?? "");
+  const [year, setYear] = useState(row.session_year === null ? "" : String(row.session_year));
+  const [clientImage, setClientImage] = useState(row.client_image_url ?? "");
+  const [gallery, setGallery] = useState(row.gallery_url ?? "");
+  const [googleReview, setGoogleReview] = useState(row.google_review_url ?? "");
+  const [tags, setTags] = useState(row.tags.join(", "));
+
+  const yearInvalid = year.trim() !== "" && !/^\d{4}$/.test(year.trim());
+
+  function save() {
+    onUpdate({
+      school: school.trim() || null,
+      location: location.trim() || null,
+      session_year: year.trim() === "" ? null : Number(year.trim()),
+      client_image_url: clientImage.trim() || null,
+      gallery_url: gallery.trim() || null,
+      google_review_url: googleReview.trim() || null,
+      tags: tags.split(",").map((tag) => tag.trim()).filter(Boolean),
+    });
+  }
+
+  return (
+    <div className="mt-6 rounded-2xl p-5" style={{ background: T.panelSolid, border: `1px solid ${T.border}` }}>
+      <p className="text-sm font-black" style={{ color: T.ink }}>Context &amp; links</p>
+      <p className="mt-1 text-xs" style={{ color: T.inkFaint }}>
+        Powers contextual placement — a school match shows on that school&rsquo;s page, and the{" "}
+        <code style={{ fontFamily: T.mono }}>nervous</code> tag surfaces this near posing tips.
+      </p>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_1fr_110px]">
+        <Field label="School" htmlFor="t-school">
+          <input id="t-school" type="text" maxLength={120} value={school} placeholder="e.g. SJSU"
+            onChange={(e) => setSchool(e.target.value)} className="w-full rounded-xl px-3 py-2.5 text-sm outline-none" style={inputStyle} />
+        </Field>
+        <Field label="Location" htmlFor="t-location">
+          <input id="t-location" type="text" maxLength={120} value={location} placeholder="e.g. San Jose, CA"
+            onChange={(e) => setLocation(e.target.value)} className="w-full rounded-xl px-3 py-2.5 text-sm outline-none" style={inputStyle} />
+        </Field>
+        <Field label="Year" htmlFor="t-year">
+          <input id="t-year" type="number" min={1990} max={2100} value={year} placeholder="2025"
+            onChange={(e) => setYear(e.target.value)} className="w-full rounded-xl px-3 py-2.5 text-sm outline-none" style={inputStyle} />
+        </Field>
+      </div>
+
+      <div className="mt-3 grid gap-3">
+        <Field label="Client image URL" htmlFor="t-image">
+          <input id="t-image" type="url" maxLength={500} value={clientImage} placeholder="https://…/photo.jpg"
+            onChange={(e) => setClientImage(e.target.value)} className="w-full rounded-xl px-3 py-2.5 text-sm outline-none" style={inputStyle} />
+        </Field>
+        <Field label="Full gallery link" htmlFor="t-gallery">
+          <input id="t-gallery" type="url" maxLength={500} value={gallery} placeholder="https://…/gallery"
+            onChange={(e) => setGallery(e.target.value)} className="w-full rounded-xl px-3 py-2.5 text-sm outline-none" style={inputStyle} />
+        </Field>
+        <Field label="Google review link" htmlFor="t-review">
+          <input id="t-review" type="url" maxLength={500} value={googleReview} placeholder="https://g.page/…"
+            onChange={(e) => setGoogleReview(e.target.value)} className="w-full rounded-xl px-3 py-2.5 text-sm outline-none" style={inputStyle} />
+        </Field>
+        <Field label="Tags (comma-separated)" htmlFor="t-tags">
+          <input id="t-tags" type="text" value={tags} placeholder="nervous, first-time"
+            onChange={(e) => setTags(e.target.value)} className="w-full rounded-xl px-3 py-2.5 text-sm outline-none" style={inputStyle} />
+        </Field>
+      </div>
+
+      <button type="button" disabled={saving || yearInvalid} onClick={save}
+        className="mt-4 rounded-full px-4 py-2 text-xs font-black transition-all disabled:opacity-50"
+        style={{ background: T.action, color: T.actionText }}>
+        Save context details
+      </button>
+    </div>
+  );
+}
+
+function Field({ label, htmlFor, children }: { label: string; htmlFor: string; children: ReactNode }) {
+  return (
+    <div>
+      <label htmlFor={htmlFor} className="text-[11px] font-black uppercase tracking-wider" style={{ color: T.inkFaint }}>{label}</label>
+      <div className="mt-1">{children}</div>
+    </div>
+  );
+}
+
 function PublicPreview({ row }: { row: Testimonial }) {
   const displayName = buildTestimonialDisplayName(row.first_name, row.last_name, row.display_name_preference);
   return (
@@ -443,6 +538,7 @@ function TestimonialDetail(props: DetailProps) {
         </div>
 
         <HomepageControls row={row} saving={props.saving} onUpdate={props.onUpdate} />
+        <ContextControls row={row} saving={props.saving} onUpdate={props.onUpdate} />
         <PublicPreview row={row} />
 
         <div className="mt-7 border-t pt-5" style={{ borderColor: T.border }}>

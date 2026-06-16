@@ -25,6 +25,8 @@ import { selectDistinctImageUrl } from "@/lib/photoMetadata";
 import { anim } from "@/lib/proStyles";
 import styles from "@/app/(professional)/pricing/Pricing.module.css";
 import GraduationRateEstimator from "@/app/components/GraduationRateEstimator";
+import ContextualTestimonials from "@/app/components/ContextualTestimonials";
+import { getContextualTestimonials } from "@/lib/testimonialsData";
 import { formatCurrency } from "@/lib/pricing";
 import { BOOKING_POLICY, PRICING_CATALOG, getBookingPolicyItems } from "@/lib/pricingCatalog";
 
@@ -106,7 +108,11 @@ export default async function GradPricingPage() {
   // Images come from Supabase. The page falls back through options until it finds one.
   // To set a specific image: go to Supabase → Table Editor → site_settings
   //   and set pricing_grad_standard_image or pricing_grad_group_image to a photo URL.
-  const [{ images }, siteSettings] = await Promise.all([getPortfolioData(), getSiteSettings()]);
+  const [{ images }, siteSettings, testimonials] = await Promise.all([
+    getPortfolioData(),
+    getSiteSettings(),
+    getContextualTestimonials({ category: "grads" }, 2),
+  ]);
   const gradImages = images.filter((img) => img.category_slug === "grads");
 
   // packageImage = photo used in the "Graduation Package" section (right column)
@@ -354,6 +360,12 @@ export default async function GradPricingPage() {
           ))}
         </div>
       </section>
+
+      <ContextualTestimonials
+        testimonials={testimonials}
+        heading="Grads who booked a session"
+        subheading="Recent graduates on what their campus session was like."
+      />
 
       {/* ── BOTTOM CTA STRIP ──────────────────────────────────────────────────
            The panel at the very bottom before the footer.
