@@ -1631,6 +1631,12 @@ function AdminDashboard() {
                 <span className="text-sm leading-none">🎞️</span>
                 <span>Content Engine</span>
               </button>
+              <button onClick={()=>adminLogout().then(()=>{setAuthed(false);setPw("");})}
+                className="flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[12px] font-semibold whitespace-nowrap transition-all"
+                style={{color:T.inkFaint,background:T.inset,border:`1px solid ${T.border}`}}>
+                <span className="text-sm leading-none">←</span>
+                <span>Sign out</span>
+              </button>
             </div>
           );
         })()}
