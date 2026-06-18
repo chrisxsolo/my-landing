@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { C } from "@/lib/colors";
 import { T, INQ_STATUS } from "@/app/admin/adminTheme";
 import CommandPalette from "@/app/admin/CommandPalette";
+import AdminWebsiteNavigation, { type WebsiteTab } from "@/app/admin/AdminWebsiteNavigation";
 
 function subscribeReducedMotion(onChange:()=>void){
   const mq=window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -105,7 +106,7 @@ import {
 
 export const dynamic = 'force-dynamic'
 
-type Tab = "home"|"poses"|"couplesGuide"|"couplesLocations"|"locations"|"bayGuide"|"familyGuide"|"portfolio"|"caseStudies"|"categories"|"blog"|"library"|"navigation"|"aboutPage"|"analytics"|"payments"|"inquiries"|"clients"|"testimonials"|"funnel"|"attribution"|"vault"|"ai"|"chat"|"format"|"accounts";
+type Tab = "home"|WebsiteTab|"analytics"|"payments"|"inquiries"|"clients"|"testimonials"|"funnel"|"attribution"|"vault"|"ai"|"chat"|"format"|"accounts";
 type ImageLibraryRow = { id:number; title:string; alt:string|null; image_url:string; source_type:string; source_post_id:number|null; source_post_slug:string|null; source_role:string; in_portfolio:boolean; created_at:string; };
 type Inquiry = AdminInquiry;
 type AdminSessionsResponse = { sessions?: AdminClientSessionDTO[]; session?: AdminClientSessionDTO; error?: string; };
@@ -126,7 +127,6 @@ type PortfolioSeoDraft = { school: GradSchoolOption|null; location: GradLocation
 const EMPTY_CATEGORY = {name:"",slug:"",description:"",sort_order:"1",active:true};
 const EMPTY_PORTFOLIO = {title:"",alt:"",category_slug:"graduation",school:"",featured:false,sort_order:""};
 const EMPTY_PORTFOLIO_SEO_DRAFT: PortfolioSeoDraft = {school:null,location:null,session:null,degree:null,year:null,attire:null,goldenHour:false};
-const WEBSITE_TABS:Tab[]=["poses","couplesGuide","couplesLocations","locations","bayGuide","familyGuide","portfolio","caseStudies","categories","blog","library","navigation","aboutPage"];
 const CLIENT_TABS:Tab[]=["inquiries","clients","testimonials","analytics","payments","funnel","attribution","ai","chat","format"];
 const VAULT_TABS:Tab[]=["vault"];
 const TAB_LABELS:Record<Tab,string>={home:"🏠 Home",poses:"📸 Grad Poses",couplesGuide:"💞 Couples Posing Guide",couplesLocations:"💑 Couples Locations",locations:"📍 Campus Spots",bayGuide:"🗺️ Bay Guide",familyGuide:"👨‍👩‍👧 Family Guide",portfolio:"🖼️ Portfolio",caseStudies:"📖 Case Studies",categories:"🏷️ Categories",blog:"✍️ Blog",library:"🗄️ Image Library",navigation:"🧭 Navigation",aboutPage:"🙋 About Page",analytics:"📊 Analytics",payments:"💵 Revenue",funnel:"📈 Funnel",attribution:"🎯 Attribution",inquiries:"📬 Inquiries",clients:"👥 Clients",testimonials:"💬 Testimonials",vault:"📓 Vault",ai:"🤖 AI Training",chat:"💬 AI Chat",format:"✨ Quick Format",accounts:"👤 Accounts"};
@@ -1564,9 +1564,7 @@ function AdminDashboard() {
                 ))}
                 <div className="h-px my-2 mx-1" style={{background:T.rowBorder}}/>
                 <p className="text-[10px] font-black uppercase tracking-[0.13em] px-3 pt-0.5 pb-1" style={{color:T.inkFaint}}>Website</p>
-                {WEBSITE_TABS.map(t=>(
-                  <NavBtn key={t} t={t} icon={t==="poses"?"📸":t==="couplesGuide"?"💞":t==="couplesLocations"?"💑":t==="locations"?"📍":t==="bayGuide"?"🗺️":t==="portfolio"?"🖼️":t==="categories"?"🏷️":t==="blog"?"✍️":t==="navigation"?"🧭":"🗄️"} label={TAB_LABELS[t].replace(/^[^\s]+\s/,"")}/>
-                ))}
+                <AdminWebsiteNavigation key={tab} activeTab={tab} onNavigate={go}/>
                 <div className="h-px my-2 mx-1" style={{background:T.rowBorder}}/>
                 <p className="text-[10px] font-black uppercase tracking-[0.13em] px-3 pt-0.5 pb-1" style={{color:T.inkFaint}}>Marketing</p>
                 <button onClick={()=>router.push("/admin/content-engine")}
