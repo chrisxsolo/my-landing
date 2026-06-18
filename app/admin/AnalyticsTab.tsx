@@ -1,6 +1,12 @@
 "use client";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { T } from "@/app/admin/adminTheme";
+import {
+  MAX_ADMIN_DAY_OFFSET,
+  MIN_ADMIN_DAY_OFFSET,
+  buildAdminDayRange,
+  clampAdminDayOffset,
+} from "@/lib/analytics/adminDayRange";
 
 const panel = { background: T.panel, border: `1px solid ${T.border}`, boxShadow: T.shadow } as const;
 const card = "rounded-2xl overflow-hidden";
@@ -8,7 +14,7 @@ const card = "rounded-2xl overflow-hidden";
 type ViewEvent  = { user_id:string|null; viewed_at:string; referrer:string|null; device:string|null };
 type ClickEvent = { link_id:number|null; user_id:string|null; clicked_at:string; referrer:string|null; device:string|null };
 type LinkRow    = { id:number; label:string; emoji:string|null; url:string };
-type ViewMode   = "today" | "7d" | "30d" | "week";
+type ViewMode   = "today" | "day" | "7d" | "30d" | "week";
 
 const SOURCES = [
   { key:"instagram", label:"Instagram",       color:"#e1306c" },
@@ -119,6 +125,7 @@ export default function AnalyticsTab() {
   const [clicks, setClicks]         = useState<ClickEvent[]>([]);
   const [links, setLinks]           = useState<LinkRow[]>([]);
   const [viewMode, setViewMode]     = useState<ViewMode>("today");
+  const [dayOffset, setDayOffset]   = useState(MIN_ADMIN_DAY_OFFSET);
   const [weeksBack, setWeeksBack]   = useState(0);
   const [hoverIdx, setHoverIdx]     = useState<number | null>(null);
   const [hoverHour, setHoverHour]   = useState<number | null>(null);
@@ -143,6 +150,7 @@ export default function AnalyticsTab() {
 
   let currStart: Date, currEnd: Date, prevStart: Date, prevEnd: Date;
   let periodLabel = "";
+  let dayTrendLabel = "";
 
   if (viewMode === "today") {
     currStart = new Date(); currStart.setHours(0, 0, 0, 0);
@@ -150,6 +158,14 @@ export default function AnalyticsTab() {
     prevStart = new Date(currStart); prevStart.setDate(prevStart.getDate() - 1);
     prevEnd   = new Date(now);       prevEnd.setDate(prevEnd.getDate() - 1);
     periodLabel = new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  } else if (viewMode === "day") {
+    const range = buildAdminDayRange(new Date(), dayOffset);
+    currStart = range.currStart;
+    currEnd = range.currEnd;
+    prevStart = range.prevStart;
+    prevEnd = range.prevEnd;
+    periodLabel = range.periodLabel;
+    dayTrendLabel = range.trendLabel;
   } else if (viewMode === "week") {
     currStart = getWeekStart(weeksBack);
     currEnd   = new Date(currStart); currEnd.setDate(currStart.getDate() + 6); currEnd.setHours(23, 59, 59, 999);
@@ -220,7 +236,8 @@ export default function AnalyticsTab() {
   }).sort((a, b) => b.clicks - a.clicks);
 
   // ── Daily stats for chart ─────────────────────────────────────────────
-  const dailyStats = buildRangeStats(currStart, viewMode === "week" ? currEnd : now, currClicks, currViews);
+  const dailyStatsEnd = viewMode === "week" || viewMode === "day" ? currEnd : now;
+  const dailyStats = buildRangeStats(currStart, dailyStatsEnd, currClicks, currViews);
   const busiestDay = dailyStats.reduce<(typeof dailyStats)[0] | null>(
     (best, s) => !best || s.clicks + s.views > best.clicks + best.views ? s : best, null
   );
@@ -234,6 +251,8 @@ export default function AnalyticsTab() {
 
   const trendLabel = viewMode === "today"
     ? "vs. yesterday (same time)"
+    : viewMode === "day"
+    ? dayTrendLabel
     : viewMode === "week"
     ? `vs. week of ${getWeekStart(weeksBack + 1).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
     : `vs. previous ${viewMode === "7d" ? 7 : 30} days`;
@@ -255,13 +274,17 @@ export default function AnalyticsTab() {
           {/* Time controls */}
           <div className="flex flex-col gap-2 lg:items-end">
             {/* Mode picker + Refresh on same row */}
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <div className="flex gap-1 p-1 rounded-xl" style={{ background: T.inset }}>
-                {(["today", "7d", "30d", "week"] as ViewMode[]).map(m => (
-                  <button key={m} onClick={() => { setViewMode(m); if (m !== "week") setWeeksBack(0); }}
+                {(["today", "day", "7d", "30d", "week"] as ViewMode[]).map(m => (
+                  <button key={m} onClick={() => {
+                    setViewMode(m);
+                    if (m === "day") setDayOffset(MIN_ADMIN_DAY_OFFSET);
+                    if (m !== "week") setWeeksBack(0);
+                  }}
                     className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
                     style={viewMode === m ? { background: T.panelSolid, color: T.ink, boxShadow: T.shadow } : { color: T.inkFaint }}>
-                    {m === "today" ? "Today" : m === "7d" ? "7d" : m === "30d" ? "30d" : "Week"}
+                    {m === "today" ? "Today" : m === "day" ? "Day" : m === "7d" ? "7d" : m === "30d" ? "30d" : "Week"}
                   </button>
                 ))}
               </div>
@@ -272,18 +295,22 @@ export default function AnalyticsTab() {
               </button>
             </div>
 
-            {/* Week navigator */}
-            {viewMode === "week" && (
+            {/* Calendar navigator */}
+            {(viewMode === "week" || viewMode === "day") && (
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => setWeeksBack(w => Math.min(w + 1, MAX_WEEKS_BACK))}
-                  disabled={weeksBack >= MAX_WEEKS_BACK}
+                  onClick={() => viewMode === "day"
+                    ? setDayOffset(offset => clampAdminDayOffset(offset + 1))
+                    : setWeeksBack(w => Math.min(w + 1, MAX_WEEKS_BACK))}
+                  disabled={viewMode === "day" ? dayOffset >= MAX_ADMIN_DAY_OFFSET : weeksBack >= MAX_WEEKS_BACK}
                   className="w-7 h-7 rounded-lg flex items-center justify-center text-sm font-bold transition-all disabled:opacity-30"
                   style={{ background: T.inset, color: T.inkSoft, border: `1px solid ${T.border}` }}>‹</button>
                 <span className="text-xs font-bold min-w-[130px] text-center" style={{ color: T.inkSoft }}>{periodLabel}</span>
                 <button
-                  onClick={() => setWeeksBack(w => Math.max(w - 1, 0))}
-                  disabled={weeksBack === 0}
+                  onClick={() => viewMode === "day"
+                    ? setDayOffset(offset => clampAdminDayOffset(offset - 1))
+                    : setWeeksBack(w => Math.max(w - 1, 0))}
+                  disabled={viewMode === "day" ? dayOffset <= MIN_ADMIN_DAY_OFFSET : weeksBack === 0}
                   className="w-7 h-7 rounded-lg flex items-center justify-center text-sm font-bold transition-all disabled:opacity-30"
                   style={{ background: T.inset, color: T.inkSoft, border: `1px solid ${T.border}` }}>›</button>
               </div>
