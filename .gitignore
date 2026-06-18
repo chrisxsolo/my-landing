@@ -43,6 +43,7 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .superpowers
+.worktrees
 
 # local test database
 # supabase/test/prod-baseline.sql is committed (schema-only, zero data rows) so
