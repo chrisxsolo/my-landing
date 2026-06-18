@@ -1,3 +1,7 @@
+// Read-path normalization: raw portfolio_categories slug → canonical display
+// slug. The publish RPC (publish_session_content_item, migration
+// 20260618000001) applies the INVERSE when writing portfolio_images
+// (grads → graduation, families → family) — keep the two in sync.
 export const PORTFOLIO_CATEGORY_SLUG_ALIASES: Record<string, string> = {
   family: "families",
   graduation: "grads",
