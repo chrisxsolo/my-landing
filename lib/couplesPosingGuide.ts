@@ -173,6 +173,28 @@ export function getOwnedStoragePaths(
   });
 }
 
+const COUPLES_MIME_EXT: Record<(typeof COUPLES_IMAGE_TYPES)[number], string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "image/avif": "avif",
+};
+
+export function couplesImageExtForMime(mime: string): string | null {
+  return COUPLES_MIME_EXT[mime as (typeof COUPLES_IMAGE_TYPES)[number]] ?? null;
+}
+
+// Inspiration uploads go browser → Storage via a signed URL, then the client
+// reports the path back to create the row. This guards the create path so a
+// caller can only register an object that matches a server-issued upload path
+// (year/<uuid>.<ext>), never an arbitrary location in the bucket.
+const COUPLES_INSPIRATION_PATH_RE =
+  /^\d{4}\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|png|webp|avif)$/i;
+
+export function isOwnedCouplesInspirationPath(path: string): boolean {
+  return COUPLES_INSPIRATION_PATH_RE.test(path);
+}
+
 function optionalText(value: unknown, maxLength: number) {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();

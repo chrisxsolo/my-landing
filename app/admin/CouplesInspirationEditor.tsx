@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { C } from "@/lib/colors";
+import { supabase } from "@/lib/supabase";
 import {
   COUPLES_IMAGE_TYPES,
   COUPLES_INSPIRATION_CATEGORIES,
@@ -178,19 +179,73 @@ export default function CouplesInspirationEditor({
     };
   }
 
-  async function save() {
-    if (!canSave) return;
-    setSaving(true);
-    try {
-      let response: Response;
-      if (editing) {
-        response = await fetch("/api/admin/couples-posing-guide", {
+  function resetForm() {
+    setDraft(EMPTY_DRAFT);
+    setFiles([]);
+    setPreviews([]);
+  }
+
+  // Each file goes browser → Storage via a signed URL, then a small JSON request
+  // registers the row. Bytes never pass through the API route, so batch size is
+  // no longer capped by the serverless request-body limit.
+  async function uploadInspirationFile(file: File) {
+    const dimensions = await readDimensions(file);
+    const signResponse = await fetch("/api/admin/couples-posing-guide/sign", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mime: file.type, sizeBytes: file.size }),
+    });
+    const signed = await signResponse.json();
+    if (!signResponse.ok) throw new Error(signed.error ?? "Could not start the upload.");
+
+    const upload = await supabase.storage
+      .from(signed.bucket)
+      .uploadToSignedUrl(signed.path, signed.token, file, { contentType: file.type });
+    if (upload.error) throw new Error(upload.error.message);
+
+    const createResponse = await fetch("/api/admin/couples-posing-guide", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...metadata(dimensions), storage_path: signed.path }),
+    });
+    const created = await createResponse.json();
+    if (!createResponse.ok) throw new Error(created.error ?? "Could not save inspiration image");
+  }
+
+  async function runUploads() {
+    let succeeded = 0;
+    const failed: string[] = [];
+    for (const file of files) {
+      try {
+        await uploadInspirationFile(file);
+        succeeded += 1;
+      } catch (error) {
+        console.error("[couples-guide-admin] upload failed", file.name, error);
+        failed.push(file.name);
+      }
+    }
+    if (succeeded === 0) {
+      showToast(`Could not upload ${failed.length === 1 ? "the image" : "any images"}`, false);
+      return;
+    }
+    showToast(
+      failed.length === 0
+        ? `${succeeded} reference${succeeded === 1 ? "" : "s"} added`
+        : `Added ${succeeded}, ${failed.length} failed: ${failed.join(", ")}`,
+      failed.length === 0,
+    );
+    resetForm();
+    onSaved();
+  }
+
+  async function saveMetadataOnly() {
+    const response = editing
+      ? await fetch("/api/admin/couples-posing-guide", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ids: [editing.id], updates: metadata() }),
-        });
-      } else if (externalMode) {
-        response = await fetch("/api/admin/couples-posing-guide", {
+        })
+      : await fetch("/api/admin/couples-posing-guide", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -200,27 +255,25 @@ export default function CouplesInspirationEditor({
             rights_confirmed: false,
           }),
         });
-      } else {
-        const dimensions = await readDimensions(files[0]);
-        const formData = new FormData();
-        files.forEach((file) => formData.append("files", file));
-        formData.append("metadata", JSON.stringify(metadata(dimensions)));
-        response = await fetch("/api/admin/couples-posing-guide", {
-          method: "POST",
-          body: formData,
-        });
-      }
+    const json = await response.json();
+    if (!response.ok) {
+      showToast(json.error ?? "Could not save inspiration image", false);
+      return;
+    }
+    showToast(editing ? "Inspiration image updated" : "Private reference added");
+    resetForm();
+    onSaved();
+  }
 
-      const json = await response.json();
-      if (!response.ok) {
-        showToast(json.error ?? "Could not save inspiration image", false);
-        return;
+  async function save() {
+    if (!canSave) return;
+    setSaving(true);
+    try {
+      if (!editing && !externalMode) {
+        await runUploads();
+      } else {
+        await saveMetadataOnly();
       }
-      showToast(editing ? "Inspiration image updated" : `${externalMode ? 1 : files.length} reference${files.length === 1 ? "" : "s"} added`);
-      setDraft(EMPTY_DRAFT);
-      setFiles([]);
-      setPreviews([]);
-      onSaved();
     } catch (error) {
       console.error("[couples-guide-admin] save failed", error);
       showToast("Could not save inspiration image", false);

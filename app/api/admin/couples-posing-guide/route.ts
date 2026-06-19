@@ -5,8 +5,8 @@ import {
   COUPLES_INSPIRATION_BUCKET,
   COUPLES_INSPIRATION_TABLE,
   getOwnedStoragePaths,
+  isOwnedCouplesInspirationPath,
   validateInspirationImageInput,
-  validateInspirationUpload,
 } from "@/lib/couplesPosingGuide";
 import { requireAdmin } from "@/lib/requireAdmin";
 
@@ -39,22 +39,6 @@ function jsonError(error: unknown, fallback: string, status = 500) {
   return NextResponse.json({ error: message }, { status });
 }
 
-function safeFileName(fileName: string) {
-  const normalized = fileName
-    .normalize("NFKD")
-    .replace(/[^\w.-]+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "")
-    .toLowerCase();
-  return normalized || "inspiration-image";
-}
-
-function parseMetadata(value: FormDataEntryValue | null) {
-  if (typeof value !== "string") throw new Error("Image metadata is required.");
-  const parsed = JSON.parse(value) as Record<string, unknown>;
-  return parsed;
-}
-
 function omitFields(
   data: Record<string, unknown>,
   fields: string[],
@@ -65,16 +49,26 @@ function omitFields(
   );
 }
 
-async function insertExternalReference(body: Record<string, unknown>) {
-  const validation = validateInspirationImageInput({
-    ...body,
-    storage_path: null,
-    visibility: "private",
-    is_published: false,
-    rights_confirmed: false,
-  });
+// Creates one inspiration row. Files are uploaded browser → Storage first (see
+// the sign route), so an uploaded reference arrives as a storage_path and keeps
+// the chosen visibility; an external reference arrives as a URL and is forced
+// private until an authorized copy is uploaded.
+async function insertReference(body: Record<string, unknown>) {
+  const uploaded = typeof body.storage_path === "string" && body.storage_path.trim() !== "";
+  const validation = validateInspirationImageInput(
+    uploaded
+      ? body
+      : { ...body, storage_path: null, visibility: "private", is_published: false, rights_confirmed: false },
+  );
   if (!validation.ok) throw new Error(validation.error);
-  if (!validation.data.external_source_url) throw new Error("Source URL is required.");
+
+  const { storage_path, external_source_url } = validation.data;
+  if (!storage_path && !external_source_url) {
+    throw new Error("Add an uploaded image or a source URL.");
+  }
+  if (storage_path && !isOwnedCouplesInspirationPath(storage_path)) {
+    throw new Error("Invalid upload reference.");
+  }
 
   const supabase = createSupabaseAdminClient();
   const nextOrder = await getNextDisplayOrder();
@@ -84,7 +78,18 @@ async function insertExternalReference(body: Record<string, unknown>) {
     .insert({ ...row, display_order: row.display_order || nextOrder })
     .select("*")
     .single();
-  if (error) throw error;
+  if (error) {
+    // Roll back the just-uploaded object so a failed insert never orphans it.
+    if (storage_path) {
+      const cleanup = await supabase.storage
+        .from(COUPLES_INSPIRATION_BUCKET)
+        .remove([storage_path]);
+      if (cleanup.error) {
+        console.error("[admin/couples-posing-guide] insert rollback failed", cleanup.error);
+      }
+    }
+    throw error;
+  }
   return data;
 }
 
@@ -98,67 +103,6 @@ async function getNextDisplayOrder() {
     .maybeSingle();
   if (error) throw error;
   return Number(data?.display_order ?? 0) + 1;
-}
-
-async function uploadImages(formData: FormData) {
-  const metadata = parseMetadata(formData.get("metadata"));
-  const files = formData.getAll("files").filter((item): item is File => item instanceof File);
-  if (files.length === 0) throw new Error("Choose at least one image.");
-
-  for (const file of files) {
-    const validation = validateInspirationUpload(file);
-    if (!validation.ok) throw new Error(validation.error);
-  }
-
-  const supabase = createSupabaseAdminClient();
-  const year = new Date().getUTCFullYear();
-  const uploadedPaths: string[] = [];
-  const nextOrder = await getNextDisplayOrder();
-
-  try {
-    const rows = [];
-    for (const [index, file] of files.entries()) {
-      const path = `${year}/${crypto.randomUUID()}/${safeFileName(file.name)}`;
-      const { error } = await supabase.storage
-        .from(COUPLES_INSPIRATION_BUCKET)
-        .upload(path, await file.arrayBuffer(), {
-          contentType: file.type,
-          cacheControl: "3600",
-          upsert: false,
-        });
-      if (error) throw error;
-      uploadedPaths.push(path);
-
-      const validation = validateInspirationImageInput({
-        ...metadata,
-        storage_path: path,
-        external_source_url: null,
-      });
-      if (!validation.ok) throw new Error(validation.error);
-      const row = omitFields(validation.data, ["owns_storage_object"]);
-      rows.push({
-        ...row,
-        display_order: row.display_order || nextOrder + index,
-      });
-    }
-
-    const { data, error } = await supabase
-      .from(COUPLES_INSPIRATION_TABLE)
-      .insert(rows)
-      .select("*");
-    if (error) throw error;
-    return data ?? [];
-  } catch (error) {
-    if (uploadedPaths.length > 0) {
-      const cleanup = await supabase.storage
-        .from(COUPLES_INSPIRATION_BUCKET)
-        .remove(uploadedPaths);
-      if (cleanup.error) {
-        console.error("[admin/couples-posing-guide] upload rollback failed", cleanup.error);
-      }
-    }
-    throw error;
-  }
 }
 
 export async function GET(req: NextRequest) {
@@ -175,11 +119,9 @@ export async function POST(req: NextRequest) {
   const deny = requireAdmin(req);
   if (deny) return deny;
   try {
-    const contentType = req.headers.get("content-type") ?? "";
-    const images = contentType.includes("multipart/form-data")
-      ? await uploadImages(await req.formData())
-      : [await insertExternalReference(await req.json() as Record<string, unknown>)];
-    return NextResponse.json({ images }, { status: 201 });
+    const body = await req.json() as Record<string, unknown>;
+    const image = await insertReference(body);
+    return NextResponse.json({ images: [image] }, { status: 201 });
   } catch (error) {
     return jsonError(error, "Failed to add inspiration image.", 400);
   }
