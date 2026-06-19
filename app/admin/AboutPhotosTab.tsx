@@ -14,6 +14,7 @@ import {
   validateAdminPhotoFile,
   validatePhotoAltText,
 } from "@/lib/photoAdminShared";
+import { uploadToSignedTarget } from "@/lib/adminSignedUpload";
 import AboutFactEditorCard, { type AboutPhotoRow } from "@/app/admin/AboutFactEditorCard";
 
 type Props = { showToast: (message: string, ok?: boolean) => void };
@@ -111,11 +112,12 @@ export default function AboutPhotosTab({ showToast }: Props) {
 
     setBusySlug(slug);
     try {
-      const fd = new FormData();
-      fd.append("file", file!);
-      fd.append("fact_slug", slug);
-      fd.append("alt_text", alt);
-      const res = await fetch(API, { method: "POST", body: fd });
+      const { path } = await uploadToSignedTarget("about-photos", slug, file!);
+      const res = await fetch(API, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ fact_slug: slug, storage_path: path, alt_text: alt }),
+      });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Upload failed");
       // update local state from response

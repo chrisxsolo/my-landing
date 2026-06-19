@@ -12,6 +12,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { COUPLES_PHOTO_LOCATION_OPTIONS, MAX_COUPLES_PHOTO_BYTES, ALLOWED_COUPLES_PHOTO_TYPES } from "@/lib/couplesPhotosAdmin";
+import { uploadToSignedTarget } from "@/lib/adminSignedUpload";
 
 type Photo = {
   id: string;
@@ -72,12 +73,12 @@ export default function CouplesLocationsTab({ showToast }: Props) {
 
     setUploading(true);
     try {
-      const fd = new FormData();
-      fd.append("file", file);
-      fd.append("location_slug", slug);
-      fd.append("alt_text", alt.trim());
-      if (caption.trim()) fd.append("caption", caption.trim());
-      const res = await fetch(API, { method: "POST", body: fd });
+      const { path } = await uploadToSignedTarget("couples-photos", slug, file);
+      const res = await fetch(API, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ location_slug: slug, storage_path: path, alt_text: alt.trim(), caption: caption.trim() || null }),
+      });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Upload failed");
       setFile(null); setAlt(""); setCaption("");
@@ -130,13 +131,12 @@ export default function CouplesLocationsTab({ showToast }: Props) {
   async function replace(photo: Photo, newFile: File) {
     setBusyId(photo.id);
     try {
-      const fd = new FormData();
-      fd.append("file", newFile);
-      fd.append("location_slug", slug);
-      fd.append("alt_text", photo.alt_text ?? "Couples photo");
-      if (photo.caption) fd.append("caption", photo.caption);
-      fd.append("replaceId", photo.id);
-      const res = await fetch(API, { method: "POST", body: fd });
+      const { path } = await uploadToSignedTarget("couples-photos", slug, newFile);
+      const res = await fetch(API, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ location_slug: slug, storage_path: path, alt_text: photo.alt_text ?? "Couples photo", caption: photo.caption ?? null, replaceId: photo.id }),
+      });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Replace failed");
       showToast("Photo replaced.");

@@ -178,18 +178,11 @@ export default function BlogTab({ showToast }: Props) {
       fd.append("sites", "professional");
       const [res, storageUrlResults] = await Promise.all([
         fetch("/api/ai-blog-from-photos", { method: "POST", body: fd }),
-        Promise.all(compressedForStorage.map((blob, i) => {
-          // Upload via the requireAdmin-gated service-role route, not the anon client.
-          const form = new FormData();
-          form.append("file", new File([blob], `blog-${ts}-${i}.jpg`, { type: "image/jpeg" }));
-          form.append("folder", "blog");
-          return fetch("/api/admin/upload-image", { method: "POST", credentials: "include", body: form })
-            .then(async (r) => {
-              const d = (await r.json().catch(() => null)) as { url?: string; error?: string } | null;
-              if (!r.ok || !d?.url) { console.error("[ai-blog] upload:", d?.error); return null; }
-              return d.url;
-            });
-        })),
+        Promise.all(compressedForStorage.map((blob, i) =>
+          // Upload straight to Storage via a signed URL (bypasses the serverless
+          // body limit). Quiet toast — this is a background batch.
+          uploadImage(new File([blob], `blog-${ts}-${i}.jpg`, { type: "image/jpeg" }), "blog", () => {}),
+        )),
       ]);
       let json: Record<string, unknown> = {};
       try { json = await res.json(); } catch { /* non-JSON body */ }

@@ -10,10 +10,9 @@ import {
   FAMILY_PHOTOS_BUCKET,
   FAMILY_LOCATION_PHOTOS_TABLE,
   isValidFamilyLocationSlug,
-  validateFamilyPhotoFile,
   validateAltText,
-  safeFamilyFileName,
 } from "@/lib/familyPhotosAdmin";
+import { isOwnedAdminUploadPath } from "@/lib/adminUploadTargets";
 
 export const dynamic = "force-dynamic";
 
@@ -60,35 +59,28 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// ── POST (multipart): upload a new photo, or replace an existing one ──────────
+// ── POST (json): register an uploaded photo, or replace an existing one ───────
+// The file is uploaded browser -> Storage first (app/api/admin/storage/sign), so
+// only the storage_path + metadata arrive here.
 export async function POST(req: NextRequest) {
   const deny = requireAdmin(req);
   if (deny) return deny;
   try {
-    const form = await req.formData();
-    const file = form.get("file");
-    const slug = form.get("location_slug");
-    const altText = form.get("alt_text");
-    const caption = (form.get("caption") as string | null)?.trim() || null;
-    const featured = form.get("featured") === "true";
-    const replaceId = (form.get("replaceId") as string | null) || null;
+    const body = (await req.json()) as Record<string, unknown>;
+    const slug = body.location_slug;
+    const storagePath = typeof body.storage_path === "string" ? body.storage_path : "";
+    const altText = body.alt_text;
+    const caption = typeof body.caption === "string" ? body.caption.trim() || null : null;
+    const featured = body.featured === true;
+    const replaceId = typeof body.replaceId === "string" ? body.replaceId : null;
 
-    if (!(file instanceof File)) throw new Error("Choose an image to upload.");
     if (!isValidFamilyLocationSlug(slug)) throw new Error("Unknown family location.");
-    const fileCheck = validateFamilyPhotoFile(file);
-    if (!fileCheck.ok) throw new Error(fileCheck.error);
+    if (!isOwnedAdminUploadPath(storagePath, slug)) throw new Error("Invalid upload reference.");
     const altCheck = validateAltText(altText);
     if (!altCheck.ok) throw new Error(altCheck.error);
 
     const supabase = createSupabaseAdminClient();
-    const path = `${slug}/${crypto.randomUUID()}-${safeFamilyFileName(file.name)}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from(FAMILY_PHOTOS_BUCKET)
-      .upload(path, await file.arrayBuffer(), { contentType: file.type, cacheControl: "3600", upsert: false });
-    if (uploadError) throw uploadError;
-
-    const image_url = supabase.storage.from(FAMILY_PHOTOS_BUCKET).getPublicUrl(path).data.publicUrl;
+    const image_url = supabase.storage.from(FAMILY_PHOTOS_BUCKET).getPublicUrl(storagePath).data.publicUrl;
 
     try {
       if (replaceId) {
@@ -104,7 +96,7 @@ export async function POST(req: NextRequest) {
 
         const { data, error } = await supabase
           .from(FAMILY_LOCATION_PHOTOS_TABLE)
-          .update({ image_url, storage_path: path, alt_text: (altText as string).trim(), caption })
+          .update({ image_url, storage_path: storagePath, alt_text: (altText as string).trim(), caption })
           .eq("id", replaceId)
           .select(SELECT)
           .single();
@@ -120,14 +112,14 @@ export async function POST(req: NextRequest) {
       const sort_order = await nextSortOrder(supabase, slug);
       const { data, error } = await supabase
         .from(FAMILY_LOCATION_PHOTOS_TABLE)
-        .insert({ location_slug: slug, image_url, storage_path: path, alt_text: (altText as string).trim(), caption, featured, published: false, sort_order })
+        .insert({ location_slug: slug, image_url, storage_path: storagePath, alt_text: (altText as string).trim(), caption, featured, published: false, sort_order })
         .select(SELECT)
         .single();
       if (error) throw error;
       return NextResponse.json({ photo: data }, { status: 201 });
     } catch (error) {
       // Roll back the just-uploaded object if the DB write failed.
-      const rm = await supabase.storage.from(FAMILY_PHOTOS_BUCKET).remove([path]);
+      const rm = await supabase.storage.from(FAMILY_PHOTOS_BUCKET).remove([storagePath]);
       if (rm.error) console.error("[admin/family-photos] upload rollback failed", rm.error);
       throw error;
     }

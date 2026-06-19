@@ -1,27 +1,18 @@
-// Uploads an image to the public `grad-photos` bucket via the requireAdmin-gated
-// service-role route (app/api/admin/upload-image). The browser no longer touches
-// the anon Supabase client for writes, so the bucket's anon INSERT policy can be
-// dropped. Signature is unchanged so existing admin callers need no edits.
+import { supabase } from "@/lib/supabase";
+import { uploadToSignedTarget } from "@/lib/adminSignedUpload";
+
+// Uploads an image to the public `grad-photos` bucket. The file goes browser ->
+// Storage via a signed URL (bypassing the serverless request-body limit that
+// breaks large uploads), then the public URL is derived locally. Signature is
+// unchanged so existing admin callers need no edits.
 export async function uploadImage(
   file: File,
   folder: string,
   toast: (msg: string, ok?: boolean) => void,
 ): Promise<string | null> {
   try {
-    const form = new FormData();
-    form.append("file", file);
-    form.append("folder", folder);
-
-    const res = await fetch("/api/admin/upload-image", {
-      method: "POST",
-      credentials: "include",
-      body: form,
-    });
-    const data = (await res.json().catch(() => null)) as { url?: string; error?: string } | null;
-    if (!res.ok || !data?.url) {
-      throw new Error(data?.error ?? "Image upload failed.");
-    }
-    return data.url;
+    const { bucket, path } = await uploadToSignedTarget("grad-image", folder, file);
+    return supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
   } catch (error) {
     console.error("Upload error:", error);
     const message = error instanceof Error ? error.message : "Image upload failed.";

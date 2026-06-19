@@ -17,7 +17,8 @@ import {
   resolveAboutFacts,
   validateAboutFactContent,
 } from "@/lib/aboutFacts";
-import { validateAdminPhotoFile, validatePhotoAltText, safePhotoFileName } from "@/lib/photoAdminShared";
+import { validatePhotoAltText } from "@/lib/photoAdminShared";
+import { isOwnedAdminUploadPath } from "@/lib/adminUploadTargets";
 
 export const dynamic = "force-dynamic";
 
@@ -64,32 +65,25 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// ── POST (multipart): upload or replace the photo for a fact ──────────────────
+// ── POST (json): register or replace the photo for a fact ─────────────────────
+// The file is uploaded browser -> Storage first (app/api/admin/storage/sign), so
+// only the storage_path + metadata arrive here.
 export async function POST(req: NextRequest) {
   const deny = requireAdmin(req);
   if (deny) return deny;
   try {
-    const form = await req.formData();
-    const file = form.get("file");
-    const slug = form.get("fact_slug");
-    const altText = form.get("alt_text");
+    const body = (await req.json()) as Record<string, unknown>;
+    const slug = body.fact_slug;
+    const storagePath = typeof body.storage_path === "string" ? body.storage_path : "";
+    const altText = body.alt_text;
 
-    if (!(file instanceof File)) throw new Error("Choose an image to upload.");
     if (!isValidAboutFactSlug(slug)) throw new Error("Unknown about fact.");
-    const fileCheck = validateAdminPhotoFile(file);
-    if (!fileCheck.ok) throw new Error(fileCheck.error);
+    if (!isOwnedAdminUploadPath(storagePath, slug)) throw new Error("Invalid upload reference.");
     const altCheck = validatePhotoAltText(altText);
     if (!altCheck.ok) throw new Error(altCheck.error);
 
     const supabase = createSupabaseAdminClient();
-    const path = `${slug}/${crypto.randomUUID()}-${safePhotoFileName(file.name, "about-photo")}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from(ABOUT_PHOTOS_BUCKET)
-      .upload(path, await file.arrayBuffer(), { contentType: file.type, cacheControl: "3600", upsert: false });
-    if (uploadError) throw uploadError;
-
-    const image_url = supabase.storage.from(ABOUT_PHOTOS_BUCKET).getPublicUrl(path).data.publicUrl;
+    const image_url = supabase.storage.from(ABOUT_PHOTOS_BUCKET).getPublicUrl(storagePath).data.publicUrl;
 
     try {
       const { data: existing, error: readErr } = await supabase
@@ -102,7 +96,7 @@ export async function POST(req: NextRequest) {
       const { data, error } = await supabase
         .from(ABOUT_PHOTOS_TABLE)
         .upsert(
-          { fact_slug: slug, image_url, storage_path: path, alt_text: (altText as string).trim(), updated_at: new Date().toISOString() },
+          { fact_slug: slug, image_url, storage_path: storagePath, alt_text: (altText as string).trim(), updated_at: new Date().toISOString() },
           { onConflict: "fact_slug" },
         )
         .select(SELECT)
@@ -116,7 +110,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ photo: data }, { status: existing ? 200 : 201 });
     } catch (error) {
       // Roll back the just-uploaded object if the DB write failed.
-      const rm = await supabase.storage.from(ABOUT_PHOTOS_BUCKET).remove([path]);
+      const rm = await supabase.storage.from(ABOUT_PHOTOS_BUCKET).remove([storagePath]);
       if (rm.error) console.error("[admin/about-photos] upload rollback failed", rm.error);
       throw error;
     }
