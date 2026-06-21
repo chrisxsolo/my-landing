@@ -22,6 +22,8 @@ export default function ActionBar({ items, marketingPermission, onChanged }: Pro
   const approved = items.filter((i) => i.status === "approved");
   const failed = items.filter((i) => i.status === "failed");
   const handled = items.length - drafts.length;
+  const publishBlocked = !marketingPermission;
+  const publishDisabled = busy !== null || publishBlocked;
   if (items.length === 0) return null;
 
   const approveAll = async () => {
@@ -76,6 +78,9 @@ export default function ActionBar({ items, marketingPermission, onChanged }: Pro
     }}>
       <span style={{ fontSize: 13, color: T.inkSoft }}>
         {handled} of {items.length} handled · {failed.length} failed · {approved.length} approved awaiting publish
+        {approved.length > 0 && publishBlocked && (
+          <span style={{ color: T.amber }}> — enable Marketing permission above to publish</span>
+        )}
         {notice && <span style={{ color: T.red }}> — {notice}</span>}
       </span>
       <span style={{ display: "flex", gap: 8 }}>
@@ -85,8 +90,10 @@ export default function ActionBar({ items, marketingPermission, onChanged }: Pro
           </button>
         )}
         {approved.length > 0 && (
-          <button style={btn(true)} disabled={busy !== null || !marketingPermission}
-            title={!marketingPermission ? "Enable marketing permission to publish" : undefined}
+          <button
+            style={{ ...btn(true), ...(publishDisabled ? { opacity: 0.45, cursor: "not-allowed", boxShadow: "none" } : {}) }}
+            disabled={publishDisabled}
+            title={publishBlocked ? "Enable marketing permission to publish" : undefined}
             onClick={() => void publishApproved()}>
             {busy === "publish" ? "Publishing…" : `Publish approved (${approved.length})`}
           </button>

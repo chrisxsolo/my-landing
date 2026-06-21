@@ -14,6 +14,7 @@ import { btn, card, chip, sectionTitle } from "./ui";
 
 interface Props {
   sessionId: string;
+  session: Record<string, unknown>;
   activePackage: EnginePackage | null;
   items: EngineItem[];
   photos: EnginePhoto[];
@@ -21,13 +22,32 @@ interface Props {
   onChanged: () => void;
 }
 
+// Explains a "skipped" type so the bare chip isn't a mystery. The generation
+// targets only skip for two reasons (see generationTargets.ts): a guide type
+// whose service has no guide page, or a school photo with no school set. Facts
+// live in the package SNAPSHOT, so the school remedy is set-then-Regenerate.
+function skipReason(type: string, serviceType: string, schoolSlug: string | null): string | null {
+  if (type === "guide_photo") {
+    return `Guides exist only for couples & families — a ${serviceType || "this"} session has no guide page, so there's nothing to publish here.`;
+  }
+  if (type === "school_page_photo" && !schoolSlug) {
+    return "No school set on this session. Choose a school in Session facts above, then Regenerate to include school-page photos.";
+  }
+  if (type === "testimonial_feature") {
+    return "No approved testimonial matched this client (matched by email), so there's nothing to feature.";
+  }
+  return null;
+}
+
 export default function GenerationSection({
-  sessionId, activePackage, items, photos, aiAllowed, onChanged,
+  sessionId, session, activePackage, items, photos, aiAllowed, onChanged,
 }: Props) {
   const [busyType, setBusyType] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [preserveApprovals, setPreserveApprovals] = useState(true);
 
+  const serviceType = typeof session.service_type === "string" ? session.service_type : "";
+  const schoolSlug = typeof session.school_slug === "string" ? session.school_slug : null;
   const analyzedCount = photos.filter((p) => !p.excluded && p.analysis_status === "completed").length;
   const progress = activePackage?.generation_settings.progress ?? {};
   const selected = activePackage?.generation_settings.selected_types ?? [];
@@ -143,26 +163,30 @@ export default function GenerationSection({
               const entry = progress[type];
               const status = entry?.status ?? "pending";
               const color = status === "failed" ? T.red : status === "completed" ? T.ink : T.inkSoft;
+              const reason = status === "skipped" ? skipReason(type, serviceType, schoolSlug) : null;
               return (
-                <div key={type} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13 }}>
-                  <span>{CONTENT_TYPE_LABELS[type]}</span>
-                  <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                    {entry?.usage && (
-                      <span style={{ color: T.inkSoft, fontSize: 11 }}>
-                        {entry.usage.input_tokens + entry.usage.output_tokens} tok
-                      </span>
-                    )}
-                    <span style={chip(color, T.inset)} title={entry?.error ?? undefined}>{status}</span>
-                    {(status === "pending" || status === "failed") && (
-                      <button style={btn(false)} disabled={busyType !== null}
-                        onClick={() => void generateOne(type)}>
-                        {busyType === type ? "Generating…" : status === "failed" ? "Retry" : "Generate"}
-                      </button>
-                    )}
-                    {status === "failed" && (
-                      <button style={btn(false)} onClick={() => void skip(type)}>Skip</button>
-                    )}
-                  </span>
+                <div key={type} style={{ display: "grid", gap: 2 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13 }}>
+                    <span>{CONTENT_TYPE_LABELS[type]}</span>
+                    <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                      {entry?.usage && (
+                        <span style={{ color: T.inkSoft, fontSize: 11 }}>
+                          {entry.usage.input_tokens + entry.usage.output_tokens} tok
+                        </span>
+                      )}
+                      <span style={chip(color, T.inset)} title={entry?.error ?? undefined}>{status}</span>
+                      {(status === "pending" || status === "failed") && (
+                        <button style={btn(false)} disabled={busyType !== null}
+                          onClick={() => void generateOne(type)}>
+                          {busyType === type ? "Generating…" : status === "failed" ? "Retry" : "Generate"}
+                        </button>
+                      )}
+                      {status === "failed" && (
+                        <button style={btn(false)} onClick={() => void skip(type)}>Skip</button>
+                      )}
+                    </span>
+                  </div>
+                  {reason && <span style={{ fontSize: 11, color: T.inkSoft, lineHeight: 1.4 }}>{reason}</span>}
                 </div>
               );
             })}

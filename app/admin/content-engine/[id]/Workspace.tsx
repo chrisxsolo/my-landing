@@ -95,7 +95,7 @@ export default function Workspace({ sessionId }: { sessionId: string }) {
       <FactsSection session={session} sessionId={sessionId} onSaved={refresh} />
       <PhotosSection sessionId={sessionId} photos={photos}
         aiAllowed={session.ai_processing_allowed as boolean} onChanged={refresh} />
-      <GenerationSection sessionId={sessionId} activePackage={data.activePackage}
+      <GenerationSection sessionId={sessionId} session={session} activePackage={data.activePackage}
         items={data.items} aiAllowed={session.ai_processing_allowed as boolean}
         photos={photos} onChanged={refresh} />
       <ItemsSection items={data.items} photos={photos} onChanged={refresh} />
