@@ -101,6 +101,11 @@ export const engineApi = {
       "/api/admin/session-content/publish",
       { method: "POST", body: JSON.stringify({ itemId }) },
     ),
+  addJournalPhotos: (itemId: string, photoIds: string[]) =>
+    request<{ added: number; slug: string; postId: string; totalExtras: number }>(
+      "/api/admin/session-content/journal-photos",
+      { method: "POST", body: JSON.stringify({ itemId, photoIds }) },
+    ),
   takedown: (itemId: string) =>
     request<{ removed: boolean; derivativesDeleted: string[] }>("/api/admin/session-content/takedown", {
       method: "POST", body: JSON.stringify({ itemId }),

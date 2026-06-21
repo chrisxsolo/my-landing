@@ -99,7 +99,7 @@ export default function Workspace({ sessionId }: { sessionId: string }) {
         items={data.items} aiAllowed={session.ai_processing_allowed as boolean}
         photos={photos} onChanged={refresh} />
       <ItemsSection items={data.items} photos={photos} onChanged={refresh} />
-      <PublicationHistory published={data.published} onChanged={refresh} viewCounts={analytics?.perItem ?? {}} />
+      <PublicationHistory published={data.published} photos={photos} onChanged={refresh} viewCounts={analytics?.perItem ?? {}} />
       <ActionBar items={data.items}
         marketingPermission={session.marketing_permission as boolean} onChanged={refresh} />
     </main>

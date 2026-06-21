@@ -91,6 +91,51 @@ async function buildDerivative(client: SupabaseClient, sessionId: string, photo:
   return { photoId: photo.id, url, storagePath, reused: false };
 }
 
+async function mapWithConcurrency<I, O>(items: I[], limit: number, fn: (item: I) => Promise<O>): Promise<O[]> {
+  const out: O[] = new Array(items.length);
+  let cursor = 0;
+  const worker = async () => {
+    while (cursor < items.length) {
+      const idx = cursor++;
+      out[idx] = await fn(items[idx]);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return out;
+}
+
+// Build (or reuse) public derivatives for an explicit set of session photos —
+// used when amending an already-published post (the publish path uses
+// prepareApprovedDerivatives, which derives ids from a single item's payload).
+// Reuse logic mirrors prepareApprovedDerivatives: a fresh content-addressed
+// derivative is skipped when the recorded hash still matches the source.
+export async function ensureDerivativesForPhotos(
+  client: SupabaseClient, sessionId: string, photoIds: string[],
+): Promise<DerivativeResult[]> {
+  const ids = [...new Set(photoIds)];
+  if (ids.length === 0) return [];
+
+  const { data: photos, error } = await client.from("session_photos")
+    .select("id,photography_session_id,storage_path,content_hash,public_derivative_url,public_derivative_content_hash")
+    .in("id", ids);
+  if (error) throw new DerivativeError(`could not load photos: ${error.message}`, "storage");
+  const byId = new Map((photos ?? []).map((p) => [p.id as string, p as PhotoRow]));
+
+  return mapWithConcurrency(ids, 4, async (id) => {
+    const photo = byId.get(id);
+    if (!photo || photo.photography_session_id !== sessionId) {
+      throw new DerivativeError(`photo ${id} does not belong to this session`, "foreign_photo");
+    }
+    if (photo.public_derivative_url && photo.public_derivative_content_hash === photo.content_hash) {
+      return {
+        photoId: photo.id, url: photo.public_derivative_url,
+        storagePath: derivativeStoragePath(sessionId, photo.id, photo.content_hash), reused: true,
+      };
+    }
+    return buildDerivative(client, sessionId, photo);
+  });
+}
+
 export interface PrepareDerivativesArgs {
   client: SupabaseClient;
   itemId: string;

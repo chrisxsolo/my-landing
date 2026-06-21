@@ -5,17 +5,19 @@
 import { useState } from "react";
 import { T } from "@/app/admin/adminTheme";
 import { engineApi } from "@/app/admin/content-engine/engineApi";
-import { CONTENT_TYPE_LABELS, type EngineItem } from "@/app/admin/content-engine/engineTypes";
+import { CONTENT_TYPE_LABELS, type EngineItem, type EnginePhoto } from "@/app/admin/content-engine/engineTypes";
 import { pathsForPublishedItem } from "@/lib/contentEngine/publishRevalidation";
+import AddJournalPhotos from "./AddJournalPhotos";
 import { btn, card, sectionTitle } from "./ui";
 
 interface Props {
   published: EngineItem[];
+  photos: EnginePhoto[];
   onChanged: () => void;
   viewCounts: Record<string, number>;
 }
 
-export default function PublicationHistory({ published, onChanged, viewCounts }: Props) {
+export default function PublicationHistory({ published, photos, onChanged, viewCounts }: Props) {
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   if (published.length === 0) return null;
@@ -64,23 +66,27 @@ export default function PublicationHistory({ published, onChanged, viewCounts }:
             item.content_type === "journal_post" ? 1 : 0
           ];
           return (
-            <div key={item.id} style={{
-              display: "flex", justifyContent: "space-between", alignItems: "center",
-              fontSize: 13, opacity: takenDown ? 0.55 : 1,
-            }}>
-              <span>
-                {CONTENT_TYPE_LABELS[item.content_type] ?? item.content_type}
-                {" · "}{item.published_at ? new Date(item.published_at).toLocaleDateString() : ""}
-                {viewCounts[item.id] !== undefined && <> · {viewCounts[item.id]} views</>}
-                {takenDown && " · taken down"}
-                {livePath && !takenDown && (
-                  <> · <a href={livePath} target="_blank" rel="noreferrer" style={{ color: T.ink }}>{livePath}</a></>
+            <div key={item.id} style={{ display: "grid", gap: 4, opacity: takenDown ? 0.55 : 1 }}>
+              <div style={{
+                display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13,
+              }}>
+                <span>
+                  {CONTENT_TYPE_LABELS[item.content_type] ?? item.content_type}
+                  {" · "}{item.published_at ? new Date(item.published_at).toLocaleDateString() : ""}
+                  {viewCounts[item.id] !== undefined && <> · {viewCounts[item.id]} views</>}
+                  {takenDown && " · taken down"}
+                  {livePath && !takenDown && (
+                    <> · <a href={livePath} target="_blank" rel="noreferrer" style={{ color: T.ink }}>{livePath}</a></>
+                  )}
+                </span>
+                {!takenDown && item.published_target_type !== "none" && (
+                  <button style={btn(false, true)} disabled={busy !== null} onClick={() => void takedown(item)}>
+                    {busy === item.id ? "Removing…" : "Take down"}
+                  </button>
                 )}
-              </span>
-              {!takenDown && item.published_target_type !== "none" && (
-                <button style={btn(false, true)} disabled={busy !== null} onClick={() => void takedown(item)}>
-                  {busy === item.id ? "Removing…" : "Take down"}
-                </button>
+              </div>
+              {!takenDown && item.content_type === "journal_post" && (
+                <AddJournalPhotos item={item} photos={photos} onChanged={onChanged} />
               )}
             </div>
           );
