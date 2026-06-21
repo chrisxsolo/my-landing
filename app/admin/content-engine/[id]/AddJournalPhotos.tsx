@@ -7,7 +7,7 @@ import { useState } from "react";
 import { T } from "@/app/admin/adminTheme";
 import { engineApi } from "@/app/admin/content-engine/engineApi";
 import type { EngineItem, EnginePhoto } from "@/app/admin/content-engine/engineTypes";
-import { btn, input } from "./ui";
+import { btn } from "./ui";
 
 const MAX_PER_ADD = 12;
 const asIds = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
@@ -58,18 +58,39 @@ export default function AddJournalPhotos({ item, photos, onChanged }: {
       </button>
       {open && (
         <div style={{ marginTop: 8, display: "grid", gap: 8 }}>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(116px, 1fr))", gap: 8 }}>
             {candidates.map((p) => {
               const on = selected.has(p.id);
+              const atCap = !on && selected.size >= MAX_PER_ADD;
               return (
-                <button key={p.id} onClick={() => toggle(p.id)}
+                <button key={p.id} onClick={() => toggle(p.id)} disabled={atCap}
+                  title={p.original_filename ?? undefined}
                   style={{
-                    ...input, width: "auto", cursor: "pointer",
-                    opacity: on ? 1 : 0.55,
-                    borderColor: on ? T.violet : T.border,
+                    position: "relative", padding: 0, textAlign: "left", overflow: "hidden",
+                    background: T.inset, borderRadius: 10,
+                    border: `2px solid ${on ? T.violet : T.border}`,
+                    cursor: atCap ? "not-allowed" : "pointer", opacity: atCap ? 0.4 : 1,
                   }}>
-                  {on ? "✓ " : ""}{p.original_filename ?? p.id.slice(0, 8)}
-                  {p.quality_score ? ` (q${p.quality_score})` : ""}
+                  {p.thumbnailUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- short-lived signed URL, next/image can't optimize it
+                    <img src={p.thumbnailUrl} alt={p.alt_text ?? p.original_filename ?? "session photo"}
+                      style={{ width: "100%", aspectRatio: "1", objectFit: "cover", display: "block" }} />
+                  ) : (
+                    <div style={{ aspectRatio: "1", background: T.inset }} />
+                  )}
+                  {on && (
+                    <span style={{
+                      position: "absolute", top: 5, right: 5, height: 20, minWidth: 20, padding: "0 5px",
+                      borderRadius: 999, background: T.violet, color: T.actionText,
+                      display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 800,
+                    }}>✓</span>
+                  )}
+                  <span style={{
+                    display: "block", padding: "4px 6px", fontSize: 10, color: T.inkSoft,
+                    whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                  }}>
+                    {p.original_filename ?? p.id.slice(0, 8)}{p.quality_score ? ` · q${p.quality_score}` : ""}
+                  </span>
                 </button>
               );
             })}
