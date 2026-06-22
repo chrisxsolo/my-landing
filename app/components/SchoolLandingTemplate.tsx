@@ -5,9 +5,12 @@ import { PRICING_CATALOG, getGraduationTravelNote } from "@/lib/pricingCatalog";
 import { buildBookingIntentParams } from "@/lib/bookingIntent";
 import SchoolLandingDetails from "./SchoolLandingDetails";
 import SchoolGallery from "./SchoolGallery";
+import SchoolClusterLinks from "./SchoolClusterLinks";
 import ContentEventBeacon from "@/app/components/ContentEventBeacon";
 import ContextualTestimonials from "@/app/components/ContextualTestimonials";
 import { getContextualTestimonials, testimonialMatchesSchool } from "@/lib/testimonialsData";
+import { getBlogPostSummaries } from "@/lib/professionalData";
+import { detectSchoolLink } from "@/lib/portfolioCategoryContent";
 
 // ── TYPES ─────────────────────────────────────────────────────────────────────
 
@@ -332,6 +335,14 @@ export default async function SchoolLandingTemplate({ data }: { data: SchoolLand
   const isSchoolSpecific = schoolProof.length > 0;
   const testimonials = isSchoolSpecific ? schoolProof : matchedTestimonials;
 
+  // Recent journal sessions for this campus. Reuses the same matcher that builds
+  // the in-article link on /blog/[slug], so the campus↔post links stay symmetric.
+  const campusPath = `/grads/${data.slug}`;
+  const relatedPosts = (await getBlogPostSummaries("professional"))
+    .filter((post) => detectSchoolLink(`${post.title} ${post.slug}`)?.href === campusPath)
+    .slice(0, 3)
+    .map((post) => ({ slug: post.slug, title: post.title }));
+
   return (
     <main className="school-page">
       <ContentEventBeacon contentType="school_page" contentId={data.slug} />
@@ -412,6 +423,15 @@ export default async function SchoolLandingTemplate({ data }: { data: SchoolLand
             : "Recent graduates from across the Bay Area on their session with me."
         }
         tint
+      />
+
+      {/* Hub → spoke: route visitors (and link equity) from this campus money-page
+          into the planning guides, FAQ, recent campus sessions, and sibling
+          campuses. Spoke → hub already exists from the guides and journal posts. */}
+      <SchoolClusterLinks
+        slug={data.slug}
+        schoolShort={data.schoolShort}
+        relatedPosts={relatedPosts}
       />
 
       {/* ── CTA ───────────────────────────────────────────────────────────────── */}

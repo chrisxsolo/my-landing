@@ -4,7 +4,8 @@ import Image from "next/image";
 import { notFound } from "next/navigation";
 import { getBlogPostBySlug } from "@/lib/professionalData";
 import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
-import { renderPostBody, detectSchoolLink } from "./postBody";
+import { renderPostBody } from "./postBody";
+import { detectSchoolLink } from "@/lib/portfolioCategoryContent";
 import ContentEventBeacon from "@/app/components/ContentEventBeacon";
 
 // Cached/ISR: rebuilt at most hourly, or immediately on admin post saves

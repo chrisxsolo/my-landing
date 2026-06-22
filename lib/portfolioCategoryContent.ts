@@ -101,3 +101,31 @@ export const GRAD_SCHOOL_LINKS: GradSchoolLink[] = GRAD_SCHOOLS.map((school) => 
   label: school.label,
   href: `/grads/${school.slug}`,
 }));
+
+// ── Post → school landing internal-link detection ─────────────────────────────
+// Maps a post (by title + slug text) to its grad school landing page. Used by
+// /blog/[slug] for in-article links AND by the school landing pages to surface
+// recent sessions from that campus — sharing one matcher keeps both link
+// directions in sync. Patterns are ordered most-specific-first; the anchor label
+// derives from GRAD_SCHOOLS so it never drifts from the registry.
+export type SchoolLink = { label: string; href: string };
+
+const SCHOOL_MATCHERS: { slug: string; test: RegExp }[] = [
+  { slug: "uc-berkeley", test: /uc berkeley|berkeley/ },
+  { slug: "sjsu", test: /san jose state|sjsu/ },
+  { slug: "sf-state", test: /sf state|sfsu|san francisco state/ },
+  { slug: "usf", test: /university of san francisco|\busf\b/ },
+  { slug: "csueb", test: /csu east bay|csueb|east bay/ },
+  { slug: "santa-clara", test: /santa clara|\bscu\b/ },
+  { slug: "stanford", test: /stanford|palo alto/ },
+];
+
+export function detectSchoolLink(text: string): SchoolLink | null {
+  const t = text.toLowerCase();
+  const match = SCHOOL_MATCHERS.find((m) => m.test.test(t));
+  if (!match) return null;
+  const label = gradSchoolLabel(match.slug);
+  return label
+    ? { label: `${label} graduation photographer`, href: `/grads/${match.slug}` }
+    : null;
+}

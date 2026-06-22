@@ -80,22 +80,6 @@ export function renderPostBody(body: string): ReactNode[] {
   return nodes;
 }
 
-// ── School internal-link detection ────────────────────────────────────────────
-// Maps a post (by title + slug) to its school landing page for internal linking.
-
-export type SchoolLink = { label: string; href: string };
-
-export function detectSchoolLink(text: string): SchoolLink | null {
-  const t = text.toLowerCase();
-  if (t.includes("uc berkeley") || t.includes("berkeley"))
-    return { label: "UC Berkeley graduation photographer", href: "/grads/uc-berkeley" };
-  if (t.includes("san jose state") || t.includes("sjsu"))
-    return { label: "SJSU graduation photographer", href: "/grads/sjsu" };
-  if (t.includes("sf state") || t.includes("sfsu") || t.includes("san francisco state"))
-    return { label: "SF State graduation photographer", href: "/grads/sf-state" };
-  if (t.includes("university of san francisco") || /\busf\b/.test(t))
-    return { label: "USF graduation photographer", href: "/grads/usf" };
-  if (t.includes("csu east bay") || t.includes("csueb") || t.includes("east bay"))
-    return { label: "CSU East Bay graduation photographer", href: "/grads/csueb" };
-  return null;
-}
+// School internal-link detection now lives in lib/portfolioCategoryContent
+// (detectSchoolLink), shared with the school landing pages. /blog/[slug] imports
+// it directly.
