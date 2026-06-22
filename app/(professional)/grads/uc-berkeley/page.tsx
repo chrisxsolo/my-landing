@@ -40,6 +40,16 @@ const data: SchoolLandingData = {
   ],
   sessionNote:
     "Spring graduation season (May) books quickly — inquire early if you have a specific date in mind.",
+  bestTime:
+    "Sather Gate and the Campanile plaza are best in early morning, when the light is soft and the campus is quiet before foot traffic builds. Memorial Glade and Faculty Glade hold beautiful dappled light later in the day, so a morning start lets us catch the landmarks first and finish under the trees.",
+  whatToWear:
+    "Berkeley's stone, brick, and deep-green canopy make a rich backdrop, so solid, saturated colors read better than busy patterns. Bring your stole and any honor cords — they pop against the gown — and a second casual look photographs well on Memorial Glade once the cap-and-gown frames are done.",
+  faqs: [
+    { q: "What are the best photo spots at UC Berkeley?", a: "Sather Gate, the Campanile (Sather Tower), Memorial Glade, and Faculty Glade are the signature backdrops. In one session we usually hit two or three landmarks plus a quieter, tree-shaded spot for relaxed frames." },
+    { q: "When should we shoot to avoid crowds at Sather Gate?", a: "Early morning is best — Sather Gate and the central plaza fill with foot traffic as the day goes on, so an early start keeps the iconic shots clean." },
+    { q: "Can we take photos around commencement day?", a: "Yes, though ceremony days and the surrounding weekend are the busiest and book up first. If you want photos near your ceremony date, reach out early so we can lock in a time." },
+    { q: "How early should I book a Berkeley grad session?", a: "Spring (May) is peak season and fills quickly. Inquiring a few weeks to a month ahead gives the best choice of dates, especially for weekend and golden-hour slots." },
+  ],
 };
 
 export const metadata: Metadata = buildSchoolMetadata(data);

@@ -40,6 +40,16 @@ const data: SchoolLandingData = {
   ],
   sessionNote:
     "Spring commencement at CSUEB typically falls in late May. Send an inquiry early if you need a specific date.",
+  bestTime:
+    "The Hayward Hills campus is built for golden hour — the elevation opens up Bay and skyline views that glow late in the day. Meiklejohn Hall and the central plazas photograph well in the afternoon, then we finish at the Pioneer Heights overlook as the sun drops for the wide, editorial frames.",
+  whatToWear:
+    "With big sky and Bay views behind you, mid-tone and warmer colors stand out against the blue backdrop. The hilltop gets breezy in the late afternoon, so structured fabrics and a light layer hold up better than anything that catches the wind.",
+  faqs: [
+    { q: "What makes CSU East Bay good for grad photos?", a: "The hilltop setting — few Bay Area campuses offer the elevation and skyline views you get from Pioneer Heights. It adds a sense of place you can't get on a flat urban campus." },
+    { q: "When's the best time of day to shoot at CSUEB?", a: "Golden hour, hands down. The late-afternoon light on the hills and the Bay views behind you are hard to beat for wide, editorial portraits." },
+    { q: "What are the main photo spots on campus?", a: "Meiklejohn Hall, the Student Union area, the Campus Greens, and the Pioneer Heights overlook for the skyline shots." },
+    { q: "When should I book for CSUEB commencement?", a: "Spring commencement is usually late May, so send an inquiry early if you need a specific date during that window." },
+  ],
 };
 
 export const metadata: Metadata = buildSchoolMetadata(data);

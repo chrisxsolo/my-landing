@@ -40,6 +40,16 @@ const data: SchoolLandingData = {
   ],
   sessionNote:
     "Spring graduation season (June) books quickly — inquire early if you have a specific date in mind.",
+  bestTime:
+    "Mission Santa Clara is at its best in late afternoon, when the light turns golden against the adobe and stucco. The Mission Gardens and Rose Garden hold soft, even light a little earlier, so we can start in the gardens and finish at the Mission as it glows.",
+  whatToWear:
+    "SCU's warm Spanish-revival architecture and lush gardens suit earth tones, cream, and soft jewel colors; the greenery and roses already give plenty of color, so a simpler outfit keeps the focus on you. The campus is flat and walkable, so most footwear works fine.",
+  faqs: [
+    { q: "What are the best photo spots at Santa Clara University?", a: "Mission Santa Clara de Asís is the signature backdrop, along with the Mission Gardens and Rose Garden, the palm-lined Alameda walkway, and the open Abby Sobrato Mall." },
+    { q: "When's the best light at the Mission?", a: "Late afternoon — the golden light on the adobe facade is the sweet spot, while the gardens nearby stay soft and even a little earlier in the day." },
+    { q: "Can we shoot during SCU graduation season?", a: "Yes. June commencement is the busiest time, so reach out early if you'd like a session close to your ceremony date." },
+    { q: "Can family and friends join the session?", a: "Of course — group and family frames are part of most grad sessions, and I keep them quick and well-organized." },
+  ],
 };
 
 export const metadata: Metadata = buildSchoolMetadata(data);

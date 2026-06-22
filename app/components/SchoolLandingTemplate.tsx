@@ -5,6 +5,7 @@ import { PRICING_CATALOG, getGraduationTravelNote } from "@/lib/pricingCatalog";
 import { buildBookingIntentParams } from "@/lib/bookingIntent";
 import SchoolLandingDetails from "./SchoolLandingDetails";
 import SchoolGallery from "./SchoolGallery";
+import SchoolSessionGuide, { type SchoolFaq } from "./SchoolSessionGuide";
 import SchoolClusterLinks from "./SchoolClusterLinks";
 import ContentEventBeacon from "@/app/components/ContentEventBeacon";
 import ContextualTestimonials from "@/app/components/ContextualTestimonials";
@@ -32,6 +33,9 @@ export interface SchoolLandingData {
   spots: SchoolSpot[];           // 3–4 notable campus spots
   sessionNote?: string;          // optional timing/season note
   heroImage?: string;            // optional Supabase image URL
+  bestTime?: string;             // campus-specific best time of day / light
+  whatToWear?: string;           // campus-tuned wardrobe guidance
+  faqs?: SchoolFaq[];            // 3–4 campus-specific Q&A (drives FAQPage schema)
 }
 
 export function buildSchoolMetadata(data: SchoolLandingData): Metadata {
@@ -406,6 +410,16 @@ export default async function SchoolLandingTemplate({ data }: { data: SchoolLand
       />
 
       <SchoolGallery slug={data.slug} school={data.schoolShort} />
+
+      {/* Per-campus depth: best time / light, campus-tuned wardrobe, and a
+          campus FAQ (with FAQPage schema). One strong page beats thin per-topic
+          pages — these render only when the campus data file provides them. */}
+      <SchoolSessionGuide
+        schoolShort={data.schoolShort}
+        bestTime={data.bestTime}
+        whatToWear={data.whatToWear}
+        faqs={data.faqs}
+      />
 
       {/* School-matched social proof — shows nothing until a matching, featured
           testimonial exists for this campus (or grads generally). The heading

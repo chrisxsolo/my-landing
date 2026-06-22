@@ -40,6 +40,16 @@ const data: SchoolLandingData = {
   ],
   sessionNote:
     "Spring graduation season (June) books quickly — inquire early if you have a specific date in mind.",
+  bestTime:
+    "Stanford's sandstone arcades and the Memorial Church facade hold soft, even light through much of the afternoon, so there's flexibility in timing. Palm Drive and the Oval look their best late in the day, framed toward the foothills — a mid-to-late-afternoon start lets us work the Quad first and finish on Palm Drive in warm light.",
+  whatToWear:
+    "The warm sandstone and gold mosaic of MemChu pair beautifully with earth tones, cream, and richer jewel colors; stark white can blend into the stone, so a little color helps you stand out. Comfortable shoes help — there's a fair walk between the Quad, Hoover Tower, and Palm Drive.",
+  faqs: [
+    { q: "What are the best photo spots at Stanford?", a: "The Main Quad and Memorial Church are the signature backdrop, along with Palm Drive, Hoover Tower, and the Oval. The Arizona Cactus Garden is a unique option a short walk away." },
+    { q: "What's the best time of day for Stanford grad photos?", a: "The Quad and MemChu arches stay soft and even through the afternoon, while Palm Drive and the Oval shine late in the day — so a mid-to-late-afternoon session captures both looks." },
+    { q: "Can we shoot around Commencement?", a: "Yes. Stanford's June graduation season is the busiest stretch, so if you want photos near your ceremony date, inquire early to secure a time." },
+    { q: "How much walking is involved in a Stanford session?", a: "Some — the landmarks are spread across campus, so we plan an efficient route. Bring comfortable shoes and we'll cover the highlights without rushing." },
+  ],
 };
 
 export const metadata: Metadata = buildSchoolMetadata(data);

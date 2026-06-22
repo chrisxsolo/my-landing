@@ -40,6 +40,16 @@ const data: SchoolLandingData = {
   ],
   sessionNote:
     "May graduation week fills fast. If you have a specific date near your ceremony, send an inquiry early.",
+  bestTime:
+    "Tower Hall and the palm-lined paseo look their best in late afternoon, when the brick warms up and the downtown light softens. The Campus Quad and Seventh Street stay shaded through the day, so we can start with relaxed frames there and finish at Tower Hall as the light turns golden.",
+  whatToWear:
+    "SJSU's red-brick architecture and green quad pair well with neutral and jewel tones — very bright reds can compete with the brick, so cooler colors tend to stand out more. A clean, structured outfit under the gown reads sharp for the formal Tower Hall shots.",
+  faqs: [
+    { q: "What are the best photo spots at San Jose State?", a: "Tower Hall is the signature backdrop, along with the MLK Library plaza, the Campus Quad, and tree-lined Seventh Street. We usually combine the landmark building with one or two quieter, shaded spots." },
+    { q: "When is the best light for SJSU grad photos?", a: "Late afternoon is the sweet spot — the brick and plazas glow, and downtown San Jose's harder midday light has softened." },
+    { q: "Can we shoot during SJSU graduation week?", a: "Yes. May graduation week is the busiest stretch of the year, so if you want a date near your ceremony, send an inquiry early." },
+    { q: "Can my family and friends be in some of the photos?", a: "Absolutely — group and family shots are part of most grad sessions, and I keep them quick and organized so no one's left standing around." },
+  ],
 };
 
 export const metadata: Metadata = buildSchoolMetadata(data);

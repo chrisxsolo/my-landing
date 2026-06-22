@@ -40,6 +40,16 @@ const data: SchoolLandingData = {
   ],
   sessionNote:
     "SF State ceremony dates vary by college — confirm your ceremony date when you inquire.",
+  bestTime:
+    "SF State's open plazas and the Administration Building light evenly through late morning and afternoon, and the coastal marine layer often keeps the light soft all day. If we extend to spots like Dolores Park or the waterfront, late afternoon and golden hour are ideal.",
+  whatToWear:
+    "The campus's modern, neutral architecture lets bolder colors stand out, so don't be afraid of a saturated outfit. If we add San Francisco locations, bring a layer — the west side of the city runs cooler and breezier than downtown.",
+  faqs: [
+    { q: "Is there a travel fee at SF State?", a: "No — SF State is a home campus, so there's no travel fee, and we can add nearby San Francisco locations to the same session if you'd like." },
+    { q: "Can we combine campus photos with SF landmarks?", a: "Yes. A popular option pairs campus portraits with spots like Dolores Park, Golden Gate Park, or the waterfront in one itinerary — just mention it when you inquire so we can plan the timing." },
+    { q: "What are the best spots on the SF State campus?", a: "The Administration Building, the library area, and the open plazas are the core campus backdrops, with Lake Merced a short walk away for a natural setting." },
+    { q: "How do ceremony dates affect booking?", a: "SF State ceremony dates vary by college, so confirm your date when you inquire and I'll help find a session time that fits around it." },
+  ],
 };
 
 export const metadata: Metadata = buildSchoolMetadata(data);
