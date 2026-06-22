@@ -128,7 +128,15 @@ function normalizeForMatch(value: string | null): string {
   return (value ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
-function matchesSchool(testimonial: FeaturedTestimonial, school: string): boolean {
+// True when a testimonial plausibly belongs to the given school — checks both
+// the structured `school` column and the free-text `session_type` (e.g. "SJSU
+// Graduation Session"). Exported so a school page can label its proof block
+// honestly: only claim "<School> grads" when a card on the page is actually
+// from that campus, otherwise degrade to regional ("Bay Area grads") copy.
+export function testimonialMatchesSchool(
+  testimonial: FeaturedTestimonial,
+  school: string | null,
+): boolean {
   const needle = normalizeForMatch(school);
   if (needle.length < 3) return false;
   const haystacks = [normalizeForMatch(testimonial.school), normalizeForMatch(testimonial.session_type)];
@@ -140,7 +148,7 @@ function scoreTestimonial(testimonial: FeaturedTestimonial, match: TestimonialMa
     return 0;
   }
   let score = 1; // base for clearing the category filter (or no category given)
-  if (match.school && matchesSchool(testimonial, match.school)) score += SCHOOL_BOOST;
+  if (match.school && testimonialMatchesSchool(testimonial, match.school)) score += SCHOOL_BOOST;
   if (match.tag && testimonial.tags.includes(match.tag.toLowerCase())) score += TAG_BOOST;
   return score;
 }

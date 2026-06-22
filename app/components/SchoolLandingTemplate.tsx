@@ -7,7 +7,7 @@ import SchoolLandingDetails from "./SchoolLandingDetails";
 import SchoolGallery from "./SchoolGallery";
 import ContentEventBeacon from "@/app/components/ContentEventBeacon";
 import ContextualTestimonials from "@/app/components/ContextualTestimonials";
-import { getContextualTestimonials } from "@/lib/testimonialsData";
+import { getContextualTestimonials, testimonialMatchesSchool } from "@/lib/testimonialsData";
 
 // ── TYPES ─────────────────────────────────────────────────────────────────────
 
@@ -317,10 +317,20 @@ export default async function SchoolLandingTemplate({ data }: { data: SchoolLand
     sessionType: "Graduation Portrait",
     school: data.school,
   });
-  const testimonials = await getContextualTestimonials(
+  const matchedTestimonials = await getContextualTestimonials(
     { category: "grads", school: data.schoolShort },
     2,
   );
+  // Trust hierarchy: prefer this exact campus; otherwise fall back to the
+  // regional grad pool. Only keep the school-specific heading when every card
+  // shown is actually from this school — never put another campus's review
+  // under "<School> grads". With no exact-school proof, the block degrades to
+  // honest "Bay Area grads" copy instead.
+  const schoolProof = matchedTestimonials.filter((testimonial) =>
+    testimonialMatchesSchool(testimonial, data.schoolShort),
+  );
+  const isSchoolSpecific = schoolProof.length > 0;
+  const testimonials = isSchoolSpecific ? schoolProof : matchedTestimonials;
 
   return (
     <main className="school-page">
@@ -387,11 +397,20 @@ export default async function SchoolLandingTemplate({ data }: { data: SchoolLand
       <SchoolGallery slug={data.slug} school={data.schoolShort} />
 
       {/* School-matched social proof — shows nothing until a matching, featured
-          testimonial exists for this campus (or grads generally). */}
+          testimonial exists for this campus (or grads generally). The heading
+          only claims this campus when the cards are actually from here. */}
       <ContextualTestimonials
         testimonials={testimonials}
-        heading={`${data.schoolShort} grads on working with me`}
-        subheading={`What recent ${data.school} graduates say about their session.`}
+        heading={
+          isSchoolSpecific
+            ? `${data.schoolShort} grads on working with me`
+            : "What Bay Area grads say about working with me"
+        }
+        subheading={
+          isSchoolSpecific
+            ? `What recent ${data.school} graduates say about their session.`
+            : "Recent graduates from across the Bay Area on their session with me."
+        }
         tint
       />
 
