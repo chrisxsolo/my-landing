@@ -95,10 +95,11 @@ const GUIDE_LINKS = [
 ] as const;
 
 export default function SchoolClusterLinks({ slug, schoolShort, relatedPosts }: Props) {
-  // Spot/wear guides read better with the campus name; the rest stay generic.
+  // The spots card points at this campus's dedicated /spots page; the wear card
+  // reads better with the campus name; the rest stay generic.
   const guides = GUIDE_LINKS.map((g) =>
     g.href === "/grad-guide/campus-spots"
-      ? { ...g, title: `Best photo spots at ${schoolShort}` }
+      ? { ...g, title: `Best photo spots at ${schoolShort}`, href: `/grads/${slug}/spots` }
       : g.href === "/grad-guide/what-to-wear"
         ? { ...g, title: `What to wear for ${schoolShort} grad photos` }
         : g,

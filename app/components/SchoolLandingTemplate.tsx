@@ -18,6 +18,7 @@ import { detectSchoolLink } from "@/lib/portfolioCategoryContent";
 export interface SchoolSpot {
   name: string;
   description: string;
+  bestTime?: string;             // short best-time phrase, surfaced on the /spots page
 }
 
 export interface SchoolLandingData {
@@ -403,6 +404,7 @@ export default async function SchoolLandingTemplate({ data }: { data: SchoolLand
 
       <SchoolLandingDetails
         schoolShort={data.schoolShort}
+        slug={data.slug}
         bodyIntro={data.bodyIntro}
         travelNote={travelNote}
         sessionNote={data.sessionNote}

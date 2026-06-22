@@ -9,6 +9,7 @@ type SchoolSpot = {
 
 type Props = {
   schoolShort: string;
+  slug: string;
   bodyIntro: string;
   travelNote: string;
   sessionNote?: string;
@@ -24,6 +25,7 @@ const TRUST_ITEMS = [
 
 export default function SchoolLandingDetails({
   schoolShort,
+  slug,
   bodyIntro,
   travelNote,
   sessionNote,
@@ -92,7 +94,12 @@ export default function SchoolLandingDetails({
                 </div>
               ))}
             </div>
-            <p className="school-body-copy" style={{ marginTop: 22, color: "#667f79", fontSize: 15 }}>
+            <p className="school-body-copy" style={{ marginTop: 22, fontSize: 15 }}>
+              <Link href={`/grads/${slug}/spots`} style={{ color: "#3d6b5e", fontWeight: 700 }}>
+                See all {schoolShort} graduation photo spots &amp; the best time for each →
+              </Link>
+            </p>
+            <p className="school-body-copy" style={{ marginTop: 10, color: "#667f79", fontSize: 15 }}>
               New to grad photos? The{" "}
               <Link href="/grad-guide" style={{ color: "#3d6b5e", fontWeight: 700 }}>
                 Bay Area graduation photo guide
