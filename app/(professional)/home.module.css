@@ -315,6 +315,11 @@
   letter-spacing: 0.04em;
 }
 
+.servicePriceLine {
+  display: block;
+  line-height: 1.5;
+}
+
 .serviceNote {
   max-width: 760px;
   margin: 26px 0 0;

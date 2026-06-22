@@ -28,6 +28,11 @@ function startingAt(price: number) {
   return `Starting at $${price}`;
 }
 
+const COUPLES_PRICE_LINES = [
+  `${PRICING_CATALOG.couples.packages.mini.durationMinutes}-minute sessions from $${PRICING_CATALOG.couples.packages.mini.price}`,
+  `Full sessions from $${PRICING_CATALOG.couples.packages["1hr"].price}`,
+];
+
 function ServiceCard({
   href,
   image,
@@ -40,9 +45,10 @@ function ServiceCard({
   image: HomeImage;
   title: string;
   copy: string;
-  price: string;
+  price: string | string[];
   cta: string;
 }) {
+  const priceLines = Array.isArray(price) ? price : [price];
   return (
     <Link href={href} className={`${styles.serviceCard} ${responsive.serviceCard}`}>
       <div className={styles.serviceImage}>
@@ -51,7 +57,13 @@ function ServiceCard({
       <div className={styles.serviceBody}>
         <h3>{title}</h3>
         <p>{copy}</p>
-        <span className={styles.servicePrice}>{price}</span>
+        <span className={styles.servicePrice}>
+          {priceLines.map((line) => (
+            <span key={line} className={styles.servicePriceLine}>
+              {line}
+            </span>
+          ))}
+        </span>
         <span className={styles.cardCta}>{cta} →</span>
       </div>
     </Link>
@@ -94,7 +106,7 @@ export default function HomeServices({
             image={cardCouples}
             title="Couples Photography"
             copy="Natural, movement-led photographs for engagements, anniversaries, and everyday chapters."
-            price={startingAt(PRICING_CATALOG.couples.packages.mini.price)}
+            price={COUPLES_PRICE_LINES}
             cta="View Couples Sessions"
           />
           <ServiceCard
