@@ -353,7 +353,10 @@ const CSS = `
 `;
 
 export default function AvailabilityCalendar({ initialDates }: { initialDates: AvailDate[] }) {
-  const today = new Date();
+  // "today" is state so it can be refreshed on the client after mount (see the
+  // effect below). Cached HTML can be served days old; refreshing guarantees
+  // past-date filtering runs against the visitor's real current date.
+  const [today, setToday]       = useState(() => new Date());
   const [month, setMonth]       = useState(today.getMonth());
   const [year, setYear]         = useState(today.getFullYear());
   const [dates]                 = useState<AvailDate[]>(initialDates);
@@ -363,6 +366,12 @@ export default function AvailabilityCalendar({ initialDates }: { initialDates: A
   const [activeDate, setActiveDate] = useState(() => isoFromDate(today));
   const gridRef        = useRef<HTMLDivElement>(null);
   const focusActiveRef = useRef(false);
+
+  // Refresh "today" once on the client. ISR/CDN can serve HTML generated days
+  // ago; without this, dates that have since passed would linger in the calendar
+  // and "next windows". This guarantees all past-date filtering runs against the
+  // visitor's real current date, never one baked into stale cached markup.
+  useEffect(() => { setToday(new Date()); }, []);
 
   // Move focus to the active cell only after a keyboard-driven change, so we
   // never steal focus on mount or when the month is changed by mouse.
@@ -495,10 +504,9 @@ export default function AvailabilityCalendar({ initialDates }: { initialDates: A
           <p className="avail-hero-kicker">Live booking calendar</p>
           <h1 className="avail-hero-title">Dates.</h1>
           <p className="avail-hero-sub">
-            Find an open window before the season fills. Pick a date, send the inquiry.
+            {"Current availability is updated regularly. Send your preferred date and I'll confirm the best open window."}
           </p>
           <div className="avail-hero-chips">
-            <span className="avail-chip">{availCount} open this month</span>
             <span className="avail-chip">Bay Area campuses</span>
             <span className="avail-chip">24–48 hr replies</span>
           </div>

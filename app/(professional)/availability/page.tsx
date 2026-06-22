@@ -59,12 +59,21 @@ export default async function AvailabilityPage() {
 
   if (error) console.error("Failed to load availability:", error);
 
+  // Hide dates that have already passed so the calendar and "next windows" never
+  // advertise stale openings. The client re-filters against the visitor's local
+  // date too (see AvailabilityCalendar) — this keeps the server-rendered HTML in
+  // sync with the /api/availability JSON, which already drops past dates.
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+
   // Strip private admin notes from booked/hold dates before sending to the
   // browser. Only intentional public notes on available dates are kept.
-  const dates = (data ?? []).map((d) => ({
-    ...d,
-    note: d.status === "available" ? d.note : null,
-  })) as AvailDate[];
+  const dates = (data ?? [])
+    .filter((d) => d.date >= todayStr)
+    .map((d) => ({
+      ...d,
+      note: d.status === "available" ? d.note : null,
+    })) as AvailDate[];
 
   return (
     <main className="avail-page">
