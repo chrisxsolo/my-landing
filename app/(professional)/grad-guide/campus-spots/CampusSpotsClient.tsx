@@ -17,6 +17,16 @@ const SCHOOL_META: Record<string, { emoji: string; tagline: string }> = {
   usf:      { emoji: "⛪", tagline: "Hilltop campus, Golden Gate Park nearby, city views" },
 };
 
+// Maps this guide's internal school_id to the live /grads/<slug> route segment
+// (note: school_id keys differ from URL slugs — berkeley→uc-berkeley, sfsu→sf-state).
+const SCHOOL_SLUGS: Record<string, string> = {
+  sjsu: "sjsu",
+  berkeley: "uc-berkeley",
+  sfsu: "sf-state",
+  csueb: "csueb",
+  usf: "usf",
+};
+
 const DRAFT_SPOTS: LocationSpot[] = [
   { id: 1, school_id: "sjsu", school_name: "San Jose State University", school_short: "SJSU", name: "The SJSU Sign Wall", description: "The big blue SJSU block letters on the side of the building on 7th St. Clean, bold, instantly recognizable. Best in the morning before it gets crowded.", tip: "Arrive before 9am on weekdays for an empty wall.", icon: "🏫", image_url: null, order: 1 },
   { id: 2, school_id: "sjsu", school_name: "San Jose State University", school_short: "SJSU", name: "Tower Hall Steps", description: "The old red-brick Tower Hall is the most architectural building on campus. The front steps and archways give you a classic collegiate look that never goes out of style.", tip: "Overcast days work great here — no harsh shadows on the brick.", icon: "🏛️", image_url: null, order: 2 },
@@ -124,6 +134,17 @@ export default function CampusSpotsClient() {
               </div>
               <p className="gg-sec-kicker" data-reveal>{meta?.emoji} {meta?.tagline}</p>
               <h2 className="gg-sec-title" data-reveal>{school.name}</h2>
+              {SCHOOL_SLUGS[school.id] && (
+                <p className="gg-sec-sub" data-reveal>
+                  <Link href={`/grads/${SCHOOL_SLUGS[school.id]}`} className="gg-inline-link">
+                    {school.short} graduation photographer
+                  </Link>
+                  {" · "}
+                  <Link href={`/grads/${SCHOOL_SLUGS[school.id]}/spots`} className="gg-inline-link">
+                    best {school.short} photo spots &amp; timing
+                  </Link>
+                </p>
+              )}
 
               <div className="gg-poses">
                 {school.spots.map((spot, i) => (
