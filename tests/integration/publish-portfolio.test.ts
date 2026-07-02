@@ -18,7 +18,7 @@ describe("portfolio publisher", () => {
   it("inserts a new portfolio image with derivative URL, hash, and next sort_order", async () => {
     const sessionId = await createTestSession();
     const photo = await createTestPhoto(sessionId, { alt: "Grad portrait alt" });
-    await ensureCategory("grads");
+    await ensureCategory("graduation");
     const pkg = await createPackage(sessionId);
     const item = await createItem(pkg, "portfolio_pick", {
       session_photo_id: photo.id, category: "grads",
@@ -31,7 +31,9 @@ describe("portfolio publisher", () => {
       .select("image_url,content_hash,category_slug,alt,title,featured")
       .eq("content_hash", photo.content_hash).single();
     expect(img!.image_url).toBe(photo.public_derivative_url);
-    expect(img!.category_slug).toBe("grads");
+    // Since 20260618000001 the publish RPC stores the RESOLVED real slug
+    // (grads → graduation), keeping category_slug equal to the FK'd category.
+    expect(img!.category_slug).toBe("graduation");
     expect(img!.featured).toBe(false);
   });
 

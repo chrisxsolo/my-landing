@@ -14,3 +14,12 @@ grant all on public.client_sessions to service_role;
 grant all on public.inquiries to service_role;
 -- inquiries uses a serial id, so the service role also needs its sequence.
 grant all on sequence public.inquiries_id_seq to service_role;
+
+-- Minimal data seed: the prod baseline is schema-only, but the publish RPC
+-- (and the 20260618000001 verify) resolve engine portfolio categories against
+-- portfolio_categories rows that exist in production. Seed the four resolved
+-- slugs so data-dependent verifies mirror the prod invariant locally.
+insert into public.portfolio_categories (name, slug)
+values ('Graduation', 'graduation'), ('Family', 'family'),
+       ('Couples', 'couples'), ('Portraits', 'portraits')
+on conflict (slug) do nothing;
