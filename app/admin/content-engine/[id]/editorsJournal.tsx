@@ -2,18 +2,22 @@
 // Journal editor (spec §7.4): title/slug/body/meta, photo picker (cover +
 // extras from analyzed photos), and the structured internal-links list
 // (payload.internal_links — rendered into "Keep exploring" at publish, §9.3).
-import { CANONICAL_INTERNAL_LINKS } from "@/lib/contentEngine/taxonomy";
+import { internalLinksForService, isServiceType } from "@/lib/contentEngine/taxonomy";
+import { serviceConfigFor } from "@/lib/contentEngine/serviceConfig";
 import type { EditorProps } from "./editorsSimple";
 import { input, label } from "./ui";
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
 const arr = (v: unknown) => (Array.isArray(v) ? (v as string[]) : []);
 
-export function JournalEditor({ payload, photos, onEdit, disabled }: EditorProps) {
+export function JournalEditor({ payload, photos, onEdit, disabled, serviceType }: EditorProps) {
   const photoIds = arr(payload.photo_ids);
   const links = Array.isArray(payload.internal_links)
     ? (payload.internal_links as { url: string; label: string }[]) : [];
   const candidates = photos.filter((p) => !p.excluded && p.analysis_status === "completed");
+  const service = isServiceType(serviceType) ? serviceType : "grads";
+  const linkCandidates = internalLinksForService(service);
+  const keywordsPlaceholder = serviceConfigFor(service).keywordsPlaceholder;
 
   const togglePhoto = (id: string) => {
     const next = photoIds.includes(id) ? photoIds.filter((p) => p !== id) : [...photoIds, id];
@@ -54,6 +58,7 @@ export function JournalEditor({ payload, photos, onEdit, disabled }: EditorProps
         <div>
           <span style={label}>Meta keywords (deterministic; editable)</span>
           <textarea style={{ ...input, minHeight: 48 }} value={str(payload.meta_keywords)} disabled={disabled}
+            placeholder={keywordsPlaceholder}
             onChange={(e) => onEdit({ ...payload, meta_keywords: e.target.value })} />
         </div>
       </div>
@@ -105,7 +110,7 @@ export function JournalEditor({ payload, photos, onEdit, disabled }: EditorProps
             });
           }}>
           <option value="">+ add canonical link…</option>
-          {CANONICAL_INTERNAL_LINKS.filter((u) => !links.some((l) => l.url === u))
+          {linkCandidates.filter((u) => !links.some((l) => l.url === u))
             .map((u) => <option key={u} value={u}>{u}</option>)}
         </select>
       </div>

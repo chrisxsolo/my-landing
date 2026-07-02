@@ -6,7 +6,7 @@
 // Facts updates reject any value outside the canonical taxonomy (spec §8.5).
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
-  isServiceType, isSchoolSlug, isLightingCondition,
+  isServiceType, isSchoolSlug, isLightingCondition, isVibe, isRelationshipType,
 } from "@/lib/contentEngine/taxonomy";
 import { sessionTypeToServiceType, firstNameOf } from "@/lib/contentEngine/prefill";
 
@@ -71,6 +71,7 @@ export async function createPhotographySession(args: CreateSessionArgs): Promise
 const TEXT_FACTS = [
   "internal_client_name", "public_display_name", "primary_location",
   "degree", "internal_notes", "public_session_summary",
+  "outfit_styling", "best_moment",
 ] as const;
 
 export interface UpdateFactsArgs {
@@ -98,6 +99,18 @@ export async function updateSessionFacts(args: UpdateFactsArgs): Promise<{ updat
       throw new Error(`invalid lighting condition: ${String(facts.lighting_condition)}`);
     }
     patch.lighting_condition = facts.lighting_condition;
+  }
+  if ("vibe" in facts) {
+    if (facts.vibe !== null && !isVibe(facts.vibe)) {
+      throw new Error(`invalid vibe: ${String(facts.vibe)}`);
+    }
+    patch.vibe = facts.vibe;
+  }
+  if ("relationship_type" in facts) {
+    if (facts.relationship_type !== null && !isRelationshipType(facts.relationship_type)) {
+      throw new Error(`invalid relationship type: ${String(facts.relationship_type)}`);
+    }
+    patch.relationship_type = facts.relationship_type;
   }
   for (const key of TEXT_FACTS) {
     if (key in facts) {

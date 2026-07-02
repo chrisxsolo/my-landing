@@ -28,8 +28,8 @@ const STATUS_COLORS: Record<EngineItem["status"], string> = {
   publishing: T.blue, published: T.green, failed: T.red,
 };
 
-function ItemCard({ item, photos, onChanged }: {
-  item: EngineItem; photos: EnginePhoto[]; onChanged: () => void;
+function ItemCard({ item, photos, onChanged, serviceType }: {
+  item: EngineItem; photos: EnginePhoto[]; onChanged: () => void; serviceType?: string;
 }) {
   const { state, payload, edit, saveNow, resolveConflict } = useAutosave(
     item.id, item.payload, item.payload_revision, onChanged,
@@ -95,7 +95,7 @@ function ItemCard({ item, photos, onChanged }: {
       )}
 
       {Editor ? (
-        <Editor payload={payload} photos={photos} onEdit={edit} disabled={locked} />
+        <Editor payload={payload} photos={photos} onEdit={edit} disabled={locked} serviceType={serviceType} />
       ) : (
         <pre style={{ fontSize: 12, overflowX: "auto" }}>{JSON.stringify(payload, null, 2)}</pre>
       )}
@@ -103,8 +103,8 @@ function ItemCard({ item, photos, onChanged }: {
   );
 }
 
-export default function ItemsSection({ items, photos, onChanged }: {
-  items: EngineItem[]; photos: EnginePhoto[]; onChanged: () => void;
+export default function ItemsSection({ items, photos, onChanged, serviceType }: {
+  items: EngineItem[]; photos: EnginePhoto[]; onChanged: () => void; serviceType?: string;
 }) {
   return (
     <section style={card}>
@@ -119,7 +119,7 @@ export default function ItemsSection({ items, photos, onChanged }: {
           // focus after each autosave and discard in-flight keystrokes. Own saves
           // adopt the new revision via the reducer; external edits surface as the
           // 409 conflict prompt by design.
-          <ItemCard key={item.id} item={item} photos={photos} onChanged={onChanged} />
+          <ItemCard key={item.id} item={item} photos={photos} onChanged={onChanged} serviceType={serviceType} />
         ))
       )}
     </section>

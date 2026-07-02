@@ -8,6 +8,7 @@ const TYPE_PATTERNS: [RegExp, ServiceType][] = [
   [/couple|engagement/i, "couples"],
   [/family|families/i, "families"],
   [/maternity/i, "maternity"],
+  [/prom/i, "prom"],
   [/portrait|senior/i, "portraits"],
   [/event/i, "events"],
 ];

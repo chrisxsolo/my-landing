@@ -5,6 +5,7 @@ import { z } from "zod";
 import {
   isSchoolSlug, isPortfolioCategory, isCanonicalInternalLink,
   isGuideLocationKey, GUIDE_TYPES, SERVICE_TYPES, LIGHTING_CONDITIONS,
+  VIBES, RELATIONSHIP_TYPES,
   type ContentType,
 } from "@/lib/contentEngine/taxonomy";
 
@@ -124,6 +125,12 @@ export const sessionFactsSnapshotSchema = z.object({
   degree: z.string().nullable().optional(),
   outfit_count: z.number().int().nullable().optional(),
   group_size: z.number().int().nullable().optional(),
+  // couples facets (2026-07-02); optional so pre-existing stored snapshots
+  // and pre-migration rows still parse.
+  vibe: z.enum(VIBES).nullable().optional(),
+  relationship_type: z.enum(RELATIONSHIP_TYPES).nullable().optional(),
+  outfit_styling: z.string().nullable().optional(),
+  best_moment: z.string().nullable().optional(),
   public_session_summary: z.string().nullable().optional(),
 });
 export type SessionFactsSnapshot = z.infer<typeof sessionFactsSnapshotSchema>;
@@ -147,6 +154,10 @@ export function buildSessionFactsSnapshot(session: Record<string, unknown>): Ses
     degree: session.degree ?? null,
     outfit_count: session.outfit_count ?? null,
     group_size: session.group_size ?? null,
+    vibe: session.vibe ?? null,
+    relationship_type: session.relationship_type ?? null,
+    outfit_styling: session.outfit_styling ?? null,
+    best_moment: session.best_moment ?? null,
     public_session_summary: session.public_session_summary ?? null,
   });
 }

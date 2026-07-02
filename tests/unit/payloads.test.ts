@@ -147,4 +147,25 @@ describe("buildSessionFactsSnapshot", () => {
     // the result must itself be schema-valid
     expect(sessionFactsSnapshotSchema.safeParse(snap).success).toBe(true);
   });
+
+  it("carries the couples facets and defaults them to null on legacy rows", () => {
+    const couples = buildSessionFactsSnapshot({
+      service_type: "couples", vibe: "romantic", relationship_type: "engagement",
+      outfit_styling: "earth tones", best_moment: "fog rolled in at the bridge",
+    });
+    expect(couples.vibe).toBe("romantic");
+    expect(couples.relationship_type).toBe("engagement");
+    expect(couples.outfit_styling).toBe("earth tones");
+    expect(couples.best_moment).toBe("fog rolled in at the bridge");
+
+    // legacy grad row without the new columns still parses
+    const legacy = buildSessionFactsSnapshot({ service_type: "grads" });
+    expect(legacy.vibe).toBeNull();
+    expect(legacy.relationship_type).toBeNull();
+    expect(sessionFactsSnapshotSchema.safeParse(legacy).success).toBe(true);
+  });
+
+  it("rejects an out-of-taxonomy vibe (closed list)", () => {
+    expect(() => buildSessionFactsSnapshot({ service_type: "couples", vibe: "sparkly" })).toThrow();
+  });
 });

@@ -5,11 +5,12 @@
 // validation downstream.
 import type { SessionFactsSnapshot } from "@/lib/contentEngine/payloads";
 import {
-  CANONICAL_INTERNAL_LINKS, guideLocationKeys, PORTFOLIO_CATEGORIES,
+  guideLocationKeys, internalLinksForService, PORTFOLIO_CATEGORIES,
   type GuideType, type SchoolSlug,
 } from "@/lib/contentEngine/taxonomy";
+import { serviceConfigFor } from "@/lib/contentEngine/serviceConfig";
 
-export const PROMPT_VERSION = "2026-06-11.1";
+export const PROMPT_VERSION = "2026-07-02.1";
 
 export interface BuiltPrompt {
   system: string;
@@ -30,6 +31,19 @@ const BRAND =
   "You write for soloxsnaps, a Bay Area photographer (grads, couples, families). " +
   "Voice: warm, specific, natural — never keyword-stuffed, never invented facts.";
 
+// Service-aware system prefix (2026-07-02): the per-service guidance from
+// serviceConfig routes prompt voice/SEO by facts.service_type. grads guidance
+// is empty by design, so grad prompts are unchanged from the pre-routing engine.
+function brandFor(facts: SessionFactsSnapshot): string {
+  const guidance = serviceConfigFor(facts.service_type).contentGuidance;
+  return guidance ? `${BRAND} ${guidance}` : BRAND;
+}
+
+function analysisBrandFor(facts: SessionFactsSnapshot): string {
+  const guidance = serviceConfigFor(facts.service_type).analysisGuidance;
+  return guidance ? `${BRAND} ${guidance}` : BRAND;
+}
+
 function factsBlock(facts: SessionFactsSnapshot): string {
   return `Session facts (the ONLY facts you may use):\n${JSON.stringify(facts, null, 2)}`;
 }
@@ -45,7 +59,7 @@ function summariesBlock(photos: PhotoSummary[]): string {
 export function buildAnalysisPrompt(facts: SessionFactsSnapshot, photoIds: string[]): BuiltPrompt {
   return {
     system:
-      `${BRAND} You analyze session photographs for marketing use. ` +
+      `${analysisBrandFor(facts)} You analyze session photographs for marketing use. ` +
       "Return ONLY a JSON object — no prose, no markdown fences.",
     userText:
       `${factsBlock(facts)}\n\n` +
@@ -71,7 +85,7 @@ export function buildJournalPrompt(
 ): BuiltPrompt {
   return {
     system:
-      `${BRAND} You draft a journal/blog post about one photo session. ` +
+      `${brandFor(facts)} You draft a journal/blog post about one photo session. ` +
       "Return ONLY JSON: {\"title\",\"slug\" (lowercase-kebab),\"body\" (markdown)," +
       "\"meta_description\" (<=160 chars),\"photo_ids\":[uuids],\"cover_photo_id\":uuid}. " +
       "Choose photo_ids and the cover from the provided analyzed photos only.",
@@ -91,7 +105,7 @@ export function buildPortfolioPickPrompt(
 ): BuiltPrompt {
   return {
     system:
-      `${BRAND} You select portfolio-worthy photos. Return ONLY JSON: ` +
+      `${brandFor(facts)} You select portfolio-worthy photos. Return ONLY JSON: ` +
       "{\"picks\":[{\"session_photo_id\":uuid,\"category\":" +
       `one of ${JSON.stringify(PORTFOLIO_CATEGORIES)},` +
       "\"title\":\"<=160\",\"alt_text\":\"<=300\",\"description\":\"\",\"featured\":false}]}. " +
@@ -118,7 +132,7 @@ export function buildGuidePhotoPrompt(
   const keys = guideLocationKeys(guide);
   return {
     system:
-      `${BRAND} You place photos on location-guide pages. Return ONLY JSON: ` +
+      `${brandFor(facts)} You place photos on location-guide pages. Return ONLY JSON: ` +
       "{\"placements\":[{\"session_photo_id\":uuid,\"guide\":\"" + guide + "\"," +
       "\"location_key\":\"<one of the allowed keys>\",\"alt_text\":\"<=300\"}]}. " +
       "If no allowed location matches the session, return {\"placements\":[]}.",
@@ -128,14 +142,17 @@ export function buildGuidePhotoPrompt(
   };
 }
 
+// Link candidates are service-scoped (grads → full canonical list, unchanged;
+// couples → couples guide cluster + pricing) so a couples session can never be
+// pointed at grad pricing, school pages, or campus content.
 export function buildInternalLinkPrompt(facts: SessionFactsSnapshot): BuiltPrompt {
   return {
     system:
-      `${BRAND} You suggest internal links for a journal post. You may use ONLY ` +
+      `${brandFor(facts)} You suggest internal links for a journal post. You may use ONLY ` +
       "urls from the provided list — anything else is invalid. Return ONLY JSON: " +
       "{\"links\":[{\"url\":\"<from list>\",\"label\":\"<=120\",\"reason\":\"<=300\"}]}. Suggest 2-5.",
     userText:
       `${factsBlock(facts)}\n\nCanonical internal links (closed list):\n` +
-      JSON.stringify([...CANONICAL_INTERNAL_LINKS], null, 1),
+      JSON.stringify([...internalLinksForService(facts.service_type)], null, 1),
   };
 }

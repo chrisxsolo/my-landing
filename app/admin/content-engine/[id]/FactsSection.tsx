@@ -1,10 +1,16 @@
 "use client";
 // Section 1 — Session facts (spec §7.4): editable fields; saving commits values.
-// Taxonomy-invalid slugs are rejected server-side (422) and surfaced inline.
+// Service-aware (2026-07-02): grad-only fields (School) render only for grads;
+// couples sessions get vibe / relationship type / outfit styling / best moment
+// plus a secondary-location input. Taxonomy-invalid slugs are rejected
+// server-side (422) and surfaced inline.
 import { useState } from "react";
 import { T } from "@/app/admin/adminTheme";
 import { engineApi } from "@/app/admin/content-engine/engineApi";
-import { SERVICE_TYPES, SCHOOL_SLUGS, LIGHTING_CONDITIONS } from "@/lib/contentEngine/taxonomy";
+import {
+  SERVICE_TYPES, SCHOOL_SLUGS, LIGHTING_CONDITIONS, VIBES, RELATIONSHIP_TYPES,
+} from "@/lib/contentEngine/taxonomy";
+import { serviceConfigFor } from "@/lib/contentEngine/serviceConfig";
 import { btn, card, input, label, sectionTitle } from "./ui";
 import DictationTextarea from "./DictationTextarea";
 
@@ -15,6 +21,8 @@ interface Props {
 }
 
 const text = (v: unknown) => (typeof v === "string" ? v : "");
+const list = (v: unknown) => (Array.isArray(v) ? (v as string[]).join(", ") : "");
+const pretty = (v: string) => v.replace(/_/g, " ");
 
 export default function FactsSection({ session, sessionId, onSaved }: Props) {
   const [form, setForm] = useState({
@@ -23,13 +31,22 @@ export default function FactsSection({ session, sessionId, onSaved }: Props) {
     service_type: text(session.service_type) || "grads",
     school_slug: text(session.school_slug),
     primary_location: text(session.primary_location),
+    secondary_locations: list(session.secondary_locations),
     session_date: text(session.session_date),
     lighting_condition: text(session.lighting_condition),
+    vibe: text(session.vibe),
+    relationship_type: text(session.relationship_type),
+    outfit_styling: text(session.outfit_styling),
+    best_moment: text(session.best_moment),
     public_session_summary: text(session.public_session_summary),
     internal_notes: text(session.internal_notes),
   });
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+
+  const isGrads = form.service_type === "grads";
+  const isCouples = form.service_type === "couples";
+  const svc = serviceConfigFor(form.service_type);
 
   const set = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setForm((f) => ({ ...f, [key]: e.target.value }));
@@ -40,9 +57,14 @@ export default function FactsSection({ session, sessionId, onSaved }: Props) {
     try {
       await engineApi.patchFacts(sessionId, {
         ...form,
-        school_slug: form.school_slug || null,
+        // a non-grad session never keeps a school (grad-only fact)
+        school_slug: isGrads ? form.school_slug || null : null,
         lighting_condition: form.lighting_condition || null,
         session_date: form.session_date || null,
+        vibe: form.vibe || null,
+        relationship_type: form.relationship_type || null,
+        secondary_locations: form.secondary_locations
+          .split(",").map((s) => s.trim()).filter(Boolean),
       });
       setNotice("Saved.");
       onSaved();
@@ -71,17 +93,27 @@ export default function FactsSection({ session, sessionId, onSaved }: Props) {
             {SERVICE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
           </select>
         </div>
-        <div>
-          <span style={label}>School</span>
-          <select style={input} value={form.school_slug} onChange={set("school_slug")}>
-            <option value="">— none —</option>
-            {SCHOOL_SLUGS.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
-        </div>
+        {isGrads && (
+          <div>
+            <span style={label}>School</span>
+            <select style={input} value={form.school_slug} onChange={set("school_slug")}>
+              <option value="">— none —</option>
+              {SCHOOL_SLUGS.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+        )}
         <div>
           <span style={label}>Primary location</span>
-          <input style={input} value={form.primary_location} onChange={set("primary_location")} />
+          <input style={input} value={form.primary_location} onChange={set("primary_location")}
+            placeholder={isCouples ? "e.g. Crissy Field" : undefined} />
         </div>
+        {isCouples && (
+          <div>
+            <span style={label}>Secondary location (optional, comma-separated)</span>
+            <input style={input} value={form.secondary_locations} onChange={set("secondary_locations")}
+              placeholder="e.g. Lovers Lane" />
+          </div>
+        )}
         <div>
           <span style={label}>Session date</span>
           <input style={input} type="date" value={form.session_date} onChange={set("session_date")} />
@@ -90,13 +122,42 @@ export default function FactsSection({ session, sessionId, onSaved }: Props) {
           <span style={label}>Lighting</span>
           <select style={input} value={form.lighting_condition} onChange={set("lighting_condition")}>
             <option value="">— unknown —</option>
-            {LIGHTING_CONDITIONS.map((l) => <option key={l} value={l}>{l}</option>)}
+            {LIGHTING_CONDITIONS.map((l) => <option key={l} value={l}>{pretty(l)}</option>)}
           </select>
         </div>
+        {isCouples && (
+          <>
+            <div>
+              <span style={label}>Vibe</span>
+              <select style={input} value={form.vibe} onChange={set("vibe")}>
+                <option value="">— none —</option>
+                {VIBES.map((v) => <option key={v} value={v}>{pretty(v)}</option>)}
+              </select>
+            </div>
+            <div>
+              <span style={label}>Relationship type</span>
+              <select style={input} value={form.relationship_type} onChange={set("relationship_type")}>
+                <option value="">— none —</option>
+                {RELATIONSHIP_TYPES.map((r) => <option key={r} value={r}>{pretty(r)}</option>)}
+              </select>
+            </div>
+            <div>
+              <span style={label}>Outfit / styling</span>
+              <input style={input} value={form.outfit_styling} onChange={set("outfit_styling")}
+                placeholder="e.g. neutral earth tones, coordinated not matching" />
+            </div>
+            <div>
+              <span style={label}>Best moment</span>
+              <input style={input} value={form.best_moment} onChange={set("best_moment")}
+                placeholder="e.g. the fog rolled in right at the bridge reveal" />
+            </div>
+          </>
+        )}
       </div>
       <div style={{ marginTop: 10 }}>
         <span style={label}>Public session summary (may be sent to AI)</span>
         <DictationTextarea value={form.public_session_summary}
+          placeholder={svc.summaryPlaceholder}
           onValueChange={(v) => setForm((f) => ({ ...f, public_session_summary: v }))} />
         <span style={label}>Internal notes (never sent to AI, never published)</span>
         <DictationTextarea value={form.internal_notes}

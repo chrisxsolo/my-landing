@@ -98,7 +98,8 @@ export default function Workspace({ sessionId }: { sessionId: string }) {
       <GenerationSection sessionId={sessionId} session={session} activePackage={data.activePackage}
         items={data.items} aiAllowed={session.ai_processing_allowed as boolean}
         photos={photos} onChanged={refresh} />
-      <ItemsSection items={data.items} photos={photos} onChanged={refresh} />
+      <ItemsSection items={data.items} photos={photos} onChanged={refresh}
+        serviceType={typeof session.service_type === "string" ? session.service_type : undefined} />
       <PublicationHistory published={data.published} photos={photos} onChanged={refresh} viewCounts={analytics?.perItem ?? {}} />
       <ActionBar items={data.items}
         marketingPermission={session.marketing_permission as boolean} onChanged={refresh} />

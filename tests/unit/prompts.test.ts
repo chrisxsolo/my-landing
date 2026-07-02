@@ -4,6 +4,7 @@ import {
   buildSchoolPagePhotoPrompt, buildGuidePhotoPrompt, buildInternalLinkPrompt,
 } from "@/lib/contentEngine/prompts";
 import { CANONICAL_INTERNAL_LINKS, guideLocationKeys } from "@/lib/contentEngine/taxonomy";
+import { serviceConfigFor, SERVICE_PROMPTS } from "@/lib/contentEngine/serviceConfig";
 import type { SessionFactsSnapshot } from "@/lib/contentEngine/payloads";
 
 const facts: SessionFactsSnapshot = {
@@ -62,6 +63,13 @@ describe("prompt construction (spec §8.3)", () => {
     expect(p2.userText).toContain("sjsu");
   });
 
+  it("grad prompts carry NO service-guidance block — byte-identical to the pre-routing engine", () => {
+    expect(SERVICE_PROMPTS.grads.contentGuidance).toBe("");
+    expect(SERVICE_PROMPTS.grads.analysisGuidance).toBe("");
+    const p = buildJournalPrompt(facts, photoSummaries, { links: [], testimonialQuote: null });
+    expect(p.system).not.toContain("not a graduation session");
+  });
+
   it("prompts are built ONLY from the snapshot type — no internal fields can appear", () => {
     // Type-level guarantee: builders accept SessionFactsSnapshot, which has no
     // internal_client_name/internal_notes/email. Runtime double-check:
@@ -73,5 +81,50 @@ describe("prompt construction (spec §8.3)", () => {
     for (const p of all) {
       expect(p.system + p.userText).not.toMatch(/internal_client_name|internal_notes/);
     }
+  });
+});
+
+describe("service-aware prompt routing (couples)", () => {
+  const couplesFacts: SessionFactsSnapshot = {
+    public_display_name: "Ana & Leo", service_type: "couples", school_slug: null,
+    primary_location: "Crissy Field", secondary_locations: [], session_date: "2026-06-20",
+    lighting_condition: "golden_hour", graduation_year: null, degree: null,
+    outfit_count: null, group_size: 2, public_session_summary: "Foggy golden hour walk.",
+    vibe: "playful", relationship_type: "engagement",
+  };
+
+  it("couples journal prompt carries couples voice guidance and the anti-grad rule", () => {
+    const p = buildJournalPrompt(couplesFacts, [], { links: [], testimonialQuote: null });
+    expect(p.system).toContain("COUPLES photography session");
+    expect(p.system).toMatch(/never mention graduation/i);
+    expect(p.system).toContain("Bay Area couples");
+  });
+
+  it("couples analysis prompt asks for connection/interaction language, not grad language", () => {
+    const p = buildAnalysisPrompt(couplesFacts, ["11111111-1111-4111-8111-111111111111"]);
+    expect(p.system).toContain("connection");
+    expect(p.system).toContain("outfit coordination");
+    expect(p.system).toMatch(/candid or posed/i);
+    expect(p.system).toMatch(/never mention graduation/i);
+  });
+
+  it("couples internal-link prompt offers only couples pages + pricing — no grad/campus links", () => {
+    const p = buildInternalLinkPrompt(couplesFacts);
+    expect(p.userText).toContain("/couples-guide");
+    expect(p.userText).toContain("/couples-guide/locations/crissy-field");
+    expect(p.userText).toContain("/pricing");
+    expect(p.userText).not.toContain("/grads/");
+    expect(p.userText).not.toContain("/family-guide");
+  });
+
+  it("couples facets (vibe, relationship_type) reach the facts block", () => {
+    const p = buildJournalPrompt(couplesFacts, [], { links: [], testimonialQuote: null });
+    expect(p.userText).toContain("playful");
+    expect(p.userText).toContain("engagement");
+  });
+
+  it("unknown service types fall back to the grads config", () => {
+    expect(serviceConfigFor("weddings")).toBe(SERVICE_PROMPTS.grads);
+    expect(serviceConfigFor(null)).toBe(SERVICE_PROMPTS.grads);
   });
 });

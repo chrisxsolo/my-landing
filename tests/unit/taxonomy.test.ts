@@ -2,10 +2,11 @@ import { describe, it, expect } from "vitest";
 import { readdirSync } from "node:fs";
 import path from "node:path";
 import {
-  SERVICE_TYPES, SCHOOL_SLUGS, LIGHTING_CONDITIONS,
+  SERVICE_TYPES, SCHOOL_SLUGS, LIGHTING_CONDITIONS, VIBES, RELATIONSHIP_TYPES,
   CONTENT_TYPES, GENERATABLE_CONTENT_TYPES, PUBLICATION_TARGET_TYPES,
-  CANONICAL_INTERNAL_LINKS,
+  CANONICAL_INTERNAL_LINKS, internalLinksForService,
   isServiceType, isSchoolSlug, isPortfolioCategory, isLightingCondition,
+  isVibe, isRelationshipType,
   isContentType, isGuideType, isGuideLocationKey, isCanonicalInternalLink,
   guideLocationKeys,
 } from "@/lib/contentEngine/taxonomy";
@@ -77,5 +78,51 @@ describe("canonical internal links (closed list)", () => {
     expect(isCanonicalInternalLink("/grads/uc-berkeley")).toBe(true);
     expect(isCanonicalInternalLink("/grads/made-up")).toBe(false);
     expect(isCanonicalInternalLink("https://evil.example.com")).toBe(false);
+  });
+});
+
+describe("service-aware additions (2026-07-02)", () => {
+  it("service types include prom; couples facets validate against their closed lists", () => {
+    expect(SERVICE_TYPES).toContain("prom");
+    expect(isServiceType("prom")).toBe(true);
+    expect(VIBES).toContain("romantic");
+    expect(RELATIONSHIP_TYPES).toContain("date_night");
+    expect(isVibe("candid")).toBe(true);
+    expect(isVibe("sparkly")).toBe(false);
+    expect(isRelationshipType("engagement")).toBe(true);
+    expect(isRelationshipType("situationship")).toBe(false);
+  });
+
+  it("lighting keeps the original values and adds the couples-facing ones", () => {
+    for (const v of ["morning", "midday", "afternoon", "golden_hour", "blue_hour", "night", "mixed"]) {
+      expect(isLightingCondition(v)).toBe(true);
+    }
+    for (const v of ["sunset", "soft_shade", "overcast", "harsh_light", "flash"]) {
+      expect(isLightingCondition(v)).toBe(true);
+    }
+  });
+
+  it("internalLinksForService: grads keeps the FULL canonical list (regression)", () => {
+    expect(internalLinksForService("grads")).toEqual(CANONICAL_INTERNAL_LINKS);
+  });
+
+  it("internalLinksForService: couples gets only couples pages + pricing, all canonical", () => {
+    const links = internalLinksForService("couples");
+    expect(links).toContain("/couples-guide");
+    expect(links).toContain("/couples-guide/locations/crissy-field");
+    expect(links).toContain("/pricing");
+    expect(links.some((l) => l.startsWith("/grads/"))).toBe(false);
+    expect(links.some((l) => l.startsWith("/family-guide"))).toBe(false);
+    for (const l of links) expect(isCanonicalInternalLink(l)).toBe(true);
+  });
+
+  it("internalLinksForService: families and other services never see grad pages", () => {
+    expect(internalLinksForService("families").some((l) => l.startsWith("/grads/"))).toBe(false);
+    for (const svc of ["portraits", "maternity", "prom", "events", "other"] as const) {
+      const links = internalLinksForService(svc);
+      expect(links.some((l) => l.startsWith("/grads/"))).toBe(false);
+      expect(links).toContain("/pricing");
+      for (const l of links) expect(isCanonicalInternalLink(l)).toBe(true);
+    }
   });
 });

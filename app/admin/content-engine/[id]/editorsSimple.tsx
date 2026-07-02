@@ -12,6 +12,9 @@ export interface EditorProps {
   photos: EnginePhoto[];
   onEdit: (next: Record<string, unknown>) => void;
   disabled: boolean;
+  // Session service type — service-aware editor copy (placeholders, link
+  // candidates); optional so grad-era call sites keep working unchanged.
+  serviceType?: string;
 }
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");

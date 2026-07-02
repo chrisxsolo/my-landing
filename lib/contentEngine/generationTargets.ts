@@ -12,6 +12,7 @@ import {
   type BuiltPrompt, type PhotoSummary,
 } from "@/lib/contentEngine/prompts";
 import { validatePayload, type SessionFactsSnapshot } from "@/lib/contentEngine/payloads";
+import { generateMetaKeywords } from "@/lib/contentEngine/serviceKeywords";
 import { isSchoolSlug, type GuideType } from "@/lib/contentEngine/taxonomy";
 import { downloadOriginal, encodeBatchUnderCap, toImageBlock } from "@/lib/contentEngine/modelImages";
 
@@ -49,22 +50,11 @@ export interface TargetContext {
   facts: SessionFactsSnapshot;
 }
 
-const SERVICE_KEYWORD: Record<string, string> = {
-  grads: "graduation photos", couples: "couples photography", families: "family photography",
-  portraits: "portrait photography", maternity: "maternity photography",
-  events: "event photography", other: "photography",
-};
-
 // Deterministic meta keywords from the approved taxonomy/facts — never
-// AI-invented (spec §9.3).
+// AI-invented (spec §9.3). Service-aware routing lives in serviceKeywords;
+// grads output is unchanged.
 export function deterministicKeywords(facts: SessionFactsSnapshot): string {
-  const parts = [
-    facts.school_slug ? facts.school_slug.replace(/-/g, " ") : null,
-    facts.primary_location,
-    SERVICE_KEYWORD[facts.service_type] ?? "photography",
-    "Bay Area",
-  ].filter((p): p is string => !!p && p.length > 0);
-  return parts.join(", ");
+  return generateMetaKeywords(facts);
 }
 
 // First ~200 chars of a testimonial, cut at a word boundary.

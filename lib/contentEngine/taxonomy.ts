@@ -7,7 +7,7 @@ import { getAllFamilyLocations } from "@/lib/familyGuide/locations";
 import { getAllCouplesLocations } from "@/lib/couplesGuide/locations";
 
 export const SERVICE_TYPES = [
-  "grads", "couples", "families", "portraits", "maternity", "events", "other",
+  "grads", "couples", "families", "portraits", "maternity", "prom", "events", "other",
 ] as const;
 export type ServiceType = (typeof SERVICE_TYPES)[number];
 
@@ -27,9 +27,23 @@ export const PORTFOLIO_CATEGORIES = [
 export type PortfolioCategory = (typeof PORTFOLIO_CATEGORIES)[number];
 
 export const LIGHTING_CONDITIONS = [
-  "morning", "midday", "afternoon", "golden_hour", "blue_hour", "night", "mixed",
+  "morning", "midday", "afternoon", "golden_hour", "sunset", "blue_hour", "night",
+  "soft_shade", "overcast", "harsh_light", "flash", "mixed",
 ] as const;
 export type LightingCondition = (typeof LIGHTING_CONDITIONS)[number];
+
+// Couples-session facets (nullable columns on photography_sessions; the DB
+// check constraints in 20260702000002 mirror these lists exactly).
+export const VIBES = [
+  "romantic", "playful", "candid", "cinematic", "cozy",
+  "editorial", "adventurous", "intimate", "casual",
+] as const;
+export type Vibe = (typeof VIBES)[number];
+
+export const RELATIONSHIP_TYPES = [
+  "couple", "engagement", "anniversary", "proposal", "just_because", "date_night",
+] as const;
+export type RelationshipType = (typeof RELATIONSHIP_TYPES)[number];
 
 export const CONTENT_TYPES = [
   "journal_post", "portfolio_pick", "school_page_photo", "guide_photo",
@@ -73,12 +87,37 @@ export const CANONICAL_INTERNAL_LINKS: readonly string[] = [
   "/pricing",
 ];
 
+// Service-scoped subset of CANONICAL_INTERNAL_LINKS (spec §8.3): grads keeps
+// the full list (unchanged behavior); couples/families see only their own
+// guide cluster + pricing so the generator never suggests grad/campus pages
+// for a non-grad session. Everything stays inside the closed canonical list.
+export function internalLinksForService(serviceType: ServiceType): readonly string[] {
+  if (serviceType === "grads") return CANONICAL_INTERNAL_LINKS;
+  if (serviceType === "couples") {
+    return [
+      "/couples-guide",
+      ...COUPLES_LOCATION_KEYS.map((k) => `/couples-guide/locations/${k}`),
+      "/pricing",
+    ];
+  }
+  if (serviceType === "families") {
+    return [
+      "/family-guide",
+      ...FAMILY_LOCATION_KEYS.map((k) => `/family-guide/locations/${k}`),
+      "/pricing",
+    ];
+  }
+  return ["/family-guide", "/couples-guide", "/pricing"];
+}
+
 const has = <T extends string>(arr: readonly T[]) => {
   const set = new Set<string>(arr);
   return (v: unknown): v is T => typeof v === "string" && set.has(v);
 };
 
 export const isServiceType = has(SERVICE_TYPES);
+export const isVibe = has(VIBES);
+export const isRelationshipType = has(RELATIONSHIP_TYPES);
 export const isSchoolSlug = has(SCHOOL_SLUGS);
 export const isPortfolioCategory = has(PORTFOLIO_CATEGORIES);
 export const isLightingCondition = has(LIGHTING_CONDITIONS);
