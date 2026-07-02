@@ -5,8 +5,13 @@ import { rateLimit } from "@/lib/rateLimit";
 import { normalizeVisitorId } from "@/lib/contentEngine/trackEventRules";
 import { recordContentEvent } from "@/lib/contentEngine/recordEvent";
 
-const DEFAULT_CONTACT_EMAIL_TO = "chrisxsolo2@gmail.com";
-const DEFAULT_CONTACT_EMAIL_FROM = "soloxsnaps contact <onboarding@resend.dev>";
+// Expected production env vars (set in Vercel — never hardcode secrets):
+//   RESEND_API_KEY       — Resend API key; email sends are skipped without it
+//   CONTACT_EMAIL_TO     — notification recipient(s), comma-separated (default below)
+//   CONTACT_EMAIL_FROM   — verified-domain sender (default below)
+//   NEXT_PUBLIC_SITE_URL — canonical site URL used in email links (default below)
+const DEFAULT_CONTACT_EMAIL_TO = "soloxsnaps@gmail.com";
+const DEFAULT_CONTACT_EMAIL_FROM = "SoloXSnaps <hello@soloxsnaps.com>";
 const DEFAULT_SITE_URL = "https://soloxsnaps.com";
 
 // ── Abuse protection knobs ───────────────────────────────────────────────────
@@ -419,20 +424,45 @@ export async function POST(req: NextRequest) {
           `,
           })),
         ]);
-        if (resendError) {
-          console.error("Resend contact email failed after retries:", resendError);
+        // Structured debug object so Vercel runtime logs show exactly why a
+        // send failed. Never log the API key itself — only whether it exists.
+        const emailDebug = {
+          hasResendApiKey: true,
+          emailFrom,
+          emailTo,
+          inquiryId: inquiry?.id ?? null,
+          notificationError: resendError ?? null,
+          confirmationError: confirmationError ?? null,
+        };
+        if (resendError || confirmationError) {
+          console.error("[contact] Resend send failed after retries (inquiry was saved):", emailDebug);
         } else {
+          console.log("[contact] Resend emails sent:", { emailFrom, emailTo, inquiryId: inquiry?.id ?? null });
+        }
+        if (!resendError) {
           emailSent = true;
         }
-        if (confirmationError) {
-          console.error("Resend contact confirmation email failed after retries:", confirmationError);
-        }
       } else {
-        console.warn("Skipping contact email notification: RESEND_API_KEY is not configured.");
+        console.warn(
+          "[contact] Inquiry SAVED but email notification SKIPPED: RESEND_API_KEY is not configured.",
+          { hasResendApiKey: false, inquiryId: inquiry?.id ?? null },
+        );
       }
     } catch (emailErr) {
-      console.error("Email send failed:", emailErr);
+      console.error("[contact] Email send threw (inquiry was saved):", emailErr);
       // Don't fail — inquiry is already saved
+    }
+
+    // Best-effort tracking of whether the notification email went out.
+    // Fail-soft: a missing column or update error never blocks the response.
+    if (inquiry?.id) {
+      const { error: trackError } = await supabase
+        .from("inquiries")
+        .update({ notification_email_sent: emailSent })
+        .eq("id", inquiry.id);
+      if (trackError) {
+        console.error("[contact] Failed to record notification_email_sent:", trackError);
+      }
     }
 
     if (dbError && !emailSent) {

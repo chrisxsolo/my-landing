@@ -14,8 +14,8 @@ import { createSupabaseServerClient } from "@/lib/supabaseServer";
 
 export const dynamic = "force-dynamic";
 
-const DEFAULT_TO   = "chrisxsolo2@gmail.com";
-const DEFAULT_FROM = "soloxsnaps contact <onboarding@resend.dev>";
+const DEFAULT_TO   = "soloxsnaps@gmail.com";
+const DEFAULT_FROM = "SoloXSnaps <hello@soloxsnaps.com>";
 const CRON_SECRET  = process.env.CRON_SECRET ?? "";
 
 function escapeHtml(v: string) {
