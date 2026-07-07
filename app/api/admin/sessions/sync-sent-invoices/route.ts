@@ -1,8 +1,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/admin/sessions/sync-sent-invoices
 //
-// Scans Gmail (sent + inbox) for invoice, contract, payment, and signing events.
-// Updates client_sessions and inquiries tables accordingly.
+// Scans Gmail (sent + inbox) for invoice, contract, payment, and signing events
+// via subject heuristics, then runs an AI pass over each active client's actual
+// email thread to catch milestones the heuristics miss. Updates the inquiries
+// timeline fields and advances client_sessions.current_status (never regresses).
 // Also auto-sets estimated_delivery_date to 14 days after session_date when missing.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -11,106 +13,24 @@ import { getValidTokens } from "@/lib/gmailTokens";
 import { requireAdmin } from "@/lib/requireAdmin";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
 import { CLIENT_SESSION_TABLE } from "@/lib/clientSessions";
+import { computeAdvancedStatus, scanMilestonesForClients } from "@/lib/emailTimelineScan";
+import {
+  extractClientEmailFromSubject,
+  extractEmail,
+  fetchMessages,
+  getHeader,
+  isContractSignedSubject,
+  isContractSubject,
+  isInvoiceSubject,
+  isPaymentReceivedSubject,
+  matchClientNameInSubject,
+  msgDate,
+} from "@/lib/gmailSyncHelpers";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
-type GmailHeader = { name: string; value: string };
-type GmailMessage = {
-  id: string;
-  internalDate?: string;
-  payload?: { headers?: GmailHeader[] };
-};
-
-function getHeader(headers: GmailHeader[], name: string): string {
-  return headers.find(h => h.name.toLowerCase() === name.toLowerCase())?.value ?? "";
-}
-
-function extractEmail(headerValue: string): string {
-  const match = headerValue.match(/<([^>]+)>/);
-  if (match) return match[1].toLowerCase().trim();
-  return headerValue.toLowerCase().trim();
-}
-
-function isInvoiceSubject(subject: string): boolean {
-  return /invoice/i.test(subject) && /soloxsnaps/i.test(subject);
-}
-
-function isContractSubject(subject: string): boolean {
-  return /contract/i.test(subject) && /soloxsnaps/i.test(subject);
-}
-
-function isPaymentReceivedSubject(subject: string, from: string): boolean {
-  const sub = subject.toLowerCase();
-  const frm = from.toLowerCase();
-  if (frm.includes("venmo.com") && (sub.includes("paid you") || sub.includes("sent you"))) return true;
-  if (frm.includes("paypal.com") && (sub.includes("payment received") || sub.includes("you received"))) return true;
-  if (frm.includes("cash.app") && sub.includes("received")) return true;
-  if (frm.includes("square.com") && sub.includes("payment")) return true;
-  if (frm.includes("stripe.com") && sub.includes("payment")) return true;
-  if (frm.includes("honeybook.com") && (sub.includes("paid") || sub.includes("payment"))) return true;
-  if (sub.includes("deposit received") || sub.includes("deposit paid")) return true;
-  return false;
-}
-
-function isContractSignedSubject(subject: string, from: string): boolean {
-  const sub = subject.toLowerCase();
-  const frm = from.toLowerCase();
-  if (frm.includes("docusign") && sub.includes("completed")) return true;
-  if (frm.includes("pandadoc") && (sub.includes("signed") || sub.includes("completed"))) return true;
-  if (frm.includes("honeybook.com") && (sub.includes("signed") || sub.includes("contract"))) return true;
-  if (frm.includes("hellosign") && sub.includes("completed")) return true;
-  if ((sub.includes("contract") || sub.includes("document")) && (sub.includes("signed") || sub.includes("completed"))) return true;
-  return false;
-}
-
-function msgDate(internalDate?: string): string {
-  return internalDate
-    ? new Date(parseInt(internalDate, 10)).toISOString()
-    : new Date().toISOString();
-}
-
-function extractClientEmailFromSubject(subject: string, clientEmails: Set<string>): string | null {
-  const lower = subject.toLowerCase();
-  for (const email of clientEmails) {
-    if (lower.includes(email.toLowerCase())) return email;
-  }
-  return null;
-}
-
-function matchClientNameInSubject(subject: string, clientNames: Map<string, string>): string | null {
-  const lower = subject.toLowerCase();
-  for (const [email, name] of clientNames) {
-    if (!name) continue;
-    const parts = name.toLowerCase().split(/\s+/);
-    if (parts.some(p => p.length > 2 && lower.includes(p))) return email;
-  }
-  return null;
-}
-
-async function fetchMessages(auth: string, query: string, maxResults = 50): Promise<GmailMessage[]> {
-  const searchRes = await fetch(
-    `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(query)}&maxResults=${maxResults}`,
-    { headers: { Authorization: auth } },
-  );
-  if (!searchRes.ok) return [];
-  const data = await searchRes.json() as { messages?: { id: string }[] };
-  const ids = (data.messages ?? []).map(m => m.id);
-  if (!ids.length) return [];
-
-  return Promise.all(
-    ids.map(async id => {
-      try {
-        const r = await fetch(
-          `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}` +
-          `?format=metadata&metadataHeaders=To&metadataHeaders=From&metadataHeaders=Subject`,
-          { headers: { Authorization: auth } },
-        );
-        if (!r.ok) return null;
-        return await r.json() as GmailMessage;
-      } catch { return null; }
-    }),
-  ).then(msgs => msgs.filter((m): m is GmailMessage => m !== null));
-}
+const AI_SCAN_CLIENT_LIMIT = 16;
 
 export async function POST(req: NextRequest) {
   const deny = requireAdmin(req);
@@ -130,7 +50,7 @@ export async function POST(req: NextRequest) {
   // ── 1. Fetch all sessions from DB ──────────────────────────────────────────
   const { data: allSessions } = await supabase
     .from(CLIENT_SESSION_TABLE)
-    .select("id, client_email, client_name, invoice_status, contract_status, session_date, estimated_delivery_date");
+    .select("id, client_email, client_name, invoice_status, contract_status, current_status, session_date, estimated_delivery_date");
 
   const sessions = allSessions ?? [];
   const allEmails = new Set(sessions.map(s => (s.client_email as string).toLowerCase()));
@@ -246,8 +166,53 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // ── 4b. AI pass: read each active client's thread for missed milestones ────
+  // Heuristics above only match known subject patterns; the AI pass reads the
+  // actual conversation (client says "just Venmo'd you", signed PDF returned,
+  // gallery link sent, …) for clients whose timeline is still incomplete.
+  const oneYearAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString();
+  const { data: incompleteInquiries } = await supabase
+    .from("inquiries")
+    .select("email, name")
+    .or("reply_sent_at.is.null,invoice_sent_at.is.null,contract_sent_at.is.null,deposit_paid_at.is.null,gallery_delivered_at.is.null")
+    .gte("created_at", oneYearAgo)
+    .order("created_at", { ascending: false })
+    .limit(AI_SCAN_CLIENT_LIMIT * 2);
+
+  const scanTargets = new Map<string, { email: string; name: string | null }>();
+  for (const inq of incompleteInquiries ?? []) {
+    const email = (inq.email as string).toLowerCase();
+    if (!scanTargets.has(email)) scanTargets.set(email, { email, name: inq.name as string | null });
+    if (scanTargets.size >= AI_SCAN_CLIENT_LIMIT) break;
+  }
+
+  const galleryByEmail = new Map<string, string>();
+  const aiScanned = await scanMilestonesForClients(auth, [...scanTargets.values()]);
+
+  for (const [email, m] of aiScanned) {
+    const sent = sentByEmail.get(email) ?? { invoiceSentAt: null, contractSentAt: null };
+    if (m.invoiceSentAt && !sent.invoiceSentAt) sent.invoiceSentAt = m.invoiceSentAt;
+    if (m.contractSentAt && !sent.contractSentAt) sent.contractSentAt = m.contractSentAt;
+    sentByEmail.set(email, sent);
+
+    const firstReply = firstReplySentByEmail.get(email);
+    if (m.replySentAt && (!firstReply || m.replySentAt < firstReply)) {
+      firstReplySentByEmail.set(email, m.replySentAt);
+    }
+    if (m.depositPaidAt) {
+      paidEmails.add(email);
+      if (!paidAtByEmail.has(email)) paidAtByEmail.set(email, m.depositPaidAt);
+    }
+    if (m.contractSignedAt) {
+      signedEmails.add(email);
+      if (!signedAtByEmail.has(email)) signedAtByEmail.set(email, m.contractSignedAt);
+    }
+    if (m.galleryDeliveredAt) galleryByEmail.set(email, m.galleryDeliveredAt);
+  }
+
   // ── 5. Apply updates to client_sessions ───────────────────────────────────
   const updated: string[] = [];
+  const todayStr = new Date().toISOString().slice(0, 10);
 
   for (const session of sessions) {
     const email = (session.client_email as string).toLowerCase();
@@ -283,6 +248,21 @@ export async function POST(req: NextRequest) {
       parts.push("contract → signed");
     }
 
+    // Advance the 9-stage portal progress from detected milestones (never backward)
+    const nextStatus = computeAdvancedStatus(session.current_status as string, {
+      replySent: firstReplySentByEmail.has(email),
+      invoiceSent: !!sentInfo?.invoiceSentAt,
+      contractSent: !!sentInfo?.contractSentAt,
+      depositPaid: paidEmails.has(email),
+      contractSigned: signedEmails.has(email),
+      sessionDatePast: !!session.session_date && (session.session_date as string) < todayStr,
+      galleryDelivered: galleryByEmail.has(email),
+    });
+    if (nextStatus) {
+      sessionUpdates.current_status = nextStatus;
+      parts.push(`stage → ${nextStatus.replace(/_/g, " ")}`);
+    }
+
     // Auto-populate delivery date if session_date exists but delivery is unset
     if (session.session_date && !session.estimated_delivery_date) {
       const shoot = new Date(session.session_date as string);
@@ -305,6 +285,7 @@ export async function POST(req: NextRequest) {
     ...paidEmails,
     ...signedEmails,
     ...firstReplySentByEmail.keys(),
+    ...galleryByEmail.keys(),
   ])];
 
   let timelineUpdated = 0;
@@ -312,13 +293,13 @@ export async function POST(req: NextRequest) {
   if (allInquiryEmails.length) {
     const { data: inquiries } = await supabase
       .from("inquiries")
-      .select("id, email, reply_sent_at, invoice_sent_at, contract_sent_at, deposit_paid_at")
+      .select("id, email, reply_sent_at, invoice_sent_at, contract_sent_at, deposit_paid_at, gallery_delivered_at, booking_confirmed")
       .in("email", allInquiryEmails);
 
     for (const inq of inquiries ?? []) {
       const email = (inq.email as string).toLowerCase();
       const info = sentByEmail.get(email);
-      const inqUpdates: Record<string, string> = {};
+      const inqUpdates: Record<string, string | boolean> = {};
 
       if (firstReplySentByEmail.has(email) && !inq.reply_sent_at) {
         inqUpdates.reply_sent_at = firstReplySentByEmail.get(email)!;
@@ -328,6 +309,12 @@ export async function POST(req: NextRequest) {
       if (paidEmails.has(email) && !inq.deposit_paid_at) {
         inqUpdates.deposit_paid_at = paidAtByEmail.get(email) ?? new Date().toISOString();
       }
+      if (galleryByEmail.has(email) && !inq.gallery_delivered_at) {
+        inqUpdates.gallery_delivered_at = galleryByEmail.get(email)!;
+      }
+      if (paidEmails.has(email) && inq.booking_confirmed !== true) {
+        inqUpdates.booking_confirmed = true;
+      }
 
       if (Object.keys(inqUpdates).length) {
         await supabase.from("inquiries").update(inqUpdates).eq("id", inq.id);
@@ -336,12 +323,13 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  const scanPart = scanTargets.size > 0 ? ` (AI-scanned ${aiScanned.size}/${scanTargets.size} client thread${scanTargets.size !== 1 ? "s" : ""})` : "";
   const timelinePart = timelineUpdated > 0 ? ` + ${timelineUpdated} timeline field${timelineUpdated !== 1 ? "s" : ""} updated` : "";
   const message = updated.length
-    ? `Updated ${updated.length} client${updated.length !== 1 ? "s" : ""}: ${updated.join("; ")}${timelinePart}`
+    ? `Updated ${updated.length} client${updated.length !== 1 ? "s" : ""}: ${updated.join("; ")}${timelinePart}${scanPart}`
     : timelineUpdated > 0
-    ? `Timeline synced — ${timelineUpdated} inquiry timeline field${timelineUpdated !== 1 ? "s" : ""} updated from Gmail.`
-    : "Everything is already up to date — no new invoice, contract, payment, reply, or delivery date changes found.";
+    ? `Timeline synced — ${timelineUpdated} inquiry timeline field${timelineUpdated !== 1 ? "s" : ""} updated from Gmail${scanPart}.`
+    : `Everything is already up to date — no new invoice, contract, payment, reply, or delivery date changes found${scanPart}.`;
 
   return NextResponse.json({ updated, message });
 }
