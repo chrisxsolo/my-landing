@@ -137,7 +137,7 @@ export default function HomeHero({ slides }: { slides: HomepageHeroSlide[] }) {
       <div className={styles.overlay} />
       <div className={styles.content}>
         <p className={styles.brand}>SoloXSnaps Photography</p>
-        <h1>Bay Area Photographer</h1>
+        <h1>Bay Area Portrait Photographer</h1>
         <p className={styles.copy}>
           Bright, natural portraits with clear posing guidance for graduation, couples,
           families, and lifestyle sessions throughout San Francisco and the Bay Area.
