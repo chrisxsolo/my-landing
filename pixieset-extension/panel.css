@@ -109,6 +109,24 @@
 .sxs-field-label { color: #888; font-size: 11px; flex-shrink: 0; }
 .sxs-field-val   { color: #111; font-size: 12px; font-weight: 600; text-align: right; word-break: break-word; }
 
+.sxs-field-input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: #111;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  text-align: right;
+  padding: 2px 6px;
+  outline: none;
+  transition: border-color 0.12s, background 0.12s;
+}
+.sxs-field-input:hover  { border-color: #ddd; background: #fafafa; }
+.sxs-field-input:focus  { border-color: #26a69a; background: #fff; }
+
 .sxs-fill-btn {
   width: 100%;
   margin-top: 12px;
