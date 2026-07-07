@@ -184,14 +184,31 @@ function pickSpread(images: HomepageImage[], count: number) {
   });
 }
 
-function getHeroPosition(categorySlug: string) {
-  if (categorySlug === "families") {
-    return { objectPosition: "center 52%", mobileObjectPosition: "68% center" };
-  }
-  if (categorySlug === "couples") {
-    return { objectPosition: "center 64%", mobileObjectPosition: "center 58%" };
-  }
-  return { objectPosition: "center 64%", mobileObjectPosition: "center 56%" };
+// The wide desktop hero cover-crops portrait photos down to roughly the middle
+// 30-50% of their height, so the vertical object-position must track where the
+// subject's face is in each photo. These are hand-tuned focal points for the
+// current curated hero set, keyed by storage filename; images without an entry
+// fall back to the face-safe category defaults below.
+const HERO_FOCAL_POINTS: Record<string, string> = {
+  "squat.jpeg": "center 20%",
+  "stole-flutter.jpg": "center 44%",
+  "hand-on-head.jpg": "center 24%",
+  "1780764631805.jpg": "center 45%",
+  "1775961302745.jpg": "center 27%",
+  "1780775669251-6g2cef.jpg": "center 42%",
+};
+
+function getHeroPosition(image: HomepageImage) {
+  const defaults =
+    image.category_slug === "families"
+      ? { objectPosition: "center 35%", mobileObjectPosition: "68% center" }
+      : image.category_slug === "couples"
+        ? { objectPosition: "center 42%", mobileObjectPosition: "center 58%" }
+        : { objectPosition: "center 32%", mobileObjectPosition: "center 56%" };
+
+  const filename = image.image_url.split("/").pop() ?? "";
+  const focalPoint = HERO_FOCAL_POINTS[filename];
+  return focalPoint ? { ...defaults, objectPosition: focalPoint } : defaults;
 }
 
 function buildHomepageHeroSlides(
@@ -218,7 +235,7 @@ function buildHomepageHeroSlides(
 
   return fallbacks.map((image) => ({
     ...image,
-    ...getHeroPosition(image.category_slug),
+    ...getHeroPosition(image),
   }));
 }
 
