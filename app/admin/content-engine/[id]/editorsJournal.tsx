@@ -2,9 +2,10 @@
 // Journal editor (spec §7.4): title/slug/body/meta, photo picker (cover +
 // extras from analyzed photos), and the structured internal-links list
 // (payload.internal_links — rendered into "Keep exploring" at publish, §9.3).
+import { T } from "@/app/admin/adminTheme";
 import { internalLinksForService, isServiceType } from "@/lib/contentEngine/taxonomy";
 import { serviceConfigFor } from "@/lib/contentEngine/serviceConfig";
-import type { EditorProps } from "./editorsSimple";
+import { PhotoThumb, type EditorProps } from "./editorsSimple";
 import { input, label } from "./ui";
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
@@ -66,25 +67,47 @@ export function JournalEditor({ payload, photos, onEdit, disabled, serviceType }
       <div>
         <span style={label}>Photos (click to toggle; ◉ = cover, set below)</span>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          {candidates.map((p) => (
-            <button key={p.id} disabled={disabled} onClick={() => togglePhoto(p.id)}
-              style={{
-                ...input, width: "auto", cursor: "pointer",
-                opacity: photoIds.includes(p.id) ? 1 : 0.45,
-              }}>
-              {photoIds.includes(p.id) ? "✓ " : ""}{p.original_filename ?? p.id.slice(0, 8)}
-              {str(payload.cover_photo_id) === p.id ? " ◉" : ""}
-            </button>
-          ))}
+          {candidates.map((p) => {
+            const selected = photoIds.includes(p.id);
+            const isCover = str(payload.cover_photo_id) === p.id;
+            return (
+              <button key={p.id} disabled={disabled} onClick={() => togglePhoto(p.id)}
+                title={p.original_filename ?? p.id.slice(0, 8)}
+                style={{
+                  position: "relative", padding: 0, width: 84, height: 84,
+                  border: `2px solid ${selected ? T.green : T.border}`, borderRadius: 8,
+                  overflow: "hidden", cursor: disabled ? "default" : "pointer",
+                  background: T.inset, opacity: selected ? 1 : 0.45,
+                }}>
+                {p.thumbnailUrl && (
+                  // eslint-disable-next-line @next/next/no-img-element -- short-lived signed URL, next/image can't optimize it
+                  <img src={p.thumbnailUrl} alt={p.alt_text ?? p.original_filename ?? "session photo"}
+                    style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                )}
+                {(selected || isCover) && (
+                  <span style={{
+                    position: "absolute", top: 3, left: 3, padding: "0 5px",
+                    borderRadius: 6, fontSize: 11, lineHeight: "16px",
+                    background: "rgba(0,0,0,0.65)", color: "#fff",
+                  }}>
+                    {isCover ? "◉ cover" : "✓"}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
         <span style={label}>Cover photo</span>
-        <select style={input} disabled={disabled} value={str(payload.cover_photo_id)}
-          onChange={(e) => onEdit({ ...payload, cover_photo_id: e.target.value })}>
-          {photoIds.map((id) => {
-            const p = photos.find((x) => x.id === id);
-            return <option key={id} value={id}>{p?.original_filename ?? id.slice(0, 8)}</option>;
-          })}
-        </select>
+        <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+          <PhotoThumb photo={photos.find((x) => x.id === str(payload.cover_photo_id))} size={56} />
+          <select style={input} disabled={disabled} value={str(payload.cover_photo_id)}
+            onChange={(e) => onEdit({ ...payload, cover_photo_id: e.target.value })}>
+            {photoIds.map((id) => {
+              const p = photos.find((x) => x.id === id);
+              return <option key={id} value={id}>{p?.original_filename ?? id.slice(0, 8)}</option>;
+            })}
+          </select>
+        </div>
       </div>
 
       <div>

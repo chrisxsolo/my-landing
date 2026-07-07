@@ -3,6 +3,7 @@
 // Destination dropdowns use the canonical taxonomy so invalid slugs are
 // unrepresentable. Each editor renders controlled fields over the payload and
 // calls onEdit with the FULL next payload (autosave owns persistence).
+import { T } from "@/app/admin/adminTheme";
 import { PORTFOLIO_CATEGORIES, SCHOOL_SLUGS, GUIDE_TYPES, guideLocationKeys } from "@/lib/contentEngine/taxonomy";
 import type { EnginePhoto } from "@/app/admin/content-engine/engineTypes";
 import { input, label } from "./ui";
@@ -35,18 +36,34 @@ function Field({ name, value, onChange, disabled, multiline = false }: {
   );
 }
 
+// Thumbnail for the photo a payload references — thumbnailUrl is a short-lived
+// signed URL (photos GET route), same pattern as PhotosSection.
+export function PhotoThumb({ photo, size = 88 }: { photo: EnginePhoto | undefined; size?: number }) {
+  const box = { width: size, height: size, borderRadius: 8, flexShrink: 0 } as const;
+  if (!photo?.thumbnailUrl) return <div style={{ ...box, background: T.inset }} />;
+  return (
+    // eslint-disable-next-line @next/next/no-img-element -- short-lived signed URL, next/image can't optimize it
+    <img src={photo.thumbnailUrl} alt={photo.alt_text ?? photo.original_filename ?? "session photo"}
+      style={{ ...box, objectFit: "cover", display: "block", border: `1px solid ${T.border}` }} />
+  );
+}
+
 function PhotoSelect({ payload, photos, onEdit, disabled }: EditorProps) {
+  const selected = photos.find((p) => p.id === str(payload.session_photo_id));
   return (
     <div>
       <span style={label}>Photo</span>
-      <select style={input} disabled={disabled} value={str(payload.session_photo_id)}
-        onChange={(e) => onEdit({ ...payload, session_photo_id: e.target.value })}>
-        {photos.filter((p) => !p.excluded).map((p) => (
-          <option key={p.id} value={p.id}>
-            {p.original_filename ?? p.id.slice(0, 8)}{p.quality_score ? ` (q${p.quality_score})` : ""}
-          </option>
-        ))}
-      </select>
+      <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+        <PhotoThumb photo={selected} />
+        <select style={input} disabled={disabled} value={str(payload.session_photo_id)}
+          onChange={(e) => onEdit({ ...payload, session_photo_id: e.target.value })}>
+          {photos.filter((p) => !p.excluded).map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.original_filename ?? p.id.slice(0, 8)}{p.quality_score ? ` (q${p.quality_score})` : ""}
+            </option>
+          ))}
+        </select>
+      </div>
     </div>
   );
 }
