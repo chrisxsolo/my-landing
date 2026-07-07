@@ -33,31 +33,73 @@ function expandSchoolName(schoolText = "") {
   return key ? SCHOOL_FULL_NAMES[key] ?? schoolText : schoolText;
 }
 
-// ── PRICING (mirrors lib/pricing.ts) ─────────────────────────────────────────
+// ── PRICING (mirrors lib/pricingCatalog.ts) ──────────────────────────────────
 const GRAD_HOURLY_RATE = 350;
 const GROUP_RATES = { 2: 300, 3: 275, 4: 250, 5: 225 };
 const GROUP_RATE_6_PLUS = 200;
 const TRAVEL_FEES = {
   "sf-state": 0, "usf": 0, "sf-other": 0,
-  "uc-berkeley": 35, "csueb": 30, "sjsu": 75, "santa-clara": 70,
+  "uc-berkeley": 35, "csueb": 30, "sjsu": 75, "santa-clara": 70, "stanford": 45,
 };
 
+// Flat per-session rates for non-graduation services
+const SERVICE_FLAT_RATES = {
+  "family":          350, // Family Session (30 min)
+  "extended-family": 500, // Extended Family Session (60 min)
+  "couples":         450, // 1-Hour Couples Session
+  "engagement":      650,
+  "proposal":        750,
+};
+
+const SERVICE_LABELS = {
+  "family":          "Family Session",
+  "extended-family": "Extended Family Session",
+  "couples":         "Couples Session",
+  "engagement":      "Engagement Session",
+  "proposal":        "Proposal Session",
+  "graduation":      "Graduation Session",
+};
+
+function detectServiceType(inq) {
+  // Email-detected type wins if it's one we price
+  const fromEmail = String(inq._serviceType || "").toLowerCase();
+  if (SERVICE_FLAT_RATES[fromEmail] != null || fromEmail === "graduation") return fromEmail;
+
+  const t = `${inq.session_type || ""} ${inq.message || ""}`.toLowerCase().replace(/-/g, " ");
+  if (t.includes("proposal"))        return "proposal";
+  if (t.includes("engagement"))      return "engagement";
+  if (t.includes("couple") || t.includes("anniversary")) return "couples";
+  if (t.includes("extended family")) return "extended-family";
+  if (t.includes("family"))          return "family";
+  return "graduation";
+}
+
 function calcPrice(inquiry) {
-  const peopleRaw = inquiry.people || "1";
-  const people = parseInt(peopleRaw) || 1;
-  let sessionBase = people <= 1
-    ? GRAD_HOURLY_RATE
-    : (GROUP_RATES[people] ?? GROUP_RATE_6_PLUS) * people;
+  const service = detectServiceType(inquiry);
+  const people = parseInt(inquiry.people || "1") || 1;
+  let sessionBase, travelFee = null, schoolKey = null;
 
-  const schoolKey = detectSchoolKey(inquiry._school || inquiry.school || inquiry.message || "");
-  const travelFee = schoolKey != null && TRAVEL_FEES[schoolKey] != null
-    ? TRAVEL_FEES[schoolKey]
-    : null;
+  if (SERVICE_FLAT_RATES[service] != null) {
+    sessionBase = SERVICE_FLAT_RATES[service];
+  } else {
+    sessionBase = people <= 1
+      ? GRAD_HOURLY_RATE
+      : (GROUP_RATES[people] ?? GROUP_RATE_6_PLUS) * people;
+    schoolKey = detectSchoolKey(inquiry._school || inquiry.school || inquiry.message || "");
+    if (schoolKey != null && TRAVEL_FEES[schoolKey] != null) travelFee = TRAVEL_FEES[schoolKey];
+  }
 
+  // A price quoted/agreed in the email thread overrides the calculator
+  const agreed = Number.isFinite(inquiry._agreedTotal) ? inquiry._agreedTotal : null;
+  if (agreed != null) { sessionBase = agreed; travelFee = null; }
   const subtotal = sessionBase + (travelFee ?? 0);
   const deposit  = subtotal / 2;
 
-  return { sessionBase, travelFee, subtotal, deposit, remaining: subtotal - deposit, people, schoolKey };
+  return {
+    sessionBase, travelFee,
+    subtotal, deposit, remaining: subtotal - deposit,
+    people, schoolKey, service, priceFromEmail: agreed != null,
+  };
 }
 
 function fmt(n) { return `$${Number(n).toFixed(2)}`; }
@@ -182,7 +224,7 @@ async function renderDetail(inq) {
   detail.innerHTML = `
     <button id="sxs-back" style="margin-bottom:10px">← Back</button>
     <div class="sxs-section-title">${esc(inq.name)} · ${pageType.replace("-create", "")}</div>
-    <div id="sxs-date-status" style="font-size:11px;color:#888;margin-bottom:8px">${isCreatePage ? "" : "🔍 Checking Gmail for confirmed date…"}</div>
+    <div id="sxs-date-status" style="font-size:11px;color:#888;margin-bottom:8px">${isCreatePage ? "" : "🔍 Checking Gmail for confirmed details…"}</div>
     <div id="sxs-preview-rows"></div>
     <button id="sxs-fill" class="sxs-fill-btn" ${isCreatePage ? "" : "disabled"}>${btnLabel}</button>
     <div id="sxs-fill-status"></div>
@@ -194,6 +236,8 @@ async function renderDetail(inq) {
   let sessionDate   = inq.date_in_mind || "TBD";
   let sessionTime   = "TBD";
   let sessionSchool = inq.school || inq.message || "";
+  let serviceType   = null;
+  let agreedTotal   = null;
 
   if (isCreatePage) {
     const previewRows = document.getElementById("sxs-preview-rows");
@@ -210,19 +254,24 @@ async function renderDetail(inq) {
     });
     if (res.ok) {
       const d = await res.json();
-      if (d.readable) sessionDate   = d.readable;
-      if (d.time)     sessionTime   = d.time;
-      if (d.location) sessionSchool = d.location;
+      if (d.readable)     sessionDate   = d.readable;
+      if (d.time)         sessionTime   = d.time;
+      if (d.location)     sessionSchool = d.location;
+      if (d.session_type) serviceType   = d.session_type;
+      if (d.total_fee != null && Number.isFinite(Number(d.total_fee))) agreedTotal = Number(d.total_fee);
       const confidence = d.confidence === "high" ? "✓ Confirmed in email" : d.confidence === "medium" ? "~ Likely from email" : "~ From inquiry form";
+      const bits = [confidence];
+      if (serviceType)         bits.push(SERVICE_LABELS[serviceType] || serviceType);
+      if (agreedTotal != null) bits.push(`$${agreedTotal} agreed in email`);
       const src = document.getElementById("sxs-date-status");
-      if (src) src.textContent = confidence;
+      if (src) src.textContent = bits.join(" · ");
     }
   } catch {
     const src = document.getElementById("sxs-date-status");
     if (src) src.textContent = "Could not reach Gmail — using inquiry date";
   }
 
-  const enriched     = { ...inq, _sessionDate: sessionDate, _sessionTime: sessionTime, _school: sessionSchool };
+  const enriched     = { ...inq, _sessionDate: sessionDate, _sessionTime: sessionTime, _school: sessionSchool, _serviceType: serviceType, _agreedTotal: agreedTotal };
   const enrichedPrice = calcPrice(enriched); // recalc with detected school for travel fee
   const previewRows  = document.getElementById("sxs-preview-rows");
   if (previewRows) {
@@ -244,8 +293,9 @@ async function renderDetail(inq) {
 }
 
 function buildInvoicePreview(inq, price) {
+  const serviceLabel = SERVICE_LABELS[price.service] || "Photo Session";
   const rows = [
-    ["Session item", `Graduation Session (${inq.school || "Bay Area"})`],
+    ["Session item", `${serviceLabel} (${inq.school || "Bay Area"})`],
     ["Price", fmt(price.sessionBase)],
     ...(price.travelFee ? [["Travel Fee", fmt(price.travelFee)]] : []),
     ["Total", fmt(price.subtotal)],
@@ -318,7 +368,7 @@ function fillInvoice(inq, price) {
   let filled = 0;
 
   // Item name field (first line-item input)
-  filled += setInputByPlaceholder("Item name", `Graduation Session`);
+  filled += setInputByPlaceholder("Item name", SERVICE_LABELS[price.service] || "Photo Session");
   filled += setInputByPlaceholder("Item description", `${inq.school || "Bay Area"} · ${inq.date_in_mind || ""}`);
 
   // Price field — find inputs near a "$" label

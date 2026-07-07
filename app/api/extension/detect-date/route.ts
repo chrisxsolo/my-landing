@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
   const supabase = createSupabaseServerClient();
   const { data: inq } = await supabase
     .from("inquiries")
-    .select("name, email, date_in_mind, message")
+    .select("name, email, date_in_mind, message, session_type, school, people")
     .eq("id", inquiry_id)
     .single();
 
@@ -101,28 +101,34 @@ export async function POST(req: NextRequest) {
     const anthropic = new Anthropic();
     const res = await anthropic.messages.create({
       model: "claude-haiku-4-5",
-      max_tokens: 350,
+      max_tokens: 400,
       system: `You extract confirmed photography session details from email conversations. Today is ${today}. Current year is ${currentYear}.
 
 Extract:
 1. Date: the most recently confirmed/agreed session date
 2. Time: confirmed session time (e.g. "10:00 AM", "6:30 PM", "golden hour"). null if not mentioned.
 3. Location: the school or specific location mentioned (e.g. "UC Berkeley", "SJSU", "San Jose State", "SF State", "USF", "Cal", "East Bay"). Return the raw name as mentioned. null if not found.
+4. Session type: one of "graduation", "family", "extended-family", "couples", "engagement", "proposal", "event", "other" — based on the inquiry and emails. null if unclear.
+5. Total fee: the most recently quoted or agreed TOTAL price for the session in dollars, as a plain number (e.g. 350). Include travel fees if they were part of the quoted total. Prefer the photographer's most recent quote or an amount the client agreed to. null if no price was discussed.
 
 Rules:
 - Confirmation language: "works great", "sounds good", "perfect", "see you then", "confirmed"
 - If month+day given without year, use ${currentYear}. Only use ${currentYear + 1} if date has already passed.
+- Do NOT invent a price — only extract amounts actually written in the emails.
 
 Respond ONLY with valid JSON:
-{"date":"YYYY-MM-DD","readable":"e.g. Saturday, May 31, 2026","time":"e.g. 10:00 AM","location":"e.g. UC Berkeley","confidence":"high|medium|low"}
-If no date found: {"date":null,"readable":null,"time":null,"location":null,"confidence":"low"}`,
-      messages: [{ role: "user", content: `Client: ${inq.name}\nOriginal request: ${inq.date_in_mind ?? "not specified"}\n\nEmail thread:\n${emailContext}` }],
+{"date":"YYYY-MM-DD","readable":"e.g. Saturday, May 31, 2026","time":"e.g. 10:00 AM","location":"e.g. UC Berkeley","session_type":"family","total_fee":350,"confidence":"high|medium|low"}
+Use null for any field not found, e.g. {"date":null,"readable":null,"time":null,"location":null,"session_type":null,"total_fee":null,"confidence":"low"}`,
+      messages: [{ role: "user", content: `Client: ${inq.name}\nInquiry session type: ${inq.session_type ?? "not specified"}\nSchool: ${inq.school ?? "not specified"}\nGroup size: ${inq.people ?? "not specified"}\nOriginal request: ${inq.date_in_mind ?? "not specified"}\nInquiry message: ${inq.message ?? ""}\n\nEmail thread:\n${emailContext}` }],
     });
 
     try {
       const raw = res.content[0].type === "text" ? res.content[0].text : "{}";
-      const result = JSON.parse(extractJson(raw)) as { date: string | null; readable: string | null; time: string | null; location: string | null; confidence: string };
-      if (result.date) {
+      const result = JSON.parse(extractJson(raw)) as {
+        date: string | null; readable: string | null; time: string | null; location: string | null;
+        session_type: string | null; total_fee: number | null; confidence: string;
+      };
+      if (result.date || result.total_fee != null || result.session_type) {
         return NextResponse.json({ ...result, source: "email" }, { headers: CORS });
       }
     } catch { /* fall through */ }
@@ -134,10 +140,12 @@ If no date found: {"date":null,"readable":null,"time":null,"location":null,"conf
       date: null,
       readable: inq.date_in_mind,
       time: null,
+      session_type: inq.session_type ?? null,
+      total_fee: null,
       confidence: "low",
       source: "inquiry",
     }, { headers: CORS });
   }
 
-  return NextResponse.json({ date: null, readable: null, time: null, confidence: "low", source: "none" }, { headers: CORS });
+  return NextResponse.json({ date: null, readable: null, time: null, session_type: inq.session_type ?? null, total_fee: null, confidence: "low", source: "none" }, { headers: CORS });
 }
