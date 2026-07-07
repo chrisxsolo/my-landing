@@ -175,8 +175,11 @@ describe("generateContentType (spec §8.2)", () => {
   it("guide_photo: empty placements complete with zero items; non-guide service is skipped", async () => {
     const famSession = await createTestSession({ service_type: "families" });
     await analyzedPhoto(famSession);
-    // Pass service_type in facts so the snapshot reflects it
-    const famPkg = await createPackage(famSession, ["guide_photo"], { service_type: "families" });
+    // Pass service_type in facts so the snapshot reflects it; a location is
+    // required (guide generation pre-checks it and skips without one)
+    const famPkg = await createPackage(famSession, ["guide_photo"], {
+      service_type: "families", primary_location: "Golden Gate Park",
+    });
     const empty = await generateContentType({
       client: service, packageId: famPkg, contentType: "guide_photo",
       callModel: fakeModel(JSON.stringify({ placements: [] })),

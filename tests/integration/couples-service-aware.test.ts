@@ -129,6 +129,61 @@ describe("couples generation routing", () => {
     expect(kw).not.toContain("graduation");
   });
 
+  it("guide photo: a couples session generates a couples guide draft (with caption) instead of skipping", async () => {
+    const sessionId = await createTestSession({ service_type: "couples", school_slug: null });
+    const photo = await storedAnalyzedPhoto(sessionId, {
+      alt_text: "Couple walking Lovers Lane", title: "Lovers' Lane",
+      description: "Soft light under the eucalyptus", tags: ["couples"], suggested_category: "couples",
+    });
+    const pkg = await createPackage(sessionId, ["guide_photo"], {
+      ...couplesFacts, primary_location: "Lovers' Lane, Presidio",
+    });
+    const calls: ModelCallRequest[] = [];
+    const result = await generateContentType({
+      client: service, packageId: pkg, contentType: "guide_photo",
+      callModel: capturingModel(JSON.stringify({
+        placements: [{
+          session_photo_id: photo.id, guide: "couples", location_key: "lovers-lane",
+          alt_text: "Couple holding hands on Lovers Lane in the Presidio",
+          caption: "Late-afternoon light filters through the eucalyptus here — an easy walking path for relaxed, in-motion frames.",
+        }],
+      }), calls),
+    });
+    expect(result.outcome).toBe("completed");
+    expect(result.itemIds).toHaveLength(1);
+    expect(systemOf(calls[0])).toContain("COUPLES photography session");
+    expect(JSON.stringify(calls[0].messages)).toContain("lovers-lane");
+
+    const { data: items } = await service.from("session_content_items")
+      .select("payload,status").eq("package_id", pkg).eq("content_type", "guide_photo");
+    expect(items![0].status).toBe("draft");
+    expect(items![0].payload.guide).toBe("couples");
+    expect(items![0].payload.location_key).toBe("lovers-lane");
+    expect(items![0].payload.caption).toContain("eucalyptus");
+  });
+
+  it("guide photo: skips for a grads snapshot and for a couples snapshot without a location", async () => {
+    const gradId = await createTestSession();
+    const gradPkg = await createPackage(gradId, ["guide_photo"], {
+      service_type: "grads", school_slug: "sjsu", primary_location: "Tower Lawn",
+    });
+    const gradResult = await generateContentType({
+      client: service, packageId: gradPkg, contentType: "guide_photo",
+      callModel: capturingModel("{}", []),
+    });
+    expect(gradResult.outcome).toBe("skipped");
+
+    const noLocId = await createTestSession({ service_type: "couples", school_slug: null });
+    const noLocPkg = await createPackage(noLocId, ["guide_photo"], {
+      ...couplesFacts, primary_location: null,
+    });
+    const noLocResult = await generateContentType({
+      client: service, packageId: noLocPkg, contentType: "guide_photo",
+      callModel: capturingModel("{}", []),
+    });
+    expect(noLocResult.outcome).toBe("skipped");
+  });
+
   it("grads regression: journal keywords keep the pre-service-aware format and prompt has no couples block", async () => {
     const sessionId = await createTestSession();
     const photo = await storedAnalyzedPhoto(sessionId, {

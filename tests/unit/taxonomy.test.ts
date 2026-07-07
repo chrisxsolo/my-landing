@@ -8,7 +8,7 @@ import {
   isServiceType, isSchoolSlug, isPortfolioCategory, isLightingCondition,
   isVibe, isRelationshipType,
   isContentType, isGuideType, isGuideLocationKey, isCanonicalInternalLink,
-  guideLocationKeys,
+  guideLocationKeys, normalizeServiceType, guideTypeForService,
 } from "@/lib/contentEngine/taxonomy";
 
 describe("taxonomy constants", () => {
@@ -66,6 +66,48 @@ describe("taxonomy validators", () => {
     expect(isGuideLocationKey("family", "not-a-real-location")).toBe(false);
     // a couples-only location must not validate under family
     expect(isGuideLocationKey("couples", "legion-of-honor")).toBe(true);
+  });
+});
+
+describe("normalizeServiceType (tolerant singular/plural/case, 2026-07-07)", () => {
+  it("passes canonical values through and fixes case", () => {
+    for (const s of SERVICE_TYPES) expect(normalizeServiceType(s)).toBe(s);
+    expect(normalizeServiceType("Couples")).toBe("couples");
+    expect(normalizeServiceType(" GRADS ")).toBe("grads");
+  });
+
+  it("maps singular/plural and embedded variants onto the canonical value", () => {
+    expect(normalizeServiceType("couple")).toBe("couples");
+    expect(normalizeServiceType("couples session")).toBe("couples");
+    expect(normalizeServiceType("engagement")).toBe("couples");
+    expect(normalizeServiceType("family")).toBe("families");
+    expect(normalizeServiceType("Family mini")).toBe("families");
+    expect(normalizeServiceType("Graduation Session")).toBe("grads");
+    expect(normalizeServiceType("Senior portraits")).toBe("portraits");
+  });
+
+  it("returns null for unknown values, blanks, and non-strings", () => {
+    expect(normalizeServiceType("weddings")).toBeNull();
+    expect(normalizeServiceType("")).toBeNull();
+    expect(normalizeServiceType(null)).toBeNull();
+    expect(normalizeServiceType(42)).toBeNull();
+  });
+});
+
+describe("guideTypeForService (single source of guide-destination truth)", () => {
+  it("couples variants resolve to the couples guide; families to family", () => {
+    for (const v of ["couples", "couple", "Couples", "couples session", "engagement"]) {
+      expect(guideTypeForService(v)).toBe("couples");
+    }
+    for (const v of ["families", "family", "Family mini"]) {
+      expect(guideTypeForService(v)).toBe("family");
+    }
+  });
+
+  it("every other service type has no guide destination", () => {
+    for (const v of ["grads", "portraits", "maternity", "prom", "events", "other", "weddings", null]) {
+      expect(guideTypeForService(v)).toBeNull();
+    }
   });
 });
 

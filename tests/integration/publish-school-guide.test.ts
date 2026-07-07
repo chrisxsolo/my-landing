@@ -33,6 +33,42 @@ describe("school, guide, and testimonial publishers", () => {
     expect(count).toBe(1);
   });
 
+  it("couples guide_photo publishes into couples_location_photos with its caption", async () => {
+    const sessionId = await createTestSession({ service_type: "couples", school_slug: null });
+    const photo = await createTestPhoto(sessionId);
+    const pkg = await createPackage(sessionId, ["guide_photo"], { service_type: "couples" });
+    const item = await createItem(pkg, "guide_photo", {
+      session_photo_id: photo.id, guide: "couples", location_key: "lovers-lane",
+      alt_text: "Couple on Lovers Lane",
+      caption: "Soft light under the eucalyptus — easy walking frames.",
+    });
+    const result = await publish(item);
+    expect(result.error).toBeNull();
+    expect((result.data as { target_type: string }).target_type).toBe("couples_location_photo");
+
+    const { data: row } = await service.from("couples_location_photos")
+      .select("location_slug,alt_text,caption,published")
+      .eq("image_url", photo.public_derivative_url!).single();
+    expect(row!.location_slug).toBe("lovers-lane");
+    expect(row!.caption).toBe("Soft light under the eucalyptus — easy walking frames.");
+    expect(row!.published).toBe(true);
+  });
+
+  it("guide_photo without a caption (pre-caption payload) publishes with caption null", async () => {
+    const sessionId = await createTestSession({ service_type: "couples", school_slug: null });
+    const photo = await createTestPhoto(sessionId);
+    const pkg = await createPackage(sessionId, ["guide_photo"], { service_type: "couples" });
+    const item = await createItem(pkg, "guide_photo", {
+      session_photo_id: photo.id, guide: "couples", location_key: "crissy-field",
+      alt_text: "Couple at Crissy Field",
+    });
+    expect((await publish(item)).error).toBeNull();
+
+    const { data: row } = await service.from("couples_location_photos")
+      .select("caption").eq("image_url", photo.public_derivative_url!).single();
+    expect(row!.caption).toBeNull();
+  });
+
   it("testimonial_feature links the testimonial to the session", async () => {
     const sessionId = await createTestSession();
     const { data: t } = await service.from("testimonials").insert({

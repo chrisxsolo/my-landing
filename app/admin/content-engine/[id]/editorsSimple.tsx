@@ -117,6 +117,8 @@ export function GuideEditor(props: EditorProps) {
       </div>
       <Field name="Alt text" value={str(payload.alt_text)} disabled={disabled}
         onChange={(v) => onEdit({ ...payload, alt_text: v })} />
+      <Field name="Caption (shown on the guide page)" value={str(payload.caption)} disabled={disabled}
+        onChange={(v) => onEdit({ ...payload, caption: v })} />
     </div>
   );
 }

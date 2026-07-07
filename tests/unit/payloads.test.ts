@@ -68,6 +68,22 @@ describe("destination-validated payloads", () => {
     }).success).toBe(false);
   });
 
+  it("guide_photo carries an optional caption, defaulting to empty (pre-caption items still validate)", () => {
+    const withCaption = validatePayload("guide_photo", {
+      session_photo_id: UUID, guide: "couples", location_key: "legion-of-honor",
+      alt_text: "a", caption: "Golden hour side-light along the colonnade.",
+    });
+    expect(withCaption.success).toBe(true);
+    if (withCaption.success) {
+      expect((withCaption.data as { caption: string }).caption).toBe("Golden hour side-light along the colonnade.");
+    }
+    const legacy = validatePayload("guide_photo", {
+      session_photo_id: UUID, guide: "couples", location_key: "legion-of-honor", alt_text: "a",
+    });
+    expect(legacy.success).toBe(true);
+    if (legacy.success) expect((legacy.data as { caption: string }).caption).toBe("");
+  });
+
   it("testimonial_feature and internal_link_suggestion validate", () => {
     expect(validatePayload("testimonial_feature", { testimonial_id: UUID, quote_excerpt: "easy and fun" }).success).toBe(true);
     expect(validatePayload("internal_link_suggestion", {
@@ -167,5 +183,13 @@ describe("buildSessionFactsSnapshot", () => {
 
   it("rejects an out-of-taxonomy vibe (closed list)", () => {
     expect(() => buildSessionFactsSnapshot({ service_type: "couples", vibe: "sparkly" })).toThrow();
+  });
+
+  it("normalizes near-miss service types so a snapshot can never carry them", () => {
+    expect(buildSessionFactsSnapshot({ service_type: "couple" }).service_type).toBe("couples");
+    expect(buildSessionFactsSnapshot({ service_type: "Couples" }).service_type).toBe("couples");
+    expect(buildSessionFactsSnapshot({ service_type: "family" }).service_type).toBe("families");
+    // genuinely unknown values still throw (never silently reach AI input)
+    expect(() => buildSessionFactsSnapshot({ service_type: "weddings" })).toThrow();
   });
 });

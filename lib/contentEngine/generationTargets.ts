@@ -13,7 +13,7 @@ import {
 } from "@/lib/contentEngine/prompts";
 import { validatePayload, type SessionFactsSnapshot } from "@/lib/contentEngine/payloads";
 import { generateMetaKeywords } from "@/lib/contentEngine/serviceKeywords";
-import { isSchoolSlug, type GuideType } from "@/lib/contentEngine/taxonomy";
+import { guideTypeForService, isSchoolSlug } from "@/lib/contentEngine/taxonomy";
 import { downloadOriginal, encodeBatchUnderCap, toImageBlock } from "@/lib/contentEngine/modelImages";
 
 export class GenerationError extends Error {
@@ -254,12 +254,18 @@ async function schoolTarget(ctx: TargetContext): Promise<TargetResult> {
 }
 
 async function guideTarget(ctx: TargetContext): Promise<TargetResult> {
-  const guide: GuideType | null =
-    ctx.facts.service_type === "couples" ? "couples"
-    : ctx.facts.service_type === "families" ? "family"
-    : null;
+  const guide = guideTypeForService(ctx.facts.service_type);
   if (!guide) {
-    return { outcome: "skipped", itemSpecs: [], usage: null, note: "service type has no guide" };
+    return {
+      outcome: "skipped", itemSpecs: [], usage: null,
+      note: "no guide page is configured for this service type",
+    };
+  }
+  if (!ctx.facts.primary_location?.trim()) {
+    return {
+      outcome: "skipped", itemSpecs: [], usage: null,
+      note: `add a location before generating a ${guide} guide entry`,
+    };
   }
   const photos = await loadPhotoSummaries(ctx.client, ctx.sessionId);
   if (photos.length === 0) throw new GenerationError("no analyzed photos for this session");

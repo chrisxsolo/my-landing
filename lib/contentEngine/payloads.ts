@@ -4,8 +4,8 @@
 import { z } from "zod";
 import {
   isSchoolSlug, isPortfolioCategory, isCanonicalInternalLink,
-  isGuideLocationKey, GUIDE_TYPES, SERVICE_TYPES, LIGHTING_CONDITIONS,
-  VIBES, RELATIONSHIP_TYPES,
+  isGuideLocationKey, normalizeServiceType, GUIDE_TYPES, SERVICE_TYPES,
+  LIGHTING_CONDITIONS, VIBES, RELATIONSHIP_TYPES,
   type ContentType,
 } from "@/lib/contentEngine/taxonomy";
 
@@ -56,6 +56,7 @@ export const guidePhotoPayloadSchema = z.object({
   guide: z.enum(GUIDE_TYPES),
   location_key: z.string(),
   alt_text: z.string().default(""),
+  caption: z.string().default(""),
 }).refine((p) => isGuideLocationKey(p.guide, p.location_key), {
   message: "location_key is not valid for this guide",
   path: ["location_key"],
@@ -144,7 +145,10 @@ export type SessionFactsSnapshot = z.infer<typeof sessionFactsSnapshotSchema>;
 export function buildSessionFactsSnapshot(session: Record<string, unknown>): SessionFactsSnapshot {
   return sessionFactsSnapshotSchema.parse({
     public_display_name: session.public_display_name ?? null,
-    service_type: session.service_type,
+    // Tolerant of singular/plural/case variants ("couple", "Couples session")
+    // so a snapshot can never carry a near-miss value; genuinely unknown
+    // values still fail the enum parse below.
+    service_type: normalizeServiceType(session.service_type) ?? session.service_type,
     school_slug: session.school_slug ?? null,
     primary_location: session.primary_location ?? null,
     secondary_locations: session.secondary_locations ?? [],

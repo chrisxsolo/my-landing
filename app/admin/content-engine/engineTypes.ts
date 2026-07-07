@@ -69,6 +69,12 @@ export interface EnginePackage {
   status: "generating" | "ready" | "needs_attention" | "failed" | "archived";
   model_name: string;
   prompt_version: string;
+  // Facts frozen at package creation (spec §8.3) — generation reads THESE, not
+  // the live session row, so the UI compares the two to explain skips.
+  session_facts_snapshot?: {
+    service_type?: string;
+    primary_location?: string | null;
+  } & Record<string, unknown>;
   generation_settings: {
     selected_types?: string[];
     progress?: Record<string, {

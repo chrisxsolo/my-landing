@@ -6,7 +6,7 @@
 // Facts updates reject any value outside the canonical taxonomy (spec §8.5).
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
-  isServiceType, isSchoolSlug, isLightingCondition, isVibe, isRelationshipType,
+  normalizeServiceType, isSchoolSlug, isLightingCondition, isVibe, isRelationshipType,
 } from "@/lib/contentEngine/taxonomy";
 import { sessionTypeToServiceType, firstNameOf } from "@/lib/contentEngine/prefill";
 
@@ -58,11 +58,12 @@ export async function createPhotographySession(args: CreateSessionArgs): Promise
     return { sessionId: data.id as string };
   }
 
-  if (!input.serviceType || !isServiceType(input.serviceType)) {
+  const serviceType = normalizeServiceType(input.serviceType);
+  if (!serviceType) {
     throw new Error(`invalid service type: ${input.serviceType ?? "(missing)"}`);
   }
   const { data, error } = await client.from("photography_sessions")
-    .insert({ service_type: input.serviceType }).select("id").single();
+    .insert({ service_type: serviceType }).select("id").single();
   if (error) throw new Error(`could not create photography session: ${error.message}`);
   return { sessionId: data.id as string };
 }
@@ -85,8 +86,11 @@ export async function updateSessionFacts(args: UpdateFactsArgs): Promise<{ updat
   const patch: Record<string, unknown> = {};
 
   if ("service_type" in facts) {
-    if (!isServiceType(facts.service_type)) throw new Error(`invalid service type: ${String(facts.service_type)}`);
-    patch.service_type = facts.service_type;
+    // Tolerant of singular/plural/case variants ("couple" → "couples") so a
+    // near-miss can never be stored and later break guide resolution.
+    const normalized = normalizeServiceType(facts.service_type);
+    if (!normalized) throw new Error(`invalid service type: ${String(facts.service_type)}`);
+    patch.service_type = normalized;
   }
   if ("school_slug" in facts) {
     if (facts.school_slug !== null && !isSchoolSlug(facts.school_slug)) {

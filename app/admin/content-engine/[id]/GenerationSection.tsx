@@ -6,6 +6,7 @@
 import { useCallback, useState } from "react";
 import { T } from "@/app/admin/adminTheme";
 import { engineApi } from "@/app/admin/content-engine/engineApi";
+import { guideTypeForService } from "@/lib/contentEngine/taxonomy";
 import {
   GENERATION_ORDER, CONTENT_TYPE_LABELS,
   type EngineItem, type EnginePackage, type EnginePhoto,
@@ -22,14 +23,42 @@ interface Props {
   onChanged: () => void;
 }
 
-// Explains a "skipped" type so the bare chip isn't a mystery. The generation
-// targets only skip for two reasons (see generationTargets.ts): a guide type
-// whose service has no guide page, or a school photo with no school set. Facts
-// live in the package SNAPSHOT, so the school remedy is set-then-Regenerate.
-function skipReason(type: string, serviceType: string, schoolSlug: string | null): string | null {
-  if (type === "guide_photo") {
-    return `Guides exist only for couples & families — a ${serviceType || "this"} session has no guide page, so there's nothing to publish here.`;
+// Generation reads the package SNAPSHOT, not the live session row, so guide
+// messaging compares the two: a couples session whose package predates the
+// service-type fix must Regenerate (the snapshot is what skipped, not the
+// session). Mirrors the skip conditions in generationTargets.ts.
+function guideStatusNote(
+  status: string, serviceType: string, snapshot: EnginePackage["session_facts_snapshot"],
+): string | null {
+  const currentGuide = guideTypeForService(serviceType);
+  const snapshotGuide = guideTypeForService(snapshot?.service_type);
+  if (!currentGuide && !snapshotGuide) {
+    return status === "skipped" ? "No guide page is configured for this session type yet." : null;
   }
+  if (currentGuide && !snapshotGuide) {
+    return `This package was created while the session type was "${snapshot?.service_type || "unset"}" — ` +
+      `Regenerate to include the ${currentGuide} guide step.`;
+  }
+  const guide = snapshotGuide ?? currentGuide!;
+  if (!snapshot?.primary_location?.trim()) {
+    return status === "skipped"
+      ? `Add a location in Session facts, then Regenerate to generate a ${guide} guide entry.`
+      : `Add a location before generating a ${guide} guide entry (set it in Session facts, then Regenerate).`;
+  }
+  if (status === "skipped") {
+    return `No ${guide} guide location matched this session, so there was nothing to place.`;
+  }
+  return `${guide === "couples" ? "Couples" : "Family"} guide entry ready to generate.`;
+}
+
+// Explains skipped/pending chips so they aren't a mystery. Facts live in the
+// package SNAPSHOT, so most remedies are set-then-Regenerate.
+function statusNote(
+  type: string, status: string, serviceType: string, schoolSlug: string | null,
+  snapshot: EnginePackage["session_facts_snapshot"],
+): string | null {
+  if (type === "guide_photo") return guideStatusNote(status, serviceType, snapshot);
+  if (status !== "skipped") return null;
   if (type === "school_page_photo" && !schoolSlug) {
     return "No school set on this session. Choose a school in Session facts above, then Regenerate to include school-page photos.";
   }
@@ -163,7 +192,9 @@ export default function GenerationSection({
               const entry = progress[type];
               const status = entry?.status ?? "pending";
               const color = status === "failed" ? T.red : status === "completed" ? T.ink : T.inkSoft;
-              const reason = status === "skipped" ? skipReason(type, serviceType, schoolSlug) : null;
+              const reason = status === "skipped" || status === "pending"
+                ? statusNote(type, status, serviceType, schoolSlug, activePackage.session_facts_snapshot)
+                : null;
               return (
                 <div key={type} style={{ display: "grid", gap: 2 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13 }}>

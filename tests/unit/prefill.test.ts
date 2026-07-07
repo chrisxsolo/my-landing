@@ -6,6 +6,7 @@ describe("prefill mapping (spec §7.2)", () => {
     expect(sessionTypeToServiceType("Graduation Session")).toBe("grads");
     expect(sessionTypeToServiceType("grad photos")).toBe("grads");
     expect(sessionTypeToServiceType("Couples Golden Hour")).toBe("couples");
+    expect(sessionTypeToServiceType("couple")).toBe("couples");
     expect(sessionTypeToServiceType("engagement")).toBe("couples");
     expect(sessionTypeToServiceType("Family mini")).toBe("families");
     expect(sessionTypeToServiceType("Maternity")).toBe("maternity");

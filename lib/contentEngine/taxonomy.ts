@@ -115,6 +115,44 @@ const has = <T extends string>(arr: readonly T[]) => {
   return (v: unknown): v is T => typeof v === "string" && set.has(v);
 };
 
+// Tolerant free-text → canonical service type. Exact enum values pass through;
+// anything else is pattern-matched so singular/plural/case variants ("couple",
+// "Couples", "couples session", "engagement") land on the canonical value
+// instead of silently falling out of the taxonomy. Order matters: first match
+// wins (mirrors the original prefill mapping).
+const SERVICE_TYPE_PATTERNS: [RegExp, ServiceType][] = [
+  [/grad/i, "grads"],
+  [/couple|engagement/i, "couples"],
+  [/famil/i, "families"],
+  [/maternity/i, "maternity"],
+  [/prom/i, "prom"],
+  [/portrait|senior/i, "portraits"],
+  [/event/i, "events"],
+];
+
+export function normalizeServiceType(raw: unknown): ServiceType | null {
+  if (typeof raw !== "string") return null;
+  const value = raw.trim();
+  if (!value) return null;
+  const lower = value.toLowerCase();
+  if ((SERVICE_TYPES as readonly string[]).includes(lower)) return lower as ServiceType;
+  for (const [pattern, service] of SERVICE_TYPE_PATTERNS) {
+    if (pattern.test(value)) return service;
+  }
+  return null;
+}
+
+// Which guide page (if any) a service type publishes to. This is the single
+// source of truth for "does this session have a guide destination" — the
+// generation target and the admin UI both resolve through it, tolerant of
+// singular/plural mismatches via normalizeServiceType.
+export function guideTypeForService(serviceType: unknown): GuideType | null {
+  const normalized = normalizeServiceType(serviceType);
+  if (normalized === "couples") return "couples";
+  if (normalized === "families") return "family";
+  return null;
+}
+
 export const isServiceType = has(SERVICE_TYPES);
 export const isVibe = has(VIBES);
 export const isRelationshipType = has(RELATIONSHIP_TYPES);

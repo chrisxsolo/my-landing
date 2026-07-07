@@ -10,7 +10,7 @@ import {
 } from "@/lib/contentEngine/taxonomy";
 import { serviceConfigFor } from "@/lib/contentEngine/serviceConfig";
 
-export const PROMPT_VERSION = "2026-07-02.1";
+export const PROMPT_VERSION = "2026-07-07.1";
 
 export interface BuiltPrompt {
   system: string;
@@ -134,7 +134,11 @@ export function buildGuidePhotoPrompt(
     system:
       `${brandFor(facts)} You place photos on location-guide pages. Return ONLY JSON: ` +
       "{\"placements\":[{\"session_photo_id\":uuid,\"guide\":\"" + guide + "\"," +
-      "\"location_key\":\"<one of the allowed keys>\",\"alt_text\":\"<=300\"}]}. " +
+      "\"location_key\":\"<one of the allowed keys>\",\"alt_text\":\"<=300\"," +
+      "\"caption\":\"<=300\"}]}. The caption is shown under the photo on the public " +
+      "guide page: one or two warm sentences drawn from this photo's analysis — the " +
+      "light, the setting, the moment — useful to someone planning a session at this " +
+      "location. Never generic filler. " +
       "If no allowed location matches the session, return {\"placements\":[]}.",
     userText:
       `${factsBlock(facts)}\n\nAllowed location keys for the ${guide} guide ` +

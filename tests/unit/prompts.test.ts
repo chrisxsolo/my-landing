@@ -56,6 +56,19 @@ describe("prompt construction (spec §8.3)", () => {
     expect(p.userText).not.toContain("legion-of-honor"); // couples-only key
   });
 
+  it("guide prompt asks for a public-facing caption drawn from the photo analysis", () => {
+    const p = buildGuidePhotoPrompt({ ...facts, service_type: "families" }, photoSummaries, "family");
+    expect(p.system).toContain("\"caption\"");
+    expect(p.system.toLowerCase()).toContain("guide page");
+  });
+
+  it("couples guide prompt carries the couples location keys and couples voice guidance", () => {
+    const couples = { ...facts, service_type: "couples" as const, school_slug: null };
+    const p = buildGuidePhotoPrompt(couples, photoSummaries, "couples");
+    for (const key of guideLocationKeys("couples")) expect(p.userText).toContain(key);
+    expect(p.system).toContain("COUPLES photography session");
+  });
+
   it("portfolio + school prompts include photo summaries with their ids", () => {
     const p1 = buildPortfolioPickPrompt(facts, photoSummaries);
     const p2 = buildSchoolPagePhotoPrompt(facts, photoSummaries, "sjsu");
