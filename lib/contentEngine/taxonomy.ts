@@ -76,8 +76,9 @@ export function guideLocationKeys(guide: GuideType): string[] {
 }
 
 // Closed canonical internal-link list fed to the journal generator (spec §8.3):
-// every school page, both guide hubs, and the pricing page. Output links are
-// validated against this list — anything else is a validation failure.
+// every school page, both guide hubs, the pricing hub, and the per-service
+// pricing pages (matching app/(professional)/pricing/* directories). Output
+// links are validated against this list — anything else is a validation failure.
 export const CANONICAL_INTERNAL_LINKS: readonly string[] = [
   ...SCHOOL_SLUGS.map((s) => `/grads/${s}`),
   "/family-guide",
@@ -85,18 +86,29 @@ export const CANONICAL_INTERNAL_LINKS: readonly string[] = [
   ...FAMILY_LOCATION_KEYS.map((k) => `/family-guide/locations/${k}`),
   ...COUPLES_LOCATION_KEYS.map((k) => `/couples-guide/locations/${k}`),
   "/pricing",
+  "/pricing/grads",
+  "/pricing/couples",
+  "/pricing/families",
+  "/pricing/events",
 ];
 
-// Service-scoped subset of CANONICAL_INTERNAL_LINKS (spec §8.3): grads keeps
-// the full list (unchanged behavior); couples/families see only their own
-// guide cluster + pricing so the generator never suggests grad/campus pages
-// for a non-grad session. Everything stays inside the closed canonical list.
+// Service-scoped subset of CANONICAL_INTERNAL_LINKS (spec §8.3): each service
+// sees only its own cluster + its own pricing page, so the generator can never
+// suggest grad/campus pages for a couples session (or couples pricing for a
+// grad). Everything stays inside the closed canonical list.
 export function internalLinksForService(serviceType: ServiceType): readonly string[] {
-  if (serviceType === "grads") return CANONICAL_INTERNAL_LINKS;
+  if (serviceType === "grads") {
+    // The pre-service-aware full list, plus grad pricing — every other
+    // service's pricing page is filtered out.
+    return CANONICAL_INTERNAL_LINKS.filter(
+      (l) => !l.startsWith("/pricing/") || l === "/pricing/grads",
+    );
+  }
   if (serviceType === "couples") {
     return [
       "/couples-guide",
       ...COUPLES_LOCATION_KEYS.map((k) => `/couples-guide/locations/${k}`),
+      "/pricing/couples",
       "/pricing",
     ];
   }
@@ -104,8 +116,12 @@ export function internalLinksForService(serviceType: ServiceType): readonly stri
     return [
       "/family-guide",
       ...FAMILY_LOCATION_KEYS.map((k) => `/family-guide/locations/${k}`),
+      "/pricing/families",
       "/pricing",
     ];
+  }
+  if (serviceType === "events") {
+    return ["/family-guide", "/couples-guide", "/pricing/events", "/pricing"];
   }
   return ["/family-guide", "/couples-guide", "/pricing"];
 }

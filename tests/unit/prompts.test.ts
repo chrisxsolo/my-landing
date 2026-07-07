@@ -3,7 +3,7 @@ import {
   PROMPT_VERSION, buildAnalysisPrompt, buildJournalPrompt, buildPortfolioPickPrompt,
   buildSchoolPagePhotoPrompt, buildGuidePhotoPrompt, buildInternalLinkPrompt,
 } from "@/lib/contentEngine/prompts";
-import { CANONICAL_INTERNAL_LINKS, guideLocationKeys } from "@/lib/contentEngine/taxonomy";
+import { internalLinksForService, guideLocationKeys } from "@/lib/contentEngine/taxonomy";
 import { serviceConfigFor, SERVICE_PROMPTS } from "@/lib/contentEngine/serviceConfig";
 import type { SessionFactsSnapshot } from "@/lib/contentEngine/payloads";
 
@@ -44,9 +44,10 @@ describe("prompt construction (spec §8.3)", () => {
     expect(p.system).toContain("soloxsnaps");
   });
 
-  it("internal-link prompt carries the full closed canonical list and forbids others", () => {
+  it("internal-link prompt carries the grads-scoped closed list and forbids others", () => {
     const p = buildInternalLinkPrompt(facts);
-    for (const url of CANONICAL_INTERNAL_LINKS) expect(p.userText).toContain(url);
+    for (const url of internalLinksForService("grads")) expect(p.userText).toContain(url);
+    expect(p.userText).not.toContain("/pricing/couples");
     expect(p.system.toLowerCase()).toMatch(/only.*list|list.*only/);
   });
 

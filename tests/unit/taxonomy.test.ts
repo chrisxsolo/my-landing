@@ -144,27 +144,48 @@ describe("service-aware additions (2026-07-02)", () => {
     }
   });
 
-  it("internalLinksForService: grads keeps the FULL canonical list (regression)", () => {
-    expect(internalLinksForService("grads")).toEqual(CANONICAL_INTERNAL_LINKS);
+  it("internalLinksForService: grads keeps the pre-service-aware list + grad pricing, never other services' pricing", () => {
+    const links = internalLinksForService("grads");
+    // everything except per-service pricing pages is the full canonical list
+    expect(links.filter((l) => !l.startsWith("/pricing/")))
+      .toEqual(CANONICAL_INTERNAL_LINKS.filter((l) => !l.startsWith("/pricing/")));
+    expect(links).toContain("/pricing/grads");
+    expect(links).not.toContain("/pricing/couples");
+    expect(links).not.toContain("/pricing/families");
   });
 
-  it("internalLinksForService: couples gets only couples pages + pricing, all canonical", () => {
+  it("internalLinksForService: couples gets only couples pages + couples/hub pricing, all canonical", () => {
     const links = internalLinksForService("couples");
     expect(links).toContain("/couples-guide");
     expect(links).toContain("/couples-guide/locations/crissy-field");
+    expect(links).toContain("/pricing/couples");
     expect(links).toContain("/pricing");
+    expect(links).not.toContain("/pricing/grads");
     expect(links.some((l) => l.startsWith("/grads/"))).toBe(false);
     expect(links.some((l) => l.startsWith("/family-guide"))).toBe(false);
     for (const l of links) expect(isCanonicalInternalLink(l)).toBe(true);
   });
 
   it("internalLinksForService: families and other services never see grad pages", () => {
-    expect(internalLinksForService("families").some((l) => l.startsWith("/grads/"))).toBe(false);
+    const familyLinks = internalLinksForService("families");
+    expect(familyLinks.some((l) => l.startsWith("/grads/"))).toBe(false);
+    expect(familyLinks).toContain("/pricing/families");
+    expect(internalLinksForService("events")).toContain("/pricing/events");
     for (const svc of ["portraits", "maternity", "prom", "events", "other"] as const) {
       const links = internalLinksForService(svc);
       expect(links.some((l) => l.startsWith("/grads/"))).toBe(false);
       expect(links).toContain("/pricing");
+      expect(links).not.toContain("/pricing/grads");
       for (const l of links) expect(isCanonicalInternalLink(l)).toBe(true);
     }
+  });
+
+  it("per-service pricing links match the app/(professional)/pricing/* route directories", () => {
+    const dirs = readdirSync(path.join(process.cwd(), "app", "(professional)", "pricing"), { withFileTypes: true })
+      .filter((e) => e.isDirectory())
+      .map((e) => `/pricing/${e.name}`)
+      .sort();
+    const canonicalPricing = CANONICAL_INTERNAL_LINKS.filter((l) => l.startsWith("/pricing/")).sort();
+    expect(canonicalPricing).toEqual(dirs);
   });
 });
