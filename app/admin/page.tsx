@@ -91,8 +91,8 @@ import { GRAD_SCHOOLS } from "@/lib/portfolioCategoryContent";
 import {
   findMatchingClientSession,
   getClientSessionEmailMatches,
+  resolveEffectiveSessionStatus,
   CLIENT_SESSION_STATUS_LABELS,
-  CLIENT_SESSION_STATUS_VALUES,
   type AdminClientSessionDTO,
   type ClientSessionStatus,
 } from "@/lib/clientSessions";
@@ -902,13 +902,7 @@ function AdminDashboard() {
   }
 
   function getEffectivePortalStatus(inquiry:Inquiry,portalSession:AdminClientSessionDTO|null):ClientSessionStatus{
-    const stored=portalSession?.currentStatus??"inquiry_received";
-    const paid=inquiry.payment_status==="paid";
-    const statusIndex=CLIENT_SESSION_STATUS_VALUES.indexOf(stored);
-    const bookedIndex=CLIENT_SESSION_STATUS_VALUES.indexOf("booked");
-    if(paid&&statusIndex<bookedIndex)return"booked";
-    if(!paid&&statusIndex===bookedIndex)return"booking_in_progress";
-    return stored;
+    return resolveEffectiveSessionStatus(portalSession?.currentStatus??"inquiry_received",inquiry.payment_status==="paid");
   }
 
   async function updatePortalStatusFromInquiry(inquiry:Inquiry,status:ClientSessionStatus){

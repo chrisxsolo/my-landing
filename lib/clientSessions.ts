@@ -121,6 +121,22 @@ export function normalizeClientSessionStatus(value: string): ClientSessionStatus
   return isClientSessionStatus(value) ? value : "inquiry_received";
 }
 
+/**
+ * Reconciles a stored portal status with the inquiry's payment state: a paid
+ * client is at least "booked", and an unpaid client shown as "booked" drops
+ * back to "booking_in_progress".
+ */
+export function resolveEffectiveSessionStatus(
+  stored: ClientSessionStatus,
+  paid: boolean,
+): ClientSessionStatus {
+  const statusIndex = CLIENT_SESSION_STATUS_VALUES.indexOf(stored);
+  const bookedIndex = CLIENT_SESSION_STATUS_VALUES.indexOf("booked");
+  if (paid && statusIndex < bookedIndex) return "booked";
+  if (!paid && statusIndex === bookedIndex) return "booking_in_progress";
+  return stored;
+}
+
 export function normalizeClientSessionEmail(value: string | null | undefined) {
   if (typeof value !== "string") return null;
   const trimmed = value.trim().toLowerCase();

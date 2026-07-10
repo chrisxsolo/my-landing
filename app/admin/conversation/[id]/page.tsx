@@ -20,6 +20,7 @@ import { buildInquiryReplySubject, type SubjectSource } from "@/lib/schoolDetect
 import PipelineRail from "./PipelineRail";
 import ThreadColumn from "./ThreadColumn";
 import ContactCard from "./ContactCard";
+import ProgressPanel from "./ProgressPanel";
 import ComposePanel from "./ComposePanel";
 import TrainAiPanel from "./TrainAiPanel";
 import BookingPanel, { SunsetCard } from "./BookingPanel";
@@ -1202,6 +1203,12 @@ export default function ConversationPage() {
             status={status}
             copiedField={copiedField}
             onCopyField={copyField}
+          />
+
+          <ProgressPanel
+            inquiry={inquiry}
+            onInquiryUpdate={(patch) => setInquiry(prev => (prev ? { ...prev, ...patch } : prev))}
+            showToast={showToast}
           />
 
           <ComposePanel
