@@ -4,6 +4,7 @@ import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { rateLimit } from "@/lib/rateLimit";
 import { normalizeVisitorId } from "@/lib/contentEngine/trackEventRules";
 import { recordContentEvent } from "@/lib/contentEngine/recordEvent";
+import { resolveInquirySchoolField } from "@/lib/schoolDetection";
 
 // Expected production env vars (set in Vercel — never hardcode secrets):
 //   RESEND_API_KEY       — Resend API key; email sends are skipped without it
@@ -128,7 +129,7 @@ export async function POST(req: NextRequest) {
     const date = cleanText(body.date);
     const message = cleanText(body.message);
     const instagram = cleanText(body.instagram);
-    const school = cleanText(body.school);
+    const schoolInput = cleanText(body.school);
     const preferredTime = cleanText(body.preferredTime);
     const people = cleanText(body.people);
     const location = cleanText(body.location);
@@ -140,13 +141,20 @@ export async function POST(req: NextRequest) {
 
     // Per-field length limits — block giant payloads and obvious junk.
     const fields: Record<string, string> = {
-      name, email, phone, sessionType, date, message, instagram, school, preferredTime, people, location,
+      name, email, phone, sessionType, date, message, instagram, school: schoolInput, preferredTime, people, location,
     };
     for (const [key, value] of Object.entries(fields)) {
       if (value.length > (MAX_LENGTHS[key] ?? 200)) {
         return NextResponse.json({ error: "One of your fields is too long. Please shorten it and try again." }, { status: 400 });
       }
     }
+
+    // Normalize the school at ingestion: browser autofill drops junk like "CA"
+    // into the free-text school input, so persist the canonical school detected
+    // across all fields (location/message) instead of trusting the raw value.
+    const school = resolveInquirySchoolField({
+      school: schoolInput, location, message, session_type: sessionType, date_in_mind: date, email,
+    }) ?? "";
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {

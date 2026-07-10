@@ -104,6 +104,7 @@ import {
   updateAdminInquiry,
   type AdminInquiry,
 } from "@/lib/adminInquiries";
+import { buildInquiryReplySubject } from "@/lib/schoolDetection";
 
 export const dynamic = 'force-dynamic'
 
@@ -134,28 +135,6 @@ const TAB_LABELS:Record<Tab,string>={home:"🏠 Home",poses:"📸 Grad Poses",co
 // The six home-page "work grid" slots, in display order — used for the batch picker.
 const WORK_GRID_KEYS=["home_story_1","home_story_2","home_story_3","home_story_4","home_story_5","home_story_6"] as const;
 
-function detectSchool(text:string):string|null{
-  // Normalize accents (e.g. "José" → "Jose") so accented names still match
-  const t=text.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"");
-  if(/\bsjsu\b|san jose state/.test(t))               return "SJSU";
-  if(/\buc berkeley\b|\bberkeley\b|cal bears/.test(t)) return "UC Berkeley";
-  if(/\bsfsu\b|sf state|san francisco state/.test(t))  return "SF State";
-  if(/\bcsueb\b|cal state east bay|eastbay/.test(t))   return "CSUEB";
-  if(/\busf\b|university of san francisco/.test(t))    return "USF";
-  if(/\bstanford\b/.test(t))                           return "Stanford";
-  if(/\bsanta clara\b|\bscu\b/.test(t))                return "Santa Clara";
-  if(/\bsacramento state\b|\bsac state\b|\bcsus\b/.test(t)) return "Sac State";
-  if(/\bchico state\b|\bcsuchico\b/.test(t))           return "Chico State";
-  if(/\bfresno state\b/.test(t))                       return "Fresno State";
-  return null;
-}
-function buildSubject(inq:{session_type:string|null;message:string;date_in_mind:string|null}):string{
-  const isGrad=(inq.session_type??"").toLowerCase().includes("grad");
-  if(!isGrad) return `Re: Your ${inq.session_type??"photography"} inquiry`;
-  const haystack=[inq.message,inq.session_type,inq.date_in_mind].filter(Boolean).join(" ");
-  const school=detectSchool(haystack);
-  return school?`${school} Graduation Inquiry`:"Graduation Inquiry";
-}
 // SHA-256 of a file's bytes — used to detect duplicate photos regardless of filename.
 async function fileHash(file:File):Promise<string>{
   const digest=await crypto.subtle.digest("SHA-256",await file.arrayBuffer());
@@ -414,6 +393,8 @@ function AdminDashboard() {
 
   const [composeOpen,setComposeOpen]=useState<Record<number,boolean>>({});
   const [composeSubject,setComposeSubject]=useState<Record<number,string>>({});
+  // Inquiry ids whose subject the user edited — never auto-regenerated after that.
+  const [composeSubjectEdited,setComposeSubjectEdited]=useState<Record<number,boolean>>({});
   const [composeBody,setComposeBody]=useState<Record<number,string>>({});
   const [sendLoading,setSendLoading]=useState<number|null>(null);
   const [sendSuccess,setSendSuccess]=useState<number|null>(null);
@@ -671,7 +652,8 @@ function AdminDashboard() {
 
   function openCompose(inq:Inquiry){
     const draft=drafts[inq.id]??"";
-    setComposeSubject(p=>({...p,[inq.id]:p[inq.id]??buildSubject(inq)}));
+    // Regenerate from the latest inquiry data unless the user edited the subject.
+    setComposeSubject(p=>({...p,[inq.id]:composeSubjectEdited[inq.id]&&p[inq.id]?p[inq.id]:buildInquiryReplySubject(inq)}));
     setComposeBody(p=>({...p,[inq.id]:p[inq.id]??draft}));
     setComposeOpen(p=>({...p,[inq.id]:true}));
   }
@@ -3355,7 +3337,7 @@ function AdminDashboard() {
                                 <input
                                   type="text"
                                   value={composeSubject[inq.id]??""}
-                                  onChange={e=>setComposeSubject(p=>({...p,[inq.id]:e.target.value}))}
+                                  onChange={e=>{setComposeSubjectEdited(p=>({...p,[inq.id]:true}));setComposeSubject(p=>({...p,[inq.id]:e.target.value}));}}
                                   className="w-full px-3 py-2 rounded-xl outline-none font-medium"
                                   style={{border:`1px solid ${T.border}`,background:T.panelSolid,color:T.ink,fontFamily:"inherit",fontSize:"16px"}}
                                 />

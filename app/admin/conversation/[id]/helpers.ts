@@ -45,49 +45,6 @@ export function stripQuotes(text: string): string {
     .trim();
 }
 
-// Detect school name from free-form text (message, session_type, etc.)
-export function detectSchool(text: string): string | null {
-  const t = text.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
-  if (/\bsjsu\b|san jose state/.test(t))               return "SJSU";
-  if (/\buc berkeley\b|\bberkeley\b|cal bears/.test(t)) return "UC Berkeley";
-  if (/\bsfsu\b|sf state|san francisco state/.test(t))  return "SF State";
-  if (/\bcsueb\b|cal state east bay|eastbay/.test(t))   return "CSUEB";
-  if (/\busf\b|university of san francisco/.test(t))    return "USF";
-  if (/\bstanford\b/.test(t))                           return "Stanford";
-  if (/\bsanta clara\b|\bscu\b/.test(t))                return "Santa Clara";
-  if (/\bsacramento state\b|\bsac state\b|\bcsus\b/.test(t)) return "Sac State";
-  if (/\bchico state\b|\bcsuchico\b/.test(t))           return "Chico State";
-  if (/\bfresno state\b/.test(t))                       return "Fresno State";
-  return null;
-}
-
-// Extract a human-readable school name from a .edu email domain
-export function detectSchoolFromEmail(email: string): string | null {
-  const match = email.match(/@([\w.-]+\.edu)/i);
-  if (!match) return null;
-  const domain = match[1].toLowerCase();
-  const known: Record<string, string> = {
-    "sjsu.edu": "SJSU", "berkeley.edu": "UC Berkeley", "sfsu.edu": "SF State",
-    "csueastbay.edu": "CSUEB", "usfca.edu": "USF", "stanford.edu": "Stanford",
-    "scu.edu": "Santa Clara", "csus.edu": "Sac State", "csuchico.edu": "Chico State",
-    "csufresno.edu": "Fresno State",
-  };
-  if (known[domain]) return known[domain];
-  // Fall back to a generic prettified name from the subdomain
-  const base = domain.replace(/\.edu$/, "").split(".").at(-1) ?? domain;
-  return base.charAt(0).toUpperCase() + base.slice(1);
-}
-
-// Build a smart default subject for a new outreach
-export function buildSubject(inquiry: { session_type: string | null; message: string; date_in_mind: string | null; email?: string }): string {
-  const isGrad = (inquiry.session_type ?? "").toLowerCase().includes("grad");
-  if (!isGrad) return `Re: Your ${inquiry.session_type ?? "photography"} inquiry`;
-  const haystack = [inquiry.message, inquiry.session_type, inquiry.date_in_mind].filter(Boolean).join(" ");
-  const school   = detectSchool(haystack)
-    ?? (inquiry.email ? detectSchoolFromEmail(inquiry.email) : null);
-  return school ? `${school} Graduation Inquiry` : "Graduation Inquiry";
-}
-
 // Try to parse a free-form date string (e.g. "June 20", "June 20th") into YYYY-MM-DD.
 // Requires a recognizable month name — rejects vague strings like "Flexible".
 export function tryParseDate(str: string): string | null {

@@ -15,7 +15,8 @@ import {
   type AdminInquiry,
 } from "@/lib/adminInquiries";
 import { T, CONV, STATUS_META, Icon, ConvStyles } from "../ui";
-import { buildSubject, fmtDate, readJsonSafe, stripQuotes, tryParseDate, type ReminderDraft } from "./helpers";
+import { fmtDate, readJsonSafe, stripQuotes, tryParseDate, type ReminderDraft } from "./helpers";
+import { buildInquiryReplySubject, type SubjectSource } from "@/lib/schoolDetection";
 import PipelineRail from "./PipelineRail";
 import ThreadColumn from "./ThreadColumn";
 import ContactCard from "./ContactCard";
@@ -55,6 +56,7 @@ export default function ConversationPage() {
   const [voiceActive,   setVoiceActive]   = useState(false);
   const [voiceError,    setVoiceError]    = useState<string | null>(null);
   const [subject,       setSubject]       = useState("");
+  const [subjectSource, setSubjectSource] = useState<SubjectSource>("generated");
   const [feedback,      setFeedback]      = useState("");
   const [refineSaved,      setRefineSaved]      = useState<string | null>(null);
   const [aiDraftExpanded,  setAiDraftExpanded]  = useState(false);
@@ -150,7 +152,6 @@ export default function ConversationPage() {
         if (!data) { router.push("/admin?tab=inquiries"); return; }
         setInquiry(data);
         setStatus(data.status);
-        setSubject(buildSubject(data));
         fetchThread(data.email);
         // Show sunset immediately — confirmed date wins, fall back to client's requested date
         const sunsetDate = data.session_date ?? tryParseDate(data.date_in_mind ?? "");
@@ -162,6 +163,13 @@ export default function ConversationPage() {
       });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inquiryId]);
+
+  // Deterministic reply subject — recomputed whenever inquiry data changes
+  // (load, edits, timeline sync) until the user edits the subject themselves.
+  useEffect(() => {
+    if (!inquiry || subjectSource === "manual") return;
+    setSubject(buildInquiryReplySubject(inquiry));
+  }, [inquiry, subjectSource]);
 
   // Load saved drafts — localStorage first (fast), fall back to Supabase (cross-device)
   useEffect(() => {
@@ -1180,7 +1188,7 @@ export default function ConversationPage() {
           />
 
           <ComposePanel
-            subject={subject}           onSubject={setSubject}
+            subject={subject}           onSubject={(v) => { setSubjectSource("manual"); setSubject(v); }}
             draft={draft}               onDraft={setDraft}
             composeRef={composeRef}
             messagesCount={messages.length}
