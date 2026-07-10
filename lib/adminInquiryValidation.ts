@@ -13,8 +13,11 @@ const CREATE_FIELDS = new Set([
 const PATCH_FIELDS = new Set([
   "status", "session_type", "session_date", "preferred_time", "reply_sent_at",
   "invoice_sent_at", "contract_sent_at", "deposit_paid_at", "gallery_delivered_at",
-  "confirmation_sent_at",
+  "confirmation_sent_at", "status_source", "needs_reply", "last_inbound_at",
+  "last_outbound_at", "last_message_at", "last_message_direction",
 ]);
+const STATUS_SOURCE_VALUES = new Set(["automatic", "manual"]);
+const MESSAGE_DIRECTION_VALUES = new Set(["inbound", "outbound"]);
 const MAX_LENGTHS: Record<string, number> = {
   name: 100,
   email: 254,
@@ -33,7 +36,8 @@ const MAX_LENGTHS: Record<string, number> = {
 };
 const TIMESTAMP_FIELDS = new Set([
   "reply_sent_at", "invoice_sent_at", "contract_sent_at", "deposit_paid_at",
-  "gallery_delivered_at", "confirmation_sent_at",
+  "gallery_delivered_at", "confirmation_sent_at", "last_inbound_at",
+  "last_outbound_at", "last_message_at",
 ]);
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -177,6 +181,29 @@ export function validateInquiryPatch(value: unknown): ValidationResult<{
       const result = validateSessionDate(fieldValue);
       if (!result.ok) return { ok: false, error: result.error };
       updates.session_date = result.data;
+      continue;
+    }
+    if (field === "status_source") {
+      if (typeof fieldValue !== "string" || !STATUS_SOURCE_VALUES.has(fieldValue)) {
+        return { ok: false, error: "status_source is not allowed." };
+      }
+      updates.status_source = fieldValue;
+      continue;
+    }
+    if (field === "needs_reply") {
+      if (typeof fieldValue !== "boolean" && fieldValue !== null) {
+        return { ok: false, error: "needs_reply must be boolean or null." };
+      }
+      updates.needs_reply = fieldValue;
+      continue;
+    }
+    if (field === "last_message_direction") {
+      if (fieldValue !== null && (
+        typeof fieldValue !== "string" || !MESSAGE_DIRECTION_VALUES.has(fieldValue)
+      )) {
+        return { ok: false, error: "last_message_direction is not allowed." };
+      }
+      updates.last_message_direction = fieldValue;
       continue;
     }
     if (TIMESTAMP_FIELDS.has(field)) {

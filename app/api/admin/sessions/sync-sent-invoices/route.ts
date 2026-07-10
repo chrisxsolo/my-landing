@@ -14,6 +14,7 @@ import { requireAdmin } from "@/lib/requireAdmin";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
 import { CLIENT_SESSION_TABLE } from "@/lib/clientSessions";
 import { computeAdvancedStatus, scanMilestonesForClients } from "@/lib/emailTimelineScan";
+import { getConnectedAccountEmails, reconcileInquiriesWithGmail } from "@/lib/inquiryReconcileGmail";
 import {
   extractClientEmailFromSubject,
   extractEmail,
@@ -323,13 +324,30 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // ── 7. Reconcile inquiry reply status against the full Gmail history ──────
+  // Timeline stamps alone left inquiries stuck on "new" even after a reply,
+  // invoice, and contract went out. This pass inspects each inquiry's actual
+  // conversation (sent + received, all labels) and fixes status / needs_reply.
+  let reconcilePart = "";
+  try {
+    const connectedEmails = await getConnectedAccountEmails(auth, tokens.email);
+    const recon = await reconcileInquiriesWithGmail(supabase, auth, connectedEmails);
+    if (recon.updated > 0) {
+      reconcilePart = ` Reply status reconciled on ${recon.updated} inquir${recon.updated === 1 ? "y" : "ies"}` +
+        (recon.statusRepaired > 0 ? ` (${recon.statusRepaired} moved out of “New”)` : "") + ".";
+    }
+  } catch (error) {
+    console.error("[sync-sent-invoices] inquiry reconciliation failed:", error);
+    reconcilePart = " Reply-status reconciliation failed — see server logs.";
+  }
+
   const scanPart = scanTargets.size > 0 ? ` (AI-scanned ${aiScanned.size}/${scanTargets.size} client thread${scanTargets.size !== 1 ? "s" : ""})` : "";
   const timelinePart = timelineUpdated > 0 ? ` + ${timelineUpdated} timeline field${timelineUpdated !== 1 ? "s" : ""} updated` : "";
-  const message = updated.length
+  const message = (updated.length
     ? `Updated ${updated.length} client${updated.length !== 1 ? "s" : ""}: ${updated.join("; ")}${timelinePart}${scanPart}`
     : timelineUpdated > 0
     ? `Timeline synced — ${timelineUpdated} inquiry timeline field${timelineUpdated !== 1 ? "s" : ""} updated from Gmail${scanPart}.`
-    : `Everything is already up to date — no new invoice, contract, payment, reply, or delivery date changes found${scanPart}.`;
+    : `Everything is already up to date — no new invoice, contract, payment, reply, or delivery date changes found${scanPart}.`) + reconcilePart;
 
   return NextResponse.json({ updated, message });
 }

@@ -24,6 +24,13 @@ export const INQUIRY_SELECT = [
   "people",
   "location",
   "confirmation_sent_at",
+  "needs_reply",
+  "last_inbound_at",
+  "last_outbound_at",
+  "last_message_at",
+  "last_message_direction",
+  "status_source",
+  "gmail_thread_ids",
 ].join(",");
 
 export type AdminInquiry = {
@@ -52,7 +59,30 @@ export type AdminInquiry = {
   people: string | null;
   location: string | null;
   confirmation_sent_at: string | null;
+  needs_reply: boolean | null;
+  last_inbound_at: string | null;
+  last_outbound_at: string | null;
+  last_message_at: string | null;
+  last_message_direction: string | null;
+  status_source: string | null;
+  gmail_thread_ids: string[] | null;
 };
+
+// Statuses that never surface in the needs-reply queue.
+const NEEDS_REPLY_EXEMPT_STATUSES = new Set(["archived", "not_interested", "manual"]);
+
+/**
+ * Whether an inquiry belongs in the "Needs reply" queue. Prefers the persisted
+ * Gmail-reconciled flag; rows never reconciled fall back to the legacy
+ * "no reply stamped yet" heuristic.
+ */
+export function inquiryNeedsReply(
+  inquiry: Pick<AdminInquiry, "status" | "needs_reply" | "reply_sent_at">,
+): boolean {
+  if (NEEDS_REPLY_EXEMPT_STATUSES.has(inquiry.status)) return false;
+  if (typeof inquiry.needs_reply === "boolean") return inquiry.needs_reply;
+  return !inquiry.reply_sent_at && inquiry.status !== "responded";
+}
 
 export type AdminInquiryCreate = {
   name: string;
@@ -84,6 +114,12 @@ export type AdminInquiryPatch = Partial<Pick<
   | "deposit_paid_at"
   | "gallery_delivered_at"
   | "confirmation_sent_at"
+  | "needs_reply"
+  | "last_inbound_at"
+  | "last_outbound_at"
+  | "last_message_at"
+  | "last_message_direction"
+  | "status_source"
 >>;
 
 type InquiryResponse = {

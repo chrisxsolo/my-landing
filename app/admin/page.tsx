@@ -99,6 +99,7 @@ import {
 import {
   createAdminInquiry,
   deleteAdminInquiry,
+  inquiryNeedsReply,
   loadAdminInquiries,
   updateAdminInquiry,
   type AdminInquiry,
@@ -686,7 +687,7 @@ function AdminDashboard() {
       if(json.ok){
         setSendSuccess(inq.id);
         setComposeOpen(p=>({...p,[inq.id]:false}));
-        updateInquiryStatus(inq.id,"responded");
+        markInquiryReplied(inq);
         showToast(`Email sent to ${inq.name} ✓`);
         setTimeout(()=>setSendSuccess(null),3000);
       }else{
@@ -694,6 +695,26 @@ function AdminDashboard() {
       }
     }catch(e){showToast("Send failed — check console",false);console.error(e);}
     finally{setSendLoading(null);}
+  }
+
+  // Sending an email from the app IS the reply — reflect it immediately
+  // instead of waiting for the next Gmail reconciliation pass.
+  async function markInquiryReplied(inq:Inquiry){
+    const now=new Date().toISOString();
+    try{
+      const updated=await updateAdminInquiry(inq.id,{
+        status:"responded",
+        status_source:"automatic",
+        needs_reply:false,
+        reply_sent_at:inq.reply_sent_at??now,
+        last_outbound_at:now,
+        last_message_at:now,
+        last_message_direction:"outbound",
+      });
+      setInquiries(p=>p.map(x=>x.id===inq.id?updated:x));
+    }catch(error){
+      console.error("[admin] markInquiryReplied",error);
+    }
   }
 
   function showToast(msg:string,ok=true){setToast({msg,ok});setTimeout(()=>setToast(null),3000);}
@@ -788,9 +809,12 @@ function AdminDashboard() {
       showToast("Delete failed",false);
     }
   }
-  async function updateInquiryStatus(id:number,status:string){
+  // Status changes from the UI buttons are manual overrides — timeline sync
+  // must never undo them. Programmatic paths (e.g. after sending an email)
+  // pass "automatic" so sync keeps reconciling those rows.
+  async function updateInquiryStatus(id:number,status:string,source:"manual"|"automatic"="manual"){
     try{
-      const updated=await updateAdminInquiry(id,{status});
+      const updated=await updateAdminInquiry(id,{status,status_source:source});
       setInquiries(p=>p.map(x=>x.id===id?updated:x));
       showToast("Status updated");
     }catch(error){
@@ -1533,7 +1557,7 @@ function AdminDashboard() {
         {(()=>{
           const cancelAll=()=>{cancelEditPortfolioImage();cancelEditCategory();setEditingInquiry(null);setInquiryDeleteConfirm(null);};
           const go=(t:Tab)=>{cancelAll();setTab(t);};
-          const pendingNavCount=inquiries.filter(i=>!i.reply_sent_at&&i.status!=="archived"&&i.status!=="not_interested"&&i.status!=="responded"&&i.status!=="manual").length;
+          const pendingNavCount=inquiries.filter(inquiryNeedsReply).length;
           const NavBtn=({t,icon,label,badge}:{t:Tab;icon:string;label:string;badge?:number})=>(
             <button onClick={()=>go(t)}
               className="w-full flex items-center gap-2.5 px-3 py-[7px] rounded-xl text-[13px] font-semibold transition-all text-left group"
@@ -1672,7 +1696,7 @@ function AdminDashboard() {
           const confirmedSessions=inquiries.filter(i=>i.booking_confirmed).length;
           const newThisMonth=inquiries.filter(i=>new Date(i.created_at)>=monthStart).length;
           const paidSessions=inquiries.filter(i=>i.payment_status==="paid").length;
-          const pendingInquiries=inquiries.filter(i=>!i.reply_sent_at&&i.status!=="archived"&&i.status!=="not_interested"&&i.status!=="responded"&&i.status!=="manual").length;
+          const pendingInquiries=inquiries.filter(inquiryNeedsReply).length;
 
           const pad2=(n:number)=>String(n).padStart(2,"0");
           const todayStr=`${today.getFullYear()}-${pad2(today.getMonth()+1)}-${pad2(today.getDate())}`;
@@ -2805,7 +2829,7 @@ function AdminDashboard() {
 
             {/* ── Filter chips ── */}
             {(()=>{
-              const needsReplyFn=(i:Inquiry)=>!i.reply_sent_at&&i.status!=="archived"&&i.status!=="not_interested"&&i.status!=="responded"&&i.status!=="manual";
+              const needsReplyFn=inquiryNeedsReply;
               const chips=[
                 {key:"all" as const,label:"All",count:inquiries.length},
                 {key:"needs_reply" as const,label:"Needs reply",count:inquiries.filter(needsReplyFn).length},
@@ -2870,7 +2894,7 @@ function AdminDashboard() {
                   <p className="text-xs mt-1" style={{color:T.inkFaint}}>New contact form submissions will appear here</p>
                 </div>
               ):(()=>{
-                const needsReply=(i:Inquiry)=>!i.reply_sent_at&&i.status!=="archived"&&i.status!=="not_interested"&&i.status!=="responded"&&i.status!=="manual";
+                const needsReply=inquiryNeedsReply;
                 const hasUnread=(i:Inquiry)=>!!inboxThreads.find(t=>t.fromEmail.toLowerCase()===i.email.toLowerCase()&&t.isUnread);
                 const todayMs=new Date().setHours(0,0,0,0);
                 const filteredInquiries=inquiries.filter(i=>{
@@ -3466,7 +3490,7 @@ function AdminDashboard() {
               (clientFilter==="delivered"&&clientDelivered(c));
             return matchesSearch&&matchesFilter;
           });
-          const pendingOnClients=inquiries.filter(i=>!i.reply_sent_at&&i.status!=="archived"&&i.status!=="not_interested"&&i.status!=="responded"&&i.status!=="manual").sort((a,b)=>new Date(b.created_at).getTime()-new Date(a.created_at).getTime());
+          const pendingOnClients=inquiries.filter(inquiryNeedsReply).sort((a,b)=>new Date(b.created_at).getTime()-new Date(a.created_at).getTime());
           const hoursAgoClient=(iso:string)=>{
             const h=Math.round((Date.now()-new Date(iso).getTime())/(1000*60*60));
             if(h<1)return"just now";if(h===1)return"1h ago";if(h<24)return`${h}h ago`;
