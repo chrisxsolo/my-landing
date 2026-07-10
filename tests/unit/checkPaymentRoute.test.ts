@@ -7,6 +7,8 @@ import { NextRequest } from "next/server";
 const mocks = vi.hoisted(() => ({
   claudeText: "",
   claudeError: null as Error | null,
+  claudeUserContent: "",
+  searchQueries: [] as string[],
   updates: [] as { table: string; values: Record<string, unknown> }[],
   upserts: [] as { table: string; values: Record<string, unknown> }[],
 }));
@@ -32,8 +34,9 @@ vi.mock("@/lib/supabaseServer", () => ({
 vi.mock("@anthropic-ai/sdk", () => ({
   default: class MockAnthropic {
     messages = {
-      create: async () => {
+      create: async (args: { messages: { content: string }[] }) => {
         if (mocks.claudeError) throw mocks.claudeError;
+        mocks.claudeUserContent = args.messages[0]?.content ?? "";
         return { content: [{ type: "text", text: mocks.claudeText }] };
       },
     };
@@ -46,9 +49,19 @@ const PLAIN_BODY = Buffer.from("Hi Chris! I just sent the deposit via Venmo — 
 vi.stubGlobal("fetch", async (url: string | URL) => {
   const u = String(url);
   if (u.includes("/messages/msg1")) {
-    return Response.json({ payload: { mimeType: "text/plain", body: { data: PLAIN_BODY } } });
+    return Response.json({
+      payload: {
+        mimeType: "text/plain",
+        headers: [
+          { name: "From", value: "Jane Doe <jane@example.com>" },
+          { name: "Subject", value: "Deposit sent!" },
+        ],
+        body: { data: PLAIN_BODY },
+      },
+    });
   }
   if (u.includes("/messages?q=")) {
+    mocks.searchQueries.push(decodeURIComponent(u.split("?q=")[1].split("&")[0]));
     return Response.json({ messages: [{ id: "msg1" }] });
   }
   return new Response("not found", { status: 404 });
@@ -66,6 +79,8 @@ async function callRoute() {
 beforeEach(() => {
   mocks.claudeText = "";
   mocks.claudeError = null;
+  mocks.claudeUserContent = "";
+  mocks.searchQueries.length = 0;
   mocks.updates.length = 0;
   mocks.upserts.length = 0;
   vi.spyOn(console, "error").mockImplementation(() => {});
@@ -109,6 +124,30 @@ describe("POST /api/check-payment", () => {
     expect(mocks.updates[0].values.payment_status).toBe("paid");
     expect(mocks.updates[0].values.booking_confirmed).toBe(true);
     expect(String(mocks.updates[0].values.payment_note)).toContain("$200");
+  });
+
+  it("searches client-attributed evidence before generic provider queries", async () => {
+    mocks.claudeText = '{"paid": false, "amount": null, "method": null, "note": "No payment evidence found"}';
+    await callRoute();
+
+    // Name-scoped provider searches first, then the client thread — generic
+    // provider searches (newest-first, mostly Chris's own purchases) must
+    // never crowd these out of the MAX_EMAILS cap.
+    expect(mocks.searchQueries[0]).toContain('"Jane Doe"');
+    expect(mocks.searchQueries[0]).toContain("venmo.com");
+    expect(mocks.searchQueries[1]).toContain('"Jane"');
+    expect(mocks.searchQueries[2]).toContain("jane@example.com");
+    const genericVenmoIdx = mocks.searchQueries.findIndex(q => q.startsWith("from:(venmo.com)"));
+    expect(genericVenmoIdx).toBeGreaterThan(2);
+  });
+
+  it("includes From/Subject headers in the email context sent to Claude", async () => {
+    mocks.claudeText = '{"paid": false, "amount": null, "method": null, "note": "No payment evidence found"}';
+    await callRoute();
+
+    expect(mocks.claudeUserContent).toContain("From: Jane Doe <jane@example.com>");
+    expect(mocks.claudeUserContent).toContain("Subject: Deposit sent!");
+    expect(mocks.claudeUserContent).toContain("I just sent the deposit via Venmo");
   });
 
   it("records an unpaid check as a note only, never as a payment", async () => {

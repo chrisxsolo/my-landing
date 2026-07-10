@@ -33,9 +33,10 @@ const AVAILABILITY_TABLE = "availability";
 
 const MAX_EMAILS         = 14;
 const MAX_BODY_CHARS     = 1500;
-const MAX_CONTEXT_CHARS  = 18000;
+const MAX_CONTEXT_CHARS  = 26000;
 const CLIENT_THREAD_MAX  = 8;
 const PER_QUERY_MAX      = 4;
+const NAME_QUERY_MAX     = 6;
 
 const PAYMENT_RESULT_JSON_SCHEMA = {
   type: "object",
@@ -51,7 +52,22 @@ const PAYMENT_RESULT_JSON_SCHEMA = {
 
 // ── Gmail helpers ─────────────────────────────────────────────────────────────
 
-// null = the request itself failed (network/API error); "" = empty body.
+type GmailHeader = { name?: string; value?: string };
+
+// From/Subject/Date let Claude tell the client's payment apart from Chris's
+// own purchase notifications, which the generic provider searches also match.
+function formatMessageHeaders(headers: GmailHeader[] | undefined): string {
+  if (!headers?.length) return "";
+  return ["From", "To", "Subject", "Date"]
+    .map(name => {
+      const value = headers.find(h => h.name?.toLowerCase() === name.toLowerCase())?.value;
+      return value ? `${name}: ${value}` : null;
+    })
+    .filter(Boolean)
+    .join("\n");
+}
+
+// null = the request itself failed (network/API error); "" = empty message.
 async function fetchMessageBody(id: string, auth: string): Promise<string | null> {
   try {
     const res = await fetch(
@@ -59,8 +75,10 @@ async function fetchMessageBody(id: string, auth: string): Promise<string | null
       { headers: { Authorization: auth } }
     );
     if (!res.ok) return null;
-    const msg = await res.json() as { payload?: GmailMimePart };
-    return extractEmailText(msg.payload, MAX_BODY_CHARS);
+    const msg = await res.json() as { payload?: GmailMimePart & { headers?: GmailHeader[] } };
+    const headerLines = formatMessageHeaders(msg.payload?.headers);
+    const body = extractEmailText(msg.payload, MAX_BODY_CHARS);
+    return headerLines && body ? `${headerLines}\n${body}` : headerLines || body;
   } catch { return null; }
 }
 
@@ -78,19 +96,41 @@ async function searchMessageIds(query: string, auth: string, maxResults: number)
   } catch { return null; }
 }
 
-// Provider notifications rarely mention the client's first name (they use
-// usernames, emails, or business names), so most queries are name-free.
-function buildPaymentQueries(firstName: string): string[] {
-  const safeName = firstName.replace(/["()]/g, "").trim();
-  const queries = [
-    `from:(venmo.com) (paid OR payment OR "sent you")`,
-    `from:(paypal.com) ("sent you" OR "received money" OR payment)`,
-    `from:(zelle.com OR zellepay.com) (sent OR received OR payment OR transfer)`,
-    `from:(cash.app OR square.com OR squareup.com) (paid OR payment OR received)`,
-    `from:(apple.com) ("apple cash" OR "apple pay")`,
-    `subject:(paid OR payment OR deposit OR transfer OR "sent you" OR "received money") newer_than:1y`,
-  ];
-  if (safeName) queries.push(`"${safeName}" (deposit OR paid OR "payment sent") newer_than:1y`);
+const PROVIDER_FROM =
+  "(venmo.com OR paypal.com OR zelle.com OR zellepay.com OR cash.app OR square.com OR squareup.com OR apple.com)";
+
+// Ordered most→least targeted. Results are deduped in this order and capped
+// at MAX_EMAILS, so client-attributed evidence must come first — Gmail returns
+// newest-first, and the generic provider searches surface Chris's own recent
+// purchases, which would otherwise crowd out an older client payment.
+function buildPaymentQueries(name: string, email: string): { q: string; max: number }[] {
+  const safeFull  = name.replace(/["()]/g, "").trim();
+  const firstName = safeFull.split(/\s+/)[0] ?? "";
+  const queries: { q: string; max: number }[] = [];
+
+  // 1. Provider notifications naming this client — "Ester Chan paid you $200".
+  if (safeFull) queries.push({ q: `from:${PROVIDER_FROM} "${safeFull}"`, max: NAME_QUERY_MAX });
+  if (firstName && firstName !== safeFull) {
+    queries.push({ q: `from:${PROVIDER_FROM} "${firstName}"`, max: NAME_QUERY_MAX });
+  }
+
+  // 2. The direct email thread with the client.
+  queries.push({ q: `from:${email} OR to:${email}`, max: CLIENT_THREAD_MAX });
+
+  // 3. Any email pairing the client's name with payment keywords.
+  if (firstName) {
+    queries.push({ q: `"${firstName}" (deposit OR paid OR "payment sent") newer_than:1y`, max: PER_QUERY_MAX });
+  }
+
+  // 4. Generic provider notifications — fallback only; usually unrelated.
+  queries.push(
+    { q: `from:(venmo.com) (paid OR payment OR "sent you")`, max: PER_QUERY_MAX },
+    { q: `from:(paypal.com) ("sent you" OR "received money" OR payment)`, max: PER_QUERY_MAX },
+    { q: `from:(zelle.com OR zellepay.com) (sent OR received OR payment OR transfer)`, max: PER_QUERY_MAX },
+    { q: `from:(cash.app OR square.com OR squareup.com) (paid OR payment OR received)`, max: PER_QUERY_MAX },
+    { q: `from:(apple.com) ("apple cash" OR "apple pay")`, max: PER_QUERY_MAX },
+    { q: `subject:(paid OR payment OR deposit OR transfer OR "sent you" OR "received money") newer_than:1y`, max: PER_QUERY_MAX },
+  );
   return queries;
 }
 
@@ -107,6 +147,11 @@ Payment evidence includes:
 - Dollar amounts ($) mentioned in a payment context
 
 A generic mention of the word "payment" with no confirmation is NOT evidence.
+
+The inbox belongs to Chris, so provider notifications may include HIS OWN
+purchases and outgoing payments. Only count money Chris RECEIVED, and only when
+the payer matches "${name}" (use the From/Subject lines and any names in the
+email body). Payments from anyone else are NOT evidence for this client.
 
 Output contract — follow it exactly:
 - Return a single JSON object and nothing else: no markdown fences, no prose before or after it.
@@ -159,11 +204,8 @@ export async function POST(req: NextRequest) {
 
   const auth = `Bearer ${tokens.access_token}`;
 
-  // ── 1. Search: direct client thread + payment-provider notifications ──────
-  const queries: { q: string; max: number }[] = [
-    { q: `from:${email} OR to:${email}`, max: CLIENT_THREAD_MAX },
-    ...buildPaymentQueries(name.split(" ")[0]).map(q => ({ q, max: PER_QUERY_MAX })),
-  ];
+  // ── 1. Search: client-attributed evidence first, generic providers last ───
+  const queries = buildPaymentQueries(name, email);
   const searchResults = await Promise.all(queries.map(({ q, max }) => searchMessageIds(q, auth, max)));
 
   if (searchResults.every(r => r === null)) {
