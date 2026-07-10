@@ -1,9 +1,20 @@
-// Pure formatting + parsing helpers for the conversation workspace. No React,
-// no I/O — shared by the page and its panel components.
+// Formatting + parsing helpers for the conversation workspace. No React —
+// shared by the page and its panel components.
 
 export type ReminderDraft = {
   id: string; label: string; emoji: string; subject: string; body: string; html?: string;
 };
+
+// Read a fetch Response defensively: parse JSON only when the server says
+// it's JSON; otherwise surface the raw text as an error message so an HTML
+// error page never explodes a .json() call.
+export async function readJsonSafe(res: Response): Promise<Record<string, unknown>> {
+  const contentType = res.headers.get("content-type");
+  if (contentType?.includes("application/json")) {
+    try { return await res.json(); } catch { return {}; }
+  }
+  try { return { error: (await res.text()).slice(0, 300) }; } catch { return {}; }
+}
 
 export function fmt12h(t: string | null): string {
   if (!t) return "";

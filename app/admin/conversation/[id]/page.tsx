@@ -15,7 +15,7 @@ import {
   type AdminInquiry,
 } from "@/lib/adminInquiries";
 import { T, CONV, STATUS_META, Icon, ConvStyles } from "../ui";
-import { buildSubject, fmtDate, stripQuotes, tryParseDate, type ReminderDraft } from "./helpers";
+import { buildSubject, fmtDate, readJsonSafe, stripQuotes, tryParseDate, type ReminderDraft } from "./helpers";
 import PipelineRail from "./PipelineRail";
 import ThreadColumn from "./ThreadColumn";
 import ContactCard from "./ContactCard";
@@ -64,6 +64,7 @@ export default function ConversationPage() {
 
   // ── Payment ────────────────────────────────────────────────────────────────
   const [paymentLoading,    setPaymentLoading]    = useState(false);
+  const [markPaidLoading,   setMarkPaidLoading]   = useState(false);
   const [sessionDateInput,  setSessionDateInput]  = useState("");
   const [previewHtml,       setPreviewHtml]       = useState<string | null>(null);
   const [confirmLoading,    setConfirmLoading]    = useState(false);
@@ -671,23 +672,71 @@ export default function ConversationPage() {
           session_date: sessionDateInput || undefined,
         }),
       });
-      const json = await res.json();
-      if (!res.ok) { showToast(json.error ?? "Check failed", false); return; }
+      const json = await readJsonSafe(res) as {
+        paid?: boolean; note?: string; session_date_booked?: boolean;
+        warning?: string; error?: string;
+      };
+
+      // A non-ok response means the analysis broke (Gmail, Claude, parsing,
+      // or DB) — never present that as "the client hasn't paid".
+      if (!res.ok) {
+        console.error("[check-payment] analysis failed:", json.error);
+        showToast("Payment analysis failed. No payment status was changed.", false);
+        return;
+      }
 
       if (json.paid) {
         showToast(`Payment confirmed — ${json.note}`);
         if (json.session_date_booked) showToast(`Calendar marked as booked`);
+        if (json.warning) showToast(json.warning, false);
       } else {
-        showToast(json.note || "No payment found yet", false);
+        showToast(json.note || "No payment evidence found", false);
       }
 
       // Refresh inquiry to pick up new payment fields
       const updated = await loadAdminInquiry(inquiry.id);
       if (updated) setInquiry(updated);
-    } catch {
-      showToast("Payment check failed", false);
+    } catch (error) {
+      console.error("[check-payment] request error:", error);
+      showToast("Payment analysis failed. No payment status was changed.", false);
     } finally {
       setPaymentLoading(false);
+    }
+  }
+
+  // ── Manual payment override — reuses /api/admin/manual-payments ───────────
+  async function markPaidManually(form: { method: string; amount: string; paid_at: string; note: string }): Promise<boolean> {
+    if (!inquiry) return false;
+    setMarkPaidLoading(true);
+    try {
+      const res = await fetch("/api/admin/manual-payments", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action:       "confirm-inquiry-paid",
+          inquiry_id:   inquiry.id,
+          client_email: inquiry.email,
+          method:       form.method,
+          amount:       form.amount || undefined,
+          paid_at:      form.paid_at,
+          note:         form.note || undefined,
+        }),
+      });
+      const json = await readJsonSafe(res) as { ok?: boolean; already_paid?: boolean; error?: string };
+      if (!res.ok || !json.ok) {
+        showToast(json.error ?? "Manual payment failed", false);
+        return false;
+      }
+      showToast(json.already_paid ? "Payment details updated" : "Marked as paid ✓");
+      const updated = await loadAdminInquiry(inquiry.id);
+      if (updated) setInquiry(updated);
+      return true;
+    } catch (error) {
+      console.error("[mark-paid-manually] request error:", error);
+      showToast("Manual payment failed", false);
+      return false;
+    } finally {
+      setMarkPaidLoading(false);
     }
   }
 
@@ -1185,7 +1234,9 @@ export default function ConversationPage() {
             contractLoading={contractLoading}
             previewLoading={previewLoading}
             confirmLoading={confirmLoading}
+            markPaidLoading={markPaidLoading}
             onCheckPayment={checkPayment}
+            onMarkPaid={markPaidManually}
             onDetectDate={detectDate}
             onConfirmDate={confirmDate}
             onScheduleReminders={scheduleReminders}

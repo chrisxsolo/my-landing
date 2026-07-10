@@ -7,7 +7,10 @@
 // Body: { inquiry_id, email, name, date_in_mind?, session_date? }
 //   session_date: YYYY-MM-DD — if payment found, marks that date as "booked"
 //
-// Response: { paid, note, session_date_booked }  |  { error }
+// Response:
+//   200 { paid, amount, method, note, session_date_booked, evidence, warning? }
+//   502 { error, code, raw_preview? }  — Gmail or analysis failed; nothing was
+//       written. An analysis failure is an application error, not "unpaid".
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
@@ -15,58 +18,125 @@ import Anthropic from "@anthropic-ai/sdk";
 import { getValidTokens } from "@/lib/gmailTokens";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { requireAdmin } from "@/lib/requireAdmin";
+import { extractEmailText, type GmailMimePart } from "@/lib/gmailBodyText";
+import {
+  FALLBACK_NOTE_UNPAID,
+  findDeterministicPaymentEvidence,
+  parsePaymentDetectionResult,
+  sanitizeModelPreview,
+} from "@/lib/paymentDetection";
 
 export const dynamic = "force-dynamic";
 
+const INQUIRIES_TABLE    = "inquiries";
+const AVAILABILITY_TABLE = "availability";
+
+const MAX_EMAILS         = 14;
+const MAX_BODY_CHARS     = 1500;
+const MAX_CONTEXT_CHARS  = 18000;
+const CLIENT_THREAD_MAX  = 8;
+const PER_QUERY_MAX      = 4;
+
+const PAYMENT_RESULT_JSON_SCHEMA = {
+  type: "object",
+  properties: {
+    paid:   { type: "boolean", description: "true only when the emails contain positive payment evidence" },
+    amount: { anyOf: [{ type: "string" }, { type: "null" }], description: 'Payment amount like "$200", or null when unknown' },
+    method: { anyOf: [{ type: "string" }, { type: "null" }], description: 'Payment method like "Venmo", or null when unknown' },
+    note:   { type: "string", description: "One-sentence summary of the evidence found" },
+  },
+  required: ["paid", "amount", "method", "note"],
+  additionalProperties: false,
+};
+
 // ── Gmail helpers ─────────────────────────────────────────────────────────────
 
-type MimePart = { mimeType?: string; body?: { data?: string }; parts?: MimePart[] };
-
-function decodeBody(data: string): string {
-  try {
-    const base64 = data.replace(/-/g, "+").replace(/_/g, "/");
-    const padded  = base64.padEnd(base64.length + (4 - (base64.length % 4)) % 4, "=");
-    return decodeURIComponent(
-      Array.from(atob(padded))
-        .map(c => "%" + c.charCodeAt(0).toString(16).padStart(2, "0"))
-        .join("")
-    );
-  } catch { return ""; }
-}
-
-function extractText(part: MimePart): string {
-  if (part.mimeType === "text/plain" && part.body?.data) return decodeBody(part.body.data);
-  if (part.parts) {
-    for (const child of part.parts) {
-      const t = extractText(child);
-      if (t) return t;
-    }
-  }
-  return "";
-}
-
-async function fetchMessageBody(id: string, auth: string): Promise<string> {
+// null = the request itself failed (network/API error); "" = empty body.
+async function fetchMessageBody(id: string, auth: string): Promise<string | null> {
   try {
     const res = await fetch(
       `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=full`,
       { headers: { Authorization: auth } }
     );
-    if (!res.ok) return "";
-    const msg = await res.json() as { payload?: MimePart };
-    return extractText(msg.payload ?? {}).slice(0, 1200);
-  } catch { return ""; }
+    if (!res.ok) return null;
+    const msg = await res.json() as { payload?: GmailMimePart };
+    return extractEmailText(msg.payload, MAX_BODY_CHARS);
+  } catch { return null; }
 }
 
-// Search Gmail threads matching a query, return up to maxResults message IDs
-async function searchMessageIds(query: string, auth: string, maxResults = 5): Promise<string[]> {
-  const res = await fetch(
-    `https://gmail.googleapis.com/gmail/v1/users/me/messages` +
-    `?q=${encodeURIComponent(query)}&maxResults=${maxResults}`,
-    { headers: { Authorization: auth } }
-  );
-  if (!res.ok) return [];
-  const data = await res.json() as { messages?: { id: string }[] };
-  return (data.messages ?? []).map(m => m.id);
+// null = the search request failed; [] = no matches.
+async function searchMessageIds(query: string, auth: string, maxResults: number): Promise<string[] | null> {
+  try {
+    const res = await fetch(
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages` +
+      `?q=${encodeURIComponent(query)}&maxResults=${maxResults}`,
+      { headers: { Authorization: auth } }
+    );
+    if (!res.ok) return null;
+    const data = await res.json() as { messages?: { id: string }[] };
+    return (data.messages ?? []).map(m => m.id);
+  } catch { return null; }
+}
+
+// Provider notifications rarely mention the client's first name (they use
+// usernames, emails, or business names), so most queries are name-free.
+function buildPaymentQueries(firstName: string): string[] {
+  const safeName = firstName.replace(/["()]/g, "").trim();
+  const queries = [
+    `from:(venmo.com) (paid OR payment OR "sent you")`,
+    `from:(paypal.com) ("sent you" OR "received money" OR payment)`,
+    `from:(zelle.com OR zellepay.com) (sent OR received OR payment OR transfer)`,
+    `from:(cash.app OR square.com OR squareup.com) (paid OR payment OR received)`,
+    `from:(apple.com) ("apple cash" OR "apple pay")`,
+    `subject:(paid OR payment OR deposit OR transfer OR "sent you" OR "received money") newer_than:1y`,
+  ];
+  if (safeName) queries.push(`"${safeName}" (deposit OR paid OR "payment sent") newer_than:1y`);
+  return queries;
+}
+
+// ── Claude ────────────────────────────────────────────────────────────────────
+
+function buildSystemPrompt(name: string): string {
+  return `You are a payment detection assistant for a photographer named Chris.
+Analyze the provided emails and decide whether client "${name}" has paid a deposit or session fee.
+
+Payment evidence includes:
+- Venmo/Zelle/PayPal/Cash App/Square/Apple Cash transfer notifications
+- The client saying "I sent it", "I paid", "payment sent", "just paid", "deposit sent"
+- Bank transfer receipts or payment confirmations
+- Dollar amounts ($) mentioned in a payment context
+
+A generic mention of the word "payment" with no confirmation is NOT evidence.
+
+Output contract — follow it exactly:
+- Return a single JSON object and nothing else: no markdown fences, no prose before or after it.
+- Use exactly these property names: paid, amount, method, note.
+- "paid" must be a JSON boolean (true or false), never a string.
+- "amount" must be a string like "$200", or null when unknown.
+- "method" must be a string like "Venmo", or null when unknown.
+- "note" must be a short one-sentence summary of the evidence, or "${FALLBACK_NOTE_UNPAID}".`;
+}
+
+// Structured outputs (output_config.format) pin the response to the schema.
+// If the API rejects the option (e.g. an older model), retry once without it —
+// the defensive parser still guards the plain-text path.
+async function runPaymentAnalysis(system: string, userContent: string) {
+  const anthropic = new Anthropic();
+  const base = {
+    model:      "claude-sonnet-4-6" as const,
+    max_tokens: 300,
+    system,
+    messages:   [{ role: "user" as const, content: userContent }],
+  };
+  try {
+    return await anthropic.messages.create({
+      ...base,
+      output_config: { format: { type: "json_schema", schema: PAYMENT_RESULT_JSON_SCHEMA } },
+    });
+  } catch (err) {
+    if ((err as { status?: number })?.status === 400) return anthropic.messages.create(base);
+    throw err;
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -89,111 +159,152 @@ export async function POST(req: NextRequest) {
 
   const auth = `Bearer ${tokens.access_token}`;
 
-  // ── 1. Fetch conversation thread with the client ──────────────────────────
-  const clientThreadIds = await searchMessageIds(
-    `from:${email} OR to:${email}`, auth, 8
-  );
+  // ── 1. Search: direct client thread + payment-provider notifications ──────
+  const queries: { q: string; max: number }[] = [
+    { q: `from:${email} OR to:${email}`, max: CLIENT_THREAD_MAX },
+    ...buildPaymentQueries(name.split(" ")[0]).map(q => ({ q, max: PER_QUERY_MAX })),
+  ];
+  const searchResults = await Promise.all(queries.map(({ q, max }) => searchMessageIds(q, auth, max)));
 
-  // ── 2. Search for payment notification emails mentioning the client name ───
-  // Venmo, Zelle, PayPal, Cash App, Apple Pay all send confirmation emails
-  const firstName = name.split(" ")[0];
-  const paymentThreadIds = await searchMessageIds(
-    `(from:venmo@venmo.com OR from:service@paypal.com OR from:no-reply@zelle.com ` +
-    `OR from:cash@square.com OR from:no-reply@cash.app OR subject:paid OR subject:payment OR subject:deposit) ` +
-    `"${firstName}"`,
-    auth, 5
-  );
+  if (searchResults.every(r => r === null)) {
+    console.error("[check-payment] all Gmail searches failed for inquiry", inquiry_id);
+    return NextResponse.json(
+      { error: "Gmail search failed. No payment status was changed.", code: "GMAIL_SEARCH_FAILED" },
+      { status: 502 }
+    );
+  }
 
-  const allIds = [...new Set([...clientThreadIds, ...paymentThreadIds])].slice(0, 10);
+  const allIds = [...new Set(searchResults.filter(Boolean).flat() as string[])].slice(0, MAX_EMAILS);
 
-  // ── 3. Load message bodies in parallel ────────────────────────────────────
-  const bodies = await Promise.all(allIds.map(id => fetchMessageBody(id, auth)));
-  const emailContext = bodies
-    .map((b, i) => b ? `--- Email ${i + 1} ---\n${b}` : null)
-    .filter(Boolean)
-    .join("\n\n");
-
-  if (!emailContext) {
+  if (!allIds.length) {
     return NextResponse.json({
-      paid: false,
+      paid: false, amount: null, method: null,
       note: "No emails found to analyze.",
-      session_date_booked: false,
+      session_date_booked: false, evidence: [],
     });
   }
 
-  // ── 4. Ask Claude to determine payment status ──────────────────────────────
-  const anthropic = new Anthropic();
-  const claudeRes = await anthropic.messages.create({
-    model:      "claude-sonnet-4-6",
-    max_tokens: 300,
-    system: `You are a payment detection assistant for a photographer named Chris.
-Analyze the provided emails and determine if client "${name}" has paid a deposit or session fee.
-
-Payment evidence includes:
-- Venmo/Zelle/PayPal/Cash App/Apple Pay transfer notifications
-- Client saying "I sent it", "I paid", "payment sent", "just paid", "deposit sent"
-- Bank transfer receipts or payment confirmations
-- Amount mentions ($, dollars) in payment context
-
-Respond with ONLY valid JSON (no markdown, no explanation):
-{
-  "paid": true or false,
-  "amount": "e.g. $200" or null,
-  "method": "e.g. Venmo" or null,
-  "note": "Short 1-sentence summary of what you found, or 'No payment evidence found'"
-}`,
-    messages: [{
-      role: "user",
-      content: `Client name: ${name}\nClient email: ${email}\n\nEmails to analyze:\n\n${emailContext}`,
-    }],
-  });
-
-  let result: { paid: boolean; amount: string | null; method: string | null; note: string };
-  try {
-    const text = claudeRes.content[0].type === "text" ? claudeRes.content[0].text : "{}";
-    result = JSON.parse(text);
-  } catch {
-    result = { paid: false, amount: null, method: null, note: "Could not parse payment status." };
+  // ── 2. Load message bodies in parallel ────────────────────────────────────
+  const bodies = await Promise.all(allIds.map(id => fetchMessageBody(id, auth)));
+  if (bodies.every(b => b === null)) {
+    console.error("[check-payment] all Gmail message fetches failed for inquiry", inquiry_id);
+    return NextResponse.json(
+      { error: "Gmail message fetch failed. No payment status was changed.", code: "GMAIL_FETCH_FAILED" },
+      { status: 502 }
+    );
   }
 
-  // ── 5. Update inquiry in database ─────────────────────────────────────────
-  const supabase = createSupabaseServerClient();
-  const paymentNote = [result.note, result.amount, result.method && `via ${result.method}`]
+  const emailContext = bodies
+    .map((b, i) => b ? `--- Email ${i + 1} ---\n${b}` : null)
     .filter(Boolean)
-    .join(" · ");
+    .join("\n\n")
+    .slice(0, MAX_CONTEXT_CHARS);
+
+  if (!emailContext) {
+    return NextResponse.json({
+      paid: false, amount: null, method: null,
+      note: "No readable email content found.",
+      session_date_booked: false, evidence: [],
+    });
+  }
+
+  // ── 3. Deterministic evidence scan (fed to Claude, echoed in the note) ────
+  const evidence = findDeterministicPaymentEvidence(emailContext);
+
+  // ── 4. Ask Claude to classify ──────────────────────────────────────────────
+  let claudeRes: Awaited<ReturnType<typeof runPaymentAnalysis>>;
+  try {
+    claudeRes = await runPaymentAnalysis(
+      buildSystemPrompt(name),
+      `Client name: ${name}\nClient email: ${email}\n\n` +
+      `Deterministic keyword scan: ${evidence.length ? evidence.join("; ") : "no high-confidence payment phrases found"}.\n\n` +
+      `Emails to analyze:\n\n${emailContext}`
+    );
+  } catch (err) {
+    console.error("[check-payment] Claude request failed:", err);
+    return NextResponse.json(
+      { error: "Payment analysis request failed.", code: "PAYMENT_ANALYSIS_FAILED" },
+      { status: 502 }
+    );
+  }
+
+  const rawText = claudeRes.content.find(b => b.type === "text")?.text ?? "";
+  const result  = parsePaymentDetectionResult(rawText);
+
+  // A parse failure is an application error, not proof of non-payment:
+  // touch nothing in the database and surface a 502.
+  if (!result) {
+    console.error("[check-payment] unparseable model output:", sanitizeModelPreview(rawText));
+    return NextResponse.json({
+      error:       "Payment analysis returned an invalid response.",
+      code:        "PAYMENT_RESPONSE_PARSE_FAILED",
+      raw_preview: sanitizeModelPreview(rawText),
+    }, { status: 502 });
+  }
+
+  // ── 5. Persist the outcome ─────────────────────────────────────────────────
+  const supabase = createSupabaseServerClient();
+  const noteParts = [result.note, result.amount, result.method && `via ${result.method}`];
+  if (result.paid && evidence.length) noteParts.push(`Detected: ${evidence.slice(0, 3).join(", ")}`);
+  const paymentNote = noteParts.filter(Boolean).join(" · ");
+
+  const validSessionDate = session_date && /^\d{4}-\d{2}-\d{2}$/.test(session_date) ? session_date : null;
+  let warning: string | undefined;
 
   if (result.paid) {
     const now = new Date().toISOString();
-    await supabase.from("inquiries").update({
+    const { error: updateError } = await supabase.from(INQUIRIES_TABLE).update({
       payment_status:      "paid",
       payment_note:        paymentNote,
       payment_detected_at: now,
       deposit_paid_at:     now,
       booking_confirmed:   true,
-      ...(session_date ? { session_date } : {}),
+      ...(validSessionDate ? { session_date: validSessionDate } : {}),
     }).eq("id", inquiry_id);
+
+    if (updateError) {
+      console.error("[check-payment] inquiry update failed:", updateError);
+      return NextResponse.json(
+        { error: "Payment was detected but the inquiry could not be updated.", code: "DB_UPDATE_FAILED" },
+        { status: 500 }
+      );
+    }
+    if (session_date && !validSessionDate) {
+      warning = "session_date was not in YYYY-MM-DD format and was not saved.";
+    }
   } else {
-    // Still record that we checked, even if no payment found
-    await supabase.from("inquiries").update({
-      payment_note:        paymentNote || "No payment evidence found",
+    // Record that we checked; non-critical, so a failure only warns.
+    const { error: noteError } = await supabase.from(INQUIRIES_TABLE).update({
+      payment_note: paymentNote || FALLBACK_NOTE_UNPAID,
     }).eq("id", inquiry_id);
+    if (noteError) {
+      console.error("[check-payment] payment_note update failed:", noteError);
+      warning = "Result was not saved to the inquiry.";
+    }
   }
 
-  // ── 6. Mark availability date as booked if session_date provided ──────────
+  // ── 6. Mark availability date as booked if payment found ──────────────────
   let session_date_booked = false;
-  if (result.paid && session_date) {
-    const { error } = await supabase.from("availability").upsert(
-      { date: session_date, status: "booked", note: `Booked — ${name}` },
+  if (result.paid && validSessionDate) {
+    const { error: availError } = await supabase.from(AVAILABILITY_TABLE).upsert(
+      { date: validSessionDate, status: "booked", note: `Booked — ${name}` },
       { onConflict: "date" }
     );
-    session_date_booked = !error;
+    if (availError) {
+      console.error("[check-payment] availability upsert failed:", availError);
+      warning = "Payment saved, but the calendar date could not be marked as booked.";
+    } else {
+      session_date_booked = true;
+    }
   }
 
   return NextResponse.json({
-    paid:               result.paid,
-    amount:             result.amount,
-    method:             result.method,
-    note:               paymentNote,
+    paid:   result.paid,
+    amount: result.amount,
+    method: result.method,
+    note:   paymentNote,
     session_date_booked,
+    evidence,
+    ...(warning ? { warning } : {}),
   });
 }

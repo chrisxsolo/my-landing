@@ -40,6 +40,16 @@ type PaymentPlanInput = {
   paid?: "deposit_1" | "deposit_2" | "full";
 };
 
+type ConfirmInquiryPaidInput = {
+  action?: string;
+  inquiry_id?: number | null;
+  client_email?: string;
+  method?: string;
+  amount?: string;
+  paid_at?: string;
+  note?: string;
+};
+
 type SupabaseServerClient = ReturnType<typeof createSupabaseServerClient>;
 
 function parseCents(amount: string): number {
@@ -157,7 +167,7 @@ export async function POST(req: NextRequest) {
   const deny = requireAdmin(req);
   if (deny) return deny;
 
-  const body = await req.json() as { rows?: ManualPaymentInput[] } | PaymentPlanInput;
+  const body = await req.json() as { rows?: ManualPaymentInput[] } | PaymentPlanInput | ConfirmInquiryPaidInput;
 
   if ("action" in body && body.action === "mark-payment-state") {
     return markPaymentState(body);
@@ -165,6 +175,10 @@ export async function POST(req: NextRequest) {
 
   if ("action" in body && body.action === "void-client-payments") {
     return voidClientPayments(body as PaymentPlanInput);
+  }
+
+  if ("action" in body && body.action === "confirm-inquiry-paid") {
+    return confirmInquiryPaid(body as ConfirmInquiryPaidInput);
   }
 
   const inputRows = "rows" in body && Array.isArray(body.rows) ? body.rows : [];
@@ -254,6 +268,97 @@ async function markPaymentState(input: PaymentPlanInput) {
   }
 
   return NextResponse.json({ ok: true, saved: data ?? [] });
+}
+
+// Admin override from the conversation view: mark an inquiry paid even when
+// the Gmail/Claude scan fails. Records a manual ledger row when an amount is
+// given (skipped if an active payment already exists — no duplicates) and
+// stamps the inquiry with a clearly-labeled "Manually confirmed" note.
+async function confirmInquiryPaid(input: ConfirmInquiryPaidInput) {
+  const inquiryId = Number(input.inquiry_id);
+  const method = input.method?.trim();
+  if (!Number.isFinite(inquiryId) || !method) {
+    return NextResponse.json({ error: "inquiry_id and method are required." }, { status: 400 });
+  }
+
+  const paidAt = normalizeDate(input.paid_at?.trim() || new Date().toISOString().slice(0, 10));
+  if (!paidAt) {
+    return NextResponse.json({ error: "paid_at must be a YYYY-MM-DD date." }, { status: 400 });
+  }
+
+  const supabase = createSupabaseServerClient();
+  const { data: inquiry, error: inquiryError } = await supabase
+    .from(INQUIRIES_TABLE).select(INQUIRY_SELECT).eq("id", inquiryId).maybeSingle();
+  if (inquiryError) {
+    console.error("[confirm-inquiry-paid] inquiry lookup failed:", inquiryError);
+    return NextResponse.json({ error: inquiryError.message }, { status: 500 });
+  }
+  if (!inquiry) return NextResponse.json({ error: "Inquiry not found." }, { status: 404 });
+
+  const amountCents = input.amount?.trim() ? parseCents(input.amount) : 0;
+  const displayAmount = amountCents > 0 ? `$${formatAmount(amountCents)}` : null;
+
+  let ledger_recorded = false;
+  if (amountCents > 0) {
+    const { data: existing, error: existingError } = await supabase
+      .from(PAYMENTS_TABLE)
+      .select("id")
+      .eq("inquiry_id", inquiryId)
+      .eq("status", "active")
+      .limit(1);
+    if (existingError) {
+      console.error("[confirm-inquiry-paid] payment lookup failed:", existingError);
+      return NextResponse.json({ error: existingError.message }, { status: 500 });
+    }
+    if (!existing?.length) {
+      const { error: insertError } = await supabase.from(PAYMENTS_TABLE).insert({
+        inquiry_id: inquiryId,
+        client_name: inquiry.name,
+        client_email: (input.client_email ?? inquiry.email ?? "").trim().toLowerCase(),
+        amount: displayAmount,
+        amount_cents: amountCents,
+        method,
+        payment_type: "deposit_1",
+        invoice: "",
+        note: input.note?.trim() || "Manually confirmed from conversation view",
+        source: PAYMENT_SOURCE_MANUAL,
+        status: "active",
+        paid_at: paidAt,
+        session_date: inquiry.session_date ?? null,
+      });
+      if (insertError) {
+        console.error("[confirm-inquiry-paid] ledger insert failed:", insertError);
+        return NextResponse.json({ error: insertError.message }, { status: 500 });
+      }
+      ledger_recorded = true;
+    }
+  }
+
+  const paymentNote = ["Manually confirmed", displayAmount, `via ${method}`, input.note?.trim()]
+    .filter(Boolean)
+    .join(" · ");
+
+  const { error: updateError } = await supabase.from(INQUIRIES_TABLE).update({
+    payment_status: "paid",
+    payment_note: paymentNote,
+    payment_detected_at: paidAt,
+    deposit_paid_at: paidAt,
+    booking_confirmed: true,
+  }).eq("id", inquiryId);
+  if (updateError) {
+    console.error("[confirm-inquiry-paid] inquiry update failed:", updateError);
+    return NextResponse.json(
+      { error: "Payment was recorded but the inquiry could not be updated." },
+      { status: 500 }
+    );
+  }
+
+  return NextResponse.json({
+    ok: true,
+    ledger_recorded,
+    already_paid: inquiry.payment_status === "paid",
+    payment_note: paymentNote,
+  });
 }
 
 async function voidClientPayments(input: PaymentPlanInput) {

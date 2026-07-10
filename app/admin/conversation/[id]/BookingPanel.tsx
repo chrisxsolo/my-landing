@@ -1,10 +1,71 @@
 "use client";
 // Payment & booking panel + the golden-hour sunset card. State and API
-// handlers live in the page.
+// handlers live in the page; only the ephemeral mark-paid form fields are
+// local to this file.
 
+import { useState } from "react";
 import type { AdminInquiry } from "@/lib/adminInquiries";
 import { T, Icon, Spinner, Panel, PanelHead, MonoLabel } from "../ui";
 import { countdownLabel } from "./helpers";
+
+const PAYMENT_METHODS = ["Venmo", "Zelle", "PayPal", "Cash App", "Square", "Cash", "Other"];
+
+function localToday(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+export type ManualPaymentForm = { method: string; amount: string; paid_at: string; note: string };
+
+// ── Manual payment override form ─────────────────────────────────────────────
+function MarkPaidForm({ loading, onSubmit, onCancel }: {
+  loading: boolean;
+  onSubmit: (form: ManualPaymentForm) => Promise<boolean>;
+  onCancel: () => void;
+}) {
+  const [method, setMethod] = useState(PAYMENT_METHODS[0]);
+  const [amount, setAmount] = useState("");
+  const [paidAt, setPaidAt] = useState(localToday());
+  const [note,   setNote]   = useState("");
+
+  async function submit() {
+    const ok = await onSubmit({ method, amount: amount.trim(), paid_at: paidAt, note: note.trim() });
+    if (ok) onCancel();
+  }
+
+  const inputStyle = { border: `1px solid ${T.greenBorder}`, background: T.inset, color: T.ink, fontFamily: "inherit" };
+
+  return (
+    <div className="space-y-2 px-3 py-2.5 rounded-lg" style={{ background: T.inset, border: `1px solid ${T.greenBorder}` }}>
+      <MonoLabel>Mark paid manually</MonoLabel>
+      <div className="grid grid-cols-2 gap-1.5">
+        <select value={method} onChange={e => setMethod(e.target.value)}
+          className="conv-input text-xs rounded-lg px-2 py-1.5" style={inputStyle}>
+          {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
+        </select>
+        <input value={amount} onChange={e => setAmount(e.target.value)} placeholder="$ amount (optional)"
+          className="conv-input text-xs rounded-lg px-2 py-1.5" style={inputStyle} />
+        <input type="date" value={paidAt} onChange={e => setPaidAt(e.target.value)}
+          className="conv-input text-xs rounded-lg px-2 py-1.5" style={inputStyle} />
+        <input value={note} onChange={e => setNote(e.target.value)} placeholder="Note (optional)"
+          className="conv-input text-xs rounded-lg px-2 py-1.5" style={inputStyle} />
+      </div>
+      <div className="flex gap-1.5">
+        <button onClick={submit} disabled={loading || !paidAt}
+          className="flex items-center justify-center gap-1.5 flex-1 py-2 rounded-lg text-xs font-bold disabled:opacity-40 transition-all hover:opacity-90"
+          style={{ background: T.green, color: "#10231a" }}>
+          {loading ? <Spinner size={12} /> : <Icon name="check" size={12} />}
+          {loading ? "Saving…" : "Confirm Paid"}
+        </button>
+        <button onClick={onCancel} disabled={loading}
+          className="py-2 px-3 rounded-lg text-xs font-bold transition-all hover:opacity-70"
+          style={{ background: T.neutralBg, color: T.inkFaint }}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
 
 // ── Sunset / golden hour ─────────────────────────────────────────────────────
 export function SunsetCard({ sunsetLoading, sunsetInfo, sunsetDate, dateInMind, onFetchSunset }: {
@@ -64,6 +125,7 @@ export function SunsetCard({ sunsetLoading, sunsetInfo, sunsetDate, dateInMind, 
 type BookingProps = {
   inquiry: AdminInquiry;
   paymentLoading: boolean;
+  markPaidLoading: boolean;
   sessionDateInput: string;
   onSessionDateInput: (v: string) => void;
   detectedDate: { date: string; readable: string; confidence: string } | null;
@@ -76,6 +138,7 @@ type BookingProps = {
   previewLoading: boolean;
   confirmLoading: boolean;
   onCheckPayment: () => void;
+  onMarkPaid: (form: ManualPaymentForm) => Promise<boolean>;
   onDetectDate: () => void;
   onConfirmDate: (date: string) => void;
   onScheduleReminders: () => void;
@@ -87,6 +150,7 @@ type BookingProps = {
 export default function BookingPanel(p: BookingProps) {
   const { inquiry } = p;
   const paid = inquiry.payment_status === "paid";
+  const [markPaidOpen, setMarkPaidOpen] = useState(false);
 
   return (
     <Panel>
@@ -214,13 +278,22 @@ export default function BookingPanel(p: BookingProps) {
               {p.previewLoading ? "Building…" : "Payment Email"}
             </button>
           ) : (
-            <div className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold"
-              style={{ background: T.inset, color: T.inkFaint, border: `1px dashed ${T.borderStrong}`, opacity: 0.7 }}>
-              <Icon name="mail" size={14} className="opacity-50" />
-              <span>Unpaid</span>
-            </div>
+            <button onClick={() => setMarkPaidOpen(v => !v)} disabled={p.markPaidLoading}
+              title="Record a payment manually when the Gmail scan can't find it"
+              className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-all hover:-translate-y-px disabled:opacity-40"
+              style={markPaidOpen
+                ? { background: T.green, color: "#10231a", border: `1px solid ${T.green}` }
+                : { background: T.inset, color: T.inkSoft, border: `1px dashed ${T.borderStrong}` }}>
+              <Icon name="check" size={14} />
+              Mark Paid
+            </button>
           )}
         </div>
+
+        {!paid && markPaidOpen && (
+          <MarkPaidForm loading={p.markPaidLoading} onSubmit={p.onMarkPaid}
+            onCancel={() => setMarkPaidOpen(false)} />
+        )}
       </div>
     </Panel>
   );
