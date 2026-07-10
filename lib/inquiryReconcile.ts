@@ -12,7 +12,12 @@
 //  - "responded" never regresses to "new", even when the latest message came
 //    from the client. That case is responded + needs_reply=true.
 //  - needs_reply is true only when the latest inbound client message is newer
-//    than the latest outbound evidence.
+//    than BOTH the latest outbound evidence and the manual dismissal instant
+//    (needs_reply_dismissed_at) — dismissing the flag holds until the client
+//    actually writes again.
+//  - Last-activity timestamps only move forward: stored values count as
+//    evidence alongside the Gmail scan, so a degraded fetch (rate limit,
+//    result cap, skipped closed row) never regresses previously seen state.
 //  - archived / not_interested / manual statuses, and any status the user set
 //    by hand (status_source = "manual"), are never changed by automatic sync.
 //
@@ -67,6 +72,7 @@ export type ReconcileInquirySnapshot = {
   bookingConfirmed: boolean | null;
   paymentStatus: string | null;
   needsReply: boolean | null;
+  needsReplyDismissedAt: string | null;
   lastInboundAt: string | null;
   lastOutboundAt: string | null;
   lastMessageAt: string | null;
@@ -88,6 +94,7 @@ export type InquiryReconciliation = {
     matchedThreads: string[];
     lastInboundAt: string | null;
     lastOutboundAt: string | null;
+    needsReplyDismissedAt: string | null;
     hasReplied: boolean;
     needsReply: boolean;
     previousStatus: string;
@@ -156,12 +163,15 @@ export function computeInquiryReconciliation(
   const outbound = sorted.filter(m => m.direction === "outbound");
   const outboundAfterCreation = outbound.filter(m => (toMs(m.at) ?? 0) >= createdMs - CREATION_SKEW_MS);
 
-  // The inquiry submission itself is the first inbound contact.
-  const lastInboundMs = maxMs(createdMs, ...inbound.map(m => toMs(m.at)));
+  // The inquiry submission itself is the first inbound contact. Stored values
+  // from earlier reconciliations count too — a Gmail fetch that returns less
+  // than a previous run saw must not walk the state backwards.
+  const lastInboundMs = maxMs(createdMs, toMs(inquiry.lastInboundAt), ...inbound.map(m => toMs(m.at)));
   // Stamped outbound milestones back up the Gmail scan — a missed sent message
   // must not make a replied-to inquiry look untouched.
   const lastOutboundMs = maxMs(
     ...outbound.map(m => toMs(m.at)),
+    toMs(inquiry.lastOutboundAt),
     toMs(inquiry.replySentAt),
     toMs(inquiry.invoiceSentAt),
     toMs(inquiry.contractSentAt),
@@ -181,7 +191,14 @@ export function computeInquiryReconciliation(
 
   const closed =
     nextStatus === INQUIRY_STATUS.ARCHIVED || nextStatus === INQUIRY_STATUS.NOT_INTERESTED;
-  const needsReply = !closed && lastInboundMs !== null && lastInboundMs > (lastOutboundMs ?? -Infinity);
+  // A manual dismissal holds until the client writes again — only an inbound
+  // newer than both the dismissal and the latest outbound re-flags the row.
+  const dismissedMs = toMs(inquiry.needsReplyDismissedAt);
+  const needsReply =
+    !closed &&
+    lastInboundMs !== null &&
+    lastInboundMs > (lastOutboundMs ?? -Infinity) &&
+    lastInboundMs > (dismissedMs ?? -Infinity);
 
   const lastMessageMs = maxMs(lastInboundMs, lastOutboundMs);
   const lastMessageDirection =
@@ -221,6 +238,7 @@ export function computeInquiryReconciliation(
       matchedThreads: threadIds,
       lastInboundAt: iso(lastInboundMs),
       lastOutboundAt: iso(lastOutboundMs),
+      needsReplyDismissedAt: inquiry.needsReplyDismissedAt,
       hasReplied,
       needsReply,
       previousStatus: inquiry.status,

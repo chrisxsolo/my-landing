@@ -25,13 +25,16 @@ const GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me";
 const INQUIRIES_TABLE = "inquiries";
 const MAX_MESSAGES_PER_INQUIRY = 50;
 const INQUIRY_CONCURRENCY = 4;
+// Metadata lookups per inquiry run in small batches — 50 at once (× concurrent
+// inquiries) trips Gmail's per-user rate limit and silently drops messages.
+const META_FETCH_CONCURRENCY = 10;
 
 const RECONCILE_SELECT = [
   "id", "email", "status", "status_source", "created_at", "reply_sent_at",
   "invoice_sent_at", "contract_sent_at", "deposit_paid_at", "confirmation_sent_at",
   "gallery_delivered_at", "booking_confirmed", "payment_status", "needs_reply",
-  "last_inbound_at", "last_outbound_at", "last_message_at", "last_message_direction",
-  "gmail_thread_ids",
+  "needs_reply_dismissed_at", "last_inbound_at", "last_outbound_at",
+  "last_message_at", "last_message_direction", "gmail_thread_ids",
 ].join(",");
 
 type ReconcileRow = {
@@ -49,6 +52,7 @@ type ReconcileRow = {
   booking_confirmed: boolean | null;
   payment_status: string | null;
   needs_reply: boolean | null;
+  needs_reply_dismissed_at: string | null;
   last_inbound_at: string | null;
   last_outbound_at: string | null;
   last_message_at: string | null;
@@ -88,6 +92,7 @@ function toSnapshot(row: ReconcileRow): ReconcileInquirySnapshot {
     bookingConfirmed: row.booking_confirmed,
     paymentStatus: row.payment_status,
     needsReply: row.needs_reply,
+    needsReplyDismissedAt: row.needs_reply_dismissed_at,
     lastInboundAt: row.last_inbound_at,
     lastOutboundAt: row.last_outbound_at,
     lastMessageAt: row.last_message_at,
@@ -155,10 +160,11 @@ async function fetchInquiryMessages(
     `${GMAIL_API}/messages?q=${encodeURIComponent(query)}&maxResults=${MAX_MESSAGES_PER_INQUIRY}`,
     { headers: { Authorization: auth } },
   );
-  if (listRes.ok) {
-    const json = await listRes.json() as { messages?: { id: string }[] };
-    for (const m of json.messages ?? []) ids.add(m.id);
-  }
+  // A failed search (expired token, rate limit) must fail the row — silently
+  // reconciling against an empty message set would report success on stale data.
+  if (!listRes.ok) throw new Error(`Gmail message search failed (${listRes.status})`);
+  const json = await listRes.json() as { messages?: { id: string }[] };
+  for (const m of json.messages ?? []) ids.add(m.id);
 
   // Threads linked in a previous run can contain messages the address search
   // misses (e.g. the client switched addresses mid-thread).
@@ -180,8 +186,13 @@ async function fetchInquiryMessages(
     } catch { continue; }
   }
 
-  const fetched = await Promise.all([...ids].map(id => fetchMessageMeta(auth, id)));
-  metas.push(...fetched.filter((m): m is GmailMetaMessage => m !== null));
+  const idList = [...ids];
+  for (let i = 0; i < idList.length; i += META_FETCH_CONCURRENCY) {
+    const fetched = await Promise.all(
+      idList.slice(i, i + META_FETCH_CONCURRENCY).map(id => fetchMessageMeta(auth, id)),
+    );
+    metas.push(...fetched.filter((m): m is GmailMetaMessage => m !== null));
+  }
 
   const messages: ReconcileMessage[] = [];
   for (const meta of metas) {

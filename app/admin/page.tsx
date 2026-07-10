@@ -796,7 +796,14 @@ function AdminDashboard() {
   // pass "automatic" so sync keeps reconciling those rows.
   async function updateInquiryStatus(id:number,status:string,source:"manual"|"automatic"="manual"){
     try{
-      const updated=await updateAdminInquiry(id,{status,status_source:source});
+      // Hand-marking anything but "new" also dismisses the needs-reply flag;
+      // reconciliation only re-flags when the client writes after this instant.
+      const dismiss=source==="manual"&&status!=="new";
+      const updated=await updateAdminInquiry(id,{
+        status,
+        status_source:source,
+        ...(dismiss?{needs_reply:false,needs_reply_dismissed_at:new Date().toISOString()}:{}),
+      });
       setInquiries(p=>p.map(x=>x.id===id?updated:x));
       showToast("Status updated");
     }catch(error){

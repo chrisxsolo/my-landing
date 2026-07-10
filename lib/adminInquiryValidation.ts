@@ -13,8 +13,8 @@ const CREATE_FIELDS = new Set([
 const PATCH_FIELDS = new Set([
   "status", "session_type", "session_date", "preferred_time", "reply_sent_at",
   "invoice_sent_at", "contract_sent_at", "deposit_paid_at", "gallery_delivered_at",
-  "confirmation_sent_at", "status_source", "needs_reply", "last_inbound_at",
-  "last_outbound_at", "last_message_at", "last_message_direction",
+  "confirmation_sent_at", "status_source", "needs_reply", "needs_reply_dismissed_at",
+  "last_inbound_at", "last_outbound_at", "last_message_at", "last_message_direction",
 ]);
 const STATUS_SOURCE_VALUES = new Set(["automatic", "manual"]);
 const MESSAGE_DIRECTION_VALUES = new Set(["inbound", "outbound"]);
@@ -36,8 +36,8 @@ const MAX_LENGTHS: Record<string, number> = {
 };
 const TIMESTAMP_FIELDS = new Set([
   "reply_sent_at", "invoice_sent_at", "contract_sent_at", "deposit_paid_at",
-  "gallery_delivered_at", "confirmation_sent_at", "last_inbound_at",
-  "last_outbound_at", "last_message_at",
+  "gallery_delivered_at", "confirmation_sent_at", "needs_reply_dismissed_at",
+  "last_inbound_at", "last_outbound_at", "last_message_at",
 ]);
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;

@@ -15,7 +15,8 @@ const inquiry = (over: Partial<ReconcileInquirySnapshot> = {}): ReconcileInquiry
   createdAt: "2026-07-07T18:04:08Z", replySentAt: null, invoiceSentAt: null,
   contractSentAt: null, depositPaidAt: null, confirmationSentAt: null,
   galleryDeliveredAt: null, bookingConfirmed: false, paymentStatus: "unpaid",
-  needsReply: null, lastInboundAt: null, lastOutboundAt: null, lastMessageAt: null,
+  needsReply: null, needsReplyDismissedAt: null, lastInboundAt: null,
+  lastOutboundAt: null, lastMessageAt: null,
   lastMessageDirection: null, gmailThreadIds: null, ...over,
 });
 
@@ -99,6 +100,64 @@ describe("computeInquiryReconciliation", () => {
     expect(r.nextStatus).toBe("responded");
     expect(r.needsReply).toBe(true);
     expect(r.updates.last_message_direction).toBe("inbound");
+  });
+
+  it("keeps a dismissed needs-reply flag off when no newer client message exists", () => {
+    // The classic stuck case: client sent a conversation-ending "thank you!"
+    // after the last outbound, photographer dismissed the flag.
+    const r = computeInquiryReconciliation(
+      inquiry({
+        status: "responded",
+        replySentAt: "2026-07-07T18:59:37Z",
+        needsReply: false,
+        needsReplyDismissedAt: "2026-07-09T10:00:00Z",
+        lastInboundAt: "2026-07-08T09:00:00.000Z",
+        lastOutboundAt: "2026-07-07T18:59:37.000Z",
+      }),
+      [
+        msg("outbound", "2026-07-07T18:59:37Z"),
+        msg("inbound", "2026-07-08T09:00:00Z"),
+      ],
+    );
+    expect(r.needsReply).toBe(false);
+    expect(r.updates.needs_reply).toBeUndefined();
+  });
+
+  it("re-flags a dismissed inquiry when the client writes after the dismissal", () => {
+    const r = computeInquiryReconciliation(
+      inquiry({
+        status: "responded",
+        replySentAt: "2026-07-07T18:59:37Z",
+        needsReply: false,
+        needsReplyDismissedAt: "2026-07-09T10:00:00Z",
+      }),
+      [
+        msg("outbound", "2026-07-07T18:59:37Z"),
+        msg("inbound", "2026-07-09T19:30:00Z"),
+      ],
+    );
+    expect(r.needsReply).toBe(true);
+    expect(r.updates.needs_reply).toBe(true);
+  });
+
+  it("never regresses stored last-activity state when Gmail returns fewer messages", () => {
+    // Closed rows skip the Gmail fetch entirely; a degraded fetch looks the same.
+    const r = computeInquiryReconciliation(
+      inquiry({
+        status: "archived",
+        needsReply: false,
+        lastInboundAt: "2026-07-08T09:00:00.000Z",
+        lastOutboundAt: "2026-07-07T18:59:37.000Z",
+        lastMessageAt: "2026-07-08T09:00:00.000Z",
+        lastMessageDirection: "inbound",
+      }),
+      [],
+    );
+    expect(r.changed).toBe(false);
+    expect(r.updates.last_inbound_at).toBeUndefined();
+    expect(r.updates.last_outbound_at).toBeUndefined();
+    expect(r.updates.last_message_at).toBeUndefined();
+    expect(r.updates.last_message_direction).toBeUndefined();
   });
 
   it("never touches archived or not-interested statuses", () => {

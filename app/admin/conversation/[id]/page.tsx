@@ -606,9 +606,18 @@ export default function ConversationPage() {
       const json = await res.json();
       if (json.ok) {
         showToast(`✓ Sent to ${inquiry.name}`);
+        // Sending from here IS the reply — clear needs_reply and stamp the
+        // outbound state immediately instead of waiting for the next Gmail
+        // reconciliation. reply_sent_at records the FIRST reply, never overwrite.
+        const now = new Date().toISOString();
         const updated = await updateAdminInquiry(inquiry.id, {
           status: "responded",
-          reply_sent_at: new Date().toISOString(),
+          status_source: "automatic",
+          needs_reply: false,
+          reply_sent_at: inquiry.reply_sent_at ?? now,
+          last_outbound_at: now,
+          last_message_at: now,
+          last_message_direction: "outbound",
         });
         setInquiry(updated);
         setStatus("responded");
@@ -655,7 +664,15 @@ export default function ConversationPage() {
   async function updateStatus(s: string) {
     if (!inquiry) return;
     try {
-      const updated = await updateAdminInquiry(inquiry.id, { status: s });
+      // Manual override — timeline sync must never undo it. Anything but
+      // "new" also dismisses the needs-reply flag until the client writes again.
+      const updated = await updateAdminInquiry(inquiry.id, {
+        status: s,
+        status_source: "manual",
+        ...(s !== "new"
+          ? { needs_reply: false, needs_reply_dismissed_at: new Date().toISOString() }
+          : {}),
+      });
       setInquiry(updated);
       setStatus(s);
       showToast(`Marked as ${s}`);

@@ -25,6 +25,7 @@ export const INQUIRY_SELECT = [
   "location",
   "confirmation_sent_at",
   "needs_reply",
+  "needs_reply_dismissed_at",
   "last_inbound_at",
   "last_outbound_at",
   "last_message_at",
@@ -60,6 +61,7 @@ export type AdminInquiry = {
   location: string | null;
   confirmation_sent_at: string | null;
   needs_reply: boolean | null;
+  needs_reply_dismissed_at: string | null;
   last_inbound_at: string | null;
   last_outbound_at: string | null;
   last_message_at: string | null;
@@ -115,6 +117,7 @@ export type AdminInquiryPatch = Partial<Pick<
   | "gallery_delivered_at"
   | "confirmation_sent_at"
   | "needs_reply"
+  | "needs_reply_dismissed_at"
   | "last_inbound_at"
   | "last_outbound_at"
   | "last_message_at"
