@@ -13,6 +13,7 @@ import OpenAI from "openai";
 import { getValidTokens } from "@/lib/gmailTokens";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { requireAdmin } from "@/lib/requireAdmin";
+import { normalizeServiceType } from "@/lib/contentEngine/taxonomy";
 
 export const dynamic = "force-dynamic";
 
@@ -103,6 +104,14 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Closing line matches the client's service — 🎓 milestone copy is grads-only
+  const service = normalizeServiceType(inq.session_type);
+  const closingLine =
+    service === "grads"    ? "Can't wait to capture this milestone for you!" :
+    service === "families" ? "Can't wait to capture these memories with your family!" :
+    service === "couples"  ? "Can't wait to capture this special time together!" :
+    "Can't wait for your shoot!";
+
   // ── Ask GPT to write the reminder ────────────────────────────────────────
   const openai = new OpenAI();
   const res = await openai.chat.completions.create({
@@ -125,7 +134,7 @@ Write the message in this exact structure:
 1. "Hey [first name]! Just wanted to reach out and say I'm excited for tomorrow."
 2. "We'll meet at [time] in front of [location]." — only include what you found. If time or location unknown, say you'll confirm details soon.
 3. "Feel free to text or call me if anything comes up at (408) 722-7680."
-4. "Can't wait to capture this milestone for you!"
+4. "${closingLine}"
 
 Do NOT describe how beautiful the location is. Do NOT add extra filler sentences. Keep it short and real.`,
       },
@@ -133,6 +142,7 @@ Do NOT describe how beautiful the location is. Do NOT add extra filler sentences
         role: "user",
         content: [
           `Client first name: ${inq.name.split(" ")[0]}`,
+          `Session type: ${inq.session_type ?? "photography"}`,
           `Session date: ${sessionDateReadable}`,
           `Original inquiry: ${inq.message}`,
           emailContext ? `\nEmail thread:\n${emailContext}` : "",
@@ -142,7 +152,7 @@ Do NOT describe how beautiful the location is. Do NOT add extra filler sentences
   });
 
   const draft = stripSignoff((res.choices[0]?.message?.content ?? "").trim());
-  const subject = `See you tomorrow! 🎓`;
+  const subject = service === "grads" ? `See you tomorrow! 🎓` : `See you tomorrow! 📸`;
 
   return NextResponse.json({ subject, draft });
 }
