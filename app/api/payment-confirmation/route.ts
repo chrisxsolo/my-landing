@@ -14,16 +14,9 @@ import Anthropic from "@anthropic-ai/sdk";
 import { getValidTokens } from "@/lib/gmailTokens";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { requireAdmin } from "@/lib/requireAdmin";
+import { buildPaymentConfirmationHtml } from "@/lib/paymentConfirmationEmail";
 
 export const dynamic = "force-dynamic";
-
-const CHRIS_PHONE = "(408) 722-7680";
-
-function escapeHtml(v: string) {
-  return v
-    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
 
 function sanitizeHeader(v: string) {
   return v.replace(/[\r\n]+/g, " ").trim();
@@ -170,123 +163,6 @@ Rules:
   return dateInMind ?? null;
 }
 
-function buildHtml(opts: {
-  name: string;
-  sessionType: string | null;
-  confirmedDateLabel: string | null;
-  amount: string;
-  method: string;
-  invoice: string;
-  guideUrl: string;
-  customMessage?: string;
-}) {
-  const { name, sessionType, confirmedDateLabel, amount, method, invoice, guideUrl, customMessage } = opts;
-  const safeName    = escapeHtml(name);
-  const safeGuide   = escapeHtml(guideUrl);
-
-  const sessionRow  = sessionType
-    ? `<tr style="border-bottom:1px solid rgba(17,21,19,0.09);">
-         <td style="padding:13px 0;color:#6a716f;width:140px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Session</td>
-         <td style="padding:13px 0;color:#1b201f;font-size:15px;">${escapeHtml(sessionType)}</td>
-       </tr>`
-    : "";
-
-  const dateRow = confirmedDateLabel
-    ? `<tr style="border-bottom:1px solid rgba(17,21,19,0.09);">
-         <td style="padding:13px 0;color:#6a716f;width:140px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Date</td>
-         <td style="padding:13px 0;color:#1b201f;font-size:15px;font-weight:700;">${escapeHtml(confirmedDateLabel)}</td>
-       </tr>`
-    : "";
-
-  const invoiceRow = invoice
-    ? `<tr>
-         <td style="padding:13px 0;color:#6a716f;width:140px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Invoice</td>
-         <td style="padding:13px 0;color:#1b201f;font-size:15px;">${escapeHtml(invoice)}</td>
-       </tr>`
-    : "";
-
-  return `<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background:#f4f4f0;">
-<div style="font-family:Arial,Helvetica,sans-serif;max-width:640px;margin:0 auto;padding:48px 28px;background:#ffffff;color:#111513;">
-
-  <!-- Eyebrow -->
-  <p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.15em;color:#059669;margin:0 0 20px;">
-    soloxsnaps &nbsp;·&nbsp; Booking Confirmed ✓
-  </p>
-
-  <!-- Headline -->
-  <h1 style="font-size:34px;line-height:1.05;color:#111513;margin:0 0 16px;font-weight:800;">
-    You're all set, ${safeName}! 🎓
-  </h1>
-
-  <!-- Intro -->
-  <p style="font-size:16px;line-height:1.75;color:#303635;margin:0 0 28px;">
-    I received your payment — thank you so much! Your session is officially booked and I can't wait to capture this milestone with you.
-  </p>
-
-  <!-- Payment banner -->
-  <div style="background:linear-gradient(135deg,#10b981,#047857);border-radius:14px;padding:24px 28px;margin:0 0 28px;">
-    <p style="color:rgba(255,255,255,.75);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;margin:0 0 6px;">
-      Payment Received
-    </p>
-    <p style="color:#ffffff;font-size:30px;font-weight:800;margin:0 0 4px;line-height:1;">
-      ${escapeHtml(amount || "Deposit")}
-    </p>
-    ${method ? `<p style="color:rgba(255,255,255,.8);font-size:14px;margin:6px 0 0;">via ${escapeHtml(method)}</p>` : ""}
-  </div>
-
-  <!-- Session details -->
-  ${(sessionRow || dateRow) ? `
-  <div style="border:1px solid rgba(17,21,19,0.1);border-radius:10px;padding:22px 24px;margin:0 0 28px;">
-    <p style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#111513;margin:0 0 14px;">
-      Session Details
-    </p>
-    <table style="width:100%;border-collapse:collapse;">
-      ${sessionRow}${dateRow}${invoiceRow}
-    </table>
-  </div>
-  ` : ""}
-
-  <!-- Graduation guide CTA -->
-  <div style="border:1px solid rgba(17,21,19,0.1);border-radius:10px;padding:24px;background:#f7f8f5;margin:0 0 28px;">
-    <p style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#111513;margin:0 0 10px;">
-      Prepare for your session
-    </p>
-    <p style="font-size:15px;line-height:1.7;color:#303635;margin:0 0 20px;">
-      My graduation guide covers everything — what to wear, posing tips, how to make the most of golden hour, and all the iconic spots we can hit. Refer back to it any time before shoot day.
-    </p>
-    <a href="${safeGuide}"
-       style="display:inline-block;background:#111513;color:#ffffff;text-decoration:none;border-radius:8px;padding:13px 20px;font-size:13px;font-weight:700;letter-spacing:.02em;">
-      Open the graduation guide →
-    </a>
-  </div>
-
-  ${customMessage ? `
-  <!-- Custom note from Chris -->
-  <div style="border-left:3px solid #10b981;padding:14px 18px;margin:0 0 28px;background:rgba(16,185,129,0.04);">
-    <p style="font-size:15px;line-height:1.75;color:#303635;margin:0;white-space:pre-wrap;">${escapeHtml(customMessage)}</p>
-  </div>
-  ` : ""}
-
-  <!-- Sign-off -->
-  <p style="font-size:15px;line-height:1.75;color:#303635;margin:0 0 28px;">
-    If you need to reach me before shoot day, feel free to text or call: <strong style="color:#111513;">${CHRIS_PHONE}</strong>. Otherwise just reply to this email — I'm always happy to help. See you soon!
-  </p>
-
-  <!-- Footer -->
-  <p style="font-size:13px;line-height:1.6;color:#6a716f;border-top:1px solid rgba(17,21,19,0.1);padding-top:20px;margin:0;">
-    <strong style="color:#111513;">Chris · soloxsnaps</strong><br>
-    <a href="https://soloxsnaps.com" style="color:#6a716f;text-decoration:none;">soloxsnaps.com</a>
-    &nbsp;·&nbsp; ${CHRIS_PHONE}
-  </p>
-
-</div>
-</body>
-</html>`;
-}
-
 /** Build an HTML MIME email for the Gmail raw API.
  *
  * Two-level encoding:
@@ -350,7 +226,6 @@ export async function POST(req: NextRequest) {
   }
 
   const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://soloxsnaps.com").replace(/\/+$/, "");
-  const guideUrl = `${siteUrl}/grad-guide`;
 
   const { amount, method, invoice } = parseNote(inq.payment_note);
 
@@ -361,12 +236,12 @@ export async function POST(req: NextRequest) {
     inq.session_date,
   );
 
-  const html = buildHtml({
+  const html = buildPaymentConfirmationHtml({
     name:               inq.name,
     sessionType:        inq.session_type,
     confirmedDateLabel,
     amount, method, invoice,
-    guideUrl,
+    siteUrl,
     customMessage: custom_message,
   });
 
