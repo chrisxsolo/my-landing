@@ -48,6 +48,7 @@ export const C = {
   proAccentBorder: "rgba(61,107,94,0.28)",
   proBorder: "rgba(18,24,22,0.10)",
   proShadow: "0 14px 34px rgba(18,24,22,0.06)",
+  proFilmEdge: "#dfa63f",
   white_22: "rgba(255,255,255,0.22)",
   white_82: "rgba(255,255,255,0.82)",
   modalOverlay: "rgba(14,20,18,0.55)",

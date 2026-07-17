@@ -49,9 +49,7 @@
     margin-top: 0;
   }
 
-  .sessionGrid,
-  .processGrid,
-  .stepsGrid {
+  .sessionGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -100,9 +98,7 @@
 
   .serviceGrid,
   .sessionGrid,
-  .sessionDuo,
-  .processGrid,
-  .stepsGrid {
+  .sessionDuo {
     grid-template-columns: 1fr;
   }
 

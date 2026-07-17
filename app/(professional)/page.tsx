@@ -63,6 +63,7 @@ const COLOR_VARS = {
   "--home-accent-soft": C.proAccentSoft,
   "--home-border": C.proBorder,
   "--home-shadow": C.proShadow,
+  "--home-film": C.proFilmEdge,
   "--home-shadow-lg": C.shadowWarmLg,
 } as CSSProperties;
 

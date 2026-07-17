@@ -1,15 +1,43 @@
 import Link from "next/link";
+import { Caveat } from "next/font/google";
 import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 import styles from "@/app/(professional)/home.module.css";
 import details from "@/app/(professional)/homeDetails.module.css";
+import film from "@/app/(professional)/homeFilm.module.css";
 import responsive from "@/app/(professional)/homeResponsive.module.css";
 
-const PROCESS = [
-  ["01", "Plan", "Choose your session, location, and preferred date."],
-  ["02", "Prepare", "Receive clear outfit, timing, location, and arrival guidance."],
-  ["03", "Photograph", "Get full posing direction and natural movement prompts throughout your session."],
-  ["04", "Receive", "Download your professionally edited photographs from a private online gallery."],
-] as const;
+const caveat = Caveat({ subsets: ["latin"], weight: "600", display: "swap" });
+
+type ProcessFrame = {
+  frame: string;
+  title: string;
+  copy: string;
+  keeper?: boolean;
+};
+
+const PROCESS: readonly ProcessFrame[] = [
+  {
+    frame: "01A",
+    title: "Plan",
+    copy: "Choose your session, location, and preferred date.",
+  },
+  {
+    frame: "02A",
+    title: "Prepare",
+    copy: "Receive clear outfit, timing, location, and arrival guidance.",
+  },
+  {
+    frame: "03A",
+    title: "Photograph",
+    copy: "Get full posing direction and natural movement prompts throughout your session.",
+  },
+  {
+    frame: "04A",
+    title: "Receive",
+    copy: "Download your professionally edited photographs from a private online gallery.",
+    keeper: true,
+  },
+];
 
 export default function HomeAboutExperience({
   aboutPortrait,
@@ -46,14 +74,50 @@ export default function HomeAboutExperience({
           </div>
         </div>
 
-        <div className={`${styles.stepsGrid} ${responsive.stepsGrid}`} style={{ marginTop: 48 }}>
-          {PROCESS.map(([number, title, copy]) => (
-            <article key={number} className={styles.processStep} data-reveal>
-              <span className={styles.processNumber}>{number}</span>
-              <h3>{title}</h3>
-              <p>{copy}</p>
-            </article>
-          ))}
+        <p className={film.label}>The process, frame by frame</p>
+        <div className={film.strip}>
+          <div className={film.perf} aria-hidden="true" />
+          <ol className={film.frames}>
+            {PROCESS.map((step, index) => (
+              <li
+                key={step.frame}
+                className={film.frame}
+                data-reveal
+                data-delay={index + 1}
+              >
+                <span className={film.edge} aria-hidden="true">
+                  <span>Solox 400</span>
+                  <span className={film.frameNo}>
+                    {step.frame}
+                    {step.keeper ? (
+                      <svg
+                        className={film.circle}
+                        viewBox="0 0 100 44"
+                        preserveAspectRatio="none"
+                      >
+                        <path
+                          d="M9 22 C 12 8, 36 3, 58 5 C 82 7, 95 13, 93 24 C 91 36, 68 42, 44 41 C 22 40, 5 35, 8 23 C 10 15, 22 9, 34 8"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          vectorEffect="non-scaling-stroke"
+                        />
+                      </svg>
+                    ) : null}
+                  </span>
+                </span>
+                <h3>{step.title}</h3>
+                <p>{step.copy}</p>
+                {step.keeper ? (
+                  <span className={`${film.note} ${caveat.className}`} aria-hidden="true">
+                    the keeper
+                  </span>
+                ) : null}
+              </li>
+            ))}
+          </ol>
+          <div className={film.perf} aria-hidden="true" />
         </div>
 
         <p className={styles.copy}>

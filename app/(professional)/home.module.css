@@ -345,12 +345,6 @@
   margin-top: 36px;
 }
 
-.stepsGrid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-}
-
 .cardCta {
   display: inline-flex;
   margin-top: 18px;
@@ -403,37 +397,3 @@
   text-transform: uppercase;
 }
 
-.processGrid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.processStep {
-  min-height: 230px;
-  padding: 26px;
-  border: 1px solid var(--home-border);
-  border-radius: 18px;
-  background: var(--home-paper);
-}
-
-.processNumber {
-  display: block;
-  margin-bottom: 48px;
-  color: var(--home-accent);
-  font-size: 13px;
-  font-weight: 900;
-}
-
-.processStep h3 {
-  margin: 0;
-  font-size: 21px;
-  letter-spacing: -0.025em;
-}
-
-.processStep p {
-  margin: 10px 0 0;
-  color: var(--home-muted);
-  font-size: 14px;
-  line-height: 1.58;
-}

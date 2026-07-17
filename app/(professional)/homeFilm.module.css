@@ -1,0 +1,147 @@
+/* ── The process, rendered as a strip of film ────────────────────────────────
+   Sprocket holes are painted with the page color so the strip reads as a
+   physical object laid slightly askew on the paper. Edge print ("SOLOX 400",
+   frame numbers) uses the amber of real film edge codes; the final frame is
+   circled in grease pencil like a contact-sheet pick. */
+
+.label {
+  margin: 64px 0 16px;
+  color: var(--home-accent);
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.strip {
+  --film-hairline: color-mix(in srgb, var(--home-paper) 11%, transparent);
+  border-radius: 20px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--home-paper) 7%, var(--home-ink)),
+    var(--home-ink) 46%
+  );
+  box-shadow: var(--home-shadow-lg);
+  transform: rotate(-0.5deg);
+}
+
+.perf {
+  height: 32px;
+  background-image: repeating-linear-gradient(
+    90deg,
+    var(--home-page) 0 15px,
+    transparent 15px 37px
+  );
+  background-size: 37px 10px;
+  background-repeat: repeat-x;
+  background-position: 21px 50%;
+}
+
+.frames {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.frame {
+  min-height: 216px;
+  padding: 24px 26px 32px;
+  transition: background 220ms ease;
+}
+
+.frame + .frame {
+  border-left: 1px solid var(--film-hairline);
+}
+
+.frame:hover {
+  background: color-mix(in srgb, var(--home-paper) 5%, transparent);
+}
+
+.edge {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 42px;
+  color: color-mix(in srgb, var(--home-film) 56%, transparent);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.frameNo {
+  position: relative;
+  color: var(--home-film);
+  font-size: 12px;
+  letter-spacing: 0.14em;
+}
+
+.circle {
+  position: absolute;
+  inset: -6px -13px -7px -11px;
+  color: color-mix(in srgb, var(--home-paper) 76%, transparent);
+  pointer-events: none;
+}
+
+.frame h3 {
+  margin: 0;
+  color: var(--home-paper);
+  font-size: 21px;
+  letter-spacing: -0.025em;
+}
+
+.frame p {
+  margin: 10px 0 0;
+  color: color-mix(in srgb, var(--home-paper) 64%, transparent);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.note {
+  display: inline-block;
+  margin-top: 16px;
+  transform: rotate(-2.5deg);
+  color: color-mix(in srgb, var(--home-paper) 86%, transparent);
+  font-size: 20px;
+  line-height: 1;
+}
+
+@media (max-width: 820px) {
+  .frames {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .frame:nth-child(odd) {
+    border-left: 0;
+  }
+
+  .frame:nth-child(n + 3) {
+    border-top: 1px solid var(--film-hairline);
+  }
+}
+
+@media (max-width: 760px) {
+  .label {
+    margin-top: 48px;
+  }
+
+  .frames {
+    grid-template-columns: 1fr;
+  }
+
+  .frame {
+    min-height: 0;
+  }
+
+  .frame + .frame {
+    border-left: 0;
+    border-top: 1px solid var(--film-hairline);
+  }
+
+  .edge {
+    margin-bottom: 30px;
+  }
+}
