@@ -12,22 +12,13 @@ import { applyStatusAction } from "@/lib/contentEngine/itemTransitions";
 import { publishApprovedItem } from "@/lib/contentEngine/publishItem";
 
 // Reviewed 2026-07-17: every item is a q9-10 photo whose analysis clearly
-// matches its destination (spot names verified against location_spots).
+// matches its destination.
 const ITEM_IDS = [
-  // Kim — campus spots (grad guide)
-  "30bcb7b1-aa9e-4b65-a275-838ac52f4347", // Sather Gate
-  "907faded-876e-449a-b8bd-19572b6f0b62", // Doe Library Ledge
-  "1e9688d8-2647-42e1-9806-ac0fc88f898a", // The Campanile
-  // Kim — /grads/uc-berkeley gallery
-  "3907ef3d-6d4c-4eda-906f-22df888e82d5",
-  "bac51364-85af-4ccc-a102-a9a2c3616f5d",
-  "48bd3e7f-5d21-47d2-aa9b-770d7d0d4589",
-  "77ae96e8-7ff5-44e7-b639-a9e433b11e09",
-  // Chantal — /grads/stanford gallery
-  "f8a3fa57-2ce4-4042-ad6f-30d8577d6fb3",
-  "1cad4ca0-f7fe-4c39-929e-052383b614dc",
-  "8e6db2c1-0c20-4044-9993-32d36978f9b0",
-  "d82ca21b-b668-40fc-a1bb-27562ab5863a",
+  // Tara — /grads/sf-state gallery (Legion of Honor session, SFSU sash)
+  "d7db3ef6-654f-48e7-a128-50229a8659f6",
+  "02a76306-2bf1-43fe-85dc-e65a54e3de4c",
+  "03651a14-c711-4afc-8bf2-8974082ab43c",
+  "f59e021e-b938-4722-9f76-e4e374902e96",
 ];
 
 async function main() {

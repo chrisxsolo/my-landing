@@ -15,8 +15,7 @@ import { buildSessionFactsSnapshot } from "@/lib/contentEngine/payloads";
 import { generateContentType } from "@/lib/contentEngine/generateContent";
 
 const SESSIONS = [
-  { id: "051aa232-c30e-468b-b9ff-3aa3be136e7b", label: "Kim (grads, uc-berkeley)" },
-  { id: "616ece3b-1749-4154-af83-de8e13da9ae1", label: "Chantal (grads, stanford)" },
+  { id: "79597f62-8dca-492b-9405-6f43a561f369", label: "Tara (grads, sf-state, Legion of Honor)" },
 ];
 const TYPES = ["school_page_photo", "guide_photo"];
 
