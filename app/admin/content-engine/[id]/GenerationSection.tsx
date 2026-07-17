@@ -1,9 +1,10 @@
 "use client";
 // Section 3 — Generation (spec §7.4): pre-generation summary, per-type
-// progress, dependency-ORDERED sequencing (links + testimonial BEFORE journal
-// — Plan 3 contract), Skip failed type, and Regenerate (archive + new package,
-// optional preserve-approvals copy-forward per §8.4).
-import { useCallback, useState } from "react";
+// progress, parallel generation of independent types with the journal post
+// LAST (it consumes the link + testimonial drafts — Plan 3 contract), Skip
+// failed type, and Regenerate (archive + new package, optional
+// preserve-approvals copy-forward per §8.4).
+import { useCallback, useMemo, useState } from "react";
 import { T } from "@/app/admin/adminTheme";
 import { engineApi } from "@/app/admin/content-engine/engineApi";
 import { guideTypeForService } from "@/lib/contentEngine/taxonomy";
@@ -71,14 +72,17 @@ function statusNote(
 export default function GenerationSection({
   sessionId, session, activePackage, items, photos, aiAllowed, onChanged,
 }: Props) {
-  const [busyType, setBusyType] = useState<string | null>(null);
+  const [busyTypes, setBusyTypes] = useState<ReadonlySet<string>>(new Set());
   const [notice, setNotice] = useState<string | null>(null);
   const [preserveApprovals, setPreserveApprovals] = useState(true);
 
   const serviceType = typeof session.service_type === "string" ? session.service_type : "";
   const schoolSlug = typeof session.school_slug === "string" ? session.school_slug : null;
   const analyzedCount = photos.filter((p) => !p.excluded && p.analysis_status === "completed").length;
-  const progress = activePackage?.generation_settings.progress ?? {};
+  const progress = useMemo(
+    () => activePackage?.generation_settings.progress ?? {},
+    [activePackage],
+  );
   const selected = activePackage?.generation_settings.selected_types ?? [];
 
   const createPackage = useCallback(async (archive: boolean) => {
@@ -95,44 +99,51 @@ export default function GenerationSection({
     }
   }, [sessionId, items, preserveApprovals, onChanged]);
 
-  const generateOne = useCallback(async (contentType: string) => {
-    if (!activePackage) return;
-    setBusyType(contentType);
-    setNotice(null);
-    try {
-      const result = await engineApi.generateType(activePackage.id, contentType);
-      if (result.outcome === "failed") setNotice(`${CONTENT_TYPE_LABELS[contentType]}: ${result.error ?? "failed"}`);
-    } catch (err) {
-      setNotice(err instanceof Error ? err.message : "generation failed");
-    } finally {
-      setBusyType(null);
-      onChanged();
-    }
+  // Runs the given types concurrently (backend claims are atomic per type) and
+  // returns per-type error messages. Each type clears its own busy flag and
+  // refreshes as it finishes, so results stream in as they complete.
+  const generateBatch = useCallback(async (types: string[]): Promise<string[]> => {
+    if (!activePackage || types.length === 0) return [];
+    setBusyTypes((prev) => new Set([...prev, ...types]));
+    const results = await Promise.all(types.map(async (type) => {
+      try {
+        const result = await engineApi.generateType(activePackage.id, type);
+        return result.outcome === "failed" ? `${CONTENT_TYPE_LABELS[type]}: ${result.error ?? "failed"}` : null;
+      } catch (err) {
+        return `${CONTENT_TYPE_LABELS[type]}: ${err instanceof Error ? err.message : "generation failed"}`;
+      } finally {
+        setBusyTypes((prev) => {
+          const next = new Set(prev);
+          next.delete(type);
+          return next;
+        });
+        onChanged();
+      }
+    }));
+    return results.filter((r): r is string => r !== null);
   }, [activePackage, onChanged]);
+
+  const generateOne = useCallback(async (contentType: string) => {
+    setNotice(null);
+    const errors = await generateBatch([contentType]);
+    if (errors.length > 0) setNotice(errors.join(" · "));
+  }, [generateBatch]);
 
   const generateAll = useCallback(async () => {
     if (!activePackage) return;
     setNotice(null);
-    // dependency order is mandatory: links + testimonial feed the journal
-    for (const type of GENERATION_ORDER) {
+    const remaining = GENERATION_ORDER.filter((type) => {
       const entry = progress[type];
-      if (!entry || entry.status === "completed" || entry.status === "skipped") continue;
-      setBusyType(type);
-      try {
-        const result = await engineApi.generateType(activePackage.id, type);
-        if (result.outcome === "failed") {
-          setNotice(`${CONTENT_TYPE_LABELS[type]}: ${result.error ?? "failed"} — continue or skip below`);
-        }
-      } catch (err) {
-        setNotice(err instanceof Error ? err.message : "generation failed");
-        break;
-      } finally {
-        onChanged();
-      }
+      return !!entry && entry.status !== "completed" && entry.status !== "skipped" && !busyTypes.has(type);
+    });
+    // journal_post consumes the link + testimonial drafts, so it waits for the
+    // parallel wave; everything else is independent and runs concurrently
+    const errors = await generateBatch(remaining.filter((t) => t !== "journal_post"));
+    if (remaining.includes("journal_post")) {
+      errors.push(...await generateBatch(["journal_post"]));
     }
-    setBusyType(null);
-    onChanged();
-  }, [activePackage, progress, onChanged]);
+    if (errors.length > 0) setNotice(`${errors.join(" · ")} — retry or skip below`);
+  }, [activePackage, progress, busyTypes, generateBatch]);
 
   const skip = useCallback(async (contentType: string) => {
     if (!activePackage) return;
@@ -180,8 +191,8 @@ export default function GenerationSection({
         )}
       </div>
       <p style={{ fontSize: 13, color: T.inkSoft, margin: "4px 0 10px" }}>
-        Inputs: {analyzedCount} analyzed photos. Journal generation uses the link and
-        testimonial drafts, so types run in dependency order.
+        Inputs: {analyzedCount} analyzed photos. Independent types generate in parallel;
+        the journal post runs last because it uses the link and testimonial drafts.
       </p>
       {notice && <p style={{ fontSize: 13, color: T.red }}>{notice}</p>}
 
@@ -207,9 +218,9 @@ export default function GenerationSection({
                       )}
                       <span style={chip(color, T.inset)} title={entry?.error ?? undefined}>{status}</span>
                       {(status === "pending" || status === "failed") && (
-                        <button style={btn(false)} disabled={busyType !== null}
+                        <button style={btn(false)} disabled={busyTypes.has(type)}
                           onClick={() => void generateOne(type)}>
-                          {busyType === type ? "Generating…" : status === "failed" ? "Retry" : "Generate"}
+                          {busyTypes.has(type) ? "Generating…" : status === "failed" ? "Retry" : "Generate"}
                         </button>
                       )}
                       {status === "failed" && (
@@ -223,9 +234,11 @@ export default function GenerationSection({
             })}
           </div>
           {activePackage.status === "generating" && (
-            <button style={{ ...btn(true), marginTop: 10 }} disabled={busyType !== null}
+            <button style={{ ...btn(true), marginTop: 10 }} disabled={busyTypes.size > 0}
               onClick={() => void generateAll()}>
-              {busyType ? `Generating ${CONTENT_TYPE_LABELS[busyType] ?? busyType}…` : "Generate all remaining"}
+              {busyTypes.size > 0
+                ? `Generating ${[...busyTypes].map((t) => CONTENT_TYPE_LABELS[t] ?? t).join(", ")}…`
+                : "Generate all remaining"}
             </button>
           )}
         </>
