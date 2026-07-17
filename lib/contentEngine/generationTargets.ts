@@ -8,12 +8,12 @@ import type { ModelCaller, ModelUsage } from "@/lib/contentEngine/aiClient";
 import { extractJsonObject } from "@/lib/contentEngine/analysisResponse";
 import {
   buildJournalPrompt, buildPortfolioPickPrompt, buildSchoolPagePhotoPrompt,
-  buildGuidePhotoPrompt, buildInternalLinkPrompt,
+  buildGuidePhotoPrompt, buildGradSpotPrompt, buildInternalLinkPrompt,
   type BuiltPrompt, type PhotoSummary,
 } from "@/lib/contentEngine/prompts";
 import { validatePayload, type SessionFactsSnapshot } from "@/lib/contentEngine/payloads";
 import { generateMetaKeywords } from "@/lib/contentEngine/serviceKeywords";
-import { guideTypeForService, isSchoolSlug } from "@/lib/contentEngine/taxonomy";
+import { guideTypeForService, isSchoolSlug, SPOT_SCHOOL_IDS } from "@/lib/contentEngine/taxonomy";
 import { downloadOriginal, encodeBatchUnderCap, toImageBlock } from "@/lib/contentEngine/modelImages";
 
 export class GenerationError extends Error {
@@ -253,6 +253,64 @@ async function schoolTarget(ctx: TargetContext): Promise<TargetResult> {
   return { outcome: "completed", itemSpecs, usage };
 }
 
+// Grad guide = the campus-spots guide: each location_spots row is a single
+// image slot keyed by numeric id, scoped to the session's school. Publishing
+// replaces the spot's current photo, so placements are conservative.
+async function gradSpotTarget(ctx: TargetContext): Promise<TargetResult> {
+  const schoolSlug = ctx.facts.school_slug;
+  if (!schoolSlug || !isSchoolSlug(schoolSlug)) {
+    return {
+      outcome: "skipped", itemSpecs: [], usage: null,
+      note: "set a school before generating campus spot placements",
+    };
+  }
+  const spotSchoolId = SPOT_SCHOOL_IDS[schoolSlug];
+  if (!spotSchoolId) {
+    return {
+      outcome: "skipped", itemSpecs: [], usage: null,
+      note: `the campus spots guide does not cover ${schoolSlug}`,
+    };
+  }
+  const { data: spotRows, error } = await ctx.client
+    .from("location_spots")
+    .select("id,name,description,tip")
+    .eq("school_id", spotSchoolId)
+    .order("order", { ascending: true });
+  if (error) throw new GenerationError(`could not load campus spots: ${error.message}`);
+  if (!spotRows || spotRows.length === 0) {
+    return {
+      outcome: "skipped", itemSpecs: [], usage: null,
+      note: `no campus spots exist for ${schoolSlug} yet`,
+    };
+  }
+  const photos = await loadPhotoSummaries(ctx.client, ctx.sessionId);
+  if (photos.length === 0) throw new GenerationError("no analyzed photos for this session");
+  const known = new Set(photos.map((p) => p.session_photo_id));
+  const spotIds = new Set(spotRows.map((s) => String(s.id)));
+
+  const { json, usage } = await callForJson(
+    ctx, buildGradSpotPrompt(ctx.facts, photos, spotRows),
+  );
+  const parsed = placementsResponseSchema.safeParse(json);
+  if (!parsed.success) throw new GenerationError(`malformed placements response: ${parsed.error.message}`);
+
+  const itemSpecs = parsed.data.placements.map((raw) => {
+    const payload = validated("guide_photo", raw);
+    assertKnownPhotos([payload.session_photo_id as string], known);
+    if (payload.guide !== "grad" || !spotIds.has(payload.location_key as string)) {
+      throw new GenerationError(
+        `campus spot ${payload.location_key} is not a ${schoolSlug} spot`,
+      );
+    }
+    return {
+      content_type: "guide_photo", payload,
+      destination: `grad-${payload.location_key as string}`,
+      photoId: payload.session_photo_id as string,
+    };
+  });
+  return { outcome: "completed", itemSpecs, usage };
+}
+
 async function guideTarget(ctx: TargetContext): Promise<TargetResult> {
   const guide = guideTypeForService(ctx.facts.service_type);
   if (!guide) {
@@ -261,6 +319,7 @@ async function guideTarget(ctx: TargetContext): Promise<TargetResult> {
       note: "no guide page is configured for this service type",
     };
   }
+  if (guide === "grad") return gradSpotTarget(ctx);
   if (!ctx.facts.primary_location?.trim()) {
     return {
       outcome: "skipped", itemSpecs: [], usage: null,

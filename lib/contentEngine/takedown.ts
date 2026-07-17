@@ -27,7 +27,33 @@ export interface TakedownResult {
   revalidated: string[];
 }
 
-async function removeLiveRecord(client: SupabaseClient, targetType: string, targetId: string | null) {
+interface PublishedItemRow {
+  payload: Record<string, unknown>;
+  published_target_type: string;
+  published_target_id: string | null;
+  published_ref: Record<string, unknown> | null;
+}
+
+// grad_spot_photo published by REPLACING the spot's single image slot; the
+// pre-publish url lives in published_ref.replaced_image_url. Restore it only
+// while the spot still shows this item's derivative — a newer manual or
+// engine change to the spot wins over the restore.
+async function restoreGradSpot(client: SupabaseClient, item: PublishedItemRow) {
+  const photoId = item.payload.session_photo_id;
+  if (typeof photoId !== "string") throw new TakedownError("grad spot payload missing session_photo_id");
+  const { data: photo } = await client.from("session_photos")
+    .select("public_derivative_url").eq("id", photoId).maybeSingle();
+  if (!photo?.public_derivative_url) return;
+  const replaced = (item.published_ref?.replaced_image_url as string | null) ?? null;
+  await client.from("location_spots")
+    .update({ image_url: replaced })
+    .eq("id", item.published_target_id)
+    .eq("image_url", photo.public_derivative_url);
+}
+
+async function removeLiveRecord(client: SupabaseClient, item: PublishedItemRow) {
+  const targetType = item.published_target_type;
+  const targetId = item.published_target_id;
   if (!targetId && targetType !== "none") throw new TakedownError("published target id missing");
   switch (targetType) {
     case "blog_post": {
@@ -52,6 +78,9 @@ async function removeLiveRecord(client: SupabaseClient, targetType: string, targ
     case "couples_location_photo":
       await client.from("couples_location_photos").update({ published: false }).eq("id", targetId);
       return;
+    case "grad_spot_photo":
+      await restoreGradSpot(client, item);
+      return;
     case "testimonial":
       await client.from("testimonials").update({ photography_session_id: null }).eq("id", targetId);
       return;
@@ -74,7 +103,12 @@ export async function takedownPublishedItem(args: TakedownArgs): Promise<Takedow
     throw new TakedownError("item is already taken down");
   }
 
-  await removeLiveRecord(client, item.published_target_type as string, item.published_target_id as string | null);
+  await removeLiveRecord(client, {
+    payload: item.payload as Record<string, unknown>,
+    published_target_type: item.published_target_type as string,
+    published_target_id: item.published_target_id as string | null,
+    published_ref: item.published_ref as Record<string, unknown> | null,
+  });
 
   // shared-derivative rule (§4.3): delete only when zero live references remain
   const photoIds = photoIdsFromPayload(item.content_type, item.payload as Record<string, unknown>);

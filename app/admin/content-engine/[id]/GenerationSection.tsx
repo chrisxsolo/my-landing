@@ -7,7 +7,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { T } from "@/app/admin/adminTheme";
 import { engineApi } from "@/app/admin/content-engine/engineApi";
-import { guideTypeForService } from "@/lib/contentEngine/taxonomy";
+import { guideTypeForService, isSchoolSlug, SPOT_SCHOOL_IDS } from "@/lib/contentEngine/taxonomy";
 import {
   GENERATION_ORDER, CONTENT_TYPE_LABELS,
   type EngineItem, type EnginePackage, type EnginePhoto,
@@ -22,6 +22,25 @@ interface Props {
   photos: EnginePhoto[];
   aiAllowed: boolean;
   onChanged: () => void;
+}
+
+// The grad guide is the campus-spots page: placements key off the school (not
+// primary_location), and only campuses in SPOT_SCHOOL_IDS have spots. Mirrors
+// the skip conditions in gradSpotTarget.
+function gradGuideStatusNote(
+  status: string, snapshot: EnginePackage["session_facts_snapshot"],
+): string | null {
+  const school = typeof snapshot?.school_slug === "string" ? snapshot.school_slug : null;
+  if (!school) {
+    return "Set a school in Session facts, then Regenerate to place photos in the campus spots guide.";
+  }
+  if (!isSchoolSlug(school) || !SPOT_SCHOOL_IDS[school]) {
+    return `The campus spots guide doesn't cover ${school} yet.`;
+  }
+  if (status === "skipped") {
+    return "This package predates campus spot placements — Regenerate to include them.";
+  }
+  return "Campus spot placements ready to generate (each pick replaces that spot's current photo).";
 }
 
 // Generation reads the package SNAPSHOT, not the live session row, so guide
@@ -41,6 +60,7 @@ function guideStatusNote(
       `Regenerate to include the ${currentGuide} guide step.`;
   }
   const guide = snapshotGuide ?? currentGuide!;
+  if (guide === "grad") return gradGuideStatusNote(status, snapshot);
   if (!snapshot?.primary_location?.trim()) {
     return status === "skipped"
       ? `Add a location in Session facts, then Regenerate to generate a ${guide} guide entry.`

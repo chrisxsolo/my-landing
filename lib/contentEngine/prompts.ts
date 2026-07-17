@@ -146,6 +146,36 @@ export function buildGuidePhotoPrompt(
   };
 }
 
+export interface GradSpotSummary {
+  id: number;
+  name: string;
+  description: string;
+  tip: string;
+}
+
+// Grad guide placements target the campus-spots guide, where each spot is a
+// single image slot — publishing REPLACES the spot's current photo, so the
+// bar is "clearly this spot, clearly excellent", not "best available".
+export function buildGradSpotPrompt(
+  facts: SessionFactsSnapshot, photos: PhotoSummary[], spots: GradSpotSummary[],
+): BuiltPrompt {
+  return {
+    system:
+      `${brandFor(facts)} You match graduation photos to a campus photo-spots guide. ` +
+      "Return ONLY JSON: {\"placements\":[{\"session_photo_id\":uuid,\"guide\":\"grad\"," +
+      "\"location_key\":\"<spot id as a string>\",\"alt_text\":\"<=300, descriptive\"," +
+      "\"caption\":\"\"}]}. At most ONE photo per spot. Each placement replaces the " +
+      "spot's current example photo on the public guide, so only place a photo when it " +
+      "clearly shows that spot (or unmistakably matches its setting) AND is strong " +
+      "enough to represent it (quality_score >= 7). " +
+      "If no photo meets that bar for any spot, return {\"placements\":[]}.",
+    userText:
+      `${factsBlock(facts)}\n\nCampus spots for this school (location_key must be one ` +
+      `of these ids, as a string; any other value is invalid):\n` +
+      `${JSON.stringify(spots, null, 1)}\n\n${summariesBlock(photos)}`,
+  };
+}
+
 // Link candidates are service-scoped (grads → full canonical list, unchanged;
 // couples → couples guide cluster + pricing) so a couples session can never be
 // pointed at grad pricing, school pages, or campus content.

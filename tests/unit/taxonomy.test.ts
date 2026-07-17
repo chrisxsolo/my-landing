@@ -95,19 +95,29 @@ describe("normalizeServiceType (tolerant singular/plural/case, 2026-07-07)", () 
 });
 
 describe("guideTypeForService (single source of guide-destination truth)", () => {
-  it("couples variants resolve to the couples guide; families to family", () => {
+  it("couples variants resolve to the couples guide; families to family; grads to grad", () => {
     for (const v of ["couples", "couple", "Couples", "couples session", "engagement"]) {
       expect(guideTypeForService(v)).toBe("couples");
     }
     for (const v of ["families", "family", "Family mini"]) {
       expect(guideTypeForService(v)).toBe("family");
     }
+    for (const v of ["grads", "grad", "Graduation Session"]) {
+      expect(guideTypeForService(v)).toBe("grad");
+    }
   });
 
   it("every other service type has no guide destination", () => {
-    for (const v of ["grads", "portraits", "maternity", "prom", "events", "other", "weddings", null]) {
+    for (const v of ["portraits", "maternity", "prom", "events", "other", "weddings", null]) {
       expect(guideTypeForService(v)).toBeNull();
     }
+  });
+
+  it("grad location keys are numeric location_spots ids, not a static registry", () => {
+    expect(guideLocationKeys("grad")).toEqual([]);
+    expect(isGuideLocationKey("grad", "12")).toBe(true);
+    expect(isGuideLocationKey("grad", "tower-hall")).toBe(false);
+    expect(isGuideLocationKey("grad", "")).toBe(false);
   });
 });
 

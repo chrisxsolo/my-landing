@@ -58,12 +58,25 @@ export const GENERATABLE_CONTENT_TYPES = CONTENT_TYPES.filter(
 
 export const PUBLICATION_TARGET_TYPES = [
   "blog_post", "portfolio_image", "school_page_photo",
-  "family_location_photo", "couples_location_photo", "testimonial", "none",
+  "family_location_photo", "couples_location_photo", "grad_spot_photo",
+  "testimonial", "none",
 ] as const;
 export type PublicationTargetType = (typeof PUBLICATION_TARGET_TYPES)[number];
 
-export const GUIDE_TYPES = ["family", "couples"] as const;
+export const GUIDE_TYPES = ["family", "couples", "grad"] as const;
 export type GuideType = (typeof GUIDE_TYPES)[number];
+
+// The grad guide (/grad-guide/campus-spots) keys spots by location_spots
+// school_id, which predates the /grads route slugs — berkeley≠uc-berkeley,
+// sfsu≠sf-state. Schools absent here (stanford, santa-clara) have no campus
+// spots guide, so grad guide generation skips them.
+export const SPOT_SCHOOL_IDS: Partial<Record<SchoolSlug, string>> = {
+  sjsu: "sjsu",
+  "uc-berkeley": "berkeley",
+  "sf-state": "sfsu",
+  csueb: "csueb",
+  usf: "usf",
+};
 
 // Guide location keys derive from the registries (spec §8.5: keys never drift
 // from the guide pages). Includes unpublished locations: publication targeting
@@ -71,16 +84,33 @@ export type GuideType = (typeof GUIDE_TYPES)[number];
 const FAMILY_LOCATION_KEYS: string[] = getAllFamilyLocations().map((l) => l.slug);
 const COUPLES_LOCATION_KEYS: string[] = getAllCouplesLocations().map((l) => l.slug);
 
+// Static registries for family/couples. Grad spot keys live in the
+// location_spots table (numeric row ids), so the static list is empty —
+// callers that need real grad keys load them from the DB.
 export function guideLocationKeys(guide: GuideType): string[] {
-  return guide === "family" ? FAMILY_LOCATION_KEYS : COUPLES_LOCATION_KEYS;
+  if (guide === "family") return FAMILY_LOCATION_KEYS;
+  if (guide === "couples") return COUPLES_LOCATION_KEYS;
+  return [];
 }
 
+// Grad-guide cluster pages (matching app/(professional)/grad-guide/*) —
+// grad sessions may link to these from journal posts.
+export const GRAD_GUIDE_LINKS: readonly string[] = [
+  "/grad-guide",
+  "/grad-guide/campus-spots",
+  "/grad-guide/what-to-wear",
+  "/grad-guide/posing",
+  "/grad-guide/how-to-prepare",
+];
+
 // Closed canonical internal-link list fed to the journal generator (spec §8.3):
-// every school page, both guide hubs, the pricing hub, and the per-service
-// pricing pages (matching app/(professional)/pricing/* directories). Output
-// links are validated against this list — anything else is a validation failure.
+// every school page, the guide hubs and clusters, the pricing hub, and the
+// per-service pricing pages (matching app/(professional)/pricing/*
+// directories). Output links are validated against this list — anything else
+// is a validation failure.
 export const CANONICAL_INTERNAL_LINKS: readonly string[] = [
   ...SCHOOL_SLUGS.map((s) => `/grads/${s}`),
+  ...GRAD_GUIDE_LINKS,
   "/family-guide",
   "/couples-guide",
   ...FAMILY_LOCATION_KEYS.map((k) => `/family-guide/locations/${k}`),
@@ -98,8 +128,8 @@ export const CANONICAL_INTERNAL_LINKS: readonly string[] = [
 // grad). Everything stays inside the closed canonical list.
 export function internalLinksForService(serviceType: ServiceType): readonly string[] {
   if (serviceType === "grads") {
-    // The pre-service-aware full list, plus grad pricing — every other
-    // service's pricing page is filtered out.
+    // The pre-service-aware full list plus the grad-guide cluster and grad
+    // pricing — every other service's pricing page is filtered out.
     return CANONICAL_INTERNAL_LINKS.filter(
       (l) => !l.startsWith("/pricing/") || l === "/pricing/grads",
     );
@@ -166,6 +196,7 @@ export function guideTypeForService(serviceType: unknown): GuideType | null {
   const normalized = normalizeServiceType(serviceType);
   if (normalized === "couples") return "couples";
   if (normalized === "families") return "family";
+  if (normalized === "grads") return "grad";
   return null;
 }
 
@@ -179,6 +210,11 @@ export const isContentType = has(CONTENT_TYPES);
 export const isGuideType = has(GUIDE_TYPES);
 export const isCanonicalInternalLink = has(CANONICAL_INTERNAL_LINKS);
 
+// Grad keys are location_spots row ids — a numeric string is structurally
+// valid here; existence is enforced where the DB is reachable (the generation
+// target checks against loaded spots, the publish RPC raises on missing rows).
 export function isGuideLocationKey(guide: GuideType, key: unknown): boolean {
-  return typeof key === "string" && guideLocationKeys(guide).includes(key);
+  if (typeof key !== "string") return false;
+  if (guide === "grad") return /^\d+$/.test(key);
+  return guideLocationKeys(guide).includes(key);
 }

@@ -3,7 +3,9 @@
 // Destination dropdowns use the canonical taxonomy so invalid slugs are
 // unrepresentable. Each editor renders controlled fields over the payload and
 // calls onEdit with the FULL next payload (autosave owns persistence).
+import { useEffect, useState } from "react";
 import { T } from "@/app/admin/adminTheme";
+import { supabase } from "@/lib/supabase";
 import { PORTFOLIO_CATEGORIES, SCHOOL_SLUGS, GUIDE_TYPES, guideLocationKeys } from "@/lib/contentEngine/taxonomy";
 import type { EnginePhoto } from "@/app/admin/content-engine/engineTypes";
 import { input, label } from "./ui";
@@ -112,30 +114,73 @@ export function SchoolEditor(props: EditorProps) {
   );
 }
 
+interface SpotOption { id: number; school_short: string; name: string }
+
 export function GuideEditor(props: EditorProps) {
   const { payload, onEdit, disabled } = props;
   const guide = (str(payload.guide) || "family") as (typeof GUIDE_TYPES)[number];
+  // grad location keys are location_spots row ids — loaded once so the
+  // dropdown shows spot names instead of raw ids (same table the public
+  // campus-spots page reads).
+  const [spots, setSpots] = useState<SpotOption[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    supabase.from("location_spots").select("id,school_short,name")
+      .order("school_id").order("order", { ascending: true })
+      .then(({ data, error }) => {
+        if (error) console.error("could not load campus spots for guide editor", error);
+        if (!cancelled && data) setSpots(data as SpotOption[]);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  const locationKey = str(payload.location_key);
+  const firstKeyFor = (g: (typeof GUIDE_TYPES)[number]) =>
+    g === "grad" ? (spots[0] ? String(spots[0].id) : "") : guideLocationKeys(g)[0];
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 8 }}>
       <PhotoSelect {...props} />
       <div>
         <span style={label}>Guide</span>
         <select style={input} disabled={disabled} value={guide}
-          onChange={(e) => onEdit({ ...payload, guide: e.target.value, location_key: guideLocationKeys(e.target.value as (typeof GUIDE_TYPES)[number])[0] })}>
+          onChange={(e) => {
+            const next = e.target.value as (typeof GUIDE_TYPES)[number];
+            onEdit({ ...payload, guide: next, location_key: firstKeyFor(next) });
+          }}>
           {GUIDE_TYPES.map((g) => <option key={g} value={g}>{g}</option>)}
         </select>
       </div>
       <div>
-        <span style={label}>Location</span>
-        <select style={input} disabled={disabled} value={str(payload.location_key)}
+        <span style={label}>{guide === "grad" ? "Campus spot" : "Location"}</span>
+        <select style={input} disabled={disabled} value={locationKey}
           onChange={(e) => onEdit({ ...payload, location_key: e.target.value })}>
-          {guideLocationKeys(guide).map((k) => <option key={k} value={k}>{k}</option>)}
+          {guide === "grad" ? (
+            <>
+              {locationKey && !spots.some((s) => String(s.id) === locationKey) && (
+                <option value={locationKey}>spot #{locationKey}</option>
+              )}
+              {spots.map((s) => (
+                <option key={s.id} value={String(s.id)}>{s.school_short} — {s.name}</option>
+              ))}
+            </>
+          ) : (
+            guideLocationKeys(guide).map((k) => <option key={k} value={k}>{k}</option>)
+          )}
         </select>
       </div>
-      <Field name="Alt text" value={str(payload.alt_text)} disabled={disabled}
-        onChange={(v) => onEdit({ ...payload, alt_text: v })} />
-      <Field name="Caption (shown on the guide page)" value={str(payload.caption)} disabled={disabled}
-        onChange={(v) => onEdit({ ...payload, caption: v })} />
+      {guide === "grad" ? (
+        <p style={{ fontSize: 12, color: T.inkSoft, alignSelf: "end", margin: 0 }}>
+          Publishing replaces this spot&rsquo;s current photo on the campus spots guide
+          (takedown restores it).
+        </p>
+      ) : (
+        <>
+          <Field name="Alt text" value={str(payload.alt_text)} disabled={disabled}
+            onChange={(v) => onEdit({ ...payload, alt_text: v })} />
+          <Field name="Caption (shown on the guide page)" value={str(payload.caption)} disabled={disabled}
+            onChange={(v) => onEdit({ ...payload, caption: v })} />
+        </>
+      )}
     </div>
   );
 }
