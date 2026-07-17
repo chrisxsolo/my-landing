@@ -69,7 +69,8 @@ function guideStatusNote(
   if (status === "skipped") {
     return `No ${guide} guide location matched this session, so there was nothing to place.`;
   }
-  return `${guide === "couples" ? "Couples" : "Family"} guide entry ready to generate.`;
+  const label = guide === "couples" ? "Couples" : guide === "portrait" ? "Portrait" : "Family";
+  return `${label} guide entry ready to generate.`;
 }
 
 // Explains skipped/pending chips so they aren't a mystery. Facts live in the

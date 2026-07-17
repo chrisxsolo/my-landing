@@ -11,7 +11,8 @@ export function pathsForPublishedItem(contentType: string, payload: Record<strin
       return [`/grads/${payload.school_slug as string}`];
     case "guide_photo": {
       if (payload.guide === "grad") return ["/grad-guide/campus-spots"];
-      const hub = payload.guide === "family" ? "family-guide" : "couples-guide";
+      const hub = payload.guide === "family" ? "family-guide"
+        : payload.guide === "portrait" ? "portrait-guide" : "couples-guide";
       return [`/${hub}/locations/${payload.location_key as string}`];
     }
     default:

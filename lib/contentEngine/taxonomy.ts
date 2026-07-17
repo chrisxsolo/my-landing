@@ -5,6 +5,7 @@
 // validates against this module so invalid slugs are unstorable.
 import { getAllFamilyLocations } from "@/lib/familyGuide/locations";
 import { getAllCouplesLocations } from "@/lib/couplesGuide/locations";
+import { getAllPortraitLocations } from "@/lib/portraitGuide/locations";
 
 export const SERVICE_TYPES = [
   "grads", "couples", "families", "portraits", "maternity", "prom", "events", "other",
@@ -58,12 +59,12 @@ export const GENERATABLE_CONTENT_TYPES = CONTENT_TYPES.filter(
 
 export const PUBLICATION_TARGET_TYPES = [
   "blog_post", "portfolio_image", "school_page_photo",
-  "family_location_photo", "couples_location_photo", "grad_spot_photo",
-  "testimonial", "none",
+  "family_location_photo", "couples_location_photo", "portrait_location_photo",
+  "grad_spot_photo", "testimonial", "none",
 ] as const;
 export type PublicationTargetType = (typeof PUBLICATION_TARGET_TYPES)[number];
 
-export const GUIDE_TYPES = ["family", "couples", "grad"] as const;
+export const GUIDE_TYPES = ["family", "couples", "portrait", "grad"] as const;
 export type GuideType = (typeof GUIDE_TYPES)[number];
 
 // The grad guide (/grad-guide/campus-spots) keys spots by location_spots
@@ -83,13 +84,15 @@ export const SPOT_SCHOOL_IDS: Partial<Record<SchoolSlug, string>> = {
 // is independent of a location's search-visibility flag.
 const FAMILY_LOCATION_KEYS: string[] = getAllFamilyLocations().map((l) => l.slug);
 const COUPLES_LOCATION_KEYS: string[] = getAllCouplesLocations().map((l) => l.slug);
+const PORTRAIT_LOCATION_KEYS: string[] = getAllPortraitLocations().map((l) => l.slug);
 
-// Static registries for family/couples. Grad spot keys live in the
+// Static registries for family/couples/portrait. Grad spot keys live in the
 // location_spots table (numeric row ids), so the static list is empty —
 // callers that need real grad keys load them from the DB.
 export function guideLocationKeys(guide: GuideType): string[] {
   if (guide === "family") return FAMILY_LOCATION_KEYS;
   if (guide === "couples") return COUPLES_LOCATION_KEYS;
+  if (guide === "portrait") return PORTRAIT_LOCATION_KEYS;
   return [];
 }
 
@@ -113,8 +116,10 @@ export const CANONICAL_INTERNAL_LINKS: readonly string[] = [
   ...GRAD_GUIDE_LINKS,
   "/family-guide",
   "/couples-guide",
+  "/portrait-guide",
   ...FAMILY_LOCATION_KEYS.map((k) => `/family-guide/locations/${k}`),
   ...COUPLES_LOCATION_KEYS.map((k) => `/couples-guide/locations/${k}`),
+  ...PORTRAIT_LOCATION_KEYS.map((k) => `/portrait-guide/locations/${k}`),
   "/pricing",
   "/pricing/grads",
   "/pricing/couples",
@@ -150,10 +155,17 @@ export function internalLinksForService(serviceType: ServiceType): readonly stri
       "/pricing",
     ];
   }
+  if (serviceType === "portraits") {
+    return [
+      "/portrait-guide",
+      ...PORTRAIT_LOCATION_KEYS.map((k) => `/portrait-guide/locations/${k}`),
+      "/pricing",
+    ];
+  }
   if (serviceType === "events") {
     return ["/family-guide", "/couples-guide", "/pricing/events", "/pricing"];
   }
-  return ["/family-guide", "/couples-guide", "/pricing"];
+  return ["/family-guide", "/couples-guide", "/portrait-guide", "/pricing"];
 }
 
 const has = <T extends string>(arr: readonly T[]) => {
@@ -196,6 +208,7 @@ export function guideTypeForService(serviceType: unknown): GuideType | null {
   const normalized = normalizeServiceType(serviceType);
   if (normalized === "couples") return "couples";
   if (normalized === "families") return "family";
+  if (normalized === "portraits") return "portrait";
   if (normalized === "grads") return "grad";
   return null;
 }

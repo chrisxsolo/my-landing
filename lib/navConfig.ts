@@ -73,6 +73,7 @@ export const DEFAULT_NAV_CONFIG: NavConfig = {
         { id: "grad-guide", label: "Grad guide", href: "/grad-guide" },
         { id: "family-guide", label: "Family guide", href: "/family-guide" },
         { id: "couples-guide", label: "Couples guide", href: "/couples-guide" },
+        { id: "portrait-guide", label: "Portrait guide", href: "/portrait-guide" },
         { id: "locations", label: "Locations", href: "/bay-area-locations" },
         { id: "faq", label: "FAQ", href: "/faq" },
       ],

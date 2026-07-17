@@ -11,6 +11,7 @@ const EXPECTED_TABS = [
   "locations",
   "bayGuide",
   "familyGuide",
+  "portraitLocations",
   "portfolio",
   "caseStudies",
   "categories",
@@ -30,7 +31,7 @@ describe("admin Website navigation", () => {
     ]);
 
     expect(WEBSITE_NAV_GROUPS.map(({ items }) => items.map(({ tab }) => tab))).toEqual([
-      ["poses", "couplesGuide", "couplesLocations", "locations", "bayGuide", "familyGuide"],
+      ["poses", "couplesGuide", "couplesLocations", "locations", "bayGuide", "familyGuide", "portraitLocations"],
       ["portfolio", "caseStudies", "categories"],
       ["blog", "library"],
       ["navigation", "aboutPage"],

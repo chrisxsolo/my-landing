@@ -78,6 +78,9 @@ async function removeLiveRecord(client: SupabaseClient, item: PublishedItemRow) 
     case "couples_location_photo":
       await client.from("couples_location_photos").update({ published: false }).eq("id", targetId);
       return;
+    case "portrait_location_photo":
+      await client.from("portrait_location_photos").update({ published: false }).eq("id", targetId);
+      return;
     case "grad_spot_photo":
       await restoreGradSpot(client, item);
       return;

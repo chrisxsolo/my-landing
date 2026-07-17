@@ -2,6 +2,7 @@ import type { MetadataRoute } from "next";
 import { getBlogPostSummaries, getBlogPostSummariesForCategory } from "@/lib/professionalData";
 import { getPublishedFamilyLocations } from "@/lib/familyGuide/locations";
 import { getPublishedCouplesLocations } from "@/lib/couplesGuide/locations";
+import { getPublishedPortraitLocations } from "@/lib/portraitGuide/locations";
 import { getBlogCategorySlugs } from "@/lib/blogCategories";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -65,6 +66,13 @@ const STATIC_ROUTES: Array<{
   { path: "/couples-guide/what-to-expect", changeFrequency: "monthly", priority: 0.6 },
   { path: "/couples-guide/best-time-for-couples-photos", changeFrequency: "monthly", priority: 0.6 },
   { path: "/couples-guide/faq", changeFrequency: "monthly", priority: 0.6 },
+  { path: "/portrait-guide", changeFrequency: "monthly", priority: 0.8 },
+  { path: "/portrait-guide/locations", changeFrequency: "monthly", priority: 0.7 },
+  { path: "/portrait-guide/what-to-wear", changeFrequency: "monthly", priority: 0.6 },
+  { path: "/portrait-guide/how-to-prepare", changeFrequency: "monthly", priority: 0.6 },
+  { path: "/portrait-guide/what-to-expect", changeFrequency: "monthly", priority: 0.6 },
+  { path: "/portrait-guide/best-time-for-portraits", changeFrequency: "monthly", priority: 0.6 },
+  { path: "/portrait-guide/faq", changeFrequency: "monthly", priority: 0.6 },
   { path: "/bay-area-locations", changeFrequency: "monthly", priority: 0.7 },
   { path: "/faq", changeFrequency: "monthly", priority: 0.6 },
   { path: "/faq/graduation", changeFrequency: "monthly", priority: 0.7 },
@@ -115,6 +123,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.7,
   }));
 
+  // Individual portrait-location pages — generated from the published location
+  // registry, so new locations appear in the sitemap automatically once published.
+  const portraitLocationEntries: MetadataRoute.Sitemap = getPublishedPortraitLocations().map((loc) => ({
+    url: `${SITE_URL}${loc.canonicalPath}`,
+    changeFrequency: "monthly",
+    priority: 0.7,
+  }));
+
   // Blog category archives (e.g. the family journal) — included only once a
   // category has at least one post, so empty/thin archives stay out of the index.
   const categoryResults = await Promise.all(
@@ -131,5 +147,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.6,
     }));
 
-  return [...staticEntries, ...familyLocationEntries, ...couplesLocationEntries, ...categoryEntries, ...blogEntries];
+  return [...staticEntries, ...familyLocationEntries, ...couplesLocationEntries, ...portraitLocationEntries, ...categoryEntries, ...blogEntries];
 }

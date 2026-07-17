@@ -14,6 +14,7 @@ export const WEBSITE_NAV_GROUPS = [
       { tab: "locations", icon: "📍", label: "Campus Spots" },
       { tab: "bayGuide", icon: "🗺️", label: "Bay Guide" },
       { tab: "familyGuide", icon: "👨‍👩‍👧", label: "Family Guide" },
+      { tab: "portraitLocations", icon: "🙋", label: "Portrait Locations" },
     ],
   },
   {

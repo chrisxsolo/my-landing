@@ -64,6 +64,21 @@ export const BLOG_CATEGORIES: Record<string, BlogCategory> = {
       emptyState: "Couples journal posts are on the way.",
     },
   },
+  "portrait-photography": {
+    slug: "portrait-photography",
+    title: "Portrait Photography Journal",
+    description:
+      "Lifestyle and individual portrait photography notes, location guides, and session tips for San Francisco and the Bay Area from SoloXSnaps.",
+    intro:
+      "Notes, location guides, and session tips for planning natural, relaxed lifestyle and individual portraits in San Francisco and across the Bay Area.",
+    guide: {
+      href: "/portrait-guide",
+      label: "Lifestyle portrait guide",
+      locationsHref: "/portrait-guide/locations",
+      locationsLabel: "Portrait photo locations",
+      emptyState: "Portrait journal posts are on the way.",
+    },
+  },
   "engagement-photography": {
     slug: "engagement-photography",
     title: "Engagement Photography Journal",
