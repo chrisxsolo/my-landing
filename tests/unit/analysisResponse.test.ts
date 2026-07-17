@@ -54,6 +54,29 @@ describe("validateAnalysisResponse (identity validation, spec §8.1 step 4)", ()
     expect(() => validateAnalysisResponse(badTags, [ID1])).toThrow();
   });
 
+  it("clamps over-long text fields instead of rejecting (real prod failure: 1000+ char description)", () => {
+    const text = JSON.stringify({
+      photos: [photo(ID1, {
+        description: "word ".repeat(300),
+        alt_text: "a".repeat(400),
+        title: "t".repeat(200),
+        tags: Array.from({ length: 20 }, (_, i) => `tag-${i}-${"x".repeat(70)}`),
+      })],
+    });
+    const out = validateAnalysisResponse(text, [ID1]);
+    expect(out[0].description!.length).toBeLessThanOrEqual(1000);
+    expect(out[0].description!.endsWith("word")).toBe(true);
+    expect(out[0].alt_text.length).toBe(300);
+    expect(out[0].title!.length).toBeLessThanOrEqual(160);
+    expect(out[0].tags).toHaveLength(15);
+    for (const t of out[0].tags) expect(t.length).toBeLessThanOrEqual(60);
+  });
+
+  it("still rejects an empty alt_text", () => {
+    const text = JSON.stringify({ photos: [photo(ID1, { alt_text: "" })] });
+    expect(() => validateAnalysisResponse(text, [ID1])).toThrow();
+  });
+
   it("tolerates null optional fields", () => {
     const text = JSON.stringify({
       photos: [photo(ID1, { suggested_category: null, destination_recommendations: null })],
