@@ -117,7 +117,7 @@ describe("graduation estimator → contact → inquiry → attribution", () => {
     expect(inquiry).toBeTruthy();
     expect(inquiry!.name).toBe("Mia Rodriguez");
     expect(inquiry!.session_type).toBe("Graduation Portrait");
-    expect(inquiry!.school).toBe("UC Berkeley");
+    expect(inquiry!.school).toBe("University of California, Berkeley"); // canonical name (schoolDetection.ts)
     expect(inquiry!.people).toBe("3");
     expect(inquiry!.status).toBe("new");
     expect(inquiry!.message).toContain("Add-ons:");
