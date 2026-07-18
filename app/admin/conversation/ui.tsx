@@ -25,6 +25,7 @@ export const CONV = {
 export const STATUS_META: Record<string, { label: string; color: string; bg: string; border: string; dot: string }> = {
   new:       { label: "New",       color: T.green,    bg: T.greenBg,   border: T.greenBorder,  dot: T.green },
   responded: { label: "Responded", color: T.blue,     bg: T.blueBg,    border: T.blueBorder,   dot: T.blue },
+  not_interested: { label: "Not interested", color: T.red, bg: T.redBg, border: T.redBorder,   dot: T.red },
   archived:  { label: "Archived",  color: T.inkFaint, bg: T.neutralBg, border: T.border,       dot: T.inkFaint },
 };
 

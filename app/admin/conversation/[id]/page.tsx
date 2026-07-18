@@ -676,7 +676,7 @@ export default function ConversationPage() {
       });
       setInquiry(updated);
       setStatus(s);
-      showToast(`Marked as ${s}`);
+      showToast(`Marked as ${STATUS_META[s]?.label.toLowerCase() ?? s}`);
     } catch (error) {
       console.error("[conversation] status update failed:", error);
       showToast("Status update failed", false);
@@ -1158,7 +1158,7 @@ export default function ConversationPage() {
         </Link>
         {/* Status segmented control */}
         <div className="hidden sm:flex items-center gap-0.5 p-0.5 rounded-full flex-shrink-0" style={{ background: T.inset, border: `1px solid ${T.rowBorder}` }}>
-          {(["new", "responded", "archived"] as const).map(s => (
+          {(["new", "responded", "not_interested", "archived"] as const).map(s => (
             <button key={s} onClick={() => updateStatus(s)}
               className="text-[11px] font-semibold px-3 py-1 rounded-full transition-all"
               style={status === s
