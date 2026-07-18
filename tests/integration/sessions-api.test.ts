@@ -31,8 +31,8 @@ describe("createPhotographySession (spec §7.1, §7.2)", () => {
     const { data: row } = await service.from("photography_sessions")
       .select("service_type,marketing_permission,ai_processing_allowed").eq("id", created.sessionId).single();
     expect(row!.service_type).toBe("grads");
-    expect(row!.marketing_permission).toBe(false); // never defaulted on
-    expect(row!.ai_processing_allowed).toBe(false); // blank sessions need explicit confirmation
+    expect(row!.marketing_permission).toBe(true); // always enabled on creation
+    expect(row!.ai_processing_allowed).toBe(true); // always enabled on creation
   });
 
   it("rejects a blank session with an invalid service type", async () => {
@@ -60,7 +60,8 @@ describe("createPhotographySession (spec §7.1, §7.2)", () => {
     expect(row!.ai_processing_allowed).toBe(true); // covered by contract/privacy policy (spec §3.1)
     expect(row!.ai_processing_basis).toBe("contract");
     expect(row!.ai_processing_confirmed_at).not.toBeNull();
-    expect(row!.marketing_permission).toBe(false); // publication permission is NEVER auto-enabled
+    expect(row!.marketing_permission).toBe(true); // always enabled on creation
+    expect(row!.marketing_permission_source).toBe("contract");
   });
 
   it("a second create for the same client session conflicts with the existing id", async () => {

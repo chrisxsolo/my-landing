@@ -1,8 +1,9 @@
 // Session creation + facts updates (spec §7.1, §7.2). Creation from a client
-// session prefills facts, sets public_display_name to FIRST NAME ONLY, and
-// auto-enables ai_processing (basis 'contract', spec §3.1) — marketing
-// permission is NEVER auto-enabled. The partial unique index on
-// client_session_id makes duplicates impossible; we surface the existing id.
+// session prefills facts and sets public_display_name to FIRST NAME ONLY.
+// Both permissions (marketing + ai_processing) are auto-enabled on every
+// creation path, basis/source 'contract' — the contract covers both.
+// The partial unique index on client_session_id makes duplicates impossible;
+// we surface the existing id.
 // Facts updates reject any value outside the canonical taxonomy (spec §8.5).
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
@@ -11,6 +12,20 @@ import {
 import { sessionTypeToServiceType, firstNameOf } from "@/lib/contentEngine/prefill";
 
 export const AI_PROCESSING_POLICY_VERSION = "2026-06-06"; // matches testimonials consent_version era
+
+// Both permissions are always on for new sessions (contract covers marketing
+// use and AI processing) — the workspace never requires a manual enable step.
+function permissionDefaults(now: string): Record<string, unknown> {
+  return {
+    marketing_permission: true,
+    marketing_permission_source: "contract",
+    marketing_permission_confirmed_at: now,
+    ai_processing_allowed: true,
+    ai_processing_basis: "contract",
+    ai_processing_policy_version: AI_PROCESSING_POLICY_VERSION,
+    ai_processing_confirmed_at: now,
+  };
+}
 
 export class CreateSessionConflictError extends Error {
   readonly existingSessionId: string;
@@ -41,10 +56,7 @@ export async function createPhotographySession(args: CreateSessionArgs): Promise
       service_type: sessionTypeToServiceType(cs.session_type),
       session_date: cs.session_date ? (cs.session_date as string).slice(0, 10) : null,
       primary_location: cs.location,
-      ai_processing_allowed: true,           // covered by contract/privacy policy (spec §3.1)
-      ai_processing_basis: "contract",
-      ai_processing_policy_version: AI_PROCESSING_POLICY_VERSION,
-      ai_processing_confirmed_at: new Date().toISOString(),
+      ...permissionDefaults(new Date().toISOString()),
     }).select("id").single();
 
     if (insErr) {
@@ -63,7 +75,8 @@ export async function createPhotographySession(args: CreateSessionArgs): Promise
     throw new Error(`invalid service type: ${input.serviceType ?? "(missing)"}`);
   }
   const { data, error } = await client.from("photography_sessions")
-    .insert({ service_type: serviceType }).select("id").single();
+    .insert({ service_type: serviceType, ...permissionDefaults(new Date().toISOString()) })
+    .select("id").single();
   if (error) throw new Error(`could not create photography session: ${error.message}`);
   return { sessionId: data.id as string };
 }
