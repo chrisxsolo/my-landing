@@ -20,7 +20,9 @@ begin
    where oid = 'public.publish_session_content_item(uuid)'::regprocedure;
 
   -- grad is an accepted guide and the branch does a replace-with-restore-point.
-  if v_src not like '%(''family'',''couples'',''grad'')%' then
+  -- Tolerant of later migrations extending the guide list (20260717000002
+  -- added 'portrait'): assert 'grad' appears inside the guide check itself.
+  if v_src not like '%v_guide not in (%''grad''%)%' then
     raise exception 'publish RPC guide check does not accept grad';
   end if;
   if v_src not like '%''replaced_image_url'', v_spot.image_url%'

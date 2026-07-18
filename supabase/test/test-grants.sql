@@ -11,6 +11,7 @@ grant all on public.image_library to service_role;
 grant all on public.family_location_photos to service_role;
 grant all on public.couples_location_photos to service_role;
 grant all on public.client_sessions to service_role;
+grant all on public.location_spots to service_role;
 grant all on public.inquiries to service_role;
 -- inquiries uses a serial id, so the service role also needs its sequence.
 grant all on sequence public.inquiries_id_seq to service_role;
