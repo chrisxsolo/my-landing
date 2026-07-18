@@ -25,16 +25,53 @@ const STATUS_CHIP: Record<EnginePhoto["analysis_status"], { label: string; color
   skipped: { label: "skipped", color: T.inkFaint },
 };
 
+// Must match ALLOWED_UPLOAD_MIME in lib/contentEngine/uploadConfig.ts (that
+// module pulls in node:crypto, so it can't be imported into a client component).
+const ALLOWED_MIME: readonly string[] = ["image/jpeg", "image/png", "image/webp"];
+const MAX_NOTICE_ITEMS = 3;
+
+// readEntries() returns at most ~100 entries per call; drain until empty.
+function readAllEntries(reader: FileSystemDirectoryReader): Promise<FileSystemEntry[]> {
+  return new Promise((resolve, reject) => {
+    const all: FileSystemEntry[] = [];
+    const step = () =>
+      reader.readEntries((batch) => {
+        if (batch.length === 0) return resolve(all);
+        all.push(...batch);
+        step();
+      }, reject);
+    step();
+  });
+}
+
+async function filesFromEntry(entry: FileSystemEntry): Promise<File[]> {
+  if (entry.isFile) {
+    return new Promise((resolve, reject) =>
+      (entry as FileSystemFileEntry).file((file) => resolve([file]), reject),
+    );
+  }
+  if (entry.isDirectory) {
+    const children = await readAllEntries((entry as FileSystemDirectoryEntry).createReader());
+    return (await Promise.all(children.map(filesFromEntry))).flat();
+  }
+  return [];
+}
+
 export default function PhotosSection({ sessionId, photos, aiAllowed, onChanged }: Props) {
   const fileInput = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const uploadFiles = useCallback(async (files: FileList | null) => {
-    if (!files?.length) return;
+  const uploadFiles = useCallback(async (incoming: File[]) => {
+    if (!incoming.length) return;
     setNotice(null);
-    for (const file of Array.from(files)) {
+    const files = incoming.filter((f) => ALLOWED_MIME.includes(f.type));
+    const problems: string[] = [];
+    if (files.length < incoming.length) {
+      problems.push(`${incoming.length - files.length} file(s) skipped — JPEG, PNG, or WebP only`);
+    }
+    for (const file of files) {
       setUploading(file.name);
       try {
         const signed = await engineApi.signUpload(sessionId, { mime: file.type, sizeBytes: file.size });
@@ -47,15 +84,37 @@ export default function PhotosSection({ sessionId, photos, aiAllowed, onChanged 
         });
       } catch (err) {
         if (err instanceof EngineApiError && err.status === 409) {
-          setNotice(`${file.name}: already uploaded (duplicate photo)`);
+          problems.push(`${file.name}: already uploaded (duplicate photo)`);
         } else {
-          setNotice(`${file.name}: ${err instanceof Error ? err.message : "upload failed"}`);
+          problems.push(`${file.name}: ${err instanceof Error ? err.message : "upload failed"}`);
         }
       }
     }
     setUploading(null);
+    if (problems.length > 0) {
+      const extra = problems.length - MAX_NOTICE_ITEMS;
+      setNotice(problems.slice(0, MAX_NOTICE_ITEMS).join(" · ") + (extra > 0 ? ` · +${extra} more` : ""));
+    }
     onChanged();
   }, [sessionId, onChanged]);
+
+  const handleDrop = useCallback(async (dt: DataTransfer) => {
+    // webkitGetAsEntry() only works synchronously inside the drop event, so
+    // entries are captured before the first await. Folders arrive in
+    // dataTransfer.files as a single extensionless pseudo-file — the entry API
+    // is the only way to reach the images inside them.
+    const entries = Array.from(dt.items)
+      .map((item) => item.webkitGetAsEntry())
+      .filter((entry): entry is FileSystemEntry => entry !== null);
+    if (entries.length === 0) return uploadFiles(Array.from(dt.files));
+    try {
+      const files = (await Promise.all(entries.map(filesFromEntry))).flat();
+      await uploadFiles(files);
+    } catch (err) {
+      console.error("reading dropped folder failed", err);
+      setNotice("could not read the dropped folder — try Upload photos instead");
+    }
+  }, [uploadFiles]);
 
   const pendingCount = photos.filter((p) => !p.excluded
     && (p.analysis_status === "pending" || p.analysis_status === "failed")).length;
@@ -95,7 +154,7 @@ export default function PhotosSection({ sessionId, photos, aiAllowed, onChanged 
   return (
     <section style={card}
       onDragOver={(e) => e.preventDefault()}
-      onDrop={(e) => { e.preventDefault(); void uploadFiles(e.dataTransfer.files); }}>
+      onDrop={(e) => { e.preventDefault(); void handleDrop(e.dataTransfer); }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h2 style={sectionTitle}>Photos ({photos.length})</h2>
         <div style={{ display: "flex", gap: 8 }}>
@@ -115,12 +174,12 @@ export default function PhotosSection({ sessionId, photos, aiAllowed, onChanged 
         </p>
       )}
       {notice && <p style={{ fontSize: 13, color: T.red }}>{notice}</p>}
-      <input ref={fileInput} type="file" accept="image/jpeg,image/png,image/webp" multiple hidden
-        onChange={(e) => void uploadFiles(e.target.files)} />
+      <input ref={fileInput} type="file" accept={ALLOWED_MIME.join(",")} multiple hidden
+        onChange={(e) => void uploadFiles(Array.from(e.target.files ?? []))} />
 
       {photos.length === 0 ? (
         <p style={{ color: T.inkSoft, textAlign: "center", padding: 24 }}>
-          No photos uploaded — drop files here or use Upload photos.
+          No photos uploaded — drop files or a folder here, or use Upload photos.
         </p>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10, marginTop: 10 }}>
