@@ -75,6 +75,26 @@ export function buildAnalysisPrompt(facts: SessionFactsSnapshot, photoIds: strin
   };
 }
 
+// Curation pass (summaries only, no image bytes): everything NOT picked gets
+// excluded, so the prompt demands EXACTLY `count` picks — a short list would
+// silently shrink the session's usable pool and strict validation rejects it.
+export function buildTopPicksPrompt(
+  facts: SessionFactsSnapshot, photos: PhotoSummary[], count: number,
+): BuiltPrompt {
+  return {
+    system:
+      `${brandFor(facts)} You curate a photo session down to its strongest selects. ` +
+      "Return ONLY JSON: {\"picks\":[\"<session_photo_id uuid>\", ...]} — no prose, no markdown fences.",
+    userText:
+      `${factsBlock(facts)}\n\n${summariesBlock(photos)}\n\n` +
+      `Pick EXACTLY ${count} photos to keep as this session's selects. ` +
+      "Favor higher quality_score, then variety — different settings, poses, and " +
+      "compositions across the set. Avoid near-duplicates: when several photos' " +
+      "alt_text/tags describe the same moment, keep only the strongest one. " +
+      "Every pick must be a session_photo_id from the list above, each at most once.",
+  };
+}
+
 export interface JournalInputs {
   links: { url: string; label: string }[];
   testimonialQuote: string | null;

@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   PROMPT_VERSION, buildAnalysisPrompt, buildJournalPrompt, buildPortfolioPickPrompt,
   buildSchoolPagePhotoPrompt, buildGuidePhotoPrompt, buildInternalLinkPrompt,
+  buildTopPicksPrompt,
 } from "@/lib/contentEngine/prompts";
 import { internalLinksForService, guideLocationKeys } from "@/lib/contentEngine/taxonomy";
 import { serviceConfigFor, SERVICE_PROMPTS } from "@/lib/contentEngine/serviceConfig";
@@ -75,6 +76,14 @@ describe("prompt construction (spec §8.3)", () => {
     const p2 = buildSchoolPagePhotoPrompt(facts, photoSummaries, "sjsu");
     expect(p1.userText).toContain(photoSummaries[0].session_photo_id);
     expect(p2.userText).toContain("sjsu");
+  });
+
+  it("top-picks prompt demands an exact count and carries the photo summaries", () => {
+    const p = buildTopPicksPrompt(facts, photoSummaries, 12);
+    expect(p.system.toLowerCase()).toContain("json");
+    expect(p.system).toContain("\"picks\"");
+    expect(p.userText).toContain("EXACTLY 12");
+    expect(p.userText).toContain(photoSummaries[0].session_photo_id);
   });
 
   it("grad prompts carry NO service-guidance block — byte-identical to the pre-routing engine", () => {

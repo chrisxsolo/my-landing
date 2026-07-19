@@ -70,6 +70,11 @@ export const engineApi = {
       "/api/admin/session-content/photos/analyze",
       { method: "POST", body: JSON.stringify({ sessionId }) },
     ),
+  curatePhotos: (sessionId: string) =>
+    request<{ curated: boolean; total: number; picked: number; excluded: number }>(
+      "/api/admin/session-content/photos/curate",
+      { method: "POST", body: JSON.stringify({ sessionId }) },
+    ),
   createPackage: (sessionId: string, selectedTypes: string[], opts?: {
     archiveCurrent?: boolean; copyItems?: { item_id: string; preserve_approval: boolean }[];
   }) =>

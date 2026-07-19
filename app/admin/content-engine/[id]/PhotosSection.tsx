@@ -8,6 +8,7 @@ import { T } from "@/app/admin/adminTheme";
 import { supabase } from "@/lib/supabase";
 import { engineApi, EngineApiError } from "@/app/admin/content-engine/engineApi";
 import type { EnginePhoto } from "@/app/admin/content-engine/engineTypes";
+import { AUTO_CURATE_THRESHOLD, TOP_PICK_COUNT } from "@/lib/contentEngine/curationConfig";
 import { btn, card, chip, sectionTitle } from "./ui";
 
 interface Props {
@@ -65,7 +66,9 @@ export default function PhotosSection({ sessionId, photos, aiAllowed, onChanged,
   const fileInput = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
+  const [curating, setCurating] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
 
@@ -125,10 +128,33 @@ export default function PhotosSection({ sessionId, photos, aiAllowed, onChanged,
   const pendingCount = photos.filter((p) => !p.excluded
     && (p.analysis_status === "pending" || p.analysis_status === "failed")).length;
   const failedCount = photos.filter((p) => !p.excluded && p.analysis_status === "failed").length;
+  const includedCount = photos.filter((p) => !p.excluded).length;
+  const analyzedCount = photos.filter((p) => !p.excluded && p.analysis_status === "completed").length;
+  // Big shoots: after a clean analysis run, AI narrows the set to the top picks
+  const autoCurate = includedCount >= AUTO_CURATE_THRESHOLD;
+
+  const runCuration = useCallback(async () => {
+    setCurating(true);
+    setNotice(null);
+    setInfo(null);
+    try {
+      const result = await engineApi.curatePhotos(sessionId);
+      setInfo(result.curated
+        ? `AI kept the best ${result.picked} of ${result.total} photos — ${result.excluded} excluded (click Include on any photo to bring it back)`
+        : `Only ${result.total} analyzed photo(s) — already at or under ${TOP_PICK_COUNT}, nothing excluded`);
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : "curation failed");
+    } finally {
+      setCurating(false);
+      onChanged();
+    }
+  }, [sessionId, onChanged]);
 
   const runAnalysis = useCallback(async () => {
     setAnalyzing(true);
     setNotice(null);
+    setInfo(null);
+    let clean = false;
     try {
       // client orchestrates: one batch per request until none remain (spec §8.1)
       for (;;) {
@@ -138,7 +164,7 @@ export default function PhotosSection({ sessionId, photos, aiAllowed, onChanged,
           setNotice(`${result.failed} photo(s) failed analysis — fix or retry below`);
           break;
         }
-        if (result.remaining === 0) break;
+        if (result.remaining === 0) { clean = true; break; }
       }
     } catch (err) {
       setNotice(err instanceof Error ? err.message : "analysis failed");
@@ -146,7 +172,8 @@ export default function PhotosSection({ sessionId, photos, aiAllowed, onChanged,
       setAnalyzing(false);
       onChanged();
     }
-  }, [sessionId, onChanged]);
+    if (clean && autoCurate) await runCuration();
+  }, [sessionId, onChanged, autoCurate, runCuration]);
 
   // Optimistic: flip locally right away, revert on server failure. No full
   // refetch — that would re-sign and reload every thumbnail in the grid.
@@ -201,7 +228,14 @@ export default function PhotosSection({ sessionId, photos, aiAllowed, onChanged,
           <button style={btn(false)} onClick={() => fileInput.current?.click()} disabled={uploading !== null}>
             {uploading ? `Uploading ${uploading}…` : "Upload photos"}
           </button>
-          <button style={btn(true)} disabled={!aiAllowed || analyzing || pendingCount === 0}
+          {analyzedCount > TOP_PICK_COUNT && (
+            <button style={btn(false)} disabled={!aiAllowed || analyzing || curating}
+              onClick={() => void runCuration()}
+              title="One AI pass ranks the analyzed photos and excludes all but the strongest">
+              {curating ? "Picking…" : `AI pick top ${TOP_PICK_COUNT}`}
+            </button>
+          )}
+          <button style={btn(true)} disabled={!aiAllowed || analyzing || curating || pendingCount === 0}
             onClick={() => void runAnalysis()}
             title={!aiAllowed ? "Enable AI processing above to analyze" : undefined}>
             {analyzing ? "Analyzing…" : failedCount > 0 ? `Retry failed (${failedCount})` : `Analyze ${pendingCount} photos`}
@@ -213,7 +247,13 @@ export default function PhotosSection({ sessionId, photos, aiAllowed, onChanged,
           Analysis is disabled until AI processing is confirmed in Permissions.
         </p>
       )}
+      {autoCurate && pendingCount > 0 && (
+        <p style={{ fontSize: 13, color: T.inkSoft }}>
+          {includedCount} photos included — after analysis, AI will keep the best {TOP_PICK_COUNT} and exclude the rest.
+        </p>
+      )}
       {notice && <p style={{ fontSize: 13, color: T.red }}>{notice}</p>}
+      {info && <p style={{ fontSize: 13, color: T.green }}>{info}</p>}
       <input ref={fileInput} type="file" accept={ALLOWED_MIME.join(",")} multiple hidden
         onChange={(e) => void uploadFiles(Array.from(e.target.files ?? []))} />
 
