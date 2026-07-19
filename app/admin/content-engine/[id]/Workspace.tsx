@@ -94,7 +94,8 @@ export default function Workspace({ sessionId }: { sessionId: string }) {
       <PermissionsBar session={session} sessionId={sessionId} onChanged={refresh} />
       <FactsSection session={session} sessionId={sessionId} onSaved={refresh} />
       <PhotosSection sessionId={sessionId} photos={photos}
-        aiAllowed={session.ai_processing_allowed as boolean} onChanged={refresh} />
+        aiAllowed={session.ai_processing_allowed as boolean} onChanged={refresh}
+        onPhotosMutated={setPhotos} />
       <GenerationSection sessionId={sessionId} session={session} activePackage={data.activePackage}
         items={data.items} aiAllowed={session.ai_processing_allowed as boolean}
         photos={photos} onChanged={refresh} />

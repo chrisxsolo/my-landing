@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/requireAdmin";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
 import { ORIGINALS_BUCKET, isUuid } from "@/lib/contentEngine/uploadConfig";
+import { MAX_DELETE_BATCH, deleteSessionPhotos } from "@/lib/contentEngine/deletePhotos";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,4 +32,37 @@ export async function GET(req: NextRequest) {
     return { ...p, thumbnailUrl: data?.signedUrl ?? null };
   }));
   return NextResponse.json({ photos: withThumbs });
+}
+
+export async function DELETE(req: NextRequest) {
+  const deny = requireAdmin(req);
+  if (deny) return deny;
+
+  let body: Record<string, unknown>;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "invalid JSON body" }, { status: 400 });
+  }
+
+  const sessionId = typeof body.sessionId === "string" ? body.sessionId : "";
+  if (!isUuid(sessionId)) return NextResponse.json({ error: "sessionId must be a uuid" }, { status: 400 });
+  const photoIds = body.photoIds;
+  if (!Array.isArray(photoIds) || photoIds.length === 0) {
+    return NextResponse.json({ error: "photoIds must be a non-empty array" }, { status: 422 });
+  }
+  if (photoIds.length > MAX_DELETE_BATCH) {
+    return NextResponse.json({ error: `at most ${MAX_DELETE_BATCH} photos per delete` }, { status: 422 });
+  }
+  if (!photoIds.every((id): id is string => typeof id === "string" && isUuid(id))) {
+    return NextResponse.json({ error: "photoIds must be uuids" }, { status: 422 });
+  }
+
+  try {
+    const result = await deleteSessionPhotos(createSupabaseAdminClient(), sessionId, photoIds);
+    return NextResponse.json(result);
+  } catch (err) {
+    console.error("photo delete failed", err);
+    return NextResponse.json({ error: "could not delete photos" }, { status: 500 });
+  }
 }

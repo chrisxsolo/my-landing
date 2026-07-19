@@ -15,6 +15,10 @@ interface Props {
   photos: EnginePhoto[];
   aiAllowed: boolean;
   onChanged: () => void;
+  // Local-state updater for changes that don't need a full workspace refetch —
+  // a refetch re-signs every thumbnail URL, forcing the browser to reload the
+  // whole grid (the old exclude-click slowness).
+  onPhotosMutated: (updater: (prev: EnginePhoto[]) => EnginePhoto[]) => void;
 }
 
 const STATUS_CHIP: Record<EnginePhoto["analysis_status"], { label: string; color: string }> = {
@@ -57,11 +61,13 @@ async function filesFromEntry(entry: FileSystemEntry): Promise<File[]> {
   return [];
 }
 
-export default function PhotosSection({ sessionId, photos, aiAllowed, onChanged }: Props) {
+export default function PhotosSection({ sessionId, photos, aiAllowed, onChanged, onPhotosMutated }: Props) {
   const fileInput = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+  const [deleting, setDeleting] = useState(false);
 
   const uploadFiles = useCallback(async (incoming: File[]) => {
     if (!incoming.length) return;
@@ -142,14 +148,48 @@ export default function PhotosSection({ sessionId, photos, aiAllowed, onChanged 
     }
   }, [sessionId, onChanged]);
 
+  // Optimistic: flip locally right away, revert on server failure. No full
+  // refetch — that would re-sign and reload every thumbnail in the grid.
   const toggleExcluded = useCallback(async (photo: EnginePhoto) => {
+    const next = !photo.excluded;
+    onPhotosMutated((prev) => prev.map((p) => (p.id === photo.id ? { ...p, excluded: next } : p)));
     try {
-      await engineApi.patchPhoto(photo.id, { excluded: !photo.excluded });
-      onChanged();
+      await engineApi.patchPhoto(photo.id, { excluded: next });
     } catch (err) {
+      onPhotosMutated((prev) => prev.map((p) => (p.id === photo.id ? { ...p, excluded: photo.excluded } : p)));
       setNotice(err instanceof Error ? err.message : "update failed");
     }
-  }, [onChanged]);
+  }, [onPhotosMutated]);
+
+  const toggleSelected = useCallback((photoId: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(photoId)) next.delete(photoId);
+      else next.add(photoId);
+      return next;
+    });
+  }, []);
+
+  const deleteSelected = useCallback(async () => {
+    const ids = [...selected];
+    if (ids.length === 0 || deleting) return;
+    if (!confirm(`Permanently delete ${ids.length} photo(s)? Originals are removed from storage — this cannot be undone.`)) return;
+    setDeleting(true);
+    setNotice(null);
+    try {
+      const result = await engineApi.deletePhotos(sessionId, ids);
+      const gone = new Set(result.deleted);
+      onPhotosMutated((prev) => prev.filter((p) => !gone.has(p.id)));
+      setSelected(new Set());
+      if (result.skippedPublished.length > 0) {
+        setNotice(`${result.skippedPublished.length} photo(s) not deleted — already published (take down first)`);
+      }
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : "delete failed");
+    } finally {
+      setDeleting(false);
+    }
+  }, [selected, deleting, sessionId, onPhotosMutated]);
 
   return (
     <section style={card}
@@ -177,6 +217,24 @@ export default function PhotosSection({ sessionId, photos, aiAllowed, onChanged 
       <input ref={fileInput} type="file" accept={ALLOWED_MIME.join(",")} multiple hidden
         onChange={(e) => void uploadFiles(Array.from(e.target.files ?? []))} />
 
+      {photos.length > 0 && (selected.size > 0 ? (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: T.ink }}>{selected.size} selected</span>
+          <button style={{ ...btn(false), padding: "3px 10px", fontSize: 12 }}
+            onClick={() => setSelected(new Set(photos.map((p) => p.id)))}>Select all</button>
+          <button style={{ ...btn(false), padding: "3px 10px", fontSize: 12 }}
+            onClick={() => setSelected(new Set())}>Clear</button>
+          <button style={{ ...btn(false, true), padding: "3px 10px", fontSize: 12 }} disabled={deleting}
+            onClick={() => void deleteSelected()}>
+            {deleting ? "Deleting…" : `Delete ${selected.size} photo(s)`}
+          </button>
+        </div>
+      ) : (
+        <p style={{ fontSize: 12, color: T.inkFaint, margin: "10px 0 0" }}>
+          Click a photo to select it for deletion.
+        </p>
+      ))}
+
       {photos.length === 0 ? (
         <p style={{ color: T.inkSoft, textAlign: "center", padding: 24 }}>
           No photos uploaded — drop files or a folder here, or use Upload photos.
@@ -185,18 +243,31 @@ export default function PhotosSection({ sessionId, photos, aiAllowed, onChanged 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10, marginTop: 10 }}>
           {photos.map((photo) => {
             const status = STATUS_CHIP[photo.analysis_status];
+            const isSelected = selected.has(photo.id);
             return (
               <figure key={photo.id} style={{
-                margin: 0, opacity: photo.excluded ? 0.4 : 1,
-                border: `1px solid ${T.border}`, borderRadius: 10, overflow: "hidden",
+                margin: 0, opacity: photo.excluded && !isSelected ? 0.4 : 1,
+                border: `1px solid ${isSelected ? T.red : T.border}`, borderRadius: 10, overflow: "hidden",
+                boxShadow: isSelected ? `0 0 0 2px ${T.redBorder}` : undefined,
               }}>
-                {photo.thumbnailUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element -- short-lived signed URL, next/image can't optimize it
-                  <img src={photo.thumbnailUrl} alt={photo.alt_text ?? photo.original_filename ?? "session photo"}
-                    style={{ width: "100%", aspectRatio: "1", objectFit: "cover", display: "block" }} />
-                ) : (
-                  <div style={{ aspectRatio: "1", background: T.inset }} />
-                )}
+                <div onClick={() => toggleSelected(photo.id)} title="Click to select for deletion"
+                  style={{ position: "relative", cursor: "pointer" }}>
+                  {photo.thumbnailUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- short-lived signed URL, next/image can't optimize it
+                    <img src={photo.thumbnailUrl} alt={photo.alt_text ?? photo.original_filename ?? "session photo"}
+                      style={{ width: "100%", aspectRatio: "1", objectFit: "cover", display: "block" }} />
+                  ) : (
+                    <div style={{ aspectRatio: "1", background: T.inset }} />
+                  )}
+                  {isSelected && (
+                    <span style={{
+                      position: "absolute", top: 6, right: 6, width: 22, height: 22,
+                      background: T.red, color: "#131114", borderRadius: 999,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: 13, fontWeight: 800,
+                    }}>✓</span>
+                  )}
+                </div>
                 <figcaption style={{ padding: 6, fontSize: 11, display: "flex", justifyContent: "space-between", gap: 4 }}>
                   <span style={chip(status.color, T.inset)} title={photo.analysis_error ?? undefined}>
                     {status.label}{photo.quality_score ? ` · ${photo.quality_score}` : ""}

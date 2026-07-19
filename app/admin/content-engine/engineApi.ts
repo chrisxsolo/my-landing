@@ -49,6 +49,10 @@ export const engineApi = {
     request<{ updated: boolean }>(`/api/admin/session-content/photos/${photoId}`, {
       method: "PATCH", body: JSON.stringify(patch),
     }),
+  deletePhotos: (sessionId: string, photoIds: string[]) =>
+    request<{ deleted: string[]; skippedPublished: string[] }>("/api/admin/session-content/photos", {
+      method: "DELETE", body: JSON.stringify({ sessionId, photoIds }),
+    }),
   signUpload: (sessionId: string, file: { mime: string; sizeBytes: number }) =>
     request<{ bucket: string; path: string; token: string; signedUrl: string }>(
       "/api/admin/session-content/photos/sign",
