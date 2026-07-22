@@ -33,6 +33,54 @@ function expandSchoolName(schoolText = "") {
   return key ? SCHOOL_FULL_NAMES[key] ?? schoolText : schoolText;
 }
 
+// ── DATE FORMATTING ──────────────────────────────────────────────────────────
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+function ordinal(n) {
+  const s = ["th", "st", "nd", "rd"];
+  const v = n % 100;
+  return `${n}${s[(v - 20) % 10] || s[v] || s[0]}`;
+}
+
+// "July 24th" / "7/24" / "2026-07-24" → "July 24th, 2026".
+// Missing year resolves to the next occurrence of that month+day.
+// Returns null when the text isn't a parseable date (e.g. "sometime this week").
+function formatSessionDate(raw) {
+  if (!raw) return null;
+  const text = String(raw).trim();
+  let year = null, month = null, day = null;
+
+  const iso   = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(text);
+  const slash = /^(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/.exec(text);
+  const named = /([A-Za-z]{3,9})\.?\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s*(\d{4}))?/.exec(text);
+
+  if (iso) {
+    year = +iso[1]; month = +iso[2]; day = +iso[3];
+  } else if (slash) {
+    month = +slash[1]; day = +slash[2];
+    year = slash[3] ? (+slash[3] < 100 ? 2000 + +slash[3] : +slash[3]) : null;
+  } else if (named) {
+    const idx = MONTH_NAMES.findIndex(m => m.toLowerCase().startsWith(named[1].toLowerCase()));
+    if (idx >= 0) {
+      month = idx + 1; day = +named[2];
+      year = named[3] ? +named[3] : null;
+    }
+  }
+
+  if (!month || !day || month < 1 || month > 12 || day < 1 || day > 31) return null;
+
+  if (year == null) {
+    const now = new Date();
+    year = now.getFullYear();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    if (new Date(year, month - 1, day) < today) year += 1;
+  }
+  return `${MONTH_NAMES[month - 1]} ${ordinal(day)}, ${year}`;
+}
+
 // ── PRICING (mirrors lib/pricingCatalog.ts) ──────────────────────────────────
 const GRAD_HOURLY_RATE = 350;
 const GROUP_RATES = { 2: 300, 3: 275, 4: 250, 5: 225 };
@@ -233,9 +281,11 @@ async function renderDetail(inq) {
   setView("detail");
 
   // Skip Gmail scan on create pages — we only need the client name there
-  let sessionDate   = inq.date_in_mind || "TBD";
+  let sessionDate   = formatSessionDate(inq.date_in_mind) || inq.date_in_mind || "TBD";
   let sessionTime   = "TBD";
-  let sessionSchool = inq.school || inq.message || "";
+  // Location falls back to school only — never the raw inquiry message
+  // (calcPrice still scans the message for school detection separately).
+  let sessionSchool = inq.school || "";
   let serviceType   = null;
   let agreedTotal   = null;
 
@@ -254,7 +304,7 @@ async function renderDetail(inq) {
     });
     if (res.ok) {
       const d = await res.json();
-      if (d.readable)     sessionDate   = d.readable;
+      if (d.readable)     sessionDate   = formatSessionDate(d.readable) || d.readable;
       if (d.time)         sessionTime   = d.time;
       if (d.location)     sessionSchool = d.location;
       if (d.session_type) serviceType   = d.session_type;
