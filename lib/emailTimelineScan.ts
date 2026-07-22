@@ -25,6 +25,8 @@ export type EmailMilestones = {
   depositPaidAt: string | null;
   contractSignedAt: string | null;
   galleryDeliveredAt: string | null;
+  /** Shoot date both sides agreed on in the thread, as YYYY-MM-DD. */
+  sessionDate: string | null;
 };
 
 export type MilestoneScanClient = { email: string; name: string | null };
@@ -121,6 +123,7 @@ type MilestoneIndices = {
   deposit_paid: number | null;
   contract_signed: number | null;
   gallery_delivered: number | null;
+  session_date: string | null;
 };
 
 const SCAN_SYSTEM_PROMPT = `You analyze the email thread between a photographer (SoloxSnaps) and one specific client to detect booking milestones. Emails are numbered chronologically and labeled with direction: "ME → CLIENT" is the photographer writing to the client, "CLIENT → ME" is the client writing back.
@@ -133,10 +136,13 @@ Identify the FIRST email (lowest number) that clearly shows each milestone:
 - contract_signed: clear evidence the client signed the contract — signed copy returned, client confirms signing, or e-sign completion notice
 - gallery_delivered: photographer delivered the final photo gallery (gallery link such as Pixieset, "your photos are ready", download link)
 
+Also extract:
+- session_date: the shoot date once both sides clearly agree on it (e.g. client says "let's lock in 8/1" and the photographer confirms). Output as YYYY-MM-DD, inferring the year from the email dates around it. If the date was later rescheduled, use the FINAL agreed date. null when no date is clearly agreed — a list of candidate dates the client is still deciding between does NOT count.
+
 Be conservative: only report a milestone when the evidence is clear for THIS client. Mentioning a future invoice ("I'll send an invoice") does NOT count as invoice_sent. Discussing price is not deposit_paid.
 
 Respond ONLY with valid JSON — no markdown, no code fences, no explanation:
-{"reply_sent":<email number or null>,"invoice_sent":<email number or null>,"contract_sent":<email number or null>,"deposit_paid":<email number or null>,"contract_signed":<email number or null>,"gallery_delivered":<email number or null>}`;
+{"reply_sent":<email number or null>,"invoice_sent":<email number or null>,"contract_sent":<email number or null>,"deposit_paid":<email number or null>,"contract_signed":<email number or null>,"gallery_delivered":<email number or null>,"session_date":<"YYYY-MM-DD" or null>}`;
 
 export async function scanClientEmailMilestones(
   auth: string,
@@ -179,6 +185,9 @@ export async function scanClientEmailMilestones(
     depositPaidAt: dateOf(indices.deposit_paid),
     contractSignedAt: dateOf(indices.contract_signed),
     galleryDeliveredAt: dateOf(indices.gallery_delivered),
+    sessionDate: typeof indices.session_date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(indices.session_date)
+      ? indices.session_date
+      : null,
   };
 }
 

@@ -3,6 +3,8 @@ import {
   CLIENT_SESSION_TABLE,
   findMatchingClientSession,
   normalizeClientSessionEmail,
+  normalizeClientSessionStatus,
+  resolveEffectiveSessionStatus,
   type ClientSessionRow,
   type ClientSessionStatus,
 } from "@/lib/clientSessions";
@@ -87,6 +89,75 @@ export async function ensureAdminPortalSession(
 
   if (createError) throw createError;
   return created.id;
+}
+
+type DepositPortalSessionInput = {
+  clientEmail: string;
+  clientName?: string | null;
+  sessionType?: string | null;
+  sessionDate?: string | null;
+  location?: string | null;
+};
+
+export type DepositPortalSessionResult = "created" | "advanced" | "unchanged" | "ambiguous" | "skipped";
+
+/**
+ * Deposit-paid side effect: guarantees the client has a portal session at
+ * least at "booked". Creates one when the client has none; advances an
+ * existing one forward only (a manually set later stage is never regressed).
+ * When the client has several sessions and none matches by type + date,
+ * returns "ambiguous" and touches nothing.
+ */
+export async function advancePortalSessionForDeposit(
+  supabase: SupabaseClient,
+  input: DepositPortalSessionInput,
+): Promise<DepositPortalSessionResult> {
+  const email = normalizeClientSessionEmail(input.clientEmail);
+  if (!email) return "skipped";
+
+  type DepositMatchRow = MatchableClientSessionRow & Pick<ClientSessionRow, "current_status">;
+  const { data: rows, error } = await supabase
+    .from(CLIENT_SESSION_TABLE)
+    .select("id,client_email,session_type,session_date,current_status")
+    .ilike("client_email", email)
+    .returns<DepositMatchRow[]>();
+  if (error) throw error;
+
+  if (!rows?.length) {
+    const { error: createError } = await supabase.from(CLIENT_SESSION_TABLE).insert({
+      client_email: email,
+      client_name: input.clientName?.trim() || null,
+      session_type: input.sessionType?.trim() || null,
+      session_date: input.sessionDate || null,
+      location: input.location?.trim() || null,
+      invoice_status: "paid",
+      current_status: "booked",
+    });
+    if (createError) throw createError;
+    return "created";
+  }
+
+  const target = rows.length === 1
+    ? rows[0]
+    : findMatchingClientSession(rows, {
+        clientEmail: email,
+        sessionType: input.sessionType,
+        sessionDate: input.sessionDate,
+      }) as DepositMatchRow | null;
+  if (!target) return "ambiguous";
+
+  const stored = normalizeClientSessionStatus(target.current_status);
+  const next = resolveEffectiveSessionStatus(stored, true);
+  const updates: Record<string, unknown> = { invoice_status: "paid" };
+  if (next !== stored) updates.current_status = next;
+  if (input.sessionDate && !target.session_date) updates.session_date = input.sessionDate;
+
+  const { error: updateError } = await supabase
+    .from(CLIENT_SESSION_TABLE)
+    .update(updates)
+    .eq("id", target.id);
+  if (updateError) throw updateError;
+  return next !== stored ? "advanced" : "unchanged";
 }
 
 export async function syncAdminInquiryPortalSession(

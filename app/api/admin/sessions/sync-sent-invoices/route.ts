@@ -13,6 +13,7 @@ import { getValidTokens } from "@/lib/gmailTokens";
 import { requireAdmin } from "@/lib/requireAdmin";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
 import { CLIENT_SESSION_TABLE } from "@/lib/clientSessions";
+import { advancePortalSessionForDeposit } from "@/lib/adminPortalSessionUpsert";
 import { computeAdvancedStatus, scanMilestonesForClients } from "@/lib/emailTimelineScan";
 import { getConnectedAccountEmails, reconcileInquiriesWithGmail } from "@/lib/inquiryReconcileGmail";
 import {
@@ -32,6 +33,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const AI_SCAN_CLIENT_LIMIT = 16;
+const AVAILABILITY_TABLE = "availability";
 
 export async function POST(req: NextRequest) {
   const deny = requireAdmin(req);
@@ -188,6 +190,7 @@ export async function POST(req: NextRequest) {
   }
 
   const galleryByEmail = new Map<string, string>();
+  const sessionDateByEmail = new Map<string, string>();
   const aiScanned = await scanMilestonesForClients(auth, [...scanTargets.values()]);
 
   for (const [email, m] of aiScanned) {
@@ -209,6 +212,7 @@ export async function POST(req: NextRequest) {
       if (!signedAtByEmail.has(email)) signedAtByEmail.set(email, m.contractSignedAt);
     }
     if (m.galleryDeliveredAt) galleryByEmail.set(email, m.galleryDeliveredAt);
+    if (m.sessionDate) sessionDateByEmail.set(email, m.sessionDate);
   }
 
   // ── 5. Apply updates to client_sessions ───────────────────────────────────
@@ -287,6 +291,7 @@ export async function POST(req: NextRequest) {
     ...signedEmails,
     ...firstReplySentByEmail.keys(),
     ...galleryByEmail.keys(),
+    ...sessionDateByEmail.keys(),
   ])];
 
   let timelineUpdated = 0;
@@ -294,7 +299,7 @@ export async function POST(req: NextRequest) {
   if (allInquiryEmails.length) {
     const { data: inquiries } = await supabase
       .from("inquiries")
-      .select("id, email, reply_sent_at, invoice_sent_at, contract_sent_at, deposit_paid_at, gallery_delivered_at, booking_confirmed")
+      .select("id, email, name, session_type, session_date, location, reply_sent_at, invoice_sent_at, contract_sent_at, deposit_paid_at, gallery_delivered_at, booking_confirmed")
       .in("email", allInquiryEmails);
 
     for (const inq of inquiries ?? []) {
@@ -317,9 +322,50 @@ export async function POST(req: NextRequest) {
         inqUpdates.booking_confirmed = true;
       }
 
+      const depositEvidence = paidEmails.has(email) || !!inq.deposit_paid_at;
+      const detectedDate = sessionDateByEmail.get(email);
+
+      // Session date agreed over email → stamp the inquiry, mark the calendar
+      // day booked (once the deposit is in), and backfill dateless portal
+      // sessions — same writes as confirming the date in the conversation view.
+      if (detectedDate && !inq.session_date) {
+        inqUpdates.session_date = detectedDate;
+        if (depositEvidence) {
+          await supabase.from(AVAILABILITY_TABLE).upsert(
+            { date: detectedDate, status: "booked", note: `Booked — ${(inq.name as string | null) ?? email}` },
+            { onConflict: "date" },
+          );
+        }
+        await supabase.from(CLIENT_SESSION_TABLE)
+          .update({ session_date: detectedDate })
+          .ilike("client_email", email)
+          .is("session_date", null);
+      }
+
       if (Object.keys(inqUpdates).length) {
         await supabase.from("inquiries").update(inqUpdates).eq("id", inq.id);
         timelineUpdated++;
+      }
+
+      // A client who booked entirely over email may have no portal session at
+      // all — step 5 can only advance existing rows. Create one at "booked".
+      const galleryEvidence = galleryByEmail.has(email) || !!inq.gallery_delivered_at;
+      if (depositEvidence && !galleryEvidence && !allEmails.has(email)) {
+        try {
+          const result = await advancePortalSessionForDeposit(supabase, {
+            clientEmail: email,
+            clientName: inq.name as string | null,
+            sessionType: inq.session_type as string | null,
+            sessionDate: (inq.session_date as string | null) ?? detectedDate ?? null,
+            location: inq.location as string | null,
+          });
+          if (result === "created") {
+            allEmails.add(email);
+            updated.push(`${email}: portal session created at booked`);
+          }
+        } catch (error) {
+          console.error(`[sync-sent-invoices] portal session create failed for ${email}:`, error);
+        }
       }
     }
   }

@@ -13,6 +13,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/requireAdmin";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
+import { advancePortalSessionForDeposit } from "@/lib/adminPortalSessionUpsert";
 
 export const dynamic = "force-dynamic";
 
@@ -184,9 +185,19 @@ async function approveRows(supabase: SupabaseServerClient, ids: number[]) {
   return NextResponse.json({ ok: true, approved, skippedDuplicates });
 }
 
-// Inquiry + availability updates that previously ran inside the Gmail sync.
+// Inquiry + availability + portal-session updates that previously ran inside
+// the Gmail sync.
 async function applySideEffects(supabase: SupabaseServerClient, row: StagedRow, now: string) {
+  let inquiry: { session_type: string | null; session_date: string | null } | null = null;
+
   if (row.inquiry_id) {
+    const { data } = await supabase
+      .from(INQUIRIES_TABLE)
+      .select("session_type, session_date")
+      .eq("id", row.inquiry_id)
+      .single<{ session_type: string | null; session_date: string | null }>();
+    inquiry = data;
+
     await supabase.from(INQUIRIES_TABLE).update({
       payment_status: "paid",
       payment_note: `${row.method || "Payment"}: ${row.amount}`,
@@ -196,10 +207,27 @@ async function applySideEffects(supabase: SupabaseServerClient, row: StagedRow, 
     }).eq("id", row.inquiry_id);
   }
 
-  if (row.session_date) {
+  const sessionDate = row.session_date ?? inquiry?.session_date ?? null;
+  if (sessionDate) {
     await supabase.from(AVAILABILITY_TABLE).upsert(
-      { date: row.session_date, status: "booked", note: row.client_name },
+      { date: sessionDate, status: "booked", note: row.client_name },
       { onConflict: "date" },
     );
+  }
+
+  // A paid deposit means the client is booked — make sure the portal reflects
+  // it even when the whole booking happened over email.
+  try {
+    const result = await advancePortalSessionForDeposit(supabase, {
+      clientEmail: row.client_email,
+      clientName: row.client_name,
+      sessionType: inquiry?.session_type ?? null,
+      sessionDate,
+    });
+    if (result === "ambiguous") {
+      console.error(`[payment-staging] portal session ambiguous for ${row.client_email} — left untouched`);
+    }
+  } catch (error) {
+    console.error(`[payment-staging] portal session update failed for ${row.client_email}:`, error);
   }
 }
