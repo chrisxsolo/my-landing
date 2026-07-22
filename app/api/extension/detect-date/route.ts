@@ -174,7 +174,7 @@ export async function POST(req: NextRequest) {
 Extract:
 1. Date: the most recently confirmed/agreed session date
 2. Time: the session time most recently discussed (e.g. "10:00 AM", "6:30 PM", "golden hour"). Prefer an explicitly confirmed time; if none was confirmed, use the most recently proposed time from either party. Format clock times like "6:00 PM". null only if no time was ever mentioned in any email.
-3. Location: the school, park, neighborhood, or specific spot most recently discussed for the shoot (e.g. "UC Berkeley", "SJSU", "Golden Gate Park", "Palace of Fine Arts, San Francisco"). Return a short place name only — never a sentence or a quote from the email. null if not found.
+3. Location: the school, park, neighborhood, city, or specific spot most recently discussed for the shoot (e.g. "UC Berkeley", "SJSU", "Golden Gate Park", "Palace of Fine Arts, San Francisco"). If only a city was mentioned, return the city (e.g. "SF" → "San Francisco"). Return a short place name only — never a sentence or a quote from the email. null if not found.
 4. Session type: one of "graduation", "family", "extended-family", "couples", "engagement", "proposal", "event", "other" — based on the inquiry and emails. null if unclear.
 5. Total fee: the most recently quoted or agreed TOTAL price for the session in dollars, as a plain number (e.g. 350). Include travel fees if they were part of the quoted total. Prefer the photographer's most recent quote or an amount the client agreed to. null if no price was discussed.
 
