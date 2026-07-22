@@ -14,6 +14,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/requireAdmin";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { advancePortalSessionForDeposit } from "@/lib/adminPortalSessionUpsert";
+import { buildBookedAvailabilityNote } from "@/lib/clientSessions";
 
 export const dynamic = "force-dynamic";
 
@@ -188,14 +189,14 @@ async function approveRows(supabase: SupabaseServerClient, ids: number[]) {
 // Inquiry + availability + portal-session updates that previously ran inside
 // the Gmail sync.
 async function applySideEffects(supabase: SupabaseServerClient, row: StagedRow, now: string) {
-  let inquiry: { session_type: string | null; session_date: string | null } | null = null;
+  let inquiry: { session_type: string | null; session_date: string | null; preferred_time: string | null } | null = null;
 
   if (row.inquiry_id) {
     const { data } = await supabase
       .from(INQUIRIES_TABLE)
-      .select("session_type, session_date")
+      .select("session_type, session_date, preferred_time")
       .eq("id", row.inquiry_id)
-      .single<{ session_type: string | null; session_date: string | null }>();
+      .single<{ session_type: string | null; session_date: string | null; preferred_time: string | null }>();
     inquiry = data;
 
     await supabase.from(INQUIRIES_TABLE).update({
@@ -210,7 +211,7 @@ async function applySideEffects(supabase: SupabaseServerClient, row: StagedRow, 
   const sessionDate = row.session_date ?? inquiry?.session_date ?? null;
   if (sessionDate) {
     await supabase.from(AVAILABILITY_TABLE).upsert(
-      { date: sessionDate, status: "booked", note: row.client_name },
+      { date: sessionDate, status: "booked", note: buildBookedAvailabilityNote(row.client_name, inquiry?.preferred_time) },
       { onConflict: "date" },
     );
   }

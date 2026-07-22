@@ -183,6 +183,25 @@ export function formatClientSessionDateTime(value: string | null) {
   }).format(date);
 }
 
+export function formatSessionTime12h(time: string | null | undefined): string | null {
+  if (!time) return null;
+  const [h, m] = time.split(":").map(Number);
+  if (!Number.isInteger(h) || !Number.isInteger(m)) return null;
+  const ampm = h >= 12 ? "PM" : "AM";
+  const h12 = h % 12 || 12;
+  return `${h12}:${String(m).padStart(2, "0")} ${ampm}`;
+}
+
+/** Note text for a booked day on the availability calendar, e.g. "Booked — Claudia Lee · 4:00 PM". */
+export function buildBookedAvailabilityNote(
+  name: string | null | undefined,
+  time?: string | null,
+): string {
+  const base = `Booked — ${name?.trim() || "client"}`;
+  const formatted = formatSessionTime12h(time ?? null);
+  return formatted ? `${base} · ${formatted}` : base;
+}
+
 export function buildClientSessionMatchKey(input: ClientSessionMatchInput) {
   return {
     email: normalizeClientSessionEmail(input.clientEmail),

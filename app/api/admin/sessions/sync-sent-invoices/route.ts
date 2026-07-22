@@ -12,7 +12,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getValidTokens } from "@/lib/gmailTokens";
 import { requireAdmin } from "@/lib/requireAdmin";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
-import { CLIENT_SESSION_TABLE } from "@/lib/clientSessions";
+import { buildBookedAvailabilityNote, CLIENT_SESSION_TABLE } from "@/lib/clientSessions";
 import { advancePortalSessionForDeposit } from "@/lib/adminPortalSessionUpsert";
 import { computeAdvancedStatus, scanMilestonesForClients } from "@/lib/emailTimelineScan";
 import { getConnectedAccountEmails, reconcileInquiriesWithGmail } from "@/lib/inquiryReconcileGmail";
@@ -191,6 +191,7 @@ export async function POST(req: NextRequest) {
 
   const galleryByEmail = new Map<string, string>();
   const sessionDateByEmail = new Map<string, string>();
+  const sessionTimeByEmail = new Map<string, string>();
   const aiScanned = await scanMilestonesForClients(auth, [...scanTargets.values()]);
 
   for (const [email, m] of aiScanned) {
@@ -213,6 +214,7 @@ export async function POST(req: NextRequest) {
     }
     if (m.galleryDeliveredAt) galleryByEmail.set(email, m.galleryDeliveredAt);
     if (m.sessionDate) sessionDateByEmail.set(email, m.sessionDate);
+    if (m.sessionTime) sessionTimeByEmail.set(email, m.sessionTime);
   }
 
   // ── 5. Apply updates to client_sessions ───────────────────────────────────
@@ -299,7 +301,7 @@ export async function POST(req: NextRequest) {
   if (allInquiryEmails.length) {
     const { data: inquiries } = await supabase
       .from("inquiries")
-      .select("id, email, name, session_type, session_date, location, reply_sent_at, invoice_sent_at, contract_sent_at, deposit_paid_at, gallery_delivered_at, booking_confirmed")
+      .select("id, email, name, session_type, session_date, preferred_time, location, reply_sent_at, invoice_sent_at, contract_sent_at, deposit_paid_at, gallery_delivered_at, booking_confirmed")
       .in("email", allInquiryEmails);
 
     for (const inq of inquiries ?? []) {
@@ -324,6 +326,10 @@ export async function POST(req: NextRequest) {
 
       const depositEvidence = paidEmails.has(email) || !!inq.deposit_paid_at;
       const detectedDate = sessionDateByEmail.get(email);
+      const sessionTime = (inq.preferred_time as string | null) ?? sessionTimeByEmail.get(email) ?? null;
+      if (sessionTimeByEmail.has(email) && !inq.preferred_time) {
+        inqUpdates.preferred_time = sessionTimeByEmail.get(email)!;
+      }
 
       // Session date agreed over email → stamp the inquiry, mark the calendar
       // day booked (once the deposit is in), and backfill dateless portal
@@ -332,7 +338,7 @@ export async function POST(req: NextRequest) {
         inqUpdates.session_date = detectedDate;
         if (depositEvidence) {
           await supabase.from(AVAILABILITY_TABLE).upsert(
-            { date: detectedDate, status: "booked", note: `Booked — ${(inq.name as string | null) ?? email}` },
+            { date: detectedDate, status: "booked", note: buildBookedAvailabilityNote((inq.name as string | null) ?? email, sessionTime) },
             { onConflict: "date" },
           );
         }

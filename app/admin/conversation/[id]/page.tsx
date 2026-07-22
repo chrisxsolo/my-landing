@@ -17,6 +17,7 @@ import {
 import { T, CONV, STATUS_META, Icon, ConvStyles } from "../ui";
 import { fmtDate, readJsonSafe, stripQuotes, tryParseDate, type ReminderDraft } from "./helpers";
 import { buildInquiryReplySubject, type SubjectSource } from "@/lib/schoolDetection";
+import { buildBookedAvailabilityNote } from "@/lib/clientSessions";
 import PipelineRail from "./PipelineRail";
 import ThreadColumn from "./ThreadColumn";
 import ContactCard from "./ContactCard";
@@ -850,7 +851,7 @@ export default function ConversationPage() {
       await fetch("/api/admin/availability", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date: dateStr, status: "booked", note: `Booked — ${inquiry.name}` }),
+        body: JSON.stringify({ date: dateStr, status: "booked", note: buildBookedAvailabilityNote(inquiry.name, inquiry.preferred_time) }),
       });
       // Keep client_sessions in sync so the ICS calendar feed stays accurate
       await supabase.from("client_sessions")
