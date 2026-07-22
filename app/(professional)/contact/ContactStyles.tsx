@@ -52,9 +52,33 @@ const CSS = `
     line-height: 1.72;
     text-wrap: pretty;
   }
-  .contact-copy a {
+  .contact-field-hint {
+    margin: -6px 0 18px;
+    color: var(--ink-muted);
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  .contact-field-hint a {
     color: ${C.proAccent};
     font-weight: 700;
+  }
+  .contact-field-pop {
+    animation: contactFieldPop 0.26s ease;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .contact-field-pop {
+      animation: none;
+    }
+  }
+  @keyframes contactFieldPop {
+    from {
+      opacity: 0;
+      transform: translateY(-6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
   .contact-hero-media {
     position: relative;

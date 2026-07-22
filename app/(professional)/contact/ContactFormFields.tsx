@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { ContactFormValues } from "./ContactClient";
 
 const SESSION_TYPES = [
@@ -50,7 +51,9 @@ function IdentityFields({ form, onChange }: FieldGroupProps) {
 }
 
 function SessionFields({ form, onChange }: FieldGroupProps) {
-  const showSchoolField = !form.sessionType || form.sessionType === "Graduation Portrait";
+  // School field is prefilled via ?school= from campus landing pages, so it
+  // must stay visible even when no session type has been chosen yet.
+  const showSchoolField = form.sessionType === "Graduation Portrait" || Boolean(form.school);
 
   return (
     <>
@@ -64,13 +67,19 @@ function SessionFields({ form, onChange }: FieldGroupProps) {
           </select>
         </div>
         {showSchoolField ? (
-          <div className="contact-field">
+          <div className="contact-field contact-field-pop">
             <label htmlFor="school" className="contact-label">School / Campus</label>
             <input id="school" name="school" type="text" placeholder="UC Berkeley, SF State, etc."
               className="contact-input" value={form.school} onChange={onChange} />
           </div>
         ) : null}
       </div>
+      {showSchoolField ? (
+        <p className="contact-field-hint contact-field-pop">
+          The <Link href="/grad-guide">graduation photo guide</Link> covers outfits, posing, and
+          the best campus spots.
+        </p>
+      ) : null}
       <div className="form-row">
         <div className="contact-field">
           <label htmlFor="people" className="contact-label">Number of people</label>
