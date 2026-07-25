@@ -14,7 +14,10 @@ export async function POST(req: NextRequest) {
   const context = formData.get("context");
 
   const body = new FormData();
-  body.append("file", audio, "audio.webm");
+  // Whisper picks its decoder from the extension — keep the client's filename
+  // (Safari records audio/mp4, which the client names audio.m4a).
+  const filename = audio instanceof File && audio.name ? audio.name : "audio.webm";
+  body.append("file", audio, filename);
   body.append("model", "whisper-1");
   body.append("language", "en");
   if (context && typeof context === "string" && context.trim()) {
