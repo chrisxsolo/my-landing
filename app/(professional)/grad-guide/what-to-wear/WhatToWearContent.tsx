@@ -1,10 +1,8 @@
-"use client";
-import { supabase } from "@/lib/supabase";
+// Server component — outfit tips arrive as props from the page's cached read,
+// so the article is in the initial HTML with no browser Supabase fetch.
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import { GRAD_GUIDE_CSS, GG_SQUIGGLE_PATH } from "@/lib/gradGuide";
-
-type OutfitTip = { id: number; title: string; tip: string; icon: string; order: number };
+import type { GradOutfitTip as OutfitTip } from "@/lib/gradGuideData";
 
 const DRAFT_OUTFITS: OutfitTip[] = [
   { id: 1, title: "Keep it simple — you're the focus", tip: "Your outfit should complement you, not compete with you. Solid colors, clean lines, and minimal patterns are always the right call. The more simple your outfit, the more timeless your photos will look.", icon: "✨", order: 1 },
@@ -31,21 +29,8 @@ const categories = [
 const MARQUEE = ["What to Wear", "Outfit Tips", "Colors That Pop", "Fit Matters", "Look Your Best", "Bay Area Shoots"];
 const marquee = [...MARQUEE, ...MARQUEE];
 
-export default function WhatToWearClient() {
-  const [outfits, setOutfits] = useState<OutfitTip[]>(DRAFT_OUTFITS);
-
-  useEffect(() => {
-    async function fetchOutfits() {
-      try {
-        const { data, error } = await supabase.from("grad_outfits").select("*").order("order", { ascending: true });
-        if (error) console.error(error);
-        if (data && data.length > 0) setOutfits(data);
-      } catch (err) {
-        console.error(err);
-      }
-    }
-    fetchOutfits();
-  }, []);
+export default function WhatToWearContent({ outfits: outfitsFromDb }: { outfits: OutfitTip[] }) {
+  const outfits = outfitsFromDb.length > 0 ? outfitsFromDb : DRAFT_OUTFITS;
 
   return (
     <main className="gg-page">

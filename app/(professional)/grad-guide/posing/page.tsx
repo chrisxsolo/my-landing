@@ -1,12 +1,17 @@
 // POSING GUIDE  →  soloxsnaps.com/grad-guide/posing
 // Server component — exports metadata + Article/Breadcrumb JSON-LD.
-// Interactive content lives in PosingClient.tsx.
+// Content is server-rendered in PosingContent.tsx.
 
 import type { Metadata } from "next";
-import PosingClient from "./PosingClient";
+import PosingContent from "./PosingContent";
 import ContextualTestimonials from "@/app/components/ContextualTestimonials";
 import { getContextualTestimonials } from "@/lib/testimonialsData";
+import { getGradPoses } from "@/lib/gradGuideData";
 import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
+
+// ISR: content now server-fetches (cached); refresh hourly, sooner on admin
+// revalidate. Previously this page was frozen static + client-fetched.
+export const revalidate = 3600;
 
 const SITE_URL = "https://www.soloxsnaps.com";
 const PATH = "/grad-guide/posing";
@@ -27,7 +32,10 @@ export const metadata: Metadata = {
 };
 
 export default async function PosingPage() {
-  const testimonials = await getContextualTestimonials({ category: "grads", tag: "nervous" }, 1);
+  const [testimonials, poses] = await Promise.all([
+    getContextualTestimonials({ category: "grads", tag: "nervous" }, 1),
+    getGradPoses(),
+  ]);
   const articleLd = {
     "@context": "https://schema.org",
     "@type": "Article",
@@ -52,7 +60,7 @@ export default async function PosingPage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd).replace(/</g, "\\u003c") }}
       />
-      <PosingClient />
+      <PosingContent poses={poses} />
       {/* Reassurance right where nerves show up — a nervous-tagged grad client,
           falling back to any featured grad testimonial. */}
       <ContextualTestimonials

@@ -68,11 +68,11 @@ export default function PosesTab({ showToast }: Props) {
     if (editingPose) {
       const res = await fetch("/api/admin/grad-poses", { method: "PATCH", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ id: editingPose.id, updates: { title: poseForm.title, instructions: poseForm.instructions, image_url, order: parseInt(poseForm.order) || editingPose.order } }) });
       if (!res.ok) showToast("Update failed", false);
-      else { showToast("Pose updated!"); cancelEditPose(); fetchPoses(); }
+      else { showToast("Pose updated!"); cancelEditPose(); fetchPoses(); revalidatePublicSite(); }
     } else {
       const res = await fetch("/api/admin/grad-poses", { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ title: poseForm.title, instructions: poseForm.instructions, image_url, order: parseInt(poseForm.order) || poses.length + 1 }) });
       if (!res.ok) showToast("Save failed", false);
-      else { showToast("Pose added!"); setPoseForm(EMPTY_POSE); setPoseImg(null); setPoseImgPreview(null); if (poseFileRef.current) poseFileRef.current.value = ""; fetchPoses(); }
+      else { showToast("Pose added!"); setPoseForm(EMPTY_POSE); setPoseImg(null); setPoseImgPreview(null); if (poseFileRef.current) poseFileRef.current.value = ""; fetchPoses(); revalidatePublicSite(); }
     }
     setPoseSaving(false);
   }
@@ -84,7 +84,12 @@ export default function PosesTab({ showToast }: Props) {
     setDeleteConfirm(null);
     if (editingPose?.id === id) cancelEditPose();
     showToast("Pose deleted");
+    revalidatePublicSite();
   }
+
+  // Fire-and-forget: busts the cached /grad-guide/posing content so edits show
+  // up on the public page immediately instead of at the next hourly refresh.
+  function revalidatePublicSite() { fetch("/api/admin/revalidate", { method: "POST", credentials: "include" }).catch(() => {}); }
 
   return (
     <div className="space-y-6">

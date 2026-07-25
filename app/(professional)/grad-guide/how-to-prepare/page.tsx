@@ -1,10 +1,15 @@
 // HOW TO PREPARE  →  soloxsnaps.com/grad-guide/how-to-prepare
 // Server component — exports metadata + Article/Breadcrumb JSON-LD.
-// Interactive content lives in HowToPrepareClient.tsx.
+// Content is server-rendered in HowToPrepareContent.tsx.
 
 import type { Metadata } from "next";
-import HowToPrepareClient from "./HowToPrepareClient";
+import HowToPrepareContent from "./HowToPrepareContent";
+import { getGradPrepTips } from "@/lib/gradGuideData";
 import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
+
+// ISR: content now server-fetches (cached); refresh hourly, sooner on admin
+// revalidate. Previously this page was frozen static + client-fetched.
+export const revalidate = 3600;
 
 const SITE_URL = "https://www.soloxsnaps.com";
 const PATH = "/grad-guide/how-to-prepare";
@@ -24,7 +29,8 @@ export const metadata: Metadata = {
   },
 };
 
-export default function HowToPreparePage() {
+export default async function HowToPreparePage() {
+  const tips = await getGradPrepTips();
   const articleLd = {
     "@context": "https://schema.org",
     "@type": "Article",
@@ -49,7 +55,7 @@ export default function HowToPreparePage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd).replace(/</g, "\\u003c") }}
       />
-      <HowToPrepareClient />
+      <HowToPrepareContent tips={tips} />
     </>
   );
 }

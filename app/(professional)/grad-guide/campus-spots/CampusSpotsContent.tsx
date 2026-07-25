@@ -1,11 +1,9 @@
-"use client";
-import { supabase } from "@/lib/supabase";
+// Server component — spots arrive as props from the page's cached read, so the
+// article and photos are in the initial HTML with no browser Supabase fetch.
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 import { GRAD_GUIDE_CSS, GG_SQUIGGLE_PATH } from "@/lib/gradGuide";
-
-type LocationSpot = { id: number; school_id: string; school_name: string; school_short: string; name: string; description: string; tip: string; icon: string; image_url: string | null; order: number };
+import type { LocationSpot } from "@/lib/gradGuideData";
 
 const SCHOOL_ORDER = ["sjsu", "berkeley", "sfsu", "csueb", "usf"];
 
@@ -59,25 +57,13 @@ const DRAFT_SPOTS: LocationSpot[] = [
 const MARQUEE = ["San Jose State", "UC Berkeley", "SF State", "Cal State East Bay", "USF", "Best Spots", "Golden Hour", "Campus Shoots"];
 const marquee = [...MARQUEE, ...MARQUEE];
 
-export default function CampusSpotsClient() {
-  const [spots, setSpots] = useState<LocationSpot[]>(DRAFT_SPOTS);
-
-  useEffect(() => {
-    async function fetchSpots() {
-      try {
-        const { data, error } = await supabase.from("location_spots").select("*").order("school_id").order("order", { ascending: true });
-        if (error) console.error(error);
-        if (data && data.length > 0) {
-          const supabaseIds = new Set(data.map((s) => s.school_id));
-          const draftFallback = DRAFT_SPOTS.filter((s) => !supabaseIds.has(s.school_id));
-          setSpots([...data, ...draftFallback]);
-        }
-      } catch (err) {
-        console.error(err);
-      }
-    }
-    fetchSpots();
-  }, []);
+export default function CampusSpotsContent({ spots: spotsFromDb }: { spots: LocationSpot[] }) {
+  // DB rows win; draft spots fill in only for schools the DB doesn't cover yet.
+  let spots = DRAFT_SPOTS;
+  if (spotsFromDb.length > 0) {
+    const dbSchoolIds = new Set(spotsFromDb.map((s) => s.school_id));
+    spots = [...spotsFromDb, ...DRAFT_SPOTS.filter((s) => !dbSchoolIds.has(s.school_id))];
+  }
 
   const schools = SCHOOL_ORDER.map((id) => {
     const schoolSpots = spots.filter((s) => s.school_id === id);

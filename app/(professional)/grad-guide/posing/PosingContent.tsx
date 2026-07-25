@@ -1,11 +1,9 @@
-"use client";
-import { supabase } from "@/lib/supabase";
+// Server component — poses arrive as props from the page's cached read, so the
+// article and photos are in the initial HTML with no browser Supabase fetch.
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 import { GRAD_GUIDE_CSS, GG_SQUIGGLE_PATH } from "@/lib/gradGuide";
-
-type Pose = { id: number; title: string; image_url: string; instructions: string; order: number };
+import type { GradPose as Pose } from "@/lib/gradGuideData";
 
 const DRAFT_POSES: Pose[] = [
   { id: 1, title: "Hand on Hip, Hand on Stool", image_url: "", instructions: "Place one hand on your hip and rest the other on a stool, ledge, or wall. This breaks up stiff posture and gives you something natural to do with your hands. Shift your weight to one leg slightly — it creates a relaxed S-curve that photographs beautifully.", order: 1 },
@@ -19,21 +17,8 @@ const DRAFT_POSES: Pose[] = [
 const MARQUEE = ["Pose Guide", "Study Before Shoot", "Natural Light", "Real Moments", "No Stiff Poses", "Bay Area Grads"];
 const marquee = [...MARQUEE, ...MARQUEE];
 
-export default function PosingClient() {
-  const [poses, setPoses] = useState<Pose[]>(DRAFT_POSES);
-
-  useEffect(() => {
-    async function fetchPoses() {
-      try {
-        const { data, error } = await supabase.from("grad_poses").select("*").order("order", { ascending: true });
-        if (error) console.error(error);
-        if (data && data.length > 0) setPoses(data);
-      } catch (err) {
-        console.error(err);
-      }
-    }
-    fetchPoses();
-  }, []);
+export default function PosingContent({ poses: posesFromDb }: { poses: Pose[] }) {
+  const poses = posesFromDb.length > 0 ? posesFromDb : DRAFT_POSES;
 
   return (
     <main className="gg-page">

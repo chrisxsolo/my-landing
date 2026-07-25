@@ -1,10 +1,15 @@
 // WHAT TO WEAR  →  soloxsnaps.com/grad-guide/what-to-wear
 // Server component — exports metadata + Article/Breadcrumb JSON-LD.
-// Interactive content lives in WhatToWearClient.tsx.
+// Content is server-rendered in WhatToWearContent.tsx.
 
 import type { Metadata } from "next";
-import WhatToWearClient from "./WhatToWearClient";
+import WhatToWearContent from "./WhatToWearContent";
+import { getGradOutfitTips } from "@/lib/gradGuideData";
 import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
+
+// ISR: content now server-fetches (cached); refresh hourly, sooner on admin
+// revalidate. Previously this page was frozen static + client-fetched.
+export const revalidate = 3600;
 
 const SITE_URL = "https://www.soloxsnaps.com";
 const PATH = "/grad-guide/what-to-wear";
@@ -24,7 +29,8 @@ export const metadata: Metadata = {
   },
 };
 
-export default function WhatToWearPage() {
+export default async function WhatToWearPage() {
+  const outfits = await getGradOutfitTips();
   const articleLd = {
     "@context": "https://schema.org",
     "@type": "Article",
@@ -49,7 +55,7 @@ export default function WhatToWearPage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd).replace(/</g, "\\u003c") }}
       />
-      <WhatToWearClient />
+      <WhatToWearContent outfits={outfits} />
     </>
   );
 }

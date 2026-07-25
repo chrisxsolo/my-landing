@@ -1,48 +1,11 @@
-"use client";
-import { supabase } from "@/lib/supabase";
-import { useEffect, useState } from "react";
+// "Recent grad shoots" gallery — async server component. Photos come from the
+// cached grad_photos read (lib/gradGuideData.ts), so they're in the initial
+// HTML instead of arriving after hydration + a browser-side Supabase fetch.
 import OptimizedPhoto from "@/app/components/OptimizedPhoto";
+import { getGradPhotos } from "@/lib/gradGuideData";
 
-// Client island for the "Recent grad shoots" gallery. This is the ONLY part of
-// the grad-guide hub that needs the browser — it reads published photos from
-// Supabase after hydration. Everything else on the page is server-rendered so
-// the article text, headings, and internal links exist in the initial HTML.
-
-type GradPhoto = { id: number; image_url: string; caption: string | null };
-
-const GRAD_PHOTOS_TABLE = "grad_photos";
-
-export default function GradGallery() {
-  const [photos, setPhotos] = useState<GradPhoto[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    async function fetchPhotos() {
-      try {
-        const { data, error } = await supabase
-          .from(GRAD_PHOTOS_TABLE)
-          .select("*")
-          .order("created_at", { ascending: false });
-        if (error) console.error("grad_photos load failed", error);
-        if (data) setPhotos(data);
-      } catch (err) {
-        console.error("grad_photos load threw", err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchPhotos();
-  }, []);
-
-  if (loading) {
-    return (
-      <div className="gg-gallery">
-        {[...Array(6)].map((_, i) => (
-          <div key={i} className="gg-gallery-skel" />
-        ))}
-      </div>
-    );
-  }
+export default async function GradGallery() {
+  const photos = await getGradPhotos();
 
   if (photos.length === 0) {
     return (

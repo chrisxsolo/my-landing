@@ -1,10 +1,8 @@
-"use client";
-import { supabase } from "@/lib/supabase";
+// Server component — prep tips arrive as props from the page's cached read,
+// so the article is in the initial HTML with no browser Supabase fetch.
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import { GRAD_GUIDE_CSS, GG_SQUIGGLE_PATH } from "@/lib/gradGuide";
-
-type PrepTip = { id: number; title: string; description: string; icon: string; order: number };
+import type { GradPrepTip as PrepTip } from "@/lib/gradGuideData";
 
 const DRAFT_PREP_TIPS: PrepTip[] = [
   { id: 1, title: "Get a good night's sleep", description: "Tired eyes, dull skin, and low energy all show up on camera. Skip the late night before your shoot and get at least 7-8 hours. Drink water the morning of. You'll look and feel sharper.", icon: "😴", order: 1 },
@@ -34,21 +32,8 @@ const categories = [
 const MARQUEE = ["Show Up Ready", "Sleep Well", "Eat First", "Steam Your Gown", "Golden Hour", "Bay Area Grads"];
 const marquee = [...MARQUEE, ...MARQUEE];
 
-export default function HowToPrepareClient() {
-  const [tips, setTips] = useState<PrepTip[]>(DRAFT_PREP_TIPS);
-
-  useEffect(() => {
-    async function fetchTips() {
-      try {
-        const { data, error } = await supabase.from("grad_prep_tips").select("*").order("order", { ascending: true });
-        if (error) console.error(error);
-        if (data && data.length > 0) setTips(data);
-      } catch (err) {
-        console.error(err);
-      }
-    }
-    fetchTips();
-  }, []);
+export default function HowToPrepareContent({ tips: tipsFromDb }: { tips: PrepTip[] }) {
+  const tips = tipsFromDb.length > 0 ? tipsFromDb : DRAFT_PREP_TIPS;
 
   return (
     <main className="gg-page">

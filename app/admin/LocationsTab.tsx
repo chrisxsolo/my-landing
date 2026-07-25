@@ -79,12 +79,12 @@ export default function LocationsTab({ showToast }: Props) {
       const updates = { school_id: school.id, school_name: school.name, school_short: school.short, name: spotForm.name, description: spotForm.description, tip: spotForm.tip, icon: spotForm.icon, image_url, order: parseInt(spotForm.order) || editingSpot.order };
       const res = await fetch("/api/admin/location-spots", { method: "PATCH", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ id: editingSpot.id, updates }) });
       if (!res.ok) showToast("Update failed", false);
-      else { showToast("Location updated!"); cancelEditSpot(); fetchSpots(); }
+      else { showToast("Location updated!"); cancelEditSpot(); fetchSpots(); revalidatePublicSite(); }
     } else {
       const spot = { school_id: school.id, school_name: school.name, school_short: school.short, name: spotForm.name, description: spotForm.description, tip: spotForm.tip, icon: spotForm.icon, image_url, order: parseInt(spotForm.order) || spots.filter(s => s.school_id === school.id).length + 1 };
       const res = await fetch("/api/admin/location-spots", { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify(spot) });
       if (!res.ok) showToast("Save failed", false);
-      else { showToast("Location added!"); setSpotForm(EMPTY_SPOT); setSpotImg(null); setSpotImgPreview(null); if (spotFileRef.current) spotFileRef.current.value = ""; fetchSpots(); }
+      else { showToast("Location added!"); setSpotForm(EMPTY_SPOT); setSpotImg(null); setSpotImgPreview(null); if (spotFileRef.current) spotFileRef.current.value = ""; fetchSpots(); revalidatePublicSite(); }
     }
     setSpotSaving(false);
   }
@@ -95,7 +95,12 @@ export default function LocationsTab({ showToast }: Props) {
     setSpotDeleteConfirm(null);
     if (editingSpot?.id === id) cancelEditSpot();
     showToast("Spot deleted");
+    revalidatePublicSite();
   }
+
+  // Fire-and-forget: busts the cached /grad-guide/campus-spots content so edits
+  // show up on the public page immediately instead of at the next hourly refresh.
+  function revalidatePublicSite() { fetch("/api/admin/revalidate", { method: "POST", credentials: "include" }).catch(() => {}); }
 
   return (
     <div className="space-y-6">

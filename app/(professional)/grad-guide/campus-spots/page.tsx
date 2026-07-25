@@ -1,10 +1,15 @@
 // CAMPUS SPOTS  →  soloxsnaps.com/grad-guide/campus-spots
 // Server component — exports metadata + Article/Breadcrumb JSON-LD.
-// Interactive content lives in CampusSpotsClient.tsx.
+// Content is server-rendered in CampusSpotsContent.tsx.
 
 import type { Metadata } from "next";
-import CampusSpotsClient from "./CampusSpotsClient";
+import CampusSpotsContent from "./CampusSpotsContent";
+import { getLocationSpots } from "@/lib/gradGuideData";
 import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
+
+// ISR: content now server-fetches (cached); refresh hourly, sooner on admin
+// revalidate. Previously this page was frozen static + client-fetched.
+export const revalidate = 3600;
 
 const SITE_URL = "https://www.soloxsnaps.com";
 const PATH = "/grad-guide/campus-spots";
@@ -24,7 +29,8 @@ export const metadata: Metadata = {
   },
 };
 
-export default function CampusSpotsPage() {
+export default async function CampusSpotsPage() {
+  const spots = await getLocationSpots();
   const articleLd = {
     "@context": "https://schema.org",
     "@type": "Article",
@@ -49,7 +55,7 @@ export default function CampusSpotsPage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd).replace(/</g, "\\u003c") }}
       />
-      <CampusSpotsClient />
+      <CampusSpotsContent spots={spots} />
     </>
   );
 }

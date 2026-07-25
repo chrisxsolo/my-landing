@@ -1,12 +1,16 @@
 // GRAD GUIDE HUB  →  soloxsnaps.com/grad-guide
 // Server component — exports metadata + Article/Breadcrumb JSON-LD.
-// All body content (headings, prose, internal links) is server-rendered in
-// GradGuideContent.tsx; the only client island is the Supabase photo gallery.
+// All body content (headings, prose, internal links, and the photo gallery) is
+// server-rendered in GradGuideContent.tsx / GradGallery.tsx.
 // Lives on the professional site and renders inside ProfessionalLayout.
 
 import type { Metadata } from "next";
 import GradGuideContent from "./GradGuideContent";
 import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
+
+// ISR: the gallery now server-fetches (cached); refresh hourly, sooner on
+// admin revalidate. Previously this page was frozen static + client-fetched.
+export const revalidate = 3600;
 
 const SITE_URL = "https://www.soloxsnaps.com";
 const PATH = "/grad-guide";
