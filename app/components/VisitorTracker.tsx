@@ -18,6 +18,7 @@ const BEACON_COVERED: RegExp[] = [
   /^\/grads\/[a-z0-9-]+$/,
   /^\/family-guide\/locations\/[a-z0-9-]+$/,
   /^\/couples-guide\/locations\/[a-z0-9-]+$/,
+  /^\/portrait-guide\/locations\/[a-z0-9-]+$/,
 ];
 
 export default function VisitorTracker() {

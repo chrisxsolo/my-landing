@@ -26,11 +26,14 @@ const KNOWN_ROUTES: RegExp[] = [
   /^\/blog\/[a-z0-9-]+$/,
   /^\/blog\/category\/[a-z0-9-]+$/,
   /^\/portfolio$/,
-  /^\/grads\/[a-z0-9-]+$/,
+  /^\/grads\/[a-z0-9-]+(?:\/spots)?$/,
   /^\/grad-guide(?:\/[a-z0-9-]+)?$/,
   /^\/family-guide(?:\/[a-z0-9-]+)?(?:\/[a-z0-9-]+)?$/,
   /^\/couples-guide(?:\/[a-z0-9-]+)?(?:\/[a-z0-9-]+)?$/,
+  /^\/portrait-guide(?:\/[a-z0-9-]+)?(?:\/[a-z0-9-]+)?$/,
+  /^\/couples-posing-guide$/,
   /^\/pricing(?:\/[a-z0-9-]+)?$/,
+  /^\/faq\/graduation$/,
   /^\/(about|contact|faq|availability|bay-area-locations)$/,
 ];
 
