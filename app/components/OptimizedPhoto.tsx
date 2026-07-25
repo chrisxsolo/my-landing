@@ -36,7 +36,10 @@ export default function OptimizedPhoto({
       fill
       sizes={sizes}
       className={className}
-      priority={priority}
+      // Next 16 deprecated `priority` in favor of `preload`; fetchPriority
+      // restores the high-priority hint `priority` used to set on the <img>.
+      preload={priority}
+      fetchPriority={priority ? "high" : undefined}
       quality={quality}
       style={style}
       unoptimized={unoptimized}

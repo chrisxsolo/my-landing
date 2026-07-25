@@ -1,8 +1,9 @@
 // DB-backed school gallery (spec §3.5): async server component, renders
-// nothing until published placements exist. Plain <img> like the rest of the
-// site's Supabase-hosted public images (remote loader not configured).
+// nothing until published placements exist. Photos go through OptimizedPhoto
+// so Supabase serves resized WebP variants instead of full-res originals.
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { getSchoolGalleryPhotos } from "@/lib/contentEngine/schoolGalleryData";
+import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 
 export default async function SchoolGallery({ slug, school }: { slug: string; school: string }) {
   const photos = await getSchoolGalleryPhotos(createSupabaseServerClient(), slug);
@@ -21,9 +22,14 @@ export default async function SchoolGallery({ slug, school }: { slug: string; sc
         }}>
           {photos.map((photo) => (
             <figure key={photo.id} style={{ margin: 0 }}>
-              {/* eslint-disable-next-line @next/next/no-img-element -- Supabase public URL; matches site convention */}
-              <img src={photo.url} alt={photo.alt} loading="lazy"
-                style={{ width: "100%", aspectRatio: "4 / 5", objectFit: "cover", borderRadius: 12, display: "block" }} />
+              <div style={{ position: "relative", aspectRatio: "4 / 5", borderRadius: 12, overflow: "hidden" }}>
+                <OptimizedPhoto
+                  src={photo.url}
+                  alt={photo.alt}
+                  sizes="(max-width: 520px) 100vw, (max-width: 900px) 50vw, 33vw"
+                  quality={75}
+                />
+              </div>
               {photo.caption && (
                 <figcaption style={{ fontSize: 13, opacity: 0.75, marginTop: 4 }}>{photo.caption}</figcaption>
               )}

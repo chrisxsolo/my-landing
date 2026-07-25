@@ -438,7 +438,6 @@ export default async function ProfessionalAboutPage() {
               src={portrait}
               alt="Chris Solorzano"
               sizes="(max-width: 920px) 90vw, 40vw"
-              priority
               quality={90}
               objectPosition="center top"
             />
