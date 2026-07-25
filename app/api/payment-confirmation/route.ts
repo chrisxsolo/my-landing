@@ -259,6 +259,7 @@ export async function POST(req: NextRequest) {
     to:      inq.email,
     subject,
     html,
+    ...(thread_id ? { threadId: thread_id } : {}),
   });
 
   const gmailRes = await fetch(
@@ -266,7 +267,7 @@ export async function POST(req: NextRequest) {
     {
       method:  "POST",
       headers: { Authorization: `Bearer ${tokens.access_token}`, "Content-Type": "application/json" },
-      body:    JSON.stringify({ raw }),
+      body:    JSON.stringify({ raw, ...(thread_id ? { threadId: thread_id } : {}) }),
     }
   );
 
