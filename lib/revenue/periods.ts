@@ -149,15 +149,22 @@ export function buildComparisonPeriod(
   }
 
   if (mode === "prevMonth") {
-    const prevStart = new Date(start.getFullYear(), start.getMonth() - 1, start.getDate());
-    const prevEnd = new Date(end.getFullYear(), end.getMonth() - 1, end.getDate(), 23, 59, 59, 999);
+    const prevStart = shiftedDate(start.getFullYear(), start.getMonth() - 1, start.getDate());
+    const prevEnd = endOfDay(shiftedDate(end.getFullYear(), end.getMonth() - 1, end.getDate()));
     return { start: prevStart, end: prevEnd, label: rangeLabel(prevStart, prevEnd) };
   }
 
   // prevYear
-  const prevStart = new Date(start.getFullYear() - 1, start.getMonth(), start.getDate());
-  const prevEnd = new Date(end.getFullYear() - 1, end.getMonth(), end.getDate(), 23, 59, 59, 999);
+  const prevStart = shiftedDate(start.getFullYear() - 1, start.getMonth(), start.getDate());
+  const prevEnd = endOfDay(shiftedDate(end.getFullYear() - 1, end.getMonth(), end.getDate()));
   return { start: prevStart, end: prevEnd, label: rangeLabel(prevStart, prevEnd) };
+}
+
+// Clamp the day so month-end dates land in the target month instead of
+// overflowing into the next one (Jul 31 shifted to June must be Jun 30, not Jul 1).
+function shiftedDate(year: number, month: number, day: number): Date {
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  return new Date(year, month, Math.min(day, lastDay));
 }
 
 function isWholeMonths(start: Date, end: Date): boolean {
