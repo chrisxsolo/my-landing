@@ -96,7 +96,7 @@ export default function SchoolLandingDetails({
             </div>
             <p className="school-body-copy" style={{ marginTop: 22, fontSize: 15 }}>
               <Link href={`/grads/${slug}/spots`} style={{ color: "#3d6b5e", fontWeight: 700 }}>
-                See all {schoolShort} graduation photo spots &amp; the best time for each →
+                See all {schoolShort}{" "}graduation photo spots &amp; the best time for each →
               </Link>
             </p>
             <p className="school-body-copy" style={{ marginTop: 10, color: "#667f79", fontSize: 15 }}>

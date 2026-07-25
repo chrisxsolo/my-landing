@@ -127,7 +127,7 @@ export default function CampusSpotsContent({ spots: spotsFromDb }: { spots: Loca
                   </Link>
                   {" · "}
                   <Link href={`/grads/${SCHOOL_SLUGS[school.id]}/spots`} className="gg-inline-link">
-                    best {school.short} photo spots &amp; timing
+                    best {school.short}{" "}photo spots &amp; timing
                   </Link>
                 </p>
               )}
