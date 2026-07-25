@@ -61,7 +61,9 @@ export function isInstagramSource(s: VisitorSessionRow): boolean {
 // Legacy message-text source guess. Returns a labeled channel or null when the
 // text gives no signal (the inquiry then falls to the "unattributed" bucket).
 const MESSAGE_RULES: { re: RegExp; channel: Channel }[] = [
-  { re: /instagram|@|ig\b|insta\b|your (post|reel|story|page)/i, channel: { key: "instagram", label: "Instagram" } },
+  // "@" must look like a handle mention, not an email address ("jane@gmail.com"),
+  // and "ig" needs both boundaries so "big"/"gig" don't read as Instagram.
+  { re: /instagram|(?<![\w.])@[a-z0-9_.]{2,}|\big\b|\binsta\b|your (post|reel|story|page)/i, channel: { key: "instagram", label: "Instagram" } },
   { re: /google|searched/i, channel: { key: "google", label: "Google" } },
   { re: /referr|recommend|friend|told me|word of mouth|my (sister|brother|mom|dad|cousin|roommate|classmate)/i, channel: { key: "referral", label: "Referral" } },
   { re: /tiktok/i, channel: { key: "tiktok", label: "TikTok" } },
