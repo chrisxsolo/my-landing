@@ -27,7 +27,7 @@ function parsePaymentCents(amount: string | null | undefined): number {
   if (!amount) return 0;
   const match = amount.match(/[\d,]+(?:\.\d{1,2})?/);
   if (!match) return 0;
-  return Math.round(parseFloat(match[0].replace(",", "")) * 100);
+  return Math.round(parseFloat(match[0].replace(/,/g, "")) * 100);
 }
 
 export function buildMonthPeriod(year: number, month: number): PaymentPeriod {
