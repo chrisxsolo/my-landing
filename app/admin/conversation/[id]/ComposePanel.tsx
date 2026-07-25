@@ -158,7 +158,7 @@ export default function ComposePanel({
           <MonoLabel>Refine AI draft</MonoLabel>
           <div className="flex gap-2">
             <input type="text" value={feedback} onChange={e => onFeedback(e.target.value)}
-              onKeyDown={e => { if (e.key === "Enter" && feedback.trim()) onGenerate(feedback); }}
+              onKeyDown={e => { if (e.key === "Enter" && feedback.trim() && !draftLoading) onGenerate(feedback); }}
               placeholder='e.g. "be more direct" · "add turnaround time"'
               className="conv-input flex-1 px-3 py-2 rounded-xl"
               style={{ border: `1px solid ${T.border}`, background: T.inset, color: T.ink, fontFamily: "inherit", fontSize: "16px" }} />

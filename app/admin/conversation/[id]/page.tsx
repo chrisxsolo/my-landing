@@ -191,17 +191,17 @@ export default function ConversationPage() {
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => {
           if (!data) return;
+          // Functional updates: the user may have started typing/dictating
+          // before this resolves — never clobber in-progress text with the
+          // older cloud copy. The persist effects below handle localStorage.
           if (data.draft && !localDraft) {
-            setDraft(data.draft);
-            localStorage.setItem(`draft_${inquiryId}`, data.draft);
+            setDraft((prev) => prev || data.draft);
           }
           if (data.ai_draft && !localAi) {
-            setLastAiDraft(data.ai_draft);
-            localStorage.setItem(`ai_draft_${inquiryId}`, data.ai_draft);
+            setLastAiDraft((prev) => prev || data.ai_draft);
           }
           if (data.original_ai_draft && !localOriginal) {
-            setOriginalAiDraft(data.original_ai_draft);
-            localStorage.setItem(`original_ai_draft_${inquiryId}`, data.original_ai_draft);
+            setOriginalAiDraft((prev) => prev || data.original_ai_draft);
           }
         })
         .catch(() => {});
@@ -612,17 +612,24 @@ export default function ConversationPage() {
         // outbound state immediately instead of waiting for the next Gmail
         // reconciliation. reply_sent_at records the FIRST reply, never overwrite.
         const now = new Date().toISOString();
-        const updated = await updateAdminInquiry(inquiry.id, {
-          status: "responded",
-          status_source: "automatic",
-          needs_reply: false,
-          reply_sent_at: inquiry.reply_sent_at ?? now,
-          last_outbound_at: now,
-          last_message_at: now,
-          last_message_direction: "outbound",
-        });
-        setInquiry(updated);
-        setStatus("responded");
+        try {
+          const updated = await updateAdminInquiry(inquiry.id, {
+            status: "responded",
+            status_source: "automatic",
+            needs_reply: false,
+            reply_sent_at: inquiry.reply_sent_at ?? now,
+            last_outbound_at: now,
+            last_message_at: now,
+            last_message_direction: "outbound",
+          });
+          setInquiry(updated);
+          setStatus("responded");
+        } catch (err) {
+          // The email went out — never surface this as a send failure, or a
+          // natural retry would email the client twice.
+          console.error("post-send inquiry update failed", err);
+          showToast("Sent — but the inquiry status didn't update. Refresh to sync.", false);
+        }
 
         // Auto-learn from every send — fire and forget (don't block UX)
         if (lastAiDraft) {
@@ -848,13 +855,13 @@ export default function ConversationPage() {
       await updateAdminInquiry(inquiry.id, { session_date: dateStr });
       // Availability is locked down at the DB level — write through the admin
       // server route (service role) rather than the public anon client.
-      await fetch("/api/admin/availability", {
+      const availRes = await fetch("/api/admin/availability", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ date: dateStr, status: "booked", note: buildBookedAvailabilityNote(inquiry.name, inquiry.preferred_time) }),
       });
       // Keep client_sessions in sync so the ICS calendar feed stays accurate
-      await supabase.from("client_sessions")
+      const { error: sessionError } = await supabase.from("client_sessions")
         .update({ session_date: dateStr })
         .eq("client_email", inquiry.email)
         .is("session_date", null);
@@ -863,7 +870,12 @@ export default function ConversationPage() {
       setDetectedDate(null);
       setSessionDateInput("");
       fetchSunset(dateStr);
-      showToast("Session date confirmed and calendar updated ✓");
+      if (!availRes.ok || sessionError) {
+        console.error("confirmDate partial failure", { availabilityStatus: availRes.status, sessionError });
+        showToast("Date saved, but the calendar didn't update — mark the date booked manually.", false);
+      } else {
+        showToast("Session date confirmed and calendar updated ✓");
+      }
     } catch {
       showToast("Failed to save date", false);
     } finally {
@@ -1008,6 +1020,7 @@ export default function ConversationPage() {
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let replyText = "";
+      let errorText = "";
       let buf = "";
 
       while (true) {
@@ -1019,9 +1032,13 @@ export default function ConversationPage() {
         for (const line of lines) {
           if (!line.startsWith("data: ")) continue;
           try {
-            const event = JSON.parse(line.slice(6)) as { type: string; text?: string; new_rules?: string[]; saved_to_vault?: boolean };
+            const event = JSON.parse(line.slice(6)) as { type: string; text?: string; message?: string; new_rules?: string[]; saved_to_vault?: boolean };
             if (event.type === "text" && event.text) {
               replyText += event.text;
+            } else if (event.type === "error") {
+              // The route streams failures as SSE over HTTP 200 — don't let
+              // them fall through to the "Got it!" success reply.
+              errorText = event.message || "Something went wrong — try again.";
             } else if (event.type === "done") {
               if (event.new_rules?.length) {
                 setTrainSaved(event.new_rules);
@@ -1032,7 +1049,7 @@ export default function ConversationPage() {
         }
       }
 
-      setTrainMessages(p => [...p, { role: "assistant", content: replyText || "Got it!" }]);
+      setTrainMessages(p => [...p, { role: "assistant", content: replyText || errorText || "Got it!" }]);
     } catch {
       setTrainMessages(p => [...p, { role: "assistant", content: "Something went wrong — try again." }]);
     } finally {
