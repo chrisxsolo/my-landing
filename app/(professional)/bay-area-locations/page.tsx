@@ -13,7 +13,9 @@ import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
 import LocationsExplorer from "./LocationsExplorer";
 
-export const dynamic = "force-dynamic";
+// ISR: no request-time data on this page, so serve the cached render and
+// refresh hourly. Admin edits bust it sooner via /api/admin/revalidate.
+export const revalidate = 3600;
 
 const PATH = "/bay-area-locations";
 const PAGE_TITLE = "Bay Area Photo Location Guide";

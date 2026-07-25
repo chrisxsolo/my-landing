@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { requireAdmin } from "@/lib/requireAdmin";
+import { PUBLIC_CONTENT_CACHE_TAG } from "@/lib/publicContentCache";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
 import { publishApprovedItem } from "@/lib/contentEngine/publishItem";
 import { isUuid } from "@/lib/contentEngine/uploadConfig";
@@ -26,7 +27,12 @@ export async function POST(req: NextRequest) {
     const outcome = await publishApprovedItem({
       client: createSupabaseAdminClient(),
       itemId,
-      revalidate: (path) => revalidatePath(path),
+      revalidate: (path) => {
+        // Bust the cached blog reads first so the regenerated page sees the
+        // new post instead of the hour-old data-cache entry.
+        revalidateTag(PUBLIC_CONTENT_CACHE_TAG, { expire: 0 });
+        revalidatePath(path);
+      },
     });
     if (outcome.status === "blocked") return NextResponse.json({ error: outcome.reason }, { status: 409 });
     if (outcome.status === "failed") return NextResponse.json({ error: outcome.error }, { status: 422 });

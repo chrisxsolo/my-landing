@@ -5,8 +5,9 @@
 // hourly ISR window. Admin save handlers call this after a successful mutation.
 
 import { type NextRequest, NextResponse } from "next/server";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { requireAdmin } from "@/lib/requireAdmin";
+import { PUBLIC_CONTENT_CACHE_TAG } from "@/lib/publicContentCache";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,11 @@ export async function POST(req: NextRequest) {
 
   // Layout-level revalidation of the root invalidates all cached pages and data
   // on their next visit — simpler and route-group-safe vs. enumerating paths.
+  // The tag additionally busts the unstable_cache data entries those pages
+  // re-read while regenerating (lib/publicContentCache.ts).
+  // { expire: 0 } hard-expires the tag (vs "max" stale-while-revalidate) so
+  // the admin sees their edit on the very next page load.
+  revalidateTag(PUBLIC_CONTENT_CACHE_TAG, { expire: 0 });
   revalidatePath("/", "layout");
 
   return NextResponse.json({ revalidated: true, now: Date.now() });

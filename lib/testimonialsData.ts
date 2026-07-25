@@ -1,4 +1,5 @@
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
+import { cachePublicContent } from "@/lib/publicContentCache";
 import { buildTestimonialDisplayName, type TestimonialDisplayPreference } from "@/lib/testimonialValidation";
 
 export type FeaturedTestimonial = {
@@ -60,7 +61,10 @@ function toFeatured(row: PublicRow): FeaturedTestimonial {
 // Homepage social proof. Returns only testimonials curated for the homepage:
 // approved, published (published_at set), and featured — ordered by the admin's
 // display_order.
-export async function getFeaturedTestimonials(limit = 6): Promise<FeaturedTestimonial[]> {
+// Cached: getFeaturedTestimonialsForCategory and getContextualTestimonials
+// both funnel through this query, so this single wrapper covers every public
+// testimonial placement.
+export const getFeaturedTestimonials = cachePublicContent(async (limit: number = 6): Promise<FeaturedTestimonial[]> => {
   const supabase = createSupabaseServerClient();
   const { data, error } = await supabase
     .from("testimonials")
@@ -76,7 +80,7 @@ export async function getFeaturedTestimonials(limit = 6): Promise<FeaturedTestim
   // Cast via unknown: the new metadata columns aren't in the generated Database
   // types yet, so the typed client widens the row to an error union.
   return ((data ?? []) as unknown as PublicRow[]).map(toFeatured);
-}
+}, ["featured-testimonials"]);
 
 // Maps a free-text testimonial session_type (e.g. "SJSU Graduation Session",
 // "Maternity Session") onto a normalized portfolio category slug. Returns null

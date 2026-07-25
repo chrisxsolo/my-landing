@@ -33,7 +33,7 @@ import {
   type FeaturedTestimonial,
 } from "@/lib/testimonialsData";
 import { getPortfolioCategoryContent } from "@/lib/portfolioCategoryContent";
-import { getPortfolioCaseStudies } from "@/lib/portfolioCaseStudies";
+import { getPortfolioCaseStudies, type PortfolioCaseStudy } from "@/lib/portfolioCaseStudies";
 import CategoryProof from "@/app/(professional)/portfolio/_components/CategoryProof";
 import PortfolioSchoolLinks from "@/app/(professional)/portfolio/_components/PortfolioSchoolLinks";
 import PortfolioSchoolFilter from "@/app/(professional)/portfolio/_components/PortfolioSchoolFilter";
@@ -42,7 +42,9 @@ import PortfolioCtaPair from "@/app/(professional)/portfolio/_components/Portfol
 import styles from "@/app/(professional)/portfolio/Portfolio.module.css";
 import ContentEventBeacon from "@/app/components/ContentEventBeacon";
 
-export const dynamic = "force-dynamic";
+// Reading searchParams already renders this page per-request; the data it
+// reads is served from the tagged public-content cache (lib/publicContentCache)
+// so each render skips the Supabase round-trips force-dynamic used to force.
 
 // Max photos shown per view — keeps the page to curated proof, not a 100-image
 // wall. The audit's target is "your best 24–36"; 30 sits in the middle.
@@ -109,10 +111,12 @@ export default async function PortfolioPage({
 
   // ── COPY + PROOF + CASE STUDIES ───────────────────────────────────────────
   const content = getPortfolioCategoryContent(selectedCategory);
-  const testimonials: FeaturedTestimonial[] = selectedCategory
-    ? await getFeaturedTestimonialsForCategory(selectedCategory, 3)
-    : await getFeaturedTestimonials(3);
-  const caseStudies = await getPortfolioCaseStudies(selectedCategory);
+  const [testimonials, caseStudies]: [FeaturedTestimonial[], PortfolioCaseStudy[]] = await Promise.all([
+    selectedCategory
+      ? getFeaturedTestimonialsForCategory(selectedCategory, 3)
+      : getFeaturedTestimonials(3),
+    getPortfolioCaseStudies(selectedCategory),
+  ]);
 
   return (
     <main className={styles.portfolioPage}>

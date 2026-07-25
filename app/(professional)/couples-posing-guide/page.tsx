@@ -12,12 +12,27 @@ import {
   type CouplesInspirationImage,
 } from "@/lib/couplesPosingGuide";
 import { C } from "@/lib/colors";
+import { cachePublicContent } from "@/lib/publicContentCache";
 import CouplesPosingGuideClient from "./CouplesPosingGuideClient";
 import ContextualTestimonials from "@/app/components/ContextualTestimonials";
 import { getContextualTestimonials } from "@/lib/testimonialsData";
 import styles from "./couplesPosingGuide.module.css";
 
 export const dynamic = "force-dynamic";
+
+// Public visitors read the gallery + prompts through the shared content cache
+// (busted by /api/admin/revalidate). Admin preview keeps calling the uncached
+// lib functions so just-saved edits show up immediately — which is also why
+// the lib functions themselves stay uncached: the admin editor routes reuse
+// them and must read fresh after writes.
+const listInspirationImagesCached = cachePublicContent(
+  listCouplesInspirationImages,
+  ["couples-inspiration-images"],
+);
+const listPosingPromptsCached = cachePublicContent(
+  listCouplesPosingPrompts,
+  ["couples-posing-prompts"],
+);
 
 export const metadata: Metadata = {
   title: "Couples Posing Guide",
@@ -69,7 +84,9 @@ export default async function CouplesPosingGuidePage({ searchParams }: PageProps
 
   let images: CouplesInspirationImage[] = [];
   try {
-    const loaded = await listCouplesInspirationImages(dataMode);
+    const loaded = isAdmin
+      ? await listCouplesInspirationImages(dataMode)
+      : await listInspirationImagesCached(dataMode);
     images = filterInspirationImagesForMode(
       loaded as CouplesInspirationImage[],
       dataMode,
@@ -83,8 +100,10 @@ export default async function CouplesPosingGuidePage({ searchParams }: PageProps
     }
   }
 
-  const testimonials = await getContextualTestimonials({ category: "couples", tag: "nervous" }, 1);
-  const loadedPrompts = await listCouplesPosingPrompts(dataMode, true);
+  const [testimonials, loadedPrompts] = await Promise.all([
+    getContextualTestimonials({ category: "couples", tag: "nervous" }, 1),
+    isAdmin ? listCouplesPosingPrompts(dataMode, true) : listPosingPromptsCached(dataMode, true),
+  ]);
   const prompts = displayMode === "photographer"
     ? loadedPrompts
     : loadedPrompts.map(({ number, slug, title, category, keywords }) => ({

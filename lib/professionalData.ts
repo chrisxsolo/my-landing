@@ -1,4 +1,5 @@
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
+import { cachePublicContent } from "@/lib/publicContentCache";
 import {
   getPhotoAlt,
   getPhotoTitle,
@@ -266,17 +267,19 @@ export async function getPortfolioImages(categories: PortfolioCategory[]) {
   }
 }
 
-export async function getPortfolioData() {
+// Cached: every public page reads this on render; without the cache each
+// visit to a dynamic route (e.g. /portfolio) paid two Supabase round-trips.
+export const getPortfolioData = cachePublicContent(async () => {
   const categories = await getPortfolioCategories();
   const images = await getPortfolioImages(categories);
 
   return { categories, images };
-}
+}, ["portfolio-data"]);
 
 // Reads the admin-editable primary nav from site_settings. Always returns a
 // valid NavConfig — parseNavConfig falls back to DEFAULT_NAV_CONFIG on a missing
 // row or malformed JSON, so ProNav can render before the admin ever saves.
-export async function getNavConfig(): Promise<NavConfig> {
+export const getNavConfig = cachePublicContent(async (): Promise<NavConfig> => {
   try {
     const supabase = createSupabaseServerClient();
     const { data } = await supabase
@@ -288,9 +291,9 @@ export async function getNavConfig(): Promise<NavConfig> {
   } catch {
     return DEFAULT_NAV_CONFIG;
   }
-}
+}, ["nav-config"]);
 
-export async function getSiteSettings(): Promise<Record<string, string | null>> {
+export const getSiteSettings = cachePublicContent(async (): Promise<Record<string, string | null>> => {
   try {
     const supabase = createSupabaseServerClient();
     const { data } = await supabase.from("site_settings").select("key,value");
@@ -299,12 +302,12 @@ export async function getSiteSettings(): Promise<Record<string, string | null>> 
   } catch {
     return {};
   }
-}
+}, ["site-settings"]);
 
 // Lists posts for a category without the heavy `body` column — for the listing
 // grid and sitemap, which only need metadata + cover images. /blog/[slug] uses
 // getBlogPostBySlug, which still selects the full row including body.
-export async function getBlogPostSummaries(category: "professional" | "journal") {
+export const getBlogPostSummaries = cachePublicContent(async (category: "professional" | "journal") => {
   try {
     const supabase = createSupabaseServerClient();
     // Try sites array column first (supports cross-posting)
@@ -332,13 +335,13 @@ export async function getBlogPostSummaries(category: "professional" | "journal")
     console.error(`Failed to load ${category} post summaries`, error);
     return [];
   }
-}
+}, ["blog-post-summaries"]);
 
 // Generalized version of getBlogPostSummaries for an arbitrary category tag
 // (e.g. "family-photography"). Tries the `sites` array first (cross-posting),
 // then falls back to the legacy single `category` column. Returns [] on error so
 // category archive pages always render.
-export async function getBlogPostSummariesForCategory(category: string) {
+export const getBlogPostSummariesForCategory = cachePublicContent(async (category: string) => {
   try {
     const supabase = createSupabaseServerClient();
     const { data, error } = await supabase
@@ -364,9 +367,9 @@ export async function getBlogPostSummariesForCategory(category: string) {
     console.error(`Failed to load ${category} post summaries`, error);
     return [];
   }
-}
+}, ["blog-post-summaries-for-category"]);
 
-export async function getBlogPostBySlug(category: "professional" | "journal", slug: string) {
+export const getBlogPostBySlug = cachePublicContent(async (category: "professional" | "journal", slug: string) => {
   try {
     const supabase = createSupabaseServerClient();
     // Try sites array column first (supports cross-posting)
@@ -396,4 +399,4 @@ export async function getBlogPostBySlug(category: "professional" | "journal", sl
     console.error(`Failed to load ${category} post ${slug}`, error);
     return null;
   }
-}
+}, ["blog-post-by-slug"]);

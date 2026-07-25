@@ -1,4 +1,5 @@
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
+import { cachePublicContent } from "@/lib/publicContentCache";
 import { normalizePortfolioCategorySlug } from "@/lib/photoMetadata";
 
 // A per-session story block shown on /portfolio: location, time of day, what the
@@ -45,10 +46,9 @@ function normalize(raw: RawCaseStudy): PortfolioCaseStudy {
   };
 }
 
-// Active case studies for a category (or all when no slug). Returns [] on error
-// so the portfolio page always renders. category_slug is normalized both ways so
-// a stored "graduation" matches a requested "grads".
-export async function getPortfolioCaseStudies(categorySlug?: string | null): Promise<PortfolioCaseStudy[]> {
+// Cached without the category argument — the query never varies, so one cache
+// entry serves every category view; filtering stays in-memory below.
+const getActiveCaseStudies = cachePublicContent(async (): Promise<PortfolioCaseStudy[]> => {
   try {
     const supabase = createSupabaseServerClient();
     const { data, error } = await supabase
@@ -60,13 +60,20 @@ export async function getPortfolioCaseStudies(categorySlug?: string | null): Pro
 
     if (error || !data) return [];
 
-    const studies = data.map((row) => normalize(row as RawCaseStudy)).filter((study) => study.title);
-    if (!categorySlug) return studies;
-
-    const wanted = normalizePortfolioCategorySlug(categorySlug);
-    return studies.filter((study) => study.category_slug === wanted);
+    return data.map((row) => normalize(row as RawCaseStudy)).filter((study) => study.title);
   } catch (error) {
     console.error("Failed to load portfolio case studies", error);
     return [];
   }
+}, ["portfolio-case-studies"]);
+
+// Active case studies for a category (or all when no slug). Returns [] on error
+// so the portfolio page always renders. category_slug is normalized both ways so
+// a stored "graduation" matches a requested "grads".
+export async function getPortfolioCaseStudies(categorySlug?: string | null): Promise<PortfolioCaseStudy[]> {
+  const studies = await getActiveCaseStudies();
+  if (!categorySlug) return studies;
+
+  const wanted = normalizePortfolioCategorySlug(categorySlug);
+  return studies.filter((study) => study.category_slug === wanted);
 }

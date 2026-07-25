@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { requireAdmin } from "@/lib/requireAdmin";
+import { PUBLIC_CONTENT_CACHE_TAG } from "@/lib/publicContentCache";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
 import { addJournalPhotos, AddPhotosError } from "@/lib/contentEngine/addJournalPhotos";
 import { isUuid } from "@/lib/contentEngine/uploadConfig";
@@ -35,6 +36,12 @@ export async function POST(req: NextRequest) {
 
   try {
     const result = await addJournalPhotos({ client: createSupabaseAdminClient(), itemId, photoIds });
+    try {
+      // Bust cached blog reads so the regenerated pages pick up the new photos.
+      revalidateTag(PUBLIC_CONTENT_CACHE_TAG, { expire: 0 });
+    } catch (err) {
+      console.error("tag revalidation failed (hourly ISR is the backstop)", err);
+    }
     for (const path of ["/blog", `/blog/${result.slug}`]) {
       try {
         revalidatePath(path);
