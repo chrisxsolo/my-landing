@@ -39,9 +39,12 @@ export async function POST(req: NextRequest) {
   const deny = requireAdmin(req);
   if (deny) return deny;
 
-  let body: { templates: { id: string; subject?: string; instructions?: string }[] };
+  let body: { templates: { id: string; subject?: string; instructions?: string }[] } | null;
   try { body = await req.json(); }
   catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
+  if (!Array.isArray(body?.templates)) {
+    return NextResponse.json({ error: "templates array required" }, { status: 400 });
+  }
 
   const supabase = createSupabaseServerClient();
   const rows: { key: string; value: string; updated_at: string }[] = [];

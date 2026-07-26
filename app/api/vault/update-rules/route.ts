@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
 
   const response = await client.messages.create({
     model: "claude-sonnet-4-6",
-    max_tokens: 1600,
+    max_tokens: 8000,
     system: buildMergeSystem(today),
     messages: [{
       role: "user",
@@ -83,11 +83,27 @@ Output the updated note. Same markdown format. No preamble.`,
     }],
   });
 
+  // A truncated rewrite would permanently drop every rule after the cut —
+  // never let it replace the full note.
+  if (response.stop_reason === "max_tokens") {
+    console.error("[vault/update-rules] merge output truncated at max_tokens");
+    return NextResponse.json(
+      { error: "Rules merge was truncated — the note was NOT updated. Try again with fewer rules." },
+      { status: 500 },
+    );
+  }
+
   const updatedNote = response.content
     .filter(block => block.type === "text")
     .map(block => (block as { type: "text"; text: string }).text)
     .join("")
     .trim();
+  if (!updatedNote) {
+    return NextResponse.json(
+      { error: "Rules merge returned no text — the note was NOT updated." },
+      { status: 500 },
+    );
+  }
 
   const supabase = createSupabaseServerClient();
   const { error } = await supabase

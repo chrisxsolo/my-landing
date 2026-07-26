@@ -63,7 +63,12 @@ export async function POST(req: NextRequest) {
   const deny = requireAdmin(req);
   if (deny) return deny;
 
-  const { keywords = [] }: { keywords: string[] } = await req.json();
+  let body: { keywords?: unknown } | null;
+  try { body = await req.json(); }
+  catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
+  const keywords = Array.isArray(body?.keywords)
+    ? body.keywords.filter((k): k is string => typeof k === "string")
+    : [];
 
   const supabase = createSupabaseServerClient();
   const { data, error } = await supabase
