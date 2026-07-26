@@ -11,6 +11,9 @@ import { requireAdmin } from "@/lib/requireAdmin";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 
 export const dynamic = "force-dynamic";
+// Up to 200 drafts generate in parallel in one request — needs more than the
+// default function timeout.
+export const maxDuration = 300;
 
 type VaultRow = { id: string; title: string; folder: string; content: string };
 

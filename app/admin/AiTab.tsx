@@ -11,12 +11,6 @@ type RulesData = {
   rule_count: number;
 };
 
-type BatchStatus = {
-  batch_id: string;
-  processing_status: string;
-  request_counts: { processing: number; succeeded: number; errored: number; expired: number; canceled: number };
-};
-
 type DraftResult = { inquiry_id: number; inquiry_name: string; draft: string };
 
 export default function AiTab() {
@@ -37,7 +31,6 @@ export default function AiTab() {
 
   // Batch drafts state
   const [batchLoading, setBatchLoading] = useState(false);
-  const [batchStatus, setBatchStatus] = useState<BatchStatus | null>(null);
   const [batchResults, setBatchResults] = useState<DraftResult[]>([]);
   const [batchMsg, setBatchMsg] = useState<string | null>(null);
   const [batchSaved, setBatchSaved] = useState(false);
@@ -60,9 +53,6 @@ export default function AiTab() {
       .then(r => r.json())
       .then(d => setRulesData(d as RulesData))
       .catch(() => {});
-
-    // Check if a batch job is already running
-    checkBatchStatus();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -181,16 +171,6 @@ export default function AiTab() {
 
   // ── Batch drafts ──────────────────────────────────────────────────────────
 
-  async function checkBatchStatus() {
-    try {
-      const res = await fetch("/api/admin/batch-drafts");
-      if (!res.ok) return;
-      const json = await res.json() as { batch?: BatchStatus; results?: DraftResult[]; message?: string };
-      if (json.batch) setBatchStatus(json.batch);
-      if (json.results?.length) setBatchResults(json.results);
-    } catch { /* no batch running */ }
-  }
-
   async function syncToneFromSent() {
     setToneLoading(true);
     setToneResult(null);
@@ -221,16 +201,23 @@ export default function AiTab() {
     setBatchResults([]);
     setBatchSaved(false);
     try {
+      // Synchronous route: drafts come back in this response, no polling.
       const res = await fetch("/api/admin/batch-drafts", { method: "POST" });
-      const json = await res.json() as { batch_id?: string; request_count?: number; error?: string; message?: string };
+      const json = await res.json() as { results?: DraftResult[]; request_count?: number; error?: string; message?: string };
       if (!res.ok || json.error) {
-        setBatchMsg(json.error ?? json.message ?? "Failed to start batch");
+        setBatchMsg(json.error ?? json.message ?? "Failed to generate drafts");
         return;
       }
-      setBatchMsg(`Batch started for ${json.request_count} inquiries. Check back in ~1 hour for results.`);
-      await checkBatchStatus();
+      const results = json.results ?? [];
+      setBatchResults(results);
+      if (results.length === 0) {
+        setBatchMsg(json.message ?? "No unanswered inquiries found");
+      } else {
+        const failed = (json.request_count ?? results.length) - results.length;
+        setBatchMsg(`${results.length} draft${results.length !== 1 ? "s" : ""} generated${failed > 0 ? ` (${failed} failed)` : ""}.`);
+      }
     } catch {
-      setBatchMsg("Failed to start batch job");
+      setBatchMsg("Failed to generate drafts");
     } finally {
       setBatchLoading(false);
     }
@@ -246,7 +233,6 @@ export default function AiTab() {
   }
 
   const card = "bg-white rounded-2xl border border-slate-100 overflow-hidden";
-  const batchDone = batchStatus?.processing_status === "ended";
 
   return (
     <div className="space-y-5">
@@ -473,46 +459,22 @@ export default function AiTab() {
             <div>
               <p className="text-sm font-black text-slate-900">Batch Draft All Inquiries</p>
               <p className="text-xs text-slate-400 mt-0.5">
-                Generates reply drafts for every unanswered inquiry at 50% cost. Results ready in ~1 hour.
+                Generates reply drafts for every unanswered inquiry in one go. Takes a minute or two.
               </p>
             </div>
             <div className="flex gap-2 flex-shrink-0">
-              {batchStatus && (
-                <button
-                  onClick={checkBatchStatus}
-                  className="text-xs font-bold px-3 py-1.5 rounded-xl border"
-                  style={{ borderColor: "rgba(0,0,0,0.1)", color: "#64748b", background: "#fff" }}>
-                  Refresh
-                </button>
-              )}
               <button
                 onClick={startBatch}
-                disabled={batchLoading || (!!batchStatus && !batchDone)}
+                disabled={batchLoading}
                 className="text-xs font-bold px-3 py-1.5 rounded-xl disabled:opacity-40"
                 style={{ background: "linear-gradient(135deg,#f59e0b,#f97316)", color: "#fff" }}>
-                {batchLoading ? "Starting…" : batchStatus && !batchDone ? "Running…" : "Start Batch"}
+                {batchLoading ? "Generating…" : "Generate Drafts"}
               </button>
             </div>
           </div>
 
-          {/* Status */}
-          {batchStatus && (
-            <div className="mt-3 px-3 py-2.5 rounded-xl text-xs"
-              style={{ background: batchDone ? "rgba(16,185,129,0.06)" : "rgba(245,158,11,0.06)", border: `1px solid ${batchDone ? "rgba(16,185,129,0.2)" : "rgba(245,158,11,0.2)"}` }}>
-              <div className="flex items-center gap-2">
-                <span>{batchDone ? "✓ Done" : "⏳ Processing"}</span>
-                <span className="text-slate-400">·</span>
-                <span className="text-slate-500">
-                  {batchStatus.request_counts.succeeded} succeeded
-                  {batchStatus.request_counts.processing > 0 && ` · ${batchStatus.request_counts.processing} processing`}
-                  {batchStatus.request_counts.errored > 0 && ` · ${batchStatus.request_counts.errored} errored`}
-                </span>
-              </div>
-            </div>
-          )}
-
           {/* Results */}
-          {batchDone && batchResults.length > 0 && (
+          {batchResults.length > 0 && (
             <div className="mt-3 space-y-2">
               <div className="flex items-center justify-between">
                 <p className="text-xs font-semibold text-slate-600">{batchResults.length} drafts ready</p>
