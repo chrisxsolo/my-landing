@@ -143,6 +143,25 @@ export function normalizeClientSessionEmail(value: string | null | undefined) {
   return trimmed.length ? trimmed : null;
 }
 
+// ILIKE treats % and _ as wildcards, so an email like jo_n@yahoo.com would
+// match join@yahoo.com and cross-link another client's session. Escape the
+// pattern chars so email lookups match literally (case-insensitively).
+export function escapeIlikePattern(value: string): string {
+  return value.replace(/[\\%_]/g, (ch) => `\\${ch}`);
+}
+
+// Today's calendar date in the studio's timezone as YYYY-MM-DD. Server code
+// must use this instead of new Date() getters — Vercel runs in UTC, where the
+// local date rolls over at 5pm PT. (en-CA formats as YYYY-MM-DD.)
+export function todayInClientSessionTimeZone(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: CLIENT_SESSION_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
 function normalizeClientSessionText(value: string | null | undefined) {
   if (typeof value !== "string") return null;
   const trimmed = value.trim().toLowerCase();

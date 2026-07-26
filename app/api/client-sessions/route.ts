@@ -3,6 +3,7 @@ import { getUserFromRequest } from "@/lib/auth/get-user";
 import {
   buildClientSessionMatchKey,
   CLIENT_SESSION_TABLE,
+  escapeIlikePattern,
   type ClientSessionRow,
   toClientSessionDTO,
 } from "@/lib/clientSessions";
@@ -31,7 +32,7 @@ async function fetchRowsByEmail(email: string) {
   const { data, error } = await supabase
     .from(CLIENT_SESSION_TABLE)
     .select("*")
-    .ilike("client_email", email)
+    .ilike("client_email", escapeIlikePattern(email))
     .returns<ClientSessionRow[]>();
 
   if (error) throw error;
@@ -55,26 +56,14 @@ async function fetchMatchingInquiries(email: string) {
   const { data, error } = await supabase
     .from(INQUIRIES_TABLE)
     .select("id,name,email,session_type,session_date,date_in_mind,location,school,preferred_time,booking_confirmed,created_at")
-    .ilike("email", email)
+    .ilike("email", escapeIlikePattern(email))
     .returns<InquirySeedRow[]>();
 
   if (error) throw error;
   return data ?? [];
 }
 
-function datesMatch(stored: string | null, expected: string | null) {
-  if (!stored || !expected) return stored === expected;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(expected)) {
-    return buildClientSessionMatchKey({
-      clientEmail: "match@example.com",
-      sessionDate: stored,
-    }).sessionDate === expected;
-  }
-  return new Date(stored).getTime() === new Date(expected).getTime();
-}
-
 function matchingInquiry(row: ClientSessionRow, inquiries: InquirySeedRow[]) {
-  if (inquiries.length === 1) return inquiries[0];
   const target = buildClientSessionMatchKey({
     clientEmail: row.client_email,
     sessionType: row.session_type,
@@ -97,16 +86,19 @@ async function reconcileRows(rows: ClientSessionRow[], inquiries: InquirySeedRow
     const inquiry = matchingInquiry(row, inquiries);
     if (!inquiry) return row;
 
+    // Fill gaps only — admin edits to a session row must survive dashboard
+    // loads, so inquiry-derived values never overwrite populated fields.
     const details = buildClientSessionSyncFields(inquiry);
-    const changed = row.client_name !== details.client_name
-      || row.session_type !== details.session_type
-      || row.location !== details.location
-      || !datesMatch(row.session_date, details.session_date);
-    if (changed) {
-      const { error } = await supabase.from(CLIENT_SESSION_TABLE).update(details).eq("id", row.id);
-      if (error) throw error;
-    }
-    return { ...row, ...details };
+    const updates: Partial<ClientSessionRow> = {};
+    if (!row.client_name && details.client_name) updates.client_name = details.client_name;
+    if (!row.session_type && details.session_type) updates.session_type = details.session_type;
+    if (!row.location && details.location) updates.location = details.location;
+    if (!row.session_date && details.session_date) updates.session_date = details.session_date;
+    if (Object.keys(updates).length === 0) return row;
+
+    const { error } = await supabase.from(CLIENT_SESSION_TABLE).update(updates).eq("id", row.id);
+    if (error) throw error;
+    return { ...row, ...updates };
   }));
 }
 
@@ -116,7 +108,7 @@ async function linkEmailMatches(userId: string, email: string) {
     .from(CLIENT_SESSION_TABLE)
     .update({ client_user_id: userId, google_linked_at: new Date().toISOString() })
     .is("client_user_id", null)
-    .ilike("client_email", email);
+    .ilike("client_email", escapeIlikePattern(email));
 
   if (error) console.error("[client-sessions] email link failed", error);
 }

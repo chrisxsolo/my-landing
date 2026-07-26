@@ -5,6 +5,7 @@ import { rateLimit } from "@/lib/rateLimit";
 import { normalizeVisitorId } from "@/lib/contentEngine/trackEventRules";
 import { recordContentEvent } from "@/lib/contentEngine/recordEvent";
 import { resolveInquirySchoolField } from "@/lib/schoolDetection";
+import { escapeIlikePattern } from "@/lib/clientSessions";
 
 // Expected production env vars (set in Vercel — never hardcode secrets):
 //   RESEND_API_KEY       — Resend API key; email sends are skipped without it
@@ -180,7 +181,7 @@ export async function POST(req: NextRequest) {
     const { data: recent } = await supabase
       .from("inquiries")
       .select("created_at")
-      .ilike("email", emailNormalized)
+      .ilike("email", escapeIlikePattern(emailNormalized))
       .gte("created_at", new Date(Date.now() - 60 * 60 * 1000).toISOString())
       .order("created_at", { ascending: false });
     if (recent && recent.length > 0) {

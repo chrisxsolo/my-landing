@@ -1,6 +1,7 @@
 import { type SupabaseClient } from "@supabase/supabase-js";
 import {
   CLIENT_SESSION_TABLE,
+  escapeIlikePattern,
   findMatchingClientSession,
   normalizeClientSessionEmail,
   normalizeClientSessionStatus,
@@ -119,7 +120,7 @@ export async function advancePortalSessionForDeposit(
   const { data: rows, error } = await supabase
     .from(CLIENT_SESSION_TABLE)
     .select("id,client_email,session_type,session_date,current_status")
-    .ilike("client_email", email)
+    .ilike("client_email", escapeIlikePattern(email))
     .returns<DepositMatchRow[]>();
   if (error) throw error;
 
@@ -171,7 +172,7 @@ export async function syncAdminInquiryPortalSession(
   const { data: rows, error } = await supabase
     .from(CLIENT_SESSION_TABLE)
     .select("id,client_email,session_type,session_date")
-    .ilike("client_email", email)
+    .ilike("client_email", escapeIlikePattern(email))
     .returns<MatchableClientSessionRow[]>();
   if (error) throw error;
   if (!rows?.length) return;

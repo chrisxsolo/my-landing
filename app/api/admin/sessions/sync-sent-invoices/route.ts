@@ -12,7 +12,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getValidTokens } from "@/lib/gmailTokens";
 import { requireAdmin } from "@/lib/requireAdmin";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
-import { buildBookedAvailabilityNote, CLIENT_SESSION_TABLE } from "@/lib/clientSessions";
+import { buildBookedAvailabilityNote, CLIENT_SESSION_TABLE, escapeIlikePattern } from "@/lib/clientSessions";
 import { advancePortalSessionForDeposit } from "@/lib/adminPortalSessionUpsert";
 import { computeAdvancedStatus, scanMilestonesForClients } from "@/lib/emailTimelineScan";
 import { getConnectedAccountEmails, reconcileInquiriesWithGmail } from "@/lib/inquiryReconcileGmail";
@@ -51,14 +51,22 @@ export async function POST(req: NextRequest) {
   const supabase = createSupabaseAdminClient();
 
   // ── 1. Fetch all sessions from DB ──────────────────────────────────────────
-  const { data: allSessions } = await supabase
+  const { data: allSessions, error: sessionsError } = await supabase
     .from(CLIENT_SESSION_TABLE)
     .select("id, client_email, client_name, invoice_status, contract_status, current_status, session_date, estimated_delivery_date");
 
+  if (sessionsError) {
+    console.error("[sync-sent-invoices] failed to load sessions:", sessionsError);
+    return NextResponse.json({ error: "Failed to load client sessions" }, { status: 500 });
+  }
+
   const sessions = allSessions ?? [];
   const allEmails = new Set(sessions.map(s => (s.client_email as string).toLowerCase()));
+  // Keyed lowercase — every downstream lookup (paidEmails, signedEmails,
+  // sentByEmail in step 5) uses lowercased emails, and matchClientNameInSubject
+  // returns this map's key verbatim.
   const clientNames = new Map<string, string>(
-    sessions.map(s => [s.client_email as string, (s.client_name as string) ?? ""])
+    sessions.map(s => [(s.client_email as string).toLowerCase(), (s.client_name as string) ?? ""])
   );
 
   // ── 2. Scan sent folder: invoices + contracts ──────────────────────────────
@@ -299,12 +307,18 @@ export async function POST(req: NextRequest) {
   let timelineUpdated = 0;
 
   if (allInquiryEmails.length) {
-    const { data: inquiries } = await supabase
+    // inquiries.email is stored as typed by the client, so a case-sensitive
+    // .in() with our lowercased keys would skip mixed-case rows. Fetch and
+    // filter on the normalized address instead (the table is small).
+    const emailSet = new Set(allInquiryEmails);
+    const { data: allInquiries } = await supabase
       .from("inquiries")
-      .select("id, email, name, session_type, session_date, preferred_time, location, reply_sent_at, invoice_sent_at, contract_sent_at, deposit_paid_at, gallery_delivered_at, booking_confirmed")
-      .in("email", allInquiryEmails);
+      .select("id, email, name, session_type, session_date, preferred_time, location, reply_sent_at, invoice_sent_at, contract_sent_at, deposit_paid_at, gallery_delivered_at, booking_confirmed");
+    const inquiries = (allInquiries ?? []).filter(
+      (inq) => emailSet.has((inq.email as string).toLowerCase()),
+    );
 
-    for (const inq of inquiries ?? []) {
+    for (const inq of inquiries) {
       const email = (inq.email as string).toLowerCase();
       const info = sentByEmail.get(email);
       const inqUpdates: Record<string, string | boolean> = {};
@@ -344,7 +358,7 @@ export async function POST(req: NextRequest) {
         }
         await supabase.from(CLIENT_SESSION_TABLE)
           .update({ session_date: detectedDate })
-          .ilike("client_email", email)
+          .ilike("client_email", escapeIlikePattern(email))
           .is("session_date", null);
       }
 

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserFromRequest } from "@/lib/auth/get-user";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
-import { CLIENT_SESSION_TABLE } from "@/lib/clientSessions";
+import { CLIENT_SESSION_TABLE, escapeIlikePattern } from "@/lib/clientSessions";
 import {
   buildClientSessionInsertSeed,
   type InquirySeedRow,
@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
   const { data: existing } = await admin
     .from(CLIENT_SESSION_TABLE)
     .select("id, client_user_id")
-    .ilike("client_email", email);
+    .ilike("client_email", escapeIlikePattern(email));
 
   if (existing && existing.length > 0) {
     // Link any unlinked sessions to this user
@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
   const { data: inquiry } = await admin
     .from("inquiries")
     .select("id,name,email,session_type,session_date,date_in_mind,location,school,booking_confirmed,preferred_time,created_at")
-    .ilike("email", email)
+    .ilike("email", escapeIlikePattern(email))
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle<InquirySeedRow>();
