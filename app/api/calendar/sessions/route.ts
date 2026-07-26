@@ -119,13 +119,16 @@ export async function GET(req: NextRequest) {
   }
 
   // Inquiry-based sessions — only add if not already covered by a portal session
-  // (portal sessions are the source of truth when both exist for same client/date)
-  const portalDates = new Set(portalRows.map(r => r.session_date!.slice(0, 10)));
+  // (portal sessions are the source of truth when both exist for same client/date).
+  // Key on client + date: two different clients booked on the same day must
+  // BOTH appear, so date alone can never suppress an event.
+  const portalKeys = new Set(
+    portalRows.map(r => `${(r.client_email ?? "").toLowerCase()}|${r.session_date!.slice(0, 10)}`),
+  );
   const inquiryRows = inquiryRes.data ?? [];
   for (const row of inquiryRows) {
-    const dateKey = row.session_date.slice(0, 10);
-    // Skip if a portal session already exists on the same date (avoids duplicates)
-    if (portalDates.has(dateKey)) continue;
+    const dateKey = `${(row.email ?? "").toLowerCase()}|${row.session_date.slice(0, 10)}`;
+    if (portalKeys.has(dateKey)) continue;
     const summary = [row.session_type, row.name].filter(Boolean).join(" — ");
     events.push({
       uid: `soloxsnaps-inquiry-${row.id}@soloxsnaps.com`,
