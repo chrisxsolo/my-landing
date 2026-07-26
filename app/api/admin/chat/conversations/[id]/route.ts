@@ -54,6 +54,10 @@ export async function PATCH(
     .single();
 
   if (error) {
+    // PGRST116 = zero rows from .single() — the conversation doesn't exist
+    if (error.code === "PGRST116") {
+      return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
+    }
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
   return NextResponse.json(data);

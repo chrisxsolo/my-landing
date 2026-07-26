@@ -48,10 +48,13 @@ export async function POST(req: NextRequest) {
 
   if (!apiKey) return errorStream("No API key configured");
 
-  const { conversationId, messages } = await req.json() as {
+  let body: {
     conversationId?: string;
     messages: { role: "user" | "assistant"; content: string }[];
-  };
+  } | null;
+  try { body = await req.json(); }
+  catch { return errorStream("Invalid JSON body"); }
+  const { conversationId, messages } = body ?? {};
 
   if (!Array.isArray(messages) || messages.length === 0) {
     return errorStream("messages required");
@@ -62,11 +65,12 @@ export async function POST(req: NextRequest) {
   // Persist the latest user message
   const lastUserMsg = [...messages].reverse().find(m => m.role === "user");
   if (conversationId && lastUserMsg) {
-    await sb.from("chat_messages").insert({
+    const { error: insertError } = await sb.from("chat_messages").insert({
       conversation_id: conversationId,
       role: "user",
       content: lastUserMsg.content,
     });
+    if (insertError) console.error("[admin/chat] user message insert failed:", insertError);
 
     // Set conversation title from first user message if still default
     if (messages.filter(m => m.role === "user").length === 1) {
@@ -110,11 +114,12 @@ export async function POST(req: NextRequest) {
 
         // Persist the assistant response
         if (conversationId && fullResponse) {
-          await sb.from("chat_messages").insert({
+          const { error: insertError } = await sb.from("chat_messages").insert({
             conversation_id: conversationId,
             role: "assistant",
             content: fullResponse,
           });
+          if (insertError) console.error("[admin/chat] assistant message insert failed:", insertError);
         }
 
         emit({ type: "done" });

@@ -90,20 +90,30 @@ Editing rules:
     }],
   });
 
+  // A truncated or empty rewrite must never replace the full note — that
+  // permanently loses every rule after the cut.
+  if (res.stop_reason === "max_tokens") {
+    throw new Error("Rules merge hit max_tokens — refusing to overwrite the vault note with a truncated rewrite");
+  }
   const updated = res.content
     .filter(b => b.type === "text")
     .map(b => (b as { type: "text"; text: string }).text)
     .join("")
     .trim();
+  if (!updated) {
+    throw new Error("Rules merge returned no text — refusing to overwrite the vault note");
+  }
 
   if (data?.id) {
-    await supabase.from("vault_notes").update({ content: updated }).eq("id", data.id);
+    const { error } = await supabase.from("vault_notes").update({ content: updated }).eq("id", data.id);
+    if (error) throw error;
   } else {
-    await supabase.from("vault_notes").insert({
+    const { error } = await supabase.from("vault_notes").insert({
       folder: "09 AI Instructions",
       title: "Email Rules",
       content: updated,
     });
+    if (error) throw error;
   }
 
   return newRules.length;
@@ -192,7 +202,16 @@ Output only the rules, one per line starting with a dash. No praise, no explanat
     .map(line => line.replace(/^[-–•*]\s*/, "").trim())
     .filter(line => line.length > 10);
 
-  const written = await mergeRulesToVault(rules, client);
+  let written: number;
+  try {
+    written = await mergeRulesToVault(rules, client);
+  } catch (err) {
+    console.error("[sync-tone-from-sent] vault merge failed:", err);
+    return NextResponse.json(
+      { error: "Extracted rules but failed to save them to the vault — nothing was overwritten." },
+      { status: 500 },
+    );
+  }
 
   return NextResponse.json({ rules, written, emails_analyzed: emails.length });
 }

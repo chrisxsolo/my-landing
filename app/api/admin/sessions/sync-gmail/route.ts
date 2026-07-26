@@ -147,11 +147,12 @@ export async function POST(req: NextRequest) {
   const deny = requireAdmin(req);
   if (deny) return deny;
 
-  let body: { session_id: string };
+  let body: { session_id: string } | null;
   try { body = await req.json(); }
   catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
 
-  const { session_id } = body;
+  // `null` is valid JSON, so the destructure must not run before this check.
+  const session_id = body?.session_id;
   if (!session_id) return NextResponse.json({ error: "session_id required" }, { status: 400 });
 
   const supabase = createSupabaseAdminClient();
@@ -240,7 +241,10 @@ export async function POST(req: NextRequest) {
     .select("*")
     .single<ClientSessionRow>();
 
-  if (updateErr) throw updateErr;
+  if (updateErr) {
+    console.error("[sync-gmail] session update failed:", updateErr);
+    return NextResponse.json({ error: "Failed to save synced details" }, { status: 500 });
+  }
 
   return NextResponse.json({
     session: toAdminClientSessionDTO(updated),

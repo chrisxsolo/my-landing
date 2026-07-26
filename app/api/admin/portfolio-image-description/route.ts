@@ -95,11 +95,14 @@ export async function POST(req: NextRequest) {
     let description = fallback;
 
     const supabase = createSupabaseServerClient();
-    const { data: current } = await supabase
+    const { data: current, error: fetchError } = await supabase
       .from("portfolio_images")
       .select("image_url")
       .eq("id", imageId)
       .single();
+    if (fetchError || !current) {
+      return NextResponse.json({ error: "Image not found." }, { status: 404 });
+    }
 
     try {
       description = await polishWithAi(fallback, body, current?.image_url ?? null);
