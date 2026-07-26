@@ -28,6 +28,7 @@
 
 import type { Metadata } from "next";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
+import { todayInClientSessionTimeZone } from "@/lib/clientSessions";
 import AvailabilityCalendar, { type AvailDate } from "./AvailabilityCalendar";
 
 export const revalidate = 300;
@@ -63,8 +64,7 @@ export default async function AvailabilityPage() {
   // advertise stale openings. The client re-filters against the visitor's local
   // date too (see AvailabilityCalendar) — this keeps the server-rendered HTML in
   // sync with the /api/availability JSON, which already drops past dates.
-  const today = new Date();
-  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  const todayStr = todayInClientSessionTimeZone();
 
   // Strip private admin notes from booked/hold dates before sending to the
   // browser. Only intentional public notes on available dates are kept.

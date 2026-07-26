@@ -20,6 +20,7 @@
 
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
+import { todayInClientSessionTimeZone } from "@/lib/clientSessions";
 
 export const dynamic = "force-dynamic";
 
@@ -83,8 +84,7 @@ function buildQuickRead(label: string, g: Grouped): string {
 export async function GET() {
   try {
     const supabase = createSupabaseServerClient();
-    const today = new Date();
-    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    const todayStr = todayInClientSessionTimeZone();
 
     const { data, error } = await supabase
       .from("availability")
