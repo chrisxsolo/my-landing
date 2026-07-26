@@ -15,7 +15,7 @@ function parseCents(amount: string): number {
   if (!amount) return 0;
   const m = amount.match(/[\d,]+(?:\.\d{1,2})?/);
   if (!m) return 0;
-  return Math.round(parseFloat(m[0].replace(",", "")) * 100);
+  return Math.round(parseFloat(m[0].replace(/,/g, "")) * 100);
 }
 
 export async function POST(req: NextRequest) {
