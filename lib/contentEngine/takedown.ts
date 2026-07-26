@@ -15,6 +15,14 @@ export class TakedownError extends Error {
   }
 }
 
+// supabase-js returns errors instead of throwing. Every write before the
+// taken_down_at stamp must abort on failure — otherwise the item is marked
+// taken down while the content is still live, and the "already taken down"
+// guard blocks any retry.
+function ensureWrite(error: { message: string } | null, action: string): void {
+  if (error) throw new TakedownError(`${action} failed: ${error.message}`);
+}
+
 export interface TakedownArgs {
   client: SupabaseClient;
   itemId: string;
@@ -45,10 +53,11 @@ async function restoreGradSpot(client: SupabaseClient, item: PublishedItemRow) {
     .select("public_derivative_url").eq("id", photoId).maybeSingle();
   if (!photo?.public_derivative_url) return;
   const replaced = (item.published_ref?.replaced_image_url as string | null) ?? null;
-  await client.from("location_spots")
+  const { error } = await client.from("location_spots")
     .update({ image_url: replaced })
     .eq("id", item.published_target_id)
     .eq("image_url", photo.public_derivative_url);
+  ensureWrite(error, "grad spot restore");
 }
 
 async function removeLiveRecord(client: SupabaseClient, item: PublishedItemRow) {
@@ -59,34 +68,47 @@ async function removeLiveRecord(client: SupabaseClient, item: PublishedItemRow) 
     case "blog_post": {
       const id = Number(targetId);
       if (Number.isNaN(id)) throw new TakedownError(`published target id is not numeric: ${targetId}`);
-      await client.from("image_library").delete().eq("source_post_id", id);
-      await client.from("blog_posts").delete().eq("id", id);
+      const { error: libErr } = await client.from("image_library").delete().eq("source_post_id", id);
+      ensureWrite(libErr, "image_library delete");
+      const { error: postErr } = await client.from("blog_posts").delete().eq("id", id);
+      ensureWrite(postErr, "blog_posts delete");
       return;
     }
     case "portfolio_image": {
       const id = Number(targetId);
       if (Number.isNaN(id)) throw new TakedownError(`published target id is not numeric: ${targetId}`);
-      await client.from("portfolio_images").delete().eq("id", id);
+      const { error: pfErr } = await client.from("portfolio_images").delete().eq("id", id);
+      ensureWrite(pfErr, "portfolio_images delete");
       return;
     }
-    case "school_page_photo":
-      await client.from("school_page_photos").update({ active: false }).eq("id", targetId);
+    case "school_page_photo": {
+      const { error: err } = await client.from("school_page_photos").update({ active: false }).eq("id", targetId);
+      ensureWrite(err, "school_page_photos deactivate");
       return;
-    case "family_location_photo":
-      await client.from("family_location_photos").update({ published: false }).eq("id", targetId);
+    }
+    case "family_location_photo": {
+      const { error: err } = await client.from("family_location_photos").update({ published: false }).eq("id", targetId);
+      ensureWrite(err, "family_location_photos unpublish");
       return;
-    case "couples_location_photo":
-      await client.from("couples_location_photos").update({ published: false }).eq("id", targetId);
+    }
+    case "couples_location_photo": {
+      const { error: err } = await client.from("couples_location_photos").update({ published: false }).eq("id", targetId);
+      ensureWrite(err, "couples_location_photos unpublish");
       return;
-    case "portrait_location_photo":
-      await client.from("portrait_location_photos").update({ published: false }).eq("id", targetId);
+    }
+    case "portrait_location_photo": {
+      const { error: err } = await client.from("portrait_location_photos").update({ published: false }).eq("id", targetId);
+      ensureWrite(err, "portrait_location_photos unpublish");
       return;
+    }
     case "grad_spot_photo":
       await restoreGradSpot(client, item);
       return;
-    case "testimonial":
-      await client.from("testimonials").update({ photography_session_id: null }).eq("id", targetId);
+    case "testimonial": {
+      const { error: err } = await client.from("testimonials").update({ photography_session_id: null }).eq("id", targetId);
+      ensureWrite(err, "testimonials unlink");
       return;
+    }
     case "none":
       return; // nothing live to remove
     default:
@@ -126,12 +148,13 @@ export async function takedownPublishedItem(args: TakedownArgs): Promise<Takedow
         const { error: rmErr } = await client.storage.from(PUBLIC_DERIVATIVES_BUCKET)
           .remove([photo.public_derivative_storage_path as string]);
         if (rmErr) console.error(`derivative removal failed for ${photo.id}:`, rmErr.message);
-        await client.from("session_photos").update({
+        const { error: clearErr } = await client.from("session_photos").update({
           public_derivative_url: null,
           public_derivative_storage_path: null,
           public_derivative_content_hash: null,
           public_derivative_created_at: null,
         }).eq("id", photo.id);
+        ensureWrite(clearErr, `derivative column clear for ${photo.id}`);
         derivativesDeleted.push(photo.id);
       }
     }
@@ -139,7 +162,8 @@ export async function takedownPublishedItem(args: TakedownArgs): Promise<Takedow
 
   // preserve history: stays 'published', marked taken down
   const ref = { ...((item.published_ref as Record<string, unknown>) ?? {}), taken_down_at: new Date().toISOString() };
-  await client.from("session_content_items").update({ published_ref: ref }).eq("id", itemId);
+  const { error: stampErr } = await client.from("session_content_items").update({ published_ref: ref }).eq("id", itemId);
+  ensureWrite(stampErr, "taken_down_at stamp");
 
   const paths = pathsForPublishedItem(item.content_type, item.payload as Record<string, unknown>);
   const revalidated: string[] = [];

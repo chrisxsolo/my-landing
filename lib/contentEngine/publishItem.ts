@@ -51,10 +51,23 @@ export async function publishApprovedItem(args: PublishArgs): Promise<PublishOut
   }
   const result = data as { item_id: string; target_type: string; target_id: string | null };
 
-  // Step C — targeted revalidation (post-commit; failures are recoverable)
-  const { data: item } = await client.from("session_content_items")
+  // Step C — targeted revalidation (post-commit; failures are recoverable).
+  // The item IS live at this point — a failed re-read must never surface as a
+  // publish failure (a retry would just 409 "already published"). Report
+  // published with the revalidation marked pending; hourly ISR is the backstop.
+  const { data: item, error: readError } = await client.from("session_content_items")
     .select("content_type,payload").eq("id", itemId).single();
-  const paths = pathsForPublishedItem(item!.content_type, item!.payload as Record<string, unknown>);
+  if (readError || !item) {
+    console.error(`post-publish re-read failed for ${itemId} (recoverable; hourly ISR is the backstop)`, readError);
+    return {
+      status: "published",
+      targetType: result.target_type,
+      targetId: result.target_id,
+      revalidated: [],
+      revalidationFailures: ["(all paths — post-publish read failed)"],
+    };
+  }
+  const paths = pathsForPublishedItem(item.content_type, item.payload as Record<string, unknown>);
   const revalidated: string[] = [];
   const revalidationFailures: string[] = [];
   for (const path of paths) {
