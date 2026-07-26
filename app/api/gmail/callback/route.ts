@@ -9,6 +9,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getStoredRefreshToken, saveGmailTokens } from "@/lib/gmailTokens";
+import { isValidAdminSession } from "@/lib/adminAuthShared";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,16 @@ export async function GET(req: NextRequest) {
   const clientId     = process.env.GOOGLE_CLIENT_ID     ?? "";
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET ?? "";
   const redirectUri  = `${siteUrl}/api/gmail/callback`;
+
+  // The consent flow is always started from /admin (gmail/auth is
+  // requireAdmin-gated), so the redirect lands in the admin's own browser.
+  // Without this check, anyone completing Google consent for their own
+  // mailbox could overwrite the stored credentials — the state cookie alone
+  // is no guard, since the requester controls it.
+  const adminSession = req.cookies.get("admin_session")?.value;
+  if (!isValidAdminSession(adminSession, process.env.ADMIN_SESSION_SECRET)) {
+    return NextResponse.redirect(`${siteUrl}/admin?tab=inquiries&gmail=error`);
+  }
 
   const code        = req.nextUrl.searchParams.get("code");
   const error       = req.nextUrl.searchParams.get("error");
