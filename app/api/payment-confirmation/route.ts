@@ -172,10 +172,9 @@ Rules:
  *     Gmail messages.send API (+ → -, / → _, no padding).
  */
 function buildRawMimeMessage(opts: {
-  from: string; to: string; subject: string;
-  html: string; threadId?: string;
+  from: string; to: string; subject: string; html: string;
 }): string {
-  const { from, to, subject, html, threadId } = opts;
+  const { from, to, subject, html } = opts;
 
   // ── Step 1: standard base64 for the HTML body (NOT base64url) ────────────
   // btoa produces standard base64 (+, /, =). Do NOT replace those chars here.
@@ -190,9 +189,6 @@ function buildRawMimeMessage(opts: {
     `MIME-Version: 1.0`,
     `Content-Type: text/html; charset=UTF-8`,
     `Content-Transfer-Encoding: base64`,
-    ...(threadId
-      ? [`References: ${sanitizeHeader(threadId)}`, `In-Reply-To: ${sanitizeHeader(threadId)}`]
-      : []),
   ];
 
   const rawMime = [...headers, "", htmlWrapped].join("\r\n");
@@ -206,11 +202,11 @@ export async function POST(req: NextRequest) {
   const deny = requireAdmin(req);
   if (deny) return deny;
 
-  let body: { inquiry_id: string | number; mode: "preview" | "send"; thread_id?: string; custom_message?: string };
+  let body: { inquiry_id: string | number; mode: "preview" | "send"; custom_message?: string };
   try { body = await req.json(); }
   catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
 
-  const { inquiry_id, mode = "preview", thread_id, custom_message } = body;
+  const { inquiry_id, mode = "preview", custom_message } = body;
   if (!inquiry_id) return NextResponse.json({ error: "inquiry_id required" }, { status: 400 });
 
   const supabase = createSupabaseServerClient();
@@ -259,7 +255,6 @@ export async function POST(req: NextRequest) {
     to:      inq.email,
     subject,
     html,
-    ...(thread_id ? { threadId: thread_id } : {}),
   });
 
   const gmailRes = await fetch(
@@ -267,7 +262,7 @@ export async function POST(req: NextRequest) {
     {
       method:  "POST",
       headers: { Authorization: `Bearer ${tokens.access_token}`, "Content-Type": "application/json" },
-      body:    JSON.stringify({ raw, ...(thread_id ? { threadId: thread_id } : {}) }),
+      body:    JSON.stringify({ raw }),
     }
   );
 

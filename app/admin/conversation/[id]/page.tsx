@@ -799,14 +799,12 @@ export default function ConversationPage() {
     if (!inquiry) return;
     setConfirmLoading(true);
     try {
-      const latestThreadId = messages.at(-1)?.threadId;
       const res = await fetch("/api/payment-confirmation", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({
           inquiry_id:     inquiry.id,
           mode:           "send",
-          thread_id:      latestThreadId,
           custom_message: customComment || undefined,
         }),
       });
