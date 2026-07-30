@@ -348,20 +348,26 @@ function AdminDashboard() {
       if(!res.ok){showToast(json.error??"Gmail sync failed",false);return;}
       showToast(json.message??"Timeline synced from Gmail ✓");
       fetchInquiries();
+      fetchPortalSessions();
     }catch{showToast("Gmail sync failed",false);}
     finally{setTimelineSyncLoading(false);}
   }
 
   async function syncPayments(){
     setSyncLoading(true);setSyncResult(null);setSyncMsg(null);
+    let scanned=false;
     try{
       const res=await fetch("/api/sync-payments",{method:"POST"});
       const json=await res.json();
       if(!res.ok){setSyncMsg(json.error??"Sync failed");return;}
       if(json.message){setSyncMsg(json.message);}
       setSyncResult(json.staged??[]);
+      scanned=true;
     }catch{setSyncMsg("Sync request failed");}
     finally{setSyncLoading(false);}
+    // One click does both: after the payment scan, sync the timeline so
+    // detected milestones and portal stages light up without a second button.
+    if(scanned) await syncTimeline();
   }
 
   // ── Gmail ─────────────────────────────────────────────────────────────────
