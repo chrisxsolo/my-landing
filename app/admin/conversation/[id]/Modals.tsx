@@ -3,6 +3,7 @@
 // contract. Both render over a Darkroom scrim; the email preview itself stays
 // on white since that's how the client will see it.
 
+import { useRef } from "react";
 import type { AdminInquiry } from "@/lib/adminInquiries";
 import { T, Icon, Spinner, PanelHead, MonoLabel } from "../ui";
 
@@ -13,8 +14,13 @@ export function ConfirmationModal({ inquiry, previewHtml, customComment, onCusto
   onCustomComment: (v: string) => void;
   confirmLoading: boolean;
   onClose: () => void;
-  onSend: () => void;
+  /** editedHtml is the preview's content after inline edits, null when untouched. */
+  onSend: (editedHtml: string | null) => void;
 }) {
+  const editRef = useRef<HTMLDivElement | null>(null);
+  // Tracked in a ref, not state — edits mutate the DOM directly and a
+  // re-render would clobber them by re-applying previewHtml.
+  const dirtyRef = useRef(false);
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-10 overflow-y-auto"
       style={{ background: T.scrim, backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" }}>
@@ -50,9 +56,19 @@ export function ConfirmationModal({ inquiry, previewHtml, customComment, onCusto
           )}
         </div>
 
-        {/* Email preview — white, as the client sees it */}
+        {/* Email preview — white, as the client sees it. Directly editable. */}
         <div className="flex-1 overflow-y-auto p-4">
-          <div className="rounded-xl overflow-hidden" style={{ background: "#ffffff" }}
+          <p className="text-[10px] font-medium mb-2 text-center" style={{ color: T.inkFaint }}>
+            ✏️ Click anywhere in the email to edit it — what you see is what sends
+          </p>
+          <div
+            ref={editRef}
+            contentEditable
+            suppressContentEditableWarning
+            onInput={() => { dirtyRef.current = true; }}
+            spellCheck={false}
+            className="rounded-xl overflow-hidden outline-none"
+            style={{ background: "#ffffff", caretColor: "#111513" }}
             dangerouslySetInnerHTML={{ __html: previewHtml }} />
         </div>
 
@@ -64,7 +80,7 @@ export function ConfirmationModal({ inquiry, previewHtml, customComment, onCusto
             Cancel
           </button>
           <button
-            onClick={onSend}
+            onClick={() => onSend(dirtyRef.current ? (editRef.current?.innerHTML ?? null) : null)}
             disabled={confirmLoading}
             className="flex-1 text-sm font-black py-2.5 rounded-xl transition-all hover:-translate-y-px disabled:opacity-40 flex items-center justify-center gap-2"
             style={{ background: T.action, color: T.actionText, boxShadow: T.glow }}>

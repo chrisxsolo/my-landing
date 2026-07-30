@@ -114,11 +114,7 @@ export function buildPaymentConfirmationHtml(opts: {
 `
     : "";
 
-  return `<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background:#f4f4f0;">
-<div style="font-family:Arial,Helvetica,sans-serif;max-width:640px;margin:0 auto;padding:48px 28px;background:#ffffff;color:#111513;">
+  return wrapPaymentConfirmationShell(`<div style="font-family:Arial,Helvetica,sans-serif;max-width:640px;margin:0 auto;padding:48px 28px;background:#ffffff;color:#111513;">
 
   <!-- Eyebrow -->
   <p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.15em;color:#059669;margin:0 0 20px;">
@@ -177,7 +173,18 @@ ${guideBlock}
     &nbsp;·&nbsp; ${CHRIS_PHONE}
   </p>
 
-</div>
+</div>`);
+}
+
+/** Doctype/body shell around the email content. Exported separately because
+ *  the admin preview renders (and lets the user edit) only the inner content —
+ *  the browser strips the document shell — so send re-wraps edited HTML here. */
+export function wrapPaymentConfirmationShell(inner: string): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f4f4f0;">
+${inner}
 </body>
 </html>`;
 }

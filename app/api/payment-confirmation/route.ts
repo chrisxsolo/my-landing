@@ -14,7 +14,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { getValidTokens } from "@/lib/gmailTokens";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { requireAdmin } from "@/lib/requireAdmin";
-import { buildPaymentConfirmationHtml } from "@/lib/paymentConfirmationEmail";
+import { buildPaymentConfirmationHtml, wrapPaymentConfirmationShell } from "@/lib/paymentConfirmationEmail";
 
 export const dynamic = "force-dynamic";
 
@@ -202,12 +202,15 @@ export async function POST(req: NextRequest) {
   const deny = requireAdmin(req);
   if (deny) return deny;
 
-  let body: { inquiry_id: string | number; mode: "preview" | "send"; custom_message?: string };
+  let body: { inquiry_id: string | number; mode: "preview" | "send"; custom_message?: string; edited_html?: string };
   try { body = await req.json(); }
   catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
 
-  const { inquiry_id, mode = "preview", custom_message } = body;
+  const { inquiry_id, mode = "preview", custom_message, edited_html } = body;
   if (!inquiry_id) return NextResponse.json({ error: "inquiry_id required" }, { status: 400 });
+  if (edited_html !== undefined && (typeof edited_html !== "string" || !edited_html.trim() || edited_html.length > 500_000)) {
+    return NextResponse.json({ error: "edited_html must be a non-empty string under 500KB" }, { status: 400 });
+  }
 
   const supabase = createSupabaseServerClient();
   const { data: inq } = await supabase
@@ -224,51 +227,59 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Client has not paid yet" }, { status: 400 });
   }
 
-  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://soloxsnaps.com").replace(/\/+$/, "");
+  let html: string;
+  if (mode === "send" && edited_html) {
+    // WYSIWYG: the admin edited the preview inline, so send exactly that
+    // content re-wrapped in the document shell the preview stripped.
+    // custom_message is ignored here — the edited preview is the source of truth.
+    html = wrapPaymentConfirmationShell(edited_html);
+  } else {
+    const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://soloxsnaps.com").replace(/\/+$/, "");
 
-  let { amount, method, invoice } = parseNote(inq.payment_note);
-  if (!amount) {
-    // payment_note is only written at approval time — before that, pull the
-    // amount/method from the ledger row or the pending staged payment.
-    const { data: ledgerRow } = await supabase
-      .from("payments")
-      .select("amount, method, invoice")
-      .eq("inquiry_id", inq.id)
-      .eq("status", "active")
-      .order("paid_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    const { data: stagedRow } = ledgerRow ? { data: null } : await supabase
-      .from("payments_staging")
-      .select("amount, method, invoice")
-      .eq("inquiry_id", inq.id)
-      .eq("status", "pending")
-      .order("paid_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    const row = ledgerRow ?? stagedRow;
-    if (row) {
-      amount = row.amount ?? amount;
-      method = row.method ?? method;
-      invoice = row.invoice ?? invoice;
+    let { amount, method, invoice } = parseNote(inq.payment_note);
+    if (!amount) {
+      // payment_note is only written at approval time — before that, pull the
+      // amount/method from the ledger row or the pending staged payment.
+      const { data: ledgerRow } = await supabase
+        .from("payments")
+        .select("amount, method, invoice")
+        .eq("inquiry_id", inq.id)
+        .eq("status", "active")
+        .order("paid_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const { data: stagedRow } = ledgerRow ? { data: null } : await supabase
+        .from("payments_staging")
+        .select("amount, method, invoice")
+        .eq("inquiry_id", inq.id)
+        .eq("status", "pending")
+        .order("paid_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const row = ledgerRow ?? stagedRow;
+      if (row) {
+        amount = row.amount ?? amount;
+        method = row.method ?? method;
+        invoice = row.invoice ?? invoice;
+      }
     }
+
+    // Use AI to pick the single confirmed date from the email thread
+    const confirmedDateLabel = await detectConfirmedDate(
+      inq.email,
+      inq.date_in_mind,
+      inq.session_date,
+    );
+
+    html = buildPaymentConfirmationHtml({
+      name:               inq.name,
+      sessionType:        inq.session_type,
+      confirmedDateLabel,
+      amount, method, invoice,
+      siteUrl,
+      customMessage: custom_message,
+    });
   }
-
-  // Use AI to pick the single confirmed date from the email thread
-  const confirmedDateLabel = await detectConfirmedDate(
-    inq.email,
-    inq.date_in_mind,
-    inq.session_date,
-  );
-
-  const html = buildPaymentConfirmationHtml({
-    name:               inq.name,
-    sessionType:        inq.session_type,
-    confirmedDateLabel,
-    amount, method, invoice,
-    siteUrl,
-    customMessage: custom_message,
-  });
 
   if (mode === "preview") {
     return NextResponse.json({ html });

@@ -795,7 +795,7 @@ export default function ConversationPage() {
   }
 
   // ── Payment confirmation email: send ──────────────────────────────────────
-  async function sendConfirmation() {
+  async function sendConfirmation(editedHtml: string | null) {
     if (!inquiry) return;
     setConfirmLoading(true);
     try {
@@ -806,6 +806,7 @@ export default function ConversationPage() {
           inquiry_id:     inquiry.id,
           mode:           "send",
           custom_message: customComment || undefined,
+          edited_html:    editedHtml || undefined,
         }),
       });
       const json = await res.json();
