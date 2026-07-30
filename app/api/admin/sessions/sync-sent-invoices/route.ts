@@ -226,12 +226,27 @@ export async function POST(req: NextRequest) {
   }
 
   // ── 5. Apply updates to client_sessions ───────────────────────────────────
+  // Milestones already stamped on the inquiry (by an earlier sync or clicked
+  // manually in the timeline UI) count as evidence too — otherwise a session
+  // whose deposit was stamped outside this run stays stuck at an early stage.
+  const { data: allInquiries } = await supabase
+    .from("inquiries")
+    .select("id, email, name, session_type, session_date, preferred_time, location, reply_sent_at, invoice_sent_at, contract_sent_at, deposit_paid_at, gallery_delivered_at, booking_confirmed")
+    .order("created_at", { ascending: false });
+
+  const inquiryByEmail = new Map<string, NonNullable<typeof allInquiries>[number]>();
+  for (const inq of allInquiries ?? []) {
+    const email = (inq.email as string).toLowerCase();
+    if (!inquiryByEmail.has(email)) inquiryByEmail.set(email, inq);
+  }
+
   const updated: string[] = [];
   const todayStr = new Date().toISOString().slice(0, 10);
 
   for (const session of sessions) {
     const email = (session.client_email as string).toLowerCase();
     const sentInfo = sentByEmail.get(email);
+    const inqStamps = inquiryByEmail.get(email);
     const sessionUpdates: Record<string, string> = {};
     const parts: string[] = [];
 
@@ -265,13 +280,13 @@ export async function POST(req: NextRequest) {
 
     // Advance the 9-stage portal progress from detected milestones (never backward)
     const nextStatus = computeAdvancedStatus(session.current_status as string, {
-      replySent: firstReplySentByEmail.has(email),
-      invoiceSent: !!sentInfo?.invoiceSentAt,
-      contractSent: !!sentInfo?.contractSentAt,
-      depositPaid: paidEmails.has(email),
+      replySent: firstReplySentByEmail.has(email) || !!inqStamps?.reply_sent_at,
+      invoiceSent: !!sentInfo?.invoiceSentAt || !!inqStamps?.invoice_sent_at,
+      contractSent: !!sentInfo?.contractSentAt || !!inqStamps?.contract_sent_at,
+      depositPaid: paidEmails.has(email) || !!inqStamps?.deposit_paid_at,
       contractSigned: signedEmails.has(email),
       sessionDatePast: !!session.session_date && (session.session_date as string) < todayStr,
-      galleryDelivered: galleryByEmail.has(email),
+      galleryDelivered: galleryByEmail.has(email) || !!inqStamps?.gallery_delivered_at,
     });
     if (nextStatus) {
       sessionUpdates.current_status = nextStatus;
@@ -308,12 +323,9 @@ export async function POST(req: NextRequest) {
 
   if (allInquiryEmails.length) {
     // inquiries.email is stored as typed by the client, so a case-sensitive
-    // .in() with our lowercased keys would skip mixed-case rows. Fetch and
-    // filter on the normalized address instead (the table is small).
+    // .in() with our lowercased keys would skip mixed-case rows. Filter the
+    // step-5 load on the normalized address instead (the table is small).
     const emailSet = new Set(allInquiryEmails);
-    const { data: allInquiries } = await supabase
-      .from("inquiries")
-      .select("id, email, name, session_type, session_date, preferred_time, location, reply_sent_at, invoice_sent_at, contract_sent_at, deposit_paid_at, gallery_delivered_at, booking_confirmed");
     const inquiries = (allInquiries ?? []).filter(
       (inq) => emailSet.has((inq.email as string).toLowerCase()),
     );
