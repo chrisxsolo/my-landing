@@ -36,14 +36,14 @@ const SERVICE_EMAIL_CONTENT: Record<string, ServiceEmailContent> = {
     emoji: "📸",
     intro: "I received your payment — thank you so much! Your session is officially booked and I can't wait to capture these memories with your family.",
     guidePath: "/family-guide",
-    guideBlurb: "My family session guide covers everything — what to wear, how to prep the little ones, timing for the best light, and my favorite Bay Area locations. Refer back to it any time before shoot day.",
+    guideBlurb: "My family session guide covers everything — what to wear, how to prep the little ones, and timing for the best light. Refer back to it any time before shoot day.",
     guideCta: "Open the family guide →",
   },
   couples: {
     emoji: "📸",
     intro: "I received your payment — thank you so much! Your session is officially booked and I can't wait to capture this special time together.",
     guidePath: "/couples-guide",
-    guideBlurb: "My couples guide covers everything — what to wear, posing tips, how to make the most of golden hour, and my favorite Bay Area locations. Refer back to it any time before shoot day.",
+    guideBlurb: "My couples guide covers everything — what to wear, posing tips, and how to make the most of golden hour. Refer back to it any time before shoot day.",
     guideCta: "Open the couples guide →",
   },
 };
