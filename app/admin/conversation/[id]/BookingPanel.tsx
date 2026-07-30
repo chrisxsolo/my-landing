@@ -149,7 +149,10 @@ type BookingProps = {
 
 export default function BookingPanel(p: BookingProps) {
   const { inquiry } = p;
-  const paid = inquiry.payment_status === "paid";
+  // A timeline-stamped deposit counts as paid here — payment_status only flips
+  // once the staged payment is approved in the Payments tab, and the
+  // confirmation email shouldn't have to wait for ledger review.
+  const paid = inquiry.payment_status === "paid" || !!inquiry.deposit_paid_at;
   const [markPaidOpen, setMarkPaidOpen] = useState(false);
 
   return (

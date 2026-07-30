@@ -217,13 +217,42 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (!inq) return NextResponse.json({ error: "Inquiry not found" }, { status: 404 });
-  if (inq.payment_status !== "paid") {
+  // A timeline-stamped deposit counts as paid — payment_status only flips once
+  // the staged payment is approved in the Payments tab, and the confirmation
+  // shouldn't be blocked on ledger review.
+  if (inq.payment_status !== "paid" && !inq.deposit_paid_at) {
     return NextResponse.json({ error: "Client has not paid yet" }, { status: 400 });
   }
 
   const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://soloxsnaps.com").replace(/\/+$/, "");
 
-  const { amount, method, invoice } = parseNote(inq.payment_note);
+  let { amount, method, invoice } = parseNote(inq.payment_note);
+  if (!amount) {
+    // payment_note is only written at approval time — before that, pull the
+    // amount/method from the ledger row or the pending staged payment.
+    const { data: ledgerRow } = await supabase
+      .from("payments")
+      .select("amount, method, invoice")
+      .eq("inquiry_id", inq.id)
+      .eq("status", "active")
+      .order("paid_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const { data: stagedRow } = ledgerRow ? { data: null } : await supabase
+      .from("payments_staging")
+      .select("amount, method, invoice")
+      .eq("inquiry_id", inq.id)
+      .eq("status", "pending")
+      .order("paid_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const row = ledgerRow ?? stagedRow;
+    if (row) {
+      amount = row.amount ?? amount;
+      method = row.method ?? method;
+      invoice = row.invoice ?? invoice;
+    }
+  }
 
   // Use AI to pick the single confirmed date from the email thread
   const confirmedDateLabel = await detectConfirmedDate(
