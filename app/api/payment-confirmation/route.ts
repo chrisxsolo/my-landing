@@ -311,8 +311,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `Send failed: ${err.error?.message ?? "unknown error"}` }, { status: 500 });
   }
 
-  // Mark that confirmation was sent
-  await supabase.from("inquiries").update({ status: "responded", confirmation_sent_at: new Date().toISOString() }).eq("id", inq.id);
+  // Mark that confirmation was sent. The confirmation IS an outbound reply —
+  // clear needs_reply and stamp the outbound state immediately instead of
+  // waiting for the next Gmail reconciliation.
+  const sentAt = new Date().toISOString();
+  await supabase.from("inquiries").update({
+    status: "responded",
+    confirmation_sent_at: sentAt,
+    needs_reply: false,
+    last_outbound_at: sentAt,
+    last_message_at: sentAt,
+    last_message_direction: "outbound",
+  }).eq("id", inq.id);
 
   return NextResponse.json({ ok: true });
 }
