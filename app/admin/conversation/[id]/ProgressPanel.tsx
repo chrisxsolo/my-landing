@@ -11,6 +11,7 @@ import type { AdminInquiry } from "@/lib/adminInquiries";
 import {
   findMatchingClientSession,
   getClientSessionEmailMatches,
+  inquiryCountsAsPaid,
   resolveEffectiveSessionStatus,
   CLIENT_SESSION_STATUS_LABELS,
   type AdminClientSessionDTO,
@@ -70,7 +71,7 @@ export default function ProgressPanel({ inquiry, onInquiryUpdate, showToast }: P
     getClientSessionEmailMatches(sessions, inquiry.email).length > 1 && !portalSession;
   const effectiveStatus = resolveEffectiveSessionStatus(
     portalSession?.currentStatus ?? "inquiry_received",
-    inquiry.payment_status === "paid",
+    inquiryCountsAsPaid(inquiry),
   );
 
   async function selectStatus(status: ClientSessionStatus) {

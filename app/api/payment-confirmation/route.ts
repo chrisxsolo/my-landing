@@ -82,22 +82,59 @@ function extractJson(raw: string): string {
   return raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
 }
 
-/** Scan the Gmail thread and return the single most-recently-agreed date.
- *  Returns a formatted readable string like "Friday, June 20, 2026", or null. */
-async function detectConfirmedDate(
-  email: string,
-  dateInMind: string | null,
-  sessionDate: string | null,
-): Promise<string | null> {
-  // If there's already a confirmed session_date set, format and use it
-  if (sessionDate) {
-    return new Date(sessionDate + "T12:00:00").toLocaleDateString("en-US", {
-      weekday: "long", month: "long", day: "numeric", year: "numeric",
-    });
-  }
+/** Normalize any stored/extracted amount into a "$150" / "$150.50" string. */
+function formatMoney(raw: string | number | null | undefined): string {
+  const text = typeof raw === "number" ? String(raw) : typeof raw === "string" ? raw : "";
+  const match = text.replace(/,/g, "").match(/\d+(?:\.\d{1,2})?/);
+  if (!match) return "";
+  const value = Number(match[0]);
+  if (!isFinite(value) || value <= 0) return "";
+  return `$${Number.isInteger(value) ? value : value.toFixed(2)}`;
+}
+
+function formatSessionDate(sessionDate: string): string {
+  return new Date(sessionDate + "T12:00:00").toLocaleDateString("en-US", {
+    weekday: "long", month: "long", day: "numeric", year: "numeric",
+  });
+}
+
+type ThreadDetails = { confirmedDateLabel: string | null; amount: string; method: string };
+
+const THREAD_SCAN_SYSTEM = (today: string, currentYear: number) =>
+  `You extract booking facts from the email thread between a photographer (SoloxSnaps) and one client. Today is ${today}. Current year is ${currentYear}.
+
+Confirmed session date:
+- Find the ONE date that was most recently agreed upon between the photographer and client
+- Prefer dates with confirmation language: "works", "perfect", "see you then", "confirmed", "sounds good", "can't wait"
+- A date proposed + positive reply = confirmed
+- If multiple dates were discussed, return only the final agreed one
+- If only month+day is given, use ${currentYear}. Use ${currentYear + 1} only if the date has already passed.
+
+Deposit actually paid:
+- amount: the money this client has already PAID (client says "just sent you $100", a payment confirmation, or the photographer acknowledging "got your $100"). Digits only, e.g. "100" or "100.50".
+- method: how they paid — Venmo, Zelle, PayPal, Cash App, Square, Cash — when stated.
+- A quoted price, package total, or remaining balance is NOT a payment. Return null for both when no payment amount is clearly stated.
+
+Return ONLY valid JSON, no markdown:
+{"date":"YYYY-MM-DD","readable":"Friday, June 20, 2026","amount":"100","method":"Venmo"}
+Use null for any field you cannot determine.`;
+
+/** Scan the Gmail thread for the agreed shoot date and the deposit the client
+ *  actually paid. Skipped entirely when the caller already has both — a stored
+ *  session_date and a ledger amount need no AI pass. */
+async function detectThreadDetails(opts: {
+  email: string;
+  dateInMind: string | null;
+  sessionDate: string | null;
+  needAmount: boolean;
+}): Promise<ThreadDetails> {
+  const { email, dateInMind, sessionDate, needAmount } = opts;
+  const knownDateLabel = sessionDate ? formatSessionDate(sessionDate) : null;
+  const empty: ThreadDetails = { confirmedDateLabel: knownDateLabel ?? dateInMind ?? null, amount: "", method: "" };
+  if (knownDateLabel && !needAmount) return empty;
 
   const tokens = await getValidTokens();
-  if (!tokens) return dateInMind ?? null;
+  if (!tokens) return empty;
 
   const auth = `Bearer ${tokens.access_token}`;
   const searchRes = await fetch(
@@ -105,11 +142,11 @@ async function detectConfirmedDate(
     `?q=${encodeURIComponent(`from:${email} OR to:${email}`)}&maxResults=20`,
     { headers: { Authorization: auth } }
   );
-  if (!searchRes.ok) return dateInMind ?? null;
+  if (!searchRes.ok) return empty;
 
   const searchData = await searchRes.json() as { messages?: { id: string }[] };
   const ids = (searchData.messages ?? []).map(m => m.id).slice(0, 15);
-  if (!ids.length) return dateInMind ?? null;
+  if (!ids.length) return empty;
 
   const bodies = await Promise.all(ids.map(async id => {
     try {
@@ -129,7 +166,7 @@ async function detectConfirmedDate(
     .map((b, i) => `--- Email ${i + 1} ---\n${b}`)
     .join("\n\n");
 
-  if (!emailContext) return dateInMind ?? null;
+  if (!emailContext) return empty;
 
   const today = new Date().toISOString().split("T")[0];
   const currentYear = new Date().getFullYear();
@@ -137,17 +174,8 @@ async function detectConfirmedDate(
 
   const res = await anthropic.messages.create({
     model:      "claude-haiku-4-5",
-    max_tokens: 150,
-    system: `You extract the single confirmed photography session date from an email thread. Today is ${today}. Current year is ${currentYear}.
-
-Rules:
-- Find the ONE date that was most recently agreed upon between the photographer and client
-- Prefer dates with confirmation language: "works", "perfect", "see you then", "confirmed", "sounds good", "can't wait"
-- A date proposed + positive reply = confirmed
-- If multiple dates were discussed, return only the final agreed one
-- If only month+day is given, use ${currentYear}. Use ${currentYear + 1} only if the date has already passed.
-- Return ONLY valid JSON, no markdown: {"date":"YYYY-MM-DD","readable":"Friday, June 20, 2026"}
-- If no date found: {"date":null,"readable":null}`,
+    max_tokens: 200,
+    system: THREAD_SCAN_SYSTEM(today, currentYear),
     messages: [{
       role: "user",
       content: `Client's original date request: ${dateInMind ?? "not specified"}\n\nEmail thread:\n${emailContext}`,
@@ -156,11 +184,17 @@ Rules:
 
   try {
     const raw = res.content[0].type === "text" ? res.content[0].text : "{}";
-    const result = JSON.parse(extractJson(raw)) as { date: string | null; readable: string | null };
-    if (result.readable) return result.readable;
+    const result = JSON.parse(extractJson(raw)) as {
+      readable: string | null; amount: string | null; method: string | null;
+    };
+    return {
+      confirmedDateLabel: knownDateLabel ?? result.readable ?? dateInMind ?? null,
+      amount: needAmount ? formatMoney(result.amount) : "",
+      method: needAmount && typeof result.method === "string" ? result.method.trim().slice(0, 40) : "",
+    };
   } catch { /* fall through */ }
 
-  return dateInMind ?? null;
+  return empty;
 }
 
 /** Build an HTML MIME email for the Gmail raw API.
@@ -258,18 +292,26 @@ export async function POST(req: NextRequest) {
         .maybeSingle();
       const row = ledgerRow ?? stagedRow;
       if (row) {
-        amount = row.amount ?? amount;
+        amount = formatMoney(row.amount) || amount;
         method = row.method ?? method;
         invoice = row.invoice ?? invoice;
       }
     }
 
-    // Use AI to pick the single confirmed date from the email thread
-    const confirmedDateLabel = await detectConfirmedDate(
-      inq.email,
-      inq.date_in_mind,
-      inq.session_date,
-    );
+    // Read the thread for the confirmed date and — when the deposit was only
+    // ever detected from email, with no ledger or staged row to read it from —
+    // the amount the client actually paid.
+    const details = await detectThreadDetails({
+      email: inq.email,
+      dateInMind: inq.date_in_mind,
+      sessionDate: inq.session_date,
+      needAmount: !amount,
+    });
+    const confirmedDateLabel = details.confirmedDateLabel;
+    if (!amount && details.amount) {
+      amount = details.amount;
+      method = method || details.method;
+    }
 
     html = buildPaymentConfirmationHtml({
       name:               inq.name,

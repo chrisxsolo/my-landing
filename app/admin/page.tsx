@@ -92,6 +92,7 @@ import { GRAD_SCHOOLS } from "@/lib/portfolioCategoryContent";
 import {
   findMatchingClientSession,
   getClientSessionEmailMatches,
+  inquiryCountsAsPaid,
   resolveEffectiveSessionStatus,
   CLIENT_SESSION_STATUS_LABELS,
   type AdminClientSessionDTO,
@@ -909,7 +910,7 @@ function AdminDashboard() {
   }
 
   function getEffectivePortalStatus(inquiry:Inquiry,portalSession:AdminClientSessionDTO|null):ClientSessionStatus{
-    return resolveEffectiveSessionStatus(portalSession?.currentStatus??"inquiry_received",inquiry.payment_status==="paid");
+    return resolveEffectiveSessionStatus(portalSession?.currentStatus??"inquiry_received",inquiryCountsAsPaid(inquiry));
   }
 
   async function updatePortalStatusFromInquiry(inquiry:Inquiry,status:ClientSessionStatus){

@@ -5,6 +5,7 @@
 
 import { useState } from "react";
 import type { AdminInquiry } from "@/lib/adminInquiries";
+import { inquiryCountsAsPaid } from "@/lib/clientSessions";
 import { T, Icon, Spinner, Panel, PanelHead, MonoLabel } from "../ui";
 import { countdownLabel } from "./helpers";
 
@@ -149,10 +150,7 @@ type BookingProps = {
 
 export default function BookingPanel(p: BookingProps) {
   const { inquiry } = p;
-  // A timeline-stamped deposit counts as paid here — payment_status only flips
-  // once the staged payment is approved in the Payments tab, and the
-  // confirmation email shouldn't have to wait for ledger review.
-  const paid = inquiry.payment_status === "paid" || !!inquiry.deposit_paid_at;
+  const paid = inquiryCountsAsPaid(inquiry);
   const [markPaidOpen, setMarkPaidOpen] = useState(false);
 
   return (

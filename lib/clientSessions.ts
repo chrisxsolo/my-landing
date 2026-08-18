@@ -137,6 +137,19 @@ export function resolveEffectiveSessionStatus(
   return stored;
 }
 
+/**
+ * Payment evidence for resolveEffectiveSessionStatus and the booking UI. A
+ * timeline-stamped deposit counts as paid: payment_status only flips once the
+ * staged payment is approved in the Payments tab, and a session booked over
+ * email must not sit at "booking in progress" waiting on ledger review.
+ */
+export function inquiryCountsAsPaid(inquiry: {
+  payment_status?: string | null;
+  deposit_paid_at?: string | null;
+}): boolean {
+  return inquiry.payment_status === "paid" || !!inquiry.deposit_paid_at;
+}
+
 export function normalizeClientSessionEmail(value: string | null | undefined) {
   if (typeof value !== "string") return null;
   const trimmed = value.trim().toLowerCase();
