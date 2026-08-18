@@ -68,10 +68,19 @@ export function buildPaymentConfirmationHtml(opts: {
   amount: string;
   method: string;
   invoice: string;
+  /** Full session price, e.g. "$450". Omitted when the shoot can't be priced. */
+  sessionTotal?: string;
+  /** Remaining balance, e.g. "$225". Empty once the session is paid in full. */
+  balanceDue?: string;
+  /** Caption under the balance — the due date, or the paid-in-full note. */
+  balanceNote?: string;
   siteUrl: string;
   customMessage?: string;
 }) {
-  const { name, sessionType, confirmedDateLabel, amount, method, invoice, siteUrl, customMessage } = opts;
+  const {
+    name, sessionType, confirmedDateLabel, amount, method, invoice,
+    sessionTotal, balanceDue, balanceNote, siteUrl, customMessage,
+  } = opts;
   const content  = emailContentForService(sessionType);
   const safeName = escapeHtml(name);
 
@@ -93,6 +102,23 @@ export function buildPaymentConfirmationHtml(opts: {
     ? `<tr>
          <td style="padding:13px 0;color:#6a716f;width:140px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Invoice</td>
          <td style="padding:13px 0;color:#1b201f;font-size:15px;">${escapeHtml(invoice)}</td>
+       </tr>`
+    : "";
+
+  const totalRow = sessionTotal
+    ? `<tr style="border-bottom:1px solid rgba(17,21,19,0.09);">
+         <td style="padding:13px 0;color:#6a716f;width:140px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Session total</td>
+         <td style="padding:13px 0;color:#1b201f;font-size:15px;">${escapeHtml(sessionTotal)}</td>
+       </tr>`
+    : "";
+
+  const balanceRow = sessionTotal && (balanceDue || balanceNote)
+    ? `<tr style="border-bottom:1px solid rgba(17,21,19,0.09);">
+         <td style="padding:13px 0;color:#6a716f;width:140px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Balance</td>
+         <td style="padding:13px 0;color:#1b201f;font-size:15px;">
+           ${balanceDue ? `<strong>${escapeHtml(balanceDue)}</strong>` : ""}
+           ${balanceNote ? `<span style="color:#6a716f;">${escapeHtml(balanceNote)}</span>` : ""}
+         </td>
        </tr>`
     : "";
 
@@ -143,13 +169,13 @@ export function buildPaymentConfirmationHtml(opts: {
   </div>
 
   <!-- Session details -->
-  ${(sessionRow || dateRow) ? `
+  ${(sessionRow || dateRow || totalRow) ? `
   <div style="border:1px solid rgba(17,21,19,0.1);border-radius:10px;padding:22px 24px;margin:0 0 28px;">
     <p style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#111513;margin:0 0 14px;">
       Session Details
     </p>
     <table style="width:100%;border-collapse:collapse;">
-      ${sessionRow}${dateRow}${invoiceRow}
+      ${sessionRow}${dateRow}${totalRow}${balanceRow}${invoiceRow}
     </table>
   </div>
   ` : ""}

@@ -53,11 +53,12 @@ function parsePeopleCount(value: string | number | null | undefined, text: strin
   return explicit ? Math.max(1, Number(explicit[1])) : 1;
 }
 
-export function inferSessionTotalCents(inquiry: PaymentTotalInquiry | null | undefined): number {
+/** Session price from the published rate card alone — session type, group
+ *  size, and campus travel fee. Ignores any dollar figure written on the
+ *  inquiry, so callers that must not mistake a deposit for the total (the
+ *  booking confirmation email) can price the shoot from the catalog. */
+export function catalogSessionTotalCents(inquiry: PaymentTotalInquiry | null | undefined): number {
   if (!inquiry) return 0;
-
-  const explicit = parseKnownMoneyCents(inquiry.payment_note) || parseKnownMoneyCents(inquiry.message);
-  if (explicit > 0) return explicit;
 
   const text = [
     inquiry.session_type,
@@ -79,6 +80,15 @@ export function inferSessionTotalCents(inquiry: PaymentTotalInquiry | null | und
   if (/\bcouple|portrait|anniversary\b/.test(text)) return COUPLES_PACKAGES["1hr"].price * 100;
 
   return 0;
+}
+
+export function inferSessionTotalCents(inquiry: PaymentTotalInquiry | null | undefined): number {
+  if (!inquiry) return 0;
+
+  const explicit = parseKnownMoneyCents(inquiry.payment_note) || parseKnownMoneyCents(inquiry.message);
+  if (explicit > 0) return explicit;
+
+  return catalogSessionTotalCents(inquiry);
 }
 
 export function inferPaymentTotalCents(
