@@ -3224,7 +3224,7 @@ function AdminDashboard() {
                                 ):(
                                   <div className="flex items-center justify-between flex-wrap gap-2">
                                     <p className="text-[11px] font-medium" style={{color:T.inkFaint}}>Copy → paste into Gmail → send to {inq.email}</p>
-                                    <a href={`mailto:${inq.email}?subject=Re: Your inquiry&body=${encodeURIComponent(drafts[inq.id])}`}
+                                    <a href={`mailto:${inq.email}?subject=${encodeURIComponent(composeSubject[inq.id]||buildInquiryReplySubject(inq))}&body=${encodeURIComponent(drafts[inq.id])}`}
                                        className="text-[11px] font-bold px-2.5 py-1 rounded-lg transition-all hover:opacity-80"
                                        style={{background:T.inset,color:T.inkSoft}}>
                                       Open in Gmail →

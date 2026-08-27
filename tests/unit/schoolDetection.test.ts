@@ -111,11 +111,38 @@ describe("buildInquiryReplySubject", () => {
     }))).toBe("Graduation Inquiry");
   });
 
-  it("keeps the non-graduation subject format", () => {
-    expect(buildInquiryReplySubject(inquiry({ session_type: "Family" })))
-      .toBe("Re: Your Family inquiry");
-    expect(buildInquiryReplySubject(inquiry({ session_type: null })))
-      .toBe("Re: Your photography inquiry");
+  it("names the session type for non-graduation inquiries", () => {
+    expect(buildInquiryReplySubject(inquiry({ session_type: "Family Session" })))
+      .toBe("Family Session Inquiry");
+    expect(buildInquiryReplySubject(inquiry({ session_type: "Couples Session" })))
+      .toBe("Couples Session Inquiry");
+    expect(buildInquiryReplySubject(inquiry({ session_type: "Individual Portrait" })))
+      .toBe("Portrait Session Inquiry");
+    expect(buildInquiryReplySubject(inquiry({ session_type: "Event Coverage" })))
+      .toBe("Event Coverage Inquiry");
+    expect(buildInquiryReplySubject(inquiry({ session_type: "Other", message: "" })))
+      .toBe("Photography Inquiry");
+    expect(buildInquiryReplySubject(inquiry({ session_type: null, message: "" })))
+      .toBe("Photography Inquiry");
+  });
+
+  it("lets a more specific message refine a vague session type", () => {
+    expect(buildInquiryReplySubject(inquiry({
+      session_type: "Individual Portrait",
+      message: "My boyfriend and I want photos for our anniversary",
+    }))).toBe("Couples Session Inquiry");
+    expect(buildInquiryReplySubject(inquiry({
+      session_type: "Couples Session", message: "I am planning a proposal at Baker Beach",
+    }))).toBe("Proposal Inquiry");
+    expect(buildInquiryReplySubject(inquiry({
+      session_type: "Other", message: "We just got engaged!",
+    }))).toBe("Engagement Inquiry");
+  });
+
+  it("does not let a vague message downgrade a specific session type", () => {
+    expect(buildInquiryReplySubject(inquiry({
+      session_type: "Family Session", message: "We would love some portraits outdoors",
+    }))).toBe("Family Session Inquiry");
   });
 });
 

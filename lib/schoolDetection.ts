@@ -223,17 +223,58 @@ function isGraduationInquiry(inquiry: InquirySchoolSource): boolean {
   return (inquiry.session_type ?? "").toLowerCase().includes("grad");
 }
 
+const GRADUATION_LABEL = "Graduation";
+
+// Subject label for each kind of session, most specific first — the rank is
+// what lets a signal in the message refine a vaguer session_type ("Individual
+// Portrait" + a message about the couple's anniversary → Couples Session).
+const SESSION_LABEL_PATTERNS: { re: RegExp; label: string }[] = [
+  { re: /\bgrad(uation|uating|uate|s)?\b/, label: GRADUATION_LABEL },
+  { re: /\bpropos(al|e|ing)\b/, label: "Proposal" },
+  { re: /\bengage(ment|d)\b/, label: "Engagement" },
+  { re: /\b(couples?|partner|boyfriend|girlfriend|fiance|anniversary)\b/, label: "Couples Session" },
+  { re: /\b(family|families|maternity|newborn)\b/, label: "Family Session" },
+  { re: /\b(events?|party|birthday|corporate)\b/, label: "Event Coverage" },
+  { re: /\b(individual|solo|personal|lifestyle|headshot|portraits?)\b/, label: "Portrait Session" },
+];
+
+/** Rank of a label in SESSION_LABEL_PATTERNS; lower = more specific. */
+function labelRank(label: string): number {
+  return SESSION_LABEL_PATTERNS.findIndex((p) => p.label === label);
+}
+
+function detectSessionLabel(text: string | null | undefined): string | null {
+  const normalized = normalizeText(text ?? "");
+  if (!normalized) return null;
+  return SESSION_LABEL_PATTERNS.find((p) => p.re.test(normalized))?.label ?? null;
+}
+
 /**
- * Deterministic reply subject for an inquiry. Graduation inquiries get
- * "<school abbreviation> Graduation Inquiry" whenever any inquiry field
- * identifies the school; plain "Graduation Inquiry" only as a last resort.
+ * The session label to headline the subject with. The dropdown value is the
+ * starting point, but the client's own message wins when it names something
+ * more specific — the form only offers six types and address autofill or a
+ * mismatched pick shouldn't send "Portrait Session" to a couple.
+ */
+function resolveSessionLabel(inquiry: InquirySchoolSource): string | null {
+  const fromType = detectSessionLabel(inquiry.session_type);
+  const fromMessage = detectSessionLabel(inquiry.message);
+  if (!fromType) return fromMessage;
+  if (!fromMessage) return fromType;
+  return labelRank(fromMessage) < labelRank(fromType) ? fromMessage : fromType;
+}
+
+/**
+ * Deterministic reply subject for an inquiry: "<session> Inquiry", with
+ * graduation inquiries naming the campus ("SJSU Graduation Inquiry") whenever
+ * any inquiry field identifies the school.
  */
 export function buildInquiryReplySubject(inquiry: InquirySchoolSource): string {
-  if (!isGraduationInquiry(inquiry)) {
-    return `Re: Your ${inquiry.session_type ?? "photography"} inquiry`;
+  const label = resolveSessionLabel(inquiry);
+  if (label === GRADUATION_LABEL) {
+    const school = detectSchoolFromInquiry(inquiry);
+    return school ? `${school.abbreviation} Graduation Inquiry` : "Graduation Inquiry";
   }
-  const school = detectSchoolFromInquiry(inquiry);
-  return school ? `${school.abbreviation} Graduation Inquiry` : "Graduation Inquiry";
+  return `${label ?? "Photography"} Inquiry`;
 }
 
 export type SubjectSource = "generated" | "manual";
