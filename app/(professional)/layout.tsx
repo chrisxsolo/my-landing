@@ -2,7 +2,9 @@ import Link from "next/link";
 import ProNav from "@/app/components/ProNav";
 import ScrollReveal from "@/app/components/ScrollReveal";
 import VisitorTracker from "@/app/components/VisitorTracker";
-import { getNavConfig } from "@/lib/professionalData";
+import PricingPhotoWarmup from "@/app/components/PricingPhotoWarmup";
+import { getNavConfig, getPortfolioData, getSiteSettings } from "@/lib/professionalData";
+import { getPricingPhotoManifest } from "@/lib/pricingPhotos";
 import styles from "@/app/(professional)/ProfessionalLayout.module.css";
 
 const footerLinks = [
@@ -15,10 +17,13 @@ const footerLinks = [
 ];
 
 export default async function ProfessionalLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  const navConfig = await getNavConfig();
+  const [navConfig, { images }, settings] = await Promise.all([
+    getNavConfig(), getPortfolioData(), getSiteSettings(),
+  ]);
   return (
     <div className={styles.professionalShell}>
       <VisitorTracker />
+      <PricingPhotoWarmup manifest={getPricingPhotoManifest(images, settings)} />
       <ScrollReveal />
       <ProNav config={navConfig} />
       {children}

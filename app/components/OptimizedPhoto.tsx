@@ -7,6 +7,7 @@ type OptimizedPhotoProps = {
   sizes: string;
   className?: string;
   priority?: boolean;
+  loading?: "eager" | "lazy";
   quality?: 75 | 85 | 90;
   objectPosition?: string;
   unoptimized?: boolean;
@@ -19,6 +20,7 @@ export default function OptimizedPhoto({
   sizes,
   className,
   priority = false,
+  loading,
   quality = 85,
   objectPosition,
   unoptimized = false,
@@ -39,6 +41,7 @@ export default function OptimizedPhoto({
       // Next 16 deprecated `priority` in favor of `preload`; fetchPriority
       // restores the high-priority hint `priority` used to set on the <img>.
       preload={priority}
+      loading={priority ? undefined : loading}
       fetchPriority={priority ? "high" : undefined}
       quality={quality}
       style={style}

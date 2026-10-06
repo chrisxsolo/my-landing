@@ -21,7 +21,7 @@ import type { CSSProperties } from "react";
 import Link from "next/link";
 import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 import { getPortfolioData, getSiteSettings } from "@/lib/professionalData";
-import { selectDistinctImageUrl } from "@/lib/photoMetadata";
+import { getGradPricingPhotos, PRICING_PHOTO_SIZES } from "@/lib/pricingPhotos";
 import { anim } from "@/lib/proStyles";
 import styles from "@/app/(professional)/pricing/Pricing.module.css";
 import GraduationRateEstimator from "@/app/components/GraduationRateEstimator";
@@ -75,12 +75,6 @@ const groupPricing = [
   { people: "6-8 people", price: graduationPricing.groupRates[6] },
 ];
 
-// ── FALLBACK GROUP IMAGE ──────────────────────────────────────────────────────
-// If no group image is set in Supabase site_settings, this Supabase Storage URL is used.
-// To change: upload a new photo to Supabase Storage and paste the URL here.
-const GROUP_GRAD_IMAGE_URL =
-  "https://dmtslzwglpezympptqls.supabase.co/storage/v1/object/public/grad-photos/portfolio/1775960037598.jpeg";
-
 // ── INFO CARDS (Booking / Session flow / Travel) ─────────────────────────────
 // These are the three cards shown between the hero and the packages.
 // To edit text: change heading or items strings.
@@ -113,19 +107,7 @@ export default async function GradPricingPage() {
     getSiteSettings(),
     getContextualTestimonials({ category: "grads" }, 2),
   ]);
-  const gradImages = images.filter((img) => img.category_slug === "grads");
-
-  // packageImage = photo used in the "Graduation Package" section (right column)
-  const packageImage = siteSettings.pricing_grad_standard_image || gradImages[1]?.image_url || gradImages[0]?.image_url || null;
-
-  // groupImage = photo used in the "Group Grad Package" section (left column)
-  const groupImage =
-    siteSettings.pricing_grad_group_image ||
-    gradImages.find((img) => img.image_url === GROUP_GRAD_IMAGE_URL)?.image_url ||
-    gradImages.find((img) => `${img.title} ${img.alt}`.toLowerCase().includes("group"))?.image_url ||
-    gradImages[6]?.image_url ||
-    packageImage;
-  const heroImage = selectDistinctImageUrl(gradImages, [packageImage, groupImage], packageImage);
+  const { packageImage, groupImage, heroImage } = getGradPricingPhotos(images, siteSettings);
 
   return (
     <main className={styles.pricingModern} style={mediaVars}>
@@ -150,7 +132,7 @@ export default async function GradPricingPage() {
             <OptimizedPhoto
               src={heroImage}
               alt=""
-              sizes="100vw"
+              sizes={PRICING_PHOTO_SIZES.hero}
               priority
               quality={90}
             />
@@ -261,7 +243,8 @@ export default async function GradPricingPage() {
             <OptimizedPhoto
               src={packageImage}
               alt="Graduation portrait by soloxsnaps"
-              sizes="(max-width: 940px) 90vw, 42vw"
+              sizes={PRICING_PHOTO_SIZES.package}
+              loading="eager"
               objectPosition="center top"
             />
           </div>
@@ -279,7 +262,8 @@ export default async function GradPricingPage() {
             <OptimizedPhoto
               src={groupImage}
               alt="Group graduation portraits by soloxsnaps"
-              sizes="(max-width: 940px) 90vw, 38vw"
+              sizes={PRICING_PHOTO_SIZES.secondary}
+              loading="eager"
               objectPosition="center top"
             />
           </div>

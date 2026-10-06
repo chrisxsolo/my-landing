@@ -10,6 +10,7 @@ import ContextualTestimonials from "@/app/components/ContextualTestimonials";
 import { getContextualTestimonials } from "@/lib/testimonialsData";
 import { formatCurrency } from "@/lib/pricing";
 import { PRICING_CATALOG, getBookingPolicyItems } from "@/lib/pricingCatalog";
+import { getCouplesPricingPhoto, PRICING_PHOTO_SIZES } from "@/lib/pricingPhotos";
 
 // Cached/ISR: refreshed at most hourly, or immediately on admin content saves
 // (POST /api/admin/revalidate).
@@ -94,9 +95,7 @@ export default async function CouplesPricingPage() {
     getSiteSettings(),
     getContextualTestimonials({ category: "couples" }, 2),
   ]);
-  const coupleImages = images.filter((img) => img.category_slug === "couples");
-  const fallback = images[0]?.image_url ?? null;
-  const heroImage = siteSettings.pricing_couples_standard_image || coupleImages[0]?.image_url || fallback;
+  const heroImage = getCouplesPricingPhoto(images, siteSettings);
 
   return (
     <main className={styles.pricingModern} style={mediaVars}>
@@ -107,7 +106,7 @@ export default async function CouplesPricingPage() {
             <OptimizedPhoto
               src={heroImage}
               alt=""
-              sizes="100vw"
+              sizes={PRICING_PHOTO_SIZES.hero}
               priority
               quality={90}
             />

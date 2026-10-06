@@ -20,7 +20,7 @@ import Link from "next/link";
 import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 import { getPortfolioData, getSiteSettings } from "@/lib/professionalData";
 import type { CSSProperties } from "react";
-import { selectDistinctImageUrl } from "@/lib/photoMetadata";
+import { getFamilyPricingPhotos, PRICING_PHOTO_SIZES } from "@/lib/pricingPhotos";
 import { anim } from "@/lib/proStyles";
 import styles from "@/app/(professional)/pricing/Pricing.module.css";
 import { formatCurrency } from "@/lib/pricing";
@@ -89,13 +89,7 @@ export default async function FamilyPricingPage() {
     getSiteSettings(),
     getContextualTestimonials({ category: "families" }, 2),
   ]);
-  const familyImages = images.filter((img) => img.category_slug === "families");
-
-  // sessionImage  = photo in the "Family Session" package (right column)
-  const sessionImage  = siteSettings.pricing_family_session_image  || familyImages[1]?.image_url || familyImages[0]?.image_url || null;
-  // extendedImage = photo in the "Extended Family Session" package (left column)
-  const extendedImage = siteSettings.pricing_family_extended_image || familyImages[2]?.image_url || familyImages[0]?.image_url || null;
-  const heroImage = selectDistinctImageUrl(familyImages, [sessionImage, extendedImage], sessionImage);
+  const { sessionImage, extendedImage, heroImage } = getFamilyPricingPhotos(images, siteSettings);
 
   return (
     <main className={styles.pricingModern} style={mediaVars}>
@@ -121,7 +115,7 @@ export default async function FamilyPricingPage() {
             <OptimizedPhoto
               src={heroImage}
               alt=""
-              sizes="100vw"
+              sizes={PRICING_PHOTO_SIZES.hero}
               priority
               quality={90}
             />
@@ -229,7 +223,8 @@ export default async function FamilyPricingPage() {
             <OptimizedPhoto
               src={sessionImage}
               alt="Bay Area family portrait by soloxsnaps"
-              sizes="(max-width: 940px) 90vw, 42vw"
+              sizes={PRICING_PHOTO_SIZES.package}
+              loading="eager"
             />
           </div>
         )}
@@ -246,7 +241,8 @@ export default async function FamilyPricingPage() {
             <OptimizedPhoto
               src={extendedImage}
               alt="Extended family portrait by soloxsnaps"
-              sizes="(max-width: 940px) 90vw, 38vw"
+              sizes={PRICING_PHOTO_SIZES.secondary}
+              loading="eager"
             />
           </div>
         )}

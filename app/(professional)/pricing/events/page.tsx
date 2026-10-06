@@ -14,6 +14,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import OptimizedPhoto from "@/app/components/OptimizedPhoto";
+import { getEventPricingPhotos, PRICING_PHOTO_SIZES } from "@/lib/pricingPhotos";
 import { getPortfolioData, getSiteSettings } from "@/lib/professionalData";
 import type { CSSProperties } from "react";
 import { anim } from "@/lib/proStyles";
@@ -86,10 +87,7 @@ const infoCards = [
 
 export default async function EventPricingPage() {
   const [{ images }, siteSettings] = await Promise.all([getPortfolioData(), getSiteSettings()]);
-  const eventImages = images.filter((img) => img.category_slug === "events");
-
-  const primaryImage  = siteSettings.pricing_event_primary_image  || eventImages[0]?.image_url || null;
-  const secondaryImage = siteSettings.pricing_event_secondary_image || eventImages[1]?.image_url || primaryImage;
+  const { primaryImage, secondaryImage } = getEventPricingPhotos(images, siteSettings);
 
   return (
     <main className={styles.pricingModern} style={mediaVars}>
@@ -103,7 +101,7 @@ export default async function EventPricingPage() {
             <OptimizedPhoto
               src={primaryImage}
               alt=""
-              sizes="100vw"
+              sizes={PRICING_PHOTO_SIZES.hero}
               priority
               quality={90}
             />
@@ -193,7 +191,8 @@ export default async function EventPricingPage() {
             <OptimizedPhoto
               src={primaryImage}
               alt="Event photography by soloxsnaps"
-              sizes="(max-width: 940px) 90vw, 42vw"
+              sizes={PRICING_PHOTO_SIZES.package}
+              loading="eager"
             />
           </div>
         )}
@@ -206,7 +205,8 @@ export default async function EventPricingPage() {
             <OptimizedPhoto
               src={secondaryImage}
               alt="Full event coverage by soloxsnaps"
-              sizes="(max-width: 940px) 90vw, 38vw"
+              sizes={PRICING_PHOTO_SIZES.secondary}
+              loading="eager"
             />
           </div>
         )}

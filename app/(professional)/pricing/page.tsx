@@ -9,6 +9,7 @@ import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 import { getPortfolioData, getSiteSettings } from "@/lib/professionalData";
 import { formatCurrency } from "@/lib/pricing";
 import { PRICING_CATALOG } from "@/lib/pricingCatalog";
+import { getPricingCardPhotos, PRICING_PHOTO_SIZES } from "@/lib/pricingPhotos";
 import styles from "@/app/(professional)/pricing/Pricing.module.css";
 
 const graduationPricing = PRICING_CATALOG.graduation;
@@ -58,16 +59,7 @@ const RATES = [
 export default async function RatesPage() {
   const [{ images }, siteSettings] = await Promise.all([getPortfolioData(), getSiteSettings()]);
 
-  const gradBg    = images.find((i) => i.category_slug === "grads")?.image_url    ?? null;
-  const familyBg  =
-    siteSettings.pricing_card_families_image
-    ?? images.find((i) => i.category_slug === "families")?.image_url
-    ?? null;
-  const couplesBg =
-    images.find((i) => i.category_slug === "couples")?.image_url
-    ?? siteSettings.pricing_couples_standard_image
-    ?? null;
-  const bgMap: Record<string, string | null> = { grads: gradBg, families: familyBg, couples: couplesBg };
+  const bgMap = getPricingCardPhotos(images, siteSettings);
 
   return (
     <main className={styles.ratesRoot}>
@@ -105,7 +97,8 @@ export default async function RatesPage() {
                   <OptimizedPhoto
                     src={bg}
                     alt=""
-                    sizes="(max-width: 860px) 100vw, 33vw"
+                    sizes={PRICING_PHOTO_SIZES.card}
+                    loading="eager"
                     quality={85}
                   />
                 </div>
