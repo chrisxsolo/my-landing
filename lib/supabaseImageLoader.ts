@@ -1,5 +1,7 @@
 "use client";
 
+import { PUBLIC_IMAGE_WEB_COPIES } from "@/lib/imageWebCopies";
+
 // Custom next/image loader (next.config.ts → images.loaderFile). Routes every
 // Supabase Storage image through Supabase's on-the-fly transformation endpoint
 // (render/image/public) instead of Vercel's /_next/image optimizer, which was
@@ -38,7 +40,8 @@ export default function supabaseImageLoader({ src, width, quality }: LoaderArgs)
     return src;
   }
 
-  url.pathname = url.pathname.replace(OBJECT_PREFIX, RENDER_PREFIX);
+  const storagePath = url.pathname.slice(OBJECT_PREFIX.length);
+  url.pathname = RENDER_PREFIX + (PUBLIC_IMAGE_WEB_COPIES[storagePath] ?? storagePath);
   url.searchParams.set("width", String(Math.min(width, MAX_TRANSFORM_WIDTH)));
   url.searchParams.set("quality", String(quality ?? 75));
   // Without an explicit resize mode Supabase defaults to "cover", which keeps the

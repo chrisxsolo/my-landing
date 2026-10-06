@@ -137,7 +137,7 @@ export default async function ProfessionalBlogPostPage({ params }: Props) {
               fill
               sizes="(max-width: 1400px) 100vw, 1400px"
               style={{ objectFit: "cover" }}
-              priority
+              preload
               quality={90}
             />
           </div>
@@ -223,6 +223,7 @@ export default async function ProfessionalBlogPostPage({ params }: Props) {
                     sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                     style={{ objectFit: "cover" }}
                     quality={85}
+                    loading="eager"
                   />
                 </div>
               ))}

@@ -35,11 +35,11 @@ describe("rates photos load before visitors scroll to them", () => {
     expect(photos.filter((photo) => photo.includes('loading="lazy"'))).toEqual([]);
   });
 
-  it("other photos keep lazy loading by default", () => {
+  it("shared photos start loading immediately by default", () => {
     const html = renderToStaticMarkup(createElement(OptimizedPhoto, {
       src: "/other-photo.jpg", alt: "Portrait", sizes: "100vw",
     }));
-    expect(html).toContain('loading="lazy"');
+    expect(html).toContain('loading="eager"');
   });
 });
 

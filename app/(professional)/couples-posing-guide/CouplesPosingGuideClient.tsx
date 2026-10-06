@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import styles from "./couplesPosingGuide.module.css";
 import galleryStyles from "./couplesGallery.module.css";
+import useInspirationPhotoWarmup from "./useInspirationPhotoWarmup";
 
 type Prompt = {
   number: number;
@@ -100,6 +101,7 @@ export default function CouplesPosingGuideClient({
     if (galleryCategory === "All") return images;
     return images.filter((image) => image.categories.includes(galleryCategory));
   }, [galleryCategory, images]);
+  useInspirationPhotoWarmup(filteredImages);
 
   const moveLightbox = useCallback((direction: number) => {
     setActiveImage((current) => {
@@ -327,6 +329,7 @@ export default function CouplesPosingGuideClient({
                   width={image.width || 1200}
                   height={image.height || 1500}
                   sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                  loading="eager"
                 />
                 <span>{image.title}</span>
               </button>
@@ -367,6 +370,7 @@ export default function CouplesPosingGuideClient({
                 width={selectedImage.width || 1600}
                 height={selectedImage.height || 2000}
                 sizes="95vw"
+                loading="eager"
               />
             </div>
             <div className={galleryStyles.lightboxCopy}>

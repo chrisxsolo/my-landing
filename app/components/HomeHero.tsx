@@ -46,14 +46,11 @@ export default function HomeHero({ slides }: { slides: HomepageHeroSlide[] }) {
   const [current, setCurrent] = useState(0);
   const [paused, setPaused] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
-  const [renderedSlides, setRenderedSlides] = useState(() => new Set([0]));
   const currentRef = useRef(0);
 
   const showSlide = useCallback((index: number, action?: string) => {
     const next = (index + slides.length) % slides.length;
-    const following = slides.length > 1 ? (next + 1) % slides.length : next;
     currentRef.current = next;
-    setRenderedSlides((previous) => new Set([...previous, next, following]));
     setCurrent(next);
     if (action) trackHero(action);
   }, [slides.length]);
@@ -70,10 +67,6 @@ export default function HomeHero({ slides }: { slides: HomepageHeroSlide[] }) {
     if (slides.length < 2 || paused || reducedMotion) return;
 
     let intervalId: number | undefined;
-    const warmupId = window.setTimeout(() => {
-      const next = (currentRef.current + 1) % slides.length;
-      setRenderedSlides((previous) => new Set([...previous, next]));
-    }, 1200);
     const start = () => {
       if (intervalId || document.hidden) return;
       intervalId = window.setInterval(
@@ -91,7 +84,6 @@ export default function HomeHero({ slides }: { slides: HomepageHeroSlide[] }) {
     document.addEventListener("visibilitychange", handleVisibility);
     start();
     return () => {
-      window.clearTimeout(warmupId);
       stop();
       document.removeEventListener("visibilitychange", handleVisibility);
     };
@@ -107,7 +99,6 @@ export default function HomeHero({ slides }: { slides: HomepageHeroSlide[] }) {
     >
       <div className={styles.slides}>
         {slides.map((slide, index) => {
-          if (!renderedSlides.has(index)) return null;
           const imageStyle: HeroImageStyle = {
             "--hero-position": slide.objectPosition,
             "--hero-mobile-position": slide.mobileObjectPosition,
@@ -125,6 +116,8 @@ export default function HomeHero({ slides }: { slides: HomepageHeroSlide[] }) {
                 fill
                 sizes="100vw"
                 preload={index === 0}
+                loading={index === 0 ? undefined : "eager"}
+                fetchPriority={index === 0 ? undefined : "low"}
                 quality={index === 0 ? 90 : 85}
                 className={styles.image}
                 style={imageStyle}

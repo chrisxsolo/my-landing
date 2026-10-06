@@ -5,44 +5,15 @@ import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import type { PricingPhotoManifest, PricingPhotoRequest } from "@/lib/pricingPhotos";
 import supabaseImageLoader from "@/lib/supabaseImageLoader";
+import { schedulePhotoWarmup, warmPhoto } from "@/lib/photoWarmup";
 
-const warmedPhotos = new Map<string, HTMLImageElement>();
-
-function warmPhoto(request: PricingPhotoRequest) {
+function warmPricingPhoto(request: PricingPhotoRequest) {
   const { props } = getImageProps({ ...request, alt: "", fill: true, loader: supabaseImageLoader });
-  const key = `${props.srcSet ?? props.src}|${props.sizes}`;
-  if (warmedPhotos.has(key)) return;
-  const image = new window.Image();
-  image.fetchPriority = "low";
-  image.decoding = "async";
-  image.sizes = props.sizes ?? "";
-  image.srcset = props.srcSet ?? "";
-  image.src = props.src;
-  warmedPhotos.set(key, image);
-  image.decode().catch((error) => {
-    warmedPhotos.delete(key);
-    console.error("[pricing-photos] Failed to warm photo", request.src, error);
-  });
+  return warmPhoto({ src: props.src, srcSet: props.srcSet, sizes: props.sizes });
 }
 
 function warmRoute(manifest: PricingPhotoManifest, href: string) {
-  manifest[href]?.forEach(warmPhoto);
-}
-
-function scheduleWarmup(callback: () => void) {
-  let cancel = () => {};
-  const schedule = () => {
-    if ("requestIdleCallback" in window) {
-      const id = window.requestIdleCallback(callback, { timeout: 2000 });
-      cancel = () => window.cancelIdleCallback(id);
-    } else {
-      const id = setTimeout(callback, 0);
-      cancel = () => clearTimeout(id);
-    }
-  };
-  if (document.readyState === "complete") schedule();
-  else window.addEventListener("load", schedule, { once: true });
-  return () => { window.removeEventListener("load", schedule); cancel(); };
+  manifest[href]?.forEach(warmPricingPhoto);
 }
 
 export default function PricingPhotoWarmup({ manifest }: { manifest: PricingPhotoManifest }) {
@@ -50,9 +21,9 @@ export default function PricingPhotoWarmup({ manifest }: { manifest: PricingPhot
   useEffect(() => {
     // Current-page photos have already started loading; warm likely destinations
     // after the page finishes so background work cannot hold up its hero.
-    return scheduleWarmup(() => {
+    return schedulePhotoWarmup(() => {
       Object.entries(manifest).filter(([href]) => href !== pathname)
-        .forEach(([, photos]) => photos.forEach(warmPhoto));
+        .forEach(([, photos]) => photos.forEach(warmPricingPhoto));
     });
   }, [manifest, pathname]);
 

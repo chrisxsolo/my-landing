@@ -20,7 +20,7 @@ export default function OptimizedPhoto({
   sizes,
   className,
   priority = false,
-  loading,
+  loading = "eager",
   quality = 85,
   objectPosition,
   unoptimized = false,
