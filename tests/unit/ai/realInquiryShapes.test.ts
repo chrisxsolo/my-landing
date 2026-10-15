@@ -124,3 +124,46 @@ describe("dates the client supplied are not flagged as invented", () => {
       .toContain("unsupported_date");
   });
 });
+
+describe("date formats the inquiry form actually stores", () => {
+  function ctxWith(overrides: Parameters<typeof inquiry>[0]) {
+    return buildEmailContext({
+      inquiry: inquiry(overrides),
+      messages: [],
+      availability: AVAILABILITY,
+      threadLoaded: true,
+      now: NOW,
+    });
+  }
+
+  it("accepts slash dates from date_in_mind", () => {
+    // A real date_in_mind: "5/24 @5:30pm, 5/25 @5:30pm, 5/26 @5:30pm". A draft
+    // that correctly declined May 24th was flagged for inventing it.
+    const context = ctxWith({ dateInMind: "5/24 @5:30pm, 5/25 @5:30pm, 5/26 @5:30pm" });
+    const draft = "Hi Sarah,\n\nI can't confirm May 24th to 26th just yet, but I'm open later in the year";
+    expect(validateEmailDraft(draft, context).issues.map((i) => i.type))
+      .not.toContain("unsupported_date");
+  });
+
+  it("accepts every date in a multi-date field, not just the first", () => {
+    // "May 30, June 4, June 10" is one field holding three dates.
+    const context = ctxWith({ dateInMind: "May 30, June 4, June 10" });
+    const draft = "Hi Sarah,\n\nJune 10th is the one that works best on my end";
+    expect(validateEmailDraft(draft, context).issues.map((i) => i.type))
+      .not.toContain("unsupported_date");
+  });
+
+  it("still flags a date nobody mentioned when the field holds slash dates", () => {
+    const context = ctxWith({ dateInMind: "5/24, 5/25" });
+    const draft = "Hi Sarah,\n\nHow about February 14th?";
+    expect(validateEmailDraft(draft, context).issues.map((i) => i.type))
+      .toContain("unsupported_date");
+  });
+
+  it("ignores a figure that is not a date", () => {
+    const context = ctxWith({ message: "we are a party of 5/6 people, not sure yet" });
+    const draft = "Hi Sarah,\n\nHow about December 25th?";
+    expect(validateEmailDraft(draft, context).issues.map((i) => i.type))
+      .toContain("unsupported_date");
+  });
+});

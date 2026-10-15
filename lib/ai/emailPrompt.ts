@@ -145,7 +145,7 @@ function renderAvailability(context: EmailContext): string {
   } else if (availability.requestedDateStatus === "on_hold") {
     lines.push(`The date they asked about (${context.request.dateInMind}) is ON HOLD for someone else. Treat it as unavailable and offer alternatives.`);
   } else if (availability.requestedDateStatus === "unknown") {
-    lines.push(`The date they asked about (${context.request.dateInMind}) is not in the availability table either way. Do not say yes or no to it; say you'll confirm, or offer a date from the open list.`);
+    lines.push(`The date they asked about (${context.request.dateInMind}) is not in the availability table either way. Do not say yes or no to it; say you'll confirm, or offer a date from the open list. Never explain WHY you cannot confirm it: the availability table, how far ahead it runs, and the fact that a list exists are all internal. "I'll double check June and get back to you" is the whole sentence.`);
   }
 
   if (availability.offerable.length) {
@@ -170,6 +170,13 @@ function renderAvailability(context: EmailContext): string {
       `Dates that are NOT available: ${availability.unavailable.slice(0, 12).map((d) => d.label).join("; ")}.`,
     );
   }
+
+  // Unconditional, because the leak came back through a path with no requested
+  // date at all: "since my calendar starts October 15th". The client should
+  // never learn that a table, a list, or a horizon exists.
+  lines.push(
+    "Never describe how you know your availability. No mention of a calendar, a list, a table, a window, or how far ahead it runs. Offer the dates, or say you'll confirm, and nothing about the machinery.",
+  );
 
   // Worded as a constraint on claims, not as required output language. Asking
   // for a time to be "phrased as a proposal" produced a verbal tic: five

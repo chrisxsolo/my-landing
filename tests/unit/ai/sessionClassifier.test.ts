@@ -17,7 +17,12 @@ describe("a proposal mentioned in passing is not a proposal booking", () => {
     const message =
       "interested in doing a short 30 min session. I plan to do my proposal shortly before and I would just like to do a couples session after. I dont think I can afford much more than the 30 min session";
     expect(resolvePlaybookKey("Couples Session", message)).toBe("couples");
-    expect(buildPricingFacts({ sessionType: "Couples Session", message }).basePrices).toEqual([350]);
+    const facts = buildPricingFacts({ sessionType: "Couples Session", message });
+    // The $750 proposal rate is the error being guarded against. The session
+    // packages are all quotable, and their wording points at the $350 mini.
+    expect(facts.basePrices).not.toContain(750);
+    expect(facts.basePrices).toContain(350);
+    expect(facts.lines.join(" ")).toMatch(/points at the 30-Min Mini Session/);
   });
 
   it("treats a couple who missed photographing their own proposal as couples", () => {
@@ -25,7 +30,9 @@ describe("a proposal mentioned in passing is not a proposal booking", () => {
     const message =
       "we recently got married Sept 4th but unfortunately we did not take pictures of our proposal or wedding so we'd love to book an hour session and make up for it";
     expect(resolvePlaybookKey("Couples Session", message)).toBe("couples");
-    expect(buildPricingFacts({ sessionType: "Couples Session", message }).basePrices).toEqual([450]);
+    const facts = buildPricingFacts({ sessionType: "Couples Session", message });
+    expect(facts.basePrices).not.toContain(750);
+    expect(facts.lines.join(" ")).toMatch(/points at the 1-Hour Session/);
   });
 
   it("keeps an engagement session at the engagement rate when a proposal is only speculative", () => {
@@ -169,5 +176,40 @@ describe("genuinely ambiguous requests are flagged rather than guessed", () => {
   it("does not flag a refinement within the same group", () => {
     const result = classifySession("Individual Portrait", "lifestyle portraits and professional headshots for my brand");
     expect(result.ambiguous).toBe(false);
+  });
+});
+
+describe("the couples card does not hide its own options", () => {
+  it("offers all three session lengths when they ask about packages", () => {
+    // Sending only the matched package produced "I only offer that one package
+    // right now" to a client who had asked about two of them. That claim is
+    // false, and it came out of the facts block.
+    const facts = buildPricingFacts({
+      sessionType: "Couples Session",
+      message: "Hey we love your photography style. Either looking at standard or signature package",
+    });
+    const text = facts.lines.join(" ");
+    expect(text).toContain("$350");
+    expect(text).toContain("$450");
+    expect(text).toContain("$575");
+    expect(facts.basePrices).toEqual([350, 450, 575]);
+  });
+
+  it("keeps a proposal on one rate", () => {
+    const facts = buildPricingFacts({
+      sessionType: "Couples Session",
+      message: "I'm going to propose to her, want someone to capture the surprise",
+    });
+    expect(facts.basePrices).toEqual([750]);
+    expect(facts.lines.join(" ")).not.toContain("$350");
+  });
+
+  it("keeps an engagement session on one rate", () => {
+    const facts = buildPricingFacts({
+      sessionType: "Other",
+      message: "My fiancée and I are looking to have some engagement photos taken",
+    });
+    expect(facts.basePrices).toEqual([650]);
+    expect(facts.lines.join(" ")).not.toContain("$450");
   });
 });

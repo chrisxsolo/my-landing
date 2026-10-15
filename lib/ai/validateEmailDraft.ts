@@ -106,7 +106,31 @@ function normalizeDateMention(value: string): string | null {
     return monthName ? `${monthName} ${Number(iso[3])}` : null;
   }
   const named = value.match(new RegExp(`(${MONTHS}|${MONTH_ABBR})\\.?\\s+(\\d{1,2})`, "i"));
-  return named ? canonicalDate(named[1], named[2]) : null;
+  if (named) return canonicalDate(named[1], named[2]);
+  return normalizeSlashDate(value);
+}
+
+/**
+ * "5/24" and "5/24/26" onto "may 24".
+ *
+ * A real date_in_mind read "5/24 @5:30pm, 5/25 @5:30pm, 5/26 @5:30pm", and a
+ * draft that correctly said it could not confirm May 24th was flagged for
+ * naming a date nobody had mentioned.
+ */
+function normalizeSlashDate(value: string): string | null {
+  const match = value.match(/\b(\d{1,2})\/(\d{1,2})(?:\/\d{2,4})?\b/);
+  if (!match) return null;
+  const month = Number(match[1]);
+  const day = Number(match[2]);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  return `${MONTH_NAMES[month - 1]} ${day}`;
+}
+
+/** Every slash date in a block of text, normalised. */
+function slashDatesIn(text: string): string[] {
+  return [...text.matchAll(/\b(\d{1,2})\/(\d{1,2})(?:\/\d{2,4})?\b/g)]
+    .map((match) => normalizeSlashDate(match[0]))
+    .filter((value): value is string => value !== null);
 }
 
 /** Every date the client themselves named, in any of their own text. */
@@ -131,6 +155,25 @@ function clientRaisedDates(context: EmailContext): Set<string> {
     const canonical = canonicalDate(match[1], match[2]);
     if (canonical) raised.add(canonical);
   }
+
+  // Every field the client typed into, because they do not always use the one
+  // we expect: a real inquiry put "September 28" in the LOCATION field and
+  // left date_in_mind empty, and the draft was flagged for naming it.
+  const clientText = [
+    context.request.rawMessage,
+    context.request.dateInMind ?? "",
+    context.request.location ?? "",
+    context.request.preferredTime ?? "",
+  ].join(" \n ");
+
+  for (const date of slashDatesIn(clientText)) raised.add(date);
+  for (const match of clientText.matchAll(
+    new RegExp(`\\b(${MONTHS}|${MONTH_ABBR})\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?\\b`, "gi"),
+  )) {
+    const canonical = canonicalDate(match[1], match[2]);
+    if (canonical) raised.add(canonical);
+  }
+
   return raised;
 }
 

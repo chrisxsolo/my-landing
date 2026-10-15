@@ -89,19 +89,48 @@ function graduationFacts(peopleCount: number): PricingFacts {
   };
 }
 
-function couplesFacts(packageKey: keyof typeof PRICING_CATALOG.couples.packages): PricingFacts {
+function describePackage(key: keyof typeof PRICING_CATALOG.couples.packages): string {
+  const pkg = PRICING_CATALOG.couples.packages[key];
+  const minimumImages = "minimumImages" in pkg ? pkg.minimumImages : null;
+  return `${pkg.label}: ${money(pkg.price)}, ${pkg.durationLabel}${minimumImages ? `, ${minimumImages}+ edited images` : ""}.`;
+}
+
+/**
+ * The couples session card.
+ *
+ * `showAllPackages` exists because sending only the matched package let the
+ * model conclude the others did not exist. A client who wrote "either looking
+ * at standard or signature package" was told "I only offer that one package
+ * right now", which is false and came from the facts block, not the model's
+ * imagination. Proposal and engagement still ship alone: those have one rate
+ * each, and widening the list there is how a $750 proposal gets quoted at
+ * $350.
+ */
+function couplesFacts(
+  packageKey: keyof typeof PRICING_CATALOG.couples.packages,
+  showAllPackages = false,
+): PricingFacts {
   const couples = PRICING_CATALOG.couples;
   const pkg = couples.packages[packageKey];
-  const minimumImages = "minimumImages" in pkg ? pkg.minimumImages : null;
 
-  const lines = [
-    `${pkg.label}: ${money(pkg.price)}, ${pkg.durationLabel}${minimumImages ? `, ${minimumImages}+ edited images` : ""}.`,
+  const sessionKeys = ["mini", "1hr", "signature"] as const;
+  const lines = showAllPackages
+    ? [
+      ...sessionKeys.map(describePackage),
+      `Their wording points at the ${pkg.label}, but all three above are real options you may describe.`,
+    ]
+    : [describePackage(packageKey)];
+
+  lines.push(
     `Add-ons: extra location ${money(couples.addOns.extraLocation.price)}, extra outfit ${money(couples.addOns.extraOutfit.price)}, extra 30 minutes ${money(couples.addOns.extra30Minutes.price)}, 72-hour gallery ${money(couples.addOns.expedited.price)}, rush preview of 5 images in 48 hours ${money(couples.addOns.rushPreview.price)}.`,
-  ];
+  );
+
   return {
     verified: true,
     lines,
-    basePrices: [pkg.price],
+    basePrices: showAllPackages
+      ? sessionKeys.map((key) => couples.packages[key].price)
+      : [pkg.price],
     addOnPrices: [
       couples.addOns.extraLocation.price, couples.addOns.extraOutfit.price,
       couples.addOns.extra30Minutes.price, couples.addOns.expedited.price,
@@ -298,7 +327,7 @@ export function buildPricingFacts(input: BusinessFactsInput): PricingFacts {
     case "graduation": return graduationFacts(people);
     case "proposal":   return couplesFacts("proposal");
     case "engagement": return couplesFacts("engagement");
-    case "couples":    return couplesFacts(detectCouplesPackage(sessionType, message));
+    case "couples":    return couplesFacts(detectCouplesPackage(sessionType, message), true);
     case "family":     return familyFacts(people);
     case "event":      return eventFacts();
     case "headshot":   return unpricedSessionFacts("headshot");
@@ -390,11 +419,19 @@ export function buildTravelFact(
   message?: string | null,
 ): string | null {
   const campus = (school ?? "").trim();
-  // Clients often name the place in the message and leave the field blank:
-  // "if you could take photos anytime Friday ... at Rockaway Beach in
-  // Pacifica". Used only as a last resort, and only to decide that travel
-  // needs raising, never to pick an amount.
-  const place = (location ?? "").trim() || (!campus ? placeInMessage(message ?? "") : "");
+  const field = (location ?? "").trim();
+
+  // The location field is not reliably a location. One real inquiry carried
+  // "September 28" in it, with the actual place ("Shark Fin Cove Davenport")
+  // in the message, which produced the line "the travel fee for September 28
+  // is not in the rate card". So the field is used when it names somewhere
+  // recognisable, and the message is consulted otherwise.
+  const fieldNamesAPlace = Boolean(field) && (
+    NAMED_CAMPUSES.some(([pattern]) => pattern.test(field.toLowerCase()))
+    || IN_SAN_FRANCISCO.test(field.toLowerCase())
+    || OUTSIDE_SAN_FRANCISCO.test(field.toLowerCase())
+  );
+  const place = fieldNamesAPlace ? field : placeInMessage(message ?? "") || (campus ? "" : field);
   if (!place && !campus) return null;
 
   const unknown = (subject: string) =>
