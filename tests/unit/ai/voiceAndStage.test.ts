@@ -223,7 +223,11 @@ describe("5. session confirmation once a date is accepted", () => {
     });
     expect(context.conversation.stage).toBe("scheduling");
     const text = prompt(context, "October 26th works for me!");
-    expect(text).toMatch(/35 to 80 words/);
+    // Calibrated to his real replies at this stage, and phrased as a habit
+    // rather than a ceiling: the old hand-set budget flagged 22% of Chris's
+    // own sent emails as too long.
+    expect(text).toMatch(/40 to 105 words/);
+    expect(text).toMatch(/not a budget/);
     expect(text).toMatch(/do not restate them unless they ask about price again/);
   });
 });

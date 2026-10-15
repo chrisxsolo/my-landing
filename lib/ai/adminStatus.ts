@@ -9,8 +9,7 @@
 // The reason is that generation never saw the database. Invoice, contract and
 // deposit state were inferred ONLY by regex over the Gmail thread
 // (lib/ai/threadDigest.ts), which is a reasonable fallback and a poor primary
-// source — and which currently returns nothing at all, because the app's Gmail
-// refresh token is revoked.
+// source: it reads a promise as an event.
 //
 // So: the inquiries row is authoritative. A timestamp is a fact. The thread
 // may only ADD the softer reading — that Chris promised something he has not
@@ -42,7 +41,34 @@ export type AdminStatus = {
   depositPaid: boolean;
   galleryDelivered: boolean;
   confirmationSent: boolean;
+  /**
+   * The `booking_confirmed` column and nothing else.
+   *
+   * It used to be `booking_confirmed || depositPaid`, which made a payment
+   * speak for a confirmation. They are separate events and the draft is what
+   * tells a client which one has happened.
+   */
   bookingConfirmed: boolean;
+  /**
+   * Whether the contract came BACK signed.
+   *
+   * Always "unknown": there is no `contract_signed_at` column, so nothing in
+   * the system can establish it. Named explicitly rather than left absent,
+   * because an absent field reads as false and false reads as "not signed" —
+   * a claim the record cannot support either way.
+   */
+  contractSigned: "unknown";
+  /**
+   * Every booking requirement satisfied: the deposit is in AND the booking is
+   * confirmed on the record.
+   *
+   * This is the only boolean allowed to mean "booked", and it deliberately
+   * does not include `invoiceSent`. Six live inquiries have an invoice sent
+   * with no deposit against it; under the old definition each of those was
+   * "booked", and a draft would tell the client their session was secured
+   * before they had paid for it.
+   */
+  fullyBooked: boolean;
   sessionDate: string | null;
   /** True when Chris said he would send something but no record shows he did. */
   invoicePromised: boolean;
@@ -76,6 +102,8 @@ export function buildAdminStatus(
       galleryDelivered: false,
       confirmationSent: false,
       bookingConfirmed: false,
+      contractSigned: "unknown",
+      fullyBooked: false,
       sessionDate: null,
       invoicePromised: digest.invoice === "promised",
       contractPromised: digest.contract === "promised",
@@ -93,7 +121,9 @@ export function buildAdminStatus(
     depositPaid,
     galleryDelivered: stamped(row.gallery_delivered_at),
     confirmationSent: stamped(row.confirmation_sent_at),
-    bookingConfirmed: Boolean(row.booking_confirmed) || depositPaid,
+    bookingConfirmed: Boolean(row.booking_confirmed),
+    contractSigned: "unknown",
+    fullyBooked: depositPaid && Boolean(row.booking_confirmed),
     sessionDate: row.session_date?.trim() || null,
     // Only meaningful while the record says it has not happened.
     invoicePromised: !invoiceSent && digest.invoice !== "none",
@@ -142,6 +172,20 @@ export function renderAdminStatus(status: AdminStatus): string[] {
         : "No deposit has been received. Do not call the session confirmed, booked, secured, or all set.",
     );
     lines.push("Sent, paid, signed and confirmed are four different things. Never use one to imply another.");
+  }
+
+  // There is no contract_signed_at column, so this can never be established.
+  // Stated unconditionally because the claim is cheap to make and impossible
+  // to support: "now that the contract is signed" reads as a verified fact.
+  if (status.contractSent) {
+    lines.push("Whether the contract came back SIGNED is not recorded anywhere, so you do not know. Never say it is signed, and never write a sentence that assumes it.");
+  }
+
+  // Paid is not the same as every booking requirement being met.
+  if (status.depositPaid && !status.fullyBooked) {
+    lines.push("The deposit is in but the booking is not marked confirmed on the record. You may thank them for the deposit. Do not say the session is officially booked or confirmed.");
+  } else if (status.fullyBooked) {
+    lines.push("The deposit is in and the booking is confirmed, so you may call the session booked.");
   }
 
   if (status.galleryDelivered) lines.push("The gallery HAS been delivered.");
