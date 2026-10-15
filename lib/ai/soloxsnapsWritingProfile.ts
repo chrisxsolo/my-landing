@@ -23,7 +23,7 @@ export const PHOTOGRAPHER = {
   region: "San Francisco Bay Area",
   specialties: [
     "graduation", "couples", "engagement", "proposal",
-    "family", "portrait", "headshot",
+    "family", "portrait", "headshot", "event",
   ],
 } as const;
 
@@ -106,27 +106,99 @@ Ask which university if it isn't known yet. Confirm availability only from the v
   portrait: `Keep it simple and practical. Cover location, time of day, session length, and price. Ask what the photos are for if that changes the approach.`,
 
   headshot: `Practical and brief. Cover how many people, session length, location and background, how many edited images they get, and the price. If editing comes up, say the retouching is natural and light. Do not promise retouching that isn't in the package.`,
+
+  event: `Find out what the event is, how many hours of coverage they want, and the venue, because the rate depends on length. Event coverage has a minimum number of hours, so say so plainly rather than quoting an hourly rate they could misread. Mention travel only if the venue is well outside San Francisco.`,
 } as const;
 
 /**
- * Resolves a free-text session type ("Grad Photos", "couples / engagement")
- * onto a playbook key. Order matters: the more specific types are tested first
- * so "engagement session for a couple" lands on engagement.
+ * Matches session-type wording onto a playbook key.
+ *
+ * Order matters: the more specific types are tested first so "engagement
+ * session for a couple" lands on engagement rather than couples.
+ *
+ * `strict` tightens the patterns that are prone to matching a passing mention.
+ * The dropdown is curated input and is matched leniently; a free-text message
+ * is matched strictly, because "family-owned restaurant brands" in a
+ * commercial inquiry otherwise resolves to a family session.
  */
-export function resolvePlaybookKey(sessionType: string | null | undefined): string | null {
-  const text = (sessionType ?? "").toLowerCase();
-  if (!text.trim()) return null;
-  if (/proposal|propose/.test(text)) return "proposal";
-  if (/engagement|engaged/.test(text)) return "engagement";
-  if (/grad/.test(text)) return "graduation";
-  if (/family|famil/.test(text)) return "family";
-  if (/headshot|head shot|linkedin|corporate portrait|business portrait/.test(text)) return "headshot";
-  if (/couple|anniversary|date night/.test(text)) return "couples";
-  if (/portrait|lifestyle|individual|solo|senior/.test(text)) return "portrait";
+function matchPlaybook(text: string, strict: boolean): string | null {
+  const haystack = text.toLowerCase();
+  if (!haystack.trim()) return null;
+
+  // "ask her/him" and "pop the question" catch a proposal described without
+  // the word: a real inquiry filed as Couples read "engagement photos, I'd
+  // love to ask her in the Muir Woods", which is a proposal shoot.
+  if (/proposal|propos(?:e|ing|al)|pop the question|\bask (?:her|him|them)\b|said yes/.test(haystack)) return "proposal";
+  if (/engagement|engaged|fianc/.test(haystack)) return "engagement";
+  if (/\bgrad\b|graduat/.test(haystack)) return "graduation";
+
+  const familyPattern = strict
+    ? /\b(?:my|our|the|whole|extended) famil|famil(?:y|ies) (?:session|photos|portraits|shoot|pictures)|family of \d/
+    : /\bfamil/;
+  if (familyPattern.test(haystack)) return "family";
+
+  if (/headshot|head shot|linkedin|corporate portrait|business portrait/.test(haystack)) return "headshot";
+  if (/couple|anniversary|date night/.test(haystack)) return "couples";
+
+  const eventPattern = strict
+    ? /\bevent (?:coverage|photos|photography)\b|art exhibit|gallery opening|\breunion\b|\bconference\b|networking event/
+    : /\bevent\b|exhibit|opening|reunion|party|conference|networking|celebration/;
+  if (eventPattern.test(haystack)) return "event";
+
+  if (/portrait|lifestyle|individual|solo|senior/.test(haystack)) return "portrait";
   return null;
 }
 
-export function getPlaybook(sessionType: string | null | undefined): string | null {
-  const key = resolvePlaybookKey(sessionType);
+/**
+ * How specific each playbook is.
+ *
+ * A dropdown choice only wins when it is at least as specific as what the
+ * message says. "Couples Session" plus a message describing a proposal is a
+ * proposal: taking the dropdown there loaded the wrong playbook and quoted
+ * the $650 engagement rate for a $750 proposal shoot.
+ */
+const PLAYBOOK_SPECIFICITY: Record<string, number> = {
+  proposal: 5,
+  engagement: 4,
+  graduation: 3,
+  family: 3,
+  event: 3,
+  headshot: 3,
+  couples: 2,
+  portrait: 1,
+};
+
+function specificity(key: string | null): number {
+  return key ? PLAYBOOK_SPECIFICITY[key] ?? 0 : 0;
+}
+
+/**
+ * Resolves the session type, reading the client's own words when they are more
+ * specific than the dropdown.
+ *
+ * The form's "Other" option is a dumping ground: real inquiries filed under it
+ * include "This is an engagement shoot as I am going to propose" and "multiple
+ * locations for my graduation pictures". Resolving from the dropdown alone
+ * meant the draft asked what kind of session they wanted after they had just
+ * said.
+ */
+export function resolvePlaybookKey(
+  sessionType: string | null | undefined,
+  message?: string | null,
+): string | null {
+  const fromType = matchPlaybook(sessionType ?? "", false);
+  const fromMessage = matchPlaybook(message ?? "", true);
+
+  if (fromType && fromMessage) {
+    return specificity(fromMessage) > specificity(fromType) ? fromMessage : fromType;
+  }
+  return fromType ?? fromMessage;
+}
+
+export function getPlaybook(
+  sessionType: string | null | undefined,
+  message?: string | null,
+): string | null {
+  const key = resolvePlaybookKey(sessionType, message);
   return key ? SESSION_PLAYBOOKS[key] : null;
 }

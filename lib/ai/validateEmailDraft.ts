@@ -65,11 +65,30 @@ function extractPrices(draft: string): number[] {
 }
 
 const MONTHS = "january|february|march|april|may|june|july|august|september|october|november|december";
+/** Abbreviations too: a real inquiry carried date_in_mind "Jul 19". */
+const MONTH_ABBR = "jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec";
+const MONTH_TO_INDEX: Record<string, number> = {
+  january: 1, february: 2, march: 3, april: 4, may: 5, june: 6, july: 7,
+  august: 8, september: 9, october: 10, november: 11, december: 12,
+  jan: 1, feb: 2, mar: 3, apr: 4, jun: 6, jul: 7, aug: 8, sep: 9, sept: 9,
+  oct: 10, nov: 11, dec: 12,
+};
+const MONTH_NAMES = [
+  "january", "february", "march", "april", "may", "june",
+  "july", "august", "september", "october", "november", "december",
+];
 
 /** Calendar dates the draft states, normalised to "month day". */
 function extractDates(draft: string): string[] {
-  return [...draft.matchAll(new RegExp(`\\b(${MONTHS})\\s+(\\d{1,2})(?:st|nd|rd|th)?\\b`, "gi"))]
-    .map((match) => `${match[1].toLowerCase()} ${Number(match[2])}`);
+  return [...draft.matchAll(new RegExp(`\\b(${MONTHS}|${MONTH_ABBR})\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?\\b`, "gi"))]
+    .map((match) => canonicalDate(match[1], match[2]))
+    .filter((value): value is string => value !== null);
+}
+
+/** "Jul"/"July" + "19" → "july 19", so spellings compare equal. */
+function canonicalDate(month: string, day: string): string | null {
+  const index = MONTH_TO_INDEX[month.toLowerCase().replace(/\.$/, "")];
+  return index ? `${MONTH_NAMES[index - 1]} ${Number(day)}` : null;
 }
 
 /**
@@ -83,11 +102,36 @@ function extractDates(draft: string): string[] {
 function normalizeDateMention(value: string): string | null {
   const iso = value.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
   if (iso) {
-    const monthName = MONTHS.split("|")[Number(iso[2]) - 1];
+    const monthName = MONTH_NAMES[Number(iso[2]) - 1];
     return monthName ? `${monthName} ${Number(iso[3])}` : null;
   }
-  const named = value.match(new RegExp(`(${MONTHS})\\s+(\\d{1,2})`, "i"));
-  return named ? `${named[1].toLowerCase()} ${Number(named[2])}` : null;
+  const named = value.match(new RegExp(`(${MONTHS}|${MONTH_ABBR})\\.?\\s+(\\d{1,2})`, "i"));
+  return named ? canonicalDate(named[1], named[2]) : null;
+}
+
+/** Every date the client themselves named, in any of their own text. */
+function clientRaisedDates(context: EmailContext): Set<string> {
+  const raised = new Set<string>();
+
+  const add = (value: string | null | undefined) => {
+    const normalized = value ? normalizeDateMention(value) : null;
+    if (normalized) raised.add(normalized);
+  };
+
+  for (const date of context.thread.digest.datesDiscussed) add(date);
+  add(context.request.dateInMind);
+
+  // The inquiry form message is NOT part of the Gmail thread, so dates written
+  // there never reached the thread digest. A draft answering "your September 1
+  // deadline is earlier than my open dates" was flagged for naming a date the
+  // client had supplied themselves.
+  for (const match of context.request.rawMessage.matchAll(
+    new RegExp(`\\b(${MONTHS}|${MONTH_ABBR})\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?\\b`, "gi"),
+  )) {
+    const canonical = canonicalDate(match[1], match[2]);
+    if (canonical) raised.add(canonical);
+  }
+  return raised;
 }
 
 /** Non-empty paragraphs, trimmed. */
@@ -223,11 +267,7 @@ function checkFacts(draft: string, context: EmailContext): ValidationIssue[] {
         .filter((value): value is string => value !== null),
     );
     // A date the client themselves raised may be discussed, including to say no.
-    const clientRaised = new Set(
-      [...context.thread.digest.datesDiscussed, context.request.dateInMind ?? ""]
-        .map(normalizeDateMention)
-        .filter((value): value is string => value !== null),
-    );
+    const clientRaised = clientRaisedDates(context);
     // Unavailable dates are nameable too — the draft has to be able to rule out
     // a date Chris cannot shoot.
     for (const entry of context.availability.unavailable) {

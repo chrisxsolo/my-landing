@@ -46,6 +46,7 @@ export function buildStableSystem(
   playbookKey: string | null,
   approvedRules: WritingRule[],
 ): string {
+  // The key is already resolved, so passing it as the session type is exact.
   const playbook = getPlaybook(playbookKey);
 
   const sections = [

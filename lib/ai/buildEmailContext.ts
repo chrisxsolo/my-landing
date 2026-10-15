@@ -159,7 +159,9 @@ export function buildEmailContext(input: BuildEmailContextInput): EmailContext {
   const now = input.now ?? new Date();
   const warnings: ContextWarning[] = [];
 
-  const playbook = resolvePlaybookKey(inquiry.sessionType);
+  // The message is consulted too: the form's "Other" option hides real
+  // proposals, graduations, and engagements.
+  const playbook = resolvePlaybookKey(inquiry.sessionType, inquiry.message);
   if (!playbook) {
     warnings.push({
       code: "session_type_unknown",

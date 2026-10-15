@@ -128,6 +128,43 @@ function familyFacts(peopleCount: number): PricingFacts {
 }
 
 /**
+ * Event coverage, priced by length.
+ *
+ * The catalog has three tiers with different hourly rates and minimums, so an
+ * hourly figure alone is misleading — the minimum is the number that decides
+ * what they pay.
+ */
+function eventFacts(): PricingFacts {
+  const events = PRICING_CATALOG.events;
+  const { smallEvent, mediumEvent, largeEvent } = events;
+
+  const lines = [
+    `Short event coverage: ${money(smallEvent.hourlyRate)} per hour with a ${smallEvent.minimumHours}-hour minimum, ${smallEvent.minimumImages}+ edited images, ${smallEvent.turnaroundLabel}.`,
+    `Longer events of ${mediumEvent.minimumHours} hours or more: ${money(mediumEvent.hourlyRate)} per hour.`,
+    `Half day (${largeEvent.halfDayHours} hours): ${money(largeEvent.halfDayPrice)}. Full day starts at ${money(largeEvent.fullDayStartingPrice)}.`,
+    `Add-ons: second shooter ${events.addOns.secondShooter.displayPrice}, expedited delivery ${events.addOns.expedited.displayPrice}.`,
+    `Travel beyond ${events.includedTravelMiles} miles of San Francisco: ${events.addOns.travel.displayPrice}.`,
+  ];
+
+  return {
+    verified: true,
+    lines,
+    // Quotable totals: the minimum booking at each tier, plus the day rates.
+    basePrices: [
+      smallEvent.hourlyRate * smallEvent.minimumHours,
+      mediumEvent.hourlyRate * mediumEvent.minimumHours,
+      largeEvent.halfDayPrice,
+      largeEvent.fullDayStartingPrice,
+      smallEvent.hourlyRate,
+      mediumEvent.hourlyRate,
+    ],
+    addOnPrices: [],
+    needsManualQuote:
+      "Event pricing depends on hours, venue, and travel. Confirm the final figure yourself before promising a total.",
+  };
+}
+
+/**
  * Headshot and individual-portrait sessions are not in the rate card. Saying
  * so is the correct output: it makes the validator flag any price the model
  * invents, and it tells Chris the quote needs him.
@@ -150,14 +187,20 @@ function parsePeople(value: string | number | null | undefined, message: string)
   return inMessage ? Math.max(1, Number(inMessage[1])) : 1;
 }
 
-/** Picks the couples package the client's own words point at. */
+/**
+ * Picks the couples package the client's own words point at.
+ *
+ * Proposal is tested first and with the same widened patterns as the playbook
+ * matcher: "engagement photos, I'd love to ask her" is a proposal, and pricing
+ * it as an engagement session under-quoted it by $100.
+ */
 function detectCouplesPackage(
   sessionType: string,
   message: string,
 ): keyof typeof PRICING_CATALOG.couples.packages {
   const text = `${sessionType} ${message}`.toLowerCase();
-  if (/proposal|propose/.test(text)) return "proposal";
-  if (/engagement|engaged/.test(text)) return "engagement";
+  if (/proposal|propos(?:e|ing|al)|pop the question|\bask (?:her|him|them)\b|said yes/.test(text)) return "proposal";
+  if (/engagement|engaged|fianc/.test(text)) return "engagement";
   if (/signature|90 ?min|90-minute/.test(text)) return "signature";
   if (/\bmini\b|30 ?min|30-minute/.test(text)) return "mini";
   return "1hr";
@@ -172,7 +215,7 @@ export type BusinessFactsInput = {
 export function buildPricingFacts(input: BusinessFactsInput): PricingFacts {
   const sessionType = input.sessionType ?? "";
   const message = input.message ?? "";
-  const playbook = resolvePlaybookKey(sessionType);
+  const playbook = resolvePlaybookKey(sessionType, message);
   const people = parsePeople(input.people, message);
 
   switch (playbook) {
@@ -181,6 +224,7 @@ export function buildPricingFacts(input: BusinessFactsInput): PricingFacts {
     case "engagement": return couplesFacts("engagement");
     case "couples":    return couplesFacts(detectCouplesPackage(sessionType, message));
     case "family":     return familyFacts(people);
+    case "event":      return eventFacts();
     case "headshot":   return unpricedSessionFacts("headshot");
     case "portrait":   return unpricedSessionFacts("individual portrait");
     default:
