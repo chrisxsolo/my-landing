@@ -50,3 +50,6 @@ next-env.d.ts
 # CI can rebuild the test DB for integration tests. It carries no data/secrets.
 # (Local secrets like .env.test stay ignored via the .env* rule above.)
 .env.test
+
+# AI email evaluation artifacts (contain real client data, never committed)
+/.eval-out/

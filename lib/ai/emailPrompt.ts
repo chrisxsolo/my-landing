@@ -73,6 +73,61 @@ export function buildStableSystem(
   return sections.join("\n\n");
 }
 
+const ORDINAL_DAY = (day: number): string => {
+  const suffix = day % 10 === 1 && day !== 11 ? "st"
+    : day % 10 === 2 && day !== 12 ? "nd"
+    : day % 10 === 3 && day !== 13 ? "rd" : "th";
+  return `${day}${suffix}`;
+};
+
+/**
+ * Collapses consecutive open dates into ranges.
+ *
+ * A date carrying a note is never merged, so the note stays attached to the
+ * day it belongs to.
+ */
+function compressAvailability(entries: EmailContext["availability"]["offerable"]): string {
+  const parts: string[] = [];
+  let run: typeof entries = [];
+
+  const flush = () => {
+    if (!run.length) return;
+    const monthOf = (entry: (typeof run)[number]) =>
+      new Date(`${entry.date}T12:00:00Z`).toLocaleDateString("en-US", { month: "long", timeZone: "UTC" });
+    const dayOf = (entry: (typeof run)[number]) => Number(entry.date.slice(8, 10));
+
+    if (run.length < 3) {
+      for (const entry of run) {
+        parts.push(`${monthOf(entry)} ${ORDINAL_DAY(dayOf(entry))}${entry.note ? ` (${entry.note})` : ""}`);
+      }
+    } else {
+      const first = run[0];
+      const last = run[run.length - 1];
+      const sameMonth = monthOf(first) === monthOf(last);
+      parts.push(
+        `${monthOf(first)} ${ORDINAL_DAY(dayOf(first))} to ${sameMonth ? "" : `${monthOf(last)} `}${ORDINAL_DAY(dayOf(last))}`,
+      );
+    }
+    run = [];
+  };
+
+  const sorted = [...entries].sort((a, b) => a.date.localeCompare(b.date));
+  for (const entry of sorted) {
+    const previous = run[run.length - 1];
+    // Compared in UTC on purpose. Local-time arithmetic makes October 31st to
+    // November 1st a 25-hour gap when the clocks go back, which silently
+    // stopped compressing every run that crossed the DST boundary.
+    const consecutive = previous
+      && !previous.note && !entry.note
+      && Date.parse(`${entry.date}T00:00:00Z`)
+         - Date.parse(`${previous.date}T00:00:00Z`) === 86_400_000;
+    if (previous && !consecutive) flush();
+    run.push(entry);
+  }
+  flush();
+  return parts.join("; ");
+}
+
 /** Renders availability as facts, never as an invitation to improvise. */
 function renderAvailability(context: EmailContext): string {
   const { availability } = context;
@@ -95,11 +150,17 @@ function renderAvailability(context: EmailContext): string {
 
   if (availability.offerable.length) {
     lines.push(
-      `Dates you may offer (these and only these): ${availability.offerable
-        .slice(0, 12)
-        .map((d) => d.label + (d.note ? ` (${d.note})` : ""))
-        .join("; ")}.`,
+      `Dates you may offer (these and only these): ${compressAvailability(availability.offerable)}.`,
     );
+    if (availability.offerable.length > 4) {
+      // Left to itself the model recited the calendar: "October 15th, 16th,
+      // 17th, 18th, 19th, 20th, 21st, 22nd, 23rd, 25th, 26th, or 27th".
+      // Chris writes "I'm available September 17th to 21st, 24th to 25th, or
+      // the 29th" — a run becomes a range and the list stays short.
+      lines.push(
+        "That is more dates than belongs in an email. Offer three or four, or give a range where they run consecutively, the way Chris does. Any date on the list is fine to pick from.",
+      );
+    }
   } else {
     lines.push("There are no open dates on the calendar. Do not offer any date.");
   }

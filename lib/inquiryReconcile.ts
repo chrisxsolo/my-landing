@@ -55,6 +55,12 @@ export type ReconcileMessage = {
   /** Normalized sender address. */
   fromEmail: string;
   direction: MessageDirection;
+  /**
+   * Every normalized address on the message (From / To / Cc). Only the
+   * mailbox-wide refresh scan needs it — to attribute an outbound message to
+   * the inquiry it was addressed to — so per-inquiry callers may omit it.
+   */
+  participants?: string[];
 };
 
 export type ReconcileInquirySnapshot = {

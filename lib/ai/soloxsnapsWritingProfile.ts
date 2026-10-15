@@ -108,97 +108,30 @@ Ask which university if it isn't known yet. Confirm availability only from the v
   headshot: `Practical and brief. Cover how many people, session length, location and background, how many edited images they get, and the price. If editing comes up, say the retouching is natural and light. Do not promise retouching that isn't in the package.`,
 
   event: `Find out what the event is, how many hours of coverage they want, and the venue, because the rate depends on length. Event coverage has a minimum number of hours, so say so plainly rather than quoting an hourly rate they could misread. Mention travel only if the venue is well outside San Francisco.`,
+
+  elopement: `Say you'd love to shoot it, warmly, because this is their wedding. Find out the ceremony time, how many hours of coverage they want, and where. There is no published elopement rate, so do not quote one: say you'll put a quote together once you know the timing and hours. Multi-hour coverage and a venue outside the city both change the figure, so settle those first.`,
+
+  headshot_event: `This is a group booking for a club, class, or company, and it gets priced by hand every time. Find out how many people, how long you have, and the venue. Do not quote a per-person or per-hour rate from the session card. Say you'll send a quote for the group once you know the headcount and the time window, and ask whether the headcount could move.`,
+
+  commercial: `Brand, editorial, and commercial work is quoted per project, so ask what the deliverables are: where the images run, how many are needed, and whether there is a usage or licensing requirement. Find out the date and location. Do not quote a portrait or headshot rate. Say you'll put a proper quote together once you know the scope.`,
 } as const;
 
 /**
- * Matches session-type wording onto a playbook key.
+ * Session classification moved to lib/ai/sessionClassifier.ts.
  *
- * Order matters: the more specific types are tested first so "engagement
- * session for a couple" lands on engagement rather than couples.
- *
- * `strict` tightens the patterns that are prone to matching a passing mention.
- * The dropdown is curated input and is matched leniently; a free-text message
- * is matched strictly, because "family-owned restaurant brands" in a
- * commercial inquiry otherwise resolves to a family session.
+ * It used to be an ordered first-match list here, which read any mention of a
+ * word as a request for that session type. Re-exported so the many call sites
+ * that import it from the writing profile keep working.
  */
-function matchPlaybook(text: string, strict: boolean): string | null {
-  const haystack = text.toLowerCase();
-  if (!haystack.trim()) return null;
+export { resolvePlaybookKey, classifySession } from "./sessionClassifier";
+export type { PlaybookKey, Classification } from "./sessionClassifier";
 
-  // "ask her/him" and "pop the question" catch a proposal described without
-  // the word: a real inquiry filed as Couples read "engagement photos, I'd
-  // love to ask her in the Muir Woods", which is a proposal shoot.
-  if (/proposal|propos(?:e|ing|al)|pop the question|\bask (?:her|him|them)\b|said yes/.test(haystack)) return "proposal";
-  if (/engagement|engaged|fianc/.test(haystack)) return "engagement";
-  if (/\bgrad\b|graduat/.test(haystack)) return "graduation";
-
-  const familyPattern = strict
-    ? /\b(?:my|our|the|whole|extended) famil|famil(?:y|ies) (?:session|photos|portraits|shoot|pictures)|family of \d/
-    : /\bfamil/;
-  if (familyPattern.test(haystack)) return "family";
-
-  if (/headshot|head shot|linkedin|corporate portrait|business portrait/.test(haystack)) return "headshot";
-  if (/couple|anniversary|date night/.test(haystack)) return "couples";
-
-  const eventPattern = strict
-    ? /\bevent (?:coverage|photos|photography)\b|art exhibit|gallery opening|\breunion\b|\bconference\b|networking event/
-    : /\bevent\b|exhibit|opening|reunion|party|conference|networking|celebration/;
-  if (eventPattern.test(haystack)) return "event";
-
-  if (/portrait|lifestyle|individual|solo|senior/.test(haystack)) return "portrait";
-  return null;
-}
-
-/**
- * How specific each playbook is.
- *
- * A dropdown choice only wins when it is at least as specific as what the
- * message says. "Couples Session" plus a message describing a proposal is a
- * proposal: taking the dropdown there loaded the wrong playbook and quoted
- * the $650 engagement rate for a $750 proposal shoot.
- */
-const PLAYBOOK_SPECIFICITY: Record<string, number> = {
-  proposal: 5,
-  engagement: 4,
-  graduation: 3,
-  family: 3,
-  event: 3,
-  headshot: 3,
-  couples: 2,
-  portrait: 1,
-};
-
-function specificity(key: string | null): number {
-  return key ? PLAYBOOK_SPECIFICITY[key] ?? 0 : 0;
-}
-
-/**
- * Resolves the session type, reading the client's own words when they are more
- * specific than the dropdown.
- *
- * The form's "Other" option is a dumping ground: real inquiries filed under it
- * include "This is an engagement shoot as I am going to propose" and "multiple
- * locations for my graduation pictures". Resolving from the dropdown alone
- * meant the draft asked what kind of session they wanted after they had just
- * said.
- */
-export function resolvePlaybookKey(
-  sessionType: string | null | undefined,
-  message?: string | null,
-): string | null {
-  const fromType = matchPlaybook(sessionType ?? "", false);
-  const fromMessage = matchPlaybook(message ?? "", true);
-
-  if (fromType && fromMessage) {
-    return specificity(fromMessage) > specificity(fromType) ? fromMessage : fromType;
-  }
-  return fromType ?? fromMessage;
-}
+import { resolvePlaybookKey as resolveKey } from "./sessionClassifier";
 
 export function getPlaybook(
   sessionType: string | null | undefined,
   message?: string | null,
 ): string | null {
-  const key = resolvePlaybookKey(sessionType, message);
-  return key ? SESSION_PLAYBOOKS[key] : null;
+  const key = resolveKey(sessionType, message);
+  return key ? SESSION_PLAYBOOKS[key] ?? null : null;
 }

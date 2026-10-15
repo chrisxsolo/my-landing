@@ -21,7 +21,7 @@ type Props = {
   remindersLoading?: Record<number, boolean>;
   remindersOpen?: Record<number, boolean>;
   onAddEvent?: (date?: string) => void;
-  onFinalPayment?: (id: number, amount: string, method: string) => Promise<void>;
+  onFinalPayment?: (id: number, amount: string, method: string) => Promise<boolean>;
   deposit1Amounts?: Map<number, string>;
 };
 
@@ -244,11 +244,14 @@ export default function SessionCalendar({
               async function confirmFinalPayment() {
                 if (!onFinalPayment || !finalPaymentAmount) return;
                 setFinalPaymentSaving(true);
-                await onFinalPayment(s.id, finalPaymentAmount, finalPaymentMethod);
-                setFinalPaymentSaving(false);
-                setFinalPaymentId(null);
-                setFinalPaymentAmount("");
-                setFinalPaymentMethod("Venmo");
+                try {
+                  if (!await onFinalPayment(s.id, finalPaymentAmount, finalPaymentMethod)) return;
+                  setFinalPaymentId(null);
+                  setFinalPaymentAmount("");
+                  setFinalPaymentMethod("Venmo");
+                } finally {
+                  setFinalPaymentSaving(false);
+                }
               }
 
               return (

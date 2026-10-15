@@ -323,7 +323,15 @@ function checkQuestionsAnswered(draft: string, context: EmailContext): Validatio
       .filter((word) => word.length > 3 && !stopWords.has(word));
     if (!keywords.length) continue;
 
-    const covered = keywords.filter((word) => draftWords.has(word)).length / keywords.length;
+    // Prefix-matched, so an answer worded differently still counts: a draft
+    // that says "for prep, I'd go with soft colors" does answer "any tips for
+    // preparing?", and exact matching called it unanswered.
+    const draftList = [...draftWords];
+    const covered = keywords.filter((word) => {
+      if (draftWords.has(word)) return true;
+      const stem = word.slice(0, 4);
+      return draftList.some((candidate) => candidate.length > 3 && candidate.startsWith(stem));
+    }).length / keywords.length;
     if (covered < 0.34) {
       issues.push({
         type: "unanswered_question", severity: "medium",

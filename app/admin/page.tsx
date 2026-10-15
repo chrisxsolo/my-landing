@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState, useCallback, useSyncExternalStore, Suspense } from "react";
 import { useRouter } from "next/navigation";
 import { C } from "@/lib/colors";
-import { T, INQ_STATUS } from "@/app/admin/adminTheme";
+import { T, INQ_STATUS, inquiryCardChrome } from "@/app/admin/adminTheme";
 import CommandPalette from "@/app/admin/CommandPalette";
 import AdminWebsiteNavigation, { type WebsiteTab } from "@/app/admin/AdminWebsiteNavigation";
 
@@ -53,7 +53,7 @@ function SessionTypeEditor({id,value,onSave,onCancel}:{id:number;value:string;on
     </form>
   );
 }
-import { checkAuth, login, logout as adminLogout } from "@/lib/adminAuth";
+import { useAdminAuthed, login, logout as adminLogout } from "@/lib/adminAuth";
 import AdminSessionStatusStrip from "@/app/components/admin-session-status-strip";
 import BayAreaLocationsManager from "@/app/admin/BayAreaLocationsManager";
 import AnalyticsTab from "@/app/admin/AnalyticsTab";
@@ -78,6 +78,7 @@ import NavigationTab from "@/app/admin/NavigationTab";
 import TestimonialsTab from "@/app/admin/TestimonialsTab";
 import CouplesPosingGuideTab from "@/app/admin/CouplesPosingGuideTab";
 import { uploadImage } from "@/lib/uploadImage";
+import { parsePositivePaymentCents } from "@/lib/paymentAmount";
 import {
   type GradLocationOption,
   type GradSchoolOption,
@@ -101,8 +102,10 @@ import {
 import {
   createAdminInquiry,
   deleteAdminInquiry,
+  inquiryConversationStatus,
   inquiryNeedsReply,
   loadAdminInquiries,
+  refreshAdminInquiries,
   updateAdminInquiry,
   type AdminInquiry,
 } from "@/lib/adminInquiries";
@@ -170,15 +173,14 @@ export default function AdminPage() {
 
 function AdminDashboard() {
   const router=useRouter();
-  const [authed,setAuthed]=useState(false);
+  const authed=useAdminAuthed();
   const [pw,setPw]=useState("");
   const [pwErr,setPwErr]=useState(false);
   const [tab,setTab]=useState<Tab>("home");
   const [toast,setToast]=useState<{msg:string;ok:boolean}|null>(null);
 
-  // Check localStorage on mount + handle OAuth callback params
+  // Handle OAuth callback params after the layout verifies the server session
   useEffect(() => {
-    if (checkAuth()) setAuthed(true);
     const searchParams=new URLSearchParams(window.location.search);
     const gmailParam=searchParams.get("gmail");
     const tabParam=searchParams.get("tab") as Tab|null;
@@ -377,9 +379,6 @@ function AdminDashboard() {
   const [gmailLoading,setGmailLoading]=useState(false);
   type InboxThread={threadId:string;fromName:string;fromEmail:string;subject:string;snippet:string;timestamp:number;messageCount:number;isUnread:boolean};
   const [inboxThreads,setInboxThreads]=useState<InboxThread[]>([]);
-  const [dismissedThreadIds,setDismissedThreadIds]=useState<Set<string>>(()=>{
-    try{const s=localStorage.getItem("dismissed_inbox_threads");return new Set(s?JSON.parse(s):[]);}catch{return new Set();}
-  });
   const [inboxLoading,setInboxLoading]=useState(false);
   const [blockedSenders,setBlockedSenders]=useState<string[]>([]);
   const [blockedSendersLoading,setBlockedSendersLoading]=useState(false);
@@ -614,16 +613,15 @@ function AdminDashboard() {
   }
 
   async function dismissUnreadThread(threadId:string){
-    setDismissedThreadIds(prev=>{
-      const next=new Set(prev);
-      next.add(threadId);
-      try{localStorage.setItem("dismissed_inbox_threads",JSON.stringify([...next]));}catch{}
-      return next;
-    });
-    setInboxThreads(p=>p.map(t=>t.threadId===threadId?{...t,isUnread:false}:t));
+    const timestamp=inboxThreads.find(t=>t.threadId===threadId)?.timestamp;
     try{
-      await fetch("/api/gmail/mark-read",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({threadId})});
-    }catch{/* best-effort */}
+      const res=await fetch("/api/gmail/mark-read",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({threadId})});
+      if(!res.ok)throw new Error("Could not mark the message as read");
+      setInboxThreads(p=>p.map(t=>t.threadId===threadId&&t.timestamp===timestamp?{...t,isUnread:false}:t));
+    }catch(error){
+      console.error("[admin] mark thread read failed",error);
+      showToast("Could not mark the message as read — try again",false);
+    }
   }
 
   async function polishFreeCompose(){
@@ -724,6 +722,15 @@ function AdminDashboard() {
     return Object.keys(headers).length?{headers}:undefined;
   }
 
+  // Fold new Gmail activity into inquiry reply state when the dashboard opens
+  // (and whenever it regains focus), so a reply sent straight from Gmail — or a
+  // client answering one — recolors the card without anyone pressing Sync
+  // Timeline. Cheap and server-throttled; silent on failure by design.
+  async function autoRefreshInquiries(){
+    const result=await refreshAdminInquiries();
+    if(result.updated>0)fetchInquiries();
+  }
+
   async function fetchInquiries(){
     setInquiriesLoading(true);
     const paymentsReq = fetch("/api/admin/payments")
@@ -764,21 +771,33 @@ function AdminDashboard() {
     setInquiriesLoading(false);
   }
 
-  async function handleFinalPayment(id:number,amount:string,method:string){
+  async function handleFinalPayment(id:number,amount:string,method:string):Promise<boolean>{
+    if(parsePositivePaymentCents(amount)===null){showToast("Enter a valid payment amount greater than zero",false);return false;}
     const inq=inquiries.find(i=>i.id===id);
-    const res=await fetch("/api/admin/record-final-payment",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({inquiry_id:id,client_name:inq?.name??'',client_email:inq?.email??'',amount,method})});
-    const json=await res.json() as {ok?:boolean;error?:string};
-    if(!res.ok){showToast(json.error??"Failed to record payment",false);return;}
-    setFinalPaymentIds(prev=>new Set([...prev,id]));
-    showToast(`Final payment recorded for ${inq?.name??'client'} ✓`);
+    try{
+      const res=await fetch("/api/admin/record-final-payment",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({inquiry_id:id,client_name:inq?.name??'',client_email:inq?.email??'',amount,method})});
+      const json=await res.json() as {ok?:boolean;error?:string};
+      if(!res.ok)throw new Error(json.error??"Failed to record payment");
+      setFinalPaymentIds(prev=>new Set([...prev,id]));
+      showToast(`Final payment recorded for ${inq?.name??'client'} ✓`);
+      return true;
+    }catch(error){
+      console.error("[admin] record final payment failed",error);
+      showToast(error instanceof Error?error.message:"Failed to record payment",false);
+      return false;
+    }
   }
   async function recordCardPayment(id:number){
     setCardPaymentSaving(true);
-    await handleFinalPayment(id,cardPaymentAmount,cardPaymentMethod);
-    setCardPaymentSaving(false);
-    setCardPaymentId(null);
-    setCardPaymentAmount("");
-    setCardPaymentMethod("Venmo");
+    try{
+      if(!await handleFinalPayment(id,cardPaymentAmount,cardPaymentMethod))return;
+      setCardPaymentId(null);
+      setCardPaymentAmount("");
+      setCardPaymentMethod("Venmo");
+    }catch(error){
+      console.error("[admin] record card payment failed",error);
+      showToast("Failed to record payment — try again",false);
+    }finally{setCardPaymentSaving(false);}
   }
   async function fetchPortalSessions(){
     setPortalSessionsLoading(true);
@@ -1034,24 +1053,28 @@ function AdminDashboard() {
   async function saveBatchImages(){
     if(!batchItems.length){showToast("No images queued",false);return;}
     setBatchSaving(true);
-    // Upload all files in parallel (5 at a time) — the old one-at-a-time loop was the bottleneck.
-    const uploads=await mapWithConcurrency(batchItems,5,async item=>({item,url:await uploadImage(item.file,"portfolio",showToast)}));
-    const base=portfolioImages.length;
-    const rows=uploads.filter(u=>u.url).map((u,idx)=>{
-      const cat=categories.find(c=>c.slug===u.item.category_slug);
-      return {title:u.item.title||"Portfolio image",alt:u.item.title||"Portfolio image",image_url:u.url,category_id:cat?.id??null,category_slug:u.item.category_slug,location:u.item.location.trim()||null,content_hash:u.item.hash,featured:false,sort_order:base+idx+1};
-    });
-    let saved=0;
-    if(rows.length){
-      // Single bulk insert instead of one request per photo (service-role API).
+    try{
+      const uploads=await mapWithConcurrency(batchItems,5,async item=>({item,url:await uploadImage(item.file,"portfolio",showToast)}));
+      const successfulUploads=uploads.filter(u=>u.url);
+      const rows=successfulUploads.map((u,idx)=>{
+        const cat=categories.find(c=>c.slug===u.item.category_slug);
+        return {title:u.item.title||"Portfolio image",alt:u.item.title||"Portfolio image",image_url:u.url,category_id:cat?.id??null,category_slug:u.item.category_slug,location:u.item.location.trim()||null,content_hash:u.item.hash,featured:false,sort_order:portfolioImages.length+idx+1};
+      });
+      if(!rows.length){showToast("Upload failed — photos kept for retry",false);return;}
       const res=await fetch('/api/admin/portfolio-images',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(rows)});
-      if(!res.ok){const j=await res.json().catch(()=>({}));showToast("Some photos failed to save — "+(j.error||""),false);}else saved=rows.length;
-    }
-    if(saved<batchItems.length)showToast(`${batchItems.length-saved} photo${batchItems.length-saved!==1?"s":""} failed to upload`,false);
-    setBatchSaving(false);
-    setBatchItems([]);
-    clearBatchSelection();
-    if(saved>0){showToast(`${saved} image${saved!==1?"s":""} uploaded`);fetchPortfolioImages();revalidatePublicSite();}
+      if(!res.ok)throw new Error("Photos could not be saved — queue kept for retry");
+      const savedIds=new Set(successfulUploads.map(u=>u.item.id));
+      setBatchItems(prev=>prev.filter(item=>!savedIds.has(item.id)));
+      setBatchSelected(prev=>new Set([...prev].filter(id=>!savedIds.has(id))));
+      batchAnchorRef.current=null;
+      successfulUploads.forEach(({item})=>URL.revokeObjectURL(item.preview));
+      fetchPortfolioImages();revalidatePublicSite();
+      const failed=batchItems.length-savedIds.size;
+      showToast(failed?`${savedIds.size} uploaded; ${failed} failed — kept for retry`:`${savedIds.size} images uploaded`,failed===0);
+    }catch(error){
+      console.error("[admin] batch upload failed",error);
+      showToast("Photos could not be saved — queue kept for retry",false);
+    }finally{setBatchSaving(false);}
   }
 
   async function importGradPhotos(){
@@ -1219,7 +1242,15 @@ function AdminDashboard() {
     if(data)setPortfolioImages(data);
     setPortfolioLoading(false);
   }
-  useEffect(()=>{if(authed){fetchCategories();fetchPortfolioImages();fetchLibraryImages();fetchSiteSettings();fetchInquiries();fetchPortalSessions();fetchGmailStatus();fetchInbox();fetchBlockedSenders();}},[authed]);
+  useEffect(()=>{if(authed){fetchCategories();fetchPortfolioImages();fetchLibraryImages();fetchSiteSettings();fetchInquiries();fetchPortalSessions();fetchGmailStatus();fetchInbox();fetchBlockedSenders();autoRefreshInquiries();}},[authed]);
+  // Coming back to an already-open dashboard re-checks Gmail; the server's
+  // cooldown makes a rapid tab-flip free.
+  useEffect(()=>{
+    if(!authed)return;
+    const onVisible=()=>{if(document.visibilityState==="visible")autoRefreshInquiries();};
+    document.addEventListener("visibilitychange",onVisible);
+    return()=>document.removeEventListener("visibilitychange",onVisible);
+  },[authed]);
   useEffect(()=>{if(authed&&(tab==="inquiries"||tab==="clients")){fetchInquiries();fetchPortalSessions();fetchGmailStatus();fetchBlockedSenders();}},[authed,tab]);
 
   // ── Professional portfolio handlers ──────────────────────────────────
@@ -1239,7 +1270,15 @@ function AdminDashboard() {
     }
     setCategorySaving(false);
   }
-  async function deleteCategory(id:number){await fetch(`/api/admin/portfolio-categories?id=${id}`,{method:'DELETE',credentials:'include'});setCategories(p=>p.filter(x=>x.id!==id));setCategoryDeleteConfirm(null);if(editingCategory?.id===id)cancelEditCategory();revalidatePublicSite();showToast("Category deleted");}
+  async function deleteCategory(id:number){
+    try{
+      const res=await fetch(`/api/admin/portfolio-categories?id=${id}`,{method:'DELETE',credentials:'include'});
+      if(!res.ok)throw new Error("Category deletion failed");
+      setCategories(p=>p.filter(x=>x.id!==id));setCategoryDeleteConfirm(null);
+      if(editingCategory?.id===id)cancelEditCategory();
+      revalidatePublicSite();showToast("Category deleted");
+    }catch(error){console.error("[admin] delete category failed",error);showToast("Could not delete category — try again",false);}
+  }
 
   function startEditPortfolioImage(image:PortfolioImage){setEditingPortfolioImage(image);setPortfolioForm({title:image.title,alt:image.alt??"",category_slug:image.category_slug,school:image.school??"",featured:image.featured,sort_order:String(image.sort_order)});setPortfolioFile(null);setPortfolioPreview(image.image_url);window.scrollTo({top:0,behavior:"smooth"});}
   function cancelEditPortfolioImage(){setEditingPortfolioImage(null);setPortfolioForm(EMPTY_PORTFOLIO);setPortfolioFile(null);setPortfolioPreview(null);if(portfolioFileRef.current)portfolioFileRef.current.value="";}
@@ -1337,15 +1376,25 @@ function AdminDashboard() {
     }
     setPortfolioSaving(false);
   }
-  async function deletePortfolioImage(id:number){await fetch(`/api/admin/portfolio-images?id=${id}`,{method:'DELETE',credentials:'include'});setPortfolioImages(p=>p.filter(x=>x.id!==id));setPortfolioDeleteConfirm(null);if(editingPortfolioImage?.id===id)cancelEditPortfolioImage();revalidatePublicSite();showToast("Portfolio image deleted");}
+  async function deletePortfolioImage(id:number){
+    try{
+      const res=await fetch(`/api/admin/portfolio-images?id=${id}`,{method:'DELETE',credentials:'include'});
+      if(!res.ok)throw new Error("Portfolio image deletion failed");
+      setPortfolioImages(p=>p.filter(x=>x.id!==id));setPortfolioDeleteConfirm(null);
+      if(editingPortfolioImage?.id===id)cancelEditPortfolioImage();
+      revalidatePublicSite();showToast("Portfolio image deleted");
+    }catch(error){console.error("[admin] delete image failed",error);showToast("Could not delete image — try again",false);}
+  }
 
-  async function toggleCarousel(id:number, current:boolean){
-    const carouselCount = portfolioImages.filter(i=>i.hero_carousel).length;
-    if(!current && carouselCount>=5){showToast("Max 5 carousel images — remove one first",false);return;}
-    await fetch('/api/admin/portfolio-images',{method:'PATCH',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({id,updates:{hero_carousel:!current}})});
-    setPortfolioImages(p=>p.map(x=>x.id===id?{...x,hero_carousel:!current}:x));
-    revalidatePublicSite();
-    showToast(!current?"Added to carousel":"Removed from carousel");
+  async function toggleCarousel(id:number,current:boolean){
+    const carouselCount=portfolioImages.filter(i=>i.hero_carousel).length;
+    if(!current&&carouselCount>=5){showToast("Max 5 carousel images — remove one first",false);return;}
+    try{
+      const res=await fetch('/api/admin/portfolio-images',{method:'PATCH',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({id,updates:{hero_carousel:!current}})});
+      if(!res.ok)throw new Error("Carousel update failed");
+      setPortfolioImages(p=>p.map(x=>x.id===id?{...x,hero_carousel:!current}:x));
+      revalidatePublicSite();showToast(!current?"Added to carousel":"Removed from carousel");
+    }catch(error){console.error("[admin] carousel update failed",error);showToast("Could not update carousel — try again",false);}
   }
 
   function slugify(s:string){return s.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");}
@@ -1369,12 +1418,12 @@ function AdminDashboard() {
           <div className="rounded-2xl p-8" style={{background:T.panel,border:`1px solid ${T.border}`,boxShadow:T.shadowHover}}>
             <label className="block text-[10px] font-bold tracking-[0.2em] uppercase mb-2" style={{color:T.inkFaint,fontFamily:T.mono}}>Password</label>
             <input type="password" value={pw} onChange={e=>{setPw(e.target.value);setPwErr(false);}}
-              onKeyDown={e=>{if(e.key==="Enter")login(pw).then(ok=>{if(ok)setAuthed(true);else setPwErr(true);});}}
+              onKeyDown={e=>{if(e.key==="Enter")login(pw).then(ok=>{if(!ok)setPwErr(true);});}}
               placeholder="Enter password" autoFocus
               className="w-full px-3 py-2.5 rounded-xl text-sm font-medium outline-none transition-colors mb-4"
               style={{background:T.inset,border:`1px solid ${pwErr?T.red:T.border}`,color:T.ink}}/>
             {pwErr&&<p className="text-xs font-semibold mb-3" style={{color:T.red}}>Incorrect password</p>}
-            <button onClick={()=>login(pw).then(ok=>{if(ok)setAuthed(true);else setPwErr(true);})}
+            <button onClick={()=>login(pw).then(ok=>{if(!ok)setPwErr(true);})}
               className="w-full py-2.5 rounded-xl font-bold text-sm transition-all hover:opacity-90" style={{background:T.action,color:T.actionText,boxShadow:T.glow}}>
               Step inside →
             </button>
@@ -1609,7 +1658,7 @@ function AdminDashboard() {
                 ))}
               </div>
               <div className="border-t pt-2.5 px-1" style={{borderColor:T.rowBorder}}>
-                <button onClick={()=>adminLogout().then(()=>{setAuthed(false);setPw("");})}
+                <button onClick={()=>adminLogout().then(()=>{setPw("");}).catch(error=>{console.error("[admin] sign out failed",error);showToast("Could not sign out — try again",false);})}
                   className="w-full flex items-center gap-2 px-3 py-[7px] rounded-xl text-[13px] font-semibold transition-colors"
                   style={{color:T.inkFaint}}
                   onMouseEnter={e=>{e.currentTarget.style.color=T.inkSoft;e.currentTarget.style.background=T.inset;}}
@@ -1650,7 +1699,7 @@ function AdminDashboard() {
                 <span className="text-sm leading-none">🎞️</span>
                 <span>Content Engine</span>
               </button>
-              <button onClick={()=>adminLogout().then(()=>{setAuthed(false);setPw("");})}
+              <button onClick={()=>adminLogout().then(()=>{setPw("");}).catch(error=>{console.error("[admin] sign out failed",error);showToast("Could not sign out — try again",false);})}
                 className="flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[12px] font-semibold whitespace-nowrap transition-all"
                 style={{color:T.inkFaint,background:T.inset,border:`1px solid ${T.border}`}}>
                 <span className="text-sm leading-none">←</span>
@@ -2934,17 +2983,16 @@ function AdminDashboard() {
                 });
                 return sortedInquiries.map(inq=>{
                   const isOpen=editingInquiry?.id===inq.id;
-                  const statusMeta=INQ_STATUS[inq.status as keyof typeof INQ_STATUS]??INQ_STATUS.archived;
                   const hasDraft=!!drafts[inq.id];
-                  const unreadThread=inboxThreads.find(t=>t.fromEmail.toLowerCase()===inq.email.toLowerCase()&&t.isUnread&&!dismissedThreadIds.has(t.threadId));
-
-                  const highlighted=!!unreadThread||needsReply(inq);
+                  const unreadThread=inboxThreads.find(t=>t.fromEmail.toLowerCase()===inq.email.toLowerCase()&&t.isUnread);
+                  // Badge and rail come from one derived status, so the card can
+                  // never show "Responded" and "Needs reply" at the same time.
+                  const cardStatus=inquiryConversationStatus(inq,{unreadInboundAt:unreadThread?.timestamp??null});
+                  const chrome=inquiryCardChrome(cardStatus);
                   return(
                     <div key={inq.id}
                          className="rounded-2xl overflow-hidden transition-shadow hover:shadow-md"
-                         style={highlighted
-                           ?{background:T.panelSolid,border:`1px solid ${T.amberBorder}`,borderLeft:`3px solid ${T.amber}`,boxShadow:T.shadow}
-                           :{background:T.panelSolid,border:`1px solid ${T.border}`,borderLeft:`3px solid ${statusMeta.color}`}}>
+                         style={chrome.card}>
 
                       {/* ── Card header (always visible) ── */}
                       <div className="flex items-stretch">
@@ -2954,15 +3002,9 @@ function AdminDashboard() {
                           className="flex-1 min-w-0 p-4 sm:p-5 transition-colors duration-150 cursor-pointer hover:bg-black/[0.02]">
                           <div className="flex items-center gap-2 flex-wrap mb-1">
                             <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full"
-                                  style={{background:statusMeta.bg,color:statusMeta.color}}>
-                              {statusMeta.label}
+                                  style={chrome.badge}>
+                              {chrome.label}
                             </span>
-                            {highlighted&&!unreadThread&&(
-                              <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full"
-                                    style={{background:T.amberBg,color:T.amber}}>
-                                Needs reply
-                              </span>
-                            )}
                             {unreadThread&&(
                               <span className="flex items-center gap-0.5">
                                 <button

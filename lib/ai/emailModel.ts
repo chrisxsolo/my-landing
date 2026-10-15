@@ -23,8 +23,17 @@ import { isKnownEmailModel } from "./modelPricing";
 export const DEFAULT_EMAIL_MODEL = "claude-sonnet-5-5";
 export const DEFAULT_EMAIL_EFFORT = "low";
 
-/** Max output tokens. One email body, with headroom for a long availability list. */
-export const EMAIL_MAX_TOKENS = 900;
+/**
+ * Max output tokens.
+ *
+ * Reasoning tokens are drawn from this budget too, so it is not just the body
+ * length. At 900 a genuinely ambiguous pricing question ("rate for 2 people
+ * for 1.5hours", which the rate card did not answer) spent the budget
+ * thinking and returned a draft cut off mid-sentence. The ceiling is not a
+ * target: output is billed per token actually used, and the validator flags a
+ * draft that runs long.
+ */
+export const EMAIL_MAX_TOKENS = 1400;
 
 /** Hard ceiling on a single generation so a hung request cannot pin the route. */
 export const EMAIL_TIMEOUT_MS = 45_000;

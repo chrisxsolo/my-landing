@@ -10,7 +10,7 @@
 // pipeline spent requests working out things a database query already knew.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { resolvePlaybookKey } from "./soloxsnapsWritingProfile";
+import { classifySession } from "./sessionClassifier";
 import { buildPricingFacts, buildTravelFact, buildPolicyFacts, type PricingFacts } from "./businessFacts";
 import { buildGoldenHourWindow, goldenHourCaveat, type GoldenHourWindow } from "./goldenHour";
 import { buildThreadDigest, renderThreadDigest, type ThreadDigest, type ThreadMessage } from "./threadDigest";
@@ -48,7 +48,9 @@ export type ContextWarning = {
     | "availability_unverified"
     | "availability_time_unverified"
     | "pricing_unverified"
+    | "travel_unverified"
     | "session_type_unknown"
+    | "session_type_ambiguous"
     | "requested_date_unavailable"
     | "booking_state_uncertain"
     | "thread_not_loaded";
@@ -161,12 +163,21 @@ export function buildEmailContext(input: BuildEmailContextInput): EmailContext {
 
   // The message is consulted too: the form's "Other" option hides real
   // proposals, graduations, and engagements.
-  const playbook = resolvePlaybookKey(inquiry.sessionType, inquiry.message);
+  const classification = classifySession(inquiry.sessionType, inquiry.message);
+  const playbook = classification.key;
   if (!playbook) {
     warnings.push({
       code: "session_type_unknown",
       severity: "medium",
       message: "Session type could not be identified, so no rate card applies. Check the price before sending.",
+    });
+  } else if (classification.ambiguous) {
+    // Two unrelated kinds of session asked for in one message. Picking one
+    // silently is how a wrong rate gets quoted confidently.
+    warnings.push({
+      code: "session_type_ambiguous",
+      severity: "medium",
+      message: `They describe both a ${playbook} and a ${classification.alternative} session. The draft treats it as ${playbook}. Check that is the one they want before quoting.`,
     });
   }
 
@@ -227,6 +238,18 @@ export function buildEmailContext(input: BuildEmailContextInput): EmailContext {
     });
   }
 
+  // A shoot outside the city whose travel fee is not in the rate card, on top
+  // of a session price that IS. That combination is where a confident-sounding
+  // total goes out short by the travel fee.
+  const travelFact = buildTravelFact(inquiry.school, inquiry.location, inquiry.message);
+  if (travelFact?.includes("NOT in the rate card") && pricingFacts.verified) {
+    warnings.push({
+      code: "travel_unverified",
+      severity: "medium",
+      message: "This location is outside San Francisco and has no travel fee in the rate card. The draft will not state a total. Add the travel fee yourself before sending.",
+    });
+  }
+
   // ── Thread ──────────────────────────────────────────────────────────────
   const digest = buildThreadDigest(messages, now);
   if (digest.invoice === "promised" || digest.contract === "promised") {
@@ -269,7 +292,7 @@ export function buildEmailContext(input: BuildEmailContextInput): EmailContext {
       timeVerified: false,
       requestedDateStatus,
     },
-    pricing: { ...pricingFacts, travelFact: buildTravelFact(inquiry.school) },
+    pricing: { ...pricingFacts, travelFact },
     policy: buildPolicyFacts(),
     goldenHour: {
       window: goldenHourDate ? buildGoldenHourWindow(goldenHourDate) : null,

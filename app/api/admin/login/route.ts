@@ -9,6 +9,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/requireAdmin";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,12 @@ const COOKIE_OPTS = {
   path:      "/",
   maxAge:    60 * 60 * 24 * 30, // 30 days
 };
+
+export function GET(req: NextRequest) {
+  const response = requireAdmin(req) ?? NextResponse.json({ authenticated: true });
+  response.headers.set("Cache-Control", "no-store");
+  return response;
+}
 
 export async function POST(req: NextRequest) {
   let body: { password?: string };

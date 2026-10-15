@@ -4,6 +4,8 @@
 // Single source for these surfaces so no hex values live inline in the tabs.
 // (Same pattern as app/admin/payments/palette.ts, which themes Revenue.)
 
+import type { InquiryConversationStatus } from "@/lib/adminInquiries";
+
 export const T = {
   // Canvas — warm near-black with a faint safelight glow bleeding in from above
   page: "#131114",
@@ -59,7 +61,28 @@ export const T = {
 /** Status colors for inquiry pipeline chips/rails. */
 export const INQ_STATUS = {
   new: { label: "● New", color: T.green, bg: T.greenBg },
+  needs_reply: { label: "⚑ Needs reply", color: T.amber, bg: T.amberBg },
   responded: { label: "✓ Responded", color: T.blue, bg: T.blueBg },
   not_interested: { label: "✕ Not interested", color: T.red, bg: T.redBg },
   archived: { label: "○ Archived", color: T.inkFaint, bg: T.neutralBg },
 } as const;
+
+/**
+ * Badge + border tokens for an inquiry card. One status in, one coherent set of
+ * colors out — so a blue "Responded" card can never carry the amber
+ * needs-reply highlight (and vice versa).
+ */
+export function inquiryCardChrome(status: InquiryConversationStatus) {
+  const meta = INQ_STATUS[status];
+  const awaitingReply = status === "needs_reply";
+  return {
+    label: meta.label,
+    badge: { background: meta.bg, color: meta.color },
+    card: {
+      background: T.panelSolid,
+      border: `1px solid ${awaitingReply ? T.amberBorder : T.border}`,
+      borderLeft: `3px solid ${meta.color}`,
+      boxShadow: T.shadow,
+    },
+  };
+}

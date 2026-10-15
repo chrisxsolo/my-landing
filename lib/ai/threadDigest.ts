@@ -45,10 +45,19 @@ export type ThreadDigest = {
 
 const DAY_MS = 86_400_000;
 
-/** Chris saying he will do something later. */
+/**
+ * Chris saying he will do something later.
+ *
+ * The modal forms matter as much as "I'll": his standard closing line is
+ * "once we decide on the date, time and location, I can send over the invoice
+ * and contract to secure the session". Without "I can" this read as no
+ * invoice having been mentioned at all, so the next draft re-explained the
+ * booking step he had already explained.
+ */
 const PROMISE_PATTERNS = [
   /\b(?:i'?ll|i will|going to|gonna|let me)\s+(?:go ahead and\s+)?(?:send|get|shoot)\b/i,
-  /\bonce (?:we|you)\b[^.!?]*\bi'?ll\b/i,
+  /\b(?:i can|i could|i'?d be happy to|happy to|i'?d love to)\s+(?:go ahead and\s+)?(?:send|get|shoot)\b/i,
+  /\bonce (?:we|you)\b[^.!?]*\b(?:i'?ll|i can)\b/i,
 ];
 
 /** Chris saying he already did it. */
@@ -154,8 +163,12 @@ function extractOpenQuestions(messages: ThreadMessage[]): string[] {
   const lastClientMessage = [...messages].reverse().find((m) => !m.fromMe);
   if (!lastClientMessage) return [];
 
+  // Split on every sentence end, not only on "?". A client who writes a
+  // paragraph and finishes it with a question used to yield the whole
+  // paragraph as one "question", and the keyword-coverage check then reported
+  // it unanswered no matter what the draft said.
   return lastClientMessage.body
-    .split(/(?<=\?)\s+|\n/)
+    .split(/(?<=[.!?])\s+|\n/)
     .map((sentence) => sentence.trim())
     .filter((sentence) => sentence.endsWith("?") && sentence.length > 8)
     .slice(0, 5);
@@ -208,7 +221,14 @@ export function renderThreadDigest(digest: ThreadDigest): string[] {
   ];
 
   if (digest.quotedPrices.length) {
-    lines.push(`Prices Chris already quoted in this thread, most recent message first: ${digest.quotedPrices.join(", ")}. Do not contradict these.`);
+    // The "do not restate" half matters as much as the "do not contradict"
+    // half. A client who asked a one-line availability question got the price
+    // and the whole booking step read back at them: 93 words where Chris
+    // wrote 39.
+    lines.push(`Prices Chris already quoted in this thread, most recent message first: ${digest.quotedPrices.join(", ")}. Do not contradict these, and do not restate them unless they ask about price again. They already have the number.`);
+  }
+  if (digest.invoice !== "none" || digest.contract !== "none") {
+    lines.push("Chris has already explained how booking works in this thread. Do not explain the invoice and contract step again unless they ask, or unless this email is the one settling the booking.");
   }
   if (digest.datesDiscussed.length) {
     lines.push(`Dates already discussed: ${digest.datesDiscussed.slice(0, 12).join(", ")}.`);

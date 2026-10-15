@@ -204,6 +204,76 @@ describe("computeInquiryReconciliation", () => {
     expect(r.nextStatus).toBe("responded");
   });
 
+  it("tracks unlimited back-and-forth, persisting state between passes", () => {
+    // Each pass feeds the previous pass's writes back in, the way the DB row
+    // would, and adds the next message in the exchange.
+    const exchange: { direction: "inbound" | "outbound"; at: string }[] = [
+      { direction: "outbound", at: "2026-07-07T19:00:00Z" },
+      { direction: "inbound", at: "2026-07-07T20:00:00Z" },
+      { direction: "outbound", at: "2026-07-07T21:00:00Z" },
+      { direction: "inbound", at: "2026-07-08T08:00:00Z" },
+      { direction: "outbound", at: "2026-07-08T09:00:00Z" },
+    ];
+    let row = inquiry();
+    const messages: ReconcileMessage[] = [msg("inbound", "2026-07-07T18:04:08Z")];
+    for (const step of exchange) {
+      messages.push(msg(step.direction, step.at));
+      const r = computeInquiryReconciliation(row, messages);
+      expect(r.nextStatus, step.at).toBe("responded");
+      expect(r.needsReply, step.at).toBe(step.direction === "inbound");
+      expect(r.updates.last_message_direction ?? row.lastMessageDirection, step.at).toBe(step.direction);
+      row = {
+        ...row,
+        status: r.nextStatus,
+        needsReply: r.needsReply,
+        lastInboundAt: (r.updates.last_inbound_at as string) ?? row.lastInboundAt,
+        lastOutboundAt: (r.updates.last_outbound_at as string) ?? row.lastOutboundAt,
+        lastMessageAt: (r.updates.last_message_at as string) ?? row.lastMessageAt,
+        lastMessageDirection: (r.updates.last_message_direction as string) ?? row.lastMessageDirection,
+        replySentAt: (r.updates.reply_sent_at as string) ?? row.replySentAt,
+      };
+    }
+  });
+
+  it("uses the newest message regardless of the order they are supplied in", () => {
+    const ordered = computeInquiryReconciliation(inquiry(), [
+      msg("inbound", "2026-07-07T18:04:08Z"),
+      msg("outbound", "2026-07-07T19:00:00Z"),
+      msg("inbound", "2026-07-07T20:00:00Z"),
+    ]);
+    const shuffled = computeInquiryReconciliation(inquiry(), [
+      msg("inbound", "2026-07-07T20:00:00Z"),
+      msg("inbound", "2026-07-07T18:04:08Z"),
+      msg("outbound", "2026-07-07T19:00:00Z"),
+    ]);
+    expect(shuffled.needsReply).toBe(true);
+    expect(shuffled.updates.last_message_direction).toBe("inbound");
+    expect(shuffled.updates).toEqual(ordered.updates);
+  });
+
+  it("is unaffected by the same message appearing twice", () => {
+    const once = computeInquiryReconciliation(inquiry(), [
+      msg("inbound", "2026-07-07T18:04:08Z"),
+      msg("outbound", "2026-07-07T19:00:00Z"),
+    ]);
+    const twice = computeInquiryReconciliation(inquiry(), [
+      msg("inbound", "2026-07-07T18:04:08Z"),
+      msg("outbound", "2026-07-07T19:00:00Z"),
+      msg("outbound", "2026-07-07T19:00:00Z"),
+    ]);
+    expect(twice.updates).toEqual(once.updates);
+    expect(twice.needsReply).toBe(false);
+  });
+
+  it("resolves identical inbound/outbound timestamps the same way every time", () => {
+    const both = [msg("inbound", "2026-07-07T19:00:00Z", { id: "in" }), msg("outbound", "2026-07-07T19:00:00Z", { id: "out" })];
+    const first = computeInquiryReconciliation(inquiry(), both);
+    const second = computeInquiryReconciliation(inquiry(), [...both].reverse());
+    expect(first.needsReply).toBe(false);
+    expect(first.updates.last_message_direction).toBe("outbound");
+    expect(second.updates).toEqual(first.updates);
+  });
+
   it("merges and dedupes matched Gmail thread ids", () => {
     const r = computeInquiryReconciliation(inquiry({ gmailThreadIds: ["t0"] }), [
       msg("inbound", "2026-07-07T18:04:00Z", { threadId: "t1" }),

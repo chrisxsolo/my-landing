@@ -362,6 +362,7 @@ function buildInvoicePreview(inq, price) {
 
 function buildContractPreview(inq, price) {
   const rows = [
+    ["SESSION_TYPE",     (SERVICE_LABELS[price.service] || "Photo Session").replace(/ Session$/, "")],
     ["SESSION_DATE",     inq._sessionDate || inq.date_in_mind || "TBD"],
     ["SESSION_TIME",     inq._sessionTime || "TBD"],
     ["SESSION_LOCATION", expandSchoolName(inq._school || inq.school || "") || "Bay Area, CA"],
@@ -455,8 +456,10 @@ function fillContract(inq, price) {
   const sessionDate     = edited.SESSION_DATE || inq._sessionDate || inq.date_in_mind || "TBD";
   const sessionTime     = edited.SESSION_TIME || inq._sessionTime || "TBD";
   const sessionLocation = edited.SESSION_LOCATION || expandSchoolName(inq._school || inq.school || "") || "Bay Area, CA";
+  const sessionType = edited.SESSION_TYPE || (SERVICE_LABELS[price.service] || "Photo Session").replace(/ Session$/, "");
 
   const replacements = [
+    { pattern: /\[SESSION_TYPE\]/g,     value: sessionType },
     { pattern: /\[SESSION_DATE\]/g,     value: sessionDate },
     { pattern: /\[SESSION_TIME\]/g,     value: sessionTime },
     { pattern: /\[SESSION_LOCATION\]/g, value: sessionLocation },
@@ -482,7 +485,7 @@ function fillContract(inq, price) {
     let text = node.nodeValue;
     let changed = false;
     for (const { pattern, value } of replacements) {
-      const next = text.replace(pattern, value);
+      const next = text.replace(pattern, () => value);
       if (next !== text) { text = next; changed = true; filled++; }
     }
     if (changed) {
@@ -490,6 +493,8 @@ function fillContract(inq, price) {
       node.parentElement?.dispatchEvent(new Event("input", { bubbles: true }));
     }
   }
+
+  filled += replaceContractSessionType(textNodes, sessionType);
 
   // 2. Replace PixiSet smart field spans (teal underlined clickable elements)
   // These are rendered as <span> or <a> with the label as their text content

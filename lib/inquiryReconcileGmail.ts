@@ -28,8 +28,12 @@ const INQUIRY_CONCURRENCY = 4;
 // Metadata lookups per inquiry run in small batches — 50 at once (× concurrent
 // inquiries) trips Gmail's per-user rate limit and silently drops messages.
 const META_FETCH_CONCURRENCY = 10;
+// Labels that mean a message was never actually exchanged with the client.
+// Unsent drafts are ordinary messages in the Gmail API (label DRAFT) and would
+// otherwise count as a sent reply; trashed/spam mail is not conversation state.
+const EXCLUDED_LABELS = ["DRAFT", "TRASH", "SPAM"];
 
-const RECONCILE_SELECT = [
+export const RECONCILE_SELECT = [
   "id", "email", "status", "status_source", "created_at", "reply_sent_at",
   "invoice_sent_at", "contract_sent_at", "deposit_paid_at", "confirmation_sent_at",
   "gallery_delivered_at", "booking_confirmed", "payment_status", "needs_reply",
@@ -37,7 +41,7 @@ const RECONCILE_SELECT = [
   "last_message_at", "last_message_direction", "gmail_thread_ids",
 ].join(",");
 
-type ReconcileRow = {
+export type ReconcileRow = {
   id: number;
   email: string;
   status: string;
@@ -60,10 +64,11 @@ type ReconcileRow = {
   gmail_thread_ids: string[] | null;
 };
 
-type GmailMetaMessage = {
+export type GmailMetaMessage = {
   id: string;
   threadId?: string;
   internalDate?: string;
+  labelIds?: string[];
   payload?: { headers?: { name: string; value: string }[] };
 };
 
@@ -76,7 +81,7 @@ export type ReconcileSummary = {
   changes: { id: number; email: string; previousStatus: string; nextStatus: string; needsReply: boolean }[];
 };
 
-function toSnapshot(row: ReconcileRow): ReconcileInquirySnapshot {
+export function toSnapshot(row: ReconcileRow): ReconcileInquirySnapshot {
   return {
     id: row.id,
     email: row.email,
@@ -142,6 +147,18 @@ async function fetchMessageMeta(auth: string, id: string): Promise<GmailMetaMess
   } catch { return null; }
 }
 
+/** Message metadata for many ids, in rate-limit-friendly batches. */
+export async function fetchMessageMetaBatch(auth: string, ids: string[]): Promise<GmailMetaMessage[]> {
+  const metas: GmailMetaMessage[] = [];
+  for (let i = 0; i < ids.length; i += META_FETCH_CONCURRENCY) {
+    const fetched = await Promise.all(
+      ids.slice(i, i + META_FETCH_CONCURRENCY).map(id => fetchMessageMeta(auth, id)),
+    );
+    metas.push(...fetched.filter((m): m is GmailMetaMessage => m !== null));
+  }
+  return metas;
+}
+
 /**
  * All messages involving the client address (any label — sent replies live
  * under SENT, not the inbox) plus messages from already-linked threads.
@@ -186,16 +203,45 @@ async function fetchInquiryMessages(
     } catch { continue; }
   }
 
-  const idList = [...ids];
-  for (let i = 0; i < idList.length; i += META_FETCH_CONCURRENCY) {
-    const fetched = await Promise.all(
-      idList.slice(i, i + META_FETCH_CONCURRENCY).map(id => fetchMessageMeta(auth, id)),
-    );
-    metas.push(...fetched.filter((m): m is GmailMetaMessage => m !== null));
-  }
+  metas.push(...await fetchMessageMetaBatch(auth, [...ids]));
 
-  const messages: ReconcileMessage[] = [];
+  return toReconcileMessages(metas, email, connectedEmails);
+}
+
+/** Every normalized address on the message, across From / To / Cc. */
+function messageParticipants(headers: { name: string; value: string }[]): string[] {
+  const addresses = new Set<string>();
+  for (const header of headers) {
+    if (!["from", "to", "cc"].includes(header.name.toLowerCase())) continue;
+    for (const part of header.value.split(",")) {
+      const address = normalizeEmail(part);
+      if (address.includes("@")) addresses.add(address);
+    }
+  }
+  return [...addresses];
+}
+
+/**
+ * Turns Gmail message metadata into classified conversation messages. Pure so
+ * the exclusion rules are testable: unsent drafts and trashed/spam mail never
+ * count, third parties in the thread count as neither side, and a message id
+ * seen twice (search result + linked thread) is kept once.
+ *
+ * `clientEmails` is one address for a per-inquiry scan, or every inquiry
+ * address for the mailbox-wide refresh scan.
+ */
+export function toReconcileMessages(
+  metas: GmailMetaMessage[],
+  clientEmails: string | string[],
+  connectedEmails: string[],
+): ReconcileMessage[] {
+  const clients = new Set(
+    (Array.isArray(clientEmails) ? clientEmails : [clientEmails]).map(normalizeEmail),
+  );
+  const byId = new Map<string, ReconcileMessage>();
   for (const meta of metas) {
+    if (meta.labelIds?.some(label => EXCLUDED_LABELS.includes(label))) continue;
+    if (byId.has(meta.id)) continue;
     const headers = meta.payload?.headers ?? [];
     const fromRaw = headers.find(h => h.name.toLowerCase() === "from")?.value ?? "";
     const fromEmail = normalizeEmail(fromRaw);
@@ -204,19 +250,20 @@ async function fetchInquiryMessages(
     if (!at) continue;
 
     // Classify strictly: outbound = from the connected account, inbound = from
-    // the client. Third-party mail in the thread (payment processors, e-sign
-    // bots) must not count as either side of the conversation.
+    // a known client. Third-party mail in the thread (payment processors,
+    // e-sign bots) must not count as either side of the conversation.
     const outbound = isOutboundMessage({ fromEmail }, connectedEmails);
-    if (!outbound && fromEmail !== email) continue;
-    messages.push({
+    if (!outbound && !clients.has(fromEmail)) continue;
+    byId.set(meta.id, {
       id: meta.id,
       threadId: meta.threadId ?? null,
       at,
       fromEmail,
       direction: outbound ? "outbound" : "inbound",
+      participants: messageParticipants(headers),
     });
   }
-  return messages;
+  return [...byId.values()];
 }
 
 /**
