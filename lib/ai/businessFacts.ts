@@ -34,8 +34,9 @@ export type PricingFacts = {
   needsManualQuote: string | null;
 };
 
+/** "$350", or "$43.50" when a bridge toll leaves cents on a travel fee. */
 function money(amount: number): string {
-  return `$${amount}`;
+  return Number.isInteger(amount) ? `$${amount}` : `$${amount.toFixed(2)}`;
 }
 
 function graduationFacts(peopleCount: number): PricingFacts {
@@ -186,7 +187,7 @@ function eventFacts(): PricingFacts {
     `Longer events of ${mediumEvent.minimumHours} hours or more: ${money(mediumEvent.hourlyRate)} per hour.`,
     `Half day (${largeEvent.halfDayHours} hours): ${money(largeEvent.halfDayPrice)}. Full day starts at ${money(largeEvent.fullDayStartingPrice)}.`,
     `Add-ons: second shooter ${events.addOns.secondShooter.displayPrice}, expedited delivery ${events.addOns.expedited.displayPrice}.`,
-    `Travel beyond ${events.includedTravelMiles} miles of San Francisco: ${events.addOns.travel.displayPrice}.`,
+    `Travel outside San Francisco: ${events.addOns.travel.displayPrice}. Never work out a venue's travel fee yourself; state one only if it is given to you as a fact.`,
   ];
 
   return {
@@ -446,7 +447,13 @@ export function buildTravelFact(
   // out-of-city draft carried a travel-fee paragraph whether or not the client
   // had asked about money.
   const unknown = (subject: string) =>
-    `${subject} is outside San Francisco, so a travel fee applies, but its amount is NOT in the rate card. Never state a travel-fee amount, and never give a session total that is missing it. Mention travel ONLY if you are quoting a price in this email or they asked what it costs; then one clause is enough ("plus a travel fee for ${subject}, which I'll confirm once we settle the location"). If this email is not about price, leave travel out entirely.`;
+    `${subject} is outside San Francisco, so a travel fee applies, but its amount is NOT in the rate card. Never state a travel-fee amount or work one out yourself, and never give a session total that is missing it. Mention travel ONLY if you are quoting a price in this email or they asked what it costs; then one clause is enough ("plus a travel fee for ${subject}, which I'll confirm for you"). The destination is known, so do not ask them to confirm the location again; a meeting spot still to be picked does not change it. If this email is not about price, leave travel out entirely.`;
+
+  // Verified by the app from driving distance and tolls. The wording carries
+  // no other dollar figure, because the validator treats every figure in this
+  // fact as quotable.
+  const verified = (subject: string, fee: number) =>
+    `Travel fee for ${subject}: ${money(fee)}. This is the verified fee; use it as given and never recalculate it. When you quote the session price, add it and give the all-in total as one figure, the way Chris does ("plus a travel fee of X, so Y total").`;
 
   // ── The location decides, when they gave one: it is where the shoot is ──
   if (place) {
@@ -456,7 +463,7 @@ export function buildTravelFact(
     // session somewhere in "East Bay" is not a CSU East Bay graduation, and
     // billing it that campus's $30 would be a guess.
     const fee = namedCampusFee(normalized);
-    if (fee !== null) return `Travel fee for ${place}: ${money(fee)}. When you quote the session price, add this and give the all-in total, the way Chris does ("so $425 total").`;
+    if (fee !== null) return verified(place, fee);
     if (IN_SAN_FRANCISCO.test(normalized)) return `No travel fee for ${place}, it's in San Francisco.`;
     if (OUTSIDE_SAN_FRANCISCO.test(normalized)) return unknown(place);
     // The location told us nothing either way, so fall through to the school.
@@ -470,7 +477,7 @@ export function buildTravelFact(
       if (!pattern.test(normalized)) continue;
       const fee = fees[key];
       if (fee === null) return `No travel fee for ${campus}, it's in San Francisco.`;
-      if (typeof fee === "number") return `Travel fee for ${campus}: ${money(fee)}. When you quote the session price, add this and give the all-in total, the way Chris does ("so $425 total").`;
+      if (typeof fee === "number") return verified(campus, fee);
       break;
     }
     return unknown(campus);

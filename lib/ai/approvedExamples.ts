@@ -69,7 +69,7 @@ export const SEED_EXAMPLES: ApprovedExample[] = [
 
 Thank you so much for reaching out, and congratulations on your graduation! I'd love to take your graduation pictures!
 
-My graduation sessions at San Jose State start at $350 for a 1-hour session, plus a $75 travel fee for SJSU, so $425 total
+My graduation sessions at San Jose State start at $350 for a 1-hour session, plus a $70 travel fee for SJSU, so $420 total
 
 Let me know which date works best for you, and I'll send over the invoice and contract to secure the session once we confirm the details
 
@@ -167,7 +167,7 @@ June 9th at 7pm works perfectly, see you then!`,
     scenarios: ["pricing_discussion"],
     tags: ["pricing", "travel", "group", "short"],
     source: "seed",
-    body: `Yes, the $300 per person listed on my graduation pricing page is correct. For two graduates, that would be $600 total, plus the travel fee to San Jose State, which brings the session total to $675
+    body: `Yes, the $300 per person listed on my graduation pricing page is correct. For two graduates, that would be $600 total, plus the travel fee to San Jose State, which brings the session total to $670
 
 If you'd like, I can send over the invoice and contract once you confirm the location`,
   },

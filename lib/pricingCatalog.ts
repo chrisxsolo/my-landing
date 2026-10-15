@@ -5,7 +5,13 @@ export const BOOKING_POLICY = {
   contractDeadline: "before the session",
 } as const;
 
+// Explicit extension: tests/pricingCatalog.test.mjs loads this file with
+// Node's native TypeScript support, which does not guess extensions.
+import { TRAVEL_RATE_LABEL, verifiedTravelFee } from "./travelFee.ts";
+
 const STANDARD_TURNAROUND_DAYS = 14;
+
+const RATE_PER_MILE_LABEL = `${TRAVEL_RATE_LABEL} / mile (round trip)`;
 
 export const PRICING_CATALOG = {
   standardTurnaroundDays: STANDARD_TURNAROUND_DAYS,
@@ -51,11 +57,11 @@ export const PRICING_CATALOG = {
       "sf-state": null,
       "usf": null,
       "sf-other": null,
-      "uc-berkeley": 35,
-      "csueb": 30,
-      "sjsu": 75,
-      "santa-clara": 70,
-      "stanford": 45,
+      "uc-berkeley": verifiedTravelFee("uc-berkeley"),
+      "csueb": verifiedTravelFee("csueb"),
+      "sjsu": verifiedTravelFee("sjsu"),
+      "santa-clara": verifiedTravelFee("santa-clara"),
+      "stanford": verifiedTravelFee("stanford"),
       "other": undefined,
     },
     durationRules: {
@@ -114,11 +120,11 @@ export const PRICING_CATALOG = {
     },
     travelFees: {
       sf: null,
-      oakland: 35,
-      berkeley: 35,
-      peninsula: 45,
-      "south-bay": 75,
-      "santa-clara": 70,
+      oakland: undefined,
+      berkeley: verifiedTravelFee("uc-berkeley"),
+      peninsula: undefined,
+      "south-bay": undefined,
+      "santa-clara": verifiedTravelFee("santa-clara"),
       other: undefined,
     },
   },
@@ -154,9 +160,8 @@ export const PRICING_CATALOG = {
     addOns: {
       secondShooter: { label: "Second shooter", displayPrice: "$100-$150 / hr" },
       expedited: { label: "48-72 hour expedited delivery", displayPrice: "$250-$500" },
-      travel: { label: "Travel beyond 20 miles of SF", displayPrice: "$0.75-$1.00 / mile (round trip)" },
+      travel: { label: "Travel outside San Francisco", displayPrice: `${RATE_PER_MILE_LABEL} + tolls` },
     },
-    includedTravelMiles: 20,
   },
 } as const;
 
@@ -203,9 +208,24 @@ export function getMinimumImageCountForSessionType(sessionType: string): number 
   return PRICING_CATALOG.events.smallEvent.minimumImages;
 }
 
+/** "$70" for whole dollars, "$43.50" when a toll adds cents. */
+export function formatFee(amount: number): string {
+  return Number.isInteger(amount)
+    ? `$${amount.toLocaleString("en-US")}`
+    : `$${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+const CAMPUS_SHORT_NAMES: Partial<Record<keyof typeof PRICING_CATALOG.graduation.travelFees, string>> = {
+  "uc-berkeley": "Berkeley",
+  sjsu: "SJSU",
+  csueb: "CSU East Bay",
+  "santa-clara": "Santa Clara",
+  stanford: "Stanford",
+};
+
 export function getGraduationTravelNote(school: keyof typeof PRICING_CATALOG.graduation.travelFees): string {
   const fee = PRICING_CATALOG.graduation.travelFees[school];
   if (fee === null) return "No travel fee for San Francisco locations.";
-  if (typeof fee === "number") return `${school === "uc-berkeley" ? "Berkeley" : school === "sjsu" ? "SJSU" : school === "csueb" ? "CSU East Bay" : school === "santa-clara" ? "Santa Clara" : "Stanford"} sessions include a $${fee} travel fee from San Francisco.`;
+  if (typeof fee === "number") return `${CAMPUS_SHORT_NAMES[school]} sessions include a ${formatFee(fee)} travel fee from San Francisco.`;
   return "Travel fee will be confirmed after the exact location is reviewed.";
 }

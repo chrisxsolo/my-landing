@@ -127,8 +127,8 @@ describe("pricing pages render values from the catalog, not hardcoded literals",
       fc(e.largeEvent.fullDayStartingPrice), // $4,000
       e.addOns.secondShooter.displayPrice, // $100-$150 / hr
       e.addOns.expedited.displayPrice, // $250-$500
-      e.addOns.travel.displayPrice, // $0.75-$1.00 / mile (round trip)
-      `${e.includedTravelMiles} miles`, // 20 miles
+      e.addOns.travel.displayPrice, // $0.70 / mile (round trip) + tolls
+      "Included within San Francisco.",
       e.smallEvent.turnaroundLabel, // 1-2 week standard turnaround
     ]);
     expect(visibleText(html).toLowerCase()).not.toContain("deposit");

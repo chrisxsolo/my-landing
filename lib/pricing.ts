@@ -4,6 +4,7 @@
 import {
   PRICING_CATALOG,
   calculatePaymentSchedule,
+  formatFee,
 } from "./pricingCatalog";
 
 // ── BASE RATES ────────────────────────────────────────────────────────────────
@@ -33,7 +34,8 @@ export const SESSION_LENGTHS = {
 export type SessionLengthKey = keyof typeof SESSION_LENGTHS;
 
 // ── TRAVEL FEES ───────────────────────────────────────────────────────────────
-// Flat fees per school. null = no travel fee. undefined = fee TBD.
+// Per school, from lib/travelFee.ts ($0.70/round-trip mile + tolls).
+// null = included (inside SF). undefined = no verified route, confirmed per spot.
 export const TRAVEL_FEES: Record<string, number | null | undefined> = {
   ...PRICING_CATALOG.graduation.travelFees,
 };
@@ -81,7 +83,7 @@ export interface EstimateResult {
   subtotal: number
   deposit: number
   remainingBalance: number
-  travelMethod: "flat" | "mileage" | "none" | "tbd"
+  travelMethod: "mileage" | "none" | "tbd"
   groupNote: string | null
 }
 
@@ -118,7 +120,7 @@ export function calculateGraduationEstimate(input: EstimateInput): EstimateResul
   const travelMethod: EstimateResult["travelMethod"] =
     travelFee === null      ? "none" :
     travelFee === undefined ? "tbd"  :
-    "flat"
+    "mileage"
 
   const travelAmount = travelFee ?? 0
 
@@ -137,7 +139,7 @@ export function calculateGraduationEstimate(input: EstimateInput): EstimateResul
 }
 
 export function formatCurrency(amount: number): string {
-  return `$${amount.toLocaleString("en-US")}`
+  return formatFee(amount)
 }
 
 // ── COUPLES PACKAGES ─────────────────────────────────────────────────────────
@@ -198,7 +200,7 @@ export function calculateCouplesEstimate(input: CouplesEstimateInput): EstimateR
   const travelMethod: EstimateResult["travelMethod"] =
     travelFee === null      ? "none" :
     travelFee === undefined ? "tbd"  :
-    "flat"
+    "mileage"
   const travelAmount = (travelFee ?? 0) as number
 
   const subtotal = pkg.price + addons + travelAmount

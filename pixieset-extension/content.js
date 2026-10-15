@@ -85,9 +85,11 @@ function formatSessionDate(raw) {
 const GRAD_HOURLY_RATE = 350;
 const GROUP_RATES = { 2: 300, 3: 275, 4: 250, 5: 225 };
 const GROUP_RATE_6_PLUS = 200;
+// Travel = round-trip miles x $0.70 rounded up to $5, plus tolls (lib/travelFee.ts).
+// tests/unit/travelFee.test.ts fails if these drift from the site.
 const TRAVEL_FEES = {
   "sf-state": 0, "usf": 0, "sf-other": 0,
-  "uc-berkeley": 35, "csueb": 30, "sjsu": 75, "santa-clara": 70, "stanford": 45,
+  "uc-berkeley": 43.5, "csueb": 63.5, "sjsu": 70, "santa-clara": 65, "stanford": 50,
 };
 
 // Flat per-session rates for non-graduation services

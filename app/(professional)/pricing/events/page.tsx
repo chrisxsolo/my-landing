@@ -78,8 +78,9 @@ const infoCards = [
   {
     heading: "Travel",
     items: [
-      `Included within ${eventPricing.includedTravelMiles} miles of San Francisco.`,
-      "Beyond local area: custom quote based on mileage, lodging, and logistics.",
+      "Included within San Francisco.",
+      `Outside San Francisco: ${eventPricing.addOns.travel.displayPrice}.`,
+      "Overnight or out-of-region events: custom quote for lodging and logistics.",
     ],
     delay: 0.52,
   },

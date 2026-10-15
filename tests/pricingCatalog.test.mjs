@@ -31,7 +31,7 @@ test("pricing catalog contains every operational pricing category", () => {
   assert.equal(PRICING_CATALOG.graduation.baseHourlyRate, 350);
   assert.equal(PRICING_CATALOG.graduation.groupRates[6], 200);
   assert.equal(PRICING_CATALOG.graduation.addOns.extraOutfit.price, 75);
-  assert.equal(PRICING_CATALOG.graduation.travelFees["uc-berkeley"], 35);
+  assert.equal(PRICING_CATALOG.graduation.travelFees["uc-berkeley"], 43.5);
   assert.equal(PRICING_CATALOG.graduation.standardMinimumImages, 50);
   assert.equal(PRICING_CATALOG.graduation.durationRules.groupMinimumMinutes, 90);
 
@@ -84,7 +84,7 @@ test("every add-on price across categories is pinned", () => {
   const events = PRICING_CATALOG.events.addOns;
   assert.equal(events.secondShooter.displayPrice, "$100-$150 / hr");
   assert.equal(events.expedited.displayPrice, "$250-$500");
-  assert.equal(events.travel.displayPrice, "$0.75-$1.00 / mile (round trip)");
+  assert.equal(events.travel.displayPrice, "$0.70 / mile (round trip) + tolls");
 });
 
 test("package prices and minimum image counts are pinned per category", () => {
@@ -128,11 +128,12 @@ test("graduation travel fees are pinned for every school", () => {
   assert.equal(fees["sf-state"], null);
   assert.equal(fees["usf"], null);
   assert.equal(fees["sf-other"], null);
-  assert.equal(fees["uc-berkeley"], 35);
-  assert.equal(fees["csueb"], 30);
-  assert.equal(fees["sjsu"], 75);
-  assert.equal(fees["santa-clara"], 70);
-  assert.equal(fees["stanford"], 45);
+  // $0.70 x round-trip miles, rounded up to $5, plus the westbound toll.
+  assert.equal(fees["uc-berkeley"], 43.5);
+  assert.equal(fees["csueb"], 63.5);
+  assert.equal(fees["sjsu"], 70);
+  assert.equal(fees["santa-clara"], 65);
+  assert.equal(fees["stanford"], 50);
   assert.equal(fees["other"], undefined);
 });
 

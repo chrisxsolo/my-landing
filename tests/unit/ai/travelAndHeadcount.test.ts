@@ -47,13 +47,13 @@ describe("the location outranks the school", () => {
     // Santa Clara University to Filoli, the travel fee would be updated".
     const fact = buildTravelFact("Santa Clara University", "Filoli Garden");
     expect(fact).toMatch(NOT_IN_CARD);
-    expect(fact).not.toContain("$70");
+    expect(fact).not.toContain("$65");
   });
 
   it("keeps the campus fee when the shoot is on campus", () => {
-    expect(buildTravelFact("San Jose State University", null)).toContain("Travel fee for San Jose State University: $75.");
-    expect(buildTravelFact(null, "San Jose State University")).toContain("Travel fee for San Jose State University: $75.");
-    expect(buildTravelFact("University of California, Berkeley", null)).toContain("$35");
+    expect(buildTravelFact("San Jose State University", null)).toContain("Travel fee for San Jose State University: $70.");
+    expect(buildTravelFact(null, "San Jose State University")).toContain("Travel fee for San Jose State University: $70.");
+    expect(buildTravelFact("University of California, Berkeley", null)).toContain("$43.50");
   });
 
   it("charges nothing inside San Francisco", () => {
@@ -62,11 +62,11 @@ describe("the location outranks the school", () => {
   });
 
   it("does not spread a campus fee across the whole region", () => {
-    // CSU East Bay's $30 is that campus, not everywhere in the East Bay.
-    expect(buildTravelFact(null, "East Bay")).not.toContain("$30");
-    expect(buildTravelFact("California State University, East Bay", null)).toContain("$30");
+    // CSU East Bay's $63.50 is that campus, not everywhere in the East Bay.
+    expect(buildTravelFact(null, "East Bay")).not.toContain("$63.50");
+    expect(buildTravelFact("California State University, East Bay", null)).toContain("$63.50");
     // "Cal State" is not Cal: this school field used to get Berkeley's fee.
-    expect(buildTravelFact("Cal State East Bay", null)).toContain("$30");
+    expect(buildTravelFact("Cal State East Bay", null)).toContain("$63.50");
   });
 });
 

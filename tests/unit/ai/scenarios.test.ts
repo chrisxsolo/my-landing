@@ -44,7 +44,7 @@ describe("1. graduation inquiry with university specified", () => {
     const prompt = promptFor(context);
     expect(context.client.playbook).toBe("graduation");
     expect(prompt).toContain("$350 per hour");
-    expect(prompt).toContain("Travel fee for UC Berkeley: $35");
+    expect(prompt).toContain("Travel fee for UC Berkeley: $43.50");
   });
 });
 

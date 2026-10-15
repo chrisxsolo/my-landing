@@ -11,6 +11,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { classifySession } from "./sessionClassifier";
+import { TRAVEL_RATE_LABEL } from "@/lib/travelFee";
 import { buildPricingFacts, buildTravelFact, buildPolicyFacts, buildContactFacts, type PricingFacts } from "./businessFacts";
 import { buildGoldenHourWindow, goldenHourCaveat, type GoldenHourWindow } from "./goldenHour";
 import { buildThreadDigest, renderThreadDigest, type ThreadDigest, type ThreadMessage } from "./threadDigest";
@@ -270,7 +271,7 @@ export function buildEmailContext(input: BuildEmailContextInput): EmailContext {
     warnings.push({
       code: "travel_unverified",
       severity: "medium",
-      message: "This location is outside San Francisco and has no travel fee in the rate card. The draft will not state a total. Add the travel fee yourself before sending.",
+      message: `This location is outside San Francisco and has no verified route yet, so the draft will not state a total. Route it with scripts/travel-route.mjs and add it to lib/travelFee.ts, or add the fee yourself before sending (${TRAVEL_RATE_LABEL}/round-trip mile, rounded up to $5, plus tolls).`,
     });
   }
 
