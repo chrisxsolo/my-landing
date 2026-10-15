@@ -20,6 +20,8 @@ type Rule = {
   createdAt: string;
 };
 
+type ConflictInfo = { id: string; rule: string; reason: string };
+
 type RulesResponse = {
   permanent: { hardRules: string[]; styleNotes: string[]; bannedPhrases: string[]; source: string };
   learned: { pending: Rule[]; approved: Rule[]; rejected: Rule[]; superseded: Rule[] };
@@ -55,6 +57,9 @@ export default function AiRulesPanel() {
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [showPermanent, setShowPermanent] = useState(false);
+  // Conflicts the server refused to approve over, keyed by the rule that hit
+  // them. Resolved by retiring the old rule in the same write.
+  const [conflicts, setConflicts] = useState<Record<string, ConflictInfo[]>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -74,14 +79,37 @@ export default function AiRulesPanel() {
 
   useEffect(() => { void load(); }, [load]);
 
-  async function act(id: string, action: "approve" | "reject") {
+  /**
+   * Approve or reject a rule.
+   *
+   * A 409 means approving it would contradict a rule already in use. The
+   * server refuses rather than letting both go live; passing `supersedes`
+   * approves the new rule and retires the old one in one write.
+   */
+  async function act(
+    id: string,
+    action: "approve" | "reject",
+    supersedes?: string[],
+  ) {
     setBusyId(id);
     try {
-      await fetch("/api/ai/rules", {
+      const res = await fetch("/api/ai/rules", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ id, action }),
+        body: JSON.stringify({ id, action, ...(supersedes ? { supersedes } : {}) }),
+      });
+
+      if (res.status === 409) {
+        const json = await res.json() as { conflicts?: ConflictInfo[] };
+        setConflicts(prev => ({ ...prev, [id]: json.conflicts ?? [] }));
+        return;
+      }
+
+      setConflicts(prev => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
       });
       await load();
     } catch (err) {
@@ -193,29 +221,52 @@ export default function AiRulesPanel() {
           ) : (
             <ul className="space-y-2">
               {pending.map(rule => (
-                <li key={rule.id} className="flex items-start gap-3 p-3 rounded-xl"
+                <li key={rule.id} className="p-3 rounded-xl space-y-2"
                   style={{ background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.18)" }}>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs leading-snug text-slate-700">{rule.rule}</p>
-                    <p className="text-[10px] text-slate-400 mt-1">
-                      {rule.category}
-                      {/* A factual rule is kept for reference but can never reach a prompt. */}
-                      {rule.category === "factual" ? " · never sent to Claude" : ""}
-                      {" · from "}{rule.source}
-                    </p>
+                  <div className="flex items-start gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs leading-snug text-slate-700">{rule.rule}</p>
+                      <p className="text-[10px] text-slate-400 mt-1">
+                        {rule.category}
+                        {/* A factual rule is kept for reference but can never reach a prompt. */}
+                        {rule.category === "factual" ? " · never sent to Claude" : ""}
+                        {" · from "}{rule.source}
+                      </p>
+                    </div>
+                    <div className="flex gap-1.5 flex-shrink-0">
+                      <button onClick={() => act(rule.id, "approve")} disabled={busyId === rule.id}
+                        className="text-[11px] font-bold px-2.5 py-1 rounded-lg disabled:opacity-40"
+                        style={{ background: "rgba(16,185,129,0.12)", color: "#047857" }}>
+                        Approve
+                      </button>
+                      <button onClick={() => act(rule.id, "reject")} disabled={busyId === rule.id}
+                        className="text-[11px] font-bold px-2.5 py-1 rounded-lg disabled:opacity-40"
+                        style={{ background: "rgba(0,0,0,0.04)", color: "#64748b" }}>
+                        Reject
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex gap-1.5 flex-shrink-0">
-                    <button onClick={() => act(rule.id, "approve")} disabled={busyId === rule.id}
-                      className="text-[11px] font-bold px-2.5 py-1 rounded-lg disabled:opacity-40"
-                      style={{ background: "rgba(16,185,129,0.12)", color: "#047857" }}>
-                      Approve
-                    </button>
-                    <button onClick={() => act(rule.id, "reject")} disabled={busyId === rule.id}
-                      className="text-[11px] font-bold px-2.5 py-1 rounded-lg disabled:opacity-40"
-                      style={{ background: "rgba(0,0,0,0.04)", color: "#64748b" }}>
-                      Reject
-                    </button>
-                  </div>
+
+                  {conflicts[rule.id]?.length > 0 && (
+                    <div className="rounded-lg p-2.5 space-y-1.5"
+                      style={{ background: "rgba(239,68,68,0.07)", border: "1px solid rgba(239,68,68,0.2)" }}>
+                      <p className="text-[10px] font-bold uppercase tracking-wide" style={{ color: "#dc2626" }}>
+                        Contradicts a rule already in use
+                      </p>
+                      {conflicts[rule.id].map(conflict => (
+                        <p key={conflict.id} className="text-[11px] leading-snug text-slate-600">
+                          &ldquo;{conflict.rule}&rdquo;
+                        </p>
+                      ))}
+                      <button
+                        onClick={() => act(rule.id, "approve", conflicts[rule.id].map(c => c.id))}
+                        disabled={busyId === rule.id}
+                        className="text-[11px] font-bold px-2.5 py-1 rounded-lg disabled:opacity-40"
+                        style={{ background: "rgba(16,185,129,0.12)", color: "#047857" }}>
+                        Approve this and retire the old one
+                      </button>
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>

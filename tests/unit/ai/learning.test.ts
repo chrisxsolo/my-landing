@@ -192,3 +192,36 @@ describe("prompt rule selection", () => {
     expect(selected[0].rule).toBe("Rule number 29");
   });
 });
+
+describe("approval-time conflict detection", () => {
+  // Regression guard for a gap found while importing the 68 legacy rules:
+  // intake only compares against APPROVED rules, so a batch arriving as
+  // pending has nothing to contradict yet. The contradiction becomes real at
+  // approval time, which is where it must also be checked — otherwise both
+  // sides of the old note's greeting contradiction could go live together.
+  it("finds no conflict among pending rules", () => {
+    const pendingPair = [
+      rule("Open with the client's name as the greeting", { status: "pending" }),
+      rule('Omit personal greetings such as "Hi Anna," at the start', { status: "pending" }),
+    ];
+    expect(findConflicts(pendingPair[1].rule, pendingPair)).toHaveLength(0);
+  });
+
+  it("finds the conflict once the opposing rule is approved", () => {
+    const approvedFirst = [rule("Open with the client's name as the greeting", { status: "approved" })];
+    const conflicts = findConflicts('Omit personal greetings such as "Hi Anna," at the start', approvedFirst);
+    expect(conflicts).toHaveLength(1);
+    expect(conflicts[0].existing.id).toBe(approvedFirst[0].id);
+  });
+
+  it("is resolvable by superseding the rule it contradicts", () => {
+    const approved = [rule("Use bullet points when presenting multiple dates", { status: "approved" })];
+    const candidate = "Never use a bullet list for dates, write them as a sentence";
+    const conflicts = findConflicts(candidate, approved);
+
+    // What the route does: filter out conflicts the caller agreed to retire.
+    const supersedes = new Set(conflicts.map((c) => c.existing.id));
+    const unresolved = conflicts.filter((c) => !supersedes.has(c.existing.id));
+    expect(unresolved).toHaveLength(0);
+  });
+});

@@ -4,10 +4,12 @@
 //   GET    returns the permanent profile (read-only, for reference) plus every
 //          learned rule grouped by status, so Chris can see exactly what the
 //          model is being told.
-//   POST   { id, action: "approve" | "reject", supersedes?: string[] }
-//          Approving is the only way a rule reaches a prompt. `supersedes`
-//          retires the rules it contradicts in the same write, which is how a
-//          conflict gets resolved instead of accumulating.
+//   POST   { id, action: "approve" | "reject" | "add", supersedes?: string[] }
+//          Approving is the only way a rule reaches a prompt, and it is
+//          refused with 409 when the rule contradicts one already approved.
+//          Re-sending with the conflicting ids in `supersedes` retires them in
+//          the same write, which is how a conflict gets resolved instead of
+//          accumulating.
 //
 // Previously this route returned the raw markdown note and there was no way to
 // approve, reject, or retire anything.
@@ -16,7 +18,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/requireAdmin";
 import { fetchWritingRules, setRuleStatus, insertWritingRule } from "@/lib/ai/aiEmailStore";
-import { classifyRuleIntake, selectPromptRules, RULE_CATEGORIES, type RuleCategory } from "@/lib/ai/writingRules";
+import { classifyRuleIntake, findConflicts, selectPromptRules, RULE_CATEGORIES, type RuleCategory } from "@/lib/ai/writingRules";
 import { PERMANENT_RULES, STYLE_NOTES, BANNED_PHRASES } from "@/lib/ai/soloxsnapsWritingProfile";
 
 export const dynamic = "force-dynamic";
@@ -107,13 +109,44 @@ export async function POST(req: NextRequest) {
       : NextResponse.json({ error: "Could not update the rule." }, { status: 500 });
   }
 
+  const all = await fetchWritingRules();
+  const target = all.find((rule) => rule.id === body.id);
+  if (!target) return NextResponse.json({ error: "No such rule." }, { status: 404 });
+
+  // Conflict check belongs HERE, not only on intake.
+  //
+  // Intake compares a candidate against already-approved rules, so a batch of
+  // pending rules has nothing to contradict yet — the 68 rules imported from
+  // the old vault note all arrived pending and clean. The contradiction only
+  // becomes real at the moment a second, opposing rule is approved. Without
+  // this check both sides of "Open with the client's name" and "Omit personal
+  // greetings" could go live together, which is the exact failure the old
+  // note had.
+  const supersedes = new Set(body.supersedes ?? []);
+  const unresolved = findConflicts(target.rule, all)
+    .filter((conflict) => !supersedes.has(conflict.existing.id));
+
+  if (unresolved.length) {
+    return NextResponse.json({
+      error: "This contradicts a rule you have already approved.",
+      conflicts: unresolved.map((conflict) => ({
+        id: conflict.existing.id,
+        rule: conflict.existing.rule,
+        reason: conflict.reason,
+      })),
+      // The caller resolves it by re-sending with the conflicting ids in
+      // `supersedes`, which retires them in the same write.
+      resolution: "supersedes",
+    }, { status: 409 });
+  }
+
   const approved = await setRuleStatus(body.id, "approved");
   if (!approved) return NextResponse.json({ error: "Could not update the rule." }, { status: 500 });
 
   // Retire the rules this one replaces, pointing them at their replacement so
   // the history stays readable.
   const retired: string[] = [];
-  for (const supersededId of body.supersedes ?? []) {
+  for (const supersededId of supersedes) {
     if (supersededId === body.id) continue;
     if (await setRuleStatus(supersededId, "superseded", body.id)) retired.push(supersededId);
   }
