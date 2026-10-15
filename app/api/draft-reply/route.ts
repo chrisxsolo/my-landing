@@ -209,6 +209,9 @@ export async function POST(req: NextRequest) {
             threadText,
             chrisInstruction: body.feedback ?? null,
             isRegeneration: Boolean(body.is_regeneration),
+            // The draft he rejected, so a second attempt can actually differ
+            // from it. Empty on a first generation.
+            previousDraft: currentDraft || null,
           }, call);
       }
     });

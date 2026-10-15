@@ -79,6 +79,14 @@ export type GenerateInput = BuildEmailContextInput & {
   chrisInstruction?: string | null;
   rules: WritingRule[];
   isRegeneration?: boolean;
+  /**
+   * The draft being replaced, on a regeneration.
+   *
+   * Without it the instruction "write a genuinely different email" was
+   * unactionable: the model had nothing to be different FROM, so a second
+   * attempt could reproduce the first almost verbatim and bill for it.
+   */
+  previousDraft?: string | null;
 };
 
 function toUsageRecord(
@@ -99,6 +107,48 @@ function toUsageRecord(
   };
 }
 
+/**
+ * The second-attempt instruction.
+ *
+ * Three things the old version got wrong. It never showed the model the draft
+ * it was replacing. It told the model to change the greeting purely for
+ * variety, which produced a worse opening on a draft whose opening was fine.
+ * And it asserted "shorter is usually the thing he wanted", which is a guess —
+ * Chris's real replies run longer than the old prompt assumed, so a
+ * regeneration that cut further was often moving away from what he would send.
+ *
+ * Feedback outranks everything: if he said what was wrong, that is the brief,
+ * and "be different" stops being the instruction at all.
+ */
+function regenerationBlock(
+  previousDraft: string | null | undefined,
+  feedback: string | null | undefined,
+): string {
+  const parts: string[] = [];
+  const previous = previousDraft?.trim();
+
+  if (previous) {
+    parts.push(`Chris did not send this draft:\n\n<previous_draft>\n${previous}\n</previous_draft>`);
+  } else {
+    parts.push("This is a second attempt: Chris did not want the first draft, which is not available to show you.");
+  }
+
+  if (feedback?.trim()) {
+    // Already carried in the <chris_instruction> block above; named again here
+    // so the second attempt is aimed at his complaint rather than at variety.
+    parts.push("He said what he wanted changed, in the instruction above. That is the brief for this attempt: fix what he named and leave what he did not name alone.");
+  } else {
+    parts.push(
+      previous
+        ? "He did not say what was wrong. Write a genuinely different email: a different structure and different wording, reaching the same verified facts. Do not simply trim the previous one, and do not change the opening merely to be different if the opening was right for this stage. Length should still follow what they asked, not a target."
+        : "Write a different email from whatever came before: a different structure and different wording, reaching the same verified facts.",
+    );
+  }
+
+  parts.push("Every date, time, price, and booking claim must still come from the verified facts.");
+  return parts.join("\n\n");
+}
+
 /** Fresh draft, or a regeneration of one. */
 export async function generateDraft(
   input: GenerateInput,
@@ -115,10 +165,8 @@ export async function generateDraft(
 
   const result = await call({
     system,
-    // A regeneration that reproduces the previous draft wastes the request.
-    // Nothing used to tell the model it was a second attempt.
     userPrompt: input.isRegeneration
-      ? `${userPrompt}\n\nThis is a second attempt: Chris did not want the first draft. Write a genuinely different email. Change the structure and the wording, not the facts. If the previous version opened by thanking them, open another way. Shorter is usually the thing he wanted.`
+      ? `${userPrompt}\n\n${regenerationBlock(input.previousDraft, input.chrisInstruction)}`
       : userPrompt,
   });
   const draft = stripParagraphPeriods(stripSignoff(cleanDraft(result.text)));

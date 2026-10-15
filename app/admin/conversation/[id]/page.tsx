@@ -61,6 +61,9 @@ type DraftUsage = {
   unpriced_model: boolean;
 };
 
+/** Bodies fetched for drafting context. One Gmail call each, so it is capped. */
+const THREAD_BODY_LIMIT = 12;
+
 const FONTS_HREF = "https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..900;1,9..144,400..900&family=IBM+Plex+Mono:wght@400;500;600&display=swap";
 
 export default function ConversationPage() {
@@ -73,6 +76,11 @@ export default function ConversationPage() {
   const [messages,      setMessages]      = useState<GmailMessage[]>([]);
   const [myEmail,       setMyEmail]       = useState("");
   const [threadLoading, setThreadLoading] = useState(false);
+  // Whether the Gmail history is actually known. Distinct from threadLoading:
+  // `!threadLoading` was being sent to the drafting route as "thread loaded",
+  // so a failed fetch reported a complete, empty conversation and the draft
+  // was written as if the client had never emailed.
+  const [threadKnown,   setThreadKnown]   = useState(false);
   const [expanded,      setExpanded]      = useState<Record<string, boolean>>({});
   // Bodies loaded on demand when a message is expanded
   const [bodies,        setBodies]        = useState<Record<string, string>>({});
@@ -278,20 +286,52 @@ export default function ConversationPage() {
     try {
       const res  = await fetch(`/api/gmail/thread?email=${encodeURIComponent(email)}`);
       const json = await res.json() as { messages: GmailMessage[]; myEmail: string; error?: string };
-      if (json.error && !json.messages?.length) showToast(json.error, false);
-      setMessages(json.messages ?? []);
-      setMyEmail(json.myEmail ?? "");
-      // Auto-expand + load body for the last message only
-      const last = json.messages?.at(-1);
-      if (last) {
-        setExpanded({ [last.id]: true });
-        loadBody(last.id);
+      if (json.error && !json.messages?.length) {
+        showToast(json.error, false);
+        setThreadKnown(false);
+        setMessages([]);
+        return;
       }
+      const list = json.messages ?? [];
+      setMessages(list);
+      setMyEmail(json.myEmail ?? "");
+      setThreadKnown(true);
+      // Expand the newest message for reading.
+      const last = list.at(-1);
+      if (last) setExpanded({ [last.id]: true });
+      // Load every body, not just the newest.
+      //
+      // Bodies used to arrive only when Chris clicked a message open, and the
+      // drafting payload fell back to `m.snippet` — a ~100-character Gmail
+      // preview — for every message he had not opened. So the model was handed
+      // a truncated history and told it was the conversation. On a ten-message
+      // thread that is most of the context missing, which is the real reason
+      // drafts repeated settled details.
+      await loadBodies(list.slice(-THREAD_BODY_LIMIT).map(m => m.id));
     } catch {
       showToast("Failed to load Gmail thread", false);
+      setThreadKnown(false);
     } finally {
       setThreadLoading(false);
     }
+  }
+
+  /** Fetches several message bodies at once, skipping any already held. */
+  async function loadBodies(ids: string[]) {
+    const wanted = ids.filter(id => bodies[id] === undefined);
+    if (!wanted.length) return;
+    setBodyLoading(p => ({ ...p, ...Object.fromEntries(wanted.map(id => [id, true])) }));
+    const fetched = await Promise.all(wanted.map(async id => {
+      try {
+        const res  = await fetch(`/api/gmail/message?id=${id}`);
+        const json = await res.json() as { body?: string };
+        return [id, json.body ?? ""] as const;
+      } catch {
+        return [id, ""] as const;
+      }
+    }));
+    setBodies(p => ({ ...p, ...Object.fromEntries(fetched) }));
+    setBodyLoading(p => ({ ...p, ...Object.fromEntries(wanted.map(id => [id, false])) }));
   }
 
   // ── Lazy-load a single message body on expand ──────────────────────────────
@@ -351,7 +391,9 @@ export default function ConversationPage() {
       location:            inquiry.location,
       instagram:           inquiry.instagram,
       thread_context:      threadContext,
-      thread_loaded:       !threadLoading,
+      // Only true when the history is genuinely known AND every message it
+      // contains has a real body. A snippet is a preview, not a message.
+      thread_loaded:       threadKnown && messages.every(m => Boolean(bodies[m.id])),
       thread_messages:     messages.map(m => ({
         timestamp: m.timestamp,
         fromMe:    m.isMe,
@@ -391,6 +433,9 @@ export default function ConversationPage() {
       } else {
         payload.mode = "generate";
         payload.is_regeneration = Boolean(draft.trim());
+        // Send the draft being replaced so the regeneration can be genuinely
+        // different from it rather than guessing what it is avoiding.
+        if (payload.is_regeneration) payload.current_draft = draft;
       }
 
       const res  = await fetch("/api/draft-reply", {
@@ -717,6 +762,10 @@ export default function ConversationPage() {
               ai_draft:    lastAiDraft,
               actual_sent: draft,
               mode:        "auto",
+              // Lets the measurement separate a first attempt Chris sent as-is
+              // from one he had to regenerate first.
+              inquiry_id:      inquiry.id,
+              was_regenerated: Boolean(originalAiDraft) && originalAiDraft !== lastAiDraft,
             }),
           }).catch(() => {});
         }
