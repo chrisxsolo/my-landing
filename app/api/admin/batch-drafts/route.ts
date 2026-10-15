@@ -1,167 +1,146 @@
+// ─────────────────────────────────────────────────────────────────────────────
 // POST /api/admin/batch-drafts
-//   Generates drafts for all unanswered inquiries (no reply_sent_at) in parallel.
-//   Returns: { results: [{inquiry_id, inquiry_name, draft}] }
 //
-// GET /api/admin/batch-drafts
-//   Legacy endpoint — returns 404 (batch polling no longer needed).
+// Drafts a reply for every unanswered inquiry, using the same Claude pipeline
+// as the single-draft endpoint so a batch draft is not a lower-quality draft.
+//
+// Previously this ran GPT-4.1 at temperature 0.9 against its own copy of the
+// prompt, with three whole vault folders inlined and no validation, so batch
+// drafts and single drafts disagreed about how to write.
+//
+// Still one API call per inquiry — that is inherent to drafting N emails — but
+// the shared stable prompt prefix is cached after the first call, so the rest
+// read it at a fraction of the input price.
+// ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
-import OpenAI from "openai";
 import { requireAdmin } from "@/lib/requireAdmin";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
+import { resolveEmailModelConfig, createEmailModelCaller } from "@/lib/ai/emailModel";
+import { fetchAvailabilitySnapshot } from "@/lib/ai/availabilitySnapshot";
+import { fetchWritingRules, fetchExamplePool, recordUsage } from "@/lib/ai/aiEmailStore";
+import { resolveBudgetConfig, evaluateBudget } from "@/lib/ai/aiUsage";
+import { fetchMonthToDateSpendUsd } from "@/lib/ai/aiEmailStore";
+import { generateDraft } from "@/lib/ai/emailOperations";
 
 export const dynamic = "force-dynamic";
-// Up to 200 drafts generate in parallel in one request — needs more than the
-// default function timeout.
+// Drafts generate in parallel batches; this needs more than the default timeout.
 export const maxDuration = 300;
 
-type VaultRow = { id: string; title: string; folder: string; content: string };
+/** Concurrency cap, so a hundred inquiries do not become a hundred open sockets. */
+const BATCH_SIZE = 8;
+const MAX_INQUIRIES = 200;
 
-const VAULT_ALWAYS_INCLUDE = new Set(["03 Client Communication", "01 SOPs", "09 AI Instructions"]);
-
-function buildVaultContext(notes: VaultRow[]): string {
-  const sections: string[] = [];
-  for (const note of notes) {
-    if (!VAULT_ALWAYS_INCLUDE.has(note.folder) || !note.content.trim()) continue;
-    sections.push(`### ${note.folder} / ${note.title}\n${note.content.trim()}`);
-  }
-  return sections.join("\n\n---\n\n");
-}
-
-function buildSystemPrompt(vaultContext: string, availability: string): string {
-  const vaultSection = vaultContext
-    ? `\n\n---\nBUSINESS KNOWLEDGE BASE:\n\n${vaultContext}\n---`
-    : "";
-  return `You are Chris Solorzano, a Bay Area photographer writing real emails to real clients.
-
-Write like a friendly, confident photographer who genuinely cares. Conversational, warm, direct. Sound like a person, not a business.
-
-Hard rules (non-negotiable):
-- Plain text only — no markdown, bold, asterisks, or bullet points
-- Start with "Hi [Name]," — nothing before it
-- No sign-off or name at the end — stop after the last sentence of content
-- No em dashes — use commas instead
-- All pricing and policies must come from the knowledge base only
-
-Current availability:
-${availability}${vaultSection}`;
-}
-
-function buildUserPrompt(inq: {
+type InquiryRow = {
+  id: number;
   name: string;
   email: string;
   phone: string | null;
   session_type: string | null;
   date_in_mind: string | null;
-  message: string;
-}): string {
-  return `Draft a reply to this client inquiry:
-
-Name: ${inq.name}
-Email: ${inq.email}${inq.phone ? `\nPhone: ${inq.phone}` : ""}${inq.session_type ? `\nSession type: ${inq.session_type}` : ""}${inq.date_in_mind ? `\nDate they have in mind: ${inq.date_in_mind}` : ""}
-
-Their message:
-${inq.message}
-
-Write the reply now.`;
-}
-
-async function fetchAvailability(): Promise<string> {
-  try {
-    const base = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-    const res = await fetch(`${base}/api/availability`, { cache: "no-store" });
-    if (!res.ok) return "Availability data unavailable.";
-    const json = await res.json();
-    return (json as { quick_read?: string }).quick_read ?? "Availability data unavailable.";
-  } catch {
-    return "Check soloxsnaps.com/availability for open dates.";
-  }
-}
-
-function stripSignoff(text: string): string {
-  return text
-    .replace(/\n+[-–]?\s*Chris\s*$/i, "")
-    .replace(/\n+(?:best|thanks|cheers|warm regards|regards|sincerely)[,.]?\s*\n+chris\s*$/i, "")
-    .trimEnd();
-}
-
-// ── GET — legacy polling endpoint ─────────────────────────────────────────────
-
-export async function GET(req: NextRequest) {
-  const deny = requireAdmin(req);
-  if (deny) return deny;
-  return NextResponse.json({ message: "No batch job found" }, { status: 404 });
-}
-
-// ── POST — generate drafts for all unanswered inquiries ───────────────────────
+  message: string | null;
+  school: string | null;
+  people: string | null;
+  preferred_time: string | null;
+  location: string | null;
+};
 
 export async function POST(req: NextRequest) {
   const deny = requireAdmin(req);
   if (deny) return deny;
 
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return NextResponse.json({ error: "No API key" }, { status: 500 });
-
-  const supabase = createSupabaseServerClient();
-
-  const { data: inquiries, error: inqErr } = await supabase
-    .from("inquiries")
-    .select("id, name, email, phone, session_type, date_in_mind, message")
-    .is("reply_sent_at", null)
-    .order("created_at", { ascending: false })
-    .limit(200);
-
-  if (inqErr) {
-    console.error("[batch-drafts] fetch inquiries error", inqErr);
-    return NextResponse.json({ error: "Failed to fetch inquiries" }, { status: 500 });
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    return NextResponse.json({ error: "ANTHROPIC_API_KEY is not configured." }, { status: 503 });
   }
 
-  if (!inquiries || inquiries.length === 0) {
+  const supabase = createSupabaseServerClient();
+  const { data: inquiries, error } = await supabase
+    .from("inquiries")
+    .select("id, name, email, phone, session_type, date_in_mind, message, school, people, preferred_time, location")
+    .is("reply_sent_at", null)
+    .order("created_at", { ascending: false })
+    .limit(MAX_INQUIRIES);
+
+  if (error) {
+    console.error("[batch-drafts] fetch inquiries error", error);
+    return NextResponse.json({ error: "Failed to fetch inquiries" }, { status: 500 });
+  }
+  if (!inquiries?.length) {
     return NextResponse.json({ message: "No unanswered inquiries found" }, { status: 200 });
   }
 
-  const [vaultRows, availability] = await Promise.all([
-    supabase
-      .from("vault_notes")
-      .select("id, title, folder, content")
-      .then(r => (r.data ?? []) as VaultRow[]),
-    fetchAvailability(),
-  ]);
-
-  const systemPrompt = buildSystemPrompt(buildVaultContext(vaultRows), availability);
-  const client = new OpenAI({ apiKey });
-
-  const settled = await Promise.allSettled(
-    inquiries.map(async inq => {
-      const res = await client.chat.completions.create({
-        model: "gpt-4.1",
-        max_tokens: 600,
-        temperature: 0.9,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: buildUserPrompt(inq as Parameters<typeof buildUserPrompt>[0]) },
-        ],
-      });
-      const raw = (res.choices[0]?.message?.content ?? "").trim();
-      return {
-        inquiry_id: inq.id as number,
-        inquiry_name: inq.name as string,
-        draft: stripSignoff(raw),
-      };
-    })
-  );
-
-  const results = settled
-    .filter(
-      (r): r is PromiseFulfilledResult<{ inquiry_id: number; inquiry_name: string; draft: string }> =>
-        r.status === "fulfilled"
-    )
-    .map(r => r.value);
-
-  const failed = settled.filter(r => r.status === "rejected").length;
-  if (failed > 0) {
-    console.error(`[batch-drafts] ${failed} draft(s) failed`);
+  // A batch is the easiest way to burn through a month's budget by accident, so
+  // it is checked up front and refused as a whole rather than part-way through.
+  const budgetConfig = resolveBudgetConfig();
+  const budget = evaluateBudget(await fetchMonthToDateSpendUsd(), budgetConfig);
+  if (budget.blocked) {
+    return NextResponse.json({ error: budget.message, budget }, { status: 429 });
   }
 
-  return NextResponse.json({ results, request_count: inquiries.length });
+  const [availability, rules, examplePool] = await Promise.all([
+    fetchAvailabilitySnapshot(),
+    fetchWritingRules(),
+    fetchExamplePool(),
+  ]);
+
+  const config = resolveEmailModelConfig();
+  const call = createEmailModelCaller(apiKey, config);
+  const rows = inquiries as InquiryRow[];
+
+  const results: { inquiry_id: number; inquiry_name: string; draft: string; valid: boolean }[] = [];
+  let failed = 0;
+
+  for (let start = 0; start < rows.length; start += BATCH_SIZE) {
+    const settled = await Promise.allSettled(
+      rows.slice(start, start + BATCH_SIZE).map(async (inquiry) => {
+        const result = await generateDraft({
+          inquiry: {
+            name: inquiry.name,
+            email: inquiry.email,
+            phone: inquiry.phone,
+            sessionType: inquiry.session_type,
+            message: inquiry.message ?? "",
+            dateInMind: inquiry.date_in_mind,
+            preferredTime: inquiry.preferred_time,
+            location: inquiry.location,
+            school: inquiry.school,
+            people: inquiry.people,
+          },
+          // A batch runs off the inquiry form alone; no Gmail thread is loaded,
+          // and saying so keeps the draft from implying prior correspondence.
+          messages: [],
+          availability,
+          threadLoaded: true,
+          examplePool,
+          rules,
+          latestClientMessage: null,
+          threadText: null,
+        }, call);
+
+        await recordUsage(result.usage);
+        return {
+          inquiry_id: inquiry.id,
+          inquiry_name: inquiry.name,
+          draft: result.draft,
+          valid: result.validation.valid,
+        };
+      }),
+    );
+
+    for (const outcome of settled) {
+      if (outcome.status === "fulfilled") results.push(outcome.value);
+      else failed += 1;
+    }
+  }
+
+  if (failed > 0) console.error(`[batch-drafts] ${failed} draft(s) failed`);
+
+  return NextResponse.json({
+    results,
+    request_count: rows.length,
+    failed,
+    // Drafts that failed deterministic validation are flagged, not hidden.
+    needs_review: results.filter((row) => !row.valid).length,
+  });
 }

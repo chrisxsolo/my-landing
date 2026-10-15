@@ -1,6 +1,7 @@
 "use client";
-// Learn from Reply — compares the AI draft with what was actually sent and
-// saves the style differences as permanent rules. Analysis lives in the page.
+// Learn from Reply — compares the AI draft with what was actually sent.
+// Factual changes are reported as corrections; style changes become rule
+// candidates that need approval. Analysis lives in the page.
 
 import { T, Icon, Spinner, Panel, PanelHead, MonoLabel } from "../ui";
 
@@ -14,6 +15,8 @@ type Props = {
   aiDraftExpanded: boolean;
   onAiDraftExpanded: (v: boolean) => void;
   learnedRules: string[] | null;
+  /** Edits classified as corrections to this one email, not preferences. */
+  factualEdits: string[];
   learnLoading: boolean;
   onAnalyze: () => void;
   onReset: () => void;
@@ -27,12 +30,28 @@ export default function LearnPanel(p: Props) {
       <div className="p-5 space-y-3">
         <PanelHead icon="pen" tint={T.action} bg={T.amberBg} title="Learn from reply" />
 
+        {/* Shown whether or not any rule came out: it is the answer to "why
+            didn't it learn that?", and the old system's worst habit was
+            turning exactly these edits into permanent style rules. */}
+        {p.factualEdits.length > 0 && (
+          <div className="rounded-xl p-3 space-y-1.5"
+            style={{ background: T.inset, border: `1px solid ${T.rowBorder}` }}>
+            <MonoLabel>Corrections to this email only</MonoLabel>
+            {p.factualEdits.map((edit, i) => (
+              <p key={i} className="text-[11px] leading-snug" style={{ color: T.inkFaint }}>{edit}</p>
+            ))}
+            <p className="text-[10px] pt-0.5" style={{ color: T.inkFaint, opacity: 0.8 }}>
+              Not saved as rules. A changed date or price belongs to this client, not to your writing style.
+            </p>
+          </div>
+        )}
+
         {p.learnedRules ? (
           <div className="rounded-xl p-4 space-y-2"
             style={{ background: T.greenBg, border: `1px solid ${T.greenBorder}` }}>
             <p className="flex items-center gap-1.5" style={{ color: T.green }}>
               <Icon name="check" size={11} />
-              <MonoLabel color={T.green}>{p.learnedRules.length} rule{p.learnedRules.length === 1 ? "" : "s"} saved to Obsidian vault</MonoLabel>
+              <MonoLabel color={T.green}>{p.learnedRules.length} rule{p.learnedRules.length === 1 ? "" : "s"} waiting for your approval</MonoLabel>
             </p>
             <ul className="space-y-1.5">
               {p.learnedRules.map((rule, i) => (
@@ -42,7 +61,9 @@ export default function LearnPanel(p: Props) {
                 </li>
               ))}
             </ul>
-            <p className="text-[10px] pt-1" style={{ color: T.inkFaint }}>Applied to all future drafts automatically.</p>
+            <p className="text-[10px] pt-1" style={{ color: T.inkFaint }}>
+              Nothing changes until you approve these on the AI tab. A rule that contradicts one you already approved is flagged there instead of being stacked on top of it.
+            </p>
             <button onClick={p.onReset}
               className="text-xs font-bold transition-colors hover:opacity-70" style={{ color: T.violet }}>
               ↩ Analyze another
@@ -51,7 +72,7 @@ export default function LearnPanel(p: Props) {
         ) : (
           <>
             <p className="text-xs leading-relaxed" style={{ color: T.inkSoft }}>
-              Paste what you actually sent. Claude compares it to the AI draft and saves the style differences permanently.
+              Paste what you actually sent. The differences are classified first: changed dates, prices, times, and names are treated as corrections to this email, and only genuine style changes become rules for you to approve.
             </p>
 
             {hasAiDraft ? (
@@ -102,7 +123,7 @@ export default function LearnPanel(p: Props) {
               style={{ background: T.action, color: T.actionText, boxShadow: T.glow }}>
               {p.learnLoading
                 ? <><Spinner size={13} /> Analyzing…</>
-                : <><Icon name="pen" size={13} /> Analyze & save to Obsidian</>}
+                : <><Icon name="pen" size={13} /> Learn from edit</>}
             </button>
           </>
         )}

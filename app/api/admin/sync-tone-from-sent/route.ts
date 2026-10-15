@@ -1,18 +1,23 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/admin/sync-tone-from-sent
 //
-// Fetches Chris's sent emails from the past 7 days, passes them to Claude
-// for tone/style analysis, and merges any extracted rules into the
-// "09 AI Instructions / Email Rules" vault note in Supabase.
+// Fetches Chris's sent emails from the past 7 days and asks Claude to describe
+// the style patterns across them. Observations are stored as PENDING rules for
+// approval, never applied directly: a batch of whatever happened to be in Sent
+// Mail is weak evidence compared with an email Chris explicitly approved.
 //
-// Response: { rules: string[]; written: number; emails_analyzed: number }
+// One API call per sync. The second call that rewrote the vault note is gone.
+//
+// Response: { rules, written, skipped, emails_analyzed, message }
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { getValidTokens } from "@/lib/gmailTokens";
 import { requireAdmin } from "@/lib/requireAdmin";
-import { createSupabaseServerClient } from "@/lib/supabaseServer";
+import { fetchWritingRules, insertWritingRule, recordUsage } from "@/lib/ai/aiEmailStore";
+import { classifyRuleIntake } from "@/lib/ai/writingRules";
+import { resolveEmailModelConfig } from "@/lib/ai/emailModel";
 
 export const dynamic = "force-dynamic";
 
@@ -49,74 +54,46 @@ function stripQuotedReply(text: string): string {
     .trim();
 }
 
-async function mergeRulesToVault(newRules: string[], client: Anthropic): Promise<number> {
-  if (newRules.length === 0) return 0;
-  const today = new Date().toISOString().slice(0, 10);
-  const supabase = createSupabaseServerClient();
+/**
+ * Stores observed rules as pending candidates.
+ *
+ * Previously this asked Claude to rewrite the whole "Email Rules" markdown
+ * note with the new rules merged in — a second API call per sync whose output
+ * replaced the note wholesale. Dedup and conflict detection are deterministic
+ * now (lib/ai/writingRules.ts), so there is no second call and nothing is
+ * overwritten.
+ *
+ * Everything lands as `pending`. These rules are inferred from whatever
+ * happened to be in Sent Mail this week, which is weaker evidence than an
+ * approved example, so none of it reaches a draft without Chris agreeing.
+ */
+async function storeObservedRules(observed: string[]): Promise<{
+  pending: { id: string; rule: string }[];
+  skipped: { rule: string; verdict: string }[];
+}> {
+  const pending: { id: string; rule: string }[] = [];
+  const skipped: { rule: string; verdict: string }[] = [];
+  if (!observed.length) return { pending, skipped };
 
-  const { data } = await supabase
-    .from("vault_notes")
-    .select("id, content")
-    .eq("folder", "09 AI Instructions")
-    .eq("title", "Email Rules")
-    .single();
+  const existing = await fetchWritingRules();
 
-  const existing = data?.content ?? "";
-
-  const mergeSystem = `You are a knowledge base editor for a photography business. Your job is to maintain a clean, well-structured markdown note of AI email writing rules.
-
-Each rule in the note is timestamped in the format [YYYY-MM-DD] at the start of the line.
-New rules being integrated today are dated ${today}.
-
-Editing rules:
-- If a new rule CONTRADICTS or SUPERSEDES an existing rule: DELETE the old rule, ADD the new one with today's date [${today}]
-- When two rules conflict, ALWAYS prefer the one with the NEWER date
-- If a new rule is essentially the same as an existing one: KEEP the existing rule unchanged
-- If a new rule is genuinely new: ADD it under the most relevant ## section with today's date [${today}]
-- NEVER keep two rules that say opposite or conflicting things
-- Preserve all YAML frontmatter exactly as-is
-- Update the "updated" frontmatter field to ${today}
-- Preserve the existing ## section structure
-- If a new rule doesn't fit any existing section, add it under ## Learned Rules
-- Output ONLY the updated markdown note — no explanation, no preamble`;
-
-  const res = await client.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 2000,
-    system: mergeSystem,
-    messages: [{
-      role: "user",
-      content: `Current Email Rules note:\n\n---\n${existing}\n---\n\nNew rules to integrate (dated ${today}):\n\n${newRules.map(r => `- [${today}] ${r}`).join("\n")}\n\nOutput the updated note only.`,
-    }],
-  });
-
-  // A truncated or empty rewrite must never replace the full note — that
-  // permanently loses every rule after the cut.
-  if (res.stop_reason === "max_tokens") {
-    throw new Error("Rules merge hit max_tokens — refusing to overwrite the vault note with a truncated rewrite");
-  }
-  const updated = res.content
-    .filter(b => b.type === "text")
-    .map(b => (b as { type: "text"; text: string }).text)
-    .join("")
-    .trim();
-  if (!updated) {
-    throw new Error("Rules merge returned no text — refusing to overwrite the vault note");
-  }
-
-  if (data?.id) {
-    const { error } = await supabase.from("vault_notes").update({ content: updated }).eq("id", data.id);
-    if (error) throw error;
-  } else {
-    const { error } = await supabase.from("vault_notes").insert({
-      folder: "09 AI Instructions",
-      title: "Email Rules",
-      content: updated,
+  for (const rule of observed) {
+    const intake = classifyRuleIntake(rule, existing);
+    if (intake.verdict !== "new") {
+      skipped.push({ rule, verdict: intake.verdict });
+      continue;
+    }
+    const row = await insertWritingRule({
+      rule, category: "style", status: "pending", source: "sync-from-sent",
     });
-    if (error) throw error;
+    if (row) {
+      pending.push({ id: row.id, rule: row.rule });
+      // Added to the in-memory set too, so two near-identical observations in
+      // one batch do not both get stored.
+      existing.push(row);
+    }
   }
-
-  return newRules.length;
+  return { pending, skipped };
 }
 
 export async function POST(req: NextRequest) {
@@ -173,9 +150,10 @@ export async function POST(req: NextRequest) {
   // Ask Claude to extract tone + style rules from these real sent emails
   const client = new Anthropic({ apiKey });
   const today = new Date().toISOString().slice(0, 10);
+  const modelConfig = resolveEmailModelConfig();
 
   const analysisRes = await client.messages.create({
-    model: "claude-sonnet-4-6",
+    model: modelConfig.model,
     max_tokens: 800,
     system: `You are a writing-style analyst. You will receive a batch of real emails that Chris Solorzano sent to photography clients. Your job is to extract concrete, actionable style rules that describe HOW Chris writes — his tone, structure, word choice, sentence length, what he includes, and what he omits.
 
@@ -202,16 +180,26 @@ Output only the rules, one per line starting with a dash. No praise, no explanat
     .map(line => line.replace(/^[-–•*]\s*/, "").trim())
     .filter(line => line.length > 10);
 
-  let written: number;
-  try {
-    written = await mergeRulesToVault(rules, client);
-  } catch (err) {
-    console.error("[sync-tone-from-sent] vault merge failed:", err);
-    return NextResponse.json(
-      { error: "Extracted rules but failed to save them to the vault — nothing was overwritten." },
-      { status: 500 },
-    );
-  }
+  const { pending, skipped } = await storeObservedRules(rules);
 
-  return NextResponse.json({ rules, written, emails_analyzed: emails.length });
+  await recordUsage({
+    operation: "learn",
+    model: analysisRes.model,
+    input_tokens: analysisRes.usage.input_tokens,
+    output_tokens: analysisRes.usage.output_tokens,
+    cache_creation_input_tokens: analysisRes.usage.cache_creation_input_tokens ?? 0,
+    cache_read_input_tokens: analysisRes.usage.cache_read_input_tokens ?? 0,
+    duration_ms: 0,
+    success: true,
+  });
+
+  return NextResponse.json({
+    rules: pending.map((row) => row.rule),
+    written: pending.length,
+    skipped,
+    emails_analyzed: emails.length,
+    message: pending.length
+      ? `${pending.length} rule${pending.length === 1 ? "" : "s"} proposed. Approve them on the AI tab to use them.`
+      : "Nothing new to propose from this week's sent mail.",
+  });
 }

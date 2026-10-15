@@ -463,17 +463,20 @@ function AdminDashboard() {
     if(ai_draft.trim()===actual){showToast("The two drafts are identical — paste the email you actually sent (after your edits)",false);return;}
     setLearnLoading(inq.id);
     try{
-      const res=await fetch("/api/draft-reply",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:inq.name,email:inq.email,message:inq.message,ai_draft,actual_sent:actual})});
-      const json=await res.json() as {rules?:string[];written?:number;error?:string};
-      if(json.rules?.length){
-        setLearnedRules(p=>({...p,[inq.id]:json.rules!}));
-        const written=json.written??0;
-        const msg=written===0
-          ?"Rules already in vault — nothing new to add"
-          :`✓ ${written} new rule${written===1?"":"s"} saved to Obsidian vault`;
-        showToast(msg,written>0);
-      }else if(json.error){showToast(json.error,false);}
-      else{showToast("No differences found — drafts may be very similar",false);}
+      const res=await fetch("/api/ai/learn",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({ai_draft,actual_sent:actual,mode:"review"})});
+      const json=await res.json() as {candidates?:{rule:string;intake:{verdict:string}}[];message?:string;error?:string};
+      if(json.error){showToast(json.error,false);}
+      else{
+        // Only genuinely new candidates are worth showing: duplicates and
+        // conflicts are reported on the AI tab, not stacked onto the rules.
+        const fresh=(json.candidates??[]).filter(c=>c.intake.verdict==="new").map(c=>c.rule);
+        if(fresh.length){
+          setLearnedRules(p=>({...p,[inq.id]:fresh}));
+          showToast(`${fresh.length} rule${fresh.length===1?"":"s"} waiting for approval on the AI tab`);
+        }else{
+          showToast(json.message??"Nothing to learn from these edits",false);
+        }
+      }
     }catch(e){showToast("Analysis failed",false);console.error(e);}
     finally{setLearnLoading(null);}
   }
@@ -627,7 +630,10 @@ function AdminDashboard() {
     if(!freeComposeBody.trim())return;
     setFreeComposePolishing(true);
     try{
-      const payload={name:freeComposeTo||"",email:freeComposeTo,message:freeComposeBody,session_type:null,date_in_mind:null,phone:null};
+      // Explicitly polish mode. This function has always been named polish but
+      // sent no raw_draft, so it fell through to generating a fresh email from
+      // the body instead of tidying what was typed.
+      const payload={name:freeComposeTo||"",email:freeComposeTo,message:freeComposeBody,raw_draft:freeComposeBody,mode:"polish",session_type:null,date_in_mind:null,phone:null};
       const res=await fetch("/api/draft-reply",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
       const json=await res.json();
       if(json.draft)setFreeComposeBody(json.draft);

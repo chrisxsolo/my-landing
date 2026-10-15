@@ -2,14 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { C } from "@/lib/colors";
+import AiRulesPanel from "./AiRulesPanel";
 
 type Message = { role: "user" | "assistant"; content: string };
-
-type RulesData = {
-  content: string;
-  updated_at: string | null;
-  rule_count: number;
-};
 
 type DraftResult = { inquiry_id: number; inquiry_name: string; draft: string };
 
@@ -21,8 +16,6 @@ export default function AiTab() {
   const [savedRules, setSavedRules] = useState<string[]>([]);
   const [sessionLoading, setSessionLoading] = useState(true);
 
-  const [rulesData, setRulesData] = useState<RulesData | null>(null);
-  const [rulesLoading, setRulesLoading] = useState(false);
   const [showRules, setShowRules] = useState(false);
 
   // Tone sync state
@@ -48,12 +41,7 @@ export default function AiTab() {
       })
       .catch(() => {/* no prior session */})
       .finally(() => setSessionLoading(false));
-
-    fetch("/api/ai/rules", { credentials: "include" })
-      .then(r => r.json())
-      .then(d => setRulesData(d as RulesData))
-      .catch(() => {});
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, []);
 
   useEffect(() => {
@@ -119,7 +107,9 @@ export default function AiTab() {
               if (event.new_rules?.length) {
                 setSavedRules(event.new_rules);
                 setTimeout(() => setSavedRules([]), 5000);
-                if (showRules) loadRules();
+                // Open the queue so the proposed rules are visible: they are
+                // pending, and they do nothing until approved there.
+                setShowRules(true);
               }
             } else if (event.type === "error") {
               const errMsg = event.message ?? "Something went wrong. Try again.";
@@ -144,22 +134,7 @@ export default function AiTab() {
     }
   }
 
-  async function loadRules() {
-    setRulesLoading(true);
-    try {
-      const res = await fetch("/api/ai/rules", { credentials: "include" });
-      const d = await res.json() as RulesData;
-      setRulesData(d);
-    } catch (err) {
-      console.error("[AiTab] loadRules error", err);
-      setRulesData(null);
-    } finally {
-      setRulesLoading(false);
-    }
-  }
-
   function toggleRules() {
-    if (!showRules && !rulesData) loadRules();
     setShowRules(p => !p);
   }
 
@@ -187,7 +162,6 @@ export default function AiTab() {
         emails_analyzed: json.emails_analyzed ?? 0,
         message: json.message,
       });
-      if ((json.written ?? 0) > 0 && showRules) loadRules();
     } catch {
       setToneResult({ rules: [], written: 0, emails_analyzed: 0, message: "Sync failed — try again" });
     } finally {
@@ -242,7 +216,7 @@ export default function AiTab() {
         <div>
           <h2 className="text-lg font-black text-slate-900">AI Training</h2>
           <p className="text-sm text-slate-400 mt-0.5">
-            Chat to teach Claude how to write your emails. Rules save automatically.
+            Chat to teach Claude how to write your emails. Rules are proposed here and take effect once you approve them.
           </p>
         </div>
         <div className="flex gap-2">
@@ -252,8 +226,7 @@ export default function AiTab() {
             style={showRules
               ? { background: "rgba(99,102,241,0.1)", color: "#6366f1", borderColor: "rgba(99,102,241,0.3)" }
               : { background: "#fff", color: "#64748b", borderColor: "rgba(0,0,0,0.08)" }}>
-            {showRules ? "Hide Rules" : "View Live Rules"}
-            {rulesData ? ` (${rulesData.rule_count})` : ""}
+            {showRules ? "Hide rules" : "Rules & usage"}
           </button>
           <button
             onClick={startNewSession}
@@ -264,70 +237,8 @@ export default function AiTab() {
         </div>
       </div>
 
-      {/* Rules summary bar */}
-      {rulesData && (
-        <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl"
-          style={{ background: "rgba(99,102,241,0.06)", border: "1px solid rgba(99,102,241,0.15)" }}>
-          <div className="flex items-center gap-2 text-xs">
-            <span style={{ color: "#6366f1" }}>⚡</span>
-            <span className="font-semibold" style={{ color: "#4338ca" }}>
-              Claude knows {rulesData.rule_count} rule{rulesData.rule_count !== 1 ? "s" : ""}
-            </span>
-            {rulesData.updated_at && (
-              <span className="text-slate-400">
-                · last updated {new Date(rulesData.updated_at).toLocaleDateString()}
-              </span>
-            )}
-          </div>
-          <button
-            onClick={toggleRules}
-            className="text-xs font-bold px-2.5 py-1 rounded-lg border"
-            style={{ borderColor: "rgba(99,102,241,0.25)", color: "#6366f1", background: "#fff" }}>
-            {showRules ? "Hide" : "See all"}
-          </button>
-        </div>
-      )}
-
-      {/* Rules Inspector */}
-      {showRules && (
-        <div className={card}>
-          <div className="h-[3px]" style={{ background: "linear-gradient(90deg,#6366f1,#8b5cf6)" }} />
-          <div className="p-4">
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <p className="text-sm font-black text-slate-900">Live Email Rules</p>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  This is the exact note Claude reads before every draft.
-                  {rulesData?.updated_at
-                    ? ` Last updated ${new Date(rulesData.updated_at).toLocaleDateString()}.`
-                    : ""}
-                </p>
-              </div>
-              <button
-                onClick={loadRules}
-                disabled={rulesLoading}
-                className="text-xs font-bold px-2 py-1 rounded-lg border disabled:opacity-40"
-                style={{ borderColor: C.p1_20, color: C.p1 }}>
-                {rulesLoading ? "Refreshing…" : "Refresh"}
-              </button>
-            </div>
-            {rulesLoading && !rulesData ? (
-              <div className="h-24 flex items-center justify-center text-slate-400 text-sm animate-pulse">
-                Loading rules…
-              </div>
-            ) : rulesData?.content ? (
-              <pre className="text-xs text-slate-600 whitespace-pre-wrap font-mono leading-relaxed bg-slate-50 rounded-xl p-3 max-h-72 overflow-y-auto border"
-                style={{ borderColor: C.p1_15 }}>
-                {rulesData.content}
-              </pre>
-            ) : (
-              <p className="text-sm text-slate-400 text-center py-6">
-                No rules saved yet — start chatting to teach Claude your style.
-              </p>
-            )}
-          </div>
-        </div>
-      )}
+      {/* Rules queue + usage */}
+      {showRules && <AiRulesPanel />}
 
       {/* Training Chat */}
       <div className={card}>

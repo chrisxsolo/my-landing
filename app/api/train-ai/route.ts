@@ -1,236 +1,198 @@
+// ─────────────────────────────────────────────────────────────────────────────
 // POST /api/train-ai
 //
-// Conversational training endpoint. Chris chats naturally; Claude extracts
-// concrete style rules and writes them to vault_notes ("09 AI Instructions" / "Email Rules").
+// Conversational training. Chris chats about how he wants emails written;
+// Claude replies and proposes concrete rules.
 //
-// Body: { messages: {role:"user"|"assistant", content:string}[], session_id?: string }
-// Response: SSE stream of:
-//   { type:"text", text: string }        — reply tokens as they arrive
-//   { type:"done", new_rules, saved_to_vault, session_id }
+// Body:     { messages: {role, content}[], session_id? }
+// Response: SSE of
+//   { type:"text", text }                              reply tokens
+//   { type:"done", new_rules, pending, session_id }     rules awaiting approval
+//
+// Two changes from the previous version. It runs on Claude rather than GPT-4.1,
+// and proposed rules go into ai_writing_rules as `pending` instead of being
+// merged into a markdown note by a second model call. That merge ran at
+// max_tokens 1600 against a note longer than that, so it truncated the note on
+// every run; the live note still ends mid-rule with a dangling "- [".
+//
+// Rules proposed here change nothing until approved via POST /api/ai/rules.
+// ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest } from "next/server";
-import OpenAI from "openai";
+import Anthropic from "@anthropic-ai/sdk";
 import { requireAdmin } from "@/lib/requireAdmin";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
+import { resolveEmailModelConfig } from "@/lib/ai/emailModel";
+import { fetchWritingRules, insertWritingRule, recordUsage } from "@/lib/ai/aiEmailStore";
+import { classifyRuleIntake, selectPromptRules } from "@/lib/ai/writingRules";
+import { PERMANENT_RULES } from "@/lib/ai/soloxsnapsWritingProfile";
 
 export const dynamic = "force-dynamic";
 
-const RULES_FOLDER = "09 AI Instructions";
-const RULES_TITLE  = "Email Rules";
-
-async function readCurrentRules(): Promise<{ id: string | null; content: string }> {
-  try {
-    const supabase = createSupabaseServerClient();
-    const { data } = await supabase
-      .from("vault_notes")
-      .select("id, content")
-      .eq("folder", RULES_FOLDER)
-      .eq("title", RULES_TITLE)
-      .single();
-    return { id: data?.id ?? null, content: data?.content ?? "" };
-  } catch (err) {
-    console.error("[train-ai] readCurrentRules error", err);
-    return { id: null, content: "" };
-  }
-}
-
-async function writeRules(id: string | null, content: string): Promise<void> {
-  const supabase = createSupabaseServerClient();
-  if (id) {
-    const { error } = await supabase.from("vault_notes").update({ content }).eq("id", id);
-    if (error) console.error("[train-ai] writeRules update error", error);
-  } else {
-    const { error } = await supabase.from("vault_notes").insert({
-      folder: RULES_FOLDER,
-      title: RULES_TITLE,
-      content,
-    });
-    if (error) console.error("[train-ai] writeRules insert error", error);
-  }
-}
+const MAX_TOKENS = 900;
 
 async function persistSession(
   sessionId: string | null,
-  messages: { role: string; content: string }[]
+  messages: { role: string; content: string }[],
 ): Promise<string> {
-  const supabase = createSupabaseServerClient();
-  if (sessionId) {
-    await supabase
+  try {
+    const supabase = createSupabaseServerClient();
+    if (sessionId) {
+      await supabase.from("ai_training_sessions").update({ messages }).eq("id", sessionId);
+      return sessionId;
+    }
+    const { data } = await supabase
       .from("ai_training_sessions")
-      .update({ messages })
-      .eq("id", sessionId);
-    return sessionId;
+      .insert({ messages })
+      .select("id")
+      .single();
+    return String(data?.id ?? "");
+  } catch (err) {
+    console.error("[train-ai] persistSession failed:", err);
+    return sessionId ?? "";
   }
-  const { data } = await supabase
-    .from("ai_training_sessions")
-    .insert({ messages })
-    .select("id")
-    .single();
-  return String(data?.id ?? "");
 }
 
-function buildExtractSystem(currentRules: string): string {
-  const rulesSection = currentRules
-    ? `\n\nCurrent saved rules (already in vault — do NOT re-extract these verbatim):\n${currentRules}`
-    : "\n\nNo rules saved yet.";
+function buildSystem(approvedRules: string[]): string {
+  const existing = approvedRules.length
+    ? `\n\nRules Chris has already approved. Do not propose these again:\n${approvedRules.map((rule) => `- ${rule}`).join("\n")}`
+    : "\n\nNo learned rules are approved yet.";
 
-  return `You are a helpful assistant that helps Chris Solorzano train an AI email assistant for his photography business (soloxsnaps.com).
+  return `You help Chris Solorzano train the email assistant for his photography business.
 
-Chris will chat with you naturally about how he wants the AI to write emails — what to say, what not to say, corrections, tone preferences, etc.
+Chris will talk about how he wants emails written. Reply naturally and briefly: confirm what you understood, and ask a question if his preference is ambiguous.
 
-Your job:
-1. Have a natural, friendly conversation. Acknowledge what he said, confirm what you understood.
-2. At the end of EVERY response, extract any new instructions as concrete rules — even if Chris is being casual or conversational. If there is ANY implied preference or instruction in what he said, extract it.
-
-Always end your response with a JSON block in this exact format (empty array only if there is truly zero instruction or preference):
+Then propose any new rule his message implies, in a JSON block at the very end of every reply:
 <rules>
-["rule 1", "rule 2"]
+["rule one", "rule two"]
 </rules>
+Use an empty array when he expressed no preference.
 
-Rules must be:
-- Short and actionable (one sentence)
-- Written as instructions for Claude: "Always X", "Never Y", "If Z then W"
-- Specific enough to be unambiguous
-- Extracted even from conversational hints (e.g. "I usually keep it short" → "Keep replies concise — 3 sentences or fewer unless the question requires detail")
+A rule must be one sentence, phrased as an instruction, and about HOW to write rather than about one client, date, price, or place. Never propose a rule that merely restates a permanent rule below.
 
-Hard rules already saved (never re-extract):
-- Never add a sign-off or name at the end of emails — end with the last line of content only
-- No em dashes (—) in email output — use commas or rewrite the sentence instead${rulesSection}`;
+These are permanent and always active, so they are never rules to propose:
+${PERMANENT_RULES.map((rule) => `- ${rule}`).join("\n")}${existing}`;
 }
 
-const MERGE_SYSTEM = `You are a knowledge base editor for a photography business. Your job is to maintain a clean, well-structured markdown note of AI email writing rules.
-
-Editing rules:
-- If a new rule CONTRADICTS or SUPERSEDES an existing rule, DELETE the old rule and ADD the new one
-- If a new rule is essentially the same as an existing one, KEEP the existing wording — no duplicates
-- If a new rule is genuinely new, ADD it under the most relevant ## section
-- NEVER keep two rules that say opposite or conflicting things — always prefer the newer rule
-- Preserve all YAML frontmatter exactly as-is (the --- block at the top)
-- Preserve the existing ## section structure
-- Update the last_updated frontmatter field to today's date
-- If a new rule doesn't fit any existing section, add it under ## Learned Rules
-- Output ONLY the updated markdown note — no explanation, no preamble`;
-
-// Buffer to safely stream text without accidentally emitting a partial <rules> tag.
-// Keeps the last TAIL chars buffered; emits the safe prefix each iteration.
+/** Keeps a partial <rules> tag from being streamed to the client as text. */
 const TAIL_BUFFER = 400;
+
+function sseStream(payload: unknown): Response {
+  const encoder = new TextEncoder();
+  return new Response(
+    new ReadableStream({
+      start(controller) {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(payload)}\n\n`));
+        controller.close();
+      },
+    }),
+    { headers: { "Content-Type": "text/event-stream" } },
+  );
+}
 
 export async function POST(req: NextRequest) {
   const deny = requireAdmin(req);
   if (deny) return deny;
 
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    const encoder = new TextEncoder();
-    const errStream = new ReadableStream({
-      start(c) {
-        c.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "error", message: "No API key" })}\n\n`));
-        c.close();
-      },
-    });
-    return new Response(errStream, { headers: { "Content-Type": "text/event-stream" } });
-  }
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return sseStream({ type: "error", message: "ANTHROPIC_API_KEY is not configured." });
 
-  const { messages, session_id } = await req.json() as {
+  const { messages, session_id } = (await req.json()) as {
     messages: { role: "user" | "assistant"; content: string }[];
     session_id?: string;
   };
 
   if (!Array.isArray(messages) || messages.length === 0) {
-    const encoder = new TextEncoder();
-    const errStream = new ReadableStream({
-      start(c) {
-        c.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "error", message: "messages array required" })}\n\n`));
-        c.close();
-      },
-    });
-    return new Response(errStream, { headers: { "Content-Type": "text/event-stream" } });
+    return sseStream({ type: "error", message: "messages array required" });
   }
 
-  const client = new OpenAI({ apiKey });
-  const { id: rulesId, content: currentRules } = await readCurrentRules();
+  const config = resolveEmailModelConfig();
+  const existingRules = await fetchWritingRules();
+  const approved = selectPromptRules(existingRules, 40).map((rule) => rule.rule);
+  const client = new Anthropic({ apiKey });
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream({
     async start(controller) {
-      function emit(data: unknown) {
+      const emit = (data: unknown) =>
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
-      }
 
       try {
-        const openaiStream = await client.chat.completions.create({
-          model: "gpt-4.1",
-          max_tokens: 800,
-          stream: true,
-          messages: [
-            { role: "system", content: buildExtractSystem(currentRules) },
-            ...messages,
-          ],
+        const claudeStream = await client.messages.stream({
+          model: config.model,
+          max_tokens: MAX_TOKENS,
+          output_config: { effort: config.effort },
+          system: buildSystem(approved),
+          messages,
         });
 
         let fullText = "";
         let sentUpTo = 0;
 
-        for await (const chunk of openaiStream) {
-          const text = chunk.choices[0]?.delta?.content ?? "";
-          if (text) {
-            fullText += text;
-            // Emit the safe prefix — keep TAIL_BUFFER chars buffered to avoid
-            // splitting a <rules> tag across two emit calls.
-            const safeEnd = fullText.length - TAIL_BUFFER;
-            if (safeEnd > sentUpTo) {
-              emit({ type: "text", text: fullText.slice(sentUpTo, safeEnd) });
-              sentUpTo = safeEnd;
-            }
+        for await (const event of claudeStream) {
+          if (event.type !== "content_block_delta" || event.delta.type !== "text_delta") continue;
+          fullText += event.delta.text;
+          const safeEnd = fullText.length - TAIL_BUFFER;
+          if (safeEnd > sentUpTo) {
+            emit({ type: "text", text: fullText.slice(sentUpTo, safeEnd) });
+            sentUpTo = safeEnd;
           }
         }
 
-        // Stream done — emit buffered tail with <rules> block stripped
-        const tail = fullText.slice(sentUpTo);
-        const cleanTail = tail.split("<rules>")[0];
-        if (cleanTail) emit({ type: "text", text: cleanTail });
+        const tail = fullText.slice(sentUpTo).split("<rules>")[0];
+        if (tail) emit({ type: "text", text: tail });
 
-        // Parse rules
-        const rulesMatch = fullText.match(/<rules>\s*(\[[\s\S]*?\])\s*<\/rules>/);
-        let newRules: string[] = [];
-        if (rulesMatch) {
-          try { newRules = JSON.parse(rulesMatch[1]) as string[]; } catch { /* ignore */ }
+        const match = fullText.match(/<rules>\s*(\[[\s\S]*?\])\s*<\/rules>/);
+        let proposed: string[] = [];
+        if (match) {
+          try { proposed = JSON.parse(match[1]) as string[]; } catch { /* malformed block, no rules */ }
         }
 
         const reply = fullText.replace(/<rules>[\s\S]*?<\/rules>/, "").trim();
+        const savedSessionId = await persistSession(session_id ?? null, [
+          ...messages,
+          { role: "assistant", content: reply },
+        ]);
 
-        // Persist session
-        const allMessages = [...messages, { role: "assistant", content: reply }];
-        const savedSessionId = await persistSession(session_id ?? null, allMessages).catch(() => "");
+        // Only genuinely new rules are stored, and only as pending. A duplicate
+        // or a contradiction is reported back rather than appended.
+        const pending: { id: string; rule: string }[] = [];
+        const skipped: { rule: string; verdict: string }[] = [];
 
-        // Merge rules into vault (second Claude call — non-streaming)
-        let savedToVault = false;
-        if (newRules.length > 0) {
-          try {
-            const mergeRes = await client.chat.completions.create({
-              model: "gpt-4.1",
-              max_tokens: 1600,
-              messages: [
-                { role: "system", content: MERGE_SYSTEM },
-                {
-                  role: "user",
-                  content: `Current Email Writer Rules note:\n\n---\n${currentRules || "(empty)"}\n---\n\nNew rules to integrate (replace conflicts, add new, remove outdated):\n\n${newRules.map(r => `- ${r}`).join("\n")}\n\nOutput the updated note only.`,
-                },
-              ],
-            });
-
-            const updatedNote = (mergeRes.choices[0]?.message?.content ?? "").trim();
-
-            await writeRules(rulesId, updatedNote);
-            savedToVault = true;
-          } catch (err) {
-            console.error("[train-ai] vault write error", err);
+        for (const rule of proposed) {
+          if (typeof rule !== "string" || rule.trim().length < 12) continue;
+          const intake = classifyRuleIntake(rule, existingRules);
+          if (intake.verdict !== "new") {
+            skipped.push({ rule, verdict: intake.verdict });
+            continue;
           }
+          const row = await insertWritingRule({
+            rule, category: "style", status: "pending", source: "train-chat",
+          });
+          if (row) pending.push({ id: row.id, rule: row.rule });
         }
 
-        emit({ type: "done", new_rules: newRules, saved_to_vault: savedToVault, session_id: savedSessionId });
+        const usage = await claudeStream.finalMessage();
+        await recordUsage({
+          operation: "learn",
+          model: usage.model,
+          input_tokens: usage.usage.input_tokens,
+          output_tokens: usage.usage.output_tokens,
+          cache_creation_input_tokens: usage.usage.cache_creation_input_tokens ?? 0,
+          cache_read_input_tokens: usage.usage.cache_read_input_tokens ?? 0,
+          duration_ms: 0,
+          success: true,
+        });
+
+        emit({
+          type: "done",
+          new_rules: pending.map((row) => row.rule),
+          pending,
+          skipped,
+          session_id: savedSessionId,
+        });
       } catch (err) {
-        console.error("[train-ai] stream error", err);
+        console.error("[train-ai] stream error:", err);
         emit({ type: "error", message: "Something went wrong. Try again." });
       } finally {
         controller.close();
@@ -242,7 +204,7 @@ export async function POST(req: NextRequest) {
     headers: {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
-      "Connection": "keep-alive",
+      Connection: "keep-alive",
     },
   });
 }

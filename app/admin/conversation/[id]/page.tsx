@@ -31,6 +31,38 @@ import { ConfirmationModal, ContractModal } from "./Modals";
 
 type Inquiry = AdminInquiry;
 
+/** Shape returned by POST /api/draft-reply for every mode. */
+type AiDraftResponse = {
+  draft?: string;
+  error?: string;
+  validation?: DraftValidation | null;
+  warnings?: ContextWarning[];
+  usage?: DraftUsage | null;
+  budget?: { state: "ok" | "warning" | "over"; message: string | null } | null;
+};
+
+type DraftValidation = {
+  valid: boolean;
+  needsReview: boolean;
+  issues: { type: string; severity: "high" | "medium" | "low"; description: string; excerpt?: string }[];
+};
+
+type ContextWarning = {
+  code: string;
+  severity: "high" | "medium" | "low";
+  message: string;
+};
+
+type DraftUsage = {
+  model: string;
+  input_tokens: number;
+  output_tokens: number;
+  cache_read_input_tokens: number;
+  duration_ms: number;
+  estimated_cost_usd: number;
+  unpriced_model: boolean;
+};
+
 const FONTS_HREF = "https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..900;1,9..144,400..900&family=IBM+Plex+Mono:wght@400;500;600&display=swap";
 
 export default function ConversationPage() {
@@ -60,7 +92,16 @@ export default function ConversationPage() {
   const [subject,       setSubject]       = useState("");
   const [subjectSource, setSubjectSource] = useState<SubjectSource>("generated");
   const [feedback,      setFeedback]      = useState("");
-  const [refineSaved,      setRefineSaved]      = useState<string | null>(null);
+  // Deterministic validation + context gaps from the last AI response. Shown in
+  // the compose panel so an unverified fact is visible before Chris sends.
+  const [validation,       setValidation]       = useState<DraftValidation | null>(null);
+  const [contextWarnings,  setContextWarnings]  = useState<ContextWarning[]>([]);
+  const [lastUsage,        setLastUsage]        = useState<DraftUsage | null>(null);
+  const [editLoading,      setEditLoading]      = useState<null | "shorten" | "naturalize">(null);
+  const [exampleSaving,    setExampleSaving]    = useState(false);
+  // Edits classified as corrections to this one email. Surfaced so it is clear
+  // why they did not become rules.
+  const [factualEdits,     setFactualEdits]     = useState<string[]>([]);
   const [aiDraftExpanded,  setAiDraftExpanded]  = useState(false);
   const [sendLoading,   setSendLoading]   = useState(false);
   const [toast,         setToast]         = useState<{ msg: string; ok: boolean } | null>(null);
@@ -276,54 +317,78 @@ export default function ConversationPage() {
     if (opening) loadBody(id);
   }
 
+  // ── Shared request context ──────────────────────────────────────────────────
+  // Built once and reused by every AI operation so each one sees the same
+  // verified facts. Structured messages let the server read booking state
+  // deterministically instead of inferring it from prose.
+  function buildAiPayload(): Record<string, unknown> | null {
+    if (!inquiry) return null;
+
+    const threadContext = messages.length > 0
+      ? messages.map(m => {
+          const body = bodies[m.id] ? stripQuotes(bodies[m.id]).slice(0, 800) : m.snippet;
+          return `[${fmtDate(m.timestamp)}] ${m.isMe ? "You (Chris)" : inquiry.name}:\n${body}`;
+        }).join("\n\n---\n\n")
+      : null;
+
+    const lastMsg = messages.at(-1);
+    const latestBody = lastMsg
+      ? (bodies[lastMsg.id] ? stripQuotes(bodies[lastMsg.id]) : lastMsg.snippet)
+      : null;
+
+    return {
+      name:                inquiry.name,
+      email:               inquiry.email,
+      phone:               inquiry.phone,
+      session_type:        inquiry.session_type,
+      date_in_mind:        inquiry.date_in_mind,
+      message:             inquiry.message,
+      school:              inquiry.school,
+      people:              inquiry.people,
+      preferred_time:      inquiry.preferred_time,
+      location:            inquiry.location,
+      instagram:           inquiry.instagram,
+      thread_context:      threadContext,
+      thread_loaded:       !threadLoading,
+      thread_messages:     messages.map(m => ({
+        timestamp: m.timestamp,
+        fromMe:    m.isMe,
+        body:      bodies[m.id] ? stripQuotes(bodies[m.id]) : m.snippet,
+      })),
+      latest_message_body: latestBody,
+      latest_message_from: lastMsg ? (lastMsg.isMe ? "me" : "client") : null,
+    };
+  }
+
+  // Applies a successful AI response. Shared so every operation surfaces
+  // validation issues and context warnings the same way.
+  function applyAiResult(json: AiDraftResponse & { draft: string }): void {
+    setDraft(json.draft);
+    setLastAiDraft(json.draft);
+    setValidation(json.validation ?? null);
+    setContextWarnings(json.warnings ?? []);
+    setLastUsage(json.usage ?? null);
+    if (json.budget?.message) showToast(json.budget.message, json.budget.state === "ok");
+  }
+
   // ── AI Draft ────────────────────────────────────────────────────────────────
   async function generateDraft(refeedback?: string) {
-    if (!inquiry) return;
+    const payload = buildAiPayload();
+    if (!inquiry || !payload) return;
+    if (draftLoading) return; // guards double-clicks before the server dedup sees them
     setDraftLoading(true);
     try {
-      // Build a readable summary of the thread for Claude using loaded bodies
-      const threadContext = messages.length > 0
-        ? messages.map(m => {
-            const body = bodies[m.id] ? stripQuotes(bodies[m.id]).slice(0, 800) : m.snippet;
-            return `[${fmtDate(m.timestamp)}] ${m.isMe ? "You (Chris)" : inquiry.name}:\n${body}`;
-          }).join("\n\n---\n\n")
-        : undefined;
-
-      // Most recent email body — used so AI replies to what was last said, not the original form
-      const lastMsg = messages.at(-1);
-      const latestBody = lastMsg
-        ? (bodies[lastMsg.id] ? stripQuotes(bodies[lastMsg.id]) : lastMsg.snippet)
-        : null;
-
-      // Fetch similar sent emails for tone matching (same as polishDraft does)
-      const gmailQuery = buildGmailQuery(inquiry.message, inquiry.session_type);
-      const gmailRes = await fetch(
-        `/api/gmail/similar-sent?query=${encodeURIComponent(gmailQuery)}`
-      ).catch(() => null);
-      const gmailJson = gmailRes?.ok ? await gmailRes.json().catch(() => null) : null;
-      const gmailExamples: string[] = gmailJson?.examples ?? [];
-
-      const payload: Record<string, string | string[] | null> = {
-        name:                inquiry.name,
-        email:               inquiry.email,
-        phone:               inquiry.phone,
-        session_type:        inquiry.session_type,
-        date_in_mind:        inquiry.date_in_mind,
-        message:             inquiry.message,
-        school:              inquiry.school,
-        people:              inquiry.people,
-        preferred_time:      inquiry.preferred_time,
-        location:            inquiry.location,
-        instagram:           inquiry.instagram,
-        thread_context:      threadContext ?? null,
-        latest_message_body: latestBody ?? null,
-        latest_message_from: lastMsg ? (lastMsg.isMe ? "me" : "client") : null,
-        ...(gmailExamples.length ? { gmail_examples: gmailExamples } : {}),
-      };
-
-      if (refeedback && draft) {
-        payload.previous_draft = draft;
-        payload.feedback        = refeedback;
+      // A refinement is a surgical edit of the current draft; a bare generate
+      // writes a fresh one. Regenerating over an existing draft is flagged so
+      // the usage dashboard can separate first tries from retries.
+      const isRefine = Boolean(refeedback && draft);
+      if (isRefine) {
+        payload.mode = "refine";
+        payload.current_draft = draft;
+        payload.feedback = refeedback;
+      } else {
+        payload.mode = "generate";
+        payload.is_regeneration = Boolean(draft.trim());
       }
 
       const res  = await fetch("/api/draft-reply", {
@@ -331,18 +396,11 @@ export default function ConversationPage() {
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify(payload),
       });
-      const json = await res.json();
+      const json = await res.json() as AiDraftResponse;
       if (json.draft) {
-        setDraft(json.draft);
-        setLastAiDraft(json.draft);
+        applyAiResult({ ...json, draft: json.draft });
         setLearnedRules(null);
         setFeedback("");
-        if (json.saved_rule) {
-          setRefineSaved(json.saved_rule);
-          setTimeout(() => setRefineSaved(null), 6000);
-        }
-        // Lock in the original draft on first generate only (not refinements)
-        const isRefine = Boolean(refeedback);
         const draftPayload: { inquiryId: number | string; draft: string; ai_draft: string; original_ai_draft?: string } = {
           inquiryId,
           draft: json.draft,
@@ -367,71 +425,32 @@ export default function ConversationPage() {
     }
   }
 
-  // ── Polish: fix typos / convert bullet points to email ─────────────────────
-
-  // Derive Gmail search keywords from the draft text + inquiry context so we
-  // can pull matching sent emails as tone examples.
-  function buildGmailQuery(text: string, sessionType: string | null): string {
-    const haystack = `${text} ${sessionType ?? ""}`.toLowerCase();
-    const terms: string[] = [];
-
-    if (/confirm|confirmed|session date|meeting point|my number|deposit paid|signed|contract/.test(haystack))
-      terms.push("confirmed session meeting point");
-    if (/first reply|inquiry|interested|reach out|session type|packages|pricing/.test(haystack))
-      terms.push("photography inquiry packages");
-    if (/reminder|day before|tomorrow|heads up/.test(haystack))
-      terms.push("session reminder tomorrow");
-    if (/reschedule|change.*date|move.*date/.test(haystack))
-      terms.push("reschedule session");
-    if (/cancel/.test(haystack))
-      terms.push("cancel session");
-    if (/location|shoot at|meet at/.test(haystack))
-      terms.push("location directions meet");
-
-    // Always include session type keywords so results stay relevant
-    if (sessionType) terms.push(sessionType.split(" ")[0]);
-
-    return terms.length ? terms.join(" ") : "photography session";
-  }
-
+  // ── Polish: fix typos / convert dictation or bullets into an email ─────────
+  //
+  // Tone examples used to come from a Gmail search of the Sent folder on every
+  // call (one search plus five message fetches). They now come from the curated
+  // approved-example pool server-side: an email being in Sent does not make it
+  // a good writing reference.
   async function polishDraft(textOverride?: string) {
     const textToPolish = textOverride ?? draft;
-    if (!inquiry || !textToPolish.trim()) return;
+    const payload = buildAiPayload();
+    if (!inquiry || !payload || !textToPolish.trim()) return;
+    if (polishLoading) return;
     setPolishLoading(true);
     try {
-      const threadContext = messages.length > 0
-        ? messages.map(m => {
-            const body = bodies[m.id] ? stripQuotes(bodies[m.id]).slice(0, 800) : m.snippet;
-            return `[${m.isMe ? "Chris" : inquiry.name}]: ${body}`;
-          }).join("\n\n")
-        : undefined;
-
-      // Fetch similar sent emails in parallel with no blocking
-      const gmailQuery = buildGmailQuery(textToPolish, inquiry.session_type);
-      const gmailRes = await fetch(
-        `/api/gmail/similar-sent?query=${encodeURIComponent(gmailQuery)}`
-      ).catch(() => null);
-      const gmailJson = gmailRes?.ok ? await gmailRes.json().catch(() => null) : null;
-      const gmailExamples: string[] = gmailJson?.examples ?? [];
+      payload.mode = "polish";
+      payload.raw_draft = textToPolish;
 
       const res  = await fetch("/api/draft-reply", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name:            inquiry.name,
-          email:           inquiry.email,
-          message:         inquiry.message,
-          session_type:    inquiry.session_type,
-          thread_context:  threadContext ?? null,
-          raw_draft:       textToPolish,
-          gmail_examples:  gmailExamples.length ? gmailExamples : undefined,
-        }),
+        body:    JSON.stringify(payload),
       });
-      const json = await res.json();
+      const json = await res.json() as AiDraftResponse;
       if (json.draft) {
-        setDraft(json.draft);
+        applyAiResult({ ...json, draft: json.draft });
         setManualAiDraft(json.draft);
-        showToast("✓ Polished — pre-filled in Learn from Reply");
+        showToast("Polished");
       } else {
         showToast(json.error ?? "Polish failed", false);
       }
@@ -439,6 +458,60 @@ export default function ConversationPage() {
       showToast("Polish failed", false);
     } finally {
       setPolishLoading(false);
+    }
+  }
+
+  // ── Make shorter / Make more natural ──────────────────────────────────────
+  // Both edit the draft in place and preserve every verified fact; the server
+  // validates the result against the same context that produced it.
+  async function editDraft(mode: "shorten" | "naturalize") {
+    const payload = buildAiPayload();
+    if (!inquiry || !payload || !draft.trim()) return;
+    if (editLoading) return;
+    setEditLoading(mode);
+    try {
+      payload.mode = mode;
+      payload.current_draft = draft;
+
+      const res  = await fetch("/api/draft-reply", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify(payload),
+      });
+      const json = await res.json() as AiDraftResponse;
+      if (json.draft) {
+        applyAiResult({ ...json, draft: json.draft });
+        showToast(mode === "shorten" ? "Shortened" : "Rewritten in your voice");
+      } else {
+        showToast(json.error ?? "Edit failed", false);
+      }
+    } catch {
+      showToast("Edit failed", false);
+    } finally {
+      setEditLoading(null);
+    }
+  }
+
+  // ── Approve the current draft as a writing example ────────────────────────
+  async function approveAsExample() {
+    if (!inquiry || !draft.trim() || exampleSaving) return;
+    setExampleSaving(true);
+    try {
+      const res = await fetch("/api/ai/examples", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          body:         draft,
+          session_type: inquiry.session_type,
+          inquiry_id:   String(inquiryId),
+        }),
+      });
+      const json = await res.json() as { ok?: boolean; error?: string };
+      showToast(json.ok ? "Saved as an approved example" : (json.error ?? "Could not save"), Boolean(json.ok));
+    } catch {
+      showToast("Could not save the example", false);
+    } finally {
+      setExampleSaving(false);
     }
   }
 
@@ -631,20 +704,17 @@ export default function ConversationPage() {
           showToast("Sent — but the inquiry status didn't update. Refresh to sync.", false);
         }
 
-        // Auto-learn from every send — fire and forget (don't block UX)
+        // Note what changed between the draft and what went out. Deterministic
+        // and free: no API call, and nothing is written to the rules. Sending
+        // an email must never silently change how future drafts are written.
         if (lastAiDraft) {
-          const sentDraft = draft;
-          const aiDraft   = lastAiDraft;
-          fetch("/api/draft-reply", {
+          fetch("/api/ai/learn", {
             method:  "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              name:         inquiry.name,
-              email:        inquiry.email,
-              message:      inquiry.message,
-              ai_draft:     aiDraft,
-              actual_sent:  sentDraft,
-              perfect_draft: sentDraft.trim() === aiDraft.trim(),
+              ai_draft:    lastAiDraft,
+              actual_sent: draft,
+              mode:        "auto",
             }),
           }).catch(() => {});
         }
@@ -1056,56 +1126,55 @@ export default function ConversationPage() {
     }
   }
 
-  // ── Teach AI: compare AI draft vs actual sent, write new rules to Obsidian vault ──
+  // ── Learn from edit ───────────────────────────────────────────────────────
+  //
+  // Deterministic classification runs first and for free. A changed price,
+  // date, time, or name is a correction to this one email and is reported as
+  // such, never generalised. Only genuine style changes become rule
+  // candidates, and they sit as pending until approved on the AI tab.
   async function learnFromReply() {
     const aiDraftToUse = originalAiDraft || lastAiDraft || manualAiDraft.trim();
     if (!inquiry || !aiDraftToUse || !actualSent.trim()) return;
     setLearnLoading(true);
-    const isPerfect = aiDraftToUse.trim() === actualSent.trim();
     try {
-      const analyzeRes = await fetch("/api/draft-reply", {
+      const res = await fetch("/api/ai/learn", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name:          inquiry.name,
-          email:         inquiry.email,
-          message:       inquiry.message,
-          ai_draft:      aiDraftToUse,
-          actual_sent:   actualSent.trim(),
-          perfect_draft: isPerfect,
+          ai_draft:    aiDraftToUse,
+          actual_sent: actualSent.trim(),
+          mode:        "review",
         }),
       });
-      const analyzeJson = await analyzeRes.json() as { rules?: string[]; written?: number; error?: string };
+      const json = await res.json() as {
+        edits?: { kind: string; category: string; description: string }[];
+        candidates?: { rule: string; intake: { verdict: string } }[];
+        message?: string;
+        error?: string;
+      };
 
-      const rawRules = analyzeJson.rules ?? [];
-      const identicalSentinel = rawRules.length === 1 && rawRules[0].toLowerCase().includes("identical");
-      const rules = identicalSentinel ? [] : rawRules;
-      const written = identicalSentinel ? 0 : (analyzeJson.written ?? 0);
+      if (json.error) { showToast(json.error, false); return; }
 
-      if (analyzeJson.error) {
-        showToast(analyzeJson.error, false);
+      const newRules = (json.candidates ?? [])
+        .filter(c => c.intake.verdict === "new")
+        .map(c => c.rule);
+
+      if (!newRules.length) {
+        // The common case worth being explicit about: a factual fix is not a
+        // writing preference, and the old system turned it into one anyway.
+        showToast(json.message ?? "Nothing to learn from these edits", false);
+        setFactualEdits((json.edits ?? []).filter(e => e.category === "factual").map(e => e.description));
         return;
       }
 
-      if (!rules.length) {
-        showToast(
-          identicalSentinel
-            ? "Drafts are identical — no differences to extract"
-            : "No extractable rules found — try with a more edited reply",
-          false
-        );
-        return;
-      }
-      setLearnedRules(rules);
+      setLearnedRules(newRules);
+      setFactualEdits((json.edits ?? []).filter(e => e.category === "factual").map(e => e.description));
       setActualSent("");
-      setManualAiDraft("");
-
-      const msg = written === 0
-        ? "Rules already in vault — nothing new to add"
-        : `✓ ${written} new rule${written === 1 ? "" : "s"} saved to Obsidian vault`;
-      showToast(msg, written > 0);
+      showToast(
+        `${newRules.length} rule${newRules.length === 1 ? "" : "s"} waiting for approval on the AI tab`,
+      );
     } catch {
-      showToast("Analysis failed — try again", false);
+      showToast("Could not analyze the edit", false);
     } finally {
       setLearnLoading(false);
     }
@@ -1238,15 +1307,21 @@ export default function ConversationPage() {
             voiceError={voiceError}
             draftLoading={draftLoading}
             polishLoading={polishLoading}
+            editLoading={editLoading}
+            exampleSaving={exampleSaving}
             draftSaving={draftSaving}
             draftSaved={draftSaved}
             sendLoading={sendLoading}
             feedback={feedback}         onFeedback={setFeedback}
-            refineSaved={refineSaved}
+            validation={validation}
+            contextWarnings={contextWarnings}
+            lastUsage={lastUsage}
             onToggleVoice={toggleVoice}
             onFocusKeyboard={focusComposeForDictation}
             onPolish={() => polishDraft()}
             onGenerate={generateDraft}
+            onEdit={editDraft}
+            onApproveExample={approveAsExample}
             onSaveDraft={saveDraftToCloud}
             onSend={sendEmail}
           />
@@ -1317,6 +1392,7 @@ export default function ConversationPage() {
             aiDraftExpanded={aiDraftExpanded}
             onAiDraftExpanded={setAiDraftExpanded}
             learnedRules={learnedRules}
+            factualEdits={factualEdits}
             learnLoading={learnLoading}
             onAnalyze={learnFromReply}
             onReset={() => { setLearnedRules(null); setActualSent(""); setManualAiDraft(""); }}
