@@ -163,9 +163,7 @@ function renderAvailability(context: EmailContext): string {
       // 17th, 18th, 19th, 20th, 21st, 22nd, 23rd, 25th, 26th, or 27th".
       // Chris writes "I'm available September 17th to 21st, 24th to 25th, or
       // the 29th" — a run becomes a range and the list stays short.
-      lines.push(
-        "That is more dates than belongs in an email. Offer three or four, or give a range where they run consecutively, the way Chris does. Any date on the list is fine to pick from.",
-      );
+      lines.push("Offer three or four of them, or a range where they run consecutively. Any of them is fine to pick.");
     }
   } else {
     lines.push("There are no open dates on the calendar. Do not offer any date.");
@@ -180,17 +178,13 @@ function renderAvailability(context: EmailContext): string {
   // Unconditional, because the leak came back through a path with no requested
   // date at all: "since my calendar starts October 15th". The client should
   // never learn that a table, a list, or a horizon exists.
-  lines.push(
-    "Never describe how you know your availability. No mention of a calendar, a list, a table, a window, or how far ahead it runs. Offer the dates, or say you'll confirm, and nothing about the machinery.",
-  );
+  lines.push("Never describe how you know your availability: no calendar, list, table, window, or how far ahead it runs.");
 
   // Worded as a constraint on claims, not as required output language. Asking
   // for a time to be "phrased as a proposal" produced a verbal tic: five
   // drafts out of eight explained that the time was not confirmed, sometimes
   // twice, which Chris never does.
-  lines.push(
-    "Availability is tracked by date only, with no verified time windows. So you may suggest a time, but never state or imply that a specific time is already confirmed or held. Suggest it the way Chris does, plainly and once, without explaining that it is provisional.",
-  );
+  lines.push("Times are not verified, so suggest one plainly and once, and never imply a specific time is already held. Do not explain that it is provisional.");
   return lines.join("\n");
 }
 
@@ -272,6 +266,7 @@ export function buildVolatileSystem(
     `# Verified pricing — the only prices you may state\n${renderPricing(context)}`,
     `# Timing\n${renderGoldenHour(context)}`,
     `# What this thread already establishes\n${context.thread.lines.map((l) => `- ${l}`).join("\n")}`,
+    `# Contact and signature\n${context.contact.map((l) => `- ${l}`).join("\n")}`,
     `# Facts you do not have\nAnything not stated above is unknown. Do not fill a gap with something plausible. Ask, or leave it out.`,
   ];
 

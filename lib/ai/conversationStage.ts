@@ -54,7 +54,7 @@ export type StageShape = {
 
 const SHAPES: Record<ConversationStage, Omit<StageShape, "stage">> = {
   initial_inquiry: {
-    job: "Answer their opening question, give them real dates, and tell them how booking works once.",
+    job: 'Answer their opening question, give them real dates, and tell them how booking works once. He almost always ends a first reply with "Looking forward to hearing back from you!"',
     opening: `Open "Thank you so much for reaching out!" and then say you'd love to do the specific session they asked for. If they are graduating or newly engaged, the congratulations belongs in that same first sentence or the line right after, never bolted onto the end of the "I'd love to" sentence.`,
     omit: ["turnaround time", "retainer percentages", "add-on menus they did not ask about"],
     targetWords: [80, 130],
@@ -157,8 +157,15 @@ export function detectStage(input: StageInput): ConversationStage {
   const { digest, admin, latestClientMessage, inquiryMessage, hasSessionDate } = input;
   const text = (latestClientMessage ?? inquiryMessage ?? "").toLowerCase();
 
+  // Paperwork out, money in, or a date on the record means this conversation
+  // is well past its opening, even when the thread could not be loaded. Gmail
+  // access can fail; the record cannot, and treating a booked client as a new
+  // inquiry is how they get re-pitched a session they already paid for.
+  const booked = admin.depositPaid || admin.bookingConfirmed || admin.invoiceSent;
+  const settled = booked || Boolean(admin.sessionDate);
+
   // No prior email at all: this is the reply to the form submission.
-  if (digest.messageCount <= 1 && !latestClientMessage) return "initial_inquiry";
+  if (digest.messageCount <= 1 && !latestClientMessage && !settled) return "initial_inquiry";
 
   if (DECLINING_CLIENT.test(text)) return "decline_or_close_out";
   if (RESCHEDULE.test(text)) return "rescheduling";
@@ -168,7 +175,6 @@ export function detectStage(input: StageInput): ConversationStage {
 
   // Booked and paid, now asking how the day works. Checked BEFORE
   // booking_confirmation so a parking question does not get a booking email.
-  const booked = admin.depositPaid || admin.bookingConfirmed || admin.invoiceSent;
   if (booked && LOGISTICS_QUESTION.test(text)) return "logistics_coordination";
   if (booked && !PRICE_QUESTION.test(text) && !DATE_QUESTION.test(text)) return "logistics_coordination";
 
@@ -179,6 +185,7 @@ export function detectStage(input: StageInput): ConversationStage {
     return booked ? "booking_confirmation" : "scheduling";
   }
   if (admin.invoiceSent || admin.contractSent) return "booking_confirmation";
+  if (settled && digest.messageCount <= 1) return "booking_confirmation";
 
   if (LOGISTICS_QUESTION.test(text) && hasSessionDate) return "logistics_coordination";
 

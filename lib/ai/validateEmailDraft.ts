@@ -169,6 +169,12 @@ function clientRaisedDates(context: EmailContext): Set<string> {
   for (const date of context.thread.digest.datesDiscussed) add(date);
   add(context.request.dateInMind);
 
+  // The settled session date from the record. Naming the date a client has
+  // already booked is not an invention, and flagging it was: two drafts
+  // correctly said "I can do October 9th" and "May 24th" off the record and
+  // were reported for making them up.
+  add(context.admin.sessionDate);
+
   // The inquiry form message is NOT part of the Gmail thread, so dates written
   // there never reached the thread digest. A draft answering "your September 1
   // deadline is earlier than my open dates" was flagged for naming a date the
@@ -191,11 +197,25 @@ function clientRaisedDates(context: EmailContext): Set<string> {
   ].join(" \n ");
 
   for (const date of slashDatesIn(clientText)) raised.add(date);
+
+  // "May 23rd or 24th" and "June 5, 6 or 12" are one month with several days.
+  // Matching only the first left the rest looking invented.
   for (const match of clientText.matchAll(
-    new RegExp(`\\b(${MONTHS}|${MONTH_ABBR})\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?\\b`, "gi"),
+    new RegExp(`\\b(${MONTHS}|${MONTH_ABBR})\\.?\\s+((?:\\d{1,2}(?:st|nd|rd|th)?(?:\\s*(?:,|or|and|to|-|through|&)\\s*)?)+)`, "gi"),
   )) {
-    const canonical = canonicalDate(match[1], match[2]);
-    if (canonical) raised.add(canonical);
+    const days = [...match[2].matchAll(/\d{1,2}/g)].map((d) => Number(d[0]));
+    for (const day of days) {
+      const canonical = canonicalDate(match[1], String(day));
+      if (canonical) raised.add(canonical);
+    }
+    // "May 20-22" and "May 20 to 22" mean the 21st as well.
+    if (/-|to|through|–/.test(match[2]) && days.length >= 2) {
+      const [first, last] = [Math.min(...days), Math.max(...days)];
+      for (let day = first; day <= last && day <= 31; day += 1) {
+        const canonical = canonicalDate(match[1], String(day));
+        if (canonical) raised.add(canonical);
+      }
+    }
   }
 
   return raised;
@@ -355,7 +375,12 @@ function checkFacts(draft: string, context: EmailContext): ValidationIssue[] {
   // ── Booking state ─────────────────────────────────────────────────────────
   const claimsSent = /\b(?:just |already )?sent (?:you |over |out )?(?:the |your )?(?:invoice|contract)/i.test(draft)
     || /\b(?:invoice|contract) (?:is|has been) (?:sent|attached|on its way)\b/i.test(draft);
-  if (claimsSent && context.thread.digest.invoice !== "sent" && context.thread.digest.contract !== "sent") {
+  // Checked against the RECORD first. This check used to read only the thread,
+  // which is why a draft claiming "I sent the invoice and contract" was caught
+  // for a client whose record said so, and would have been missed for one
+  // whose record said otherwise.
+  if (claimsSent && !context.admin.invoiceSent && !context.admin.contractSent
+      && context.thread.digest.invoice !== "sent" && context.thread.digest.contract !== "sent") {
     issues.push({
       type: "fabricated_booking_state", category: "factual", severity: "high",
       description: "Says the invoice or contract was sent, but nothing in the thread shows it was.",
@@ -364,7 +389,7 @@ function checkFacts(draft: string, context: EmailContext): ValidationIssue[] {
 
   const claimsPaid = /\b(?:deposit|retainer|payment)\b[^.!?]{0,40}\b(?:received|came through|went through|confirmed)\b/i.test(draft)
     || /\byour (?:session|date) is (?:confirmed|booked|secured)\b/i.test(draft);
-  if (claimsPaid && !context.thread.digest.depositPaid) {
+  if (claimsPaid && !context.admin.depositPaid && !context.thread.digest.depositPaid) {
     issues.push({
       type: "fabricated_payment", category: "factual", severity: "high",
       description: "Treats the booking as paid or confirmed with no evidence of a deposit.",
@@ -468,25 +493,42 @@ function checkDetailEcho(draft: string, context: EmailContext): ValidationIssue[
   return issues;
 }
 
-/** The booking step stated more than once. */
+/**
+ * The booking step stated more than once.
+ *
+ * Deliberately narrow. An earlier version counted any paragraph containing
+ * "let me know" or "invoice", which flagged a perfectly good 44-word
+ * confirmation whose last line was "let me know if you have any questions" —
+ * a courtesy close, not a second next step.
+ */
 function checkDuplicateNextStep(draft: string): ValidationIssue[] {
-  const mentions = [...draft.matchAll(/\b(?:invoice|contract)\b/gi)].length;
-  const asks = [...draft.matchAll(/\blet me know\b/gi)].length;
-  const issues: ValidationIssue[] = [];
-
-  // Two separate paragraphs each carrying a next step.
   const paragraphs = trimmedParagraphs(draft);
-  const closingish = paragraphs.filter((block) =>
-    /\blet me know\b/i.test(block) || /\b(?:invoice|contract)\b/i.test(block),
-  );
-  if (closingish.length > 1 && (mentions >= 1 && asks >= 1)) {
-    issues.push({
-      type: "duplicate_next_step", category: "style", severity: "medium",
-      description: "The ask and the booking step are in two paragraphs. Chris puts them in one sentence.",
-      excerpt: closingish[closingish.length - 1].slice(0, 90),
-    });
-  }
-  return issues;
+
+  // A forward-looking promise to send the paperwork. Past tense is a fact
+  // about what happened, not a next step.
+  const promisesPaperwork = (block: string) =>
+    /\b(?:i'?ll|i will|i can|once we)\b[^.!?]*\b(?:invoice|contract)\b/i.test(block)
+    || /\b(?:invoice|contract)\b[^.!?]*\b(?:to secure|once we)\b/i.test(block);
+
+  // An ask that moves the booking along, rather than a general courtesy.
+  const asksToDecide = (block: string) =>
+    /\blet me know\b[^.!?]*\b(?:which|if|what|when|whether|date|time|works|sounds good|you'?d (?:like|prefer))\b/i.test(block)
+    && !/\blet me know if you have any questions\b/i.test(block);
+
+  const promising = paragraphs.filter(promisesPaperwork);
+  const asking = paragraphs.filter(asksToDecide);
+
+  // Two separate paragraphs, one asking and one promising, is the split Chris
+  // writes as a single sentence.
+  if (!promising.length || !asking.length) return [];
+  const sameParagraph = paragraphs.some((block) => promisesPaperwork(block) && asksToDecide(block));
+  if (sameParagraph) return [];
+
+  return [{
+    type: "duplicate_next_step", category: "style", severity: "medium",
+    description: "The ask and the booking step are in two paragraphs. Chris puts them in one sentence.",
+    excerpt: promising[promising.length - 1].slice(0, 90),
+  }];
 }
 
 function checkWritingQuality(draft: string, context: EmailContext): ValidationIssue[] {

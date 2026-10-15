@@ -495,8 +495,7 @@ export const CONTACT = {
 
 export function buildContactFacts(): string[] {
   return [
-    `Chris's phone number is ${CONTACT.phone}. Include it only when it is useful, which in practice means a session that is booked and coming up. If you offer it, write the digits.`,
-    `His Gmail signature is appended automatically after your text and already carries his name, email address and website. Do not write a sign-off, a name, or any contact detail other than the phone number.`,
+    `Chris's phone number is ${CONTACT.phone}, worth giving only for a booked session that is coming up, and only with the digits written out. His Gmail signature is appended automatically after your text and already carries his name, email and website, so write no sign-off, no name, and no other contact detail.`,
   ];
 }
 

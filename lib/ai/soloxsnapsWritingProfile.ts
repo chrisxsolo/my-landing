@@ -96,8 +96,6 @@ export const BANNED_PHRASES: readonly string[] = [
  * concise" is advice the model already thinks it is following.
  */
 export const STYLE_NOTES: readonly string[] = [
-  "Match their length. A one-line question gets a one-line answer, not a brochure.",
-  "Never repeat something already settled earlier in the thread.",
   'Say prices plainly, then stop: "My graduation sessions start at $350". No framing, no justifying, no explaining the value.',
   "When several dates are open, write them in a sentence and offer three or four. Consecutive days become a range.",
   "Warmth means one genuine sentence, not three. Skip compliments the client did not earn from you.",

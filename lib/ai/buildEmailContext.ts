@@ -11,7 +11,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { classifySession } from "./sessionClassifier";
-import { buildPricingFacts, buildTravelFact, buildPolicyFacts, type PricingFacts } from "./businessFacts";
+import { buildPricingFacts, buildTravelFact, buildPolicyFacts, buildContactFacts, type PricingFacts } from "./businessFacts";
 import { buildGoldenHourWindow, goldenHourCaveat, type GoldenHourWindow } from "./goldenHour";
 import { buildThreadDigest, renderThreadDigest, type ThreadDigest, type ThreadMessage } from "./threadDigest";
 import { selectExamples, type ApprovedExample, type ExampleScenario } from "./approvedExamples";
@@ -89,6 +89,8 @@ export type EmailContext = {
   };
   pricing: PricingFacts & { travelFact: string | null };
   policy: string[];
+  /** Phone number and signature behaviour, so no draft dangles a reference. */
+  contact: string[];
   goldenHour: { window: GoldenHourWindow | null; caveat: string | null };
   thread: { digest: ThreadDigest; lines: string[] };
   /** Where the conversation is, and the shape of email this turn calls for. */
@@ -338,6 +340,7 @@ export function buildEmailContext(input: BuildEmailContextInput): EmailContext {
     },
     pricing: { ...pricingFacts, travelFact },
     policy: buildPolicyFacts(),
+    contact: buildContactFacts(),
     goldenHour: {
       window: goldenHourDate ? buildGoldenHourWindow(goldenHourDate) : null,
       caveat: goldenHourCaveat(`${inquiry.location ?? ""} ${inquiry.preferredTime ?? ""} ${inquiry.message}`),

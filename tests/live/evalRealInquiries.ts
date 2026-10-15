@@ -53,6 +53,14 @@ type Row = {
   date_in_mind: string | null;
   preferred_time: string | null;
   location: string | null;
+  invoice_sent_at: string | null;
+  contract_sent_at: string | null;
+  deposit_paid_at: string | null;
+  gallery_delivered_at: string | null;
+  confirmation_sent_at: string | null;
+  booking_confirmed: boolean | null;
+  payment_status: string | null;
+  session_date: string | null;
 };
 
 type Split = "dev" | "holdout" | "regression" | "all";
@@ -85,7 +93,7 @@ async function main(): Promise<void> {
 
   const { data, error } = await supabase
     .from("inquiries")
-    .select("id, name, email, session_type, message, school, people, date_in_mind, preferred_time, location")
+    .select("id, name, email, session_type, message, school, people, date_in_mind, preferred_time, location, invoice_sent_at, contract_sent_at, deposit_paid_at, gallery_delivered_at, confirmation_sent_at, booking_confirmed, payment_status, session_date")
     .not("message", "is", null)
     .order("created_at", { ascending: false });
   if (error) { console.error(error.message); process.exit(1); }
@@ -130,6 +138,9 @@ async function main(): Promise<void> {
       rules: [],
       latestClientMessage: null,
       threadText: null,
+      // The authoritative record, so the draft cannot claim paperwork that
+      // never went out.
+      adminRow: row,
     }, call);
 
     usages.push(result.usage);
@@ -151,7 +162,10 @@ async function main(): Promise<void> {
       basePrices: result.context.pricing.basePrices,
       travelFact: result.context.pricing.travelFact,
       words,
+      stage: result.context.conversation.stage,
       valid: result.validation.valid,
+      factsVerified: result.validation.factsVerified,
+      styleIssues: result.validation.styleIssues,
       needsReview: result.validation.needsReview,
       issues: result.validation.issues,
       warnings: result.context.warnings,
@@ -165,7 +179,7 @@ async function main(): Promise<void> {
     console.log("─".repeat(72));
     console.log(result.draft);
     console.log();
-    console.log(`  validator: ${result.validation.valid ? "PASS" : "FAIL"}${result.validation.needsReview ? " (needs review)" : ""} · ${words} words`);
+    console.log(`  stage: ${result.context.conversation.stage} · facts ${result.validation.factsVerified ? "OK" : "FAIL"} · style flags ${result.validation.styleIssues.length} · ${words} words`);
     for (const issue of result.validation.issues) {
       console.log(`    [${issue.severity}] ${issue.type}: ${issue.description}${issue.excerpt ? ` — ${issue.excerpt}` : ""}`);
     }

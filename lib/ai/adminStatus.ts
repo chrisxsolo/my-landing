@@ -118,34 +118,40 @@ export function renderAdminStatus(status: AdminStatus): string[] {
     );
   }
 
-  lines.push(
-    status.invoiceSent
-      ? "The invoice HAS been sent. Do not say you will send it later."
-      : "No invoice has been sent. You may say you'll send it once details are settled. Do NOT say it has been sent, is on its way, or is in their inbox.",
-  );
-  lines.push(
-    status.contractSent
-      ? "The contract HAS been sent. Do not say you will send it later."
-      : "No contract has been sent. Same rule as the invoice.",
-  );
-  lines.push(
-    status.depositPaid
-      ? "The deposit HAS been received, so the session is paid for."
-      : "No deposit has been received. Do not call the session confirmed, booked, secured, or all set.",
-  );
+  // Collapsed when nothing has happened, which is most inquiries. Three
+  // separate negative sentences cost tokens on every draft to say one thing.
+  const nothingYet = !status.invoiceSent && !status.contractSent && !status.depositPaid;
+  if (nothingYet) {
+    lines.push(
+      "No invoice has been sent, no contract has been sent, and no deposit has been received. You may say you'll send the paperwork once the details are settled. Do NOT say any of it has been sent, is on its way, or is in their inbox, and do not call the session confirmed, booked, secured, or all set.",
+    );
+  } else {
+    lines.push(
+      status.invoiceSent
+        ? "The invoice HAS been sent. Do not say you will send it later."
+        : "No invoice has been sent. Do not say it has been.",
+    );
+    lines.push(
+      status.contractSent
+        ? "The contract HAS been sent. Do not say you will send it later."
+        : "No contract has been sent. Do not say it has been.",
+    );
+    lines.push(
+      status.depositPaid
+        ? "The deposit HAS been received, so the session is paid for."
+        : "No deposit has been received. Do not call the session confirmed, booked, secured, or all set.",
+    );
+    lines.push("Sent, paid, signed and confirmed are four different things. Never use one to imply another.");
+  }
 
   if (status.galleryDelivered) lines.push("The gallery HAS been delivered.");
   if (status.sessionDate) {
-    lines.push(`The session date on record is ${status.sessionDate}. Treat it as settled and do not offer alternatives unless they asked to move it.`);
+    // Worded so a paraphrase cannot leak the mechanism: a draft once wrote
+    // "your session date on record is May 20th", which is internal language.
+    lines.push(`Their session is ${status.sessionDate}. That is settled, so name it as a plain fact ("your session on May 20th") and never as a record, a file, or something you looked up. Do not offer alternatives unless they asked to move it.`);
   }
   if (status.invoicePromised || status.contractPromised) {
-    lines.push(
-      "Chris has already told them in this thread that the paperwork is coming. Do not explain the booking step again from scratch.",
-    );
+    lines.push("Chris has already told them the paperwork is coming. Do not explain the invoice and contract step again from scratch.");
   }
-
-  lines.push(
-    "Sent, paid, signed and confirmed are four different things. Never use one to imply another.",
-  );
   return lines;
 }
