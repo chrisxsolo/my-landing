@@ -16,6 +16,7 @@ import {
 } from "./aiUsage";
 import { estimateUsageCostUsd, type TokenUsage } from "./modelPricing";
 import type { InquiryAdminRow } from "./adminStatus";
+import { DRAFT_OUTCOMES_TABLE, type DraftOutcome } from "./draftOutcome";
 
 const RULES_TABLE = "ai_writing_rules";
 const EXAMPLES_TABLE = "ai_approved_examples";
@@ -179,6 +180,33 @@ export async function recordUsage(record: UsageRecord): Promise<void> {
     if (error) throw error;
   } catch (err) {
     console.error("[aiEmailStore] recordUsage failed:", err);
+  }
+}
+
+/**
+ * Records what happened to one draft between generation and send.
+ *
+ * Swallows its own failures like recordUsage does: the email has already gone
+ * out by the time this runs, and a metrics insert must never be able to report
+ * a send as failed.
+ */
+export async function recordDraftOutcome(outcome: DraftOutcome): Promise<void> {
+  try {
+    const supabase = createSupabaseServerClient();
+    const { error } = await supabase.from(DRAFT_OUTCOMES_TABLE).insert({
+      inquiry_id: outcome.inquiryId,
+      ai_words: outcome.aiWords,
+      sent_words: outcome.sentWords,
+      similarity: outcome.similarity,
+      sent_unchanged: outcome.sentUnchanged,
+      factual_edits: outcome.factualEdits,
+      stylistic_edits: outcome.stylisticEdits,
+      edit_kinds: outcome.editKinds,
+      was_regenerated: outcome.wasRegenerated,
+    });
+    if (error) throw error;
+  } catch (err) {
+    console.error("[aiEmailStore] recordDraftOutcome failed:", err);
   }
 }
 
