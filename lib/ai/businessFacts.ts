@@ -354,8 +354,10 @@ export function buildPricingFacts(input: BusinessFactsInput): PricingFacts {
 const CAMPUS_FEES: [RegExp, keyof typeof PRICING_CATALOG.graduation.travelFees][] = [
   [/sf ?state|san francisco state|sfsu/, "sf-state"],
   [/usf|university of san francisco/, "usf"],
-  [/uc ?berkeley|berkeley|cal\b/, "uc-berkeley"],
+  // CSU East Bay before Berkeley: "Cal State East Bay" would otherwise match
+  // Berkeley's bare "cal" and be billed Berkeley's fee.
   [/csueb|cal state east bay|east bay|hayward/, "csueb"],
+  [/uc ?berkeley|berkeley|cal\b(?! state)/, "uc-berkeley"],
   [/sjsu|san jose state/, "sjsu"],
   [/santa clara|scu/, "santa-clara"],
   [/stanford/, "stanford"],

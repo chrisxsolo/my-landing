@@ -65,6 +65,8 @@ describe("the location outranks the school", () => {
     // CSU East Bay's $30 is that campus, not everywhere in the East Bay.
     expect(buildTravelFact(null, "East Bay")).not.toContain("$30");
     expect(buildTravelFact("California State University, East Bay", null)).toContain("$30");
+    // "Cal State" is not Cal: this school field used to get Berkeley's fee.
+    expect(buildTravelFact("Cal State East Bay", null)).toContain("$30");
   });
 });
 
