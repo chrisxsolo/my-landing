@@ -6,10 +6,23 @@
 import type { RefObject } from "react";
 import { T, Icon, Spinner, Panel, PanelHead, MonoLabel } from "../ui";
 
+type DraftIssue = {
+  type: string;
+  /** "factual" | "format" | "style". Absent from older responses. */
+  category?: string;
+  severity: "high" | "medium" | "low";
+  description: string;
+  excerpt?: string;
+};
+
 export type DraftValidation = {
   valid: boolean;
   needsReview: boolean;
-  issues: { type: string; severity: "high" | "medium" | "low"; description: string; excerpt?: string }[];
+  /** No factual or format breach. Deliberately separate from the prose. */
+  factsVerified: boolean;
+  /** Writing-quality flags. Advisory, never a verification. */
+  styleIssues: DraftIssue[];
+  issues: DraftIssue[];
 };
 
 export type ContextWarning = {
@@ -182,11 +195,25 @@ export default function ComposePanel({
             ))}
           </div>
         )}
-        {validation && validation.valid && validation.issues.length === 0 && (
+        {/* Facts and prose are reported separately on purpose. The old copy
+            said "format and facts check out", which read as "send it" — but
+            nothing here assesses whether the email sounds like Chris. */}
+        {validation && validation.factsVerified && validation.issues.length === 0 && (
           <div className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium"
             style={{ background: T.greenBg, color: T.green }}>
             <Icon name="check" size={12} className="flex-shrink-0" />
-            <span>Format and facts check out. Still worth a read.</span>
+            <span>Dates, prices and booking status check out. Read it for voice before sending.</span>
+          </div>
+        )}
+        {validation && validation.factsVerified && validation.styleIssues.length > 0 && (
+          <div className="px-3 py-2 rounded-xl text-xs font-medium space-y-1"
+            style={{ background: T.blueBg, color: T.blue }}>
+            <p className="font-semibold">Facts are fine. These read as not-quite-Chris:</p>
+            {validation.styleIssues.map((issue, i) => (
+              <p key={`style-${issue.type}-${i}`} className="leading-snug">
+                {issue.description}{issue.excerpt ? ` (${issue.excerpt})` : ""}
+              </p>
+            ))}
           </div>
         )}
 

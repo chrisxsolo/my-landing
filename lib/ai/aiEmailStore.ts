@@ -15,6 +15,7 @@ import {
   type UsageRecord,
 } from "./aiUsage";
 import { estimateUsageCostUsd, type TokenUsage } from "./modelPricing";
+import type { InquiryAdminRow } from "./adminStatus";
 
 const RULES_TABLE = "ai_writing_rules";
 const EXAMPLES_TABLE = "ai_approved_examples";
@@ -208,3 +209,33 @@ export async function fetchMonthToDateSpendUsd(now: Date = new Date()): Promise<
 }
 
 export { estimateRecordCostUsd };
+
+/**
+ * Invoice, contract, deposit and gallery state for one inquiry.
+ *
+ * Read here rather than accepted from the request body, because this is what
+ * decides whether a draft may tell a client their paperwork went out. A draft
+ * once said "I sent the invoice and contract to your email" while
+ * `invoice_sent_at` was NULL, and that is the kind of claim that has to come
+ * from the record or not at all.
+ *
+ * Returns null on any failure, which buildAdminStatus treats as "unverified"
+ * and the prompt turns into "claim nothing".
+ */
+export async function fetchInquiryAdminRow(
+  inquiryId: number,
+): Promise<InquiryAdminRow | null> {
+  try {
+    const supabase = createSupabaseServerClient();
+    const { data, error } = await supabase
+      .from("inquiries")
+      .select("invoice_sent_at, contract_sent_at, deposit_paid_at, gallery_delivered_at, confirmation_sent_at, booking_confirmed, payment_status, session_date")
+      .eq("id", inquiryId)
+      .maybeSingle();
+    if (error) throw error;
+    return (data as InquiryAdminRow | null) ?? null;
+  } catch (err) {
+    console.error("[aiEmailStore] fetchInquiryAdminRow failed:", err);
+    return null;
+  }
+}

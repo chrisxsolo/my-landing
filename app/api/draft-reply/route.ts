@@ -31,6 +31,7 @@ import {
 } from "@/lib/ai/emailOperations";
 import type { ThreadMessage } from "@/lib/ai/threadDigest";
 import type { InquiryInput } from "@/lib/ai/buildEmailContext";
+import { fetchInquiryAdminRow } from "@/lib/ai/aiEmailStore";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +40,13 @@ type Mode = (typeof MODES)[number];
 
 type Body = {
   mode?: string;
+  /**
+   * The inquiry this draft is for. Used to read invoice, contract and deposit
+   * state from the record. Administrative status is NEVER taken from the
+   * request body: a browser must not be able to assert that an invoice went
+   * out, and the draft is what claims it to the client.
+   */
+  inquiry_id?: number | string | null;
   name?: string;
   email?: string;
   phone?: string | null;
@@ -157,10 +165,14 @@ export async function POST(req: NextRequest) {
 
   try {
     const result = await dedupe(key, async (): Promise<OperationResult> => {
-      const [availability, rules, examplePool] = await Promise.all([
+      const inquiryId = Number(body.inquiry_id);
+      const [availability, rules, examplePool, adminRow] = await Promise.all([
         fetchAvailabilitySnapshot(),
         fetchWritingRules(),
         fetchExamplePool(),
+        Number.isFinite(inquiryId) && inquiryId > 0
+          ? fetchInquiryAdminRow(inquiryId)
+          : Promise.resolve(null),
       ]);
 
       const shared = {
@@ -172,6 +184,10 @@ export async function POST(req: NextRequest) {
         threadLoaded: body.thread_loaded ?? (body.thread_messages?.length ?? 0) > 0,
         examplePool,
         rules,
+        adminRow,
+        // Every mode gets it, so stage detection is the same whether this is a
+        // fresh draft or a refinement of one.
+        latestClientMessage: body.latest_message_from === "me" ? null : (body.latest_message_body ?? null),
       };
 
       const call = createEmailModelCaller(apiKey, modelConfig);
@@ -191,7 +207,6 @@ export async function POST(req: NextRequest) {
           return generateDraft({
             ...shared,
             threadText,
-            latestClientMessage: body.latest_message_from === "me" ? null : (body.latest_message_body ?? null),
             chrisInstruction: body.feedback ?? null,
             isRegeneration: Boolean(body.is_regeneration),
           }, call);

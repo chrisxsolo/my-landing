@@ -16,8 +16,10 @@ import {
   PERMANENT_RULES,
   BANNED_PHRASES,
   STYLE_NOTES,
+  PHRASING_CORRECTIONS,
   getPlaybook,
 } from "./soloxsnapsWritingProfile";
+import { renderStage } from "./conversationStage";
 import type { EmailContext } from "./buildEmailContext";
 import type { SystemPrompt } from "./emailModel";
 import type { WritingRule } from "./writingRules";
@@ -55,6 +57,10 @@ export function buildStableSystem(
     `# Hard rules — never break these\n${bulletise(PERMANENT_RULES)}`,
     `# Never write these phrases\n${bulletise(BANNED_PHRASES)}`,
     `# Style\n${bulletise(STYLE_NOTES)}`,
+    // Concrete pairs, because the abstract rules above were not enough on
+    // their own: drafts kept producing phrasing Chris would not write while
+    // technically obeying every rule.
+    `# Phrasing Chris has rejected, and what he writes instead\n${bulletise(PHRASING_CORRECTIONS)}`,
   ];
 
   if (playbook) {
@@ -199,7 +205,9 @@ function renderAvailability(context: EmailContext): string {
  */
 const FACTS_ARE_NOT_A_SCRIPT = `These are the facts you are ALLOWED to state, not a list to get through. State only what they asked about, or what the next step genuinely needs. Leave the rest out.
 
-Specifically: do not volunteer turnaround time, delivery windows, retainer or balance policy, or add-on prices unless they asked, or unless the booking is being settled in this email.`;
+Specifically: do not volunteer turnaround time, delivery windows, retainer or balance policy, or add-on prices unless they asked, or unless the booking is being settled in this email.
+
+Price belongs in this email only if they asked about it, or a date is close to settled and they have never been quoted. If a price was already quoted in this thread, do not quote it again.`;
 
 function renderPricing(context: EmailContext): string {
   const lines = [...context.pricing.lines];
@@ -256,6 +264,10 @@ export function buildVolatileSystem(
   options: PromptOptions = {},
 ): string {
   const sections = [
+    // First, because it decides the shape of everything that follows. Without
+    // it every draft was written as a first reply.
+    `# Where this conversation is\n${renderStage(context.conversation.shape, context.thread.digest)}`,
+    `# Verified booking status — what you may and may not claim\n${context.admin.lines.map((l) => `- ${l}`).join("\n")}`,
     `# Verified availability\n${renderAvailability(context)}`,
     `# Verified pricing — the only prices you may state\n${renderPricing(context)}`,
     `# Timing\n${renderGoldenHour(context)}`,

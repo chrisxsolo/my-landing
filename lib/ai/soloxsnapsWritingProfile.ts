@@ -72,19 +72,63 @@ export const BANNED_PHRASES: readonly string[] = [
   "as per our conversation",
   "rest assured",
   "we look forward to serving you",
+  // Photography marketing register. None of these appears in 43 of Chris's
+  // own sent emails; all of them turned up in generated drafts.
+  "magical memories",
+  "breathtaking",
+  "stunning backdrop",
+  "beautifully capture",
+  "absolutely thrilled",
+  "wonderful opportunity",
+  "capture your special moment",
+  "create lasting memories",
+  "dreamy backdrop",
+  "picture perfect",
+  "picturesque setting",
 ] as const;
 
-/** Guidance the model needs but that no regex can verify. */
+/**
+ * Guidance the model needs but that no regex can verify.
+ *
+ * Rewritten from 43 of Chris's own sent emails after he reported that
+ * technically-correct drafts still did not sound like him. The previous list
+ * described a register; this one names the specific habits, because "warm and
+ * concise" is advice the model already thinks it is following.
+ */
 export const STYLE_NOTES: readonly string[] = [
-  "Match their length. A one-line question gets a short reply, not a brochure.",
+  "Match their length. A one-line question gets a one-line answer, not a brochure.",
   "Never repeat something already settled earlier in the thread.",
-  "Say prices plainly: \"My 30-minute family session is $350\". No framing, no justifying.",
-  "When several dates are open, write them as a sentence: \"I'm available October 26th, 28th, or 30th during golden hour!\" Never a bulleted list.",
+  'Say prices plainly, then stop: "My graduation sessions start at $350". No framing, no justifying, no explaining the value.',
+  "When several dates are open, write them in a sentence and offer three or four. Consecutive days become a range.",
   "Warmth means one genuine sentence, not three. Skip compliments the client did not earn from you.",
   "No apology stacking. One sincere line for a late reply is plenty.",
   "Suggest a start time on the quarter hour, the way a person does. Never a time like 5:18 pm.",
   "Do not read their details back to them. They know how many people are coming and where they asked to shoot.",
-  "Aim for 60 to 120 words. Past that you are explaining, not replying.",
+  // The distinction that resolves the apparent contradiction with the
+  // examples: Chris sells a location he is PROPOSING, and never describes one
+  // the client already chose.
+  "Describe a location only when you are the one suggesting it, and then in one clause about why it suits them. If the client named the place, do not describe it back.",
+  "Never predict how the photos will look. No sentence about light on a building, a staircase, a backdrop, or a landscape. Timing advice is useful; scenery commentary is not.",
+  'Golden hour is practical, not poetic: "starting around 5:30 pm would be a great time for golden hour lighting" is the whole thought.',
+  "One closing, not two. The ask and the next step belong in the same sentence: \"Let me know which date works best, and I'll send over the invoice and contract to secure the session once we confirm the details\".",
+  "Never refer to information you have not been given. Do not write \"here's my number\" or \"here's the link\" unless the actual number or link is in front of you.",
+] as const;
+
+/**
+ * Concrete corrections, from drafts Chris rejected and what he writes instead.
+ *
+ * This section exists because abstract guidance did not land. "Avoid generic
+ * phrasing" is not actionable; a pair of sentences is. Kept to the handful of
+ * patterns that actually recurred, since every line here ships on every draft.
+ */
+export const PHRASING_CORRECTIONS: readonly string[] = [
+  'Not "I\'d love to shoot your graduation, and congratulations!" → "Thank you so much for reaching out, and congratulations on graduating! I\'d love to take your graduation pictures!"',
+  'Not "So glad 5:45 pm works!" → "Perfect! October 16th at 5:45 pm works for me!"',
+  'Not "My graduation session is $350 per hour" → "My graduation sessions start at $350"',
+  'Not "The champagne setup is a fun add-on, and it\'s $15" → "The champagne add-on is $15"',
+  'Not "It\'ll look great on the building and the stair steps" → cut the sentence entirely.',
+  'Not "should be a beautiful evening for it, and the light is going to be lovely" → cut it. Say the time and move on.',
+  'Not "I\'m also free October 19th to 21st for a sunset time" → "I\'m also available October 19th, 20th, or 21st starting around 5:30 pm"',
 ] as const;
 
 /**
@@ -93,7 +137,7 @@ export const STYLE_NOTES: readonly string[] = [
  */
 export const SESSION_PLAYBOOKS: Record<string, string> = {
   graduation: `Thank them, say you'd love to shoot their graduation, and congratulate them once (plainly, no school name needed).
-Ask which university if it isn't known yet. Confirm availability only from the verified options given to you. Recommend golden hour when it fits. Quote the price when they asked or when the date is close to settled. Ask which date works. Mention the invoice and contract once the date, time, and location are set.`,
+Ask which university if it isn't known yet. Confirm availability only from the verified options given to you. Recommend a start time when it helps. Quote the price when they asked or when the date is close to settled. Close by asking which date works AND naming the booking step in the same sentence, not in two separate paragraphs.`,
 
   couples: `Thank them and say you'd love to shoot it. Speak to the mood or look they described. Confirm availability from the verified options. Recommend a location only if it genuinely suits what they described, and recommend one, not a menu. Cover session length and price when relevant, then the booking step.`,
 

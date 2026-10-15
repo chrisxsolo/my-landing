@@ -16,6 +16,10 @@ const eslintConfig = defineConfig([
     ".next-dev/**",
     // Standalone browser extension with its own (non-Next) conventions.
     "pixieset-extension/**",
+    // Throwaway evaluation scripts holding real client data. Gitignored, and
+    // not worth holding to the app's lint rules.
+    ".eval-out/**",
+    ".worktrees/**",
     // Skill/agent tooling scripts — Node CommonJS, not part of the app build.
     ".agents/**",
     ".claude/**",

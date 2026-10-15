@@ -121,7 +121,7 @@ describe("7. family inquiry involving a sensitive situation", () => {
       sessionType: "Family",
       message: "My father passed away and the family is together for the last time.",
     });
-    expect(context.examples.map((e) => e.id)).toContain("b-family-sensitive");
+    expect(context.examples.map((e) => e.id)).toContain("family-first-sensitive");
     expect(promptFor(context)).toMatch(/Do not write a sympathy card/i);
   });
 
@@ -134,7 +134,7 @@ describe("7. family inquiry involving a sensitive situation", () => {
 describe("8. client requesting travel pricing", () => {
   it("states an unlisted location's fee as unconfirmed rather than inventing one", () => {
     const context = contextFor({ sessionType: "Graduation", school: "UC Davis" });
-    expect(context.pricing.travelFact).toMatch(/not in the rate card and must be confirmed/i);
+    expect(context.pricing.travelFact).toMatch(/NOT in the rate card/i);
   });
 });
 
@@ -171,7 +171,7 @@ describe("11. client confirming a session date", () => {
       message("October 26th works, I just paid the deposit!", false, 1),
     ]);
     expect(context.thread.digest.depositPaid).toBe(true);
-    expect(context.examples.map((e) => e.id)).toContain("e-booking-confirmed");
+    expect(context.examples.map((e) => e.id)).toContain("booking-confirmation-invoice-sent");
   });
 });
 

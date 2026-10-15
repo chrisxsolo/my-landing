@@ -15,6 +15,8 @@ import { buildPricingFacts, buildTravelFact, buildPolicyFacts, type PricingFacts
 import { buildGoldenHourWindow, goldenHourCaveat, type GoldenHourWindow } from "./goldenHour";
 import { buildThreadDigest, renderThreadDigest, type ThreadDigest, type ThreadMessage } from "./threadDigest";
 import { selectExamples, type ApprovedExample, type ExampleScenario } from "./approvedExamples";
+import { detectStage, stageShape, type ConversationStage, type StageShape } from "./conversationStage";
+import { buildAdminStatus, renderAdminStatus, type AdminStatus, type InquiryAdminRow } from "./adminStatus";
 
 export type AvailabilityEntry = {
   date: string;
@@ -89,6 +91,10 @@ export type EmailContext = {
   policy: string[];
   goldenHour: { window: GoldenHourWindow | null; caveat: string | null };
   thread: { digest: ThreadDigest; lines: string[] };
+  /** Where the conversation is, and the shape of email this turn calls for. */
+  conversation: { stage: ConversationStage; shape: StageShape };
+  /** Invoice, contract, deposit and gallery state, from the record. */
+  admin: AdminStatus & { lines: string[] };
   examples: ApprovedExample[];
   warnings: ContextWarning[];
 };
@@ -110,25 +116,33 @@ export function normalizeDateInMind(raw: string | null | undefined): string | nu
   return parsed.toISOString().slice(0, 10);
 }
 
-/** Which approved examples this situation calls for. */
+/**
+ * Which approved examples this situation calls for.
+ *
+ * The conversation stage leads, because matching the SHAPE of the email
+ * matters more than matching the session type. The legacy scenario hints stay
+ * so a late reply or a declined date still pulls its specific example.
+ */
 function pickScenarios(
+  stage: ConversationStage,
   digest: ThreadDigest,
   requestedDateStatus: EmailContext["availability"]["requestedDateStatus"],
   hasOfferableDates: boolean,
 ): ExampleScenario[] {
-  const scenarios: ExampleScenario[] = [];
+  const scenarios: ExampleScenario[] = [stage];
 
-  if (digest.messageCount <= 1) scenarios.push("first-reply");
+  // Only a genuine first reply, so a long inquiry-shaped example cannot win
+  // retrieval on a thread that is five messages deep.
+  if (stage === "initial_inquiry") scenarios.push("first-reply");
   if (digest.daysSinceLastMessage !== null && digest.daysSinceLastMessage >= 3 && digest.awaitingChrisReply) {
     scenarios.push("late-reply");
   }
   if (requestedDateStatus === "booked" || requestedDateStatus === "on_hold") {
     scenarios.push("alternative-availability");
   }
-  if (digest.depositPaid || digest.invoice === "sent") scenarios.push("booking-confirmed");
   if (!hasOfferableDates && requestedDateStatus === "booked") scenarios.push("declining");
 
-  return scenarios.length ? scenarios : ["first-reply"];
+  return scenarios;
 }
 
 /** Tags that steer example retrieval, read off the client's own words. */
@@ -152,6 +166,14 @@ export type BuildEmailContextInput = {
   availability: AvailabilitySnapshot | null;
   /** True when the Gmail thread genuinely has no messages, vs failed to load. */
   threadLoaded: boolean;
+  /**
+   * The authoritative inquiry row. Read server-side from the id, never taken
+   * from the client: administrative claims are exactly the thing a browser
+   * must not be trusted to assert.
+   */
+  adminRow?: InquiryAdminRow | null;
+  /** The client's newest email, when it is theirs. Used for stage detection. */
+  latestClientMessage?: string | null;
   examplePool?: ApprovedExample[];
   now?: Date;
 };
@@ -250,15 +272,37 @@ export function buildEmailContext(input: BuildEmailContextInput): EmailContext {
     });
   }
 
-  // ── Thread ──────────────────────────────────────────────────────────────
+  // ── Thread, administrative status, conversation stage ───────────────────
   const digest = buildThreadDigest(messages, now);
-  if (digest.invoice === "promised" || digest.contract === "promised") {
+
+  // The record decides; the thread only softens. Without an inquiry row the
+  // status is a guess off the prose, and the prompt is told so.
+  const admin = buildAdminStatus(input.adminRow, digest);
+  if (!admin.verified) {
     warnings.push({
       code: "booking_state_uncertain",
       severity: "medium",
-      message: "The thread promises an invoice or contract but shows no evidence one was sent. Confirm before implying it went out.",
+      message: "No booking record was loaded, so invoice, contract and deposit state are unverified. The draft will not claim any of them happened.",
+    });
+  } else if (admin.invoicePromised || admin.contractPromised) {
+    warnings.push({
+      code: "booking_state_uncertain",
+      severity: "low",
+      message: "The thread promises an invoice or contract but the record shows none was sent. The draft will not imply it went out.",
     });
   }
+
+  // Falls back to the newest message that is theirs, so stage detection still
+  // works for callers that pass a thread without naming the latest message.
+  const newestClientMessage = [...messages].reverse().find((m) => !m.fromMe)?.body ?? null;
+
+  const stage = detectStage({
+    digest,
+    admin,
+    latestClientMessage: input.latestClientMessage ?? newestClientMessage,
+    inquiryMessage: inquiry.message,
+    hasSessionDate: Boolean(admin.sessionDate),
+  });
 
   // ── Golden hour ─────────────────────────────────────────────────────────
   // Only computed for a date that is actually offerable, so the draft can never
@@ -299,10 +343,12 @@ export function buildEmailContext(input: BuildEmailContextInput): EmailContext {
       caveat: goldenHourCaveat(`${inquiry.location ?? ""} ${inquiry.preferredTime ?? ""} ${inquiry.message}`),
     },
     thread: { digest, lines: renderThreadDigest(digest) },
+    conversation: { stage, shape: stageShape(stage) },
+    admin: { ...admin, lines: renderAdminStatus(admin) },
     examples: selectExamples(
       {
         sessionType: playbook,
-        scenarios: pickScenarios(digest, requestedDateStatus, offerable.length > 0),
+        scenarios: pickScenarios(stage, digest, requestedDateStatus, offerable.length > 0),
         tags: pickTags(inquiry),
       },
       input.examplePool,

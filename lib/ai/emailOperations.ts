@@ -11,7 +11,7 @@ import { buildEmailContext, type BuildEmailContextInput, type EmailContext } fro
 import { buildSystemPrompt, buildGenerateUserPrompt } from "./emailPrompt";
 import { validateEmailDraft, type ValidationResult } from "./validateEmailDraft";
 import { selectPromptRules, type WritingRule } from "./writingRules";
-import { PERMANENT_RULES } from "./soloxsnapsWritingProfile";
+import { PERMANENT_RULES, PHRASING_CORRECTIONS } from "./soloxsnapsWritingProfile";
 import type { EmailModelCaller, EmailCallResult } from "./emailModel";
 import type { EmailOperation, UsageRecord } from "./aiUsage";
 
@@ -75,7 +75,6 @@ export type OperationResult = {
 };
 
 export type GenerateInput = BuildEmailContextInput & {
-  latestClientMessage: string | null;
   threadText: string | null;
   chrisInstruction?: string | null;
   rules: WritingRule[];
@@ -109,12 +108,19 @@ export async function generateDraft(
   const system = buildSystemPrompt(context, selectPromptRules(input.rules));
   const userPrompt = buildGenerateUserPrompt({
     context,
-    latestClientMessage: input.latestClientMessage,
+    latestClientMessage: input.latestClientMessage ?? null,
     threadText: input.threadText,
     chrisInstruction: input.chrisInstruction,
   });
 
-  const result = await call({ system, userPrompt });
+  const result = await call({
+    system,
+    // A regeneration that reproduces the previous draft wastes the request.
+    // Nothing used to tell the model it was a second attempt.
+    userPrompt: input.isRegeneration
+      ? `${userPrompt}\n\nThis is a second attempt: Chris did not want the first draft. Write a genuinely different email. Change the structure and the wording, not the facts. If the previous version opened by thanking them, open another way. Shorter is usually the thing he wanted.`
+      : userPrompt,
+  });
   const draft = stripParagraphPeriods(stripSignoff(cleanDraft(result.text)));
 
   return {
@@ -233,7 +239,9 @@ ${input.currentDraft}
 
 Make it shorter. Cut filler, hedging, and anything said twice. Keep every fact: every date, time, price, location, question, and the next step all survive. If a sentence carries information, tighten it rather than deleting it.
 
-Do not introduce any new date, time, or price.
+Cut description before you cut information. A sentence about how the light or the location will look carries nothing and goes first.
+
+Do not introduce any new date, time, or price, and do not drop one to save words.
 
 Output the shorter email body only.`;
 
@@ -249,14 +257,24 @@ Output the shorter email body only.`;
   };
 }
 
-/** Pulls the wording back toward Chris's voice, facts untouched. */
+/**
+ * Pulls the wording back toward Chris's voice, facts untouched.
+ *
+ * Rewritten because this button did not work. It used to say "match the
+ * rhythm, warmth, and sentence length of the approved examples above", which
+ * aimed the model at a corpus that was itself the source of the generic
+ * phrasing — so pressing it produced another generic draft with more
+ * contractions. Now it names the specific faults to remove.
+ */
 export async function naturalizeDraft(
   input: EditInput,
   call: EmailModelCaller,
 ): Promise<OperationResult> {
   const context = buildEmailContext(input);
-  // Examples earn their place here: this operation is entirely about voice.
+  // Examples earn their place here: this operation is entirely about voice,
+  // and they are now stage-matched, so a short reply gets short models.
   const system = buildSystemPrompt(context, selectPromptRules(input.rules));
+  const [minWords, maxWords] = context.conversation.shape.targetWords;
 
   const userPrompt = `Here is the current draft:
 
@@ -264,9 +282,21 @@ export async function naturalizeDraft(
 ${input.currentDraft}
 </draft>
 
-Rewrite it so it sounds like Chris. Match the rhythm, warmth, and sentence length of the approved examples above. Strip anything that reads as corporate or stiff.
+This draft is accurate but it does not sound like Chris. Rewrite it so it does. Work through these specific faults and remove every one you find:
 
-Every fact stays exactly as it is: the same dates, the same times, the same prices, the same questions, the same next step. This is a voice change only.
+1. Sentences that describe how the photos, light, or location will look. "The light at the beach is going to be lovely", "it'll look great on the stairs", "should be a beautiful evening". Delete them outright. Do not replace them with a better description.
+2. Descriptions of a place the CLIENT chose. If they named the location, Chris does not tell them about it. Keep a location description only where Chris is the one suggesting somewhere new, and then one clause.
+3. Padding around a fact. "So glad that works!" becomes "Perfect!". "The champagne setup is a fun add-on, and it's $15" becomes "The champagne add-on is $15".
+4. A price explained or justified rather than stated. State it and move on.
+5. Two closings doing the same work. The ask and the next step go in one sentence.
+6. Anything already settled earlier in this thread, restated.
+7. Marketing register of any kind. He is a person replying to a person, not a business describing its service.
+
+${bulletiseCorrections()}
+
+Every fact stays exactly as it is: the same dates, the same times, the same prices, the same questions, the same next step, the same booking status. This is a voice change only, so do not add information and do not remove a fact to make it shorter.
+
+Aim for ${minWords} to ${maxWords} words, which is what Chris writes at this stage of a conversation.
 
 These rules still hold:
 ${PERMANENT_RULES.map((rule) => `- ${rule}`).join("\n")}
@@ -283,4 +313,8 @@ Output the rewritten email body only.`;
     usage: toUsageRecord("naturalize", result),
     estimatedCostUsd: 0,
   };
+}
+
+function bulletiseCorrections(): string {
+  return `Phrasings Chris has rejected, and what he writes instead:\n${PHRASING_CORRECTIONS.map((c) => `- ${c}`).join("\n")}`;
 }

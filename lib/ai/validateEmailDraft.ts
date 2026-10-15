@@ -30,10 +30,30 @@ export type IssueType =
   | "unanswered_question"
   | "truncated"
   | "too_long"
-  | "paragraph_period";
+  | "paragraph_period"
+  // ── Writing quality. These do not make a draft wrong, they make it one
+  //    Chris would rewrite, which is the failure that actually costs him time.
+  | "scenery_description"
+  | "detail_echo"
+  | "dangling_reference"
+  | "duplicate_next_step"
+  | "hourly_pricing"
+  | "stale_greeting"
+  | "marketing_language";
+
+/**
+ * Which kind of problem this is.
+ *
+ * Added because the UI reported "format and facts check out" and Chris
+ * reasonably read that as "send it". Facts passing says nothing about whether
+ * the email sounds like him, and conflating the two is what made the validator
+ * feel like it was approving drafts it had never assessed.
+ */
+export type IssueCategory = "factual" | "format" | "style";
 
 export type ValidationIssue = {
   type: IssueType;
+  category: IssueCategory;
   severity: "high" | "medium" | "low";
   description: string;
   /** The offending text, when there is a specific fragment to show. */
@@ -41,10 +61,14 @@ export type ValidationIssue = {
 };
 
 export type ValidationResult = {
-  /** No high-severity issues. */
+  /** No high-severity issues of any kind. */
   valid: boolean;
   /** True when something could not be checked deterministically. */
   needsReview: boolean;
+  /** No high-severity factual or format breach. Says nothing about the prose. */
+  factsVerified: boolean;
+  /** Writing-quality flags. Advisory: a judgement, never a verification. */
+  styleIssues: ValidationIssue[];
   issues: ValidationIssue[];
 };
 
@@ -186,13 +210,13 @@ function checkFormatting(draft: string, firstName: string): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
 
   if (draft.includes("—") || draft.includes("–")) {
-    issues.push({ type: "em_dash", severity: "high", description: "Contains an em or en dash." });
+    issues.push({ type: "em_dash", category: "format", severity: "high", description: "Contains an em or en dash." });
   }
 
   const upperMeridiem = draft.match(/\b\d{1,2}(?::\d{2})?\s?(?:AM|PM|A\.M\.|P\.M\.)\b/);
   if (upperMeridiem) {
     issues.push({
-      type: "uppercase_meridiem", severity: "high",
+      type: "uppercase_meridiem", category: "format", severity: "high",
       description: 'Times must be lowercase, like "5:30 pm".',
       excerpt: upperMeridiem[0],
     });
@@ -201,7 +225,7 @@ function checkFormatting(draft: string, firstName: string): ValidationIssue[] {
   const signature = SIGNATURE_PATTERNS.find((pattern) => pattern.test(draft));
   if (signature) {
     issues.push({
-      type: "signature_present", severity: "high",
+      type: "signature_present", category: "format", severity: "high",
       description: "Ends with a sign-off or signature. Gmail adds that, so this one would duplicate it.",
     });
   }
@@ -209,23 +233,23 @@ function checkFormatting(draft: string, firstName: string): ValidationIssue[] {
   for (const phrase of BANNED_PHRASES) {
     if (draft.toLowerCase().includes(phrase)) {
       issues.push({
-        type: "banned_phrase", severity: "medium",
+        type: "banned_phrase", category: "style", severity: "medium",
         description: "Uses corporate boilerplate.", excerpt: phrase,
       });
     }
   }
 
   if (/(?:^|\n)\s*(?:\*\*|##|###)|\*\*\w/.test(draft)) {
-    issues.push({ type: "markdown_formatting", severity: "high", description: "Contains markdown formatting." });
+    issues.push({ type: "markdown_formatting", category: "format", severity: "high", description: "Contains markdown formatting." });
   }
   if (/(?:^|\n)\s*(?:[-*•]\s+\S|\d+\.\s+\S)/.test(draft)) {
     issues.push({
-      type: "bullet_list", severity: "medium",
+      type: "bullet_list", category: "format", severity: "medium",
       description: "Contains a bulleted or numbered list. Availability belongs in a sentence.",
     });
   }
   if (EMOJI.test(draft)) {
-    issues.push({ type: "emoji", severity: "medium", description: "Contains an emoji." });
+    issues.push({ type: "emoji", category: "format", severity: "medium", description: "Contains an emoji." });
   }
 
   // Paragraphs are normalised by stripParagraphPeriods before this runs, so a
@@ -234,7 +258,7 @@ function checkFormatting(draft: string, firstName: string): ValidationIssue[] {
   const periodEnded = trimmedParagraphs(draft).filter((block) => /\.$/.test(block));
   if (periodEnded.length) {
     issues.push({
-      type: "paragraph_period", severity: "low",
+      type: "paragraph_period", category: "format", severity: "low",
       description: "A paragraph ends with a period, which Chris does not do.",
       excerpt: periodEnded[0].slice(-40),
     });
@@ -243,7 +267,7 @@ function checkFormatting(draft: string, firstName: string): ValidationIssue[] {
   const greeting = new RegExp(`^\\s*(?:hi|hey|hello)\\s+${firstName}\\b`, "i");
   if (!greeting.test(draft)) {
     issues.push({
-      type: "missing_greeting", severity: "medium",
+      type: "missing_greeting", category: "format", severity: "medium",
       description: `Does not open with "Hi ${firstName},".`,
     });
   }
@@ -296,7 +320,7 @@ function checkFacts(draft: string, context: EmailContext): ValidationIssue[] {
   for (const price of extractPrices(draft)) {
     if (isSupportedPrice(price, context)) continue;
     issues.push({
-      type: "unsupported_price", severity: "high",
+      type: "unsupported_price", category: "factual", severity: "high",
       description: "States a price that is not in the rate card and was not quoted earlier in this thread.",
       excerpt: `$${price}`,
     });
@@ -321,7 +345,7 @@ function checkFacts(draft: string, context: EmailContext): ValidationIssue[] {
     for (const date of extractDates(draft)) {
       if (offerable.has(date) || clientRaised.has(date)) continue;
       issues.push({
-        type: "unsupported_date", severity: "high",
+        type: "unsupported_date", category: "factual", severity: "high",
         description: "Names a date that is not on the open list and was never discussed.",
         excerpt: date,
       });
@@ -333,7 +357,7 @@ function checkFacts(draft: string, context: EmailContext): ValidationIssue[] {
     || /\b(?:invoice|contract) (?:is|has been) (?:sent|attached|on its way)\b/i.test(draft);
   if (claimsSent && context.thread.digest.invoice !== "sent" && context.thread.digest.contract !== "sent") {
     issues.push({
-      type: "fabricated_booking_state", severity: "high",
+      type: "fabricated_booking_state", category: "factual", severity: "high",
       description: "Says the invoice or contract was sent, but nothing in the thread shows it was.",
     });
   }
@@ -342,7 +366,7 @@ function checkFacts(draft: string, context: EmailContext): ValidationIssue[] {
     || /\byour (?:session|date) is (?:confirmed|booked|secured)\b/i.test(draft);
   if (claimsPaid && !context.thread.digest.depositPaid) {
     issues.push({
-      type: "fabricated_payment", severity: "high",
+      type: "fabricated_payment", category: "factual", severity: "high",
       description: "Treats the booking as paid or confirmed with no evidence of a deposit.",
     });
   }
@@ -377,12 +401,161 @@ function checkQuestionsAnswered(draft: string, context: EmailContext): Validatio
     }).length / keywords.length;
     if (covered < 0.34) {
       issues.push({
-        type: "unanswered_question", severity: "medium",
+        type: "unanswered_question", category: "style", severity: "medium",
         description: "A question in their latest email looks unanswered.",
         excerpt: question,
       });
     }
   }
+  return issues;
+}
+
+
+// ── Writing quality ─────────────────────────────────────────────────────────
+// Deterministic, cheap, and honest about what it is: these flag prose Chris
+// has told us he rewrites. They are advisory. Nothing here proves an email is
+// good, and a clean run does not mean "send it".
+
+/** Sentences predicting how the photos, light, or a place will look. */
+const SCENERY = [
+  /\b(?:the )?light(?:ing)? (?:is going to|will|would) (?:be|look)\b/i,
+  /\b(?:it|that|this|they)'?(?:ll| will| would)? (?:look|turn out) (?:great|amazing|beautiful|lovely|stunning|gorgeous|incredible)\b/i,
+  /\b(?:should|will) be a (?:beautiful|lovely|gorgeous|great|stunning) (?:evening|morning|day|time)\b/i,
+  /\bgoing to be (?:lovely|beautiful|gorgeous|stunning|magical)\b/i,
+  /\b(?:such a|what a) (?:beautiful|gorgeous|stunning|lovely) (?:spot|backdrop|setting|location)\b/i,
+];
+
+/** Soft marketing register that is not a fixed banned phrase. */
+const MARKETING = [
+  /\bperfect (?:backdrop|setting)\b/i,
+  /\bcan'?t wait to (?:capture|create)\b/i,
+  /\bunforgettable\b/i,
+  /\btruly special\b/i,
+  /\bone of a kind (?:experience|session)\b/i,
+];
+
+/** A reference to information the draft then fails to supply. */
+const DANGLING = [
+  { pattern: /\bhere'?s my (?:number|phone|cell)\b/i, satisfied: /\d{3}[-.\s]?\d{3}[-.\s]?\d{4}/ },
+  { pattern: /\b(?:here'?s|i'?ll send) the (?:link|pin)\b/i, satisfied: /https?:\/\/|maps\.app|goo\.gl/i },
+  { pattern: /\byou can (?:text|call|reach) me at\b/i, satisfied: /\d{3}[-.\s]?\d{3}[-.\s]?\d{4}/ },
+];
+
+/** Describing a place the client themselves named. */
+function checkDetailEcho(draft: string, context: EmailContext): ValidationIssue[] {
+  const named = (context.request.location ?? "").trim();
+  if (named.length < 4) return [];
+
+  // The distinctive word in what they called the place: "Rockaway Beach" →
+  // "rockaway". Generic words are skipped so "beach" alone cannot trigger.
+  const generic = new Set(["beach", "park", "campus", "garden", "gardens", "city", "hall", "the", "and", "in", "at", "san", "francisco", "building", "steps", "main", "inside", "possible", "front", "stair"]);
+  const words = named.toLowerCase().replace(/[^a-z\s]/g, " ").split(/\s+/)
+    .filter((w) => w.length > 3 && !generic.has(w));
+  if (!words.length) return [];
+
+  const issues: ValidationIssue[] = [];
+  for (const sentence of draft.split(/(?<=[.!?])\s+|\n/)) {
+    if (!words.some((w) => sentence.toLowerCase().includes(w))) continue;
+    // Praising or describing it, rather than using it as a fact.
+    if (!/\b(?:sounds like|is|are|has|have|would be|such a) (?:a )?(?:lovely|beautiful|great|perfect|gorgeous|stunning|amazing|wonderful|fun)\b/i.test(sentence)) continue;
+    issues.push({
+      type: "detail_echo", category: "style", severity: "medium",
+      description: "Describes a location the client chose themselves. Chris does not read their own details back to them.",
+      excerpt: sentence.trim().slice(0, 90),
+    });
+    break;
+  }
+  return issues;
+}
+
+/** The booking step stated more than once. */
+function checkDuplicateNextStep(draft: string): ValidationIssue[] {
+  const mentions = [...draft.matchAll(/\b(?:invoice|contract)\b/gi)].length;
+  const asks = [...draft.matchAll(/\blet me know\b/gi)].length;
+  const issues: ValidationIssue[] = [];
+
+  // Two separate paragraphs each carrying a next step.
+  const paragraphs = trimmedParagraphs(draft);
+  const closingish = paragraphs.filter((block) =>
+    /\blet me know\b/i.test(block) || /\b(?:invoice|contract)\b/i.test(block),
+  );
+  if (closingish.length > 1 && (mentions >= 1 && asks >= 1)) {
+    issues.push({
+      type: "duplicate_next_step", category: "style", severity: "medium",
+      description: "The ask and the booking step are in two paragraphs. Chris puts them in one sentence.",
+      excerpt: closingish[closingish.length - 1].slice(0, 90),
+    });
+  }
+  return issues;
+}
+
+function checkWritingQuality(draft: string, context: EmailContext): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+
+  for (const pattern of SCENERY) {
+    const hit = draft.match(pattern);
+    if (!hit) continue;
+    issues.push({
+      type: "scenery_description", category: "style", severity: "medium",
+      description: "Predicts how the photos or the light will look. Chris gives timing advice, not scenery commentary.",
+      excerpt: hit[0],
+    });
+    break;
+  }
+
+  for (const pattern of MARKETING) {
+    const hit = draft.match(pattern);
+    if (!hit) continue;
+    issues.push({
+      type: "marketing_language", category: "style", severity: "low",
+      description: "Reads as photography marketing rather than a person replying.",
+      excerpt: hit[0],
+    });
+    break;
+  }
+
+  for (const { pattern, satisfied } of DANGLING) {
+    const hit = draft.match(pattern);
+    if (!hit || satisfied.test(draft)) continue;
+    issues.push({
+      type: "dangling_reference", category: "style", severity: "high",
+      description: "Offers a phone number or link and then does not give it.",
+      excerpt: hit[0],
+    });
+  }
+
+  // Graduation is a package that starts at a price, not an hourly rate.
+  if (context.client.playbook === "graduation" && /\$\s?\d+\s*(?:per hour|\/\s?hour|\/\s?hr|an hour|a hour)/i.test(draft)) {
+    issues.push({
+      type: "hourly_pricing", category: "style", severity: "medium",
+      description: 'Quotes graduation as an hourly rate. Chris writes "my graduation sessions start at $350".',
+      excerpt: (draft.match(/\$\s?\d+\s*(?:per hour|\/\s?hour|\/\s?hr|an hour)/i) ?? [""])[0],
+    });
+  }
+
+  // A first-reply opening on a conversation that is already running.
+  const stage = context.conversation.stage;
+  if (stage !== "initial_inquiry" && context.thread.digest.messageCount > 1
+      && /thank you so much for reaching out/i.test(draft)) {
+    issues.push({
+      type: "stale_greeting", category: "style", severity: "medium",
+      description: `Opens like a first reply, but this is a ${stage.replace(/_/g, " ")} message.`,
+      excerpt: "Thank you so much for reaching out",
+    });
+  }
+
+  // Past the stage's own length budget, which is read off his sent mail.
+  const [, maxWords] = context.conversation.shape.targetWords;
+  const wordCount = draft.split(/\s+/).filter(Boolean).length;
+  if (wordCount > maxWords * 1.4) {
+    issues.push({
+      type: "too_long", category: "style", severity: "medium",
+      description: `${wordCount} words. At this stage Chris writes ${context.conversation.shape.targetWords[0]} to ${maxWords}.`,
+    });
+  }
+
+  issues.push(...checkDetailEcho(draft, context));
+  issues.push(...checkDuplicateNextStep(draft));
   return issues;
 }
 
@@ -398,7 +571,7 @@ export function validateEmailDraft(
 
   if (stopReason === "max_tokens") {
     issues.push({
-      type: "truncated", severity: "high",
+      type: "truncated", category: "factual", severity: "high",
       description: "Claude hit the output limit, so this draft is cut off. Do not send it.",
     });
   }
@@ -407,12 +580,13 @@ export function validateEmailDraft(
     ...checkFormatting(trimmed, context.client.firstName),
     ...checkFacts(trimmed, context),
     ...checkQuestionsAnswered(trimmed, context),
+    ...checkWritingQuality(trimmed, context),
   );
 
   const wordCount = trimmed.split(/\s+/).filter(Boolean).length;
   if (wordCount > MAX_REASONABLE_WORDS) {
     issues.push({
-      type: "too_long", severity: "low",
+      type: "too_long", category: "style", severity: "low",
       description: `${wordCount} words. Chris's replies run shorter than this.`,
     });
   }
@@ -421,9 +595,16 @@ export function validateEmailDraft(
   // matter how clean the string checks came out.
   const unverifiedContext = context.warnings.some((warning) => warning.severity === "high");
 
+  const styleIssues = issues.filter((issue) => issue.category === "style");
+  const factsVerified = !issues.some(
+    (issue) => issue.severity === "high" && issue.category !== "style",
+  );
+
   return {
     valid: !issues.some((issue) => issue.severity === "high"),
     needsReview: unverifiedContext || issues.length > 0,
+    factsVerified,
+    styleIssues,
     issues,
   };
 }

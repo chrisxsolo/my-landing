@@ -41,11 +41,9 @@ type AiDraftResponse = {
   budget?: { state: "ok" | "warning" | "over"; message: string | null } | null;
 };
 
-type DraftValidation = {
-  valid: boolean;
-  needsReview: boolean;
-  issues: { type: string; severity: "high" | "medium" | "low"; description: string; excerpt?: string }[];
-};
+// One definition, shared with the panel that renders it. The duplicate here
+// silently drifted out of date the moment the shape changed.
+import type { DraftValidation } from "./ComposePanel";
 
 type ContextWarning = {
   code: string;
@@ -337,6 +335,10 @@ export default function ConversationPage() {
       : null;
 
     return {
+      // The route reads invoice/contract/deposit state from this id. It is
+      // deliberately not sent as status flags: the browser must not be able to
+      // assert that paperwork went out.
+      inquiry_id:          inquiry.id,
       name:                inquiry.name,
       email:               inquiry.email,
       phone:               inquiry.phone,

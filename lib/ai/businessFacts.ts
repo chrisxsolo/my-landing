@@ -43,8 +43,12 @@ function graduationFacts(peopleCount: number): PricingFacts {
   const lines: string[] = [];
 
   if (peopleCount <= 1) {
-    lines.push(`Graduation session: ${money(grad.baseHourlyRate)} per hour, ${grad.standardMinimumImages}+ edited images, ${grad.durationRules.standardMinutes}-minute standard session.`);
-    lines.push(`A longer solo session is priced by the hour: ${grad.durationRules.allowedMinutes.join(", ")} minutes are the lengths offered.`);
+    // Phrased the way Chris phrases it: "My graduation sessions at San Jose
+    // State start at $350 for a 1-hour session". The catalog field is named
+    // baseHourlyRate, and rendering that literally as "$350 per hour" made
+    // the draft sound like it was selling time rather than a session.
+    lines.push(`Graduation sessions START AT ${money(grad.baseHourlyRate)} for a ${grad.durationRules.standardMinutes}-minute session, ${grad.standardMinimumImages}+ edited images. Say "start at ${money(grad.baseHourlyRate)}" or "${money(grad.baseHourlyRate)} for a 1-hour session". Do NOT say "${money(grad.baseHourlyRate)} per hour" or "${money(grad.baseHourlyRate)}/hour".`);
+    lines.push(`Longer sessions are available at ${grad.durationRules.allowedMinutes.join(", ")} minutes; ${money(grad.addOns.extra30Minutes.price)} for each extra 30 minutes.`);
   } else {
     const perPerson = peopleCount >= 6
       ? grad.groupRates[6]
@@ -434,8 +438,13 @@ export function buildTravelFact(
   const place = fieldNamesAPlace ? field : placeInMessage(message ?? "") || (campus ? "" : field);
   if (!place && !campus) return null;
 
+  // Worded as a constraint on CLAIMS, with relevance left to the stage. The
+  // previous wording ("say the travel fee depends on the exact location and
+  // that you'll confirm it") was an instruction to write a sentence, so every
+  // out-of-city draft carried a travel-fee paragraph whether or not the client
+  // had asked about money.
   const unknown = (subject: string) =>
-    `The travel fee for ${subject} is NOT in the rate card and must be confirmed by hand. Do not state a travel fee, and do not state a session total that includes one. Say the travel fee depends on the exact location and that you'll confirm it.`;
+    `${subject} is outside San Francisco, so a travel fee applies, but its amount is NOT in the rate card. Never state a travel-fee amount, and never give a session total that is missing it. Mention travel ONLY if you are quoting a price in this email or they asked what it costs; then one clause is enough ("plus a travel fee for ${subject}, which I'll confirm once we settle the location"). If this email is not about price, leave travel out entirely.`;
 
   // ── The location decides, when they gave one: it is where the shoot is ──
   if (place) {
@@ -445,7 +454,7 @@ export function buildTravelFact(
     // session somewhere in "East Bay" is not a CSU East Bay graduation, and
     // billing it that campus's $30 would be a guess.
     const fee = namedCampusFee(normalized);
-    if (fee !== null) return `Travel fee for ${place}: ${money(fee)}.`;
+    if (fee !== null) return `Travel fee for ${place}: ${money(fee)}. When you quote the session price, add this and give the all-in total, the way Chris does ("so $425 total").`;
     if (IN_SAN_FRANCISCO.test(normalized)) return `No travel fee for ${place}, it's in San Francisco.`;
     if (OUTSIDE_SAN_FRANCISCO.test(normalized)) return unknown(place);
     // The location told us nothing either way, so fall through to the school.
@@ -459,12 +468,36 @@ export function buildTravelFact(
       if (!pattern.test(normalized)) continue;
       const fee = fees[key];
       if (fee === null) return `No travel fee for ${campus}, it's in San Francisco.`;
-      if (typeof fee === "number") return `Travel fee for ${campus}: ${money(fee)}.`;
+      if (typeof fee === "number") return `Travel fee for ${campus}: ${money(fee)}. When you quote the session price, add this and give the all-in total, the way Chris does ("so $425 total").`;
       break;
     }
     return unknown(campus);
   }
   return unknown(place);
+}
+
+/**
+ * Contact details, so the draft can never dangle a reference to one.
+ *
+ * A real draft wrote "If you need to reach me, here's my number" and then
+ * stopped, because the number was nowhere in the prompt. Chris does give it
+ * out, in logistics emails: "You can also text me at 408-722-7680 if you need
+ * anything before the session".
+ *
+ * The Gmail signature the send path appends carries his email and website but
+ * NOT the phone number, so putting it in the body duplicates nothing.
+ */
+export const CONTACT = {
+  phone: "408-722-7680",
+  email: "soloxsnaps@gmail.com",
+  website: "soloxsnaps.com",
+} as const;
+
+export function buildContactFacts(): string[] {
+  return [
+    `Chris's phone number is ${CONTACT.phone}. Include it only when it is useful, which in practice means a session that is booked and coming up. If you offer it, write the digits.`,
+    `His Gmail signature is appended automatically after your text and already carries his name, email address and website. Do not write a sign-off, a name, or any contact detail other than the phone number.`,
+  ];
 }
 
 /** Booking policy and delivery timelines, identical for every session. */
