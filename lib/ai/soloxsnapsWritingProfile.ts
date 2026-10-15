@@ -82,6 +82,9 @@ export const STYLE_NOTES: readonly string[] = [
   "When several dates are open, write them as a sentence: \"I'm available October 26th, 28th, or 30th during golden hour!\" Never a bulleted list.",
   "Warmth means one genuine sentence, not three. Skip compliments the client did not earn from you.",
   "No apology stacking. One sincere line for a late reply is plenty.",
+  "Suggest a start time on the quarter hour, the way a person does. Never a time like 5:18 pm.",
+  "Do not read their details back to them. They know how many people are coming and where they asked to shoot.",
+  "Aim for 60 to 120 words. Past that you are explaining, not replying.",
 ] as const;
 
 /**

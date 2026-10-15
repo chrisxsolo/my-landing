@@ -109,6 +109,21 @@ export type GoldenHourWindow = {
   latestStart: string;
 };
 
+/** Start times round to the quarter hour. */
+const START_ROUNDING_MINUTES = 15;
+
+/**
+ * Rounds an instant to the nearest quarter hour.
+ *
+ * Sunset itself is a fact and stays exact, but a START time is a human
+ * suggestion and nobody proposes "5:18 pm". Handing the model a
+ * to-the-minute figure got exactly that parroted back into drafts.
+ */
+function roundToQuarterHour(instant: Date): Date {
+  const ms = START_ROUNDING_MINUTES * 60_000;
+  return new Date(Math.round(instant.getTime() / ms) * ms);
+}
+
 /**
  * Golden-hour window for a date, sized to the session.
  *
@@ -125,8 +140,8 @@ export function buildGoldenHourWindow(
   const sunset = computeSunsetUtc(dateStr, coords.latitude, coords.longitude);
   if (!sunset) return null;
 
-  const recommendedStart = new Date(sunset.getTime() - 60 * 60_000);
-  const latestStart = new Date(sunset.getTime() - sessionMinutes * 60_000);
+  const recommendedStart = roundToQuarterHour(new Date(sunset.getTime() - 60 * 60_000));
+  const latestStart = roundToQuarterHour(new Date(sunset.getTime() - sessionMinutes * 60_000));
 
   return {
     date: dateStr,

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { validateEmailDraft } from "@/lib/ai/validateEmailDraft";
+import { stripParagraphPeriods } from "@/lib/ai/emailOperations";
 import { buildEmailContext } from "@/lib/ai/buildEmailContext";
 import { AVAILABILITY, NOW, inquiry, message, GOOD_DRAFT } from "./fixtures";
 
@@ -146,5 +147,43 @@ describe("needsReview", () => {
     });
     const result = validateEmailDraft("Hi Sarah,\n\nThanks for reaching out!", unverified);
     expect(result.needsReview).toBe(true);
+  });
+});
+
+describe("paragraph periods", () => {
+  // The rule was in the permanent profile from the start but nothing enforced
+  // it. A live eval produced "I'd love to capture this for you." repeatedly.
+  it("strips the period from the end of a paragraph", () => {
+    const drafted = "Hi Sarah,\n\nI'd love to shoot your graduation photos.\n\nLet me know which date works.";
+    expect(stripParagraphPeriods(drafted)).toBe(
+      "Hi Sarah,\n\nI'd love to shoot your graduation photos\n\nLet me know which date works",
+    );
+  });
+
+  it("leaves question and exclamation marks alone", () => {
+    const drafted = "Hi Sarah,\n\nWhich date works best?\n\nLooking forward to hearing back from you!";
+    expect(stripParagraphPeriods(drafted)).toBe(drafted);
+  });
+
+  it("keeps periods inside a paragraph", () => {
+    const drafted = "Hi Sarah,\n\nThe session is $350. It includes 50+ images";
+    expect(stripParagraphPeriods(drafted)).toBe(drafted);
+  });
+
+  it("does not mangle an abbreviation at the end of a paragraph", () => {
+    const drafted = "Hi Sarah,\n\nI shoot all over the U.S.";
+    expect(stripParagraphPeriods(drafted)).toBe(drafted);
+  });
+
+  it("flags a survivor at low severity rather than blocking the draft", () => {
+    const result = validateEmailDraft("Hi Sarah,\n\nI shoot all over the U.S.", ctx());
+    const issue = result.issues.find((i) => i.type === "paragraph_period");
+    expect(issue?.severity).toBe("low");
+    expect(result.valid).toBe(true);
+  });
+
+  it("passes a draft already written the way Chris writes", () => {
+    const result = validateEmailDraft(GOOD_DRAFT, ctx());
+    expect(result.issues.map((i) => i.type)).not.toContain("paragraph_period");
   });
 });

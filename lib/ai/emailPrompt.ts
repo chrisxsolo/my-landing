@@ -109,11 +109,28 @@ function renderAvailability(context: EmailContext): string {
     );
   }
 
+  // Worded as a constraint on claims, not as required output language. Asking
+  // for a time to be "phrased as a proposal" produced a verbal tic: five
+  // drafts out of eight explained that the time was not confirmed, sometimes
+  // twice, which Chris never does.
   lines.push(
-    "Availability is tracked by date only. There are no verified time windows, so a time you suggest is a proposal. Phrase it as one and never claim a specific time is confirmed.",
+    "Availability is tracked by date only, with no verified time windows. So you may suggest a time, but never state or imply that a specific time is already confirmed or held. Suggest it the way Chris does, plainly and once, without explaining that it is provisional.",
   );
   return lines.join("\n");
 }
+
+/**
+ * Facts are what the draft MAY say, not what it must.
+ *
+ * Without this the model treated the whole block as a checklist: it
+ * volunteered 14-day delivery and a $150 expedited upsell to a client who
+ * asked only "what are your rates?", and recited the full retainer policy
+ * unprompted. That is the over-explaining Chris complained about, just with
+ * accurate numbers.
+ */
+const FACTS_ARE_NOT_A_SCRIPT = `These are the facts you are ALLOWED to state, not a list to get through. State only what they asked about, or what the next step genuinely needs. Leave the rest out.
+
+Specifically: do not volunteer turnaround time, delivery windows, retainer or balance policy, or add-on prices unless they asked, or unless the booking is being settled in this email.`;
 
 function renderPricing(context: EmailContext): string {
   const lines = [...context.pricing.lines];
@@ -123,6 +140,7 @@ function renderPricing(context: EmailContext): string {
   if (context.pricing.needsManualQuote) {
     lines.push(`PRICE NOT VERIFIED: ${context.pricing.needsManualQuote}`);
   }
+  lines.push("", FACTS_ARE_NOT_A_SCRIPT);
   return lines.join("\n");
 }
 

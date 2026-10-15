@@ -40,17 +40,31 @@ describe("formatLocalTime", () => {
 });
 
 describe("buildGoldenHourWindow", () => {
-  it("recommends starting an hour before sunset", () => {
+  it("recommends starting an hour before sunset, rounded to the quarter hour", () => {
     const window = buildGoldenHourWindow("2026-10-14", 60)!;
+    // Sunset stays exact because it is a fact; the start is a suggestion.
     expect(window.sunset).toBe("6:34 pm");
-    expect(window.recommendedStart).toBe("5:34 pm");
+    expect(window.recommendedStart).toBe("5:30 pm");
   });
 
-  it("walks the latest start back by the session length so it ends at sunset", () => {
+  it("walks the latest start back by the session length so it ends near sunset", () => {
     const thirty = buildGoldenHourWindow("2026-10-14", 30)!;
     const ninety = buildGoldenHourWindow("2026-10-14", 90)!;
-    expect(thirty.latestStart).toBe("6:04 pm");
-    expect(ninety.latestStart).toBe("5:04 pm");
+    expect(thirty.latestStart).toBe("6:00 pm");
+    expect(ninety.latestStart).toBe("5:00 pm");
+  });
+
+  it("never suggests an odd-minute start time", () => {
+    // A live eval produced "I'd suggest starting around 5:18 pm", which is not
+    // a time anyone proposes. Start times must land on :00/:15/:30/:45.
+    const dates = ["2026-01-09", "2026-03-15", "2026-06-21", "2026-08-02", "2026-10-26", "2026-12-21"];
+    for (const date of dates) {
+      for (const minutes of [30, 60, 90]) {
+        const window = buildGoldenHourWindow(date, minutes)!;
+        expect(window.recommendedStart).toMatch(/:(00|15|30|45) (am|pm)$/);
+        expect(window.latestStart).toMatch(/:(00|15|30|45) (am|pm)$/);
+      }
+    }
   });
 });
 

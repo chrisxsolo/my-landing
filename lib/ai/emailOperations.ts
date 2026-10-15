@@ -47,6 +47,25 @@ export function stripSignoff(text: string): string {
     .trimEnd();
 }
 
+/**
+ * Drops the period from the end of each paragraph.
+ *
+ * Chris does not put one there. The rule was in the permanent profile from the
+ * start but nothing enforced it, and a live eval showed the model adding them
+ * freely ("I'd love to capture this for you.").
+ *
+ * Stripped only after a lowercase letter, digit, or closing bracket, so a
+ * genuine abbreviation at the end of a paragraph ("...based in the U.S.") keeps
+ * its period rather than being mangled. Question and exclamation marks are
+ * left alone — those are his.
+ */
+export function stripParagraphPeriods(text: string): string {
+  return text
+    .split(/\n/)
+    .map((line) => line.replace(/([a-z0-9)\]])\.$/, "$1"))
+    .join("\n");
+}
+
 export type OperationResult = {
   draft: string;
   validation: ValidationResult;
@@ -96,7 +115,7 @@ export async function generateDraft(
   });
 
   const result = await call({ system, userPrompt });
-  const draft = stripSignoff(cleanDraft(result.text));
+  const draft = stripParagraphPeriods(stripSignoff(cleanDraft(result.text)));
 
   return {
     draft,
@@ -150,7 +169,7 @@ Any date, time, or price you keep or introduce must still come from the verified
 Output the revised email body only.`;
 
   const result = await call({ system: buildEditSystem(context, input.rules), userPrompt });
-  const draft = stripSignoff(cleanDraft(result.text));
+  const draft = stripParagraphPeriods(stripSignoff(cleanDraft(result.text)));
 
   return {
     draft,
@@ -188,7 +207,7 @@ ${input.rawDraft}
 Output the polished email body only.`;
 
   const result = await call({ system, userPrompt });
-  const draft = stripSignoff(cleanDraft(result.text));
+  const draft = stripParagraphPeriods(stripSignoff(cleanDraft(result.text)));
 
   return {
     draft,
@@ -219,7 +238,7 @@ Do not introduce any new date, time, or price.
 Output the shorter email body only.`;
 
   const result = await call({ system: buildEditSystem(context, input.rules), userPrompt });
-  const draft = stripSignoff(cleanDraft(result.text));
+  const draft = stripParagraphPeriods(stripSignoff(cleanDraft(result.text)));
 
   return {
     draft,
@@ -255,7 +274,7 @@ ${PERMANENT_RULES.map((rule) => `- ${rule}`).join("\n")}
 Output the rewritten email body only.`;
 
   const result = await call({ system, userPrompt });
-  const draft = stripSignoff(cleanDraft(result.text));
+  const draft = stripParagraphPeriods(stripSignoff(cleanDraft(result.text)));
 
   return {
     draft,

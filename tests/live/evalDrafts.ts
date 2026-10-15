@@ -27,6 +27,14 @@ function entry(date: string) {
   };
 }
 
+/**
+ * Fixed clock, so two runs are comparable.
+ *
+ * Without it the thread-age scenario drifted a day each day, and a run's
+ * output could not be diffed against an earlier one.
+ */
+const NOW = new Date("2026-10-14T12:00:00Z");
+
 const AVAILABILITY: AvailabilitySnapshot = {
   asOf: "2026-10-14",
   available: [entry("2026-10-26"), entry("2026-10-28"), entry("2026-10-30")],
@@ -83,6 +91,7 @@ const SCENARIOS: Scenario[] = [
   },
   {
     name: "Late reply, client waiting 9 days",
+    // Dated against NOW, not wall-clock, so "9 days" stays true.
     inquiry: {
       name: "Wilton Hayes", email: "w@example.com", sessionType: "Couples",
       message: "Following up on my note from last week, still hoping to book!",
@@ -136,6 +145,7 @@ async function main(): Promise<void> {
       messages: scenario.messages ?? [],
       availability: AVAILABILITY,
       threadLoaded: true,
+      now: NOW,
       rules: [],
       latestClientMessage: scenario.latest ?? null,
       threadText: null,

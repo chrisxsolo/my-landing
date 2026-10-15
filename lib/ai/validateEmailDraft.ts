@@ -29,7 +29,8 @@ export type IssueType =
   | "fabricated_payment"
   | "unanswered_question"
   | "truncated"
-  | "too_long";
+  | "too_long"
+  | "paragraph_period";
 
 export type ValidationIssue = {
   type: IssueType;
@@ -89,6 +90,11 @@ function normalizeDateMention(value: string): string | null {
   return named ? `${named[1].toLowerCase()} ${Number(named[2])}` : null;
 }
 
+/** Non-empty paragraphs, trimmed. */
+function trimmedParagraphs(draft: string): string[] {
+  return draft.split(/\n{2,}/).map((block) => block.trim()).filter(Boolean);
+}
+
 function checkFormatting(draft: string, firstName: string): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
 
@@ -133,6 +139,18 @@ function checkFormatting(draft: string, firstName: string): ValidationIssue[] {
   }
   if (EMOJI.test(draft)) {
     issues.push({ type: "emoji", severity: "medium", description: "Contains an emoji." });
+  }
+
+  // Paragraphs are normalised by stripParagraphPeriods before this runs, so a
+  // survivor is an abbreviation case left alone on purpose — worth showing,
+  // not worth blocking.
+  const periodEnded = trimmedParagraphs(draft).filter((block) => /\.$/.test(block));
+  if (periodEnded.length) {
+    issues.push({
+      type: "paragraph_period", severity: "low",
+      description: "A paragraph ends with a period, which Chris does not do.",
+      excerpt: periodEnded[0].slice(-40),
+    });
   }
 
   const greeting = new RegExp(`^\\s*(?:hi|hey|hello)\\s+${firstName}\\b`, "i");
