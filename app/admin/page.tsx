@@ -102,10 +102,12 @@ import {
 import {
   createAdminInquiry,
   deleteAdminInquiry,
+  deriveNeedsReply,
   inquiryConversationStatus,
   inquiryNeedsReply,
   loadAdminInquiries,
   refreshAdminInquiries,
+  replyAlertDismissed,
   updateAdminInquiry,
   type AdminInquiry,
 } from "@/lib/adminInquiries";
@@ -337,41 +339,71 @@ function AdminDashboard() {
   const [learnLoading,setLearnLoading]=useState<number|null>(null);
   const [learnedRules,setLearnedRules]=useState<Record<number,string[]>>({});
 
-  // ── Payment sync ──────────────────────────────────────────────────────────
-  const [syncLoading,setSyncLoading]=useState(false);
+  // ── Sync All ──────────────────────────────────────────────────────────────
+  // One button runs both heavyweight Gmail passes: payment detection (which
+  // only ever stages rows for review) and then the timeline / milestone scan,
+  // which reads the inquiry rows the first pass may have stamped. Sequential on
+  // purpose — two full mailbox sweeps at once just invites rate limiting.
+  const [syncState,setSyncState]=useState<"idle"|"running"|"done"|"failed">("idle");
   const [syncResult,setSyncResult]=useState<{name:string;email:string;amount:string;method:string;paymentType:string;paidAt:string;orphan:boolean;pass:number}[]|null>(null);
   const [syncMsg,setSyncMsg]=useState<string|null>(null);
-  const [timelineSyncLoading,setTimelineSyncLoading]=useState(false);
+  // A ref, not state: it has to be read and set within one tick so a double
+  // click (or the Clients tab's copy of the button) cannot start a second job.
+  const syncInFlight=useRef(false);
 
-  async function syncTimeline(){
-    setTimelineSyncLoading(true);
-    try{
-      const res=await fetch("/api/admin/sessions/sync-sent-invoices",{method:"POST"});
-      const json=await res.json();
-      if(!res.ok){showToast(json.error??"Gmail sync failed",false);return;}
-      showToast(json.message??"Timeline synced from Gmail ✓");
-      fetchInquiries();
-      fetchPortalSessions();
-    }catch{showToast("Gmail sync failed",false);}
-    finally{setTimelineSyncLoading(false);}
-  }
-
-  async function syncPayments(){
-    setSyncLoading(true);setSyncResult(null);setSyncMsg(null);
-    let scanned=false;
+  /** Payment detection pass. False means it failed; the message is already set. */
+  async function syncPaymentsPass():Promise<boolean>{
     try{
       const res=await fetch("/api/sync-payments",{method:"POST"});
       const json=await res.json();
-      if(!res.ok){setSyncMsg(json.error??"Sync failed");return;}
-      if(json.message){setSyncMsg(json.message);}
+      if(!res.ok){setSyncMsg(json.error??"Payment sync failed");return false;}
+      if(json.message)setSyncMsg(json.message);
       setSyncResult(json.staged??[]);
-      scanned=true;
-    }catch{setSyncMsg("Sync request failed");}
-    finally{setSyncLoading(false);}
-    // One click does both: after the payment scan, sync the timeline so
-    // detected milestones and portal stages light up without a second button.
-    if(scanned) await syncTimeline();
+      return true;
+    }catch{setSyncMsg("Payment sync request failed");return false;}
   }
+
+  /** Timeline / milestone pass. False means it failed. */
+  async function syncTimelinePass():Promise<boolean>{
+    try{
+      const res=await fetch("/api/admin/sessions/sync-sent-invoices",{method:"POST"});
+      const json=await res.json();
+      if(!res.ok){setSyncMsg(json.error??"Timeline sync failed");return false;}
+      return true;
+    }catch{setSyncMsg("Timeline sync request failed");return false;}
+  }
+
+  async function syncAll(){
+    if(syncInFlight.current)return;
+    syncInFlight.current=true;
+    setSyncState("running");setSyncResult(null);setSyncMsg(null);
+    try{
+      const payments=await syncPaymentsPass();
+      const timeline=await syncTimelinePass();
+      // Reload either way: a pass that failed halfway still wrote rows, and the
+      // dashboard should show whatever did land rather than stale cards.
+      await Promise.all([fetchInquiries(),fetchPortalSessions()]);
+      // Manual sync is explicit intent, so it skips the freshness window.
+      await autoRefreshInquiries({force:true});
+      if(payments&&timeline){
+        setSyncState("done");
+        showToast("Payments and timeline synced ✓");
+        // Let the confirmation sit for a moment, then return to the idle label.
+        setTimeout(()=>setSyncState(s=>s==="done"?"idle":s),4000);
+        return;
+      }
+      setSyncState("failed");
+      showToast(
+        payments?"Payments synced — timeline sync failed"
+        :timeline?"Timeline synced — payment sync failed"
+        :"Sync failed — nothing was updated",
+        false);
+    }finally{
+      syncInFlight.current=false;
+    }
+  }
+
+  const SYNC_LABEL={idle:"⟳ Sync All",running:"Syncing…",done:"✓ Synced Successfully",failed:"⚠ Sync Failed — Retry"} as const;
 
   // ── Gmail ─────────────────────────────────────────────────────────────────
   const [gmailConnected,setGmailConnected]=useState(false);
@@ -722,13 +754,31 @@ function AdminDashboard() {
     return Object.keys(headers).length?{headers}:undefined;
   }
 
-  // Fold new Gmail activity into inquiry reply state when the dashboard opens
-  // (and whenever it regains focus), so a reply sent straight from Gmail — or a
-  // client answering one — recolors the card without anyone pressing Sync
-  // Timeline. Cheap and server-throttled; silent on failure by design.
-  async function autoRefreshInquiries(){
-    const result=await refreshAdminInquiries();
-    if(result.updated>0)fetchInquiries();
+  // Fold new Gmail activity into inquiry reply state when the dashboard opens,
+  // whenever it regains focus, and whenever the Inquiries or Clients tab is
+  // entered, so a reply sent straight from Gmail — or a client answering one —
+  // recolors the card without anyone pressing Sync All.
+  //
+  // Deliberately the cheap deterministic pass (no AI, no bodies, no sending):
+  // it only refreshes reply state on rows Gmail says changed. The server skips
+  // it entirely when a successful pass ran inside the freshness window, so a
+  // tab-flip or a rerender costs one short request.
+  const autoRefreshInFlight=useRef(false);
+  const [autoRefreshing,setAutoRefreshing]=useState(false);
+
+  async function autoRefreshInquiries(options:{force?:boolean}={}){
+    // An effect can re-fire before the previous request settles; one pass at a
+    // time, so navigation never stacks up overlapping jobs.
+    if(autoRefreshInFlight.current)return;
+    autoRefreshInFlight.current=true;
+    setAutoRefreshing(true);
+    try{
+      const result=await refreshAdminInquiries(options);
+      if(result.updated>0)fetchInquiries();
+    }finally{
+      autoRefreshInFlight.current=false;
+      setAutoRefreshing(false);
+    }
   }
 
   async function fetchInquiries(){
@@ -844,6 +894,42 @@ function AdminDashboard() {
       showToast("Update failed",false);
     }
   }
+  // "Dismiss Reply Alert" is none of Replied, Archive or Not Interested: it
+  // records the conversation state the user chose to leave alone and nothing
+  // else — no email, no status change, no change to the reply history. The
+  // stored instant is what scopes it: reconciliation re-flags the row as soon
+  // as the client writes after it (see lib/inquiryReconcile.ts).
+  async function dismissReplyAlert(inq:Inquiry){
+    try{
+      const updated=await updateAdminInquiry(inq.id,{
+        needs_reply:false,
+        needs_reply_dismissed_at:new Date().toISOString(),
+      });
+      setInquiries(p=>p.map(x=>x.id===inq.id?updated:x));
+      showToast("Reply alert dismissed");
+    }catch(error){
+      console.error("[admin] dismissReplyAlert",error);
+      showToast("Could not dismiss reply alert",false);
+    }
+  }
+
+  // Back to automatic detection: clearing the dismissal instant lets the stored
+  // timestamps decide again, and deriveNeedsReply re-applies them now so the
+  // badge reappears immediately when the client's last message is unanswered.
+  async function restoreReplyAlert(inq:Inquiry){
+    try{
+      const updated=await updateAdminInquiry(inq.id,{
+        needs_reply:deriveNeedsReply(inq),
+        needs_reply_dismissed_at:null,
+      });
+      setInquiries(p=>p.map(x=>x.id===inq.id?updated:x));
+      showToast("Automatic reply detection restored");
+    }catch(error){
+      console.error("[admin] restoreReplyAlert",error);
+      showToast("Could not restore reply alert",false);
+    }
+  }
+
   async function saveSessionType(id:number,value:string){
     try{
       const updated=await updateAdminInquiry(id,{session_type:value.trim()||null});
@@ -1251,7 +1337,10 @@ function AdminDashboard() {
     document.addEventListener("visibilitychange",onVisible);
     return()=>document.removeEventListener("visibilitychange",onVisible);
   },[authed]);
-  useEffect(()=>{if(authed&&(tab==="inquiries"||tab==="clients")){fetchInquiries();fetchPortalSessions();fetchGmailStatus();fetchBlockedSenders();}},[authed,tab]);
+  // Entering Inquiries (or Clients) shows the stored rows at once and asks
+  // Gmail for anything new in the background — the freshness gate and the
+  // in-flight guard keep repeat visits from re-requesting.
+  useEffect(()=>{if(authed&&(tab==="inquiries"||tab==="clients")){fetchInquiries();fetchPortalSessions();fetchGmailStatus();fetchBlockedSenders();autoRefreshInquiries();}},[authed,tab]);
 
   // ── Professional portfolio handlers ──────────────────────────────────
   function categoryName(slug:string){return categories.find(c=>c.slug===slug)?.name??slug;}
@@ -1500,7 +1589,7 @@ function AdminDashboard() {
         actions={[
           {key:"new-client",icon:"➕",label:"New client",run:()=>{setTab("clients");setAddClientOpen(true);}},
           {key:"add-session",icon:"📸",label:"Add session to calendar",run:()=>{setTab("home");setAddEventForm(EMPTY_EVENT);setAddEventOpen(true);}},
-          {key:"sync-payments",icon:"💳",label:"Sync payments from Gmail",run:()=>{syncPayments();}},
+          {key:"sync-all",icon:"⟳",label:"Sync all from Gmail (payments + timeline)",run:()=>{syncAll();}},
           {key:"content-engine",icon:"🎞️",label:"Content Engine",run:()=>router.push("/admin/content-engine")},
           {key:"reminders",icon:"🔔",label:"Reminder templates",run:()=>router.push("/admin/reminder-templates")},
           {key:"portal",icon:"🗂️",label:"Portal sessions",run:()=>router.push("/admin/sessions")},
@@ -2815,8 +2904,13 @@ function AdminDashboard() {
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-[0.22em] mb-1" style={{color:T.inkFaint}}>Client Work</p>
                   <h2 className="text-xl font-black leading-none" style={{color:T.ink}}>Inquiries</h2>
-                  <p className="text-xs font-medium mt-1.5" style={{color:T.inkSoft}}>
-                    {inquiries.filter(i=>i.status==="new").length} new · {inquiries.length} total
+                  <p className="text-xs font-medium mt-1.5 flex items-center gap-2" style={{color:T.inkSoft}}>
+                    <span>{inquiries.filter(i=>i.status==="new").length} new · {inquiries.length} total</span>
+                    {autoRefreshing&&(
+                      <span className="flex items-center gap-1 text-[10px] font-bold" style={{color:T.inkFaint}}>
+                        <span className="animate-spin inline-block">◌</span> Checking Gmail…
+                      </span>
+                    )}
                   </p>
                 </div>
                 <div className="flex gap-2 items-center flex-wrap">
@@ -2832,15 +2926,14 @@ function AdminDashboard() {
                     <option value="session_date">Session date</option>
                     <option value="alpha">A → Z</option>
                   </select>
-                  <button onClick={syncPayments} disabled={syncLoading}
+                  <button onClick={syncAll} disabled={syncState==="running"}
+                    title="Scan Gmail for payments, then for invoice, contract and session milestones"
                     className="text-xs font-bold px-3 py-2 rounded-xl transition-all hover:-translate-y-px disabled:opacity-50 flex items-center gap-1.5"
-                    style={{background:T.greenBg,color:T.green,border:`1px solid ${T.greenBorder}`}}>
-                    {syncLoading?<><span className="animate-spin inline-block">◌</span> Scanning…</>:"💳 Sync Payments"}
-                  </button>
-                  <button onClick={syncTimeline} disabled={timelineSyncLoading}
-                    className="text-xs font-bold px-3 py-2 rounded-xl transition-all hover:-translate-y-px disabled:opacity-50 flex items-center gap-1.5"
-                    style={{background:T.violetBg,color:T.violet,border:`1px solid ${T.violetBorder}`}}>
-                    {timelineSyncLoading?<><span className="animate-spin inline-block">◌</span> Syncing…</>:"📬 Sync Timeline"}
+                    style={syncState==="failed"
+                      ?{background:T.redBg,color:T.red,border:`1px solid ${T.red}44`}
+                      :{background:T.greenBg,color:T.green,border:`1px solid ${T.greenBorder}`}}>
+                    {syncState==="running"&&<span className="animate-spin inline-block">◌</span>}
+                    {SYNC_LABEL[syncState]}
                   </button>
                   <button onClick={fetchInquiries} disabled={inquiriesLoading}
                     className="text-xs font-bold px-3 py-2 rounded-xl transition-all hover:-translate-y-px flex items-center gap-1.5"
@@ -3165,6 +3258,24 @@ function AdminDashboard() {
                                 {s==="new"?"● New":s==="responded"?"✓ Replied":s==="not_interested"?"✕ Not Int.":"○ Archive"}
                               </button>
                             ))}
+                            {/* Reply-alert override — separate from the statuses
+                                above, and shown only when there is something to
+                                dismiss or a dismissal to undo. */}
+                            {replyAlertDismissed(inq)?(
+                              <button onClick={()=>restoreReplyAlert(inq)}
+                                title="Put this inquiry back on automatic reply detection"
+                                className="text-[10px] font-bold px-2 py-0.5 rounded-lg transition-all hover:opacity-80"
+                                style={{background:T.inset,color:T.inkFaint}}>
+                                ↻ Restore Reply Alert
+                              </button>
+                            ):inquiryNeedsReply(inq)?(
+                              <button onClick={()=>dismissReplyAlert(inq)}
+                                title="Stop asking for a reply — sends nothing and leaves the status and email history alone"
+                                className="text-[10px] font-bold px-2 py-0.5 rounded-lg transition-all hover:opacity-80"
+                                style={{background:T.amberBg,color:T.amber,border:`1px solid ${T.amberBorder}`}}>
+                                🔕 Dismiss Reply Alert
+                              </button>
+                            ):null}
                           </div>
                         </div>
 
@@ -3625,15 +3736,14 @@ function AdminDashboard() {
                         {q?` matching "${q}"`:""}
                         {" · "}{inquiries.length} total session{inquiries.length===1?"":"s"}
                       </p>
-                      <button onClick={syncPayments} disabled={syncLoading}
+                      <button onClick={syncAll} disabled={syncState==="running"}
+                        title="Scan Gmail for payments, then for invoice, contract and session milestones"
                         className="text-xs font-bold px-3 py-1.5 rounded-lg transition-all hover:-translate-y-px flex items-center gap-1.5 disabled:opacity-50 flex-shrink-0"
-                        style={{background:T.greenBg,color:T.green,border:`1px solid ${T.greenBorder}`}}>
-                        {syncLoading?<><span className="animate-spin inline-block">◌</span> Scanning…</>:"💳 Sync Payments"}
-                      </button>
-                      <button onClick={syncTimeline} disabled={timelineSyncLoading}
-                        className="text-xs font-bold px-3 py-1.5 rounded-lg transition-all hover:-translate-y-px flex items-center gap-1.5 disabled:opacity-50 flex-shrink-0"
-                        style={{background:T.violetBg,color:T.violet,border:`1px solid ${T.violetBorder}`}}>
-                        {timelineSyncLoading?<><span className="animate-spin inline-block">◌</span> Syncing…</>:"📬 Sync Timeline"}
+                        style={syncState==="failed"
+                          ?{background:T.redBg,color:T.red,border:`1px solid ${T.red}44`}
+                          :{background:T.greenBg,color:T.green,border:`1px solid ${T.greenBorder}`}}>
+                        {syncState==="running"&&<span className="animate-spin inline-block">◌</span>}
+                        {SYNC_LABEL[syncState]}
                       </button>
                       <button onClick={()=>setAddClientOpen(o=>!o)}
                         className="text-xs font-bold px-3 py-1.5 rounded-lg transition-all hover:-translate-y-px flex items-center gap-1.5 flex-shrink-0"

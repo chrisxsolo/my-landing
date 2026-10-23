@@ -51,6 +51,12 @@ describe("withinCooldown", () => {
   it("does not trust a cursor from the future", () => {
     expect(withinCooldown(NOW + 60_000, NOW)).toBe(false);
   });
+
+  it("holds for five minutes — entering Inquiries again inside it is free", () => {
+    expect(REFRESH_COOLDOWN_MS).toBe(5 * 60_000);
+    expect(withinCooldown(NOW - 4 * 60_000, NOW)).toBe(true);
+    expect(withinCooldown(NOW - 6 * 60_000, NOW)).toBe(false);
+  });
 });
 
 describe("buildRefreshQueries", () => {

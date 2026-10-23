@@ -63,6 +63,19 @@ async function writeCursor(supabase: SupabaseAdmin, atMs: number): Promise<void>
   );
 }
 
+/**
+ * `{ force: true }` — sent by the manual "Sync All" button — skips the
+ * freshness gate. An absent or unparseable body is a normal automatic call.
+ */
+async function readForce(req: NextRequest): Promise<boolean> {
+  try {
+    const body = await req.json() as { force?: unknown } | null;
+    return body?.force === true;
+  } catch {
+    return false;
+  }
+}
+
 /** Message ids matching any of the windowed address queries. */
 async function searchWindow(auth: string, queries: string[]): Promise<string[]> {
   const ids = new Set<string>();
@@ -84,6 +97,7 @@ export async function POST(req: NextRequest) {
   const deny = requireAdmin(req);
   if (deny) return deny;
 
+  const force = await readForce(req);
   const tokens = await getValidTokens();
   // Not connected is a normal state on page load, not an error to toast.
   if (!tokens) return NextResponse.json({ connected: false, skipped: "gmail-not-connected", updated: 0 });
@@ -91,7 +105,7 @@ export async function POST(req: NextRequest) {
   const supabase = createSupabaseAdminClient();
   const now = Date.now();
   const cursor = await readCursor(supabase);
-  if (withinCooldown(cursor, now)) {
+  if (!force && withinCooldown(cursor, now)) {
     return NextResponse.json({ connected: true, skipped: "cooldown", updated: 0 });
   }
 

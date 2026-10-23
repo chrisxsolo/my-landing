@@ -197,12 +197,51 @@ export function inquiryConversationStatus(
 }
 
 /**
+ * Whether a manual "Dismiss Reply Alert" is still in force. A dismissal is
+ * scoped to the conversation state that existed when it was made: the moment
+ * the client writes again, the stored instant is older than the latest inbound
+ * message and automatic detection takes over. Mirrors the server-side rule in
+ * lib/inquiryReconcile.ts.
+ */
+export function replyAlertDismissed(inquiry: ConversationInquiry): boolean {
+  const dismissedAt = instant(inquiry.needs_reply_dismissed_at);
+  if (dismissedAt === null) return false;
+  const inboundAt = latest(inquiry.last_inbound_at, inquiry.created_at);
+  return inboundAt === null || inboundAt <= dismissedAt;
+}
+
+/**
+ * needs_reply as the timestamps alone imply it, ignoring both the stored flag
+ * and any dismissal. "Restore Reply Alert" uses it to put the card back on
+ * automatic detection without waiting for the next sync.
+ */
+export function deriveNeedsReply(inquiry: ConversationInquiry): boolean {
+  if (NEEDS_REPLY_EXEMPT_STATUSES.has(inquiry.status)) return false;
+  const inboundAt = latest(inquiry.last_inbound_at, inquiry.created_at);
+  if (inboundAt === null) return false;
+  const outboundAt = latest(
+    inquiry.last_outbound_at,
+    inquiry.reply_sent_at,
+    inquiry.invoice_sent_at,
+    inquiry.contract_sent_at,
+    inquiry.confirmation_sent_at,
+    inquiry.gallery_delivered_at,
+  );
+  return outboundAt === null || inboundAt > outboundAt;
+}
+
+/**
  * Whether an inquiry is awaiting a response from the photographer — i.e. it
  * belongs in the "Needs reply" queue (counts, filter chip, sort priority).
  * Brand-new inquiries count too; the card still shows them green as NEW.
+ *
+ * A live manual dismissal takes the row out of the queue whatever its status,
+ * which is what makes "Dismiss Reply Alert" work on an inquiry never replied to
+ * — the derived status stays "new", it just stops asking for attention.
  */
 export function inquiryNeedsReply(inquiry: ConversationInquiry): boolean {
   if (NEEDS_REPLY_EXEMPT_STATUSES.has(inquiry.status)) return false;
+  if (replyAlertDismissed(inquiry)) return false;
   const status = inquiryConversationStatus(inquiry);
   return status === "new" || status === "needs_reply";
 }
@@ -275,9 +314,15 @@ export type InquiryRefreshResult = {
  * the dashboard can call it on open. Never throws — a failed refresh leaves
  * the cards on their last verified state rather than breaking the page.
  */
-export async function refreshAdminInquiries(): Promise<InquiryRefreshResult> {
+export async function refreshAdminInquiries(
+  options: { force?: boolean } = {},
+): Promise<InquiryRefreshResult> {
   try {
-    const res = await fetch("/api/admin/inquiries/refresh", { method: "POST" });
+    const res = await fetch("/api/admin/inquiries/refresh", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ force: options.force === true }),
+    });
     if (!res.ok) return { connected: false, updated: 0, skipped: `http-${res.status}` };
     const json = await res.json() as Partial<InquiryRefreshResult>;
     return { connected: json.connected ?? false, updated: json.updated ?? 0, skipped: json.skipped };

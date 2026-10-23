@@ -23,8 +23,11 @@ import { normalizeEmail, type ReconcileMessage } from "@/lib/inquiryReconcile";
 /** site_settings key holding the epoch-ms instant of the last successful refresh. */
 export const INQUIRY_REFRESH_CURSOR_KEY = "inquiry_refresh_cursor";
 
-/** Opening the dashboard twice in a minute does not re-ask Gmail. */
-export const REFRESH_COOLDOWN_MS = 60_000;
+/**
+ * A successful automatic refresh this recently means re-opening Inquiries does
+ * not re-ask Gmail. The manual "Sync All" button bypasses it (force = true).
+ */
+export const REFRESH_COOLDOWN_MS = 5 * 60_000;
 /** How far back a first run (or a long-stale cursor) looks. */
 export const REFRESH_MAX_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
 /** Re-scan slightly before the cursor so a message racing the last run is not missed. */
