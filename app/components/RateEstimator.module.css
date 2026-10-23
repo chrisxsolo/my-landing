@@ -15,7 +15,6 @@
 .estimatorToggle,
 .estimatorSelect,
 .estimatorHint,
-.estimatorNote,
 .estimatorRow,
 .estimatorTotalRow,
 .estimatorDeposit,
@@ -244,13 +243,6 @@
 }
 
 /* ── NOTES ─────────────────────────────────────────────────────────────────── */
-.estimatorNote {
-  margin: 0 0 14px;
-  color: #65726d;
-  font-size: 13px;
-  line-height: 1.65;
-}
-
 /* ── CTA BUTTONS ───────────────────────────────────────────────────────────── */
 .estimatorCtas {
   display: flex;

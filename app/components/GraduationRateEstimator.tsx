@@ -10,7 +10,6 @@ import {
   type SessionLengthKey,
 } from "@/lib/pricing"
 import { BOOKING_POLICY, PRICING_CATALOG } from "@/lib/pricingCatalog"
-import { TRAVEL_RATE_LABEL } from "@/lib/travelFee"
 import { buildBookingIntentParams } from "@/lib/bookingIntent"
 import { trackEvent } from "@/lib/analytics/visitor"
 import styles from "@/app/components/RateEstimator.module.css"
@@ -81,8 +80,6 @@ export default function GraduationRateEstimator() {
     estimate.travelMethod === "none" ? "Included" :
     estimate.travelMethod === "tbd"  ? "TBD" :
     formatCurrency(estimate.travelFee as number)
-
-  const showTravelNote = estimate.travelMethod === "tbd" || estimate.travelMethod === "mileage"
 
   return (
     <section className={styles.estimator}>
@@ -206,21 +203,6 @@ export default function GraduationRateEstimator() {
             <span className={styles.estimatorTotalValue}>{formatCurrency(estimate.subtotal)}</span>
           </div>
         </div>
-
-        {/* Travel fee note */}
-        {showTravelNote && (
-          <p className={styles.estimatorNote}>
-            {estimate.travelMethod === "tbd"
-              ? `Travel outside San Francisco is ${TRAVEL_RATE_LABEL} per round-trip mile plus any bridge toll, confirmed for your exact location.`
-              : `Travel is ${TRAVEL_RATE_LABEL} per round-trip mile from San Francisco, rounded up to the nearest $5, plus any bridge toll on the route.`}
-          </p>
-        )}
-
-        {/* Disclaimer */}
-        <p className={styles.estimatorNote}>
-          Rough estimate only — final quote confirmed after date, time, and location are set.
-          Invoice and contract sent once everything is confirmed.
-        </p>
 
         {/* ── CTAs ──────────────────────────────────────────────────────────── */}
         <div className={styles.estimatorCtas}>
