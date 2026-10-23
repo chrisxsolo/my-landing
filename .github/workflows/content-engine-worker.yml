@@ -37,7 +37,10 @@ jobs:
       - name: Tick the worker until the queue is empty
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
-          SITE_URL: ${{ vars.SITE_URL || 'https://soloxsnaps.com' }}
+          # MUST be the canonical host: the apex 307s to www, and curl drops the
+          # Authorization header when a redirect crosses hosts, so a redirecting
+          # URL here would fail auth on every tick.
+          SITE_URL: ${{ vars.SITE_URL || 'https://www.soloxsnaps.com' }}
         run: |
           if [ -z "$CRON_SECRET" ]; then
             echo "CRON_SECRET is not set in this repository's Actions secrets."
@@ -61,6 +64,10 @@ jobs:
 
             case "$status" in
               200) ;;
+              30*)
+                echo "::error::$SITE_URL redirected — set the SITE_URL repo variable to the canonical host (auth is lost across a redirect)."
+                exit 1
+                ;;
               401|403)
                 echo "::error::Worker rejected the CRON_SECRET — check it matches the Vercel env var."
                 exit 1
