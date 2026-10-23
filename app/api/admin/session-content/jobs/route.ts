@@ -30,9 +30,9 @@ async function sessionIdFromBody(req: NextRequest): Promise<string | null> {
 }
 
 // Best-effort nudge so the run starts now rather than on the next cron tick.
-// The enqueue is already committed and the minute-by-minute cron will claim the
-// job regardless, so this failing (or being frozen before it leaves) only costs
-// a few seconds of latency.
+// The enqueue is already committed and the recurring tick (see the worker
+// route) will claim the job regardless, so this failing — or being frozen
+// before it leaves — only costs latency, never the run.
 function kickWorker(req: NextRequest): boolean {
   if (!CRON_SECRET) return false;
   void fetch(new URL("/api/content-engine/worker", req.nextUrl.origin), {

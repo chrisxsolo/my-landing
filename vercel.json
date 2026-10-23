@@ -6,7 +6,7 @@
     },
     {
       "path": "/api/content-engine/worker",
-      "schedule": "* * * * *"
+      "schedule": "20 16 * * *"
     }
   ]
 }

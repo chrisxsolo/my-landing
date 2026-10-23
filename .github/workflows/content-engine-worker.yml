@@ -1,0 +1,83 @@
+name: Content engine worker
+
+# Ticks the background content-run queue (/api/content-engine/worker).
+#
+# Why this lives in Actions and not vercel.json: this project is on a Vercel
+# Hobby plan, which allows only DAILY cron jobs — useless for draining a run
+# that takes a few minutes. GitHub's scheduled workflows are free and go down
+# to 5 minutes, which is plenty: the queue is durable and resumable, so a tick
+# only has to come along eventually. vercel.json keeps a daily tick as a
+# belt-and-braces sweep.
+#
+# If the Vercel plan is ever upgraded to Pro, move the schedule back into
+# vercel.json ("* * * * *") and delete this workflow.
+#
+# Needs CRON_SECRET in the repository's Actions secrets (the same value as the
+# Vercel env var). Without it this workflow no-ops instead of failing.
+# Note: GitHub disables scheduled workflows in a repo with no activity for 60
+# days, and schedules can lag at peak times.
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+# Never run two tickers at once. Jobs are leased, so an overlap would be safe —
+# it would just waste a runner.
+concurrency:
+  group: content-engine-worker
+  cancel-in-progress: false
+
+jobs:
+  drain:
+    name: Drain the queue
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Tick the worker until the queue is empty
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          SITE_URL: ${{ vars.SITE_URL || 'https://soloxsnaps.com' }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "CRON_SECRET is not set in this repository's Actions secrets."
+            echo "Add it (same value as the Vercel env var) to enable background runs."
+            exit 0
+          fi
+
+          # One call claims one job and works it for ~40s, then hands it back.
+          # Looping here drains a whole run inside a single tick when there is
+          # work; an empty queue costs one cheap request.
+          for attempt in $(seq 1 12); do
+            response=$(curl -sS -m 90 -X POST "$SITE_URL/api/content-engine/worker" \
+              -H "authorization: Bearer $CRON_SECRET" \
+              -w '\n%{http_code}') || {
+                echo "attempt $attempt: request failed; the next tick will retry"
+                exit 0
+              }
+            status=$(printf '%s' "$response" | tail -n 1)
+            body=$(printf '%s' "$response" | sed '$d')
+            echo "attempt $attempt -> HTTP $status $body"
+
+            case "$status" in
+              200) ;;
+              401|403)
+                echo "::error::Worker rejected the CRON_SECRET — check it matches the Vercel env var."
+                exit 1
+                ;;
+              503)
+                echo "Worker unavailable (missing migration or ANTHROPIC_API_KEY). Stopping."
+                exit 0
+                ;;
+              *)
+                echo "Unexpected status $status; the next tick will retry."
+                exit 0
+                ;;
+            esac
+
+            if printf '%s' "$body" | grep -q '"picked":false'; then
+              echo "Queue is empty."
+              exit 0
+            fi
+          done
+          echo "Still working after 12 attempts — the next tick picks up where this left off."

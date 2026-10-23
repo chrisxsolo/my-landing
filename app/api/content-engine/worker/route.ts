@@ -9,13 +9,17 @@
 // out, then hands the job back as 'queued'. Progress never depends on the
 // browser staying open.
 //
-// The minute-by-minute cron is what actually guarantees a run finishes. The
-// continuation POST below is only an optimisation so a run doesn't idle until
-// the next tick: a serverless invocation can be frozen as soon as it returns a
-// response, so a fire-and-forget fetch may simply never leave. Nothing here
-// relies on it landing — an unfinished job is 'queued' and the next tick claims
-// it. (This is also why there is no Promise.all over jobs: one claim per
-// invocation, many invocations.)
+// What guarantees a run finishes is the recurring tick:
+// .github/workflows/content-engine-worker.yml every 5 minutes, plus a daily
+// sweep in vercel.json. (The schedule lives in Actions because this project is
+// on a Vercel Hobby plan, which only allows daily cron jobs.)
+//
+// The continuation POST below is only an optimisation so a run doesn't idle
+// until the next tick: a serverless invocation can be frozen as soon as it
+// returns a response, so a fire-and-forget fetch may simply never leave.
+// Nothing here relies on it landing — an unfinished job is 'queued' and the
+// next tick claims it. (This is also why there is no Promise.all over jobs:
+// one claim per invocation, many invocations.)
 // ─────────────────────────────────────────────────────────────────────────────
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/requireAdmin";
@@ -64,7 +68,7 @@ async function drain(req: NextRequest): Promise<NextResponse> {
   } catch (err) {
     const error = err instanceof Error ? err.message : "worker failed";
     // Deployed ahead of its migration: say so once a tick instead of logging a
-    // crash every minute until the table exists.
+    // crash on every tick until the table exists.
     if (/content_engine_jobs|relation .* does not exist|42P01/i.test(error)) {
       console.warn("content engine worker idle: migration 20261023000001 is not applied yet");
       return NextResponse.json({ error: "queue table missing", pendingMigration: true }, { status: 503 });

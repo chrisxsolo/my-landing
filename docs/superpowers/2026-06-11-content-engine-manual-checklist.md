@@ -25,7 +25,9 @@ Run with the local stack + `npm run dev`, signed in as admin. Production is NOT 
 
 ## Background runs (content_engine_jobs)
 Needs CRON_SECRET in `.env.local`, otherwise the run queues with nothing to work
-it and the bar says so. Locally there is no cron, so kick the worker by hand:
+it and the bar says so. There is no local ticker (in production the schedule is
+.github/workflows/content-engine-worker.yml every 5 minutes — Vercel Hobby only
+allows daily cron — plus a daily sweep in vercel.json), so kick the worker by hand:
 `curl -X POST localhost:3000/api/content-engine/worker -H "authorization: Bearer $CRON_SECRET"`.
 - [ ] "Generate everything" says what it will do, then flips to a stage line with
       a progress bar (Processing photos → Choosing photos → Writing drafts)

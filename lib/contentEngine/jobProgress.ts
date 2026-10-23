@@ -41,7 +41,7 @@ export function jobStageLabel(job: JobProgressView): string {
 export function jobProgressLabel(job: JobProgressView): string {
   switch (job.status) {
     case "queued":
-      return "Queued — a worker picks this up within a minute. You can close this tab.";
+      return "Queued — a worker picks this up shortly. You can close this tab.";
     case "cancelled":
       return "Run cancelled. Anything already generated is kept as a draft.";
     case "failed":
