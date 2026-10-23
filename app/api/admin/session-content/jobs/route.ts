@@ -2,10 +2,13 @@
 // /api/admin/session-content/jobs — the admin side of a background content run.
 //
 // POST   { sessionId }  enqueue (idempotent — returns the live job if there is
-//                       one) and kick the worker so it starts straight away.
-// GET    ?sessionId=    the session's latest job, for the workspace's progress
-//                       line. Deliberately small: this is what gets polled, so
-//                       it must not re-sign photo thumbnails.
+//                       one) and work it right away, after the response, in
+//                       this same invocation.
+// GET    ?sessionId=    the session's latest job plus each photo's analysis
+//                       status, for live progress. Deliberately small: this is
+//                       what gets polled, so it must not re-sign thumbnails.
+//                       A poll that finds the run stalled (queued, or its
+//                       worker died) also restarts it.
 // DELETE { sessionId }  cancel the live job; the worker stops at its next step.
 // ─────────────────────────────────────────────────────────────────────────────
 import { NextRequest, NextResponse } from "next/server";
@@ -13,11 +16,15 @@ import { requireAdmin } from "@/lib/requireAdmin";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
 import { isUuid } from "@/lib/contentEngine/uploadConfig";
 import { JOB_COLUMNS, type ContentEngineJob } from "@/lib/contentEngine/jobRunner";
+import { drainInBackground } from "@/lib/contentEngine/workerDrain";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// The worker may run inside this route's after() — give it the same budget.
+export const maxDuration = 300;
 
-const CRON_SECRET = process.env.CRON_SECRET ?? "";
+const PHOTO_STATUS_COLUMNS =
+  "id,excluded,analysis_status,analysis_started_at,analysis_lease_expires_at,analyzed_at,quality_score,analysis_error";
 
 async function sessionIdFromBody(req: NextRequest): Promise<string | null> {
   try {
@@ -29,18 +36,11 @@ async function sessionIdFromBody(req: NextRequest): Promise<string | null> {
   }
 }
 
-// Best-effort nudge so the run starts now rather than on the next cron tick.
-// The enqueue is already committed and the recurring tick (see the worker
-// route) will claim the job regardless, so this failing — or being frozen
-// before it leaves — only costs latency, never the run.
-function kickWorker(req: NextRequest): boolean {
-  if (!CRON_SECRET) return false;
-  void fetch(new URL("/api/content-engine/worker", req.nextUrl.origin), {
-    method: "POST",
-    headers: { authorization: `Bearer ${CRON_SECRET}` },
-    cache: "no-store",
-  }).catch(() => {});
-  return true;
+/** Queued, or running under a lease that has lapsed (its worker died). */
+function isClaimable(job: ContentEngineJob, nowMs: number): boolean {
+  if (job.status === "queued") return true;
+  return job.status === "running"
+    && (job.lease_expires_at === null || Date.parse(job.lease_expires_at) <= nowMs);
 }
 
 export async function POST(req: NextRequest) {
@@ -69,9 +69,9 @@ export async function POST(req: NextRequest) {
     // False means a run was already in flight and this request adopted it —
     // the caller should not report that it started a second one.
     adopted: !row.created,
-    // False means CRON_SECRET is unset: the job is queued but no worker can be
-    // reached, so the UI should say so instead of spinning forever.
-    kicked: kickWorker(req),
+    // False means no worker can run here (ANTHROPIC_API_KEY unset), so the UI
+    // should say so instead of spinning forever.
+    kicked: drainInBackground(req.nextUrl.origin),
   });
 }
 
@@ -83,18 +83,30 @@ export async function GET(req: NextRequest) {
   if (!isUuid(sessionId)) return NextResponse.json({ error: "sessionId must be a uuid" }, { status: 400 });
 
   const admin = createSupabaseAdminClient();
-  const { data, error } = await admin
-    .from("content_engine_jobs")
-    .select(JOB_COLUMNS)
-    .eq("photography_session_id", sessionId)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (error) {
-    console.error("job lookup failed", error);
+  const [jobRes, photosRes] = await Promise.all([
+    admin
+      .from("content_engine_jobs")
+      .select(JOB_COLUMNS)
+      .eq("photography_session_id", sessionId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    admin
+      .from("session_photos")
+      .select(PHOTO_STATUS_COLUMNS)
+      .eq("photography_session_id", sessionId),
+  ]);
+  if (jobRes.error || photosRes.error) {
+    console.error("run progress lookup failed", jobRes.error ?? photosRes.error);
     return NextResponse.json({ error: "could not look up the run" }, { status: 500 });
   }
-  return NextResponse.json({ job: (data as ContentEngineJob | null) ?? null });
+  const job = (jobRes.data as unknown as ContentEngineJob | null) ?? null;
+  const serverNow = Date.now();
+  // Someone is watching a run that nothing is working: pick it up here rather
+  // than waiting for the next tick. The claim is atomic, so overlapping polls
+  // (or a tick landing at the same moment) cannot double-work it.
+  if (job && isClaimable(job, serverNow)) drainInBackground(req.nextUrl.origin);
+  return NextResponse.json({ job, photoStatuses: photosRes.data ?? [], serverNow });
 }
 
 export async function DELETE(req: NextRequest) {

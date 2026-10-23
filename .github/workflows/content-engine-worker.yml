@@ -32,7 +32,7 @@ jobs:
   drain:
     name: Drain the queue
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - name: Tick the worker until the queue is empty
         env:
@@ -48,11 +48,12 @@ jobs:
             exit 0
           fi
 
-          # One call claims one job and works it for ~40s, then hands it back.
+          # One GET claims one job and works it for up to ~4.5 minutes (GET is
+          # synchronous; POST only queues a background kick and answers 202).
           # Looping here drains a whole run inside a single tick when there is
           # work; an empty queue costs one cheap request.
-          for attempt in $(seq 1 12); do
-            response=$(curl -sS -m 90 -X POST "$SITE_URL/api/content-engine/worker" \
+          for attempt in $(seq 1 5); do
+            response=$(curl -sS -m 310 "$SITE_URL/api/content-engine/worker" \
               -H "authorization: Bearer $CRON_SECRET" \
               -w '\n%{http_code}') || {
                 echo "attempt $attempt: request failed; the next tick will retry"
@@ -87,4 +88,4 @@ jobs:
               exit 0
             fi
           done
-          echo "Still working after 12 attempts — the next tick picks up where this left off."
+          echo "Still working after 5 attempts — the next tick picks up where this left off."

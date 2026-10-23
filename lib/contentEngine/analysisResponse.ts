@@ -1,7 +1,7 @@
-// Vision-response validation (spec §8.1 steps 3-4). The model must key results
-// by session_photo_id — never array position — and identity validation
-// requires every requested id EXACTLY once with no unknown/missing/duplicate
-// ids. Violations fail only the affected batch.
+// Vision-response validation (spec §8.1 steps 3-4). Analysis sends one photo
+// per call, so identity is bound to the photo that was sent (see
+// validateSinglePhotoResponse); field validation stays strict and a violation
+// fails only that photo.
 import { z } from "zod";
 import { PORTFOLIO_CATEGORIES } from "@/lib/contentEngine/taxonomy";
 
@@ -65,28 +65,25 @@ export function extractJsonObject(text: string): unknown {
   }
 }
 
-export function validateAnalysisResponse(text: string, expectedIds: string[]): PhotoAnalysis[] {
-  const parsed = analysisResponseSchema.safeParse(extractJsonObject(text));
+/**
+ * One image in, one analysis out. With a single photo in the request there is
+ * nothing to mix up, so the result is bound to the id that was sent rather
+ * than the id the model echoed back — the model occasionally mistypes a
+ * character of the uuid, which used to fail an otherwise perfect analysis.
+ */
+export function validateSinglePhotoResponse(text: string, photoId: string): PhotoAnalysis {
+  const raw = extractJsonObject(text) as { photos?: unknown };
+  if (!Array.isArray(raw.photos) || raw.photos.length !== 1) {
+    throw new AnalysisValidationError("expected exactly one photo in the analysis response");
+  }
+  const entry = raw.photos[0];
+  if (typeof entry !== "object" || entry === null) {
+    throw new AnalysisValidationError("analysis response photo is not an object");
+  }
+  const bound = { photos: [{ ...entry, session_photo_id: photoId }] };
+  const parsed = analysisResponseSchema.safeParse(bound);
   if (!parsed.success) {
     throw new AnalysisValidationError(`analysis schema validation failed: ${parsed.error.message}`);
   }
-  const photos = parsed.data.photos;
-
-  const expected = new Set(expectedIds);
-  const seen = new Set<string>();
-  for (const p of photos) {
-    if (!expected.has(p.session_photo_id)) {
-      throw new AnalysisValidationError(`unknown session_photo_id in response: ${p.session_photo_id}`);
-    }
-    if (seen.has(p.session_photo_id)) {
-      throw new AnalysisValidationError(`duplicate session_photo_id in response: ${p.session_photo_id}`);
-    }
-    seen.add(p.session_photo_id);
-  }
-  for (const id of expected) {
-    if (!seen.has(id)) {
-      throw new AnalysisValidationError(`missing session_photo_id in response: ${id}`);
-    }
-  }
-  return photos;
+  return parsed.data.photos[0];
 }

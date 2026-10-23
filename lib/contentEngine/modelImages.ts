@@ -1,12 +1,10 @@
 // Downloads private originals and encodes them for a vision request
-// (spec §8.1 step 2): EXIF-orient, downscale, JPEG-encode, and walk the
-// quality/dimension ladder until the combined payload fits the batch cap.
+// (spec §8.1 step 2): EXIF-orient and downscale to the size the model actually
+// reads (see modelImageSize.ts), then JPEG-encode.
 import sharp from "sharp";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import {
-  ANALYSIS_ENCODE_LADDER, MAX_BATCH_IMAGE_BYTES, ladderStep, totalBytes,
-} from "@/lib/contentEngine/analysisBatching";
+import { MODEL_IMAGE_QUALITY, modelImageLongEdge } from "@/lib/contentEngine/modelImageSize";
 import { ORIGINALS_BUCKET, MAX_IMAGE_PIXELS } from "@/lib/contentEngine/uploadConfig";
 
 export async function downloadOriginal(client: SupabaseClient, storagePath: string): Promise<Buffer> {
@@ -17,26 +15,15 @@ export async function downloadOriginal(client: SupabaseClient, storagePath: stri
   return Buffer.from(await data.arrayBuffer());
 }
 
-export async function encodeImageForModel(buffer: Buffer, step: number): Promise<Buffer> {
-  const { maxDimension, quality } = ladderStep(step);
-  return sharp(buffer, { limitInputPixels: MAX_IMAGE_PIXELS })
+export async function encodeImageForModel(buffer: Buffer): Promise<Buffer> {
+  const image = sharp(buffer, { limitInputPixels: MAX_IMAGE_PIXELS });
+  const { width = 0, height = 0 } = await image.metadata();
+  const edge = modelImageLongEdge(width, height);
+  return image
     .rotate() // apply EXIF orientation
-    .resize({ width: maxDimension, height: maxDimension, fit: "inside", withoutEnlargement: true })
-    .jpeg({ quality })
+    .resize({ width: edge, height: edge, fit: "inside", withoutEnlargement: true })
+    .jpeg({ quality: MODEL_IMAGE_QUALITY })
     .toBuffer();
-}
-
-// Encode all images at ladder step 0; if the combined bytes exceed the cap,
-// re-encode everything at the next step ("reduces quality/dimensions
-// dynamically", spec §8.1 step 2). The last step is used even if still over.
-export async function encodeBatchUnderCap(buffers: Buffer[]): Promise<Buffer[]> {
-  for (let step = 0; step < ANALYSIS_ENCODE_LADDER.length; step++) {
-    const encoded = await Promise.all(buffers.map((b) => encodeImageForModel(b, step)));
-    if (totalBytes(encoded) <= MAX_BATCH_IMAGE_BYTES || step === ANALYSIS_ENCODE_LADDER.length - 1) {
-      return encoded;
-    }
-  }
-  throw new Error("unreachable: ladder always returns at the last step");
 }
 
 export function toImageBlock(encoded: Buffer): Anthropic.ImageBlockParam {

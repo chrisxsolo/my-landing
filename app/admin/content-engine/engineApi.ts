@@ -3,7 +3,7 @@
 // server's message and status so callers can branch on status (409 protocols).
 import type {
   EngineSessionRow, EnginePhoto, WorkspaceData, ReconcileReport, EngineJob,
-  EmailFactsResult, EmailFactsFreshness,
+  EmailFactsResult, EmailFactsFreshness, AnalyzeRoundResult, RunProgress,
 } from "./engineTypes";
 
 export class EngineApiError extends Error {
@@ -75,10 +75,10 @@ export const engineApi = {
       method: "POST",
       body: JSON.stringify({ sessionId, storagePath, ...declared }),
     }),
-  analyzeBatch: (sessionId: string) =>
-    request<{ claimed: number; completed: number; failed: number; remaining: number }>(
+  analyzePhotos: (sessionId: string, attemptedSince: string | null) =>
+    request<AnalyzeRoundResult>(
       "/api/admin/session-content/photos/analyze",
-      { method: "POST", body: JSON.stringify({ sessionId }) },
+      { method: "POST", body: JSON.stringify({ sessionId, attemptedSince }) },
     ),
   curatePhotos: (sessionId: string) =>
     request<{ curated: boolean; total: number; picked: number; excluded: number }>(
@@ -143,7 +143,7 @@ export const engineApi = {
       { method: "POST", body: JSON.stringify({ sessionId }) },
     ),
   getRun: (sessionId: string) =>
-    request<{ job: EngineJob | null }>(`/api/admin/session-content/jobs?sessionId=${sessionId}`),
+    request<RunProgress>(`/api/admin/session-content/jobs?sessionId=${sessionId}`),
   cancelRun: (sessionId: string) =>
     request<{ cancelled: number }>("/api/admin/session-content/jobs", {
       method: "DELETE", body: JSON.stringify({ sessionId }),

@@ -3,14 +3,14 @@ import type { EnginePackage, EnginePhoto } from "@/app/admin/content-engine/engi
 
 // The pipeline module is pure orchestration over the engine routes, so the API
 // client is faked here: these tests pin the ordering, resume and abort rules.
-const analyzeBatch = vi.fn();
+const analyzePhotos = vi.fn();
 const curatePhotos = vi.fn();
 const createPackage = vi.fn();
 const generateType = vi.fn();
 
 vi.mock("@/app/admin/content-engine/engineApi", () => ({
   engineApi: {
-    analyzeBatch: (...a: unknown[]) => analyzeBatch(...a),
+    analyzePhotos: (...a: unknown[]) => analyzePhotos(...a),
     curatePhotos: (...a: unknown[]) => curatePhotos(...a),
     createPackage: (...a: unknown[]) => createPackage(...a),
     generateType: (...a: unknown[]) => generateType(...a),
@@ -19,7 +19,7 @@ vi.mock("@/app/admin/content-engine/engineApi", () => ({
 
 const {
   analyzeAllPhotos, generateAllTypes, pendingGenerationTypes,
-  pendingAnalysisCount, includedCount,
+  pendingAnalysisCount, includedCount, mergePhotoStatuses,
 } = await import("@/app/admin/content-engine/pipeline");
 
 const SESSION = "11111111-1111-1111-1111-111111111111";
@@ -52,36 +52,20 @@ function pkg(progress: Record<string, string>, over: Partial<EnginePackage> = {}
   };
 }
 
-/** A fake analyze route backed by a photo queue, honouring 4-per-batch claims. */
-function fakeAnalysisQueue(total: number, opts: { failAt?: number } = {}) {
-  let unclaimed = total;
-  let processed = 0;
-  let inFlight = 0;
-  let peak = 0;
+const RUN_START = "2026-10-23T22:00:00.000Z";
+
+function round(over: Partial<{
+  claimed: number; completed: number; failed: number; remaining: number;
+  inFlightElsewhere: number; errors: string[];
+}>) {
   return {
-    get peak() { return peak; },
-    get processed() { return processed; },
-    handler: async () => {
-      inFlight += 1;
-      peak = Math.max(peak, inFlight);
-      const claimed = Math.min(4, unclaimed);
-      unclaimed -= claimed;
-      await new Promise((r) => setTimeout(r, 2));
-      inFlight -= 1;
-      if (claimed === 0) return { claimed: 0, completed: 0, failed: 0, remaining: unclaimed };
-      const shouldFail = opts.failAt !== undefined && processed >= opts.failAt;
-      if (shouldFail) {
-        unclaimed += claimed; // failed photos become claimable again
-        return { claimed, completed: 0, failed: claimed, remaining: unclaimed };
-      }
-      processed += claimed;
-      return { claimed, completed: claimed, failed: 0, remaining: unclaimed };
-    },
+    claimed: 0, completed: 0, failed: 0, remaining: 0, inFlightElsewhere: 0, errors: [],
+    runStartedAt: RUN_START, ...over,
   };
 }
 
 beforeEach(() => {
-  analyzeBatch.mockReset();
+  analyzePhotos.mockReset();
   curatePhotos.mockReset();
   createPackage.mockReset();
   generateType.mockReset();
@@ -118,43 +102,69 @@ describe("photo counters", () => {
 });
 
 describe("analyzeAllPhotos", () => {
-  it("drains the queue with several batches in flight", async () => {
-    const queue = fakeAnalysisQueue(20);
-    analyzeBatch.mockImplementation(queue.handler);
-    const result = await analyzeAllPhotos(SESSION, 20);
-    expect(result).toEqual({ completed: 20, failed: 0 });
-    expect(queue.peak).toBeGreaterThan(1);
-    expect(queue.peak).toBeLessThanOrEqual(3);
+  it("finishes in one round when the server drains everything", async () => {
+    analyzePhotos.mockResolvedValueOnce(round({ claimed: 24, completed: 24 }));
+    const started: string[] = [];
+    const result = await analyzeAllPhotos(SESSION, { onRunStarted: (t) => started.push(t) });
+    expect(result).toEqual({ completed: 24, failed: 0, errors: [] });
+    expect(analyzePhotos).toHaveBeenCalledTimes(1);
+    expect(analyzePhotos).toHaveBeenCalledWith(SESSION, null);
+    expect(started).toEqual([RUN_START]);
   });
 
-  it("uses one lane when a single batch covers the work", async () => {
-    const queue = fakeAnalysisQueue(3);
-    analyzeBatch.mockImplementation(queue.handler);
-    await analyzeAllPhotos(SESSION, 3);
-    expect(queue.peak).toBe(1);
+  it("passes the run start back so photos failed in this run are not retried in a loop", async () => {
+    analyzePhotos
+      .mockResolvedValueOnce(round({ claimed: 16, completed: 15, failed: 1, remaining: 8, errors: ["bad json"] }))
+      .mockResolvedValueOnce(round({ claimed: 8, completed: 8 }));
+    const result = await analyzeAllPhotos(SESSION);
+    expect(result).toEqual({ completed: 23, failed: 1, errors: ["bad json"] });
+    expect(analyzePhotos.mock.calls[1]).toEqual([SESSION, RUN_START]);
   });
 
-  it("stops the run on the first failed batch", async () => {
-    const queue = fakeAnalysisQueue(20, { failAt: 8 });
-    analyzeBatch.mockImplementation(queue.handler);
-    const result = await analyzeAllPhotos(SESSION, 20);
-    expect(result.failed).toBeGreaterThan(0);
-    expect(result.completed).toBeLessThan(20);
-    const callsAtStop = analyzeBatch.mock.calls.length;
-    await new Promise((r) => setTimeout(r, 20));
-    expect(analyzeBatch.mock.calls.length).toBe(callsAtStop);
+  it("waits out photos another worker holds, then stops when nothing is left", async () => {
+    const sleeps: number[] = [];
+    analyzePhotos
+      .mockResolvedValueOnce(round({ remaining: 4, inFlightElsewhere: 4 }))
+      .mockResolvedValueOnce(round({}));
+    await analyzeAllPhotos(SESSION, { sleep: async (ms) => { sleeps.push(ms); } });
+    expect(sleeps).toHaveLength(1);
+    expect(analyzePhotos).toHaveBeenCalledTimes(2);
   });
 
-  it("reports progress as batches commit", async () => {
-    analyzeBatch.mockImplementation(fakeAnalysisQueue(8).handler);
-    const details: string[] = [];
-    await analyzeAllPhotos(SESSION, 8, {
-      concurrency: 1, onProgress: (p) => details.push(p.detail),
-    });
-    expect(details).toEqual([
-      "Analyzing photos — 4 of 8 done",
-      "Analyzing photos — 8 of 8 done",
-    ]);
+  it("stops rather than spin when nothing is claimable and nobody holds the rest", async () => {
+    analyzePhotos.mockResolvedValue(round({ remaining: 2 }));
+    await analyzeAllPhotos(SESSION);
+    expect(analyzePhotos).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports each round so the workspace can refresh", async () => {
+    analyzePhotos
+      .mockResolvedValueOnce(round({ claimed: 8, completed: 8, remaining: 2 }))
+      .mockResolvedValueOnce(round({ claimed: 2, completed: 2 }));
+    let rounds = 0;
+    await analyzeAllPhotos(SESSION, { onRound: () => { rounds += 1; } });
+    expect(rounds).toBe(2);
+  });
+});
+
+describe("mergePhotoStatuses", () => {
+  const status = (id: string, over: Partial<{ analysis_status: string; quality_score: number | null }> = {}) => ({
+    id, excluded: false, analysis_status: "completed", analysis_started_at: null,
+    analysis_lease_expires_at: null, analyzed_at: null, quality_score: 8, analysis_error: null, ...over,
+  });
+
+  it("updates status and score in place, keeping everything else (thumbnails included)", () => {
+    const a = photo({ thumbnailUrl: "signed-a" });
+    const b = photo();
+    const next = mergePhotoStatuses([a, b], [status(a.id)]);
+    expect(next[0]).toMatchObject({ analysis_status: "completed", quality_score: 8, thumbnailUrl: "signed-a" });
+    expect(next[1]).toBe(b);
+  });
+
+  it("returns the same array when nothing changed, so React can skip the render", () => {
+    const a = photo({ analysis_status: "completed", quality_score: 8 });
+    const photos = [a];
+    expect(mergePhotoStatuses(photos, [status(a.id)])).toBe(photos);
   });
 });
 

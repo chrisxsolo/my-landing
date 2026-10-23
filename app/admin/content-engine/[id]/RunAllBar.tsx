@@ -16,10 +16,13 @@ import {
 } from "@/lib/contentEngine/jobProgress";
 import { engineApi } from "@/app/admin/content-engine/engineApi";
 import {
-  pendingAnalysisCount, pendingGenerationTypes, includedCount,
+  mergePhotoStatuses, pendingAnalysisCount, pendingGenerationTypes, includedCount,
 } from "@/app/admin/content-engine/pipeline";
-import type { EngineJob, EnginePackage, EnginePhoto } from "@/app/admin/content-engine/engineTypes";
+import type {
+  EngineJob, EnginePackage, EnginePhoto, PhotoStatusRow,
+} from "@/app/admin/content-engine/engineTypes";
 import { btn, card } from "./ui";
+import AnalysisProgress from "./AnalysisProgress";
 
 interface Props {
   sessionId: string;
@@ -28,16 +31,21 @@ interface Props {
   aiAllowed: boolean;
   flushFacts: () => Promise<void>;
   onChanged: () => void;
+  /** Folds live photo statuses into the grid without a thumbnail-re-signing refetch. */
+  onPhotosMutated: (updater: (prev: EnginePhoto[]) => EnginePhoto[]) => void;
 }
 
-const POLL_MS = 3_000;
+// Analysis commits a photo every second or two, so the counts poll briskly.
+const POLL_MS = 2_000;
 // How long a finished run keeps its outcome on screen.
 const RECENT_FINISH_MS = 10 * 60_000;
 
 export default function RunAllBar({
-  sessionId, photos, activePackage, aiAllowed, flushFacts, onChanged,
+  sessionId, photos, activePackage, aiAllowed, flushFacts, onChanged, onPhotosMutated,
 }: Props) {
   const [job, setJob] = useState<EngineJob | null>(null);
+  const [statuses, setStatuses] = useState<PhotoStatusRow[]>([]);
+  const [clockOffsetMs, setClockOffsetMs] = useState(0);
   const [starting, setStarting] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   // Bumped when a run starts, to restart the watch loop below: it stops itself
@@ -49,16 +57,19 @@ export default function RunAllBar({
 
   const poll = useCallback(async () => {
     try {
-      const { job: latest } = await engineApi.getRun(sessionId);
+      const { job: latest, photoStatuses, serverNow } = await engineApi.getRun(sessionId);
       setJob(latest);
+      setStatuses(photoStatuses);
+      setClockOffsetMs(serverNow - Date.now());
       const live = latest !== null && isJobLive(latest);
+      if (live) onPhotosMutated((prev) => mergePhotoStatuses(prev, photoStatuses));
       if (wasLive.current && !live) onChanged();
       wasLive.current = live;
       return live;
     } catch {
       return false; // transient; the next tick tries again
     }
-  }, [sessionId, onChanged]);
+  }, [sessionId, onChanged, onPhotosMutated]);
 
   // Adopt whatever is already running when the workspace opens, then follow it.
   useEffect(() => {
@@ -87,7 +98,7 @@ export default function RunAllBar({
       setJob(started);
       wasLive.current = started !== null && isJobLive(started);
       if (adopted) setNotice("A run was already going for this session — following that one.");
-      else if (!kicked) setNotice("Queued, but CRON_SECRET isn't set, so no worker can be reached.");
+      else if (!kicked) setNotice("Queued, but ANTHROPIC_API_KEY isn't set, so no worker can run it.");
       setWatchToken((t) => t + 1); // restart the watch loop
     } catch (err) {
       setNotice(err instanceof Error ? err.message : "could not start the run");
@@ -189,7 +200,11 @@ export default function RunAllBar({
         </span>
       </div>
 
-      {live && percent !== null && (
+      {live && job?.status === "running" && job.phase === "analyze" ? (
+        <AnalysisProgress statuses={statuses} runStartedAt={job.started_at}
+          startedAtMs={job.started_at ? Date.parse(job.started_at) : null}
+          clockOffsetMs={clockOffsetMs} live />
+      ) : live && percent !== null && (
         <div style={{
           marginTop: 10, height: 4, borderRadius: 999, background: T.inset, overflow: "hidden",
         }}>

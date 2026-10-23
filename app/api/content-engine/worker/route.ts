@@ -1,35 +1,30 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // /api/content-engine/worker — drains the content-run queue.
 //
-// GET  — Vercel Cron (see vercel.json) and the recovery sweep. Bearer CRON_SECRET.
-// POST — an immediate kick, either from the admin tab right after enqueueing or
-//        from this route continuing itself. Admin cookie or bearer CRON_SECRET.
+// GET  — the recurring tick (GitHub Actions, Vercel daily cron). Bearer
+//        CRON_SECRET. Synchronous: works one job for up to ~4.5 minutes and
+//        answers with the result, so the ticker can tell an empty queue
+//        ({"picked":false}) from a busy one.
+// POST — a kick (a continuation from a worker that ran out of budget, or an
+//        admin). Admin cookie or bearer CRON_SECRET. Answers 202 at once and
+//        works the job after the response, so the caller never holds a
+//        connection open for the length of a run.
 //
-// One invocation claims at most one job and works it until its time budget runs
-// out, then hands the job back as 'queued'. Progress never depends on the
-// browser staying open.
+// What guarantees a run finishes is the tick (see workerDrain.ts for the
+// faster paths and why none of them is load-bearing). Jobs are leased, so an
+// overlap between any of these paths is safe.
 //
-// What guarantees a run finishes is the recurring tick:
-// .github/workflows/content-engine-worker.yml every 5 minutes, plus a daily
-// sweep in vercel.json. (The schedule lives in Actions because this project is
-// on a Vercel Hobby plan, which only allows daily cron jobs.)
-//
-// The continuation POST below is only an optimisation so a run doesn't idle
-// until the next tick: a serverless invocation can be frozen as soon as it
-// returns a response, so a fire-and-forget fetch may simply never leave.
-// Nothing here relies on it landing — an unfinished job is 'queued' and the
-// next tick claims it. (This is also why there is no Promise.all over jobs:
-// one claim per invocation, many invocations.)
+// maxDuration 300 is allowed on the Hobby plan because the project runs on
+// Fluid compute; the job runner keeps every step inside HARD_DEADLINE_MS.
 // ─────────────────────────────────────────────────────────────────────────────
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/requireAdmin";
-import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
-import { createAnthropicCaller } from "@/lib/contentEngine/aiClient";
-import { runWorkerOnce, type RunWorkerResult } from "@/lib/contentEngine/jobRunner";
+import { drainInBackground, drainOnce } from "@/lib/contentEngine/workerDrain";
+import type { RunWorkerResult } from "@/lib/contentEngine/jobRunner";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 const CRON_SECRET = process.env.CRON_SECRET ?? "";
 
@@ -40,31 +35,15 @@ function hasCronAuth(req: NextRequest): boolean {
   return req.headers.get("authorization") === `Bearer ${CRON_SECRET}`;
 }
 
-// Best-effort continuation: one more call to this same route so the run keeps
-// moving between cron ticks. Needs CRON_SECRET (the worker holds no admin
-// cookie of its own).
-function continueInBackground(req: NextRequest) {
-  if (!CRON_SECRET) return;
-  const url = new URL("/api/content-engine/worker", req.nextUrl.origin);
-  void fetch(url, {
-    method: "POST",
-    headers: { authorization: `Bearer ${CRON_SECRET}` },
-    cache: "no-store",
-  }).catch(() => {
-    // The cron sweep is the backstop; nothing to do here.
-  });
-}
-
-async function drain(req: NextRequest): Promise<NextResponse> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return NextResponse.json({ error: "ANTHROPIC_API_KEY not configured" }, { status: 503 });
+export async function GET(req: NextRequest) {
+  if (!hasCronAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return NextResponse.json({ error: "ANTHROPIC_API_KEY not configured" }, { status: 503 });
+  }
 
   let result: RunWorkerResult;
   try {
-    result = await runWorkerOnce({
-      client: createSupabaseAdminClient(),
-      callModel: createAnthropicCaller(apiKey),
-    });
+    result = await drainOnce(req.nextUrl.origin);
   } catch (err) {
     const error = err instanceof Error ? err.message : "worker failed";
     // Deployed ahead of its migration: say so once a tick instead of logging a
@@ -76,14 +55,7 @@ async function drain(req: NextRequest): Promise<NextResponse> {
     console.error("content engine worker failed", err);
     return NextResponse.json({ error }, { status: 500 });
   }
-
-  if (result.handedOff) continueInBackground(req);
   return NextResponse.json(result);
-}
-
-export async function GET(req: NextRequest) {
-  if (!hasCronAuth(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  return drain(req);
 }
 
 export async function POST(req: NextRequest) {
@@ -91,5 +63,8 @@ export async function POST(req: NextRequest) {
     const deny = requireAdmin(req);
     if (deny) return deny;
   }
-  return drain(req);
+  if (!drainInBackground(req.nextUrl.origin)) {
+    return NextResponse.json({ error: "ANTHROPIC_API_KEY not configured" }, { status: 503 });
+  }
+  return NextResponse.json({ accepted: true }, { status: 202 });
 }

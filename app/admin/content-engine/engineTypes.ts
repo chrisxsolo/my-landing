@@ -1,8 +1,9 @@
 // DTO types for the engine admin UI — shapes mirror the Plan-4A route payloads.
 import type { SessionEngineState } from "@/lib/contentEngine/state";
 import type { ExtractionOutcome, FreshnessOutcome } from "@/lib/contentEngine/emailFacts/run";
+import type { PhotoStatusRow } from "@/lib/contentEngine/jobProgress";
 
-export type { SessionEngineState };
+export type { SessionEngineState, PhotoStatusRow };
 
 // Email-fact extraction DTOs. Type-only re-exports of the server contract, so
 // the route and the panel can never drift apart.
@@ -135,6 +136,25 @@ export interface EngineJob {
   started_at: string | null;
   finished_at: string | null;
   updated_at: string;
+}
+
+/** What GET /api/admin/session-content/jobs returns — polled while a run is live. */
+export interface RunProgress {
+  job: EngineJob | null;
+  photoStatuses: PhotoStatusRow[];
+  /** Server clock (epoch ms) when the response was built, to correct for skew. */
+  serverNow: number;
+}
+
+/** One round of the admin's Analyze button (photos run in parallel server-side). */
+export interface AnalyzeRoundResult {
+  claimed: number;
+  completed: number;
+  failed: number;
+  remaining: number;
+  inFlightElsewhere: number;
+  errors: string[];
+  runStartedAt: string;
 }
 
 export const JOB_LIVE_STATUSES: EngineJob["status"][] = ["queued", "running"];

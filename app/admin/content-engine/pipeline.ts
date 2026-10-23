@@ -3,19 +3,15 @@
 //
 // A WHOLE run is not orchestrated here any more — that moved to the background
 // worker (lib/contentEngine/jobRunner.ts) so a run survives the tab closing.
-// What stays is the shared batching: every step is an existing engine route and
-// every route claims atomically (claim_photos_for_analysis uses FOR UPDATE SKIP
-// LOCKED; claim_generation_type is per-type), so batches can run concurrently
-// and a re-run always picks up whatever is left.
+// Every step is an existing engine route and every route claims atomically
+// (claim_photos_for_analysis uses FOR UPDATE SKIP LOCKED; claim_generation_type
+// is per-type), so a re-run always picks up whatever is left.
 import { engineApi } from "./engineApi";
-import { MAX_PHOTOS_PER_BATCH } from "@/lib/contentEngine/analysisBatching";
 import { pendingGenerationTypesFrom } from "@/lib/contentEngine/generationProgress";
-import { CONTENT_TYPE_LABELS, type EnginePackage, type EnginePhoto } from "./engineTypes";
-
-// Each analysis request handles one batch (<=4 photos) well inside the route's
-// 60s budget, so several requests in flight shorten a 20-photo shoot from five
-// serial round trips to two waves.
-export const ANALYSIS_CONCURRENCY = 3;
+import type { PhotoStatusRow } from "@/lib/contentEngine/jobProgress";
+import {
+  CONTENT_TYPE_LABELS, type EnginePackage, type EnginePhoto,
+} from "./engineTypes";
 
 export type PipelineStage = "analyzing" | "generating";
 
@@ -50,55 +46,84 @@ export function pendingGenerationTypes(pkg: EnginePackage | null): string[] {
 }
 
 export interface AnalyzeAllOptions {
-  concurrency?: number;
-  onProgress?: ProgressReporter;
-  /** Called after each batch commits, for incremental UI refreshes. */
-  onBatch?: () => void;
+  /** Called after each round commits, for incremental UI refreshes. */
+  onRound?: () => void;
+  /** Called once the first round reports when this run started. */
+  onRunStarted?: (runStartedAt: string) => void;
+  /** Waits between rounds while another worker holds the remaining photos. */
+  sleep?: (ms: number) => Promise<void>;
 }
 
 export interface AnalyzeAllResult {
   completed: number;
   failed: number;
+  errors: string[];
+}
+
+// A round analyzes photos in parallel on the server for up to ~50s, so a
+// 50-photo shoot is one or two rounds. The cap only stops a pathological loop.
+const MAX_ANALYZE_ROUNDS = 30;
+const IN_FLIGHT_WAIT_MS = 3_000;
+const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Drives analysis to completion, one server round at a time — the server runs
+ * the photos concurrently. A photo that fails is retried (with backoff) inside
+ * its round and then left alone for the rest of this run, so one bad photo
+ * neither stops the others nor loops; the admin retries it explicitly.
+ */
+export async function analyzeAllPhotos(
+  sessionId: string, options: AnalyzeAllOptions = {},
+): Promise<AnalyzeAllResult> {
+  const sleep = options.sleep ?? wait;
+  let runStartedAt: string | null = null;
+  let completed = 0;
+  let failed = 0;
+  const errors: string[] = [];
+
+  for (let round = 0; round < MAX_ANALYZE_ROUNDS; round++) {
+    const result = await engineApi.analyzePhotos(sessionId, runStartedAt);
+    if (runStartedAt === null) {
+      runStartedAt = result.runStartedAt;
+      options.onRunStarted?.(runStartedAt);
+    }
+    completed += result.completed;
+    failed += result.failed;
+    for (const e of result.errors) if (!errors.includes(e)) errors.push(e);
+    options.onRound?.();
+    if (result.remaining === 0) break;
+    if (result.claimed === 0) {
+      // The rest belong to someone else (a background run): wait them out.
+      if (result.inFlightElsewhere === 0) break;
+      await sleep(IN_FLIGHT_WAIT_MS);
+    }
+  }
+  return { completed, failed, errors };
 }
 
 /**
- * Drives analysis to completion with several batches in flight. Lanes claim
- * disjoint photos (SQL-enforced), so a lane that claims nothing simply retires
- * while its siblings finish the remainder. The first failed batch stops the run,
- * matching the previous serial behaviour (the admin then retries from Photos).
+ * Folds live analysis statuses into the photo list without refetching it — a
+ * refetch re-signs every thumbnail and makes the browser reload the grid.
+ * Returns the same array when nothing changed, so React skips the render.
  */
-export async function analyzeAllPhotos(
-  sessionId: string,
-  pending: number,
-  options: AnalyzeAllOptions = {},
-): Promise<AnalyzeAllResult> {
-  const { onProgress, onBatch } = options;
-  const lanes = Math.max(1, Math.min(
-    options.concurrency ?? ANALYSIS_CONCURRENCY,
-    Math.ceil(Math.max(pending, 1) / MAX_PHOTOS_PER_BATCH),
-  ));
-  let completed = 0;
-  let failed = 0;
-  let stop = false;
-
-  await Promise.all(Array.from({ length: lanes }, async () => {
-    while (!stop) {
-      const result = await engineApi.analyzeBatch(sessionId);
-      completed += result.completed;
-      failed += result.failed;
-      onBatch?.();
-      onProgress?.({
-        stage: "analyzing",
-        detail: `Analyzing photos — ${Math.min(completed, pending)} of ${pending} done`,
-      });
-      if (result.failed > 0) { stop = true; return; }
-      if (result.remaining === 0) { stop = true; return; }
-      // Nothing left to claim but work remains: sibling lanes hold it.
-      if (result.claimed === 0) return;
-    }
-  }));
-
-  return { completed, failed };
+export function mergePhotoStatuses(
+  photos: EnginePhoto[], statuses: readonly PhotoStatusRow[],
+): EnginePhoto[] {
+  const byId = new Map(statuses.map((s) => [s.id, s]));
+  let changed = false;
+  const next = photos.map((photo) => {
+    const s = byId.get(photo.id);
+    if (!s) return photo;
+    const status = s.analysis_status as EnginePhoto["analysis_status"];
+    if (photo.analysis_status === status && photo.quality_score === s.quality_score
+      && photo.analysis_error === s.analysis_error) return photo;
+    changed = true;
+    return {
+      ...photo, analysis_status: status, quality_score: s.quality_score,
+      analysis_error: s.analysis_error, analysis_lease_expires_at: s.analysis_lease_expires_at,
+    };
+  });
+  return changed ? next : photos;
 }
 
 export interface GenerateOptions {

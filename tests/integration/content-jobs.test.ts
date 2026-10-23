@@ -333,13 +333,40 @@ describe("runWorkerOnce", () => {
     expect(job.last_error).toMatch(/no included photos/i);
   });
 
-  it("stops the run when a photo fails analysis, naming where to retry", async () => {
+  it("carries on past one failed photo and finishes, naming where to retry it", async () => {
+    const sessionId = await createTestSession();
+    const good = await pendingPhoto(sessionId, 5);
+    const bad = await pendingPhoto(sessionId, 6);
+    const packageId = await createPackage(sessionId, ["internal_link_suggestion"], { service_type: "grads" });
+    const { job_id } = await enqueue(sessionId);
+    const base = fakeModel();
+    const oneBad: ModelCaller = async (req) => {
+      const content = req.messages[0].content;
+      const isAnalysis = Array.isArray(content) && content.some((b) => b.type === "image");
+      if (isAnalysis && JSON.stringify(content).includes(bad.id)) return { text: "not json", usage: { input_tokens: 1, output_tokens: 1 }, model: req.model };
+      return base.caller(req);
+    };
+
+    const result = await runWorkerOnce({ client: service, callModel: oneBad, sleep: async () => {} });
+    expect(result.status).toBe("succeeded");
+
+    const job = await jobRow(job_id);
+    expect(job.soft_errors.join(" ")).toMatch(/1 photo\(s\) failed analysis/);
+    const { data: rows } = await service.from("session_photos")
+      .select("id,analysis_status").eq("photography_session_id", sessionId);
+    const byId = Object.fromEntries((rows ?? []).map((r) => [r.id, r.analysis_status]));
+    expect(byId[good.id]).toBe("completed");
+    expect(byId[bad.id]).toBe("failed"); // left reclaimable for the Retry button
+    expect((await itemsOf(packageId)).length).toBeGreaterThan(0);
+  });
+
+  it("stops the run when every photo fails analysis, naming where to retry", async () => {
     const sessionId = await createTestSession();
     await pendingPhoto(sessionId, 3);
     const { job_id } = await enqueue(sessionId);
     const broken: ModelCaller = async () => { throw new Error("vision call exploded"); };
 
-    const result = await runWorkerOnce({ client: service, callModel: broken });
+    const result = await runWorkerOnce({ client: service, callModel: broken, sleep: async () => {} });
     expect(result.status).toBe("failed");
 
     const job = await jobRow(job_id);

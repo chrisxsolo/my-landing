@@ -16,6 +16,10 @@ export interface ModelCallRequest {
   system: string;
   messages: Anthropic.MessageParam[];
   maxTokens: number;
+  /** Per-request timeout; the SDK default (10 min) outlives any serverless invocation. */
+  timeoutMs?: number;
+  /** SDK-level retries. Callers that retry themselves (with a deadline) pass 0. */
+  maxRetries?: number;
 }
 
 export interface ModelCallResult {
@@ -26,6 +30,15 @@ export interface ModelCallResult {
 
 export type ModelCaller = (req: ModelCallRequest) => Promise<ModelCallResult>;
 
+// The SDK validates a `timeout` key even when its value is undefined, so only
+// keys that are set are passed.
+function requestOptions(req: ModelCallRequest): Anthropic.RequestOptions {
+  const options: Anthropic.RequestOptions = {};
+  if (req.timeoutMs !== undefined) options.timeout = Math.max(1, Math.floor(req.timeoutMs));
+  if (req.maxRetries !== undefined) options.maxRetries = req.maxRetries;
+  return options;
+}
+
 export function createAnthropicCaller(apiKey: string): ModelCaller {
   const client = new Anthropic({ apiKey });
   return async (req) => {
@@ -34,7 +47,7 @@ export function createAnthropicCaller(apiKey: string): ModelCaller {
       max_tokens: req.maxTokens,
       system: req.system,
       messages: req.messages,
-    });
+    }, requestOptions(req));
     const text = response.content
       .filter((b): b is Anthropic.TextBlock => b.type === "text")
       .map((b) => b.text)

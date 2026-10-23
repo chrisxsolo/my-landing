@@ -105,7 +105,7 @@ export default function Workspace({ sessionId }: { sessionId: string }) {
       <PermissionsBar session={session} sessionId={sessionId} onChanged={refresh} />
       <RunAllBar sessionId={sessionId} photos={photos} activePackage={data.activePackage}
         aiAllowed={session.ai_processing_allowed as boolean}
-        flushFacts={flushFacts} onChanged={refresh} />
+        flushFacts={flushFacts} onChanged={refresh} onPhotosMutated={setPhotos} />
       <FactsSection session={session} sessionId={sessionId} onSaved={refresh}
         onRegisterFlush={registerFlushFacts} />
       <PhotosSection sessionId={sessionId} photos={photos}

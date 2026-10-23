@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { mapWithConcurrency } from "@/lib/contentEngine/concurrency";
+import { createLimiter, mapWithConcurrency } from "@/lib/contentEngine/concurrency";
 
 const tick = () => new Promise((r) => setTimeout(r, 1));
 
@@ -63,5 +63,28 @@ describe("mapWithConcurrency", () => {
         return n;
       }),
     ).rejects.toThrow("boom");
+  });
+});
+
+describe("createLimiter", () => {
+  it("never runs more than its slots at once, and runs everything", async () => {
+    const limit = createLimiter(2);
+    let active = 0;
+    let peak = 0;
+    const results = await Promise.all(Array.from({ length: 7 }, (_, i) => limit(async () => {
+      active += 1;
+      peak = Math.max(peak, active);
+      await new Promise((r) => setTimeout(r, 2));
+      active -= 1;
+      return i;
+    })));
+    expect(peak).toBe(2);
+    expect(results).toEqual([0, 1, 2, 3, 4, 5, 6]);
+  });
+
+  it("frees a slot when a task throws", async () => {
+    const limit = createLimiter(1);
+    await expect(limit(async () => { throw new Error("boom"); })).rejects.toThrow("boom");
+    expect(await limit(async () => "next")).toBe("next");
   });
 });

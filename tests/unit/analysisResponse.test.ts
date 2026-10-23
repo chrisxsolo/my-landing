@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  validateAnalysisResponse, extractJsonObject, AnalysisValidationError,
+  validateSinglePhotoResponse, extractJsonObject, AnalysisValidationError,
 } from "@/lib/contentEngine/analysisResponse";
 
 const ID1 = "11111111-1111-4111-8111-111111111111";
@@ -25,33 +25,35 @@ describe("extractJsonObject", () => {
   });
 });
 
-describe("validateAnalysisResponse (identity validation, spec §8.1 step 4)", () => {
-  it("accepts a complete keyed response", () => {
-    const text = JSON.stringify({ photos: [photo(ID1), photo(ID2)] });
-    const out = validateAnalysisResponse(text, [ID1, ID2]);
-    expect(out).toHaveLength(2);
-    expect(out[0].session_photo_id).toBe(ID1);
-    expect(out[0].quality_score).toBe(8);
+describe("validateSinglePhotoResponse (one photo per call)", () => {
+  it("accepts a well-formed single analysis", () => {
+    const out = validateSinglePhotoResponse(JSON.stringify({ photos: [photo(ID1)] }), ID1);
+    expect(out.session_photo_id).toBe(ID1);
+    expect(out.quality_score).toBe(8);
   });
 
-  it("rejects a missing id, an unknown id, and a duplicate id", () => {
-    const missing = JSON.stringify({ photos: [photo(ID1)] });
-    expect(() => validateAnalysisResponse(missing, [ID1, ID2])).toThrow(/missing/i);
+  it("binds the result to the photo that was sent, even when the model mistypes its id", () => {
+    // Real 2026-10-23 benchmark failure: one character of the uuid echoed wrong.
+    const typo = JSON.stringify({ photos: [photo("11111111-1111-4111-8111-111111111112")] });
+    expect(validateSinglePhotoResponse(typo, ID1).session_photo_id).toBe(ID1);
+    const missingId = JSON.stringify({ photos: [{ ...photo(ID1), session_photo_id: undefined }] });
+    expect(validateSinglePhotoResponse(missingId, ID1).session_photo_id).toBe(ID1);
+  });
 
-    const unknown = JSON.stringify({ photos: [photo(ID1), photo("33333333-3333-4333-8333-333333333333")] });
-    expect(() => validateAnalysisResponse(unknown, [ID1, ID2])).toThrow(/unknown/i);
-
-    const dup = JSON.stringify({ photos: [photo(ID1), photo(ID1)] });
-    expect(() => validateAnalysisResponse(dup, [ID1, ID1])).toThrow(/duplicate/i);
+  it("rejects anything but exactly one photo", () => {
+    expect(() => validateSinglePhotoResponse(JSON.stringify({ photos: [] }), ID1)).toThrow(/exactly one/i);
+    expect(() => validateSinglePhotoResponse(JSON.stringify({ photos: [photo(ID1), photo(ID2)] }), ID1))
+      .toThrow(/exactly one/i);
+    expect(() => validateSinglePhotoResponse(JSON.stringify({ result: "ok" }), ID1)).toThrow(/exactly one/i);
   });
 
   it("rejects hostile field values (bad category, out-of-range score, wrong types)", () => {
     const badCat = JSON.stringify({ photos: [photo(ID1, { suggested_category: "weddings" })] });
-    expect(() => validateAnalysisResponse(badCat, [ID1])).toThrow();
+    expect(() => validateSinglePhotoResponse(badCat, ID1)).toThrow();
     const badScore = JSON.stringify({ photos: [photo(ID1, { quality_score: 11 })] });
-    expect(() => validateAnalysisResponse(badScore, [ID1])).toThrow();
+    expect(() => validateSinglePhotoResponse(badScore, ID1)).toThrow();
     const badTags = JSON.stringify({ photos: [photo(ID1, { tags: "not-an-array" })] });
-    expect(() => validateAnalysisResponse(badTags, [ID1])).toThrow();
+    expect(() => validateSinglePhotoResponse(badTags, ID1)).toThrow();
   });
 
   it("clamps over-long text fields instead of rejecting (real prod failure: 1000+ char description)", () => {
@@ -63,25 +65,25 @@ describe("validateAnalysisResponse (identity validation, spec §8.1 step 4)", ()
         tags: Array.from({ length: 20 }, (_, i) => `tag-${i}-${"x".repeat(70)}`),
       })],
     });
-    const out = validateAnalysisResponse(text, [ID1]);
-    expect(out[0].description!.length).toBeLessThanOrEqual(1000);
-    expect(out[0].description!.endsWith("word")).toBe(true);
-    expect(out[0].alt_text.length).toBe(300);
-    expect(out[0].title!.length).toBeLessThanOrEqual(160);
-    expect(out[0].tags).toHaveLength(15);
-    for (const t of out[0].tags) expect(t.length).toBeLessThanOrEqual(60);
+    const out = validateSinglePhotoResponse(text, ID1);
+    expect(out.description!.length).toBeLessThanOrEqual(1000);
+    expect(out.description!.endsWith("word")).toBe(true);
+    expect(out.alt_text.length).toBe(300);
+    expect(out.title!.length).toBeLessThanOrEqual(160);
+    expect(out.tags).toHaveLength(15);
+    for (const t of out.tags) expect(t.length).toBeLessThanOrEqual(60);
   });
 
   it("still rejects an empty alt_text", () => {
     const text = JSON.stringify({ photos: [photo(ID1, { alt_text: "" })] });
-    expect(() => validateAnalysisResponse(text, [ID1])).toThrow();
+    expect(() => validateSinglePhotoResponse(text, ID1)).toThrow();
   });
 
   it("tolerates null optional fields", () => {
     const text = JSON.stringify({
       photos: [photo(ID1, { suggested_category: null, destination_recommendations: null })],
     });
-    const out = validateAnalysisResponse(text, [ID1]);
-    expect(out[0].suggested_category).toBeNull();
+    const out = validateSinglePhotoResponse(text, ID1);
+    expect(out.suggested_category).toBeNull();
   });
 });

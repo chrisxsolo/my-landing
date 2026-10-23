@@ -14,7 +14,7 @@ import {
 import { validatePayload, type SessionFactsSnapshot } from "@/lib/contentEngine/payloads";
 import { generateMetaKeywords } from "@/lib/contentEngine/serviceKeywords";
 import { guideTypeForService, isSchoolSlug, SPOT_SCHOOL_IDS } from "@/lib/contentEngine/taxonomy";
-import { downloadOriginal, encodeBatchUnderCap, toImageBlock } from "@/lib/contentEngine/modelImages";
+import { downloadOriginal, encodeImageForModel, toImageBlock } from "@/lib/contentEngine/modelImages";
 
 export class GenerationError extends Error {
   constructor(message: string) {
@@ -188,7 +188,7 @@ async function journalTarget(ctx: TargetContext): Promise<TargetResult> {
   const originals = await Promise.all(
     (paths ?? []).map((p) => downloadOriginal(ctx.client, p.storage_path as string)),
   );
-  const imageBlocks = (await encodeBatchUnderCap(originals)).map(toImageBlock);
+  const imageBlocks = (await Promise.all(originals.map(encodeImageForModel))).map(toImageBlock);
 
   const { json, usage } = await callForJson(
     ctx, buildJournalPrompt(ctx.facts, photos, { links, testimonialQuote }), imageBlocks,

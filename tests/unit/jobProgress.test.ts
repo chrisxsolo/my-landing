@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
-  isJobLive, jobPercent, jobProgressLabel, jobStageLabel,
-  type JobProgressView,
+  estimateRemainingMs, formatDuration, isJobLive, jobPercent, jobProgressLabel, jobStageLabel,
+  photoProgressLine, summarizePhotoProgress,
+  type JobProgressView, type PhotoStatusRow,
 } from "@/lib/contentEngine/jobProgress";
 
 function job(over: Partial<JobProgressView> = {}): JobProgressView {
@@ -42,15 +43,14 @@ describe("jobProgressLabel", () => {
     expect(jobProgressLabel(job({ status: "queued" }))).toContain("close this tab");
   });
 
-  it("counts photos during analysis and types during generation", () => {
+  it("leaves photo counts to the live line and counts types during generation", () => {
     expect(jobProgressLabel(job({ phase: "analyze", photos_total: 20, photos_done: 12 })))
-      .toBe("Processing photos — 12 of 20 analyzed");
+      .toBe("Analyzing photos, several at a time — you can close this tab.");
     expect(jobProgressLabel(job({ phase: "generate", types_total: 6, types_done: 4 })))
       .toBe("Writing drafts — 4 of 6 done");
   });
 
   it("omits counts it does not have yet", () => {
-    expect(jobProgressLabel(job({ phase: "analyze" }))).toBe("Processing photos");
     expect(jobProgressLabel(job({ phase: "generate" }))).toBe("Writing drafts");
   });
 
@@ -111,5 +111,54 @@ describe("jobPercent", () => {
     for (let i = 1; i < series.length; i += 1) {
       expect(series[i]).toBeGreaterThanOrEqual(series[i - 1]);
     }
+  });
+});
+
+describe("per-photo progress", () => {
+  const T0 = Date.parse("2026-10-23T22:00:00.000Z");
+  const iso = (offsetMs: number) => new Date(T0 + offsetMs).toISOString();
+  const row = (over: Partial<PhotoStatusRow>): PhotoStatusRow => ({
+    id: crypto.randomUUID(), excluded: false, analysis_status: "pending",
+    analysis_started_at: null, analysis_lease_expires_at: null, analyzed_at: null,
+    quality_score: null, analysis_error: null, ...over,
+  });
+
+  it("splits photos into completed, in progress, waiting and failed", () => {
+    const now = T0 + 30_000;
+    const p = summarizePhotoProgress([
+      row({ analysis_status: "completed", analysis_started_at: iso(1000), analyzed_at: iso(11_000) }),
+      row({ analysis_status: "processing", analysis_started_at: iso(20_000), analysis_lease_expires_at: iso(200_000) }),
+      // a dead worker's photo: lease lapsed, so it is back in the queue
+      row({ analysis_status: "processing", analysis_started_at: iso(-300_000), analysis_lease_expires_at: iso(-120_000) }),
+      row({ analysis_status: "pending" }),
+      row({ analysis_status: "failed", analysis_error: "bad json" }),
+      row({ analysis_status: "pending", excluded: true }),
+    ], now, iso(0));
+    expect(p).toMatchObject({ total: 5, completed: 1, analyzing: 1, waiting: 2, failed: 1, completedInRun: 1 });
+    expect(p.firstStartMs).toBe(T0 + 1000);
+    expect(photoProgressLine(p)).toBe("1 of 5 analyzed · 1 in progress · 2 waiting · 1 failed");
+  });
+
+  it("does not count work from before this run toward its pace", () => {
+    const p = summarizePhotoProgress([
+      row({ analysis_status: "completed", analysis_started_at: iso(-90_000), analyzed_at: iso(-80_000) }),
+    ], T0, iso(0));
+    expect(p.completedInRun).toBe(0);
+    expect(p.firstStartMs).toBeNull();
+  });
+
+  it("estimates time left from the measured pace once there is enough of it", () => {
+    const base = { total: 24, completed: 6, analyzing: 8, waiting: 10, failed: 0, completedInRun: 6, firstStartMs: T0 };
+    // 6 photos in 12s → 2s each → 18 left ≈ 36s
+    expect(estimateRemainingMs(base, T0 + 12_000)).toBe(36_000);
+    expect(estimateRemainingMs({ ...base, completedInRun: 2 }, T0 + 12_000)).toBeNull();
+    expect(estimateRemainingMs(base, T0 + 3_000)).toBeNull();
+    expect(estimateRemainingMs({ ...base, analyzing: 0, waiting: 0 }, T0 + 12_000)).toBeNull();
+  });
+
+  it("formats durations like a stopwatch", () => {
+    expect(formatDuration(42_000)).toBe("0:42");
+    expect(formatDuration(185_400)).toBe("3:05");
+    expect(formatDuration(3_730_000)).toBe("1:02:10");
   });
 });

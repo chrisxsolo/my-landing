@@ -23,3 +23,27 @@ export async function mapWithConcurrency<T, R>(
   );
   return results;
 }
+
+/**
+ * A slot limiter for one stage of a pipeline that runs inside wider
+ * concurrency — e.g. at most 2 browser image decodes while 6 uploads are in
+ * flight. Slots are handed out first-come, first-served.
+ */
+export function createLimiter(limit: number): <T>(task: () => Promise<T>) => Promise<T> {
+  const slots = Math.max(1, Math.floor(limit) || 1);
+  let active = 0;
+  const queue: (() => void)[] = [];
+  const release = () => {
+    active -= 1;
+    queue.shift()?.();
+  };
+  return async <T>(task: () => Promise<T>): Promise<T> => {
+    if (active >= slots) await new Promise<void>((resolve) => queue.push(resolve));
+    active += 1;
+    try {
+      return await task();
+    } finally {
+      release();
+    }
+  };
+}

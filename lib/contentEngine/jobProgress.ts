@@ -55,9 +55,9 @@ export function jobProgressLabel(job: JobProgressView): string {
     case "running":
       switch (job.phase) {
         case "analyze":
-          return job.photos_total > 0
-            ? `Processing photos — ${job.photos_done} of ${job.photos_total} analyzed`
-            : "Processing photos";
+          // The per-photo counts render live beneath this line (from the photo
+          // rows); the job's own counters only move between worker steps.
+          return "Analyzing photos, several at a time — you can close this tab.";
         case "curate":
           return "Choosing the strongest photos";
         case "package":
@@ -92,4 +92,102 @@ export function jobPercent(job: JobProgressView): number | null {
     return PHASE_FLOOR.generate + Math.round((job.types_done / job.types_total) * 30);
   }
   return PHASE_FLOOR[job.phase];
+}
+
+// ── Per-photo progress ──────────────────────────────────────────────────────
+// Built from the photo rows themselves rather than the job's counters, so the
+// numbers move the moment each photo commits instead of once per worker step.
+
+/** The slice of a session_photos row that progress needs. */
+export interface PhotoStatusRow {
+  id: string;
+  excluded: boolean;
+  analysis_status: string;
+  analysis_started_at: string | null;
+  analysis_lease_expires_at: string | null;
+  analyzed_at: string | null;
+  quality_score: number | null;
+  analysis_error: string | null;
+}
+
+export interface PhotoProgress {
+  total: number;
+  completed: number;
+  analyzing: number;
+  waiting: number;
+  failed: number;
+  /** Photos finished since the run started — the basis for the time estimate. */
+  completedInRun: number;
+  /** When the run's first photo was picked up (epoch ms), if it has been. */
+  firstStartMs: number | null;
+}
+
+const ms = (iso: string | null) => (iso ? Date.parse(iso) : Number.NaN);
+
+export function summarizePhotoProgress(
+  rows: readonly PhotoStatusRow[], nowMs: number, runStartedAt: string | null,
+): PhotoProgress {
+  const runStart = runStartedAt ? ms(runStartedAt) : Number.NaN;
+  // Strictly after: a run marker can equal the start of a photo from before the run.
+  const inRun = (iso: string | null) => !Number.isNaN(runStart) && ms(iso) > runStart;
+  const progress: PhotoProgress = {
+    total: 0, completed: 0, analyzing: 0, waiting: 0, failed: 0,
+    completedInRun: 0, firstStartMs: null,
+  };
+  for (const row of rows) {
+    if (row.excluded || row.analysis_status === "skipped") continue;
+    progress.total += 1;
+    if (inRun(row.analysis_started_at)) {
+      const started = ms(row.analysis_started_at);
+      progress.firstStartMs = progress.firstStartMs === null ? started : Math.min(progress.firstStartMs, started);
+    }
+    switch (row.analysis_status) {
+      case "completed":
+        progress.completed += 1;
+        if (inRun(row.analyzed_at)) progress.completedInRun += 1;
+        break;
+      case "failed":
+        progress.failed += 1;
+        break;
+      case "processing":
+        // An expired lease means its worker died; it is back in the queue.
+        if (ms(row.analysis_lease_expires_at) > nowMs) progress.analyzing += 1;
+        else progress.waiting += 1;
+        break;
+      default:
+        progress.waiting += 1;
+    }
+  }
+  return progress;
+}
+
+// Below this, one fast or slow photo swings the estimate too much to show.
+const MIN_ESTIMATE_SAMPLES = 3;
+const MIN_ESTIMATE_ELAPSED_MS = 8_000;
+
+/** Milliseconds left at the run's measured pace, or null without enough data. */
+export function estimateRemainingMs(progress: PhotoProgress, nowMs: number): number | null {
+  const left = progress.analyzing + progress.waiting;
+  if (left === 0 || progress.firstStartMs === null) return null;
+  const elapsed = nowMs - progress.firstStartMs;
+  if (progress.completedInRun < MIN_ESTIMATE_SAMPLES || elapsed < MIN_ESTIMATE_ELAPSED_MS) return null;
+  return Math.round((left * elapsed) / progress.completedInRun);
+}
+
+/** "0:42", "3:05", "1:02:10". */
+export function formatDuration(totalMs: number): string {
+  const seconds = Math.max(0, Math.round(totalMs / 1000));
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = String(seconds % 60).padStart(2, "0");
+  return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${s}` : `${m}:${s}`;
+}
+
+/** "18 of 24 analyzed · 6 in progress · 1 failed" — zero counts are left out. */
+export function photoProgressLine(progress: PhotoProgress): string {
+  const parts = [`${progress.completed} of ${progress.total} analyzed`];
+  if (progress.analyzing > 0) parts.push(`${progress.analyzing} in progress`);
+  if (progress.waiting > 0) parts.push(`${progress.waiting} waiting`);
+  if (progress.failed > 0) parts.push(`${progress.failed} failed`);
+  return parts.join(" · ");
 }
