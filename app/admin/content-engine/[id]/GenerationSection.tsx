@@ -8,6 +8,8 @@ import { useCallback, useMemo, useState } from "react";
 import { T } from "@/app/admin/adminTheme";
 import { engineApi } from "@/app/admin/content-engine/engineApi";
 import { guideTypeForService, isSchoolSlug, SPOT_SCHOOL_IDS } from "@/lib/contentEngine/taxonomy";
+import { estimateCostUsd } from "@/lib/contentEngine/aiPricing";
+import { generateAllTypes, pendingGenerationTypes } from "@/app/admin/content-engine/pipeline";
 import {
   GENERATION_ORDER, CONTENT_TYPE_LABELS,
   type EngineItem, type EnginePackage, type EnginePhoto,
@@ -106,6 +108,18 @@ export default function GenerationSection({
   );
   const selected = activePackage?.generation_settings.selected_types ?? [];
 
+  // Cost from the tokens the model actually reported for this package's
+  // generation calls — never an invented count. Photo analysis is billed
+  // separately and isn't part of this figure.
+  const cost = useMemo(() => {
+    const usages = Object.values(progress)
+      .map((entry) => entry.usage)
+      .filter((u): u is NonNullable<typeof u> => u !== null && u !== undefined);
+    if (usages.length === 0) return null;
+    const { totalUsd, unknownModels } = estimateCostUsd(usages);
+    return { totalUsd, unknownModels, calls: usages.length };
+  }, [progress]);
+
   const createPackage = useCallback(async (archive: boolean) => {
     setNotice(null);
     try {
@@ -120,28 +134,23 @@ export default function GenerationSection({
     }
   }, [sessionId, items, preserveApprovals, onChanged]);
 
-  // Runs the given types concurrently (backend claims are atomic per type) and
-  // returns per-type error messages. Each type clears its own busy flag and
-  // refreshes as it finishes, so results stream in as they complete.
+  // Independent types run concurrently and the journal post waits for them —
+  // that ordering lives in pipeline.generateAllTypes, shared with the one-click
+  // run bar. Each type clears its own busy flag and refreshes as it finishes,
+  // so results stream in as they complete.
   const generateBatch = useCallback(async (types: string[]): Promise<string[]> => {
     if (!activePackage || types.length === 0) return [];
-    setBusyTypes((prev) => new Set([...prev, ...types]));
-    const results = await Promise.all(types.map(async (type) => {
-      try {
-        const result = await engineApi.generateType(activePackage.id, type);
-        return result.outcome === "failed" ? `${CONTENT_TYPE_LABELS[type]}: ${result.error ?? "failed"}` : null;
-      } catch (err) {
-        return `${CONTENT_TYPE_LABELS[type]}: ${err instanceof Error ? err.message : "generation failed"}`;
-      } finally {
+    return generateAllTypes(activePackage.id, types, {
+      onTypeStart: (started) => setBusyTypes((prev) => new Set([...prev, ...started])),
+      onTypeSettled: (type) => {
         setBusyTypes((prev) => {
           const next = new Set(prev);
           next.delete(type);
           return next;
         });
         onChanged();
-      }
-    }));
-    return results.filter((r): r is string => r !== null);
+      },
+    });
   }, [activePackage, onChanged]);
 
   const generateOne = useCallback(async (contentType: string) => {
@@ -153,18 +162,10 @@ export default function GenerationSection({
   const generateAll = useCallback(async () => {
     if (!activePackage) return;
     setNotice(null);
-    const remaining = GENERATION_ORDER.filter((type) => {
-      const entry = progress[type];
-      return !!entry && entry.status !== "completed" && entry.status !== "skipped" && !busyTypes.has(type);
-    });
-    // journal_post consumes the link + testimonial drafts, so it waits for the
-    // parallel wave; everything else is independent and runs concurrently
-    const errors = await generateBatch(remaining.filter((t) => t !== "journal_post"));
-    if (remaining.includes("journal_post")) {
-      errors.push(...await generateBatch(["journal_post"]));
-    }
+    const remaining = pendingGenerationTypes(activePackage).filter((t) => !busyTypes.has(t));
+    const errors = await generateBatch(remaining);
     if (errors.length > 0) setNotice(`${errors.join(" · ")} — retry or skip below`);
-  }, [activePackage, progress, busyTypes, generateBatch]);
+  }, [activePackage, busyTypes, generateBatch]);
 
   const skip = useCallback(async (contentType: string) => {
     if (!activePackage) return;
@@ -214,6 +215,13 @@ export default function GenerationSection({
       <p style={{ fontSize: 13, color: T.inkSoft, margin: "4px 0 10px" }}>
         Inputs: {analyzedCount} analyzed photos. Independent types generate in parallel;
         the journal post runs last because it uses the link and testimonial drafts.
+        {cost && (
+          <>
+            {" "}Generation so far: {cost.calls} model call(s), ≈${cost.totalUsd.toFixed(4)} from
+            recorded tokens (photo analysis billed separately)
+            {cost.unknownModels.length > 0 && ` — no rate on file for ${cost.unknownModels.join(", ")}`}.
+          </>
+        )}
       </p>
       {notice && <p style={{ fontSize: 13, color: T.red }}>{notice}</p>}
 

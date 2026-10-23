@@ -120,11 +120,13 @@ export default function EngineDashboard() {
     { draft: 0, approved: 0, published: 0, failed: 0 },
   ), [rows]);
 
-  const tiles = [
-    { label: "Drafts", sub: "awaiting approval", value: totals.draft, accent: T.amber },
-    { label: "Approved", sub: "ready to publish", value: totals.approved, accent: T.violet },
-    { label: "Published", sub: "live on the site", value: totals.published, accent: T.green },
-    { label: "Attention", sub: "failed items", value: totals.failed, accent: T.red },
+  // Each tile doubles as the filter for the sessions in that state, so the
+  // count you want to act on is one click from the list that holds it.
+  const tiles: { label: string; sub: string; value: number; accent: string; filter: SessionEngineState }[] = [
+    { label: "Drafts", sub: "awaiting approval", value: totals.draft, accent: T.amber, filter: "generated" },
+    { label: "Approved", sub: "ready to publish", value: totals.approved, accent: T.violet, filter: "reviewed" },
+    { label: "Published", sub: "live on the site", value: totals.published, accent: T.green, filter: "published" },
+    { label: "Attention", sub: "failed items", value: totals.failed, accent: T.red, filter: "failed" },
   ];
 
   return (
@@ -154,17 +156,26 @@ export default function EngineDashboard() {
       </header>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 mb-5">
-        {tiles.map((s) => (
-          <div key={s.label} className="rounded-2xl p-4"
-            style={{ background: T.panel, border: `1px solid ${T.border}`, boxShadow: T.shadow }}>
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-[10px] font-bold uppercase tracking-[0.18em] m-0" style={{ color: T.inkSoft, fontFamily: T.mono }}>{s.label}</p>
-              <span className="w-1.5 h-1.5 rounded-full" style={{ background: s.accent, boxShadow: `0 0 6px ${s.accent}` }} />
-            </div>
-            <p className="text-[26px] font-bold leading-none tabular-nums m-0" style={{ color: T.ink, fontFamily: T.mono }}>{s.value}</p>
-            <p className="text-[11px] mt-1.5 font-medium m-0" style={{ color: T.inkFaint }}>{s.sub}</p>
-          </div>
-        ))}
+        {tiles.map((s) => {
+          const active = stateFilter === s.filter;
+          return (
+            <button key={s.label} type="button" aria-pressed={active}
+              title={`Show only sessions in the ${STATE_BADGES[s.filter].label} state`}
+              onClick={() => setStateFilter(active ? "all" : s.filter)}
+              className="rounded-2xl p-4 text-left transition-all hover:-translate-y-px"
+              style={{
+                background: T.panel, boxShadow: T.shadow, cursor: "pointer",
+                border: `1px solid ${active ? s.accent : T.border}`,
+              }}>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] m-0" style={{ color: T.inkSoft, fontFamily: T.mono }}>{s.label}</p>
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: s.accent, boxShadow: `0 0 6px ${s.accent}` }} />
+              </div>
+              <p className="text-[26px] font-bold leading-none tabular-nums m-0" style={{ color: T.ink, fontFamily: T.mono }}>{s.value}</p>
+              <p className="text-[11px] mt-1.5 font-medium m-0" style={{ color: T.inkFaint }}>{s.sub}</p>
+            </button>
+          );
+        })}
       </div>
 
       {notice && (

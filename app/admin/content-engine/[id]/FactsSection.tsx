@@ -4,7 +4,7 @@
 // couples sessions get vibe / relationship type / outfit styling / best moment
 // plus a secondary-location input. Taxonomy-invalid slugs are rejected
 // server-side (422) and surfaced inline.
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { T } from "@/app/admin/adminTheme";
 import { engineApi } from "@/app/admin/content-engine/engineApi";
 import {
@@ -18,13 +18,17 @@ interface Props {
   session: Record<string, unknown>;
   sessionId: string;
   onSaved: () => void;
+  // Hands the parent a committer for these fields. Generation reads the package
+  // snapshot, so the one-click run flushes the form first — forgetting to press
+  // Save facts can no longer freeze stale facts into a package.
+  onRegisterFlush?: (flush: () => Promise<void>) => void;
 }
 
 const text = (v: unknown) => (typeof v === "string" ? v : "");
 const list = (v: unknown) => (Array.isArray(v) ? (v as string[]).join(", ") : "");
 const pretty = (v: string) => v.replace(/_/g, " ");
 
-export default function FactsSection({ session, sessionId, onSaved }: Props) {
+export default function FactsSection({ session, sessionId, onSaved, onRegisterFlush }: Props) {
   const [form, setForm] = useState({
     public_display_name: text(session.public_display_name),
     internal_client_name: text(session.internal_client_name),
@@ -51,27 +55,45 @@ export default function FactsSection({ session, sessionId, onSaved }: Props) {
   const set = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setForm((f) => ({ ...f, [key]: e.target.value }));
 
-  const save = async () => {
+  // The flush handed to the parent is registered once, so it reads the current
+  // form through a ref instead of closing over a stale render.
+  const formRef = useRef(form);
+  useEffect(() => { formRef.current = form; }, [form]);
+
+  const commit = useCallback(async (values: typeof form) => {
     setSaving(true);
     setNotice(null);
     try {
       await engineApi.patchFacts(sessionId, {
-        ...form,
+        ...values,
         // a non-grad session never keeps a school (grad-only fact)
-        school_slug: isGrads ? form.school_slug || null : null,
-        lighting_condition: form.lighting_condition || null,
-        session_date: form.session_date || null,
-        vibe: form.vibe || null,
-        relationship_type: form.relationship_type || null,
-        secondary_locations: form.secondary_locations
+        school_slug: values.service_type === "grads" ? values.school_slug || null : null,
+        lighting_condition: values.lighting_condition || null,
+        session_date: values.session_date || null,
+        vibe: values.vibe || null,
+        relationship_type: values.relationship_type || null,
+        secondary_locations: values.secondary_locations
           .split(",").map((s) => s.trim()).filter(Boolean),
       });
       setNotice("Saved.");
-      onSaved();
     } catch (err) {
       setNotice(err instanceof Error ? err.message : "save failed");
+      throw err;
     } finally {
       setSaving(false);
+    }
+  }, [sessionId]);
+
+  const flush = useCallback(() => commit(formRef.current), [commit]);
+
+  useEffect(() => { onRegisterFlush?.(flush); }, [onRegisterFlush, flush]);
+
+  const save = async () => {
+    try {
+      await commit(form);
+      onSaved();
+    } catch {
+      // commit already surfaced the message in `notice`
     }
   };
 

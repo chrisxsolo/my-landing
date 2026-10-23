@@ -2,12 +2,17 @@
 // Section 2 — Photos (spec §7.4): drag/drop or picker upload through
 // sign → uploadToSignedUrl → finalize (server hash is authoritative), grid of
 // 1h signed thumbnails with analysis-status chips, Exclude toggle, and the
-// client-orchestrated analyze loop (one batch per call; Resume = same button).
+// analyze run (batches in flight concurrently; Resume = same button).
+// Uploads and analysis both run with bounded concurrency — the per-file trust
+// boundary (download + verify + optional downscale) is unchanged, it just no
+// longer waits for the previous file.
 import { useCallback, useRef, useState } from "react";
 import { T } from "@/app/admin/adminTheme";
 import { supabase } from "@/lib/supabase";
 import { engineApi, EngineApiError } from "@/app/admin/content-engine/engineApi";
 import type { EnginePhoto } from "@/app/admin/content-engine/engineTypes";
+import { analyzeAllPhotos } from "@/app/admin/content-engine/pipeline";
+import { mapWithConcurrency } from "@/lib/contentEngine/concurrency";
 import { AUTO_CURATE_THRESHOLD, TOP_PICK_COUNT } from "@/lib/contentEngine/curationConfig";
 import { btn, card, chip, sectionTitle } from "./ui";
 
@@ -34,6 +39,11 @@ const STATUS_CHIP: Record<EnginePhoto["analysis_status"], { label: string; color
 // module pulls in node:crypto, so it can't be imported into a client component).
 const ALLOWED_MIME: readonly string[] = ["image/jpeg", "image/png", "image/webp"];
 const MAX_NOTICE_ITEMS = 3;
+
+// Four files in flight keeps a 20-photo drop network-bound instead of
+// round-trip-bound, without stacking enough concurrent finalize calls
+// (download + sharp verify) to starve the route.
+const UPLOAD_CONCURRENCY = 4;
 
 // readEntries() returns at most ~100 entries per call; drain until empty.
 function readAllEntries(reader: FileSystemDirectoryReader): Promise<FileSystemEntry[]> {
@@ -64,11 +74,12 @@ async function filesFromEntry(entry: FileSystemEntry): Promise<File[]> {
 
 export default function PhotosSection({ sessionId, photos, aiAllowed, onChanged, onPhotosMutated }: Props) {
   const fileInput = useRef<HTMLInputElement | null>(null);
-  const [uploading, setUploading] = useState<string | null>(null);
+  const [uploading, setUploading] = useState<{ done: number; total: number } | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [curating, setCurating] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  const [progressNote, setProgressNote] = useState<string | null>(null);
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
 
@@ -80,8 +91,9 @@ export default function PhotosSection({ sessionId, photos, aiAllowed, onChanged,
     if (files.length < incoming.length) {
       problems.push(`${incoming.length - files.length} file(s) skipped — JPEG, PNG, or WebP only`);
     }
-    for (const file of files) {
-      setUploading(file.name);
+    let done = 0;
+    setUploading({ done: 0, total: files.length });
+    const perFile = await mapWithConcurrency(files, UPLOAD_CONCURRENCY, async (file) => {
       try {
         const signed = await engineApi.signUpload(sessionId, { mime: file.type, sizeBytes: file.size });
         const { error } = await supabase.storage
@@ -91,14 +103,18 @@ export default function PhotosSection({ sessionId, photos, aiAllowed, onChanged,
         await engineApi.finalizeUpload(sessionId, signed.path, {
           filename: file.name, mime: file.type, sizeBytes: file.size,
         });
+        return null;
       } catch (err) {
         if (err instanceof EngineApiError && err.status === 409) {
-          problems.push(`${file.name}: already uploaded (duplicate photo)`);
-        } else {
-          problems.push(`${file.name}: ${err instanceof Error ? err.message : "upload failed"}`);
+          return `${file.name}: already uploaded (duplicate photo)`;
         }
+        return `${file.name}: ${err instanceof Error ? err.message : "upload failed"}`;
+      } finally {
+        done += 1;
+        setUploading({ done, total: files.length });
       }
-    }
+    });
+    problems.push(...perFile.filter((p): p is string => p !== null));
     setUploading(null);
     if (problems.length > 0) {
       const extra = problems.length - MAX_NOTICE_ITEMS;
@@ -154,26 +170,29 @@ export default function PhotosSection({ sessionId, photos, aiAllowed, onChanged,
     setAnalyzing(true);
     setNotice(null);
     setInfo(null);
+    setProgressNote(null);
     let clean = false;
     try {
-      // client orchestrates: one batch per request until none remain (spec §8.1)
-      for (;;) {
-        const result = await engineApi.analyzeBatch(sessionId);
-        onChanged();
-        if (result.failed > 0) {
-          setNotice(`${result.failed} photo(s) failed analysis — fix or retry below`);
-          break;
-        }
-        if (result.remaining === 0) { clean = true; break; }
+      // The client orchestrates batches (spec §8.1); several run concurrently
+      // because each claim is atomic and claims disjoint photos.
+      const result = await analyzeAllPhotos(sessionId, pendingCount, {
+        onProgress: (p) => setProgressNote(p.detail),
+        onBatch: onChanged,
+      });
+      if (result.failed > 0) {
+        setNotice(`${result.failed} photo(s) failed analysis — fix or retry below`);
+      } else {
+        clean = true;
       }
     } catch (err) {
       setNotice(err instanceof Error ? err.message : "analysis failed");
     } finally {
       setAnalyzing(false);
+      setProgressNote(null);
       onChanged();
     }
     if (clean && autoCurate) await runCuration();
-  }, [sessionId, onChanged, autoCurate, runCuration]);
+  }, [sessionId, pendingCount, onChanged, autoCurate, runCuration]);
 
   // Optimistic: flip locally right away, revert on server failure. No full
   // refetch — that would re-sign and reload every thumbnail in the grid.
@@ -226,7 +245,7 @@ export default function PhotosSection({ sessionId, photos, aiAllowed, onChanged,
         <h2 style={sectionTitle}>Photos ({photos.length})</h2>
         <div style={{ display: "flex", gap: 8 }}>
           <button style={btn(false)} onClick={() => fileInput.current?.click()} disabled={uploading !== null}>
-            {uploading ? `Uploading ${uploading}…` : "Upload photos"}
+            {uploading ? `Uploading ${uploading.done} of ${uploading.total}…` : "Upload photos"}
           </button>
           {analyzedCount > TOP_PICK_COUNT && (
             <button style={btn(false)} disabled={!aiAllowed || analyzing || curating}
@@ -252,6 +271,7 @@ export default function PhotosSection({ sessionId, photos, aiAllowed, onChanged,
           {includedCount} photos included — after analysis, AI will keep the best {TOP_PICK_COUNT} and exclude the rest.
         </p>
       )}
+      {progressNote && <p style={{ fontSize: 13, color: T.blue }}>{progressNote}</p>}
       {notice && <p style={{ fontSize: 13, color: T.red }}>{notice}</p>}
       {info && <p style={{ fontSize: 13, color: T.green }}>{info}</p>}
       <input ref={fileInput} type="file" accept={ALLOWED_MIME.join(",")} multiple hidden

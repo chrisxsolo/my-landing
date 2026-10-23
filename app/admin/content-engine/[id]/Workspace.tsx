@@ -3,7 +3,7 @@
 // guided stepper, single-scroll sections gating top-to-bottom, sticky bottom
 // action bar. All durable state is server rows; refresh() refetches everything.
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { T } from "@/app/admin/adminTheme";
 import { checkAuth } from "@/lib/adminAuth";
 import { engineApi } from "@/app/admin/content-engine/engineApi";
@@ -20,6 +20,7 @@ import ItemsSection from "./ItemsSection";
 import ActionBar from "./ActionBar";
 import PublicationHistory from "./PublicationHistory";
 import ReconcileBanner from "./ReconcileBanner";
+import RunAllBar from "./RunAllBar";
 
 export default function Workspace({ sessionId }: { sessionId: string }) {
   const router = useRouter();
@@ -27,6 +28,16 @@ export default function Workspace({ sessionId }: { sessionId: string }) {
   const [photos, setPhotos] = useState<EnginePhoto[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [analytics, setAnalytics] = useState<{ views: number; ctaClicks: number; perItem: Record<string, number> } | null>(null);
+  // FactsSection registers its committer here so the one-click run saves the
+  // facts form before a package snapshot freezes them.
+  const flushFactsRef = useRef<(() => Promise<void>) | null>(null);
+  const registerFlushFacts = useCallback((flush: () => Promise<void>) => {
+    flushFactsRef.current = flush;
+  }, []);
+  const flushFacts = useCallback(
+    () => flushFactsRef.current?.() ?? Promise.resolve(),
+    [],
+  );
 
   const refresh = useCallback(async () => {
     try {
@@ -92,7 +103,11 @@ export default function Workspace({ sessionId }: { sessionId: string }) {
       <WorkflowStepper state={data.state} />
       <ReconcileBanner sessionId={sessionId} onChanged={refresh} />
       <PermissionsBar session={session} sessionId={sessionId} onChanged={refresh} />
-      <FactsSection session={session} sessionId={sessionId} onSaved={refresh} />
+      <RunAllBar sessionId={sessionId} photos={photos} activePackage={data.activePackage}
+        aiAllowed={session.ai_processing_allowed as boolean}
+        flushFacts={flushFacts} onChanged={refresh} />
+      <FactsSection session={session} sessionId={sessionId} onSaved={refresh}
+        onRegisterFlush={registerFlushFacts} />
       <PhotosSection sessionId={sessionId} photos={photos}
         aiAllowed={session.ai_processing_allowed as boolean} onChanged={refresh}
         onPhotosMutated={setPhotos} />
