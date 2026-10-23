@@ -135,8 +135,21 @@ export async function updateSessionFacts(args: UpdateFactsArgs): Promise<{ updat
       patch[key] = v === null ? null : typeof v === "string" ? v.slice(0, 2000) : String(v).slice(0, 2000);
     }
   }
-  for (const key of ["session_date", "start_time"]) {
-    if (key in facts) patch[key] = facts[key];
+  // A date and a start time are the two facts the email extractor is most
+  // likely to propose, so their formats are checked here rather than left to
+  // Postgres to reject with an opaque error.
+  if ("session_date" in facts) {
+    const value = facts.session_date;
+    if (value === null || value === "") patch.session_date = null;
+    else if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) patch.session_date = value;
+    else throw new Error(`invalid session date: ${String(value)}`);
+  }
+  if ("start_time" in facts) {
+    const value = facts.start_time;
+    if (value === null || value === "") patch.start_time = null;
+    else if (typeof value === "string" && /^([01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(value)) {
+      patch.start_time = value.slice(0, 5);
+    } else throw new Error(`invalid start time: ${String(value)}`);
   }
   for (const key of ["graduation_year", "outfit_count", "group_size"]) {
     if (key in facts) {

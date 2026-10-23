@@ -1,7 +1,16 @@
 // DTO types for the engine admin UI — shapes mirror the Plan-4A route payloads.
 import type { SessionEngineState } from "@/lib/contentEngine/state";
+import type { ExtractionOutcome, FreshnessOutcome } from "@/lib/contentEngine/emailFacts/run";
 
 export type { SessionEngineState };
+
+// Email-fact extraction DTOs. Type-only re-exports of the server contract, so
+// the route and the panel can never drift apart.
+export type { ThreadSummary } from "@/lib/contentEngine/emailFacts/run";
+export type { ExtractedFact, DroppedFact } from "@/lib/contentEngine/emailFacts/extract";
+export type EmailFactsResult = ExtractionOutcome;
+/** The GET degrades to "unavailable" whenever Gmail cannot answer. */
+export type EmailFactsFreshness = FreshnessOutcome | { outcome: "unavailable" };
 
 export interface EngineSessionRow {
   id: string;

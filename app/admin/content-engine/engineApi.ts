@@ -3,6 +3,7 @@
 // server's message and status so callers can branch on status (409 protocols).
 import type {
   EngineSessionRow, EnginePhoto, WorkspaceData, ReconcileReport, EngineJob,
+  EmailFactsResult, EmailFactsFreshness,
 } from "./engineTypes";
 
 export class EngineApiError extends Error {
@@ -39,6 +40,15 @@ export const engineApi = {
     request<{ updated: boolean }>(`/api/admin/session-content/sessions/${sessionId}`, {
       method: "PATCH", body: JSON.stringify(facts),
     }),
+  // Reads the client's Gmail conversation live every time — the point of the
+  // button is to see the message that arrived five minutes ago.
+  extractEmailFacts: (sessionId: string, threadId?: string) =>
+    request<EmailFactsResult>(`/api/admin/session-content/sessions/${sessionId}/email-facts`, {
+      method: "POST", body: JSON.stringify({ threadId: threadId ?? null }),
+    }),
+  // Metadata-only freshness check: no bodies, no model call, no cost.
+  checkEmailFacts: (sessionId: string) =>
+    request<EmailFactsFreshness>(`/api/admin/session-content/sessions/${sessionId}/email-facts`),
   patchPermissions: (sessionId: string, body: Record<string, unknown>) =>
     request<{ outcome: string }>(`/api/admin/session-content/sessions/${sessionId}/permissions`, {
       method: "PATCH", body: JSON.stringify(body),

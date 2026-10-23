@@ -1,5 +1,7 @@
 "use client";
 // Section 1 — Session facts (spec §7.4): editable fields; saving commits values.
+// Auto-fill from email (2026-10-23) reads the client's Gmail conversation and
+// proposes values; it only ever fills this form — Save facts still commits.
 // Service-aware (2026-07-02): grad-only fields (School) render only for grads;
 // couples sessions get vibe / relationship type / outfit styling / best moment
 // plus a secondary-location input. Taxonomy-invalid slugs are rejected
@@ -13,6 +15,8 @@ import {
 import { serviceConfigFor } from "@/lib/contentEngine/serviceConfig";
 import { btn, card, input, label, sectionTitle } from "./ui";
 import DictationTextarea from "./DictationTextarea";
+import AutoFillFromEmail from "./AutoFillFromEmail";
+import type { EmailFactField } from "@/lib/contentEngine/emailFacts/fields";
 
 interface Props {
   session: Record<string, unknown>;
@@ -25,6 +29,8 @@ interface Props {
 }
 
 const text = (v: unknown) => (typeof v === "string" ? v : "");
+// Postgres `time` comes back as "17:30:00"; the input wants "17:30".
+const time = (v: unknown) => (typeof v === "string" ? v.slice(0, 5) : "");
 const list = (v: unknown) => (Array.isArray(v) ? (v as string[]).join(", ") : "");
 const pretty = (v: string) => v.replace(/_/g, " ");
 
@@ -37,6 +43,7 @@ export default function FactsSection({ session, sessionId, onSaved, onRegisterFl
     primary_location: text(session.primary_location),
     secondary_locations: list(session.secondary_locations),
     session_date: text(session.session_date),
+    start_time: time(session.start_time),
     lighting_condition: text(session.lighting_condition),
     vibe: text(session.vibe),
     relationship_type: text(session.relationship_type),
@@ -70,6 +77,7 @@ export default function FactsSection({ session, sessionId, onSaved, onRegisterFl
         school_slug: values.service_type === "grads" ? values.school_slug || null : null,
         lighting_condition: values.lighting_condition || null,
         session_date: values.session_date || null,
+        start_time: values.start_time || null,
         vibe: values.vibe || null,
         relationship_type: values.relationship_type || null,
         secondary_locations: values.secondary_locations
@@ -87,6 +95,12 @@ export default function FactsSection({ session, sessionId, onSaved, onRegisterFl
   const flush = useCallback(() => commit(formRef.current), [commit]);
 
   useEffect(() => { onRegisterFlush?.(flush); }, [onRegisterFlush, flush]);
+
+  // Accepted suggestions land in the form, never straight in the database.
+  const applyExtracted = (values: Partial<Record<EmailFactField, string>>) => {
+    setForm((f) => ({ ...f, ...values }));
+    setNotice(null);
+  };
 
   const save = async () => {
     try {
@@ -141,6 +155,10 @@ export default function FactsSection({ session, sessionId, onSaved, onRegisterFl
           <input style={input} type="date" value={form.session_date} onChange={set("session_date")} />
         </div>
         <div>
+          <span style={label}>Session time (start)</span>
+          <input style={input} type="time" value={form.start_time} onChange={set("start_time")} />
+        </div>
+        <div>
           <span style={label}>Lighting</span>
           <select style={input} value={form.lighting_condition} onChange={set("lighting_condition")}>
             <option value="">— unknown —</option>
@@ -185,11 +203,16 @@ export default function FactsSection({ session, sessionId, onSaved, onRegisterFl
         <DictationTextarea value={form.internal_notes}
           onValueChange={(v) => setForm((f) => ({ ...f, internal_notes: v }))} />
       </div>
-      <div style={{ marginTop: 10, display: "flex", gap: 10, alignItems: "center" }}>
+      <div style={{ marginTop: 10, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
         <button style={btn(true)} onClick={() => void save()} disabled={saving}>
           {saving ? "Saving…" : "Save facts"}
         </button>
         {notice && <span style={{ fontSize: 13, color: notice === "Saved." ? T.inkSoft : T.red }}>{notice}</span>}
+      </div>
+      <div style={{ marginTop: 10 }}>
+        <AutoFillFromEmail sessionId={sessionId}
+          aiAllowed={Boolean(session.ai_processing_allowed)}
+          currentValues={form} onApply={applyExtracted} />
       </div>
     </section>
   );
