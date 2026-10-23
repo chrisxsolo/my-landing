@@ -9,6 +9,7 @@
 //      graduation and a September couples session has two, and mixing them is
 //      the failure the spec calls out.
 import type { ServiceType } from "@/lib/contentEngine/taxonomy";
+import { FIELD_SPECS } from "./fields";
 
 export type MessageDirection = "client" | "photographer";
 
@@ -159,9 +160,24 @@ export interface RankedThread {
 }
 
 /**
- * Score each thread on how much of what we already know it actually contains.
- * Service wording, the known session date and the known location are the three
- * signals that tell one booking's thread from another's.
+ * Does the client's own voice appear in this thread?
+ *
+ * The photographer's transactional mail — a payment confirmation, an invoice
+ * notice — quotes the service and the session date perfectly, so on keywords
+ * alone a one-message receipt outscores the nine-message negotiation that
+ * actually settled them. A receipt is not a conversation: it is a notice
+ * about one, and the facts it repeats were agreed somewhere else.
+ */
+export const isConversation = (candidate: ThreadCandidate): boolean =>
+  candidate.messages.some((m) => m.direction === "client");
+
+/**
+ * Score each thread on how much of what we already know about THIS booking it
+ * contains — the service wording, the known session date, the known location.
+ *
+ * Only those count toward the score. Thread length is a tiebreak, never a
+ * reason to prefer one booking's thread over another's: a client with two
+ * shoots does not want the chattier one picked for the quieter one.
  */
 export function rankThreadCandidates(
   candidates: ThreadCandidate[],
@@ -178,7 +194,12 @@ export function rankThreadCandidates(
 
     if (hints.sessionDate && datePhrases(hints.sessionDate).some((re) => re.test(text))) score += 3;
 
-    const location = hints.primaryLocation?.trim();
+    // Only a location that is really a place may vouch for a thread. A row
+    // holding a date in primary_location ("September 28") would otherwise
+    // match every transactional email that prints the session date.
+    const location = hints.primaryLocation
+      ? FIELD_SPECS.primary_location.coerce(hints.primaryLocation)
+      : null;
     if (location && location.length > 3 && text.toLowerCase().includes(location.toLowerCase())) {
       score += 2;
     }
@@ -186,7 +207,9 @@ export function rankThreadCandidates(
   });
 
   return ranked.sort(
-    (a, b) => b.score - a.score || b.candidate.lastAt.localeCompare(a.candidate.lastAt),
+    (a, b) => b.score - a.score
+      || b.candidate.messages.length - a.candidate.messages.length
+      || b.candidate.lastAt.localeCompare(a.candidate.lastAt),
   );
 }
 
@@ -199,9 +222,13 @@ export type ThreadChoice =
  *
  * `linkedThreadIds` are threads already tied to this booking's inquiry — an
  * explicit link always wins and several linked threads are analyzed together.
- * Otherwise one candidate is used as-is, and among several the top thread must
- * both match something we know and beat the runner-up clearly. Anything less
- * is ambiguous: guessing risks pulling a different photoshoot's details in.
+ *
+ * Otherwise, threads the client never wrote in are set aside first: once a
+ * real conversation exists, the photographer's own receipts and invoice
+ * notices are not candidates for it. Among the conversations that remain, one
+ * is used as-is; several need the top thread to match something known and to
+ * beat the runner-up clearly. Anything less is ambiguous — guessing risks
+ * pulling a different photoshoot's details into this one.
  */
 export function chooseThreads(
   candidates: ThreadCandidate[],
@@ -211,9 +238,16 @@ export function chooseThreads(
   const linked = candidates.filter((c) => linkedThreadIds.includes(c.threadId));
   if (linked.length) return { outcome: "chosen", threads: linked };
   if (candidates.length === 0) return { outcome: "chosen", threads: [] };
-  if (candidates.length === 1) return { outcome: "chosen", threads: candidates };
 
-  const ranked = rankThreadCandidates(candidates, hints);
+  const conversations = candidates.filter(isConversation);
+  // Nothing but transactional mail: ask rather than extract a booking's facts
+  // from a receipt that only repeats them.
+  if (!conversations.length) {
+    return { outcome: "ambiguous", candidates: rankThreadCandidates(candidates, hints) };
+  }
+  if (conversations.length === 1) return { outcome: "chosen", threads: conversations };
+
+  const ranked = rankThreadCandidates(conversations, hints);
   const [top, second] = ranked;
   if (top.score >= 3 && top.score - second.score >= 2) {
     return { outcome: "chosen", threads: [top.candidate] };

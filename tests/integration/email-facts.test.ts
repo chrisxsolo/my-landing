@@ -406,6 +406,57 @@ describe("permissions", () => {
   });
 });
 
+describe("the photographer's own transactional mail", () => {
+  // Regression from the first live run: the "Payment Confirmed" email repeats
+  // the service and the session date, so it outranked the nine-message thread
+  // that settled them and the extraction ran over a receipt.
+  const receipt: ConversationMessage[] = [{
+    gmailMessageId: "p1", threadId: "receipt", at: "2026-10-11T17:00:00.000Z",
+    direction: "photographer", subject: "Payment Confirmed",
+    body: "Your Couples Session is confirmed. Session date: October 25, 2026. Deposit received.",
+  }];
+
+  it("is set aside in favour of the conversation with the client", async () => {
+    const sessionId = await seedSession({ facts: { session_date: "2026-10-25" } });
+    const result = await runEmailFactExtraction({
+      client: service, callModel: modelReturning(COUPLES_FIELDS),
+      auth: "Bearer test", connectedEmails: CONNECTED, sessionId,
+      fetchThreads: threadFetcher([...COUPLES_THREAD, ...receipt]),
+      now: new Date("2026-10-12T12:00:00.000Z"),
+    });
+    expect(result.outcome).toBe("extracted");
+    if (result.outcome !== "extracted") return;
+    expect(result.threads.map((t) => t.threadId)).toEqual(["couples"]);
+    expect(result.messageCount).toBe(4);
+  });
+
+  it("is never extracted from on its own", async () => {
+    const sessionId = await seedSession({ facts: { session_date: "2026-10-25" } });
+    const result = await runEmailFactExtraction({
+      client: service, callModel: modelReturning(COUPLES_FIELDS),
+      auth: "Bearer test", connectedEmails: CONNECTED, sessionId,
+      fetchThreads: threadFetcher([...receipt, {
+        gmailMessageId: "p2", threadId: "invoice", at: "2026-10-09T17:00:00.000Z",
+        direction: "photographer", subject: "Invoice from SoloXSnaps",
+        body: "Your couples session invoice for October 25 is attached.",
+      }]),
+      now: new Date("2026-10-12T12:00:00.000Z"),
+    });
+    expect(result.outcome).toBe("ambiguous");
+  });
+
+  it("does not block a session whose only thread is a receipt from being picked by hand", async () => {
+    const sessionId = await seedSession();
+    const result = await runEmailFactExtraction({
+      client: service, callModel: modelReturning(COUPLES_FIELDS),
+      auth: "Bearer test", connectedEmails: CONNECTED, sessionId, threadId: "receipt",
+      fetchThreads: threadFetcher(receipt),
+      now: new Date("2026-10-12T12:00:00.000Z"),
+    });
+    expect(result.outcome).toBe("extracted");
+  });
+});
+
 describe("linked inquiry threads", () => {
   it("prefers the thread already linked to the booking's inquiry", async () => {
     const { data: inquiry, error } = await service.from("inquiries").insert({

@@ -118,6 +118,105 @@ describe("thread selection", () => {
     expect(choice.outcome).toBe("chosen");
   });
 
+  // Regression (2026-10-23, found on a live session): the photographer's own
+  // "Payment Confirmed" email quotes the service type and the session date, so
+  // it outscored the nine-message thread that actually settled them, and the
+  // extraction ran over a receipt.
+  const bookingThread = groupIntoThreads([
+    message({
+      gmailMessageId: "b1", threadId: "booking", subject: "Re: Your Couples Session inquiry",
+      at: "2026-07-28T10:00:00.000Z", direction: "photographer",
+      body: "Thanks for reaching out! Which dates are you thinking?",
+    }),
+    message({
+      gmailMessageId: "b2", threadId: "booking", subject: "Re: Your Couples Session inquiry",
+      at: "2026-07-28T12:00:00.000Z", direction: "client",
+      body: "We were hoping for late September — maybe the 28th, around sunset?",
+    }),
+    message({
+      gmailMessageId: "b3", threadId: "booking", subject: "Re: Your Couples Session inquiry",
+      at: "2026-07-29T10:00:00.000Z", direction: "photographer",
+      body: "September 28 at 6:00pm works. Let's meet at Crissy Field.",
+    }),
+  ])[0];
+  const receiptThread = groupIntoThreads([
+    message({
+      gmailMessageId: "r1", threadId: "receipt", subject: "Payment Confirmed",
+      at: "2026-07-30T10:00:00.000Z", direction: "photographer",
+      body: "Your Couples Session is confirmed. Session date: September 28, 2026. Deposit received.",
+    }),
+  ])[0];
+
+  it("ranks the real back-and-forth above the photographer's own receipt", () => {
+    const ranked = rankThreadCandidates([receiptThread, bookingThread], {
+      serviceType: "couples", sessionDate: "2026-09-28",
+    });
+    expect(ranked[0].candidate.threadId).toBe("booking");
+  });
+
+  it("chooses the conversation, not the receipt", () => {
+    const choice = chooseThreads([receiptThread, bookingThread], {
+      serviceType: "couples", sessionDate: "2026-09-28",
+    });
+    expect(choice.outcome).toBe("chosen");
+    if (choice.outcome === "chosen") expect(choice.threads[0].threadId).toBe("booking");
+  });
+
+  it("ignores a primary location that is really a date", () => {
+    // The live row held "September 28" in primary_location, which matched the
+    // receipt's printed date and pushed it over the booking thread.
+    const ranked = rankThreadCandidates([receiptThread, bookingThread], {
+      serviceType: "couples", sessionDate: "2026-09-28", primaryLocation: "September 28",
+    });
+    expect(ranked[0].candidate.threadId).toBe("booking");
+  });
+
+  it("still lets a real location vouch for a thread", () => {
+    const ranked = rankThreadCandidates([receiptThread, bookingThread], {
+      serviceType: "couples", primaryLocation: "Crissy Field",
+    });
+    expect(ranked[0].candidate.threadId).toBe("booking");
+  });
+
+  it("never settles on a thread the client never wrote in", () => {
+    // Only transactional mail found: asking beats extracting from a receipt.
+    const otherReceipt = groupIntoThreads([
+      message({
+        gmailMessageId: "r2", threadId: "invoice", subject: "Invoice from SoloXSnaps",
+        at: "2026-07-29T10:00:00.000Z", direction: "photographer",
+        body: "Your couples session invoice for September 28 is attached.",
+      }),
+    ])[0];
+    const choice = chooseThreads([receiptThread, otherReceipt], {
+      serviceType: "couples", sessionDate: "2026-09-28",
+    });
+    expect(choice.outcome).toBe("ambiguous");
+  });
+
+  it("sets receipts aside entirely once a real conversation exists", () => {
+    // The receipt matches the service and the date just as well as the thread
+    // that settled them, so it must be out of the running, not merely behind.
+    const choice = chooseThreads([receiptThread, bookingThread], {
+      serviceType: "couples", sessionDate: "2026-09-28",
+    });
+    expect(choice.outcome).toBe("chosen");
+    if (choice.outcome === "chosen") expect(choice.threads).toHaveLength(1);
+  });
+
+  it("does not let a longer thread stand in for a different booking", () => {
+    // Two couples conversations, nothing known that tells them apart: length
+    // alone must not decide which photoshoot's details get pulled in.
+    const shortOther = groupIntoThreads([
+      message({
+        gmailMessageId: "o1", threadId: "anniversary", subject: "Anniversary couples photos",
+        at: "2026-03-02T10:00:00.000Z", direction: "client",
+        body: "We'd love couples photos for our anniversary at Lands End.",
+      }),
+    ])[0];
+    const choice = chooseThreads([bookingThread, shortOther], { serviceType: "couples" });
+    expect(choice.outcome).toBe("ambiguous");
+  });
+
   it("prefers an explicitly linked thread over any ranking", () => {
     const choice = chooseThreads([gradThread, couplesThread], { serviceType: "couples" }, ["grad"]);
     expect(choice.outcome).toBe("chosen");

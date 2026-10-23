@@ -107,7 +107,7 @@ RULES
 - lighting_condition: a shoot booked for sunset means lighting was PLANNED as golden_hour or sunset — use status "planned". Only use "confirmed" when the conversation says what the light actually did on the day.
 - vibe / relationship_type: only when stated or clearly described. A couples shoot does not imply "romantic", and it does not imply the couple is engaged or married.
 - best_moment: only a moment that has actually happened and is described in the conversation. For a shoot that has not happened yet, use null.
-- public_display_name: the first name the client goes by. internal_client_name: their full name.
+- public_display_name: the first name the client goes by. internal_client_name: their full name as the CLIENT writes it — their signature, or how they introduce themselves. How the photographer greets them is not their full name.
 - public_session_summary: one or two plain sentences, suitable as source material for a blog post or caption, built ONLY from facts in this conversation. No email addresses, phone numbers, prices, payment or booking logistics, and nothing invented to make it read better. null when there is too little to say.
 - internal_notes: private operational details worth remembering — special requests, accessibility needs, scheduling constraints, outstanding questions, requested deliverables. No payment details, no contact details, nothing sensitive that the photographer does not need.
 - confidence: "high" when a value is explicitly confirmed in writing, "medium" when it is clearly implied, "low" when it is a thin inference. It is a plain judgement, not a probability.
