@@ -73,6 +73,12 @@ export function catalogSessionTotalCents(inquiry: PaymentTotalInquiry | null | u
     return Math.round((base + getGraduationTravelFeeFromText(text)) * 100);
   }
 
+  // An elopement starts at $950, but its coverage duration is settled per
+  // booking, so the rate card cannot total one. Returning 0 sends the caller to
+  // the price quoted in the thread, and stops "couple portraits after the
+  // ceremony" from being priced off the couples card below.
+  if (/\belop|\bcourthouse\b|\bwedding ceremony\b/.test(text)) return 0;
+
   if (/\bproposal\b/.test(text)) return COUPLES_PACKAGES.proposal.price * 100;
   if (/\bengagement\b/.test(text)) return COUPLES_PACKAGES.engagement.price * 100;
   if (/\bsignature\b/.test(text)) return COUPLES_PACKAGES.signature.price * 100;

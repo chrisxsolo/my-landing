@@ -124,6 +124,7 @@ export const CANONICAL_INTERNAL_LINKS: readonly string[] = [
   "/pricing/grads",
   "/pricing/couples",
   "/pricing/families",
+  "/pricing/elopements",
   "/pricing/events",
 ];
 

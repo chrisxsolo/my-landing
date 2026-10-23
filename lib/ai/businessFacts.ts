@@ -145,6 +145,41 @@ function couplesFacts(
   };
 }
 
+/**
+ * Elopement and courthouse ceremony coverage.
+ *
+ * Every figure here is read off the catalog, so the email, the rates page and
+ * the contract cannot drift apart. The base is a FLOOR, not a package price:
+ * two hours at $950, with anything longer quoted by hand. needsManualQuote
+ * carries that distinction rather than suppressing the price, because the
+ * starting figure is what a client asking about an elopement needs to hear.
+ *
+ * The only quotable add-on is the second location, and it buys a stop rather
+ * than time. Extra coverage is a custom quote, named without a number, which
+ * leaves the validator free to flag any figure the model attaches to it.
+ */
+function elopementFacts(): PricingFacts {
+  const elopement = PRICING_CATALOG.elopement;
+  const hours = elopement.durationMinutes / 60;
+  const lines = [
+    `Elopement and courthouse ceremony coverage STARTS AT ${money(elopement.startingPrice)} for ${hours} hours. Say "starts at ${money(elopement.startingPrice)}" or "${money(elopement.startingPrice)} for ${hours} hours of coverage". Longer coverage costs more, so never call ${money(elopement.startingPrice)} the total without settling the hours.`,
+    `It covers the ceremony, couple portraits afterward, immediate family and small-group portraits, posing guidance, a minimum of ${elopement.minimumImages} edited high-resolution images, and a private online gallery.`,
+    `${hours} hours is the base. Never offer unlimited coverage, and never state a different number of hours as if it were included. Ask whether ${hours} hours covers what they have planned.`,
+    `An additional nearby location is ${money(elopement.addOns.extraLocation.price)}, for example a courthouse ceremony followed by beach or park portraits. It is a second stop INSIDE the ${hours} hours, not extra time, and a spot that needs substantial extra travel can cost more than that.`,
+    "Coverage beyond the base is a custom quote. Say you'll put a figure together once the timing is settled, and do not price it yourself.",
+    "Travel outside San Francisco is calculated separately from round-trip distance. There is no flat travel fee, so state an amount only if one is given to you as a verified fact.",
+  ];
+
+  return {
+    verified: true,
+    lines,
+    basePrices: [elopement.startingPrice],
+    addOnPrices: [elopement.addOns.extraLocation.price],
+    needsManualQuote:
+      `${money(elopement.startingPrice)} covers ${hours} hours and is verified. Anything longer is not: price extra coverage by hand rather than in this email. Quote the starting price, add the ${money(elopement.addOns.extraLocation.price)} second location only if they raised one, and check the hours before promising a total.`,
+  };
+}
+
 function familyFacts(peopleCount: number): PricingFacts {
   const families = PRICING_CATALOG.families;
   const lines = [
@@ -337,7 +372,7 @@ export function buildPricingFacts(input: BusinessFactsInput): PricingFacts {
     case "event":      return eventFacts();
     case "headshot":   return unpricedSessionFacts("headshot");
     case "portrait":   return unpricedSessionFacts("individual portrait");
-    case "elopement":  return unpricedSessionFacts("elopement");
+    case "elopement":  return elopementFacts();
     case "commercial": return unpricedSessionFacts("commercial or branding");
     case "headshot_event": return groupBookingFacts();
     default:

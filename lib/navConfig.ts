@@ -97,6 +97,7 @@ export const DEFAULT_NAV_CONFIG: NavConfig = {
       visible: true,
       children: [
         { id: "couples-rates", label: "Couples rates", href: "/pricing/couples" },
+        { id: "elopement-rates", label: "Elopement rates", href: "/pricing/elopements" },
         { id: "grad-rates", label: "Grad rates", href: "/pricing/grads" },
         { id: "family-rates", label: "Family rates", href: "/pricing/families" },
       ],

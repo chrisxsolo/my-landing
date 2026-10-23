@@ -5,11 +5,12 @@ import type { AdminInquiry } from "@/lib/adminInquiries";
 import type { PaymentRow } from "@/lib/paymentFilters";
 import { detectSchoolKey, SCHOOL_UNLINKED } from "./schools";
 
-export type ServiceKey = "graduation" | "couples" | "family" | "portrait" | "event" | "other" | "unlinked";
+export type ServiceKey = "graduation" | "couples" | "elopement" | "family" | "portrait" | "event" | "other" | "unlinked";
 
 export const SERVICE_LABELS: Record<ServiceKey, string> = {
   graduation: "Graduation",
   couples: "Couples",
+  elopement: "Elopements",
   family: "Family",
   portrait: "Portraits",
   event: "Events",
@@ -27,6 +28,10 @@ export function normalizeService(sessionType: string | null | undefined, linked:
   if (!sessionType) return linked ? "other" : "unlinked";
   const t = sessionType.toLowerCase();
   if (/grad/.test(t)) return "graduation";
+  // Elopements are their own service with their own rate, so they must not be
+  // folded into couples revenue. Checked first: the session type reads
+  // "Elopement / Courthouse Ceremony" and would otherwise fall through.
+  if (/elope|courthouse/.test(t)) return "elopement";
   if (/couple|engagement|proposal|anniversary/.test(t)) return "couples";
   if (/family|maternity|newborn/.test(t)) return "family";
   if (/portrait|headshot|senior/.test(t)) return "portrait";

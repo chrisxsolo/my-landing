@@ -15,6 +15,7 @@ import styles from "@/app/(professional)/pricing/Pricing.module.css";
 const graduationPricing = PRICING_CATALOG.graduation;
 const familyPricing = PRICING_CATALOG.families;
 const couplesPricing = PRICING_CATALOG.couples;
+const elopementPricing = PRICING_CATALOG.elopement;
 
 // Cached/ISR: refreshed at most hourly, or immediately on admin content saves
 // (POST /api/admin/revalidate).
@@ -53,6 +54,15 @@ const RATES = [
     copy:    `Anniversary photos, engagement sessions, lifestyle portraits, and proposal coverage. Sessions from ${couplesPricing.packages.mini.durationMinutes} minutes to ${couplesPricing.packages.engagement.durationMinutes}+ minutes across Bay Area locations.`,
     cta:     "See couples pricing",
     chips:   [`From ${formatCurrency(couplesPricing.packages.mini.price)}`, `${couplesPricing.packages.mini.minimumImages}+ edited images`, "Guided posing"],
+  },
+  {
+    slug:    "elopements",
+    href:    "/pricing/elopements",
+    kicker:  "Elopement photography",
+    heading: "Elopement rates",
+    copy:    `Courthouse weddings, intimate ceremonies, and small elopements. ${elopementPricing.durationMinutes / 60} hours covering the ceremony, couple portraits afterward, and family or small-group photos.`,
+    cta:     "See elopement pricing",
+    chips:   [`From ${formatCurrency(elopementPricing.startingPrice)}`, `${elopementPricing.minimumImages}+ edited images`, `${elopementPricing.durationMinutes / 60} hours of coverage`],
   },
 ] as const;
 

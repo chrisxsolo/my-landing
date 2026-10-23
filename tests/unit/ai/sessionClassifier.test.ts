@@ -90,16 +90,6 @@ describe("a count of things is not a couple of people", () => {
 });
 
 describe("session types the rate card does not cover", () => {
-  it("recognises an elopement instead of selling a one-hour couples session", () => {
-    // 2-4 hours of ceremony coverage at Point Reyes, quoted $450.
-    const message =
-      "I was wondering if you do any elopement sessions? We are planning to have a 1 hr intimate ceremony with just us, officiant, and 1 witness. Another 1-2hr would be for pictures. What would a total of 2-4hr session look like?";
-    expect(resolvePlaybookKey("Couples Session", message)).toBe("elopement");
-    const facts = buildPricingFacts({ sessionType: "Couples Session", message });
-    expect(facts.verified).toBe(false);
-    expect(facts.basePrices).toEqual([]);
-  });
-
   it("recognises a group headshot event instead of the group graduation rate", () => {
     // Filed as a graduation portrait. The group grad rate would have quoted
     // over $1,100; the real booking was a negotiated $600 flat.

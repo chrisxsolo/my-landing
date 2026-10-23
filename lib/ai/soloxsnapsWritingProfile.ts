@@ -22,7 +22,7 @@ export const PHOTOGRAPHER = {
   city: "San Francisco",
   region: "San Francisco Bay Area",
   specialties: [
-    "graduation", "couples", "engagement", "proposal",
+    "graduation", "couples", "engagement", "proposal", "elopement",
     "family", "portrait", "headshot", "event",
   ],
 } as const;
@@ -151,7 +151,8 @@ Ask which university if it isn't known yet. Confirm availability only from the v
 
   event: `Find out what the event is, how many hours of coverage they want, and the venue, because the rate depends on length. Event coverage has a minimum number of hours, so say so plainly rather than quoting an hourly rate they could misread. Mention travel only if the venue is well outside San Francisco.`,
 
-  elopement: `Say you'd love to shoot it, warmly, because this is their wedding. Find out the ceremony time, how many hours of coverage they want, and where. There is no published elopement rate, so do not quote one: say you'll put a quote together once you know the timing and hours. Multi-hour coverage and a venue outside the city both change the figure, so settle those first.`,
+  elopement: `Thank them and congratulate them, warmly and once, because this is their wedding. Say you'd love to shoot it.
+Acknowledge the ceremony location and what they asked to have covered, without reading their own details back to them. Coverage starts at the published floor for the published number of hours, so quote both as a starting price and name the second-location add-on only if they raised one. Longer coverage is priced by hand, so check the base hours cover what they have planned rather than quoting extra time, and never promise a final total that depends on it. Give a travel figure only if one has been given to you as a fact. Close by saying the invoice and contract follow once the details are confirmed.`,
 
   headshot_event: `This is a group booking for a club, class, or company, and it gets priced by hand every time. Find out how many people, how long you have, and the venue. Do not quote a per-person or per-hour rate from the session card. Say you'll send a quote for the group once you know the headcount and the time window, and ask whether the headcount could move.`,
 

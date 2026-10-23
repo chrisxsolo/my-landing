@@ -37,6 +37,19 @@ export function getCouplesPricingPhoto(images: Photo[], settings: Settings) {
     || images[0]?.image_url || null;
 }
 
+// Elopement photos only. There is no elopement category in the library yet, so
+// this deliberately returns null rather than borrowing from the portfolio at
+// large: a graduation portrait on the elopement rates page misrepresents the
+// service. The page renders its own treatment when a slot is null, and the two
+// site_settings overrides are how real photographs get added later.
+export function getElopementPricingPhotos(images: Photo[], settings: Settings) {
+  const elopements = images.filter((image) => image.category_slug === "elopements");
+  const packageImage = settings.pricing_elopement_package_image || elopements[1]?.image_url || elopements[0]?.image_url || null;
+  const heroImage = settings.pricing_elopement_hero_image
+    || (elopements.length ? selectDistinctImageUrl(elopements, [packageImage], packageImage) : null);
+  return { packageImage, heroImage };
+}
+
 export function getEventPricingPhotos(images: Photo[], settings: Settings) {
   const events = images.filter((image) => image.category_slug === "events");
   const primaryImage = settings.pricing_event_primary_image || events[0]?.image_url || null;
@@ -51,6 +64,7 @@ export function getPricingCardPhotos(images: Photo[], settings: Settings): Recor
       ?? images.find((image) => image.category_slug === "families")?.image_url ?? null,
     couples: images.find((image) => image.category_slug === "couples")?.image_url
       ?? settings.pricing_couples_standard_image ?? null,
+    elopements: getElopementPricingPhotos(images, settings).heroImage,
   };
 }
 
@@ -68,6 +82,7 @@ export function getPricingPhotoManifest(images: Photo[], settings: Settings): Pr
   const family = getFamilyPricingPhotos(images, settings);
   const grads = getGradPricingPhotos(images, settings);
   const events = getEventPricingPhotos(images, settings);
+  const elopements = getElopementPricingPhotos(images, settings);
   return {
     "/pricing": Object.values(getPricingCardPhotos(images, settings)).flatMap((src) => photo(src, sizes.card)),
     "/pricing/families": [
@@ -79,6 +94,10 @@ export function getPricingPhotoManifest(images: Photo[], settings: Settings): Pr
       ...photo(grads.packageImage, sizes.package), ...photo(grads.groupImage, sizes.secondary),
     ],
     "/pricing/couples": photo(getCouplesPricingPhoto(images, settings), sizes.hero, 90),
+    "/pricing/elopements": [
+      ...photo(elopements.heroImage, sizes.hero, 90),
+      ...photo(elopements.packageImage, sizes.package),
+    ],
     "/pricing/events": [
       ...photo(events.primaryImage, sizes.hero, 90),
       ...photo(events.primaryImage, sizes.package), ...photo(events.secondaryImage, sizes.secondary),

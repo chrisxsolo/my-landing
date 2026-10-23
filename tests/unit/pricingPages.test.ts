@@ -115,6 +115,42 @@ describe("pricing pages render values from the catalog, not hardcoded literals",
     expect(visibleText(html).toLowerCase()).not.toContain("deposit");
   });
 
+  it("elopement page matches the catalog, including the 2-hour base", async () => {
+    const e = PRICING_CATALOG.elopement;
+    const hours = e.durationMinutes / 60;
+    const html = await renderPage(() => import("@/app/(professional)/pricing/elopements/page"));
+
+    expectAll(html, [
+      fc(e.startingPrice), // $950
+      `+${fc(e.addOns.extraLocation.price)}`, // +$125
+      e.addOns.extraCoverage.displayPrice, // Custom quote
+      `${hours} Hours of coverage`, // 2 Hours of coverage
+      `Minimum ${e.minimumImages} professionally edited images`, // Minimum 60
+      `${e.minimumImages}+ edited images`,
+      TWO_WEEK,
+      ...POLICY,
+    ]);
+    const text = visibleText(html);
+    expect(text.toLowerCase()).not.toContain("deposit");
+    // $950 is a floor for 2 hours, never a promise of open-ended coverage, and
+    // no other duration may appear.
+    expect(text).not.toMatch(/\bunlimited\b/i);
+    expect(text).toMatch(/Longer coverage is quoted individually/);
+    const durations = [...text.matchAll(/\b(\d+(?:\.\d+)?)\s*(?:hour|hr)s?\b/gi)].map((m) => Number(m[1]));
+    expect(new Set(durations)).toEqual(new Set([hours]));
+    // The second location buys a stop, not more time.
+    expect(text).toMatch(/second stop within the 2 hours, not extra coverage time/);
+    // Existing prices must not appear on the new page.
+    for (const price of [750, 650, 575, 450, 350]) {
+      expect(text).not.toContain(`$${price}`);
+    }
+    // This render has no photos at all. Rather than borrowing a graduation
+    // portrait, the page shows none and collapses the package to one column so
+    // no empty media slot is left behind.
+    expect(html.match(/<img\b/g)).toBeNull();
+    expect(html).toContain("grid-template-columns:minmax(0, 1fr)");
+  });
+
   it("events page matches the catalog", async () => {
     const e = PRICING_CATALOG.events;
     const html = await renderPage(() => import("@/app/(professional)/pricing/events/page"));
@@ -141,6 +177,7 @@ describe("pricing pages render values from the catalog, not hardcoded literals",
       fc(PRICING_CATALOG.graduation.baseHourlyRate), // $350 / hr
       fc(PRICING_CATALOG.families.packages.standard.price), // $350
       fc(PRICING_CATALOG.couples.packages.mini.price), // $350
+      fc(PRICING_CATALOG.elopement.startingPrice), // $950
       `${PRICING_CATALOG.graduation.standardMinimumImages}+`, // 50+
       `${PRICING_CATALOG.couples.packages.mini.minimumImages}+`, // 25+
     ]);

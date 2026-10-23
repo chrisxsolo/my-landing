@@ -1,14 +1,19 @@
 import Link from "next/link";
+import { formatCurrency } from "@/lib/pricing";
+import { PRICING_CATALOG } from "@/lib/pricingCatalog";
 import type { ContactFormValues } from "./ContactClient";
 
 const SESSION_TYPES = [
   "Graduation Portrait",
   "Family Session",
   "Couples Session",
+  "Elopement / Courthouse Ceremony",
   "Individual Portrait",
   "Event Coverage",
   "Other",
 ];
+
+const ELOPEMENT_SESSION_TYPE = "Elopement / Courthouse Ceremony";
 
 type ContactFormFieldsProps = {
   form: ContactFormValues;
@@ -54,6 +59,10 @@ function SessionFields({ form, onChange }: FieldGroupProps) {
   // School field is prefilled via ?school= from campus landing pages, so it
   // must stay visible even when no session type has been chosen yet.
   const showSchoolField = form.sessionType === "Graduation Portrait" || Boolean(form.school);
+  // Ceremony details go in the message rather than new fields: coverage length
+  // and a second location are often unsettled when someone first writes in, and
+  // required fields for either would stop the inquiry.
+  const showElopementHint = form.sessionType === ELOPEMENT_SESSION_TYPE;
 
   return (
     <>
@@ -78,6 +87,14 @@ function SessionFields({ form, onChange }: FieldGroupProps) {
         <p className="contact-field-hint contact-field-pop">
           The <Link href="/grad-guide">graduation photo guide</Link> covers outfits, posing, and
           the best campus spots.
+        </p>
+      ) : null}
+      {showElopementHint ? (
+        <p className="contact-field-hint contact-field-pop">
+          In your message, add the ceremony start time, roughly how long you&rsquo;d like covered, and
+          whether you want a second nearby spot for portraits. Nothing has to be final yet.{" "}
+          <Link href="/pricing/elopements">Elopement rates</Link> start at{" "}
+          {formatCurrency(PRICING_CATALOG.elopement.startingPrice)}.
         </p>
       ) : null}
       <div className="form-row">

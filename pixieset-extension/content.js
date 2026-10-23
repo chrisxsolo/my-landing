@@ -99,6 +99,8 @@ const SERVICE_FLAT_RATES = {
   "couples":         450, // 1-Hour Couples Session
   "engagement":      650,
   "proposal":        750,
+  "elopement":       950, // Elopement & Courthouse Ceremony, 2-hour base. A
+                          // floor Chris edits when the coverage runs longer.
 };
 
 const SERVICE_LABELS = {
@@ -107,6 +109,7 @@ const SERVICE_LABELS = {
   "couples":         "Couples Session",
   "engagement":      "Engagement Session",
   "proposal":        "Proposal Session",
+  "elopement":       "Elopement & Courthouse Ceremony",
   "graduation":      "Graduation Session",
 };
 
@@ -116,6 +119,7 @@ function detectServiceType(inq) {
   if (SERVICE_FLAT_RATES[fromEmail] != null || fromEmail === "graduation") return fromEmail;
 
   const t = `${inq.session_type || ""} ${inq.message || ""}`.toLowerCase().replace(/-/g, " ");
+  if (t.includes("elope") || t.includes("courthouse")) return "elopement";
   if (t.includes("proposal"))        return "proposal";
   if (t.includes("engagement"))      return "engagement";
   if (t.includes("couple") || t.includes("anniversary")) return "couples";

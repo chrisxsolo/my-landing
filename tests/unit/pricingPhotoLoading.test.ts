@@ -5,7 +5,7 @@ import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 import { getPricingPhotoManifest } from "@/lib/pricingPhotos";
 
 const { images } = vi.hoisted(() => ({
-  images: ["grads", "families", "couples", "events"].flatMap((category_slug) =>
+  images: ["grads", "families", "couples", "events", "elopements"].flatMap((category_slug) =>
     [0, 1, 2].map((id) => ({
       id, category_slug, image_url: `/${category_slug}-${id}.jpg`, title: "Portrait", alt: "Portrait",
     })),
@@ -24,6 +24,7 @@ const pages = [
   ["graduation rates", () => import("@/app/(professional)/pricing/grads/page")],
   ["couples rates", () => import("@/app/(professional)/pricing/couples/page")],
   ["event rates", () => import("@/app/(professional)/pricing/events/page")],
+  ["elopement rates", () => import("@/app/(professional)/pricing/elopements/page")],
 ] as const;
 
 describe("rates photos load before visitors scroll to them", () => {
@@ -49,6 +50,17 @@ describe("rates photo warmup follows the displayed photo selection", () => {
     expect(manifest["/pricing/families"].map((photo) => photo.src)).toEqual([
       "/families-0.jpg", "/families-1.jpg", "/families-2.jpg",
     ]);
+  });
+
+  it("warms elopement photos only from the elopement category", () => {
+    const manifest = getPricingPhotoManifest(images, {});
+    expect(manifest["/pricing/elopements"].map((photo) => photo.src)).toEqual([
+      "/elopements-0.jpg", "/elopements-1.jpg",
+    ]);
+    // A library with no elopement photos warms nothing rather than borrowing a
+    // graduation portrait for the elopement page.
+    const grads = images.filter((image) => image.category_slug === "grads");
+    expect(getPricingPhotoManifest(grads, {})["/pricing/elopements"]).toEqual([]);
   });
 
   it("uses admin overrides rather than warming obsolete portfolio photos", () => {

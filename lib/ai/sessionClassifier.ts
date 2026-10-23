@@ -110,15 +110,31 @@ const PATTERNS: Record<PlaybookKey, Patterns> = {
     mention: /engagement|engaged/,
   },
 
-  // Multi-hour ceremony coverage. Has no published rate, so recognising it is
-  // what stops a 2-4 hour elopement being quoted as a one-hour couples session.
+  // Ceremony coverage, priced from its own $950 floor. Recognising it is what
+  // keeps a courthouse wedding off the one-hour couples rate and off the $750
+  // proposal rate.
+  //
+  // "eloping" is spelled out: /\belope(?:ing)?\b/ would have had to match
+  // "elopeing", so the original pattern read every "we're eloping" as a plain
+  // couples session.
   elopement: {
     request: [
-      /\belope(?:ment|ments|ing)?\b/,
+      /\belop(?:e|es|ed|ing|ement|ements)\b/,
       /\bintimate (?:ceremony|wedding|vows)\b/,
       /\bmicro[- ]?wedding\b/,
       /\bofficiant\b/,
-      /\bcourthouse wedding\b/,
+      // Courthouse needs wedding context: SF City Hall and the county
+      // courthouses are also graduation photo spots, and a bare /courthouse/
+      // outranked graduation on specificity.
+      /\bcourthouse (?:wedding|ceremony|elopement)\b/,
+      /\b(?:married|marry|marrying|wedding|ceremony|vows)\b[^.!?]*\bcourthouse\b/,
+      /\bcourthouse\b[^.!?]*\b(?:married|marry|marrying|wedding|ceremony|vows)\b/,
+      /\bcity hall (?:wedding|ceremony|elopement)\b/,
+      /\b(?:wedding|marriage) ceremony\b/,
+      /\bceremony coverage\b/,
+      /\b(?:small|tiny|short) wedding\b/,
+      /\bexchang(?:e|ing) (?:our |the )?vows\b/,
+      /\bgetting married (?:at|on|in)\b/,
       /\bvow (?:renewal|exchange)\b/,
     ],
   },

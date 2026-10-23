@@ -128,6 +128,22 @@ export const PRICING_CATALOG = {
       other: undefined,
     },
   },
+  // Ceremony coverage, priced from a floor rather than a package.
+  //
+  // The price STARTS AT $950 for the two hours: longer coverage is quoted by
+  // hand, so nothing here may be read as a final total. An additional location
+  // does NOT extend the two hours — it is a second stop inside the same window.
+  elopement: {
+    startingPrice: 950,
+    durationMinutes: 120,
+    durationLabel: "2 hours of coverage",
+    minimumImages: 60,
+    addOns: {
+      extraLocation: { label: "Additional nearby location", shortLabel: "Extra location", price: 125 },
+      extraCoverage: { label: "Additional photography coverage", displayPrice: "Custom quote" },
+      travel: { label: "Travel outside the standard service area", displayPrice: `${RATE_PER_MILE_LABEL} + tolls` },
+    },
+  },
   families: {
     packages: {
       standard: { label: "Family Session", price: 350, durationMinutes: 30, minimumImages: 10 },
@@ -198,6 +214,9 @@ export function getGraduationTravelFeeFromText(text: string): number {
 export function getMinimumImageCountForSessionType(sessionType: string): number {
   const normalized = sessionType.toLowerCase();
   if (/\bgraduat|\bgrad\b/.test(normalized)) return PRICING_CATALOG.graduation.standardMinimumImages;
+  // Before the couples patterns: an elopement message routinely mentions a
+  // "couple" and must not fall through to the couples minimum.
+  if (/\belop|courthouse|wedding ceremony/.test(normalized)) return PRICING_CATALOG.elopement.minimumImages;
   if (/\bproposal\b/.test(normalized)) return PRICING_CATALOG.couples.packages.proposal.minimumImages;
   if (/\bengagement\b/.test(normalized)) return PRICING_CATALOG.couples.packages.engagement.minimumImages;
   if (/\bsignature\b/.test(normalized)) return PRICING_CATALOG.couples.packages.signature.minimumImages;
