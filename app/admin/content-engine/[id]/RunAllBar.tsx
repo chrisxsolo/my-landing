@@ -1,17 +1,24 @@
 "use client";
-// One-click run: everything between "photos are in" and "drafts ready to
-// review" — save facts → analyze → curate (big shoots) → create the package →
-// generate every content type. Each underlying route is the same one the
-// per-step buttons call and every claim is atomic, so pressing this again after
-// a failure resumes instead of duplicating work.
-import { useCallback, useMemo, useState } from "react";
+// One-click run, executed by the background worker.
+//
+// The button enqueues a job (content_engine_jobs) and this component only
+// WATCHES it — the server does the work, so the tab can be closed at any point
+// and reopening the workspace picks the run back up wherever it got to. The
+// enqueue is idempotent server-side, so a double-click adopts the live run
+// instead of starting a second one.
+//
+// A run produces drafts only. Publishing stays an explicit action downstream.
+import { useCallback, useEffect, useRef, useState } from "react";
 import { T } from "@/app/admin/adminTheme";
 import { AUTO_CURATE_THRESHOLD, TOP_PICK_COUNT } from "@/lib/contentEngine/curationConfig";
 import {
-  runFullPipeline, pendingAnalysisCount, pendingGenerationTypes, includedCount,
-  type PipelineProgress,
+  isJobLive, jobPercent, jobProgressLabel, jobStageLabel,
+} from "@/lib/contentEngine/jobProgress";
+import { engineApi } from "@/app/admin/content-engine/engineApi";
+import {
+  pendingAnalysisCount, pendingGenerationTypes, includedCount,
 } from "@/app/admin/content-engine/pipeline";
-import type { EnginePackage, EnginePhoto } from "@/app/admin/content-engine/engineTypes";
+import type { EngineJob, EnginePackage, EnginePhoto } from "@/app/admin/content-engine/engineTypes";
 import { btn, card } from "./ui";
 
 interface Props {
@@ -23,95 +30,180 @@ interface Props {
   onChanged: () => void;
 }
 
+const POLL_MS = 3_000;
+// How long a finished run keeps its outcome on screen.
+const RECENT_FINISH_MS = 10 * 60_000;
+
 export default function RunAllBar({
   sessionId, photos, activePackage, aiAllowed, flushFacts, onChanged,
 }: Props) {
-  const [progress, setProgress] = useState<PipelineProgress | null>(null);
-  const [running, setRunning] = useState(false);
-  const [errors, setErrors] = useState<string[]>([]);
+  const [job, setJob] = useState<EngineJob | null>(null);
+  const [starting, setStarting] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  // Bumped when a run starts, to restart the watch loop below: it stops itself
+  // once a run is no longer live, and its deps are otherwise stable.
+  const [watchToken, setWatchToken] = useState(0);
+  // Lets the poll loop refresh the workspace exactly once, on the transition
+  // out of a live run — not on every tick (a refresh re-signs every thumbnail).
+  const wasLive = useRef(false);
 
-  const plan = useMemo(() => {
-    const pendingPhotos = pendingAnalysisCount(photos);
-    const included = includedCount(photos);
-    const pendingTypes = pendingGenerationTypes(activePackage);
-    const steps: string[] = [];
-    if (pendingPhotos > 0) steps.push(`analyze ${pendingPhotos} photo(s)`);
-    if (included >= AUTO_CURATE_THRESHOLD) steps.push(`keep the best ${TOP_PICK_COUNT}`);
-    if (!activePackage) steps.push("create the content package");
-    if (!activePackage) steps.push("generate every content type");
-    else if (pendingTypes.length > 0) steps.push(`generate ${pendingTypes.length} remaining type(s)`);
-    return {
-      included,
-      steps,
-      hasWork: included > 0 && steps.length > 0,
-      resuming: activePackage !== null,
-    };
-  }, [photos, activePackage]);
-
-  const run = useCallback(async () => {
-    setRunning(true);
-    setErrors([]);
-    setProgress({ stage: "saving", detail: "Starting…" });
+  const poll = useCallback(async () => {
     try {
-      const result = await runFullPipeline({
-        sessionId, photos, activePackage, flushFacts,
-        onProgress: setProgress,
-        onChanged,
-      });
-      setErrors(result.errors);
-    } catch (err) {
-      setErrors([err instanceof Error ? err.message : "run failed"]);
-    } finally {
-      setRunning(false);
-      setProgress(null);
-      onChanged();
+      const { job: latest } = await engineApi.getRun(sessionId);
+      setJob(latest);
+      const live = latest !== null && isJobLive(latest);
+      if (wasLive.current && !live) onChanged();
+      wasLive.current = live;
+      return live;
+    } catch {
+      return false; // transient; the next tick tries again
     }
-  }, [sessionId, photos, activePackage, flushFacts, onChanged]);
+  }, [sessionId, onChanged]);
+
+  // Adopt whatever is already running when the workspace opens, then follow it.
+  useEffect(() => {
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const tick = async () => {
+      const live = await poll();
+      if (cancelled) return;
+      if (live) timer = setTimeout(() => void tick(), POLL_MS);
+    };
+    void tick();
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [poll, watchToken]);
+
+  const start = useCallback(async () => {
+    setStarting(true);
+    setNotice(null);
+    try {
+      // Facts first: the package step freezes them into its snapshot, and the
+      // worker cannot read an unsaved form.
+      await flushFacts();
+      const { job: started, adopted, kicked } = await engineApi.startRun(sessionId);
+      setJob(started);
+      wasLive.current = started !== null && isJobLive(started);
+      if (adopted) setNotice("A run was already going for this session — following that one.");
+      else if (!kicked) setNotice("Queued, but CRON_SECRET isn't set, so no worker can be reached.");
+      setWatchToken((t) => t + 1); // restart the watch loop
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : "could not start the run");
+    } finally {
+      setStarting(false);
+    }
+  }, [sessionId, flushFacts]);
+
+  const cancel = useCallback(async () => {
+    setNotice(null);
+    try {
+      await engineApi.cancelRun(sessionId);
+      await poll();
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : "could not cancel the run");
+    }
+  }, [sessionId, poll]);
 
   if (!aiAllowed) return null;
 
-  if (photos.length === 0) {
+  const live = job !== null && isJobLive(job);
+  const percent = job ? jobPercent(job) : null;
+
+  const pendingPhotos = pendingAnalysisCount(photos);
+  const included = includedCount(photos);
+  const pendingTypes = pendingGenerationTypes(activePackage);
+  const steps: string[] = [];
+  if (pendingPhotos > 0) steps.push(`analyze ${pendingPhotos} photo(s)`);
+  if (included >= AUTO_CURATE_THRESHOLD) steps.push(`keep the best ${TOP_PICK_COUNT}`);
+  if (!activePackage) steps.push("create the content package", "write every content type");
+  else if (pendingTypes.length > 0) steps.push(`write ${pendingTypes.length} remaining type(s)`);
+  const hasWork = included > 0 && steps.length > 0;
+
+  if (photos.length === 0 && !job) {
     return (
       <section style={{ ...card, display: "flex", alignItems: "center", gap: 10 }}>
         <span style={{ fontSize: 13, color: T.inkSoft }}>
           Drop this session&rsquo;s edited photos below (a whole folder works) — then one
-          click analyzes them, writes the journal post and every placement, and leaves
-          drafts waiting for your review.
+          click hands the whole run to the server: it analyzes them, writes the journal
+          post and every placement, and leaves drafts waiting for your review. You can
+          close the tab while it works.
         </span>
       </section>
     );
   }
 
-  if (!plan.hasWork && !running && errors.length === 0) return null;
+  // Worth showing while something is running or runnable, while there is a
+  // problem to read, and for a while after a finish so the run doesn't just
+  // vanish the moment it completes — but not forever on an old session.
+  const needsAttention = job?.status === "failed" || (job?.soft_errors.length ?? 0) > 0;
+  const recentlyFinished = job?.finished_at != null
+    && Date.now() - Date.parse(job.finished_at) < RECENT_FINISH_MS;
+  if (!live && !hasWork && !needsAttention && !recentlyFinished && notice === null) return null;
+
+  const accent = job?.status === "failed" ? T.red
+    : live ? T.blue
+    : job?.status === "succeeded" ? T.green
+    : T.borderStrong;
 
   return (
-    <section style={{ ...card, borderColor: running ? T.blueBorder : T.borderStrong }}>
+    <section style={{ ...card, borderColor: accent }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
         <div style={{ minWidth: 0 }}>
           <p style={{
             margin: 0, fontSize: 10, fontWeight: 800, letterSpacing: "0.18em",
-            textTransform: "uppercase", color: T.action, fontFamily: T.mono,
+            textTransform: "uppercase", fontFamily: T.mono,
+            color: job?.status === "failed" ? T.red : live ? T.blue : T.action,
           }}>
-            {running ? "Running" : plan.resuming ? "Resume" : "One click"}
+            {(live || !hasWork) && job ? jobStageLabel(job) : hasWork ? "One click" : "Run"}
           </p>
           <p style={{ margin: "4px 0 0", fontSize: 13, color: T.inkSoft }}>
-            {running && progress
-              ? progress.detail
-              : plan.hasWork
-                ? `Will ${plan.steps.join(", then ")}. Nothing publishes without your approval.`
-                : "Nothing left to run for this session."}
+            {/* A live run speaks for itself; otherwise work still to do comes
+                first, and only then the last run's outcome. */}
+            {live && job
+              ? jobProgressLabel(job)
+              : hasWork
+                ? `Will ${steps.join(", then ")} — on the server, so you can close the tab. Nothing publishes without your approval.`
+                : job
+                  ? jobProgressLabel(job)
+                  : "Nothing left to run for this session."}
           </p>
+          {job && job.attempts > 1 && live && (
+            <p style={{ margin: "4px 0 0", fontSize: 11, color: T.inkFaint }}>
+              Recovered and resumed after an interrupted attempt ({job.attempts} so far).
+            </p>
+          )}
         </div>
-        {plan.hasWork && (
-          <button style={{ ...btn(true), padding: "9px 18px", fontSize: 14 }}
-            disabled={running} onClick={() => void run()}>
-            {running ? "Working…" : plan.resuming ? "Run what's left" : "Generate everything"}
-          </button>
-        )}
+        <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          {live ? (
+            <button style={btn(false, true)} onClick={() => void cancel()}>Cancel run</button>
+          ) : hasWork ? (
+            <button style={{ ...btn(true), padding: "9px 18px", fontSize: 14 }}
+              disabled={starting} onClick={() => void start()}>
+              {starting ? "Starting…"
+                : job?.status === "failed" ? "Run what's left"
+                : activePackage ? "Run what's left" : "Generate everything"}
+            </button>
+          ) : null}
+        </span>
       </div>
-      {errors.length > 0 && (
-        <ul style={{ margin: "10px 0 0", paddingLeft: 18, fontSize: 12, color: T.red }}>
-          {errors.map((e) => <li key={e}>{e}</li>)}
+
+      {live && percent !== null && (
+        <div style={{
+          marginTop: 10, height: 4, borderRadius: 999, background: T.inset, overflow: "hidden",
+        }}>
+          <div style={{
+            width: `${percent}%`, height: "100%", background: T.blue,
+            transition: "width 400ms ease",
+          }} />
+        </div>
+      )}
+
+      {notice && <p style={{ margin: "10px 0 0", fontSize: 12, color: T.amber }}>{notice}</p>}
+      {job && job.soft_errors.length > 0 && (
+        <ul style={{ margin: "10px 0 0", paddingLeft: 18, fontSize: 12, color: T.amber }}>
+          {job.soft_errors.map((e, i) => <li key={`${i}-${e}`}>{e}</li>)}
         </ul>
       )}
     </section>

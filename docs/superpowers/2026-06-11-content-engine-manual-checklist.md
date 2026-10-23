@@ -23,6 +23,24 @@ Run with the local stack + `npm run dev`, signed in as admin. Production is NOT 
 - [ ] Analyze runs batch-by-batch with live progress; failures surface with Retry
 - [ ] Mid-analysis reload resumes cleanly (leases)
 
+## Background runs (content_engine_jobs)
+Needs CRON_SECRET in `.env.local`, otherwise the run queues with nothing to work
+it and the bar says so. Locally there is no cron, so kick the worker by hand:
+`curl -X POST localhost:3000/api/content-engine/worker -H "authorization: Bearer $CRON_SECRET"`.
+- [ ] "Generate everything" says what it will do, then flips to a stage line with
+      a progress bar (Processing photos → Choosing photos → Writing drafts)
+- [ ] Unsaved facts are committed by the run — type a location, press the button
+      WITHOUT pressing Save facts, and the guide step still sees it
+- [ ] Close the tab mid-run, reopen the workspace: the bar picks the same run back
+      up at its current stage (it does not restart, and no second run appears)
+- [ ] Press the button twice fast → "A run was already going…", one job in the DB
+- [ ] Cancel run stops it at the next step; drafts already written stay as drafts
+- [ ] Kill the worker mid-step (stop the dev server, restart within the lease):
+      the run resumes and the bar notes it recovered
+- [ ] A photo that fails analysis stops the run with a message pointing at Photos;
+      Retry there, then "Run what's left" finishes it
+- [ ] Nothing is ever published by a run — items land as drafts only
+
 ## Generation
 - [ ] Package creation shows the pre-generation summary (photo count)
 - [ ] Generate all runs in dependency order (links + testimonial BEFORE journal)

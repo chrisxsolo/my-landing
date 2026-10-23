@@ -1,26 +1,23 @@
-// Client-side pipeline orchestration — the single source of truth for the
-// "analyze → curate → package → generate" chain that used to be spread across
-// PhotosSection (analysis loop) and GenerationSection (generation wave).
+// Foreground helpers for the manual, per-step buttons in the workspace: the
+// Analyze run in PhotosSection and the Generate wave in GenerationSection.
 //
-// Nothing here is new backend behaviour: every step is an existing engine route
-// and every route already claims atomically (claim_photos_for_analysis uses
-// FOR UPDATE SKIP LOCKED; claim_generation_type is per-type), so batches can run
-// concurrently and a re-run is always safe — it picks up whatever is left.
+// A WHOLE run is not orchestrated here any more — that moved to the background
+// worker (lib/contentEngine/jobRunner.ts) so a run survives the tab closing.
+// What stays is the shared batching: every step is an existing engine route and
+// every route claims atomically (claim_photos_for_analysis uses FOR UPDATE SKIP
+// LOCKED; claim_generation_type is per-type), so batches can run concurrently
+// and a re-run always picks up whatever is left.
 import { engineApi } from "./engineApi";
 import { MAX_PHOTOS_PER_BATCH } from "@/lib/contentEngine/analysisBatching";
-import { AUTO_CURATE_THRESHOLD, TOP_PICK_COUNT } from "@/lib/contentEngine/curationConfig";
-import {
-  GENERATION_ORDER, CONTENT_TYPE_LABELS,
-  type EnginePackage, type EnginePhoto,
-} from "./engineTypes";
+import { pendingGenerationTypesFrom } from "@/lib/contentEngine/generationProgress";
+import { CONTENT_TYPE_LABELS, type EnginePackage, type EnginePhoto } from "./engineTypes";
 
 // Each analysis request handles one batch (<=4 photos) well inside the route's
 // 60s budget, so several requests in flight shorten a 20-photo shoot from five
 // serial round trips to two waves.
 export const ANALYSIS_CONCURRENCY = 3;
 
-export type PipelineStage =
-  | "saving" | "analyzing" | "curating" | "packaging" | "generating" | "done";
+export type PipelineStage = "analyzing" | "generating";
 
 export interface PipelineProgress {
   stage: PipelineStage;
@@ -43,19 +40,13 @@ export function includedCount(photos: EnginePhoto[]): number {
   return photos.filter((p) => !p.excluded).length;
 }
 
-export function analyzedCount(photos: EnginePhoto[]): number {
-  return photos.filter((p) => !p.excluded && p.analysis_status === "completed").length;
-}
-
 /** Content types of the active package that are neither completed nor skipped. */
 export function pendingGenerationTypes(pkg: EnginePackage | null): string[] {
   if (!pkg) return [];
-  const progress = pkg.generation_settings.progress ?? {};
-  const selected = pkg.generation_settings.selected_types ?? [];
-  return GENERATION_ORDER.filter((type) => selected.includes(type)).filter((type) => {
-    const entry = progress[type];
-    return !!entry && entry.status !== "completed" && entry.status !== "skipped";
-  });
+  return pendingGenerationTypesFrom(
+    pkg.generation_settings.selected_types ?? [],
+    pkg.generation_settings.progress ?? {},
+  );
 }
 
 export interface AnalyzeAllOptions {
@@ -149,95 +140,4 @@ export async function generateAllTypes(
     errors.push(...await generateWave(packageId, ["journal_post"], options));
   }
   return errors;
-}
-
-export interface RunPipelineInput {
-  sessionId: string;
-  photos: EnginePhoto[];
-  activePackage: EnginePackage | null;
-  /** Commits the Session facts form so the package snapshot freezes current values. */
-  flushFacts?: () => Promise<void>;
-  onProgress?: ProgressReporter;
-  onChanged?: () => void;
-}
-
-export interface RunPipelineResult {
-  outcome: "complete" | "errors" | "aborted";
-  errors: string[];
-}
-
-/** Everything between "photos are in" and "drafts are ready to review". */
-export async function runFullPipeline(input: RunPipelineInput): Promise<RunPipelineResult> {
-  const { sessionId, photos, activePackage, flushFacts } = input;
-  const report: ProgressReporter = input.onProgress ?? (() => {});
-  const changed = input.onChanged ?? (() => {});
-  const errors: string[] = [];
-
-  // Facts first: generation reads the package snapshot, so unsaved facts would
-  // silently skip the guide step and force a full Regenerate later.
-  if (flushFacts) {
-    report({ stage: "saving", detail: "Saving session facts…" });
-    try {
-      await flushFacts();
-    } catch (err) {
-      return { outcome: "aborted", errors: [`Session facts: ${message(err)}`] };
-    }
-  }
-
-  const pending = pendingAnalysisCount(photos);
-  if (pending > 0) {
-    report({ stage: "analyzing", detail: `Analyzing photos — 0 of ${pending} done` });
-    const result = await analyzeAllPhotos(sessionId, pending, {
-      onProgress: report, onBatch: changed,
-    });
-    if (result.failed > 0) {
-      return {
-        outcome: "aborted",
-        errors: [`${result.failed} photo(s) failed analysis — retry them in the Photos section`],
-      };
-    }
-  }
-
-  const included = includedCount(photos);
-  if (included === 0) {
-    return { outcome: "aborted", errors: ["No included photos — upload photos first"] };
-  }
-
-  // Big shoots narrow to the strongest frames before anything is written.
-  if (included >= AUTO_CURATE_THRESHOLD) {
-    report({ stage: "curating", detail: `Picking the strongest ${TOP_PICK_COUNT} photos…` });
-    try {
-      await engineApi.curatePhotos(sessionId);
-      changed();
-    } catch (err) {
-      errors.push(`Curation: ${message(err)}`);
-    }
-  }
-
-  let packageId = activePackage?.id ?? null;
-  let types = pendingGenerationTypes(activePackage);
-  if (!packageId) {
-    report({ stage: "packaging", detail: "Creating the content package…" });
-    try {
-      const created = await engineApi.createPackage(sessionId, [...GENERATION_ORDER]);
-      packageId = created.packageId;
-      types = [...GENERATION_ORDER];
-      changed();
-    } catch (err) {
-      return { outcome: "aborted", errors: [`Content package: ${message(err)}`] };
-    }
-  }
-
-  if (types.length > 0) {
-    report({ stage: "generating", detail: `Generating ${types.length} content type(s)…` });
-    errors.push(...await generateAllTypes(packageId, types, {
-      onProgress: report, onTypeSettled: changed,
-    }));
-  }
-
-  report({
-    stage: "done",
-    detail: errors.length > 0 ? "Finished with problems" : "Drafts ready for review",
-  });
-  return { outcome: errors.length > 0 ? "errors" : "complete", errors };
 }

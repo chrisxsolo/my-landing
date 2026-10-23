@@ -105,6 +105,31 @@ export interface WorkspaceData {
   activePackageId: string | null;
 }
 
+// A background content run (content_engine_jobs). The phase is the worker's
+// cursor through the pipeline; counters drive the progress line.
+export interface EngineJob {
+  id: string;
+  photography_session_id: string;
+  package_id: string | null;
+  status: "queued" | "running" | "succeeded" | "failed" | "cancelled";
+  phase: "analyze" | "curate" | "package" | "generate" | "done";
+  attempts: number;
+  steps_run: number;
+  photos_total: number;
+  photos_done: number;
+  types_total: number;
+  types_done: number;
+  soft_errors: string[];
+  last_error: string | null;
+  lease_expires_at: string | null;
+  created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+  updated_at: string;
+}
+
+export const JOB_LIVE_STATUSES: EngineJob["status"][] = ["queued", "running"];
+
 export interface ReconcileReport {
   stuckPublishing: { itemId: string; contentType: string; publishingStartedAt: string }[];
   failedWithExistingTarget: {
@@ -114,10 +139,9 @@ export interface ReconcileReport {
   orphanedDerivatives: { photoId: string; url: string }[];
 }
 
-export const GENERATION_ORDER = [
-  "internal_link_suggestion", "testimonial_feature", "portfolio_pick",
-  "school_page_photo", "guide_photo", "journal_post",
-] as const;
+// Canonical home is lib/contentEngine/generationProgress.ts — the background
+// worker reads the same order, so the two can't drift.
+export { GENERATION_ORDER } from "@/lib/contentEngine/generationProgress";
 
 export const CONTENT_TYPE_LABELS: Record<string, string> = {
   journal_post: "Journal post",

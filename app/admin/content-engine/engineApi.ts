@@ -2,7 +2,7 @@
 // automatically (same-origin). Every helper throws EngineApiError with the
 // server's message and status so callers can branch on status (409 protocols).
 import type {
-  EngineSessionRow, EnginePhoto, WorkspaceData, ReconcileReport,
+  EngineSessionRow, EnginePhoto, WorkspaceData, ReconcileReport, EngineJob,
 } from "./engineTypes";
 
 export class EngineApiError extends Error {
@@ -124,6 +124,19 @@ export const engineApi = {
   reconcileAction: (body: Record<string, unknown>) =>
     request<{ linked?: boolean; marked?: boolean }>("/api/admin/session-content/reconcile", {
       method: "POST", body: JSON.stringify(body),
+    }),
+  // Background runs. startRun is idempotent server-side: a second call while a
+  // run is live adopts it (adopted: true) instead of starting another.
+  startRun: (sessionId: string) =>
+    request<{ job: EngineJob | null; created: boolean; adopted: boolean; kicked: boolean }>(
+      "/api/admin/session-content/jobs",
+      { method: "POST", body: JSON.stringify({ sessionId }) },
+    ),
+  getRun: (sessionId: string) =>
+    request<{ job: EngineJob | null }>(`/api/admin/session-content/jobs?sessionId=${sessionId}`),
+  cancelRun: (sessionId: string) =>
+    request<{ cancelled: number }>("/api/admin/session-content/jobs", {
+      method: "DELETE", body: JSON.stringify({ sessionId }),
     }),
   revalidateAll: () => request<{ revalidated: boolean }>("/api/admin/revalidate", { method: "POST" }),
   analytics: (sessionId: string) =>
