@@ -65,7 +65,7 @@ const SESSION_SELECT = [
   "id", "client_session_id", "inquiry_id", "internal_client_name", "ai_processing_allowed",
   "service_type", "session_date", "primary_location",
   "email_facts_thread_ids", "email_facts_last_message_id", "email_facts_last_message_at",
-  "email_facts_extracted_at",
+  "email_facts_extracted_at", "email_facts_thread_pinned",
 ].join(",");
 
 export interface SessionRow {
@@ -81,6 +81,7 @@ export interface SessionRow {
   email_facts_last_message_id: string | null;
   email_facts_last_message_at: string | null;
   email_facts_extracted_at: string | null;
+  email_facts_thread_pinned: boolean | null;
 }
 
 export async function loadSession(client: SupabaseClient, sessionId: string): Promise<SessionRow> {
@@ -92,14 +93,20 @@ export async function loadSession(client: SupabaseClient, sessionId: string): Pr
 }
 
 /**
- * The client's email address and any Gmail thread already linked to this
+ * The client's email address and any Gmail thread explicitly linked to this
  * booking. The inquiry is preferred — it is the row the reply-status
  * reconciliation keeps thread ids on — then the client session.
+ *
+ * A thread this feature merely CHOSE last time is not a link. Treating it as
+ * one made a wrong automatic choice permanent, so only a thread the
+ * photographer picked by hand (pinned) carries over.
  */
 export async function resolveSessionContact(
   client: SupabaseClient, session: SessionRow,
 ): Promise<SessionContact | null> {
-  const linked = new Set<string>(session.email_facts_thread_ids ?? []);
+  const linked = new Set<string>(
+    session.email_facts_thread_pinned ? session.email_facts_thread_ids ?? [] : [],
+  );
   let email: string | null = null;
   let name: string | null = session.internal_client_name;
 
@@ -225,13 +232,15 @@ export async function runEmailFactExtraction(args: RunExtractionArgs): Promise<E
     knownFacts: knownFactsFor(fullSession ?? {}),
   });
 
-  // Remember what was read, so the cheap freshness check has a baseline and a
-  // thread the photographer disambiguated once stays disambiguated.
+  // Remember what was read, so the cheap freshness check has a baseline. Only
+  // a thread the photographer picked by hand is pinned: an automatic choice
+  // is re-derived next time, so a better rule (or a new reply) can correct it.
   const { error: markErr } = await client.from(PHOTOGRAPHY_SESSIONS_TABLE).update({
     email_facts_extracted_at: new Date().toISOString(),
     email_facts_last_message_id: latest.gmailMessageId,
     email_facts_last_message_at: latest.at,
     email_facts_thread_ids: chosen.map((thread) => thread.threadId),
+    email_facts_thread_pinned: Boolean(args.threadId),
   }).eq("id", sessionId);
   if (markErr) console.error("[email-facts] could not record extraction marker", markErr.message);
 

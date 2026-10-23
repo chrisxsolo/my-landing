@@ -457,6 +457,66 @@ describe("the photographer's own transactional mail", () => {
   });
 });
 
+describe("remembering a thread", () => {
+  // Regression: the first live run recorded the thread it chose, and that was
+  // treated as an explicit link — so a wrong automatic choice repeated itself
+  // on every later run and the corrected rule could never take effect.
+  const receipt: ConversationMessage[] = [{
+    gmailMessageId: "p1", threadId: "receipt", at: "2026-10-11T17:00:00.000Z",
+    direction: "photographer", subject: "Payment Confirmed",
+    body: "Your Couples Session is confirmed. Session date: October 25, 2026.",
+  }];
+
+  it("re-derives an automatic choice instead of repeating it", async () => {
+    const sessionId = await seedSession({ facts: { session_date: "2026-10-25" } });
+    // Stand in for the bad first run: the receipt is recorded, unpinned.
+    await service.from("photography_sessions").update({
+      email_facts_thread_ids: ["receipt"],
+      email_facts_last_message_id: "p1",
+      email_facts_last_message_at: "2026-10-11T17:00:00.000Z",
+      email_facts_extracted_at: new Date().toISOString(),
+    }).eq("id", sessionId);
+
+    const result = await runEmailFactExtraction({
+      client: service, callModel: modelReturning(COUPLES_FIELDS),
+      auth: "Bearer test", connectedEmails: CONNECTED, sessionId,
+      fetchThreads: threadFetcher([...COUPLES_THREAD, ...receipt]),
+      now: new Date("2026-10-12T12:00:00.000Z"),
+    });
+    if (result.outcome !== "extracted") throw new Error("expected an extraction");
+    expect(result.threads.map((t) => t.threadId)).toEqual(["couples"]);
+
+    const { data: row } = await service.from("photography_sessions")
+      .select("email_facts_thread_ids,email_facts_thread_pinned").eq("id", sessionId).single();
+    expect(row!.email_facts_thread_ids).toEqual(["couples"]);
+    expect(row!.email_facts_thread_pinned).toBe(false);
+  });
+
+  it("keeps a thread the photographer picked by hand", async () => {
+    const sessionId = await seedSession();
+    const picked = await runEmailFactExtraction({
+      client: service, callModel: modelReturning(COUPLES_FIELDS),
+      auth: "Bearer test", connectedEmails: CONNECTED, sessionId, threadId: "receipt",
+      fetchThreads: threadFetcher([...COUPLES_THREAD, ...receipt]),
+      now: new Date("2026-10-12T12:00:00.000Z"),
+    });
+    expect(picked.outcome).toBe("extracted");
+    const { data: row } = await service.from("photography_sessions")
+      .select("email_facts_thread_pinned").eq("id", sessionId).single();
+    expect(row!.email_facts_thread_pinned).toBe(true);
+
+    // The next run honours that choice without being told again.
+    const again = await runEmailFactExtraction({
+      client: service, callModel: modelReturning(COUPLES_FIELDS),
+      auth: "Bearer test", connectedEmails: CONNECTED, sessionId,
+      fetchThreads: threadFetcher([...COUPLES_THREAD, ...receipt]),
+      now: new Date("2026-10-12T12:00:00.000Z"),
+    });
+    if (again.outcome !== "extracted") throw new Error("expected an extraction");
+    expect(again.threads.map((t) => t.threadId)).toEqual(["receipt"]);
+  });
+});
+
 describe("linked inquiry threads", () => {
   it("prefers the thread already linked to the booking's inquiry", async () => {
     const { data: inquiry, error } = await service.from("inquiries").insert({
