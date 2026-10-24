@@ -161,8 +161,8 @@ export async function runWorkerOnce(args: RunWorkerArgs): Promise<RunWorkerResul
   const writeProgress = async (
     next: ContentEngineJob, result: StepResult,
   ): Promise<ContentEngineJob | null> => {
-    const softErrors = result.softError
-      ? [...next.soft_errors, result.softError].slice(-20)
+    const softErrors = result.softErrors?.length
+      ? [...next.soft_errors, ...result.softErrors].slice(-20)
       : next.soft_errors;
     const { data, error } = await client
       .from("content_engine_jobs")
@@ -227,7 +227,7 @@ export async function runWorkerOnce(args: RunWorkerArgs): Promise<RunWorkerResul
       return result({ status: "failed", phase: "done" });
     }
 
-    if (step.skipType) skip.add(step.skipType);
+    for (const type of step.skipTypes ?? []) skip.add(type);
 
     const updated = await writeProgress(job, step);
     if (!updated) {

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  GENERATION_ORDER, nextGenerationType, pendingGenerationTypesFrom,
+  GENERATION_ORDER, journalReady, nextGenerationWave, pendingGenerationTypesFrom,
   settledGenerationCount, MAX_TYPE_ATTEMPTS_PER_RUN,
   type GenerationProgressMap,
 } from "@/lib/contentEngine/generationProgress";
@@ -46,19 +46,45 @@ describe("pendingGenerationTypesFrom", () => {
   });
 });
 
-describe("nextGenerationType", () => {
-  it("walks the order so dependencies land before the journal post", () => {
+describe("nextGenerationWave", () => {
+  it("runs every independent type together and holds the journal post back", () => {
     const map = progress({
       internal_link_suggestion: ["pending"],
       testimonial_feature: ["pending"],
+      portfolio_pick: ["pending"],
       journal_post: ["pending"],
     });
-    expect(nextGenerationType(ALL, map)).toBe("internal_link_suggestion");
+    expect(nextGenerationWave(ALL, map))
+      .toEqual(["internal_link_suggestion", "testimonial_feature", "portfolio_pick"]);
   });
 
-  it("returns null when every selected type is terminal", () => {
+  it("lets the journal post run beside the slow picks once its own inputs are written", () => {
+    const map = progress({
+      internal_link_suggestion: ["completed"], testimonial_feature: ["skipped"],
+      portfolio_pick: ["pending"], journal_post: ["pending"],
+    });
+    expect(nextGenerationWave(ALL, map)).toEqual(["portfolio_pick", "journal_post"]);
+    expect(journalReady(ALL, map)).toBe(true);
+  });
+
+  it("holds the journal post while an input is due a retry", () => {
+    const map = progress({
+      internal_link_suggestion: ["failed", 1], journal_post: ["pending"],
+    });
+    expect(journalReady(ALL, map)).toBe(false);
+    expect(nextGenerationWave(ALL, map)).toEqual(["internal_link_suggestion"]);
+  });
+
+  it("releases the journal post once the others are settled", () => {
+    const map = progress({
+      internal_link_suggestion: ["completed"], portfolio_pick: ["skipped"], journal_post: ["pending"],
+    });
+    expect(nextGenerationWave(ALL, map)).toEqual(["journal_post"]);
+  });
+
+  it("is empty when every selected type is terminal", () => {
     const map = progress({ journal_post: ["completed"], portfolio_pick: ["skipped"] });
-    expect(nextGenerationType(ALL, map)).toBeNull();
+    expect(nextGenerationWave(ALL, map)).toEqual([]);
   });
 
   it("retries a failed type until it burns its attempts, then moves on", () => {
@@ -66,28 +92,29 @@ describe("nextGenerationType", () => {
       portfolio_pick: ["failed", MAX_TYPE_ATTEMPTS_PER_RUN - 1],
       journal_post: ["pending"],
     });
-    expect(nextGenerationType(ALL, failedOnce)).toBe("portfolio_pick");
+    // The journal post doesn't read the portfolio pick, so it need not wait for the retry.
+    expect(nextGenerationWave(ALL, failedOnce)).toEqual(["portfolio_pick", "journal_post"]);
 
     const exhausted = progress({
       portfolio_pick: ["failed", MAX_TYPE_ATTEMPTS_PER_RUN],
       journal_post: ["pending"],
     });
-    expect(nextGenerationType(ALL, exhausted)).toBe("journal_post");
+    expect(nextGenerationWave(ALL, exhausted)).toEqual(["journal_post"]);
   });
 
-  it("never returns null just because one type is stuck", () => {
+  it("ends rather than loops when every remaining type is exhausted", () => {
     const map = progress({
       guide_photo: ["failed", 9], journal_post: ["failed", 9],
     });
-    expect(nextGenerationType(ALL, map)).toBeNull();
+    expect(nextGenerationWave(ALL, map)).toEqual([]);
   });
 
   it("passes over types the caller is already handling", () => {
     const map = progress({
       internal_link_suggestion: ["pending"], portfolio_pick: ["pending"],
     });
-    expect(nextGenerationType(ALL, map, { skip: new Set(["internal_link_suggestion"]) }))
-      .toBe("portfolio_pick");
+    expect(nextGenerationWave(ALL, map, { skip: new Set(["internal_link_suggestion"]) }))
+      .toEqual(["portfolio_pick"]);
   });
 });
 

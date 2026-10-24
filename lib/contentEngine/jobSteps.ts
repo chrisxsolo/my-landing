@@ -11,7 +11,7 @@ import { generateContentType, GenerationConflictError } from "@/lib/contentEngin
 import { buildSessionFactsSnapshot } from "@/lib/contentEngine/payloads";
 import { AUTO_CURATE_THRESHOLD, TOP_PICK_COUNT } from "@/lib/contentEngine/curationConfig";
 import {
-  GENERATION_ORDER, nextGenerationType, settledGenerationCount,
+  GENERATION_ORDER, JOURNAL_DEPENDENCIES, journalReady, nextGenerationWave, settledGenerationCount,
   type GenerationProgressMap,
 } from "@/lib/contentEngine/generationProgress";
 import type { ContentEngineJob, JobPhase, WorkerContext } from "@/lib/contentEngine/jobRunner";
@@ -33,11 +33,11 @@ export interface StepEnv {
 export interface StepResult {
   phase: JobPhase;
   patch?: Partial<Record<"package_id" | "photos_total" | "photos_done" | "types_total" | "types_done", unknown>>;
-  softError?: string;
+  softErrors?: string[];
   /** Stops the run and marks it failed — the admin has something to fix. */
   fatal?: string;
-  /** Pass over this content type for the rest of the invocation. */
-  skipType?: string;
+  /** Pass over these content types for the rest of the invocation. */
+  skipTypes?: string[];
 }
 
 const message = (err: unknown) => (err instanceof Error ? err.message : String(err));
@@ -92,8 +92,8 @@ async function analyzeStep(
   // tell the admin which to retry.
   return {
     phase: "curate", patch,
-    softError: after.failed > 0
-      ? `${after.failed} photo(s) failed analysis — retry them in the Photos section`
+    softErrors: after.failed > 0
+      ? [`${after.failed} photo(s) failed analysis — retry them in the Photos section`]
       : undefined,
   };
 }
@@ -113,7 +113,7 @@ async function curateStep(ctx: WorkerContext, job: ContentEngineJob): Promise<St
     // Curation only narrows the pool; a failure must not cost the whole run.
     return {
       phase: "package",
-      softError: `could not pick the top ${TOP_PICK_COUNT} photos: ${message(err)}`,
+      softErrors: [`could not pick the top ${TOP_PICK_COUNT} photos: ${message(err)}`],
     };
   }
 }
@@ -172,47 +172,93 @@ async function packageStep(ctx: WorkerContext, job: ContentEngineJob): Promise<S
   };
 }
 
+interface PackageProgress { selected: string[]; progress: GenerationProgressMap }
+
+async function loadPackageProgress(ctx: WorkerContext, packageId: string): Promise<PackageProgress | string> {
+  const { data: pkg, error } = await ctx.client
+    .from("session_content_packages")
+    .select("generation_settings")
+    .eq("id", packageId).maybeSingle();
+  if (error || !pkg) return `package lookup failed: ${error?.message ?? "not found"}`;
+  return {
+    selected: (pkg.generation_settings?.selected_types ?? []) as string[],
+    progress: (pkg.generation_settings?.progress ?? {}) as GenerationProgressMap,
+  };
+}
+
+type TypeOutcome = { softError?: string; skipType?: string; fatal?: string };
+
+async function generateOneType(ctx: WorkerContext, packageId: string, contentType: string): Promise<TypeOutcome> {
+  try {
+    const result = await generateContentType({
+      client: ctx.client, callModel: ctx.callModel, packageId, contentType,
+    });
+    // A failed type is recorded on the package with its own error; the run
+    // carries on and the admin can retry or skip that one type by hand.
+    return result.outcome === "failed"
+      ? { softError: `${contentType}: ${result.error ?? "generation failed"}` }
+      : {};
+  } catch (err) {
+    // Someone (or a previous invocation whose lease is still live) holds this
+    // type. Leave it to them and move on.
+    if (err instanceof GenerationConflictError) return { skipType: contentType };
+    return { fatal: message(err) };
+  }
+}
+
+/**
+ * Writes the journal post once its inputs are, without waiting for the
+ * unrelated types still running beside it. Re-reads progress so a link or
+ * testimonial draft that failed (and is due a retry) holds the journal back.
+ */
+async function journalAfter(
+  ctx: WorkerContext, packageId: string, inputs: Promise<TypeOutcome[]>, skip: ReadonlySet<string>,
+): Promise<TypeOutcome[]> {
+  await inputs;
+  const now = await loadPackageProgress(ctx, packageId);
+  if (typeof now === "string" || !journalReady(now.selected, now.progress, { skip })) return [];
+  return [await generateOneType(ctx, packageId, "journal_post")];
+}
+
+/**
+ * Generates content types side by side. Every independent type starts at
+ * once; the journal post starts the moment its link and testimonial inputs
+ * are written, overlapping the slower portfolio/school/guide picks.
+ * claim_generation_type is atomic per type, so concurrent types never collide
+ * and a replayed type is a no-op.
+ */
 async function generateStep(
   ctx: WorkerContext, job: ContentEngineJob, skip: ReadonlySet<string>,
 ): Promise<StepResult> {
   if (!job.package_id) return { phase: "package" };
+  const packageId = job.package_id;
+  const before = await loadPackageProgress(ctx, packageId);
+  if (typeof before === "string") return { phase: "generate", fatal: before };
 
-  const { data: pkg, error } = await ctx.client
-    .from("session_content_packages")
-    .select("generation_settings")
-    .eq("id", job.package_id).maybeSingle();
-  if (error || !pkg) {
-    return { phase: "generate", fatal: `package lookup failed: ${error?.message ?? "not found"}` };
-  }
-  const selected = (pkg.generation_settings?.selected_types ?? []) as string[];
-  const progress = (pkg.generation_settings?.progress ?? {}) as GenerationProgressMap;
-  const settled = settledGenerationCount(selected, progress);
-  const counters = { types_total: selected.length, types_done: settled };
-
-  const contentType = nextGenerationType(selected, progress, { skip });
-  if (!contentType) return { phase: "done", patch: counters };
-
-  try {
-    const result = await generateContentType({
-      client: ctx.client, callModel: ctx.callModel,
-      packageId: job.package_id, contentType,
-    });
+  const wave = nextGenerationWave(before.selected, before.progress, { skip });
+  if (wave.length === 0) {
     return {
-      phase: "generate", patch: counters,
-      // A failed type is recorded on the package with its own error; the run
-      // carries on and the admin can retry or skip that one type by hand.
-      softError: result.outcome === "failed"
-        ? `${contentType}: ${result.error ?? "generation failed"}`
-        : undefined,
+      phase: "done",
+      patch: { types_total: before.selected.length, types_done: settledGenerationCount(before.selected, before.progress) },
     };
-  } catch (err) {
-    if (err instanceof GenerationConflictError) {
-      // Someone (or a previous invocation whose lease is still live) holds this
-      // type. Leave it to them and move on.
-      return { phase: "generate", patch: counters, skipType: contentType };
-    }
-    return { phase: "generate", patch: counters, fatal: message(err) };
   }
+
+  const isInput = (t: string) => JOURNAL_DEPENDENCIES.includes(t);
+  const inputs = Promise.all(wave.filter(isInput).map((t) => generateOneType(ctx, packageId, t)));
+  const others = Promise.all(wave.filter((t) => !isInput(t)).map((t) => generateOneType(ctx, packageId, t)));
+  const journalPending = before.selected.includes("journal_post") && !wave.includes("journal_post");
+  const journal = journalPending ? journalAfter(ctx, packageId, inputs, skip) : Promise.resolve([]);
+  const outcomes = (await Promise.all([inputs, others, journal])).flat();
+
+  const after = await loadPackageProgress(ctx, packageId);
+  return {
+    phase: "generate",
+    patch: typeof after === "string" ? undefined
+      : { types_total: after.selected.length, types_done: settledGenerationCount(after.selected, after.progress) },
+    softErrors: outcomes.flatMap((o) => (o.softError ? [o.softError] : [])),
+    skipTypes: outcomes.flatMap((o) => (o.skipType ? [o.skipType] : [])),
+    fatal: outcomes.find((o) => o.fatal)?.fatal,
+  };
 }
 
 export async function executeStep(

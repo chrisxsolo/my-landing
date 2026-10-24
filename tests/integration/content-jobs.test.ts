@@ -412,6 +412,31 @@ describe("runWorkerOnce", () => {
     expect(items.map((i) => i.content_type)).toContain("internal_link_suggestion");
   });
 
+  it("writes independent content types side by side", async () => {
+    const { sessionId } = await seedSession(["internal_link_suggestion", "portfolio_pick"]);
+    await enqueue(sessionId);
+    const base = fakeModel();
+    let inFlight = 0;
+    let peak = 0;
+    const tracking: ModelCaller = async (req) => {
+      const content = req.messages[0].content;
+      const isAnalysis = Array.isArray(content) && content.some((b) => b.type === "image");
+      if (isAnalysis) return base.caller(req);
+      inFlight += 1;
+      peak = Math.max(peak, inFlight);
+      await new Promise((r) => setTimeout(r, 30));
+      inFlight -= 1;
+      if (/portfolio/i.test(req.system)) {
+        return { text: JSON.stringify({ picks: [] }), usage: { input_tokens: 1, output_tokens: 1 }, model: req.model };
+      }
+      return base.caller(req);
+    };
+
+    const result = await runWorkerOnce({ client: service, callModel: tracking });
+    expect(result.status).toBe("succeeded");
+    expect(peak).toBe(2);
+  });
+
   it("retires a run that keeps crashing instead of retrying it forever", async () => {
     const { sessionId } = await seedSession();
     const { job_id } = await enqueue(sessionId);
