@@ -58,13 +58,18 @@ describe("destination-validated payloads", () => {
     }).success).toBe(false);
   });
 
-  it("guide_photo requires a location_key valid for its guide", () => {
+  it("guide_photo requires a structurally valid location_key for its guide", () => {
     expect(validatePayload("guide_photo", {
       session_photo_id: UUID, guide: "couples", location_key: "legion-of-honor", alt_text: "a",
     }).success).toBe(true);
-    // legion-of-honor is couples-only, so it must fail under family
+    // Database guides (2026-10-25) mean a kebab slug may name a page that is
+    // not hand-written; existence is enforced at generation (the resolved
+    // place's page only) and at publish (publishBlockReason).
     expect(validatePayload("guide_photo", {
-      session_photo_id: UUID, guide: "family", location_key: "legion-of-honor", alt_text: "a",
+      session_photo_id: UUID, guide: "family", location_key: "Legion Of Honor", alt_text: "a",
+    }).success).toBe(false);
+    expect(validatePayload("guide_photo", {
+      session_photo_id: UUID, guide: "grad", location_key: "legion-of-honor", alt_text: "a",
     }).success).toBe(false);
   });
 

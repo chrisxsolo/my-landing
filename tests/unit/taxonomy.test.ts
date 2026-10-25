@@ -7,7 +7,7 @@ import {
   CANONICAL_INTERNAL_LINKS, internalLinksForService,
   isServiceType, isSchoolSlug, isPortfolioCategory, isLightingCondition,
   isVibe, isRelationshipType,
-  isContentType, isGuideType, isGuideLocationKey, isCanonicalInternalLink,
+  isContentType, isGuideType, isGuideLocationKey, isStaticGuideLocationKey, isCanonicalInternalLink,
   guideLocationKeys, normalizeServiceType, guideTypeForService,
 } from "@/lib/contentEngine/taxonomy";
 
@@ -30,9 +30,12 @@ describe("taxonomy constants", () => {
     expect(PUBLICATION_TARGET_TYPES).toContain("none");
   });
 
-  it("generatable types exclude social_caption (Phase 2) but keep the other six", () => {
+  it("generatable types exclude social_caption (Phase 2) and location_guide (proposed by the guide step)", () => {
     expect(GENERATABLE_CONTENT_TYPES).not.toContain("social_caption");
-    expect(GENERATABLE_CONTENT_TYPES).toHaveLength(CONTENT_TYPES.length - 1);
+    expect(GENERATABLE_CONTENT_TYPES).not.toContain("location_guide");
+    expect(CONTENT_TYPES).toContain("location_guide");
+    expect(PUBLICATION_TARGET_TYPES).toContain("location_guide");
+    expect(GENERATABLE_CONTENT_TYPES).toHaveLength(CONTENT_TYPES.length - 2);
     expect(CONTENT_TYPES).toEqual(expect.arrayContaining([...GENERATABLE_CONTENT_TYPES]));
   });
 
@@ -63,9 +66,13 @@ describe("taxonomy validators", () => {
     const familyKeys = guideLocationKeys("family");
     expect(familyKeys.length).toBeGreaterThan(0);
     expect(isGuideLocationKey("family", familyKeys[0])).toBe(true);
-    expect(isGuideLocationKey("family", "not-a-real-location")).toBe(false);
-    // a couples-only location must not validate under family
-    expect(isGuideLocationKey("couples", "legion-of-honor")).toBe(true);
+    // structural: a kebab slug may name a database guide; existence is
+    // checked where the DB is reachable (generation + publish preflight)
+    expect(isGuideLocationKey("family", "shark-fin-cove-santa-cruz")).toBe(true);
+    expect(isGuideLocationKey("family", "Not A Key")).toBe(false);
+    expect(isGuideLocationKey("grad", "legion-of-honor")).toBe(false);
+    expect(isStaticGuideLocationKey("couples", "legion-of-honor")).toBe(true);
+    expect(isStaticGuideLocationKey("family", "legion-of-honor")).toBe(false);
   });
 });
 

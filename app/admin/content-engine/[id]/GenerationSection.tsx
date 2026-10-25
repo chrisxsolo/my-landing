@@ -69,10 +69,10 @@ function guideStatusNote(
       : `Add a location before generating a ${guide} guide entry (set it in Session facts, then Regenerate).`;
   }
   if (status === "skipped") {
-    return `No ${guide} guide location matched this session, so there was nothing to place.`;
+    return `Nothing was placed or proposed — the Location panel shows why (unverified place, or a ${guide} guide proposal already in review).`;
   }
   const label = guide === "couples" ? "Couples" : guide === "portrait" ? "Portrait" : "Family";
-  return `${label} guide entry ready to generate.`;
+  return `${label} guide step ready: places photos on this location's guide page, or proposes a new guide if none exists.`;
 }
 
 // Explains skipped/pending chips so they aren't a mystery. Facts live in the

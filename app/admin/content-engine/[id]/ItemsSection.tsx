@@ -8,6 +8,7 @@ import { engineApi } from "@/app/admin/content-engine/engineApi";
 import { CONTENT_TYPE_LABELS, type EngineItem, type EnginePhoto } from "@/app/admin/content-engine/engineTypes";
 import { useAutosave } from "./useAutosave";
 import { JournalEditor } from "./editorsJournal";
+import { LocationGuideEditor } from "./editorsLocationGuide";
 import {
   PortfolioEditor, SchoolEditor, GuideEditor, TestimonialEditor, LinksEditor,
   type EditorProps,
@@ -21,6 +22,7 @@ const EDITORS: Record<string, (props: EditorProps) => React.ReactElement> = {
   guide_photo: GuideEditor,
   testimonial_feature: TestimonialEditor,
   internal_link_suggestion: LinksEditor,
+  location_guide: LocationGuideEditor,
 };
 
 const STATUS_COLORS: Record<EngineItem["status"], string> = {

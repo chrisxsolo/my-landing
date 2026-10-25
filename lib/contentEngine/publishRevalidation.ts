@@ -15,6 +15,11 @@ export function pathsForPublishedItem(contentType: string, payload: Record<strin
         : payload.guide === "portrait" ? "portrait-guide" : "couples-guide";
       return [`/${hub}/locations/${payload.location_key as string}`];
     }
+    case "location_guide": {
+      const hub = payload.guide === "family" ? "family-guide"
+        : payload.guide === "portrait" ? "portrait-guide" : "couples-guide";
+      return [`/${hub}/locations/${payload.slug as string}`, `/${hub}/locations`, `/${hub}`, "/sitemap.xml"];
+    }
     default:
       return [];
   }

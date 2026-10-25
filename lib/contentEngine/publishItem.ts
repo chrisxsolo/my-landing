@@ -6,10 +6,15 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { prepareApprovedDerivatives, DerivativeError } from "@/lib/contentEngine/derivatives";
 import { pathsForPublishedItem } from "@/lib/contentEngine/publishRevalidation";
+import { publishBlockReason } from "@/lib/contentEngine/publishPreflight";
+import { resolvePendingGuideLinks, type LinkUpdateReport } from "@/lib/contentEngine/pendingGuideLinks";
+import { isLocationGuideType } from "@/lib/locations/guideCoverage";
 
 export type PublishOutcome =
   | { status: "published"; targetType: string; targetId: string | null;
-      revalidated: string[]; revalidationFailures: string[] }
+      revalidated: string[]; revalidationFailures: string[];
+      /** Journals that received (or were flagged for) this guide's link. */
+      linkUpdates?: LinkUpdateReport }
   | { status: "blocked"; reason: string }
   | { status: "failed"; error: string };
 
@@ -21,8 +26,32 @@ export interface PublishArgs {
   revalidate: (path: string) => void;
 }
 
+// After a location guide goes live, journals waiting on it get the link.
+// Recoverable like Step C: the guide is live regardless; a failure is logged.
+async function linkWaitingJournals(
+  client: SupabaseClient, contentType: string, payload: Record<string, unknown>,
+): Promise<LinkUpdateReport | undefined> {
+  if (contentType !== "location_guide" || !isLocationGuideType(payload.guide)) return undefined;
+  try {
+    return await resolvePendingGuideLinks(
+      client, payload.guide, String(payload.location_key), String(payload.slug),
+    );
+  } catch (err) {
+    console.error("pending guide link resolution failed (recoverable)", err);
+    return undefined;
+  }
+}
+
 export async function publishApprovedItem(args: PublishArgs): Promise<PublishOutcome> {
   const { client, itemId, revalidate } = args;
+
+  // Preflight — location guards the RPC cannot evaluate (item left untouched)
+  const { data: pre, error: preError } = await client.from("session_content_items")
+    .select("content_type,payload").eq("id", itemId).maybeSingle();
+  if (preError) return { status: "failed", error: preError.message };
+  if (!pre) return { status: "blocked", reason: "content item not found" };
+  const blockReason = await publishBlockReason(client, pre.content_type, pre.payload as Record<string, unknown>);
+  if (blockReason) return { status: "blocked", reason: blockReason };
 
   // Step A — derivatives (item left approved on failure; retryable)
   try {
@@ -67,6 +96,7 @@ export async function publishApprovedItem(args: PublishArgs): Promise<PublishOut
       revalidationFailures: ["(all paths — post-publish read failed)"],
     };
   }
+  const linkUpdates = await linkWaitingJournals(client, item.content_type, item.payload as Record<string, unknown>);
   const paths = pathsForPublishedItem(item.content_type, item.payload as Record<string, unknown>);
   const revalidated: string[] = [];
   const revalidationFailures: string[] = [];
@@ -86,5 +116,6 @@ export async function publishApprovedItem(args: PublishArgs): Promise<PublishOut
     targetId: result.target_id,
     revalidated,
     revalidationFailures,
+    linkUpdates,
   };
 }

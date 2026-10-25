@@ -8,7 +8,7 @@ import Link from "next/link";
 import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
 import { COUPLES_GUIDE_CSS } from "@/lib/couplesGuide/styles";
 import { locationDisplayName } from "@/lib/couplesGuide/types";
-import { getCouplesLocationSummaries } from "@/lib/couplesGuide/locations";
+import { getCouplesLocationListing } from "@/lib/locations/guideListings";
 
 const SITE_URL = "https://www.soloxsnaps.com";
 const PATH = "/couples-guide/locations";
@@ -33,8 +33,12 @@ export const metadata: Metadata = {
   twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION },
 };
 
-export default function CouplesLocationsHubPage() {
-  const locations = getCouplesLocationSummaries();
+// ISR: database guides (approved Content Engine proposals) join the hand-written
+// ones; publishing a guide revalidates this page.
+export const revalidate = 3600;
+
+export default async function CouplesLocationsHubPage() {
+  const locations = await getCouplesLocationListing();
 
   const breadcrumbLd = buildBreadcrumbJsonLd([
     { name: "Home", path: "/" },

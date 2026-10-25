@@ -4,6 +4,7 @@ import type { ExtractionOutcome, FreshnessOutcome } from "@/lib/contentEngine/em
 import type { PhotoStatusRow } from "@/lib/contentEngine/jobProgress";
 
 export type { SessionEngineState, PhotoStatusRow };
+export type { LocationSummaryDto, PlaceDto } from "@/lib/contentEngine/locationSummary";
 
 // Email-fact extraction DTOs. Type-only re-exports of the server contract, so
 // the route and the panel can never drift apart.
@@ -179,4 +180,5 @@ export const CONTENT_TYPE_LABELS: Record<string, string> = {
   guide_photo: "Guide photo",
   testimonial_feature: "Testimonial",
   internal_link_suggestion: "Internal links",
+  location_guide: "New location guide",
 };

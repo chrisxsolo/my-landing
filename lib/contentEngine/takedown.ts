@@ -60,6 +60,20 @@ async function restoreGradSpot(client: SupabaseClient, item: PublishedItemRow) {
   ensureWrite(error, "grad spot restore");
 }
 
+const GUIDE_PHOTO_TABLES = new Set(["couples_location_photos", "family_location_photos", "portrait_location_photos"]);
+
+// A published location guide is a page row plus the photo rows it created.
+// Both are unpublished (not deleted) so history and a later republish keep working.
+async function takeDownLocationGuide(client: SupabaseClient, item: PublishedItemRow) {
+  const { error } = await client.from("location_guides").update({ published: false }).eq("id", item.published_target_id);
+  ensureWrite(error, "location_guides unpublish");
+  const table = item.published_ref?.photo_table;
+  const rowIds = item.published_ref?.photo_row_ids;
+  if (typeof table !== "string" || !GUIDE_PHOTO_TABLES.has(table) || !Array.isArray(rowIds) || rowIds.length === 0) return;
+  const { error: photoErr } = await client.from(table).update({ published: false }).in("id", rowIds as string[]);
+  ensureWrite(photoErr, `${table} unpublish`);
+}
+
 async function removeLiveRecord(client: SupabaseClient, item: PublishedItemRow) {
   const targetType = item.published_target_type;
   const targetId = item.published_target_id;
@@ -103,6 +117,9 @@ async function removeLiveRecord(client: SupabaseClient, item: PublishedItemRow) 
     }
     case "grad_spot_photo":
       await restoreGradSpot(client, item);
+      return;
+    case "location_guide":
+      await takeDownLocationGuide(client, item);
       return;
     case "testimonial": {
       const { error: err } = await client.from("testimonials").update({ photography_session_id: null }).eq("id", targetId);

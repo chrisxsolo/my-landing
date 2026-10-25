@@ -80,17 +80,21 @@ describe("generateContentType (spec §8.2)", () => {
     expect(progress.internal_link_suggestion.usage.input_tokens).toBe(800);
   });
 
-  it("a non-canonical link FAILS the type and the package needs attention", async () => {
+  it("a link outside the allowed list is dropped — it never reaches the draft", async () => {
+    // 2026-10-25: links are filtered against the session's allowed list
+    // (service links + the verified place's guide) instead of failing the step.
     const sessionId = await createTestSession();
     const pkg = await createPackage(sessionId, ["internal_link_suggestion"]);
     const result = await generateContentType({
       client: service, packageId: pkg, contentType: "internal_link_suggestion",
-      callModel: fakeModel(JSON.stringify({ links: [{ url: "/nope", label: "x", reason: "y" }] })),
+      callModel: fakeModel(JSON.stringify({ links: [
+        { url: "/nope", label: "x", reason: "y" },
+        { url: "/grads/sjsu", label: "SJSU grad sessions", reason: "school" },
+      ] })),
     });
-    expect(result.outcome).toBe("failed");
-    expect(result.error).toMatch(/canonical|validation/i);
-    expect(result.packageStatus).toBe("needs_attention");
-    expect(await itemsOf(pkg, "internal_link_suggestion")).toHaveLength(0);
+    expect(result.outcome).toBe("completed");
+    const items = await itemsOf(pkg, "internal_link_suggestion");
+    expect(items[0].payload.links.map((l: { url: string }) => l.url)).toEqual(["/grads/sjsu"]);
   });
 
   it("a second call for the same type conflicts (no double generation)", async () => {
@@ -177,8 +181,10 @@ describe("generateContentType (spec §8.2)", () => {
     await analyzedPhoto(famSession);
     // Pass service_type in facts so the snapshot reflects it; a location is
     // required (guide generation pre-checks it and skips without one)
+    // Crissy Field has a family guide page, so the step places photos there
+    // (a place WITHOUT a family page would propose a new guide instead).
     const famPkg = await createPackage(famSession, ["guide_photo"], {
-      service_type: "families", primary_location: "Golden Gate Park",
+      service_type: "families", primary_location: "Crissy Field",
     });
     const empty = await generateContentType({
       client: service, packageId: famPkg, contentType: "guide_photo",

@@ -7,7 +7,7 @@ import type { Metadata } from "next";
 import CouplesGuideContent from "./CouplesGuideContent";
 import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
 import { getPortfolioData } from "@/lib/professionalData";
-import { getCouplesLocationSummaries } from "@/lib/couplesGuide/locations";
+import { getCouplesLocationListing } from "@/lib/locations/guideListings";
 
 // Cached/ISR: refreshed hourly, or immediately on admin content saves
 // (POST /api/admin/revalidate revalidates the root layout).
@@ -56,7 +56,7 @@ export default async function CouplesGuidePage() {
     .slice(0, 6)
     .map((img) => ({ image_url: img.image_url, alt: img.alt }));
 
-  const locations = getCouplesLocationSummaries();
+  const locations = await getCouplesLocationListing();
 
   const articleLd = {
     "@context": "https://schema.org",

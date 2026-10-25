@@ -5,6 +5,8 @@
 // re-review. Published/publishing items are immutable here.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { validatePayload } from "@/lib/contentEngine/payloads";
+import { removePendingGuideLinks } from "@/lib/contentEngine/pendingGuideLinks";
+import { isLocationGuideType } from "@/lib/locations/guideCoverage";
 
 const EDITABLE_STATUSES = ["draft", "approved", "failed"] as const;
 
@@ -90,7 +92,7 @@ export async function applyStatusAction(args: StatusActionArgs): Promise<StatusA
   if (!allowed) return { outcome: "forbidden", message: `unknown action ${String(action)}` };
 
   const { data: item } = await client.from("session_content_items")
-    .select("id,status").eq("id", itemId).maybeSingle();
+    .select("id,status,content_type,payload").eq("id", itemId).maybeSingle();
   if (!item) return { outcome: "not_found" };
   if (!allowed.includes(item.status)) {
     return { outcome: "forbidden", message: `cannot ${action} from status ${item.status}` };
@@ -109,5 +111,19 @@ export async function applyStatusAction(args: StatusActionArgs): Promise<StatusA
   const { error } = await client.from("session_content_items")
     .update(patch).eq("id", itemId).eq("status", item.status);
   if (error) throw new Error(`status action failed: ${error.message}`);
+  if (action === "reject" && item.content_type === "location_guide") {
+    await dropDependentLinks(client, item.payload as Record<string, unknown>);
+  }
   return { outcome: "done", status: patch.status };
+}
+
+// A rejected guide proposal must not leave journals waiting on it. The
+// rejection itself already succeeded, so a failure here is logged, not thrown.
+async function dropDependentLinks(client: SupabaseClient, payload: Record<string, unknown>) {
+  if (!isLocationGuideType(payload.guide) || typeof payload.location_key !== "string") return;
+  try {
+    await removePendingGuideLinks(client, payload.guide, payload.location_key);
+  } catch (err) {
+    console.error("could not drop pending guide links after rejection", err);
+  }
 }

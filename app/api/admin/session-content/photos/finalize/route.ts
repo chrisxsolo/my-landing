@@ -6,6 +6,7 @@ import {
   UploadFinalizationError,
 } from "@/lib/contentEngine/finalizeUpload";
 import { isUuid } from "@/lib/contentEngine/uploadConfig";
+import { sanitizeGps } from "@/lib/contentEngine/exifGps";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,6 +24,7 @@ export async function POST(req: NextRequest) {
     mime?: unknown;
     sizeBytes?: unknown;
     contentHash?: unknown;
+    gps?: unknown;
   };
   try {
     body = await req.json();
@@ -64,6 +66,7 @@ export async function POST(req: NextRequest) {
           typeof body.sizeBytes === "number" ? body.sizeBytes : 0,
         contentHash:
           typeof body.contentHash === "string" ? body.contentHash : "",
+        gps: sanitizeGps(body.gps),
       },
     });
     return NextResponse.json({ photo: row });

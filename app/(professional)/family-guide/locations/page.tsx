@@ -8,7 +8,7 @@ import Link from "next/link";
 import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
 import { FAMILY_GUIDE_CSS } from "@/lib/familyGuide/styles";
 import { locationDisplayName } from "@/lib/familyGuide/types";
-import { getFamilyLocationSummaries } from "@/lib/familyGuide/locations";
+import { getFamilyLocationListing } from "@/lib/locations/guideListings";
 
 const SITE_URL = "https://www.soloxsnaps.com";
 const PATH = "/family-guide/locations";
@@ -33,8 +33,12 @@ export const metadata: Metadata = {
   twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION },
 };
 
-export default function FamilyLocationsHubPage() {
-  const locations = getFamilyLocationSummaries();
+// ISR: database guides (approved Content Engine proposals) join the hand-written
+// ones; publishing a guide revalidates this page.
+export const revalidate = 3600;
+
+export default async function FamilyLocationsHubPage() {
+  const locations = await getFamilyLocationListing();
 
   const breadcrumbLd = buildBreadcrumbJsonLd([
     { name: "Home", path: "/" },

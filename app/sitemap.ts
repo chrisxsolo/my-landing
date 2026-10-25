@@ -3,6 +3,7 @@ import { getBlogPostSummaries, getBlogPostSummariesForCategory } from "@/lib/pro
 import { getPublishedFamilyLocations } from "@/lib/familyGuide/locations";
 import { getPublishedCouplesLocations } from "@/lib/couplesGuide/locations";
 import { getPublishedPortraitLocations } from "@/lib/portraitGuide/locations";
+import { indexableDbGuidePaths } from "@/lib/locations/guideListings";
 import { getBlogCategorySlugs } from "@/lib/blogCategories";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -132,6 +133,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.7,
   }));
 
+  // Database location guides (approved Content Engine proposals) — only the
+  // ones marked indexable (a credible set of photos), like the static pages.
+  const dbGuideEntries: MetadataRoute.Sitemap = (await indexableDbGuidePaths()).map((path) => ({
+    url: `${SITE_URL}${path}`,
+    changeFrequency: "monthly",
+    priority: 0.7,
+  }));
+
   // Blog category archives (e.g. the family journal) — included only once a
   // category has at least one post, so empty/thin archives stay out of the index.
   const categoryResults = await Promise.all(
@@ -148,5 +157,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.6,
     }));
 
-  return [...staticEntries, ...familyLocationEntries, ...couplesLocationEntries, ...portraitLocationEntries, ...categoryEntries, ...blogEntries];
+  return [...staticEntries, ...familyLocationEntries, ...couplesLocationEntries, ...portraitLocationEntries, ...dbGuideEntries, ...categoryEntries, ...blogEntries];
 }

@@ -14,6 +14,7 @@ import { supabase } from "@/lib/supabase";
 import { engineApi, EngineApiError } from "@/app/admin/content-engine/engineApi";
 import { createLimiter, mapWithConcurrency } from "@/lib/contentEngine/concurrency";
 import { readJpegOrientation } from "@/lib/contentEngine/jpegOrientation";
+import { readJpegGps, type GpsCoordinates } from "@/lib/contentEngine/exifGps";
 import { withRetries, type RetryPolicy } from "@/lib/contentEngine/retry";
 
 // Must match ALLOWED_UPLOAD_MIME / NORMALIZE_MAX_DIMENSION / NORMALIZE_TRIGGER_BYTES
@@ -37,6 +38,8 @@ export interface PreparedUpload {
   blob: Blob;
   mime: string;
   resized: boolean;
+  /** Read from the ORIGINAL before any resize drops EXIF — location evidence only. */
+  gps: GpsCoordinates | null;
 }
 
 /** Target size when the long edge exceeds `maxEdge`, else null. */
@@ -69,10 +72,11 @@ async function encodeJpeg(bitmap: ImageBitmap, width: number, height: number): P
 
 /** Shrinks a large upright JPEG to the stored size; anything else passes through untouched. */
 export async function prepareForUpload(file: File): Promise<PreparedUpload> {
-  const original: PreparedUpload = { blob: file, mime: file.type, resized: false };
-  if (file.type !== "image/jpeg" || file.size < RESIZE_MIN_BYTES) return original;
-  // A canvas re-encode drops EXIF; only an upright file is safe to re-encode.
+  if (file.type !== "image/jpeg") return { blob: file, mime: file.type, resized: false, gps: null };
   const header = new Uint8Array(await file.slice(0, HEADER_BYTES).arrayBuffer());
+  const original: PreparedUpload = { blob: file, mime: file.type, resized: false, gps: readJpegGps(header) };
+  if (file.size < RESIZE_MIN_BYTES) return original;
+  // A canvas re-encode drops EXIF; only an upright file is safe to re-encode.
   if (readJpegOrientation(header) !== 1) return original;
 
   let bitmap: ImageBitmap;
@@ -86,7 +90,7 @@ export async function prepareForUpload(file: File): Promise<PreparedUpload> {
     if (!target && file.size <= UPLOAD_REENCODE_BYTES) return original;
     const size = target ?? { width: bitmap.width, height: bitmap.height };
     const blob = await encodeJpeg(bitmap, size.width, size.height);
-    return blob.size < file.size ? { blob, mime: "image/jpeg", resized: true } : original;
+    return blob.size < file.size ? { ...original, blob, mime: "image/jpeg", resized: true } : original;
   } catch (err) {
     console.warn(`could not resize ${file.name}; uploading the original`, err);
     return original;
@@ -121,7 +125,7 @@ async function uploadPrepared(sessionId: string, file: File, prepared: PreparedU
   await withRetries(async (attempt) => {
     try {
       await engineApi.finalizeUpload(sessionId, signed.path, {
-        filename: file.name, mime: prepared.mime, sizeBytes: prepared.blob.size,
+        filename: file.name, mime: prepared.mime, sizeBytes: prepared.blob.size, gps: prepared.gps,
       });
     } catch (err) {
       // Same idea: a retried finalize that hits 409 means the first one landed.

@@ -5,12 +5,11 @@
 // validation downstream.
 import type { SessionFactsSnapshot } from "@/lib/contentEngine/payloads";
 import {
-  guideLocationKeys, internalLinksForService, PORTFOLIO_CATEGORIES,
-  type GuideType, type SchoolSlug,
+  PORTFOLIO_CATEGORIES, type GuideType, type SchoolSlug,
 } from "@/lib/contentEngine/taxonomy";
 import { serviceConfigFor } from "@/lib/contentEngine/serviceConfig";
 
-export const PROMPT_VERSION = "2026-07-07.1";
+export const PROMPT_VERSION = "2026-10-25.1";
 
 export interface BuiltPrompt {
   system: string;
@@ -98,7 +97,18 @@ export function buildTopPicksPrompt(
 export interface JournalInputs {
   links: { url: string; label: string }[];
   testimonialQuote: string | null;
+  /** verifiedPlaceBlock() — the only geography the post may state. */
+  locationBlock: string;
 }
+
+// The model once wrote a link to a guide page it guessed from the URL pattern
+// (a Santa Cruz post linking the San Francisco Ocean Beach guide). Every body
+// link is now checked against the provided list after generation, and the
+// prompt says so plainly.
+const LINK_RULE =
+  "Use ONLY the internal links listed above, exactly as given. Never write any " +
+  "other link or URL, never guess a page address, and never point readers to a " +
+  "different location than the one this session was photographed at.";
 
 export function buildJournalPrompt(
   facts: SessionFactsSnapshot, photos: PhotoSummary[], inputs: JournalInputs,
@@ -111,8 +121,9 @@ export function buildJournalPrompt(
       "Choose photo_ids and the cover from the provided analyzed photos only.",
     userText:
       `${factsBlock(facts)}\n\n${summariesBlock(photos)}\n\n` +
-      `Internal links to weave naturally into the body where relevant (use markdown links; do not invent others):\n` +
-      `${JSON.stringify(inputs.links)}\n\n` +
+      `${inputs.locationBlock}\n\n` +
+      `Internal links to weave naturally into the body where relevant (markdown links):\n` +
+      `${JSON.stringify(inputs.links)}\n${LINK_RULE}\n\n` +
       (inputs.testimonialQuote
         ? `Client words to include as a blockquote, attributed to ${facts.public_display_name ?? "the client"}: "${inputs.testimonialQuote}"\n\n`
         : "") +
@@ -146,10 +157,13 @@ export function buildSchoolPagePhotoPrompt(
   };
 }
 
+// The location is decided BEFORE this prompt (deterministic place match), so
+// the model only chooses photos and writes captions for that one guide page —
+// it never picks which location the session belongs to.
 export function buildGuidePhotoPrompt(
   facts: SessionFactsSnapshot, photos: PhotoSummary[], guide: GuideType,
+  keys: string[], locationBlock: string,
 ): BuiltPrompt {
-  const keys = guideLocationKeys(guide);
   return {
     system:
       `${brandFor(facts)} You place photos on location-guide pages. Return ONLY JSON: ` +
@@ -161,7 +175,7 @@ export function buildGuidePhotoPrompt(
       "location. Never generic filler. " +
       "If no allowed location matches the session, return {\"placements\":[]}.",
     userText:
-      `${factsBlock(facts)}\n\nAllowed location keys for the ${guide} guide ` +
+      `${factsBlock(facts)}\n\n${locationBlock}\n\nAllowed location keys for the ${guide} guide ` +
       `(any other value is invalid): ${JSON.stringify(keys)}\n\n${summariesBlock(photos)}`,
   };
 }
@@ -196,17 +210,22 @@ export function buildGradSpotPrompt(
   };
 }
 
-// Link candidates are service-scoped (grads → full canonical list, unchanged;
-// couples → couples guide cluster + pricing) so a couples session can never be
-// pointed at grad pricing, school pages, or campus content.
-export function buildInternalLinkPrompt(facts: SessionFactsSnapshot): BuiltPrompt {
+// Link candidates are service-scoped (grads → full canonical list; couples →
+// couples guide cluster + pricing) so a couples session can never be pointed
+// at grad pricing, school pages, or campus content — and location pages are
+// limited to the guide that covers the session's verified place
+// (sessionLocation.allowedInternalLinks), so a Santa Cruz shoot is never
+// offered a San Francisco beach guide.
+export function buildInternalLinkPrompt(
+  facts: SessionFactsSnapshot, allowedUrls: readonly string[], locationBlock: string,
+): BuiltPrompt {
   return {
     system:
       `${brandFor(facts)} You suggest internal links for a journal post. You may use ONLY ` +
       "urls from the provided list — anything else is invalid. Return ONLY JSON: " +
       "{\"links\":[{\"url\":\"<from list>\",\"label\":\"<=120\",\"reason\":\"<=300\"}]}. Suggest 2-5.",
     userText:
-      `${factsBlock(facts)}\n\nCanonical internal links (closed list):\n` +
-      JSON.stringify([...internalLinksForService(facts.service_type)], null, 1),
+      `${factsBlock(facts)}\n\n${locationBlock}\n\nCanonical internal links (closed list):\n` +
+      JSON.stringify([...allowedUrls], null, 1),
   };
 }

@@ -2,123 +2,29 @@
 // model (or resolves deterministically), and materializes Zod-validated draft
 // item specs. Every destination/photo reference is identity-checked against
 // this session's own analyzed photos.
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
-import type { ModelCaller, ModelUsage } from "@/lib/contentEngine/aiClient";
-import { extractJsonObject } from "@/lib/contentEngine/analysisResponse";
 import {
   buildJournalPrompt, buildPortfolioPickPrompt, buildSchoolPagePhotoPrompt,
-  buildGuidePhotoPrompt, buildGradSpotPrompt, buildInternalLinkPrompt,
-  type BuiltPrompt, type PhotoSummary,
+  buildGradSpotPrompt, buildInternalLinkPrompt,
 } from "@/lib/contentEngine/prompts";
-import { validatePayload, type SessionFactsSnapshot } from "@/lib/contentEngine/payloads";
-import { generateMetaKeywords } from "@/lib/contentEngine/serviceKeywords";
 import { guideTypeForService, isSchoolSlug, SPOT_SCHOOL_IDS } from "@/lib/contentEngine/taxonomy";
 import { downloadOriginal, encodeImageForModel, toImageBlock } from "@/lib/contentEngine/modelImages";
+import {
+  GenerationError, assertKnownPhotos, callForJson, deterministicKeywords, excerptOf,
+  loadPhotoSummaries, validated, type TargetContext, type TargetResult,
+} from "@/lib/contentEngine/generationTargetCore";
+import {
+  allowedInternalLinks, loadSessionLocation, verifiedPlaceBlock,
+} from "@/lib/contentEngine/sessionLocation";
+import { ALWAYS_ALLOWED_PATHS, internalPath, sanitizeBodyLinks } from "@/lib/contentEngine/guideLinks";
+import { locationGuideStep } from "@/lib/contentEngine/locationGuideTarget";
+import { isLocationGuideType } from "@/lib/locations/guideCoverage";
+import type { PendingGuideLink } from "@/lib/contentEngine/payloads";
 
-export class GenerationError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "GenerationError";
-  }
-}
-
-export interface ItemSpec {
-  content_type: string;
-  payload: Record<string, unknown>;
-  destination: string | null;
-  photoId: string | null;
-}
-
-export interface TargetUsage extends ModelUsage {
-  model: string;
-}
-
-export interface TargetResult {
-  outcome: "completed" | "skipped";
-  itemSpecs: ItemSpec[];
-  usage: TargetUsage | null;
-  note?: string;
-}
-
-export interface TargetContext {
-  client: SupabaseClient;
-  callModel: ModelCaller;
-  model: string;
-  sessionId: string;
-  packageId: string;
-  facts: SessionFactsSnapshot;
-}
-
-// Deterministic meta keywords from the approved taxonomy/facts — never
-// AI-invented (spec §9.3). Service-aware routing lives in serviceKeywords;
-// grads output is unchanged.
-export function deterministicKeywords(facts: SessionFactsSnapshot): string {
-  return generateMetaKeywords(facts);
-}
-
-// First ~200 chars of a testimonial, cut at a word boundary.
-export function excerptOf(message: string, max = 200): string {
-  const trimmed = message.trim();
-  if (trimmed.length <= max) return trimmed;
-  const cut = trimmed.slice(0, max);
-  const lastSpace = cut.lastIndexOf(" ");
-  return `${cut.slice(0, lastSpace > 0 ? lastSpace : max)}…`;
-}
-
-async function loadPhotoSummaries(client: SupabaseClient, sessionId: string): Promise<PhotoSummary[]> {
-  const { data, error } = await client
-    .from("session_photos")
-    .select("id,alt_text,title,description,tags,quality_score,suggested_category,storage_path")
-    .eq("photography_session_id", sessionId)
-    .eq("excluded", false)
-    .eq("analysis_status", "completed")
-    .order("quality_score", { ascending: false, nullsFirst: false });
-  if (error) throw new GenerationError(`could not load analyzed photos: ${error.message}`);
-  return (data ?? []).map((r) => ({
-    session_photo_id: r.id as string,
-    alt_text: r.alt_text, title: r.title, description: r.description,
-    tags: (r.tags ?? []) as string[], quality_score: r.quality_score,
-    suggested_category: r.suggested_category,
-  }));
-}
-
-async function callForJson(
-  ctx: TargetContext, prompt: BuiltPrompt,
-  imageBlocks: ReturnType<typeof toImageBlock>[] = [],
-): Promise<{ json: unknown; usage: TargetUsage }> {
-  const response = await ctx.callModel({
-    model: ctx.model,
-    system: prompt.system,
-    maxTokens: 4000,
-    messages: [{
-      role: "user",
-      content: imageBlocks.length
-        ? [...imageBlocks, { type: "text", text: prompt.userText }]
-        : prompt.userText,
-    }],
-  });
-  return {
-    json: extractJsonObject(response.text),
-    usage: { model: response.model, ...response.usage },
-  };
-}
-
-function validated(contentType: string, payload: unknown): Record<string, unknown> {
-  const result = validatePayload(contentType, payload);
-  if (!result.success) {
-    throw new GenerationError(
-      `validation failed for ${contentType} (canonical lists are closed): ${result.error.message}`,
-    );
-  }
-  return result.data as Record<string, unknown>;
-}
-
-function assertKnownPhotos(ids: string[], known: Set<string>) {
-  for (const id of ids) {
-    if (!known.has(id)) throw new GenerationError(`unknown photo id from model: ${id}`);
-  }
-}
+export {
+  GenerationError, deterministicKeywords, excerptOf,
+  type ItemSpec, type TargetContext, type TargetResult, type TargetUsage,
+} from "@/lib/contentEngine/generationTargetCore";
 
 const linksResponseSchema = z.object({ links: z.array(z.unknown()) });
 const picksResponseSchema = z.object({ picks: z.array(z.unknown()) });
@@ -128,11 +34,27 @@ const journalResponseSchema = z.object({
   photo_ids: z.array(z.string()), cover_photo_id: z.string(),
 });
 
+// Link candidates: the service's hubs + pricing, plus ONLY the guide page that
+// covers the session's verified place. When that place has no guide of the
+// session's type yet, the would-be link is recorded as a pending dependency
+// instead (resolved when the guide is published, dropped if rejected).
 async function internalLinkTarget(ctx: TargetContext): Promise<TargetResult> {
-  const { json, usage } = await callForJson(ctx, buildInternalLinkPrompt(ctx.facts));
+  const location = await loadSessionLocation(ctx.client, ctx.sessionId, ctx.facts.primary_location);
+  const allowed = allowedInternalLinks(ctx.facts.service_type, location);
+  const { json, usage } = await callForJson(
+    ctx, buildInternalLinkPrompt(ctx.facts, allowed.urls, verifiedPlaceBlock(location)),
+  );
   const parsed = linksResponseSchema.safeParse(json);
   if (!parsed.success) throw new GenerationError(`malformed links response: ${parsed.error.message}`);
-  const payload = validated("internal_link_suggestion", { links: parsed.data.links });
+  const allowedSet = new Set(allowed.urls);
+  const links = parsed.data.links.filter((l) => {
+    const url = (l as { url?: unknown } | null)?.url;
+    return typeof url === "string" && allowedSet.has(url);
+  });
+  const payload = validated("internal_link_suggestion", {
+    links,
+    pending_guide_links: allowed.pending ? [allowed.pending] : [],
+  });
   return { outcome: "completed", itemSpecs: [{
     content_type: "internal_link_suggestion", payload, destination: null, photoId: null,
   }], usage };
@@ -178,6 +100,8 @@ async function journalTarget(ctx: TargetContext): Promise<TargetResult> {
   const testimonialItem = siblings?.find((s) => s.content_type === "testimonial_feature");
   const links = ((linkItem?.payload?.links ?? []) as { url: string; label: string }[])
     .map((l) => ({ url: l.url, label: l.label }));
+  const pendingGuideLinks = (linkItem?.payload?.pending_guide_links ?? []) as PendingGuideLink[];
+  const location = await loadSessionLocation(ctx.client, ctx.sessionId, ctx.facts.primary_location);
   const testimonialQuote = (testimonialItem?.payload?.quote_excerpt as string | undefined) || null;
   const testimonialId = (testimonialItem?.payload?.testimonial_id as string | undefined) ?? null;
 
@@ -191,16 +115,29 @@ async function journalTarget(ctx: TargetContext): Promise<TargetResult> {
   const imageBlocks = (await Promise.all(originals.map(encodeImageForModel))).map(toImageBlock);
 
   const { json, usage } = await callForJson(
-    ctx, buildJournalPrompt(ctx.facts, photos, { links, testimonialQuote }), imageBlocks,
+    ctx, buildJournalPrompt(ctx.facts, photos, {
+      links, testimonialQuote, locationBlock: verifiedPlaceBlock(location),
+    }), imageBlocks,
   );
   const parsed = journalResponseSchema.safeParse(json);
   if (!parsed.success) throw new GenerationError(`malformed journal response: ${parsed.error.message}`);
   assertKnownPhotos([...parsed.data.photo_ids, parsed.data.cover_photo_id], known);
 
+  // Only the provided links (and the always-valid top-level pages) may stay
+  // linked in the body; anything else the model wrote is unwrapped to text.
+  const allowedPaths = new Set([
+    ...ALWAYS_ALLOWED_PATHS,
+    ...links.map((l) => internalPath(l.url) ?? l.url),
+  ]);
+  const { body, removed } = sanitizeBodyLinks(parsed.data.body, allowedPaths);
+  if (removed.length) console.warn(`journal ${ctx.packageId}: removed unapproved links ${removed.join(", ")}`);
+
   const payload = validated("journal_post", {
     ...parsed.data,
-    meta_keywords: deterministicKeywords(ctx.facts),
+    body,
+    meta_keywords: deterministicKeywords(ctx.facts, location.places),
     internal_links: links,
+    pending_guide_links: pendingGuideLinks,
     testimonial_id: testimonialId,
   });
   return { outcome: "completed", itemSpecs: [{
@@ -320,30 +257,8 @@ async function guideTarget(ctx: TargetContext): Promise<TargetResult> {
     };
   }
   if (guide === "grad") return gradSpotTarget(ctx);
-  if (!ctx.facts.primary_location?.trim()) {
-    return {
-      outcome: "skipped", itemSpecs: [], usage: null,
-      note: `add a location before generating a ${guide} guide entry`,
-    };
-  }
-  const photos = await loadPhotoSummaries(ctx.client, ctx.sessionId);
-  if (photos.length === 0) throw new GenerationError("no analyzed photos for this session");
-  const known = new Set(photos.map((p) => p.session_photo_id));
-
-  const { json, usage } = await callForJson(ctx, buildGuidePhotoPrompt(ctx.facts, photos, guide));
-  const parsed = placementsResponseSchema.safeParse(json);
-  if (!parsed.success) throw new GenerationError(`malformed placements response: ${parsed.error.message}`);
-
-  const itemSpecs = parsed.data.placements.map((raw) => {
-    const payload = validated("guide_photo", raw);
-    assertKnownPhotos([payload.session_photo_id as string], known);
-    return {
-      content_type: "guide_photo", payload,
-      destination: `${guide}-${payload.location_key as string}`,
-      photoId: payload.session_photo_id as string,
-    };
-  });
-  return { outcome: "completed", itemSpecs, usage };
+  if (!isLocationGuideType(guide)) throw new GenerationError(`unsupported guide ${guide}`);
+  return locationGuideStep(ctx, guide);
 }
 
 export const GENERATION_TARGETS: Record<string, (ctx: TargetContext) => Promise<TargetResult>> = {

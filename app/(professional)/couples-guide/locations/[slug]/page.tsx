@@ -1,6 +1,6 @@
 // INDIVIDUAL COUPLES LOCATION PAGE  →  /couples-guide/locations/[slug]
 // Statically generated from the location registry (one URL per config). Unknown
-// slugs 404 (dynamicParams = false). Photos are fetched on the server (ISR) and
+// slugs 404 (database guides render on demand). Photos are fetched on the server (ISR) and
 // passed into the shared template, so each page is fully indexable with its own
 // metadata, canonical, and JSON-LD. Unpublished locations carry a noindex tag and
 // are omitted from the sitemap until they have a credible set of photos.
@@ -8,11 +8,14 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import CouplesLocationTemplate from "./CouplesLocationTemplate";
-import { getCouplesLocation, getAllCouplesLocations } from "@/lib/couplesGuide/locations";
+import { getAllCouplesLocations } from "@/lib/couplesGuide/locations";
+import { findCouplesLocation } from "@/lib/locations/guideListings";
 import { getCouplesLocationPhotos } from "@/lib/couplesGuide/photos";
 
 export const revalidate = 3600;
-export const dynamicParams = false;
+// Hand-written locations are prebuilt; database guides (approved Content
+// Engine proposals) render on first request and then follow ISR. Unknown slugs 404.
+export const dynamicParams = true;
 
 export function generateStaticParams() {
   return getAllCouplesLocations().map((loc) => ({ slug: loc.slug }));
@@ -24,7 +27,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const data = getCouplesLocation(slug);
+  const data = await findCouplesLocation(slug);
   if (!data) return {};
 
   return {
@@ -53,7 +56,7 @@ export default async function CouplesLocationPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const data = getCouplesLocation(slug);
+  const data = await findCouplesLocation(slug);
   if (!data) notFound();
 
   const photos = await getCouplesLocationPhotos(data.slug);

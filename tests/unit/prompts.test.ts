@@ -5,6 +5,8 @@ import {
   buildTopPicksPrompt,
 } from "@/lib/contentEngine/prompts";
 import { internalLinksForService, guideLocationKeys } from "@/lib/contentEngine/taxonomy";
+
+const NO_PLACE = "Verified location: NONE. Do not name a city, county, or landmark the session facts do not state.";
 import { serviceConfigFor, SERVICE_PROMPTS } from "@/lib/contentEngine/serviceConfig";
 import type { SessionFactsSnapshot } from "@/lib/contentEngine/payloads";
 
@@ -38,6 +40,7 @@ describe("prompt construction (spec §8.3)", () => {
     const p = buildJournalPrompt(facts, photoSummaries, {
       links: [{ url: "/grads/sjsu", label: "SJSU grad sessions" }],
       testimonialQuote: "Chris made it feel easy!",
+      locationBlock: NO_PLACE,
     });
     expect(p.userText).toContain("/grads/sjsu");
     expect(p.userText).toContain("Chris made it feel easy!");
@@ -46,27 +49,39 @@ describe("prompt construction (spec §8.3)", () => {
   });
 
   it("internal-link prompt carries the grads-scoped closed list and forbids others", () => {
-    const p = buildInternalLinkPrompt(facts);
+    const p = buildInternalLinkPrompt(facts, internalLinksForService("grads"), NO_PLACE);
     for (const url of internalLinksForService("grads")) expect(p.userText).toContain(url);
     expect(p.userText).not.toContain("/pricing/couples");
     expect(p.system.toLowerCase()).toMatch(/only.*list|list.*only/);
   });
 
   it("guide prompt carries only the chosen guide's closed location keys", () => {
-    const p = buildGuidePhotoPrompt({ ...facts, service_type: "families" }, photoSummaries, "family");
+    const p = buildGuidePhotoPrompt(
+      { ...facts, service_type: "families" }, photoSummaries, "family", guideLocationKeys("family"), NO_PLACE,
+    );
     for (const key of guideLocationKeys("family")) expect(p.userText).toContain(key);
     expect(p.userText).not.toContain("legion-of-honor"); // couples-only key
   });
 
+  it("guide prompt offers ONLY the resolved location's key — the model never picks the place", () => {
+    const p = buildGuidePhotoPrompt(
+      { ...facts, service_type: "couples" }, photoSummaries, "couples", ["palace-of-fine-arts"], NO_PLACE,
+    );
+    expect(p.userText).toContain("palace-of-fine-arts");
+    expect(p.userText).not.toContain("ocean-beach");
+  });
+
   it("guide prompt asks for a public-facing caption drawn from the photo analysis", () => {
-    const p = buildGuidePhotoPrompt({ ...facts, service_type: "families" }, photoSummaries, "family");
+    const p = buildGuidePhotoPrompt(
+      { ...facts, service_type: "families" }, photoSummaries, "family", guideLocationKeys("family"), NO_PLACE,
+    );
     expect(p.system).toContain("\"caption\"");
     expect(p.system.toLowerCase()).toContain("guide page");
   });
 
   it("couples guide prompt carries the couples location keys and couples voice guidance", () => {
     const couples = { ...facts, service_type: "couples" as const, school_slug: null };
-    const p = buildGuidePhotoPrompt(couples, photoSummaries, "couples");
+    const p = buildGuidePhotoPrompt(couples, photoSummaries, "couples", guideLocationKeys("couples"), NO_PLACE);
     for (const key of guideLocationKeys("couples")) expect(p.userText).toContain(key);
     expect(p.system).toContain("COUPLES photography session");
   });
@@ -89,7 +104,7 @@ describe("prompt construction (spec §8.3)", () => {
   it("grad prompts carry NO service-guidance block — byte-identical to the pre-routing engine", () => {
     expect(SERVICE_PROMPTS.grads.contentGuidance).toBe("");
     expect(SERVICE_PROMPTS.grads.analysisGuidance).toBe("");
-    const p = buildJournalPrompt(facts, photoSummaries, { links: [], testimonialQuote: null });
+    const p = buildJournalPrompt(facts, photoSummaries, { links: [], testimonialQuote: null, locationBlock: NO_PLACE });
     expect(p.system).not.toContain("not a graduation session");
   });
 
@@ -98,8 +113,8 @@ describe("prompt construction (spec §8.3)", () => {
     // internal_client_name/internal_notes/email. Runtime double-check:
     const all = [
       buildAnalysisPrompt(facts, ["11111111-1111-4111-8111-111111111111"]),
-      buildJournalPrompt(facts, photoSummaries, { links: [], testimonialQuote: null }),
-      buildInternalLinkPrompt(facts),
+      buildJournalPrompt(facts, photoSummaries, { links: [], testimonialQuote: null, locationBlock: NO_PLACE }),
+      buildInternalLinkPrompt(facts, internalLinksForService("grads"), NO_PLACE),
     ];
     for (const p of all) {
       expect(p.system + p.userText).not.toMatch(/internal_client_name|internal_notes/);
@@ -117,7 +132,7 @@ describe("service-aware prompt routing (couples)", () => {
   };
 
   it("couples journal prompt carries couples voice guidance and the anti-grad rule", () => {
-    const p = buildJournalPrompt(couplesFacts, [], { links: [], testimonialQuote: null });
+    const p = buildJournalPrompt(couplesFacts, [], { links: [], testimonialQuote: null, locationBlock: NO_PLACE });
     expect(p.system).toContain("COUPLES photography session");
     expect(p.system).toMatch(/never mention graduation/i);
     expect(p.system).toContain("Bay Area couples");
@@ -132,7 +147,7 @@ describe("service-aware prompt routing (couples)", () => {
   });
 
   it("couples internal-link prompt offers only couples pages + pricing — no grad/campus links", () => {
-    const p = buildInternalLinkPrompt(couplesFacts);
+    const p = buildInternalLinkPrompt(couplesFacts, internalLinksForService("couples"), NO_PLACE);
     expect(p.userText).toContain("/couples-guide");
     expect(p.userText).toContain("/couples-guide/locations/crissy-field");
     expect(p.userText).toContain("/pricing");
@@ -141,7 +156,7 @@ describe("service-aware prompt routing (couples)", () => {
   });
 
   it("couples facets (vibe, relationship_type) reach the facts block", () => {
-    const p = buildJournalPrompt(couplesFacts, [], { links: [], testimonialQuote: null });
+    const p = buildJournalPrompt(couplesFacts, [], { links: [], testimonialQuote: null, locationBlock: NO_PLACE });
     expect(p.userText).toContain("playful");
     expect(p.userText).toContain("engagement");
   });

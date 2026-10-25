@@ -1,17 +1,20 @@
 // INDIVIDUAL FAMILY LOCATION PAGE  →  /family-guide/locations/[slug]
 // Statically generated from the published location registry (one URL per config).
-// Unknown/unpublished slugs 404 (dynamicParams = false). Photos are fetched on
+// Unknown/unpublished slugs 404 (database guides render on demand). Photos are fetched on
 // the server (ISR) and passed into the shared template, so each page is fully
 // indexable with its own metadata, canonical, and JSON-LD.
 
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import FamilyLocationTemplate from "./FamilyLocationTemplate";
-import { getFamilyLocation, getAllFamilyLocations } from "@/lib/familyGuide/locations";
+import { getAllFamilyLocations } from "@/lib/familyGuide/locations";
+import { findFamilyLocation } from "@/lib/locations/guideListings";
 import { getFamilyLocationPhotos } from "@/lib/familyGuide/photos";
 
 export const revalidate = 3600;
-export const dynamicParams = false;
+// Hand-written locations are prebuilt; database guides (approved Content
+// Engine proposals) render on first request and then follow ISR. Unknown slugs 404.
+export const dynamicParams = true;
 
 export function generateStaticParams() {
   // All locations are statically generated and reachable. Unpublished ones carry
@@ -25,7 +28,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const data = getFamilyLocation(slug);
+  const data = await findFamilyLocation(slug);
   if (!data) return {};
 
   return {
@@ -54,7 +57,7 @@ export default async function FamilyLocationPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const data = getFamilyLocation(slug);
+  const data = await findFamilyLocation(slug);
   if (!data) notFound();
 
   const photos = await getFamilyLocationPhotos(data.slug);

@@ -164,7 +164,13 @@ export function GuideEditor(props: EditorProps) {
               ))}
             </>
           ) : (
-            guideLocationKeys(guide).map((k) => <option key={k} value={k}>{k}</option>)
+            <>
+              {/* a database guide (approved engine proposal) is not in the static list */}
+              {locationKey && !guideLocationKeys(guide).includes(locationKey) && (
+                <option value={locationKey}>{locationKey}</option>
+              )}
+              {guideLocationKeys(guide).map((k) => <option key={k} value={k}>{k}</option>)}
+            </>
           )}
         </select>
       </div>

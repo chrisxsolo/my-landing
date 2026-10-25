@@ -6,12 +6,14 @@ import { T } from "@/app/admin/adminTheme";
 import { internalLinksForService, isServiceType } from "@/lib/contentEngine/taxonomy";
 import { serviceConfigFor } from "@/lib/contentEngine/serviceConfig";
 import { PhotoThumb, type EditorProps } from "./editorsSimple";
+import { PendingGuideLinksNote } from "./editorsLocationGuide";
 import { input, label } from "./ui";
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
 const arr = (v: unknown) => (Array.isArray(v) ? (v as string[]) : []);
 
-export function JournalEditor({ payload, photos, onEdit, disabled, serviceType }: EditorProps) {
+export function JournalEditor(props: EditorProps) {
+  const { payload, photos, onEdit, disabled, serviceType } = props;
   const photoIds = arr(payload.photo_ids);
   const links = Array.isArray(payload.internal_links)
     ? (payload.internal_links as { url: string; label: string }[]) : [];
@@ -32,6 +34,7 @@ export function JournalEditor({ payload, photos, onEdit, disabled, serviceType }
 
   return (
     <div style={{ display: "grid", gap: 8 }}>
+      <PendingGuideLinksNote {...props} />
       <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 8 }}>
         <div>
           <span style={label}>Title</span>

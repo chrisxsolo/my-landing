@@ -3,7 +3,7 @@
 // server's message and status so callers can branch on status (409 protocols).
 import type {
   EngineSessionRow, EnginePhoto, WorkspaceData, ReconcileReport, EngineJob,
-  EmailFactsResult, EmailFactsFreshness, AnalyzeRoundResult, RunProgress,
+  EmailFactsResult, EmailFactsFreshness, AnalyzeRoundResult, RunProgress, LocationSummaryDto,
 } from "./engineTypes";
 
 export class EngineApiError extends Error {
@@ -49,6 +49,13 @@ export const engineApi = {
   // Metadata-only freshness check: no bodies, no model call, no cost.
   checkEmailFacts: (sessionId: string) =>
     request<EmailFactsFreshness>(`/api/admin/session-content/sessions/${sessionId}/email-facts`),
+  // Deterministic place resolution + guide coverage for the Location panel.
+  getLocation: (sessionId: string) =>
+    request<LocationSummaryDto>(`/api/admin/session-content/sessions/${sessionId}/location`),
+  confirmLocation: (sessionId: string, body: Record<string, unknown>) =>
+    request<{ summary: LocationSummaryDto }>(`/api/admin/session-content/sessions/${sessionId}/location`, {
+      method: "POST", body: JSON.stringify(body),
+    }),
   patchPermissions: (sessionId: string, body: Record<string, unknown>) =>
     request<{ outcome: string }>(`/api/admin/session-content/sessions/${sessionId}/permissions`, {
       method: "PATCH", body: JSON.stringify(body),
@@ -70,6 +77,7 @@ export const engineApi = {
     ),
   finalizeUpload: (sessionId: string, storagePath: string, declared: {
     filename: string; mime: string; sizeBytes: number; contentHash?: string;
+    gps?: { latitude: number; longitude: number } | null;
   }) =>
     request<{ photo: { id: string } }>("/api/admin/session-content/photos/finalize", {
       method: "POST",

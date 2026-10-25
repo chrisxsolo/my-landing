@@ -38,6 +38,10 @@ export function photoIdsFromPayload(contentType: string, payload: Record<string,
     case "school_page_photo":
     case "guide_photo":
       return typeof payload.session_photo_id === "string" ? [payload.session_photo_id] : [];
+    case "location_guide": {
+      const photos = Array.isArray(payload.photos) ? (payload.photos as { session_photo_id?: unknown }[]) : [];
+      return [...new Set(photos.map((p) => p.session_photo_id).filter((id): id is string => typeof id === "string"))];
+    }
     default:
       return [];
   }

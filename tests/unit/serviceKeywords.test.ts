@@ -76,7 +76,30 @@ describe("generateMetaKeywords — couples", () => {
       ...couplesFacts, primary_location: null, lighting_condition: null,
       vibe: null, relationship_type: null,
     });
-    expect(kw).toContain("couple photoshoot in San Francisco");
+    // no verified place → no city claim at all (never a San Francisco default)
+    expect(kw).toContain("couple photoshoot");
+    expect(kw).not.toContain("San Francisco");
     expect(kw).not.toMatch(/, ,|^,|,$/);
+  });
+});
+
+describe("generateMetaKeywords — geography comes from the verified place", () => {
+  it("a Shark Fin Cove session gets Santa Cruz keywords and no San Francisco keywords", () => {
+    const kw = generateMetaKeywords({ ...couplesFacts, primary_location: "Shark Fin Cove" });
+    expect(kw).toContain("couple photoshoot in Santa Cruz");
+    expect(kw).toContain("Shark Fin Cove couples photos");
+    expect(kw).toContain("Santa Cruz engagement photos");
+    expect(kw).not.toMatch(/San Francisco|Ocean Beach/);
+  });
+
+  it("aliases resolve to the canonical place name", () => {
+    const kw = generateMetaKeywords({ ...couplesFacts, primary_location: "Shark Fin Beach" });
+    expect(kw).toContain("Shark Fin Cove couples photos");
+  });
+
+  it("an unverified place keeps its name but claims no city", () => {
+    const kw = generateMetaKeywords({ ...couplesFacts, primary_location: "Pebble Cove" });
+    expect(kw).toContain("Pebble Cove couples photos");
+    expect(kw).not.toContain("San Francisco");
   });
 });

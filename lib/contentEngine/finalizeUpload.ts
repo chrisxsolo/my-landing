@@ -5,6 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { verifyImageBuffer, ImageVerificationError } from "@/lib/contentEngine/imageVerification";
 import { needsNormalization, normalizeOriginal } from "@/lib/contentEngine/normalizeOriginal";
 import { ORIGINALS_BUCKET, isOwnedUploadPath } from "@/lib/contentEngine/uploadConfig";
+import { readJpegGps, type GpsCoordinates } from "@/lib/contentEngine/exifGps";
 
 export type UploadFinalizationErrorKind =
   | "ownership" | "download" | "verification" | "duplicate" | "insert";
@@ -23,6 +24,9 @@ export interface DeclaredUploadMeta {
   mime: string;
   sizeBytes: number;
   contentHash: string; // client-claimed; never trusted — logged when it mismatches the server hash
+  // Read by the browser from the original before a resize dropped EXIF.
+  // Location evidence only (never published); the stored bytes win when they carry GPS.
+  gps?: GpsCoordinates | null;
 }
 
 export interface FinalizeUploadArgs {
@@ -82,6 +86,10 @@ export async function finalizeUpload(args: FinalizeUploadArgs): Promise<SessionP
     throw new UploadFinalizationError(`image verification failed: ${reason}`, "verification");
   }
 
+  // GPS from the stored bytes (untouched uploads) before normalization strips
+  // EXIF; otherwise what the browser read from the original file.
+  const gps = (verified.format === "jpeg" ? readJpegGps(buffer) : null) ?? declared.gps ?? null;
+
   // Oversized originals are downscaled and re-stored over the SAME path before
   // the row is inserted, so hash/dimensions below always describe the stored
   // bytes. The upsert must succeed before re-verification — a row must never
@@ -125,6 +133,8 @@ export async function finalizeUpload(args: FinalizeUploadArgs): Promise<SessionP
       mime_type: format,
       file_size_bytes: verified.bytes,
       analysis_status: "pending",
+      gps_latitude: gps?.latitude ?? null,
+      gps_longitude: gps?.longitude ?? null,
     })
     .select("id,storage_path,content_hash,width,height,mime_type,analysis_status")
     .single();

@@ -7,7 +7,7 @@ import type { Metadata } from "next";
 import FamilyGuideContent from "./FamilyGuideContent";
 import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
 import { getPortfolioData } from "@/lib/professionalData";
-import { getFamilyLocationSummaries } from "@/lib/familyGuide/locations";
+import { getFamilyLocationListing } from "@/lib/locations/guideListings";
 
 // Cached/ISR: refreshed hourly, or immediately on admin content saves
 // (POST /api/admin/revalidate revalidates the root layout).
@@ -56,7 +56,7 @@ export default async function FamilyGuidePage() {
     .slice(0, 6)
     .map((img) => ({ image_url: img.image_url, alt: img.alt }));
 
-  const locations = getFamilyLocationSummaries();
+  const locations = await getFamilyLocationListing();
 
   const articleLd = {
     "@context": "https://schema.org",

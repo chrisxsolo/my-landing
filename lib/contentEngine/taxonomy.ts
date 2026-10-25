@@ -6,6 +6,7 @@
 import { getAllFamilyLocations } from "@/lib/familyGuide/locations";
 import { getAllCouplesLocations } from "@/lib/couplesGuide/locations";
 import { getAllPortraitLocations } from "@/lib/portraitGuide/locations";
+import { parseGuideLocationPath } from "@/lib/locations/guideCoverage";
 
 export const SERVICE_TYPES = [
   "grads", "couples", "families", "portraits", "maternity", "prom", "events", "other",
@@ -49,18 +50,21 @@ export type RelationshipType = (typeof RELATIONSHIP_TYPES)[number];
 export const CONTENT_TYPES = [
   "journal_post", "portfolio_pick", "school_page_photo", "guide_photo",
   "social_caption", "testimonial_feature", "internal_link_suggestion",
+  "location_guide",
 ] as const;
 export type ContentType = (typeof CONTENT_TYPES)[number];
 
-// v1 generation offers everything EXCEPT social_caption (Phase 2, spec §8.2).
+// Generation steps the admin can select. social_caption is Phase 2 (spec
+// §8.2); location_guide is not a step of its own — the guide_photo step
+// proposes one when the session's verified place has no guide page yet.
 export const GENERATABLE_CONTENT_TYPES = CONTENT_TYPES.filter(
-  (t) => t !== "social_caption",
-) as Exclude<ContentType, "social_caption">[];
+  (t) => t !== "social_caption" && t !== "location_guide",
+) as Exclude<ContentType, "social_caption" | "location_guide">[];
 
 export const PUBLICATION_TARGET_TYPES = [
   "blog_post", "portfolio_image", "school_page_photo",
   "family_location_photo", "couples_location_photo", "portrait_location_photo",
-  "grad_spot_photo", "testimonial", "none",
+  "grad_spot_photo", "testimonial", "location_guide", "none",
 ] as const;
 export type PublicationTargetType = (typeof PUBLICATION_TARGET_TYPES)[number];
 
@@ -222,13 +226,32 @@ export const isPortfolioCategory = has(PORTFOLIO_CATEGORIES);
 export const isLightingCondition = has(LIGHTING_CONDITIONS);
 export const isContentType = has(CONTENT_TYPES);
 export const isGuideType = has(GUIDE_TYPES);
-export const isCanonicalInternalLink = has(CANONICAL_INTERNAL_LINKS);
+const isStaticCanonicalLink = has(CANONICAL_INTERNAL_LINKS);
+
+// The closed static list, plus the URL shape of a database location guide
+// (/couples-guide/locations/<slug>). Like grad spot keys, a database guide
+// link is only STRUCTURALLY valid here; whether that guide is live is enforced
+// where the DB is reachable — generation offers only live guides, and
+// publishing a journal blocks on any link to a guide that is not live.
+export function isCanonicalInternalLink(url: unknown): url is string {
+  return isStaticCanonicalLink(url) || (typeof url === "string" && parseGuideLocationPath(url) !== null);
+}
+
+const KEBAB = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 // Grad keys are location_spots row ids — a numeric string is structurally
 // valid here; existence is enforced where the DB is reachable (the generation
 // target checks against loaded spots, the publish RPC raises on missing rows).
+// family/couples/portrait keys are a static guide slug, or a kebab slug that
+// names a database guide — generation places photos only on the guide that
+// covers the session's verified place, and publishing blocks on unknown keys.
 export function isGuideLocationKey(guide: GuideType, key: unknown): boolean {
   if (typeof key !== "string") return false;
   if (guide === "grad") return /^\d+$/.test(key);
-  return guideLocationKeys(guide).includes(key);
+  return guideLocationKeys(guide).includes(key) || KEBAB.test(key);
+}
+
+/** Static (hand-written) guide pages only — no database lookup. */
+export function isStaticGuideLocationKey(guide: GuideType, key: string): boolean {
+  return guide !== "grad" && guideLocationKeys(guide).includes(key);
 }

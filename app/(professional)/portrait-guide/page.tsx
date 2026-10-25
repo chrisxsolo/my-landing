@@ -7,7 +7,7 @@ import type { Metadata } from "next";
 import PortraitGuideContent from "./PortraitGuideContent";
 import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
 import { getPortfolioData } from "@/lib/professionalData";
-import { getPortraitLocationSummaries } from "@/lib/portraitGuide/locations";
+import { getPortraitLocationListing } from "@/lib/locations/guideListings";
 
 // Cached/ISR: refreshed hourly, or immediately on admin content saves
 // (POST /api/admin/revalidate revalidates the root layout).
@@ -56,7 +56,7 @@ export default async function PortraitGuidePage() {
     .slice(0, 6)
     .map((img) => ({ image_url: img.image_url, alt: img.alt }));
 
-  const locations = getPortraitLocationSummaries();
+  const locations = await getPortraitLocationListing();
 
   const articleLd = {
     "@context": "https://schema.org",

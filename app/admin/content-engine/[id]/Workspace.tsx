@@ -13,6 +13,7 @@ import WorkflowStepper from "@/app/admin/content-engine/WorkflowStepper";
 import type { EnginePhoto, WorkspaceData } from "@/app/admin/content-engine/engineTypes";
 import { chip } from "./ui";
 import FactsSection from "./FactsSection";
+import LocationPanel from "./LocationPanel";
 import PermissionsBar from "./PermissionsBar";
 import PhotosSection from "./PhotosSection";
 import GenerationSection from "./GenerationSection";
@@ -108,6 +109,8 @@ export default function Workspace({ sessionId }: { sessionId: string }) {
         flushFacts={flushFacts} onChanged={refresh} onPhotosMutated={setPhotos} />
       <FactsSection session={session} sessionId={sessionId} onSaved={refresh}
         onRegisterFlush={registerFlushFacts} />
+      <LocationPanel sessionId={sessionId}
+        primaryLocation={typeof session.primary_location === "string" ? session.primary_location : null} />
       <PhotosSection sessionId={sessionId} photos={photos}
         aiAllowed={session.ai_processing_allowed as boolean} onChanged={refresh}
         onPhotosMutated={setPhotos} />

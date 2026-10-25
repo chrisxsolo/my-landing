@@ -8,6 +8,7 @@ import {
   LIGHTING_CONDITIONS, VIBES, RELATIONSHIP_TYPES,
   type ContentType,
 } from "@/lib/contentEngine/taxonomy";
+import { LOCATION_GUIDE_TYPES } from "@/lib/locations/guideCoverage";
 
 // z.uuid() is the zod-v4 canonical form; z.string().uuid() is deprecated but
 // still functional. We use z.uuid() throughout per the v4 API.
@@ -19,6 +20,24 @@ const internalLink = z.object({
   label: nonEmpty,
 });
 
+const kebab = z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "must be lowercase kebab-case");
+
+// A link the journal WANTS but cannot carry yet: the location guide it points
+// at is still a proposal. It is never written into the body or internal_links
+// (so no broken public URL can ship). Publishing that guide turns it into a
+// real link; rejecting it removes the dependency. "ready" = the guide went
+// live after this journal was approved, so adding the link waits for the
+// photographer (approved content is never changed automatically).
+export const pendingGuideLinkSchema = z.object({
+  guide: z.enum(LOCATION_GUIDE_TYPES),
+  location_key: kebab,
+  place_name: nonEmpty,
+  slug: kebab,
+  label: nonEmpty,
+  status: z.enum(["pending", "ready"]).default("pending"),
+});
+export type PendingGuideLink = z.infer<typeof pendingGuideLinkSchema>;
+
 export const journalPostPayloadSchema = z.object({
   title: nonEmpty,
   slug: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "slug must be lowercase kebab-case"),
@@ -28,6 +47,7 @@ export const journalPostPayloadSchema = z.object({
   photo_ids: z.array(uuid).min(1),
   cover_photo_id: uuid,
   internal_links: z.array(internalLink).default([]),
+  pending_guide_links: z.array(pendingGuideLinkSchema).default([]),
   testimonial_id: uuid.nullable().default(null),
 }).refine((p) => p.photo_ids.includes(p.cover_photo_id), {
   message: "cover_photo_id must be one of photo_ids",
@@ -80,7 +100,78 @@ export const internalLinkSuggestionPayloadSchema = z.object({
     label: nonEmpty,
     reason: z.string().default(""),
   })).default([]),
+  pending_guide_links: z.array(pendingGuideLinkSchema).default([]),
 });
+
+const paragraphs = z.array(z.string().min(1)).min(1);
+
+// The page body of a proposed location guide — the same fields every
+// hand-written guide config carries (lib/couplesGuide/types.ts), with the one
+// guide-specific section stored as guideSection. slug/canonicalPath/published
+// are derived at publish, never authored.
+export const locationGuideDataSchema = z.object({
+  name: nonEmpty,
+  h1: nonEmpty,
+  area: nonEmpty,
+  region: nonEmpty,
+  metaTitle: nonEmpty,
+  metaDescription: nonEmpty,
+  keywords: z.array(nonEmpty).default([]),
+  cardSummary: nonEmpty,
+  bestFor: nonEmpty,
+  lightingChar: nonEmpty,
+  accessNote: nonEmpty,
+  heroAlt: nonEmpty,
+  heroTagline: nonEmpty,
+  whyItWorks: paragraphs,
+  photoVariety: paragraphs,
+  photoVarietyList: z.array(z.string().min(1)).default([]),
+  bestTimeOfDay: paragraphs,
+  bestSeasons: paragraphs,
+  whatToWear: paragraphs,
+  guideSection: paragraphs,
+  parkingArrival: paragraphs,
+  ctaTitle: nonEmpty,
+  ctaBody: nonEmpty,
+});
+export type LocationGuideData = z.infer<typeof locationGuideDataSchema>;
+
+export const locationGuidePlaceSchema = z.object({
+  name: nonEmpty,
+  city: nonEmpty,
+  county: nonEmpty,
+  state: nonEmpty,
+  region: nonEmpty,
+  search_area: nonEmpty,
+});
+
+export const locationGuidePayloadSchema = z.object({
+  guide: z.enum(LOCATION_GUIDE_TYPES),
+  location_key: kebab,
+  slug: kebab,
+  place: locationGuidePlaceSchema,
+  data: locationGuideDataSchema,
+  photos: z.array(z.object({
+    session_photo_id: uuid,
+    alt_text: z.string().default(""),
+    caption: z.string().default(""),
+  })).min(1).max(12),
+  hero_photo_id: uuid,
+  // Claims the photographer must check before publishing (parking, access,
+  // permits, anything not in verified facts). Shown on the review card.
+  needs_verification: z.array(z.string().min(1)).default([]),
+  // Search visibility. Mirrors the hand-written guides' rule: keep a page
+  // out of the index until it has a credible set of photos.
+  indexable: z.boolean().default(false),
+  source_session_id: uuid,
+}).refine((p) => p.photos.some((ph) => ph.session_photo_id === p.hero_photo_id), {
+  message: "hero_photo_id must be one of photos",
+  path: ["hero_photo_id"],
+}).refine((p) => new Set(p.photos.map((ph) => ph.session_photo_id)).size === p.photos.length, {
+  message: "each photo may appear once",
+  path: ["photos"],
+});
+export type LocationGuidePayload = z.infer<typeof locationGuidePayloadSchema>;
 
 // Dispatcher: social_caption is intentionally absent (Phase 2, spec §8.2).
 // Typed as Record<Exclude<ContentType, "social_caption">, ...> so adding a new
@@ -92,6 +183,7 @@ const PAYLOAD_SCHEMAS: Record<Exclude<ContentType, "social_caption">, z.ZodType>
   guide_photo: guidePhotoPayloadSchema,
   testimonial_feature: testimonialFeaturePayloadSchema,
   internal_link_suggestion: internalLinkSuggestionPayloadSchema,
+  location_guide: locationGuidePayloadSchema,
 };
 
 export type GeneratableContentType = keyof typeof PAYLOAD_SCHEMAS;

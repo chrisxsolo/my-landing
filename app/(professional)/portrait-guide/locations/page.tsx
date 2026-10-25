@@ -8,7 +8,7 @@ import Link from "next/link";
 import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
 import { PORTRAIT_GUIDE_CSS } from "@/lib/portraitGuide/styles";
 import { locationDisplayName } from "@/lib/portraitGuide/types";
-import { getPortraitLocationSummaries } from "@/lib/portraitGuide/locations";
+import { getPortraitLocationListing } from "@/lib/locations/guideListings";
 
 const SITE_URL = "https://www.soloxsnaps.com";
 const PATH = "/portrait-guide/locations";
@@ -33,8 +33,12 @@ export const metadata: Metadata = {
   twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION },
 };
 
-export default function PortraitLocationsHubPage() {
-  const locations = getPortraitLocationSummaries();
+// ISR: database guides (approved Content Engine proposals) join the hand-written
+// ones; publishing a guide revalidates this page.
+export const revalidate = 3600;
+
+export default async function PortraitLocationsHubPage() {
+  const locations = await getPortraitLocationListing();
 
   const breadcrumbLd = buildBreadcrumbJsonLd([
     { name: "Home", path: "/" },

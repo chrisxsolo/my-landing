@@ -27,10 +27,13 @@ const COUPLES_CONTENT_GUIDANCE =
   "location, lighting, styling, and emotional feel. Do not over-romanticize " +
   "and avoid generic luxury language. " + GRAD_TERMS_RULE + " " +
   "Weave in (naturally, never stuffed) SEO phrasing such as: couples " +
-  "photography, San Francisco couple photoshoot, Bay Area couples " +
+  "photography, <verified city> couple photoshoot, Bay Area couples " +
   "photographer, engagement-style photography, golden hour couple photos, " +
-  "candid couples photography, romantic Bay Area photoshoot locations, and " +
-  "location-specific couple-session phrases. Title style examples: " +
+  "candid couples photography, and location-specific couple-session phrases. " +
+  "Geography comes ONLY from the verified location: never call a session a " +
+  "San Francisco session unless the verified location is in San Francisco, and " +
+  "never compare it to or recommend a different location. The examples below " +
+  "show style, not places. Title style examples: " +
   "\"Couples Photoshoot at Crissy Field in San Francisco\", " +
   "\"Golden Hour Couples Session at Lovers Lane\", " +
   "\"Romantic Couple Photos at Palace of Fine Arts\", " +
