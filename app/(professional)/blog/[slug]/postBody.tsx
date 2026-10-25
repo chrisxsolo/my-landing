@@ -1,18 +1,14 @@
 import { type ReactNode } from "react";
+import Link from "next/link";
+import { C } from "@/lib/colors";
+import { parseBody, type Block, type Inline } from "@/lib/blog/markdown";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Renders a journal/blog body string into semantic HTML for SEO.
-//
-// Bodies are authored as plain text with blank-line-separated blocks. This
-// detects section headings and bullet lists (deterministically, no fragile
-// guessing) and renders them as <h2> / <ul> so search engines see real
-// structure instead of a wall of <p> tags.
-//
-// Heading rules (all deterministic):
-//  1. A non-bullet line that sits directly above bullets in the same block.
-//  2. A standalone short line whose *next* block is a bullet list.
-//  3. A standalone line that begins with an emoji (e.g. "📸 Book Your Session").
-// Everything else is a paragraph.
+// Renders a journal/blog body into semantic HTML (<h2>/<h3>, <p>, <ul>/<ol>,
+// <blockquote>, <a>, <strong>, <em>). Parsing lives in lib/blog/markdown.ts:
+// Content Engine bodies are Markdown, older posts are plain text, and both
+// render through the same tree. Everything is emitted as React elements —
+// never as raw HTML — so a body can't inject markup or script links.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const PARA = {
@@ -33,51 +29,57 @@ const H2 = {
   margin: "44px 0 18px",
 } as const;
 
+const H3 = { ...H2, fontSize: "1.25rem", margin: "34px 0 14px" } as const;
 const UL = { ...PARA, paddingLeft: 22, listStyleType: "disc" } as const;
+const OL = { ...PARA, paddingLeft: 22, listStyleType: "decimal" } as const;
 const LI = { marginBottom: 8 } as const;
+const QUOTE = {
+  ...PARA,
+  fontStyle: "italic",
+  borderLeft: `2px solid ${C.proAccentBorder}`,
+  margin: "0 0 24px",
+  padding: "2px 0 2px 20px",
+} as const;
+const LINK = {
+  color: C.proAccent,
+  textDecoration: "underline",
+  textDecorationColor: C.proAccentBorder,
+  textUnderlineOffset: "3px",
+} as const;
 
-const BULLET = /^[•*-]\s+/;
-const stripLead = (line: string) => line.replace(/^\s+/, "");
-const isBullet = (line: string) => BULLET.test(stripLead(line));
-const isEmojiHeading = (line: string) => /^\p{Extended_Pictographic}/u.test(line);
+function renderInline(nodes: Inline[]): ReactNode[] {
+  return nodes.map((n, i) => {
+    if (n.type === "text") return n.value;
+    if (n.type === "strong") return <strong key={i}>{renderInline(n.children)}</strong>;
+    if (n.type === "em") return <em key={i}>{renderInline(n.children)}</em>;
+    if (n.internal) return <Link key={i} href={n.href} style={LINK}>{renderInline(n.children)}</Link>;
+    return (
+      <a key={i} href={n.href} style={LINK} target="_blank" rel="noopener noreferrer">
+        {renderInline(n.children)}
+      </a>
+    );
+  });
+}
 
-function blockHasBullets(block: string | undefined): boolean {
-  if (!block) return false;
-  return block.split(/\n/).map((l) => l.trim()).filter(Boolean).some(isBullet);
+function renderBlock(block: Block, key: number): ReactNode {
+  switch (block.type) {
+    case "heading":
+      return block.level === 2
+        ? <h2 key={key} style={H2}>{renderInline(block.children)}</h2>
+        : <h3 key={key} style={H3}>{renderInline(block.children)}</h3>;
+    case "list": {
+      const items = block.items.map((item, j) => <li key={j} style={LI}>{renderInline(item)}</li>);
+      return block.ordered ? <ol key={key} style={OL}>{items}</ol> : <ul key={key} style={UL}>{items}</ul>;
+    }
+    case "quote":
+      return <blockquote key={key} style={QUOTE}>{renderInline(block.children)}</blockquote>;
+    case "paragraph":
+      return <p key={key} style={PARA}>{renderInline(block.children)}</p>;
+  }
 }
 
 export function renderPostBody(body: string): ReactNode[] {
-  const blocks = body.split(/\n\n+/).map((b) => b.trim()).filter(Boolean);
-  const nodes: ReactNode[] = [];
-
-  blocks.forEach((block, i) => {
-    const lines = block.split(/\n/).map((l) => l.trim()).filter(Boolean);
-    const bulletLines = lines.filter(isBullet);
-
-    if (bulletLines.length > 0) {
-      const heading = lines.find((l) => !isBullet(l));
-      if (heading) nodes.push(<h2 key={`h${i}`} style={H2}>{heading}</h2>);
-      nodes.push(
-        <ul key={`u${i}`} style={UL}>
-          {bulletLines.map((b, j) => (
-            <li key={j} style={LI}>{stripLead(b).replace(BULLET, "")}</li>
-          ))}
-        </ul>
-      );
-      return;
-    }
-
-    const single = lines.length === 1 ? lines[0] : null;
-    const nextIsBullets = blockHasBullets(blocks[i + 1]);
-    if (single && (isEmojiHeading(single) || (nextIsBullets && single.length <= 70))) {
-      nodes.push(<h2 key={`h${i}`} style={H2}>{single}</h2>);
-      return;
-    }
-
-    nodes.push(<p key={`p${i}`} style={PARA}>{lines.join(" ")}</p>);
-  });
-
-  return nodes;
+  return parseBody(body).map(renderBlock);
 }
 
 // School internal-link detection now lives in lib/portfolioCategoryContent

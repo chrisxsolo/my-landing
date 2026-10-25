@@ -1,10 +1,12 @@
 // Location-aware publish guards, run before the transactional RPC. The RPC
 // cannot see the hand-written guide registries, so these checks live here:
-//   journal_post   → no link to a location guide that is not live
+//   journal_post   → no link to a location guide that is not live, and no
+//                    link to a blog post that no longer exists
 //   guide_photo    → the target page exists (static or published database guide)
 //   location_guide → the slug/place is not already a hand-written page
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { brokenGuideLinks } from "@/lib/contentEngine/guideLinks";
+import { missingBlogLinks } from "@/lib/contentEngine/relatedPosts";
 import { loadPublishedDbGuides } from "@/lib/locations/registry";
 import {
   collidesWithStaticGuide, isLocationGuideType, parseGuideLocationPath, staticGuideSlugs,
@@ -38,8 +40,12 @@ export async function publishBlockReason(
       payload as { body: string; internal_links?: { url: string; label: string }[] },
       liveGuidePathChecker(await loadPublishedDbGuides(client)),
     );
-    return broken.length
-      ? `this post links to a location guide that is not live yet (${broken.join(", ")}) — publish or remove that guide first`
+    if (broken.length) {
+      return `this post links to a location guide that is not live yet (${broken.join(", ")}) — publish or remove that guide first`;
+    }
+    const missing = await missingBlogLinks(client, String(payload.body ?? ""));
+    return missing.length
+      ? `this post links to a blog post that no longer exists (${missing.join(", ")}) — remove that link first`
       : null;
   }
   if (contentType === "guide_photo" && isLocationGuideType(payload.guide)) {

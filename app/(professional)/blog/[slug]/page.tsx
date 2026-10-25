@@ -5,7 +5,9 @@ import { notFound } from "next/navigation";
 import { getBlogPostBySlug } from "@/lib/professionalData";
 import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
 import { renderPostBody } from "./postBody";
+import { toPlainText } from "@/lib/blog/markdown";
 import { detectSchoolLink } from "@/lib/portfolioCategoryContent";
+import { detectPostService, exploreLinksFor } from "@/lib/blog/postService";
 import ContentEventBeacon from "@/app/components/ContentEventBeacon";
 
 // Cached/ISR: rebuilt at most hourly, or immediately on admin post saves
@@ -24,7 +26,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const post = await getBlogPostBySlug("professional", slug);
   if (!post) return { title: "Not Found" };
-  const description = post.meta_description || (post.body.length > 155 ? `${post.body.slice(0, 155).trim()}…` : post.body);
+  const plain = toPlainText(post.body);
+  const description = post.meta_description || (plain.length > 155 ? `${plain.slice(0, 155).trim()}…` : plain);
   return {
     title: post.title,
     description,
@@ -59,6 +62,9 @@ export default async function ProfessionalBlogPostPage({ params }: Props) {
 
   const extraImages = post.extra_image_urls ?? [];
   const schoolLink = detectSchoolLink(`${post.title} ${post.slug}`);
+  // A school name with no other cue still means a grad post.
+  const service = detectPostService(`${post.title} ${post.slug}`) ?? (schoolLink ? "grads" : null);
+  const exploreLinks = exploreLinksFor(service, schoolLink);
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -232,7 +238,8 @@ export default async function ProfessionalBlogPostPage({ params }: Props) {
         </section>
       )}
 
-      {/* ── INTERNAL LINKS — keep exploring ── */}
+      {/* ── INTERNAL LINKS — site navigation for this kind of post (the
+          article body carries its own contextual links) ── */}
       <section style={{
         borderTop: "1px solid rgba(0,0,0,0.07)",
         padding: "64px 60px 0",
@@ -258,14 +265,7 @@ export default async function ProfessionalBlogPostPage({ params }: Props) {
           margin: 0,
           fontFamily: "Georgia, 'Times New Roman', serif",
         }}>
-          {[
-            ...(schoolLink ? [schoolLink] : []),
-            { label: "Graduation pricing", href: "/pricing/grads" },
-            { label: "Check availability", href: "/availability" },
-            { label: "Graduation photo guide", href: "/grad-guide" },
-            { label: "Bay Area campus spots", href: "/grad-guide/campus-spots" },
-            { label: "Contact", href: "/contact" },
-          ].map((l) => (
+          {exploreLinks.map((l) => (
             <li key={l.href}>
               <Link href={l.href} style={{
                 display: "inline-block",

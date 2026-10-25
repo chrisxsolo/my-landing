@@ -1,7 +1,8 @@
 "use client";
 // Journal editor (spec §7.4): title/slug/body/meta, photo picker (cover +
 // extras from analyzed photos), and the structured internal-links list
-// (payload.internal_links — rendered into "Keep exploring" at publish, §9.3).
+// (payload.internal_links — the pages the body may link; links are written
+// inside the body's paragraphs, nothing is appended at publish).
 import { T } from "@/app/admin/adminTheme";
 import { internalLinksForService, isServiceType } from "@/lib/contentEngine/taxonomy";
 import { serviceConfigFor } from "@/lib/contentEngine/serviceConfig";
@@ -114,7 +115,7 @@ export function JournalEditor(props: EditorProps) {
       </div>
 
       <div>
-        <span style={label}>Internal links (&quot;Keep exploring&quot; section at publish)</span>
+        <span style={label}>Allowed internal links (link them inside the body text)</span>
         {links.map((link, i) => (
           <div key={`${link.url}-${i}`} style={{ display: "flex", gap: 6, marginBottom: 4 }}>
             <code style={{ fontSize: 12, alignSelf: "center", whiteSpace: "nowrap" }}>{link.url}</code>

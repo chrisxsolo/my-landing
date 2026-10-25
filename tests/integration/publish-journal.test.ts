@@ -4,7 +4,7 @@ import { service, resetDb, createTestSession, createTestPhoto, createPackage, cr
 beforeAll(() => resetDb());
 
 describe("journal publisher mapping (spec §9.3)", () => {
-  it("maps every staged field, appends Keep exploring, and writes image_library rows atomically", async () => {
+  it("maps every staged field, publishes the body as written, and writes image_library rows atomically", async () => {
     const sessionId = await createTestSession();
     const cover = await createTestPhoto(sessionId, { alt: "Mia under Tower Lawn light" });
     const extra = await createTestPhoto(sessionId, { alt: "Cap toss at SJSU" });
@@ -36,9 +36,9 @@ describe("journal publisher mapping (spec §9.3)", () => {
     expect(post.og_image_url).toBe(cover.public_derivative_url);
     expect(post.meta_description).toBe("desc");
     expect(post.meta_keywords).toBe("sjsu, grad");
-    expect(post.body).toContain("Para two.");
-    expect(post.body).toContain("Keep exploring");
-    expect(post.body).toContain("[SJSU grad sessions](/grads/sjsu)");
+    // internal_links are the allowed-link list, not content: nothing is appended
+    expect(post.body).toBe("Para one.\n\nPara two.");
+    expect(post.body).not.toContain("Keep exploring");
     expect(post.published_at).not.toBeNull();
 
     const { data: lib } = await service

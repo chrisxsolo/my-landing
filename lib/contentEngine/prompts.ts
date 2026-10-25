@@ -9,7 +9,7 @@ import {
 } from "@/lib/contentEngine/taxonomy";
 import { serviceConfigFor } from "@/lib/contentEngine/serviceConfig";
 
-export const PROMPT_VERSION = "2026-10-25.1";
+export const PROMPT_VERSION = "2026-10-25.2";
 
 export interface BuiltPrompt {
   system: string;
@@ -95,7 +95,10 @@ export function buildTopPicksPrompt(
 }
 
 export interface JournalInputs {
+  /** Allowed internal links, most relevant first (see prioritizeLinks). */
   links: { url: string; label: string }[];
+  /** Existing posts on the same service the body may link once, if useful. */
+  relatedPosts?: { url: string; title: string }[];
   testimonialQuote: string | null;
   /** verifiedPlaceBlock() — the only geography the post may state. */
   locationBlock: string;
@@ -110,6 +113,32 @@ const LINK_RULE =
   "other link or URL, never guess a page address, and never point readers to a " +
   "different location than the one this session was photographed at.";
 
+// Links belong inside the story, not in a list at the end: the public page
+// already shows its own navigation and booking button below every post.
+const JOURNAL_LINKING =
+  "Weave 2-4 of these links into paragraphs where they genuinely fit, as Markdown " +
+  "links with natural, descriptive anchor text that names the page — for example: " +
+  "\"If you're planning a session here, my [<that page's title>](<its url>) covers " +
+  "the best light and spots.\" The list is ordered most relevant first: prefer the " +
+  "guide for this exact location over a broad guide. Link each page at most once, " +
+  "never put a link in a sentence that exists only to hold it, and use fewer links " +
+  "rather than forcing one.";
+
+const JOURNAL_STRUCTURE =
+  "Write it as a photographer's journal entry, not an SEO article. Flow: open with " +
+  "the session itself; then the location and how it looks; then the experience and " +
+  "the moments that stood out; then useful context about the location, light, or " +
+  "timing; then a short, natural closing paragraph. Use plain paragraphs — a ## " +
+  "heading only if the post truly needs one. Never add a \"Keep exploring\", " +
+  "\"Related resources\", \"Useful links\" or any other list of links or pages, and " +
+  "mention booking at most once, lightly — the page has its own booking button.";
+
+function relatedPostsBlock(posts: JournalInputs["relatedPosts"]): string {
+  if (!posts?.length) return "";
+  return `Earlier journal posts you may link at most ONE of, only if it adds something ` +
+    `useful for the reader (same rules as above):\n${JSON.stringify(posts)}\n\n`;
+}
+
 export function buildJournalPrompt(
   facts: SessionFactsSnapshot, photos: PhotoSummary[], inputs: JournalInputs,
 ): BuiltPrompt {
@@ -122,12 +151,14 @@ export function buildJournalPrompt(
     userText:
       `${factsBlock(facts)}\n\n${summariesBlock(photos)}\n\n` +
       `${inputs.locationBlock}\n\n` +
-      `Internal links to weave naturally into the body where relevant (markdown links):\n` +
-      `${JSON.stringify(inputs.links)}\n${LINK_RULE}\n\n` +
+      `Internal links (most relevant first):\n` +
+      `${JSON.stringify(inputs.links)}\n${JOURNAL_LINKING}\n\n` +
+      relatedPostsBlock(inputs.relatedPosts) +
+      `${LINK_RULE}\n\n` +
       (inputs.testimonialQuote
         ? `Client words to include as a blockquote, attributed to ${facts.public_display_name ?? "the client"}: "${inputs.testimonialQuote}"\n\n`
         : "") +
-      "Write 350-600 words. Mention the location and light honestly.",
+      `${JOURNAL_STRUCTURE}\n\nWrite 350-600 words. Mention the location and light honestly.`,
   };
 }
 
@@ -223,7 +254,10 @@ export function buildInternalLinkPrompt(
     system:
       `${brandFor(facts)} You suggest internal links for a journal post. You may use ONLY ` +
       "urls from the provided list — anything else is invalid. Return ONLY JSON: " +
-      "{\"links\":[{\"url\":\"<from list>\",\"label\":\"<=120\",\"reason\":\"<=300\"}]}. Suggest 2-5.",
+      "{\"links\":[{\"url\":\"<from list>\",\"label\":\"<=120\",\"reason\":\"<=300\"}]}. " +
+      "Suggest 2-4 that a reader of this post would genuinely want, in this priority: " +
+      "the guide for this session's exact location; for graduates, their school's page; " +
+      "the service's guide; the service's pricing page. Never pad the list.",
     userText:
       `${factsBlock(facts)}\n\n${locationBlock}\n\nCanonical internal links (closed list):\n` +
       JSON.stringify([...allowedUrls], null, 1),

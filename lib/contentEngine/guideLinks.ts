@@ -52,6 +52,73 @@ export function sanitizeBodyLinks(
   return { body: next, removed };
 }
 
+/**
+ * Orders allowed links by how useful they are inside a post: the guide for
+ * this exact location, then the graduate's school page, then guides, then
+ * pricing, then everything else. Stable within each rank.
+ */
+export function prioritizeLinks<T extends { url: string }>(links: readonly T[], schoolSlug?: string | null): T[] {
+  const rank = (url: string) => {
+    const path = internalPath(url) ?? url;
+    if (parseGuideLocationPath(path)) return 0;
+    if (schoolSlug && path === `/grads/${schoolSlug}`) return 1;
+    if (/-guide(?:\/|$)/.test(path)) return 2;
+    if (path.startsWith("/pricing")) return 3;
+    return 4;
+  };
+  return links.map((l, i) => ({ l, i, r: rank(l.url) }))
+    .sort((a, b) => a.r - b.r || a.i - b.i)
+    .map((x) => x.l);
+}
+
+// ── Editorial cleanup ───────────────────────────────────────────────────────
+// Navigation below an article is the website's job (blog/[slug] page), so a
+// generated body must not carry its own "Keep exploring" style link list.
+
+const GENERIC_LINK_HEADING =
+  /^(?:keep exploring|explore more|related (?:resources|reading|posts|articles|guides|links)|useful (?:links|resources)|helpful (?:links|resources)|more resources|further reading|you might also like)[\s:.!]*$/i;
+const LINK_BULLET = /^(?:[-*•]|\d{1,3}[.)])\s+\[[^\]]+\]\([^)\s]+\)/;
+
+// "## Keep exploring", "**Related resources:**", "Useful links" all count.
+const isGenericLinkHeading = (line: string) =>
+  GENERIC_LINK_HEADING.test(line.trim().replace(/^#{1,6}\s+/, "").replace(/\*\*|__/g, "").trim());
+
+/**
+ * Removes generic link-list sections: a heading like "Keep exploring" or
+ * "Related resources" followed only by bullets that start with a link. Real
+ * sections (other headings, or bullets with prose) are left alone.
+ */
+export function stripLinkListSections(body: string): { body: string; removed: number } {
+  const lines = body.split("\n");
+  const kept: string[] = [];
+  let removed = 0;
+  for (let i = 0; i < lines.length; i++) {
+    if (!isGenericLinkHeading(lines[i])) { kept.push(lines[i]); continue; }
+    let j = i + 1;
+    let bullets = 0;
+    while (j < lines.length && (lines[j].trim() === "" || LINK_BULLET.test(lines[j].trim()))) {
+      if (lines[j].trim()) bullets++;
+      j++;
+    }
+    if (bullets === 0) { kept.push(lines[i]); continue; }
+    removed++;
+    i = j - 1;
+  }
+  return { body: kept.join("\n").replace(/\n{3,}/g, "\n\n").trim(), removed };
+}
+
+/** Keeps the first link to each internal page; later repeats become plain text. */
+export function dedupeBodyLinks(body: string): string {
+  const seen = new Set<string>();
+  return body.replace(MARKDOWN_LINK, (whole, text: string, url: string) => {
+    const path = internalPath(url);
+    if (path === null) return whole;
+    if (seen.has(path)) return text;
+    seen.add(path);
+    return whole;
+  });
+}
+
 interface JournalLinkFields {
   body: string;
   internal_links?: { url: string; label: string }[];
@@ -74,8 +141,8 @@ export function guideLinkSentence(link: PendingGuideLink, url: string): string {
 
 /**
  * The guide is live: replace the pending reference with a real link — in
- * internal_links (rendered under "Keep exploring") and as one sentence at the
- * end of the body. Idempotent.
+ * internal_links (the allowed-link list) and as one sentence at the end of
+ * the body, which is where readers see it. Idempotent.
  */
 export function applyGuideLink<T extends JournalLinkFields>(
   payload: T, guide: LocationGuideType, locationKey: string, url: string,
@@ -124,4 +191,17 @@ export function brokenGuideLinks(
     ...internalLinksInBody(payload.body),
   ];
   return [...new Set(paths)].filter((p) => parseGuideLocationPath(p) !== null && !isLiveGuidePath(p));
+}
+
+/**
+ * Every generated journal body passes through this before it is stored:
+ * unapproved internal links are unwrapped, generic link-list sections are
+ * dropped, and repeat links to one page become plain text.
+ */
+export function finalizeJournalBody(
+  body: string, allowed: ReadonlySet<string>,
+): { body: string; removedLinks: string[]; removedSections: number } {
+  const linked = sanitizeBodyLinks(body, allowed);
+  const stripped = stripLinkListSections(linked.body);
+  return { body: dedupeBodyLinks(stripped.body), removedLinks: linked.removed, removedSections: stripped.removed };
 }

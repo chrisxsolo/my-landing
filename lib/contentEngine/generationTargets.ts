@@ -16,7 +16,10 @@ import {
 import {
   allowedInternalLinks, loadSessionLocation, verifiedPlaceBlock,
 } from "@/lib/contentEngine/sessionLocation";
-import { ALWAYS_ALLOWED_PATHS, internalPath, sanitizeBodyLinks } from "@/lib/contentEngine/guideLinks";
+import {
+  ALWAYS_ALLOWED_PATHS, finalizeJournalBody, internalPath, prioritizeLinks,
+} from "@/lib/contentEngine/guideLinks";
+import { loadRelatedPosts } from "@/lib/contentEngine/relatedPosts";
 import { locationGuideStep } from "@/lib/contentEngine/locationGuideTarget";
 import { isLocationGuideType } from "@/lib/locations/guideCoverage";
 import type { PendingGuideLink } from "@/lib/contentEngine/payloads";
@@ -98,8 +101,11 @@ async function journalTarget(ctx: TargetContext): Promise<TargetResult> {
     .neq("status", "rejected");
   const linkItem = siblings?.find((s) => s.content_type === "internal_link_suggestion");
   const testimonialItem = siblings?.find((s) => s.content_type === "testimonial_feature");
-  const links = ((linkItem?.payload?.links ?? []) as { url: string; label: string }[])
-    .map((l) => ({ url: l.url, label: l.label }));
+  const links = prioritizeLinks(
+    ((linkItem?.payload?.links ?? []) as { url: string; label: string }[]).map((l) => ({ url: l.url, label: l.label })),
+    ctx.facts.school_slug,
+  );
+  const relatedPosts = await loadRelatedPosts(ctx.client, ctx.facts.service_type);
   const pendingGuideLinks = (linkItem?.payload?.pending_guide_links ?? []) as PendingGuideLink[];
   const location = await loadSessionLocation(ctx.client, ctx.sessionId, ctx.facts.primary_location);
   const testimonialQuote = (testimonialItem?.payload?.quote_excerpt as string | undefined) || null;
@@ -116,7 +122,7 @@ async function journalTarget(ctx: TargetContext): Promise<TargetResult> {
 
   const { json, usage } = await callForJson(
     ctx, buildJournalPrompt(ctx.facts, photos, {
-      links, testimonialQuote, locationBlock: verifiedPlaceBlock(location),
+      links, relatedPosts, testimonialQuote, locationBlock: verifiedPlaceBlock(location),
     }), imageBlocks,
   );
   const parsed = journalResponseSchema.safeParse(json);
@@ -124,13 +130,16 @@ async function journalTarget(ctx: TargetContext): Promise<TargetResult> {
   assertKnownPhotos([...parsed.data.photo_ids, parsed.data.cover_photo_id], known);
 
   // Only the provided links (and the always-valid top-level pages) may stay
-  // linked in the body; anything else the model wrote is unwrapped to text.
+  // linked in the body; anything else the model wrote is unwrapped to text,
+  // and any link-list section it appended is dropped (the page has its own).
   const allowedPaths = new Set([
     ...ALWAYS_ALLOWED_PATHS,
     ...links.map((l) => internalPath(l.url) ?? l.url),
+    ...relatedPosts.map((p) => p.url),
   ]);
-  const { body, removed } = sanitizeBodyLinks(parsed.data.body, allowedPaths);
-  if (removed.length) console.warn(`journal ${ctx.packageId}: removed unapproved links ${removed.join(", ")}`);
+  const { body, removedLinks, removedSections } = finalizeJournalBody(parsed.data.body, allowedPaths);
+  if (removedLinks.length) console.warn(`journal ${ctx.packageId}: removed unapproved links ${removedLinks.join(", ")}`);
+  if (removedSections) console.warn(`journal ${ctx.packageId}: removed ${removedSections} link-list section(s)`);
 
   const payload = validated("journal_post", {
     ...parsed.data,
