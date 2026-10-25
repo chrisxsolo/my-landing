@@ -7,8 +7,9 @@
 // Facts updates reject any value outside the canonical taxonomy (spec §8.5).
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
-  normalizeServiceType, isSchoolSlug, isLightingCondition, isVibe, isRelationshipType,
+  normalizeServiceType, isLightingCondition, isVibe, isRelationshipType,
 } from "@/lib/contentEngine/taxonomy";
+import { findSchool } from "@/lib/contentEngine/schoolStore";
 import { sessionTypeToServiceType, firstNameOf } from "@/lib/contentEngine/prefill";
 
 export const AI_PROCESSING_POLICY_VERSION = "2026-06-06"; // matches testimonials consent_version era
@@ -106,8 +107,10 @@ export async function updateSessionFacts(args: UpdateFactsArgs): Promise<{ updat
     patch.service_type = normalized;
   }
   if ("school_slug" in facts) {
-    if (facts.school_slug !== null && !isSchoolSlug(facts.school_slug)) {
-      throw new Error(`invalid school slug: ${String(facts.school_slug)}`);
+    // Built-in schools plus custom ones saved from Session facts.
+    const slug = facts.school_slug;
+    if (slug !== null && (typeof slug !== "string" || !(await findSchool(client, slug)))) {
+      throw new Error(`invalid school slug: ${String(slug)}`);
     }
     patch.school_slug = facts.school_slug;
   }

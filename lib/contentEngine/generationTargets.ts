@@ -174,9 +174,20 @@ async function portfolioTarget(ctx: TargetContext): Promise<TargetResult> {
   return { outcome: "completed", itemSpecs, usage };
 }
 
+// Display name for skip notes — a custom school's slug isn't what anyone calls it.
+const schoolName = (facts: TargetContext["facts"]) =>
+  facts.school_short_name || facts.school_name || facts.school_slug || "this school";
+
 async function schoolTarget(ctx: TargetContext): Promise<TargetResult> {
-  if (!ctx.facts.school_slug || !isSchoolSlug(ctx.facts.school_slug)) {
+  if (!ctx.facts.school_slug) {
     return { outcome: "skipped", itemSpecs: [], usage: null, note: "session has no school" };
+  }
+  // Custom schools have no /grads page; adding one never creates a page.
+  if (!isSchoolSlug(ctx.facts.school_slug)) {
+    return {
+      outcome: "skipped", itemSpecs: [], usage: null,
+      note: `${schoolName(ctx.facts)} has no school page, so there is nowhere to place photos`,
+    };
   }
   const photos = await loadPhotoSummaries(ctx.client, ctx.sessionId);
   if (photos.length === 0) throw new GenerationError("no analyzed photos for this session");
@@ -204,17 +215,17 @@ async function schoolTarget(ctx: TargetContext): Promise<TargetResult> {
 // replaces the spot's current photo, so placements are conservative.
 async function gradSpotTarget(ctx: TargetContext): Promise<TargetResult> {
   const schoolSlug = ctx.facts.school_slug;
-  if (!schoolSlug || !isSchoolSlug(schoolSlug)) {
+  if (!schoolSlug) {
     return {
       outcome: "skipped", itemSpecs: [], usage: null,
       note: "set a school before generating campus spot placements",
     };
   }
-  const spotSchoolId = SPOT_SCHOOL_IDS[schoolSlug];
+  const spotSchoolId = isSchoolSlug(schoolSlug) ? SPOT_SCHOOL_IDS[schoolSlug] : undefined;
   if (!spotSchoolId) {
     return {
       outcome: "skipped", itemSpecs: [], usage: null,
-      note: `the campus spots guide does not cover ${schoolSlug}`,
+      note: `the campus spots guide does not cover ${schoolName(ctx.facts)}`,
     };
   }
   const { data: spotRows, error } = await ctx.client

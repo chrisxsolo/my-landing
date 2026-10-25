@@ -4,6 +4,7 @@ import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
 import { DEFAULT_ENGINE_MODEL } from "@/lib/contentEngine/aiClient";
 import { PROMPT_VERSION } from "@/lib/contentEngine/prompts";
 import { buildSessionFactsSnapshot } from "@/lib/contentEngine/payloads";
+import { findSchool } from "@/lib/contentEngine/schoolStore";
 import { isUuid } from "@/lib/contentEngine/uploadConfig";
 import { GENERATABLE_CONTENT_TYPES } from "@/lib/contentEngine/taxonomy";
 
@@ -42,9 +43,17 @@ export async function POST(req: NextRequest) {
   }
   if (!session) return NextResponse.json({ error: "photography session not found" }, { status: 404 });
 
+  let school = null;
+  try {
+    school = typeof session.school_slug === "string" ? await findSchool(admin, session.school_slug) : null;
+  } catch (err) {
+    console.error("school lookup failed for package request", err);
+    return NextResponse.json({ error: "could not look up the session's school" }, { status: 500 });
+  }
+
   let snapshot;
   try {
-    snapshot = buildSessionFactsSnapshot(session);
+    snapshot = buildSessionFactsSnapshot(session, school);
   } catch {
     return NextResponse.json(
       { error: "session facts are incomplete (service_type missing or invalid)" }, { status: 422 },

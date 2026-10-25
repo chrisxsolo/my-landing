@@ -12,6 +12,7 @@ import { chooseThreads, numberConversation, type ThreadCandidate } from "./conve
 import { fetchClientThreads } from "./gmailThreads";
 import { extractSessionFacts, type DroppedFact, type ExtractedFact } from "./extract";
 import { EMAIL_FACT_FIELDS, FIELD_SPECS, type EmailFactField } from "./fields";
+import { listSchools } from "@/lib/contentEngine/schoolStore";
 
 export const PHOTOGRAPHY_SESSIONS_TABLE = "photography_sessions";
 /** The business operates in the Bay Area; shoot dates and times are local. */
@@ -230,6 +231,7 @@ export async function runEmailFactExtraction(args: RunExtractionArgs): Promise<E
     model: args.model,
     today: todayInSessionTimezone(args.now),
     knownFacts: knownFactsFor(fullSession ?? {}),
+    schools: await listSchools(client),
   });
 
   // Remember what was read, so the cheap freshness check has a baseline. Only

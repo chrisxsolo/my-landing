@@ -18,9 +18,10 @@
 import { z } from "zod";
 import { DEFAULT_ENGINE_MODEL, type ModelCaller } from "@/lib/contentEngine/aiClient";
 import {
-  EMAIL_FACT_FIELDS, FACT_CONFIDENCES, FACT_STATUSES, FIELD_SPECS,
+  EMAIL_FACT_FIELDS, FACT_CONFIDENCES, FACT_STATUSES, FIELD_SPECS, coerceSchool,
   type EmailFactField, type FactConfidence, type FactStatus,
 } from "./fields";
+import type { SchoolOption } from "@/lib/contentEngine/schools";
 import type { NumberedMessage } from "./conversation";
 
 export const EMAIL_FACTS_PROMPT_VERSION = "email-facts-v1";
@@ -68,15 +69,17 @@ const responseSchema = z.object({
   fields: z.record(z.string(), factSchema),
 });
 
-function enumLine(field: EmailFactField): string {
+function enumLine(field: EmailFactField, schools: readonly SchoolOption[]): string {
+  const custom = field === "school_slug" ? schools.filter((s) => !s.builtIn).map((s) => s.slug) : [];
   const allowed = FIELD_SPECS[field].allowed;
-  return allowed ? ` — one of: ${allowed.join(", ")}` : "";
+  return allowed ? ` — one of: ${[...allowed, ...custom].join(", ")}` : "";
 }
 
-export function buildSystemPrompt(): string {
+/** `schools` adds saved custom schools to the school field's allowed values. */
+export function buildSystemPrompt(schools: readonly SchoolOption[] = []): string {
   const fieldLines = EMAIL_FACT_FIELDS.map((field) => {
     const spec = FIELD_SPECS[field];
-    return `- ${field} (${spec.label})${enumLine(field)}`;
+    return `- ${field} (${spec.label})${enumLine(field, schools)}`;
   }).join("\n");
 
   return `You read the email conversation between a photographer (SoloXSnaps) and ONE client, and report the CURRENT state of that photoshoot booking.
@@ -133,6 +136,8 @@ export interface ExtractArgs {
   today: string;
   /** Facts already on the session, as context for what is being confirmed. */
   knownFacts?: Partial<Record<EmailFactField, string>>;
+  /** Every saved school (built-in + custom); defaults to built-in only. */
+  schools?: readonly SchoolOption[];
 }
 
 function knownFactsBlock(known: Partial<Record<EmailFactField, string>>): string {
@@ -212,9 +217,11 @@ export function scrubPublicText(text: string): string {
 }
 
 function coerceValue(
-  field: EmailFactField, raw: RawFact["value"],
+  field: EmailFactField, raw: RawFact["value"], schools: readonly SchoolOption[],
 ): { value: string | string[] } | { reason: string } {
-  const spec = FIELD_SPECS[field];
+  const spec = field === "school_slug"
+    ? { ...FIELD_SPECS[field], coerce: (value: string) => coerceSchool(value, schools) }
+    : FIELD_SPECS[field];
   if (raw === null || raw === undefined) return { reason: "no value" };
 
   if (spec.multi) {
@@ -245,8 +252,9 @@ function acceptFact(
   field: EmailFactField,
   raw: RawFact,
   byIndex: Map<number, NumberedMessage>,
+  schools: readonly SchoolOption[],
 ): ExtractedFact | DroppedFact {
-  const coerced = coerceValue(field, raw.value);
+  const coerced = coerceValue(field, raw.value, schools);
   if ("reason" in coerced) return { field, reason: coerced.reason };
 
   const spec = FIELD_SPECS[field];
@@ -291,7 +299,8 @@ function acceptFact(
 export async function extractSessionFacts(args: ExtractArgs): Promise<ExtractionResult> {
   const { callModel, messages, today } = args;
   const model = args.model ?? DEFAULT_ENGINE_MODEL;
-  const system = buildSystemPrompt();
+  const schools = args.schools ?? [];
+  const system = buildSystemPrompt(schools);
   const known = knownFactsBlock(args.knownFacts ?? {});
 
   const accepted = new Map<EmailFactField, ExtractedFact>();
@@ -326,7 +335,7 @@ export async function extractSessionFacts(args: ExtractArgs): Promise<Extraction
     for (const field of EMAIL_FACT_FIELDS) {
       const raw = parsed.fields[field];
       if (!raw) continue;
-      const outcome = acceptFact(field, raw, byIndex);
+      const outcome = acceptFact(field, raw, byIndex, schools);
       if ("reason" in outcome) {
         // A stage that supports nothing must not erase what an earlier stage
         // found; only a real value from a later stage supersedes.

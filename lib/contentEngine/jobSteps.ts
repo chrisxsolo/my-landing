@@ -9,6 +9,7 @@ import { ANALYSIS_CONCURRENCY, runAnalysis } from "@/lib/contentEngine/analyzePh
 import { curateTopPicks } from "@/lib/contentEngine/curatePhotos";
 import { generateContentType, GenerationConflictError } from "@/lib/contentEngine/generateContent";
 import { buildSessionFactsSnapshot } from "@/lib/contentEngine/payloads";
+import { findSchool } from "@/lib/contentEngine/schoolStore";
 import { AUTO_CURATE_THRESHOLD, TOP_PICK_COUNT } from "@/lib/contentEngine/curationConfig";
 import {
   GENERATION_ORDER, JOURNAL_DEPENDENCIES, journalReady, nextGenerationWave, settledGenerationCount,
@@ -148,9 +149,12 @@ async function packageStep(ctx: WorkerContext, job: ContentEngineJob): Promise<S
   if (sErr || !session) {
     return { phase: "package", fatal: `session lookup failed: ${sErr?.message ?? "not found"}` };
   }
+  // A failed lookup throws and is recorded on the job, not reported as bad facts.
+  const school = typeof session.school_slug === "string"
+    ? await findSchool(ctx.client, session.school_slug) : null;
   let snapshot;
   try {
-    snapshot = buildSessionFactsSnapshot(session);
+    snapshot = buildSessionFactsSnapshot(session, school);
   } catch {
     return { phase: "package", fatal: "session facts are incomplete (service_type missing or invalid)" };
   }

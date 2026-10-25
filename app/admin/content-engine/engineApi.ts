@@ -5,6 +5,7 @@ import type {
   EngineSessionRow, EnginePhoto, WorkspaceData, ReconcileReport, EngineJob,
   EmailFactsResult, EmailFactsFreshness, AnalyzeRoundResult, RunProgress, LocationSummaryDto,
 } from "./engineTypes";
+import type { SchoolOption } from "@/lib/contentEngine/schools";
 
 export class EngineApiError extends Error {
   readonly status: number;
@@ -36,6 +37,13 @@ export const engineApi = {
     }),
   getWorkspace: (sessionId: string) =>
     request<WorkspaceData>(`/api/admin/session-content/sessions/${sessionId}`),
+  listSchools: () =>
+    request<{ schools: SchoolOption[] }>("/api/admin/session-content/schools"),
+  // 409 carries body.existing: the school this would duplicate.
+  createSchool: (input: { name: string; shortName: string; slug: string }) =>
+    request<{ school: SchoolOption }>("/api/admin/session-content/schools", {
+      method: "POST", body: JSON.stringify(input),
+    }),
   patchFacts: (sessionId: string, facts: Record<string, unknown>) =>
     request<{ updated: boolean }>(`/api/admin/session-content/sessions/${sessionId}`, {
       method: "PATCH", body: JSON.stringify(facts),

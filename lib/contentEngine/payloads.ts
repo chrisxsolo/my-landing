@@ -9,6 +9,7 @@ import {
   type ContentType,
 } from "@/lib/contentEngine/taxonomy";
 import { LOCATION_GUIDE_TYPES } from "@/lib/locations/guideCoverage";
+import { builtInSchool, type SchoolOption } from "@/lib/contentEngine/schools";
 
 // z.uuid() is the zod-v4 canonical form; z.string().uuid() is deprecated but
 // still functional. We use z.uuid() throughout per the v4 API.
@@ -210,6 +211,10 @@ export const sessionFactsSnapshotSchema = z.object({
   public_display_name: z.string().nullable().optional(),
   service_type: z.enum(SERVICE_TYPES),
   school_slug: z.string().nullable().optional(),
+  // The school's real name (2026-10-25) so copy never guesses from a slug;
+  // optional so snapshots stored before this still parse.
+  school_name: z.string().nullable().optional(),
+  school_short_name: z.string().nullable().optional(),
   primary_location: z.string().nullable().optional(),
   secondary_locations: z.array(z.string()).default([]),
   session_date: z.string().nullable().optional(),
@@ -234,7 +239,14 @@ export type SessionFactsSnapshot = z.infer<typeof sessionFactsSnapshotSchema>;
 // Throws a ZodError on malformed session rows (e.g. missing/invalid
 // service_type) by design — a session without a valid service_type must never
 // silently reach AI input; callers should guard or let the error surface.
-export function buildSessionFactsSnapshot(session: Record<string, unknown>): SessionFactsSnapshot {
+//
+// `school` is the resolved school (see loadSessionFactsSnapshot); built-in
+// schools resolve without it, a custom school needs the caller to look it up.
+export function buildSessionFactsSnapshot(
+  session: Record<string, unknown>, school?: Pick<SchoolOption, "name" | "shortName"> | null,
+): SessionFactsSnapshot {
+  const slug = typeof session.school_slug === "string" ? session.school_slug : null;
+  const resolved = school ?? (slug ? builtInSchool(slug) : null);
   return sessionFactsSnapshotSchema.parse({
     public_display_name: session.public_display_name ?? null,
     // Tolerant of singular/plural/case variants ("couple", "Couples session")
@@ -242,6 +254,8 @@ export function buildSessionFactsSnapshot(session: Record<string, unknown>): Ses
     // values still fail the enum parse below.
     service_type: normalizeServiceType(session.service_type) ?? session.service_type,
     school_slug: session.school_slug ?? null,
+    school_name: slug && resolved ? resolved.name : null,
+    school_short_name: slug && resolved ? resolved.shortName : null,
     primary_location: session.primary_location ?? null,
     secondary_locations: session.secondary_locations ?? [],
     session_date: session.session_date ?? null,

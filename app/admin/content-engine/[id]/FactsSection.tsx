@@ -3,6 +3,7 @@
 // Auto-fill from email (2026-10-23) reads the client's Gmail conversation and
 // proposes values; it only ever fills this form — Save facts still commits.
 // Service-aware (2026-07-02): grad-only fields (School) render only for grads;
+// the School picker (2026-10-25) can add a custom school without a code change;
 // couples sessions get vibe / relationship type / outfit styling / best moment
 // plus a secondary-location input. Taxonomy-invalid slugs are rejected
 // server-side (422) and surfaced inline.
@@ -10,12 +11,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { T } from "@/app/admin/adminTheme";
 import { engineApi } from "@/app/admin/content-engine/engineApi";
 import {
-  SERVICE_TYPES, SCHOOL_SLUGS, LIGHTING_CONDITIONS, VIBES, RELATIONSHIP_TYPES,
+  SERVICE_TYPES, LIGHTING_CONDITIONS, VIBES, RELATIONSHIP_TYPES,
 } from "@/lib/contentEngine/taxonomy";
+import { schoolLabel } from "@/lib/contentEngine/schools";
 import { serviceConfigFor } from "@/lib/contentEngine/serviceConfig";
 import { btn, card, input, label, sectionTitle } from "./ui";
 import DictationTextarea from "./DictationTextarea";
 import AutoFillFromEmail from "./AutoFillFromEmail";
+import SchoolPicker from "./SchoolPicker";
 import type { EmailFactField } from "@/lib/contentEngine/emailFacts/fields";
 
 interface Props {
@@ -53,7 +56,7 @@ export default function FactsSection({ session, sessionId, onSaved, onRegisterFl
     internal_notes: text(session.internal_notes),
   });
   const [saving, setSaving] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ text: string; ok: boolean } | null>(null);
 
   const isGrads = form.service_type === "grads";
   const isCouples = form.service_type === "couples";
@@ -83,9 +86,9 @@ export default function FactsSection({ session, sessionId, onSaved, onRegisterFl
         secondary_locations: values.secondary_locations
           .split(",").map((s) => s.trim()).filter(Boolean),
       });
-      setNotice("Saved.");
+      setNotice({ text: "Saved.", ok: true });
     } catch (err) {
-      setNotice(err instanceof Error ? err.message : "save failed");
+      setNotice({ text: err instanceof Error ? err.message : "save failed", ok: false });
       throw err;
     } finally {
       setSaving(false);
@@ -132,10 +135,12 @@ export default function FactsSection({ session, sessionId, onSaved, onRegisterFl
         {isGrads && (
           <div>
             <span style={label}>School</span>
-            <select style={input} value={form.school_slug} onChange={set("school_slug")}>
-              <option value="">— none —</option>
-              {SCHOOL_SLUGS.map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
+            <SchoolPicker value={form.school_slug}
+              onChange={(slug) => setForm((f) => ({ ...f, school_slug: slug }))}
+              onSchoolAdded={(school) => setNotice({
+                text: `Added ${schoolLabel(school)} and selected it — Save facts to keep it on this session.`,
+                ok: true,
+              })} />
           </div>
         )}
         <div>
@@ -207,7 +212,7 @@ export default function FactsSection({ session, sessionId, onSaved, onRegisterFl
         <button style={btn(true)} onClick={() => void save()} disabled={saving}>
           {saving ? "Saving…" : "Save facts"}
         </button>
-        {notice && <span style={{ fontSize: 13, color: notice === "Saved." ? T.inkSoft : T.red }}>{notice}</span>}
+        {notice && <span style={{ fontSize: 13, color: notice.ok ? T.inkSoft : T.red }}>{notice.text}</span>}
       </div>
       <div style={{ marginTop: 10 }}>
         <AutoFillFromEmail sessionId={sessionId}

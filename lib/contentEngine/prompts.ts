@@ -43,8 +43,18 @@ function analysisBrandFor(facts: SessionFactsSnapshot): string {
   return guidance ? `${BRAND} ${guidance}` : BRAND;
 }
 
+// The school is spelled out because a slug alone ("uc-law-san-francisco")
+// invites the model to guess — or swap in a better-known campus.
+function schoolRule(facts: SessionFactsSnapshot): string {
+  if (!facts.school_name) return "";
+  const short = facts.school_short_name && facts.school_short_name !== facts.school_name
+    ? ` (short name: ${facts.school_short_name})` : "";
+  return `\n\nThe graduate's school is ${facts.school_name}${short}. Refer to it only by that name ` +
+    "or its short name, and never name a different university or campus as the school.";
+}
+
 function factsBlock(facts: SessionFactsSnapshot): string {
-  return `Session facts (the ONLY facts you may use):\n${JSON.stringify(facts, null, 2)}`;
+  return `Session facts (the ONLY facts you may use):\n${JSON.stringify(facts, null, 2)}${schoolRule(facts)}`;
 }
 
 function summariesBlock(photos: PhotoSummary[]): string {

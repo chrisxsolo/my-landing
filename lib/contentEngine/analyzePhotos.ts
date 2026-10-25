@@ -21,7 +21,8 @@ import {
   AnalysisValidationError, validateSinglePhotoResponse, type PhotoAnalysis,
 } from "@/lib/contentEngine/analysisResponse";
 import { downloadOriginal, encodeImageForModel, toImageBlock } from "@/lib/contentEngine/modelImages";
-import { buildSessionFactsSnapshot, type SessionFactsSnapshot } from "@/lib/contentEngine/payloads";
+import type { SessionFactsSnapshot } from "@/lib/contentEngine/payloads";
+import { loadSessionFactsSnapshot } from "@/lib/contentEngine/schoolStore";
 import {
   ANALYSIS_RETRY, isTransientModelError, modelRetryDelayMs,
 } from "@/lib/contentEngine/modelRetry";
@@ -228,7 +229,7 @@ async function loadFacts(client: SupabaseClient, sessionId: string): Promise<Ses
   if (!session.ai_processing_allowed) {
     throw new Error("ai processing is not allowed for this session");
   }
-  return buildSessionFactsSnapshot(session);
+  return loadSessionFactsSnapshot(client, session);
 }
 
 /** Shared state for the lanes of one runAnalysis call. */

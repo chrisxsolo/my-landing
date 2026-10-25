@@ -7,6 +7,7 @@
 // shoot gets Santa Cruz keywords, and a session with no verified place gets no
 // city at all — never a San Francisco default.
 import type { SessionFactsSnapshot } from "@/lib/contentEngine/payloads";
+import { isSchoolSlug } from "@/lib/contentEngine/taxonomy";
 import { KNOWN_PLACES, type KnownPlace } from "@/lib/locations/places";
 import { resolveLocation } from "@/lib/locations/match";
 
@@ -86,10 +87,18 @@ function couplesKeywords(facts: SessionFactsSnapshot, places: readonly KnownPlac
   return [...new Set(parts)].join(", ");
 }
 
+// Built-in schools keep their exact pre-existing keyword (the slug as words);
+// a custom school uses its own name, since its slug can be an expansion.
+function schoolKeyword(facts: SessionFactsSnapshot): string | null {
+  if (!facts.school_slug) return null;
+  if (isSchoolSlug(facts.school_slug)) return facts.school_slug.replace(/-/g, " ");
+  return facts.school_short_name || facts.school_name || facts.school_slug.replace(/-/g, " ");
+}
+
 // Exact pre-existing format: school, location, service keyword, "Bay Area".
 function defaultKeywords(facts: SessionFactsSnapshot): string {
   const parts = [
-    facts.school_slug ? facts.school_slug.replace(/-/g, " ") : null,
+    schoolKeyword(facts),
     facts.primary_location,
     SERVICE_KEYWORD[facts.service_type] ?? "photography",
     "Bay Area",

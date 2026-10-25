@@ -7,7 +7,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { DEFAULT_ENGINE_MODEL, type ModelCaller } from "@/lib/contentEngine/aiClient";
 import { buildTopPicksPrompt, type PhotoSummary } from "@/lib/contentEngine/prompts";
 import { extractJsonObject } from "@/lib/contentEngine/analysisResponse";
-import { buildSessionFactsSnapshot } from "@/lib/contentEngine/payloads";
+import { loadSessionFactsSnapshot } from "@/lib/contentEngine/schoolStore";
 import { TOP_PICK_COUNT } from "@/lib/contentEngine/curationConfig";
 
 export interface CuratePhotosArgs {
@@ -78,7 +78,7 @@ export async function curateTopPicks(args: CuratePhotosArgs): Promise<CuratePhot
     return { curated: false, total: summaries.length, picked: summaries.length, excluded: 0 };
   }
 
-  const facts = buildSessionFactsSnapshot(session);
+  const facts = await loadSessionFactsSnapshot(client, session);
   const prompt = buildTopPicksPrompt(facts, summaries, count);
   const response = await callModel({
     model,

@@ -8,9 +8,10 @@
 // is dropped, never stored speculatively.
 import {
   LIGHTING_CONDITIONS, VIBES, RELATIONSHIP_TYPES, SCHOOL_SLUGS,
-  isLightingCondition, isVibe, isRelationshipType,
-  normalizeServiceType, type SchoolSlug,
+  isLightingCondition, isVibe, isRelationshipType, isSchoolSlug,
+  normalizeServiceType,
 } from "@/lib/contentEngine/taxonomy";
+import { BUILT_IN_SCHOOLS, schoolMatchesText, type SchoolOption } from "@/lib/contentEngine/schools";
 import { firstNameOf } from "@/lib/contentEngine/prefill";
 import { normalizeSchool } from "@/lib/schoolDetection";
 
@@ -95,19 +96,23 @@ const isRealDate = (value: string): boolean => {
     && date.getUTCDate() === Number(d);
 };
 
-// canonicalName → /grads/<slug>. Typed against SCHOOL_SLUGS so adding a school
-// page without teaching the extractor about it fails the build rather than
-// silently extracting nothing. Schools outside the Bay Area page set resolve
-// to no slug, which is correct — those pages do not exist.
-const SCHOOL_CANONICAL_NAMES: Record<SchoolSlug, string> = {
-  csueb: "California State University, East Bay",
-  "santa-clara": "Santa Clara University",
-  "sf-state": "San Francisco State University",
-  sjsu: "San Jose State University",
-  stanford: "Stanford University",
-  "uc-berkeley": "University of California, Berkeley",
-  usf: "University of San Francisco",
-};
+/**
+ * Model string → school slug. Saved custom schools match exactly first (so
+ * "Berkeley City College" can't fall into UC Berkeley's loose alias), then the
+ * built-in alias table maps canonicalName → /grads/<slug> via BUILT_IN_SCHOOLS
+ * (typed against SCHOOL_SLUGS, so a new page can't be forgotten here).
+ * Anything else resolves to no school.
+ */
+export function coerceSchool(raw: string, customSchools: readonly SchoolOption[] = []): string | null {
+  const value = clean(raw);
+  if (!value) return null;
+  if (isSchoolSlug(value.toLowerCase())) return value.toLowerCase();
+  const custom = customSchools.find((s) => !s.builtIn && schoolMatchesText(s, value));
+  if (custom) return custom.slug;
+  const school = normalizeSchool(value);
+  if (!school) return null;
+  return SCHOOL_SLUGS.find((slug) => BUILT_IN_SCHOOLS[slug].name === school.canonicalName) ?? null;
+}
 
 export const FIELD_SPECS: Record<EmailFactField, FieldSpec> = {
   public_display_name: {
@@ -125,17 +130,9 @@ export const FIELD_SPECS: Record<EmailFactField, FieldSpec> = {
   },
   school_slug: {
     label: "School",
+    // Custom schools are added per run (extract.ts passes the saved list).
     allowed: SCHOOL_SLUGS,
-    coerce: (raw) => {
-      const value = clean(raw);
-      if (!value) return null;
-      if ((SCHOOL_SLUGS as readonly string[]).includes(value.toLowerCase())) return value.toLowerCase();
-      const school = normalizeSchool(value);
-      if (!school) return null;
-      const slug = (Object.keys(SCHOOL_CANONICAL_NAMES) as SchoolSlug[])
-        .find((key) => SCHOOL_CANONICAL_NAMES[key] === school.canonicalName);
-      return slug ?? null;
-    },
+    coerce: (raw) => coerceSchool(raw),
   },
   primary_location: { label: "Primary location", coerce: place },
   secondary_locations: { label: "Secondary locations", multi: true, coerce: place },

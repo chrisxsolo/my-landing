@@ -86,6 +86,9 @@ function statusNote(
   if (type === "school_page_photo" && !schoolSlug) {
     return "No school set on this session. Choose a school in Session facts above, then Regenerate to include school-page photos.";
   }
+  if (type === "school_page_photo" && !isSchoolSlug(schoolSlug)) {
+    return "This school has no school page on the site, so there's nowhere to place photos. Blog posts and portfolio picks still use it.";
+  }
   if (type === "testimonial_feature") {
     return "No approved testimonial matched this client (matched by email), so there's nothing to feature.";
   }
