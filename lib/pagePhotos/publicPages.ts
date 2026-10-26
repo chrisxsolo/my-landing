@@ -7,6 +7,10 @@ import {
 } from "@/lib/pagePhotos/candidates";
 import { guidePageKey, schoolPageKey } from "@/lib/pagePhotos/pageKeys";
 import { getPhotoPool } from "@/lib/pagePhotos/pool";
+import { buildSpotPhotoLayout, campusSpotNameKey, type SpotFallback, type SpotSectionPhoto } from "@/lib/pagePhotos/spotPhotos";
+import { SPOT_SCHOOL_IDS, type SchoolSlug } from "@/lib/contentEngine/taxonomy";
+import { getLocationSpots } from "@/lib/gradGuideData";
+import { spotsForSchool } from "@/lib/schoolSpots";
 
 export interface PagePhoto {
   id: string;
@@ -48,6 +52,67 @@ export async function getSchoolPagePhotos(slug: string): Promise<SchoolPagePhoto
   });
   const [hero, ...gallery] = ordered.map(toPagePhoto);
   return { hero: hero ?? null, gallery, matchedCount: ordered.length + overflow.length };
+}
+
+export interface SchoolSpotsGuidePhotos {
+  hero: PagePhoto | null;
+  bySpot: Record<string, PagePhoto[]>;
+  gallery: PagePhoto[];
+}
+
+function sectionPhoto(spotKey: string, index: number, p: SpotSectionPhoto): PagePhoto {
+  const sized = Boolean(p.width && p.height);
+  return {
+    id: `spot:${spotKey}:${index}`, image_url: p.url, alt: p.alt, caption: null,
+    width: sized ? Number(p.width) : DEFAULT_PHOTO_RATIO.width,
+    height: sized ? Number(p.height) : DEFAULT_PHOTO_RATIO.height,
+  };
+}
+
+/** Each spot's photo on the campus-spots guide, matched by the spot's known names. */
+async function campusSpotFallbacks(slug: string, schoolShort: string): Promise<Record<string, SpotFallback>> {
+  const schoolId = SPOT_SCHOOL_IDS[slug as SchoolSlug];
+  if (!schoolId) return {};
+  const rows = (await getLocationSpots()).filter((row) => row.school_id === schoolId && row.image_url);
+  return Object.fromEntries(spotsForSchool(slug).flatMap((spot) => {
+    const names = new Set(spot.campusSpotNames.map(campusSpotNameKey));
+    const row = rows.find((r) => names.has(campusSpotNameKey(r.name)));
+    return row?.image_url
+      ? [[spot.key, { url: row.image_url, alt: `${schoolShort} graduation portrait at the ${spot.name}` }]]
+      : [];
+  }));
+}
+
+/**
+ * The school location guide's photos: the school page's hero, photographer-
+ * tagged photos per campus spot, and the remaining eligible photos as the
+ * gallery. Uses the school page's own curation (pins, hides, hero).
+ */
+export async function getSchoolSpotsGuidePhotos(slug: string, schoolShort: string): Promise<SchoolSpotsGuidePhotos> {
+  const [pool, fallbacks] = await Promise.all([getPhotoPool(), campusSpotFallbacks(slug, schoolShort)]);
+  const spotKeys = spotsForSchool(slug).map((spot) => spot.key);
+  const key = schoolPageKey(slug);
+  const curated = pool
+    ? curatePage(candidatesForPage(pool, key), curationFor(pool, key), {
+        limit: Number.MAX_SAFE_INTEGER, preferPortraitHero: true, mixPlacements: true,
+      })
+    : { ordered: [] };
+  const [heroCandidate] = curated.ordered;
+  const layout = buildSpotPhotoLayout({
+    spotKeys,
+    eligible: curated.ordered,
+    // From the curation rows, so a hide also covers a campus-spot fallback.
+    hiddenUrls: new Set(pool ? curationFor(pool, key).filter((r) => r.mode === "hide").map((r) => r.imageUrl) : []),
+    heroUrl: heroCandidate?.url ?? null,
+    tags: pool ? pool.spotTags.filter((t) => t.schoolSlug === slug) : [],
+    fallbacks,
+  });
+  return {
+    hero: heroCandidate ? toPagePhoto(heroCandidate) : null,
+    bySpot: Object.fromEntries(Object.entries(layout.bySpot)
+      .map(([spot, photos]) => [spot, photos.map((p, i) => sectionPhoto(spot, i, p))])),
+    gallery: layout.gallery.map(toPagePhoto),
+  };
 }
 
 /**

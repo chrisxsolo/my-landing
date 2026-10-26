@@ -1,7 +1,8 @@
 // Loads every photo that is already public, plus the facts needed to place
 // it: its Content Engine session (school, location, permission, exclusion),
-// explicit school-page placements, known places, live guide pages, and the
-// admin's per-page curation. Server-only.
+// explicit school-page placements, Content Engine photos already live in a
+// published journal post, known places, live guide pages, the admin's
+// per-page curation, and campus-spot tags. Server-only.
 //
 // loadPhotoPool is uncached (admin reads it right after writing).
 // getPhotoPool is the public, cached copy under the shared public-content tag,
@@ -14,6 +15,8 @@ import { loadKnownPlaces, loadPublishedDbGuides } from "@/lib/locations/registry
 import { KNOWN_PLACES, type KnownPlace } from "@/lib/locations/places";
 import type { DbGuideRef } from "@/lib/locations/guideCoverage";
 import { PAGE_PHOTO_CURATION_TABLE } from "@/lib/pagePhotos/pageKeys";
+import { isSchoolSlug } from "@/lib/contentEngine/taxonomy";
+import { SCHOOL_SPOT_PHOTOS_TABLE } from "@/lib/schoolSpots";
 import type { CurationRow } from "@/lib/pagePhotos/curate";
 import {
   indexEngineSources, resolvePhoto,
@@ -33,10 +36,25 @@ export interface ExplicitSchoolPhoto {
   sessionKey: string;
 }
 
+/** The photographer's campus-spot tag for one photo on one school guide. */
+export interface SpotTag {
+  schoolSlug: string;
+  imageUrl: string;
+  spotKey: string;
+  isFeatured: boolean;
+  position: number;
+}
+
 export interface PhotoPool {
   photos: ResolvedPhoto[];
   explicitSchool: ExplicitSchoolPhoto[];
+  /**
+   * Grads Content Engine photos that are live in a published journal post but
+   * were never added to the portfolio — matched to their session's school.
+   */
+  sessionSchool: ExplicitSchoolPhoto[];
   curation: CurationRow[];
+  spotTags: SpotTag[];
   /** Read failures. A non-empty list means the pool is incomplete (a bug). */
   errors: string[];
 }
@@ -117,6 +135,61 @@ function toExplicitSchool(row: Record<string, unknown>): ExplicitSchoolPhoto | n
   };
 }
 
+export interface EngineSchoolRow {
+  id: string;
+  url: string;
+  alt: string | null;
+  source: EngineSource;
+}
+
+function toEngineSchoolRow(row: Record<string, unknown>): EngineSchoolRow | null {
+  const source = toEngineSource(row);
+  return source && typeof row.id === "string"
+    ? { id: row.id, url: source.url, alt: text(row.alt_text), source }
+    : null;
+}
+
+/**
+ * Session photos whose ONLY public appearance is a journal post. Eligibility
+ * is the same as everywhere else (marketing permission on, not excluded), the
+ * school comes only from the session's canonical school slug — never from
+ * text — and the photo must still be in a live post, so a takedown or a photo
+ * removed from its post drops it here too.
+ */
+export function sessionSchoolPhotos(
+  rows: readonly EngineSchoolRow[], liveJournalUrls: ReadonlySet<string>, portfolio: readonly PortfolioSource[],
+): ExplicitSchoolPhoto[] {
+  const portfolioUrls = new Set(portfolio.map((p) => p.url));
+  const portfolioHashes = new Set(portfolio.flatMap((p) => (p.contentHash ? [p.contentHash] : [])));
+  return rows.filter(({ url, source }) => source.serviceType === "grads"
+    && isSchoolSlug(source.schoolSlug) && source.publishable && !source.excluded
+    && liveJournalUrls.has(url) && !portfolioUrls.has(url)
+    && !(source.contentHash && portfolioHashes.has(source.contentHash)))
+    .map(({ id, url, alt, source }) => ({
+      id, schoolSlug: source.schoolSlug as string, url,
+      alt: alt ?? "Graduation portrait by soloxsnaps",
+      caption: null, sortOrder: 0, width: source.width, height: source.height,
+      quality: source.quality, sessionKey: `session:${source.sessionId}`,
+    }));
+}
+
+function journalUrls(posts: Rows): Set<string> {
+  return new Set(posts.flatMap((post) => [
+    text(post.cover_image_url),
+    ...(Array.isArray(post.extra_image_urls) ? post.extra_image_urls.map(text) : []),
+  ].filter((url): url is string => url !== null)));
+}
+
+function toSpotTag(row: Record<string, unknown>): SpotTag {
+  return {
+    schoolSlug: String(row.school_slug),
+    imageUrl: String(row.image_url),
+    spotKey: String(row.spot_key),
+    isFeatured: row.is_featured === true,
+    position: num(row.position) ?? 0,
+  };
+}
+
 function toCurationRow(row: Record<string, unknown>): CurationRow {
   return {
     pageKey: String(row.page_key),
@@ -144,14 +217,30 @@ async function rows(query: PromiseLike<{ data: unknown; error: { message: string
   return (data ?? []) as Rows;
 }
 
+// Spot tags only add section photos. Until the school_spot_photos migration is
+// applied, the guides fall back to their campus-spot photos instead of hiding
+// every gallery on the site.
+const MISSING_TABLE_CODES = new Set(["42P01", "PGRST205"]);
+
+async function spotTagRows(client: SupabaseClient): Promise<Rows> {
+  const { data, error } = await client.from(SCHOOL_SPOT_PHOTOS_TABLE)
+    .select("school_slug,image_url,spot_key,is_featured,position");
+  if (error && MISSING_TABLE_CODES.has((error as { code?: string }).code ?? "")) {
+    console.warn(`[page-photos] ${SCHOOL_SPOT_PHOTOS_TABLE} not migrated yet; spot sections use campus-spot photos`);
+    return [];
+  }
+  if (error) throw new Error(error.message);
+  return (data ?? []) as Rows;
+}
+
 export async function loadPhotoPool(client: SupabaseClient): Promise<PhotoPool> {
   const errors: string[] = [];
-  const [portfolio, engine, school, curation, places, dbGuides] = await Promise.all([
+  const [portfolio, engine, school, curation, places, dbGuides, posts, spotTags] = await Promise.all([
     settle("portfolio_images", errors, [] as Rows, () => rows(client.from("portfolio_images")
       .select("id,title,alt,image_url,category_slug,featured,sort_order,width,height,content_hash,school,location,session_label")
       .eq("published", true))),
     settle("session_photos", errors, [] as Rows, () => rows(client.from("session_photos")
-      .select("public_derivative_url,content_hash,excluded,quality_score,width,height,photography_sessions!inner(id,public_display_name,service_type,school_slug,primary_location,marketing_permission,marketing_permission_revoked_at)")
+      .select("id,alt_text,public_derivative_url,content_hash,excluded,quality_score,width,height,photography_sessions!inner(id,public_display_name,service_type,school_slug,primary_location,marketing_permission,marketing_permission_revoked_at)")
       .not("public_derivative_url", "is", null))),
     settle("school_page_photos", errors, [] as Rows, () => rows(client.from("school_page_photos")
       .select("id,school_slug,alt_override,caption,sort_order,session_photos!inner(public_derivative_url,alt_text,width,height,quality_score,photography_session_id)")
@@ -160,18 +249,22 @@ export async function loadPhotoPool(client: SupabaseClient): Promise<PhotoPool> 
       .select("page_key,image_url,mode,position,is_hero"))),
     settle("verified_locations", errors, [...KNOWN_PLACES] as KnownPlace[], () => loadKnownPlaces(client)),
     settle("location_guides", errors, [] as DbGuideRef[], () => loadPublishedDbGuides(client)),
+    settle("blog_posts", errors, [] as Rows, () => rows(client.from("blog_posts")
+      .select("cover_image_url,extra_image_urls").contains("sites", ["professional"]))),
+    settle(SCHOOL_SPOT_PHOTOS_TABLE, errors, [] as Rows, () => spotTagRows(client)),
   ]);
 
-  const findEngine = indexEngineSources(engine.map(toEngineSource).filter((e): e is EngineSource => e !== null));
-  const photos = portfolio
-    .map(toPortfolioSource)
-    .filter((p): p is PortfolioSource => p !== null)
-    .map((p) => resolvePhoto(p, findEngine(p), { places, dbGuides }));
+  const engineRows = engine.map(toEngineSchoolRow).filter((e): e is EngineSchoolRow => e !== null);
+  const findEngine = indexEngineSources(engineRows.map((e) => e.source));
+  const portfolioSources = portfolio.map(toPortfolioSource).filter((p): p is PortfolioSource => p !== null);
+  const photos = portfolioSources.map((p) => resolvePhoto(p, findEngine(p), { places, dbGuides }));
 
   return {
     photos,
     explicitSchool: school.map(toExplicitSchool).filter((s): s is ExplicitSchoolPhoto => s !== null),
+    sessionSchool: sessionSchoolPhotos(engineRows, journalUrls(posts), portfolioSources),
     curation: curation.map(toCurationRow),
+    spotTags: spotTags.map(toSpotTag),
     errors,
   };
 }
@@ -182,7 +275,7 @@ const cachedPool = cachePublicContent(async (): Promise<PhotoPool> => {
   const pool = await loadPhotoPool(createSupabaseServerClient());
   if (pool.errors.length > 0) throw new Error(`photo pool incomplete — ${pool.errors.join("; ")}`);
   return pool;
-}, ["page-photo-pool-v1"]);
+}, ["page-photo-pool-v2"]);
 
 /** Public cached pool, or null when it could not be read (logged as a bug). */
 export async function getPhotoPool(): Promise<PhotoPool | null> {
