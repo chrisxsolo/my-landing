@@ -32,6 +32,7 @@ const SOCIAL_TITLE = `${PAGE_TITLE} | SoloXSnaps`;
 const description =
   "Graduation and couples photographer in San Francisco and the Bay Area, plus family and maternity sessions. Guided posing and transparent pricing.";
 const CHRIS_PORTRAIT = "/images/about/chris-solorzano-photographer.webp";
+const HOME_ABOUT_PORTRAIT = "/images/about/chris-solorzano-sunset-beach.webp";
 
 export const metadata: Metadata = {
   title: PAGE_TITLE,
@@ -94,7 +95,7 @@ export default async function ProfessionalHomePage() {
     getHomepageTestimonials(),
     getJournalServicesByPostId(),
   ]);
-  const home = resolveHomepageImages(settings, images, CHRIS_PORTRAIT);
+  const home = resolveHomepageImages(settings, images, HOME_ABOUT_PORTRAIT);
   const featuredSessions = buildFeaturedSessions(posts, images, 2, {
     categorize: (post) =>
       resolvePostCategories(post, servicesByPostId[String(post.id)] ?? null).map((category) => category.slug),
