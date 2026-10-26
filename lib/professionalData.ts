@@ -379,6 +379,8 @@ export const getBlogPostSummariesForCategory = cachePublicContent(async (categor
   }
 }, ["blog-post-summaries-for-category"]);
 
+// Key renamed to v2 on 2026-10-26 to drop a post left stale by a direct DB
+// edit (Vercel's data cache survives deploys).
 export const getBlogPostBySlug = cachePublicContent(async (category: "professional" | "journal", slug: string) => {
   try {
     const supabase = createSupabaseServerClient();
@@ -409,4 +411,4 @@ export const getBlogPostBySlug = cachePublicContent(async (category: "profession
     console.error(`Failed to load ${category} post ${slug}`, error);
     return null;
   }
-}, ["blog-post-by-slug"]);
+}, ["blog-post-by-slug-v2"]);
