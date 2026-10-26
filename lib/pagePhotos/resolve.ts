@@ -14,6 +14,7 @@
 // uploads only) its session label — matched by exact place identity, never
 // by scenery. A place reaches a guide only when that guide page exists.
 import { detectSchoolsInText } from "@/lib/schoolDetection";
+import { getPhotoTitle } from "@/lib/photoMetadata";
 import { BUILT_IN_SCHOOLS } from "@/lib/contentEngine/schools";
 import { guideTypeForService, isSchoolSlug, SCHOOL_SLUGS, type SchoolSlug } from "@/lib/contentEngine/taxonomy";
 import { matchPlacesByName } from "@/lib/locations/match";
@@ -191,11 +192,14 @@ function eligibility(engine: EngineSource | null): { eligible: boolean; reason: 
 }
 
 // Groups frames from one shoot so the page can spread them out. Older uploads
-// have no session; photos sharing an identical title were captioned as a set.
+// have no session; photos sharing an identical, specific title were captioned
+// as a set. The category placeholder ("Graduation portrait") says nothing about
+// the shoot, so untitled photos each stand alone.
 function sessionKeyOf(photo: PortfolioSource, engine: EngineSource | null): string {
   if (engine) return `session:${engine.sessionId}`;
   if (photo.sessionLabel) return `label:${photo.sessionLabel}`;
-  return `title:${photo.title.trim().toLowerCase()}`;
+  const placeholder = getPhotoTitle({ title: null, categorySlug: photo.category });
+  return photo.title.trim() === placeholder ? `photo:${photo.id}` : `title:${photo.title.trim().toLowerCase()}`;
 }
 
 export function resolvePhoto(

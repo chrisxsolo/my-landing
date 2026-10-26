@@ -145,6 +145,20 @@ describe("resolvePhoto — publication safety", () => {
   });
 });
 
+describe("resolvePhoto — session grouping", () => {
+  it("groups older photos that share a specific title", () => {
+    const a = resolvePhoto(photo({ id: 1, title: "SJSU Golden Hour Graduation Portrait" }), null, ctx);
+    const b = resolvePhoto(photo({ id: 2, title: "SJSU Golden Hour Graduation Portrait" }), null, ctx);
+    expect(a.sessionKey).toBe(b.sessionKey);
+  });
+
+  it("never groups untitled photos by the category placeholder title", () => {
+    const a = resolvePhoto(photo({ id: 3, title: "Graduation portrait" }), null, ctx);
+    const b = resolvePhoto(photo({ id: 4, title: "Graduation portrait" }), null, ctx);
+    expect(a.sessionKey).not.toBe(b.sessionKey);
+  });
+});
+
 describe("indexEngineSources", () => {
   it("links portfolio rows by derivative URL, then by content hash", () => {
     const find = indexEngineSources([engine({ url: "u1", contentHash: "h1" })]);
