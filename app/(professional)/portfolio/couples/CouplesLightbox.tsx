@@ -1,8 +1,9 @@
 "use client";
 
 // Full-screen photo viewer for the couples gallery. Shows the whole frame
-// (object-fit: contain), supports arrow keys, Escape, swipe, and returns focus
-// to the page on close. Body scrolling is locked while open.
+// (object-fit: contain), supports arrow keys, Escape, swipe, keeps Tab inside
+// the dialog, and returns focus to the page on close. Body scrolling is locked
+// while open.
 
 import Image from "next/image";
 import { useCallback, useEffect, useRef } from "react";
@@ -18,8 +19,27 @@ type Props = {
 
 const SWIPE_THRESHOLD_PX = 40;
 
+// Tab / Shift+Tab wrap around the dialog's own buttons instead of reaching
+// the page behind it.
+function keepFocusInside(event: KeyboardEvent, dialog: HTMLElement | null) {
+  if (event.key !== "Tab" || !dialog) return;
+  const focusable = [...dialog.querySelectorAll<HTMLElement>("button:not([disabled]), a[href]")];
+  if (focusable.length === 0) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  const active = document.activeElement;
+  if (event.shiftKey && (active === first || !dialog.contains(active))) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && (active === last || !dialog.contains(active))) {
+    event.preventDefault();
+    first.focus();
+  }
+}
+
 export default function CouplesLightbox({ photos, index, onChange, onClose }: Props) {
   const closeRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
   const touchStartX = useRef<number | null>(null);
   const photo = photos[index];
 
@@ -44,6 +64,7 @@ export default function CouplesLightbox({ photos, index, onChange, onClose }: Pr
       if (event.key === "Escape") onClose();
       if (event.key === "ArrowRight") move(1);
       if (event.key === "ArrowLeft") move(-1);
+      keepFocusInside(event, dialogRef.current);
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
@@ -58,6 +79,7 @@ export default function CouplesLightbox({ photos, index, onChange, onClose }: Pr
 
   return (
     <div
+      ref={dialogRef}
       className={styles.lightbox}
       role="dialog"
       aria-modal="true"
