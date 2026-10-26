@@ -6,6 +6,7 @@ interface Facets {
   regions: FacetOption[];
   environments: FacetOption[];
   kinds: FacetOption[];
+  lights: FacetOption[];
 }
 
 function FacetSelect({
@@ -73,6 +74,10 @@ export default function LocationFilters({
           options={facets.environments} onChange={(environment) => onChange({ ...filters, environment })} />
         <FacetSelect id="loc-kind" label="Photography type" allLabel="All types" value={filters.kind}
           options={facets.kinds} onChange={(kind) => onChange({ ...filters, kind })} />
+        {facets.lights.length > 0 ? (
+          <FacetSelect id="loc-light" label="Light" allLabel="Any light" value={filters.light}
+            options={facets.lights} onChange={(light) => onChange({ ...filters, light })} />
+        ) : null}
         <div className="loc-select-wrap">
           <label className="loc-label" htmlFor="loc-sort">Sort</label>
           <select id="loc-sort" className="loc-select" value={sort} onChange={(e) => onSort(e.target.value as SortValue)}>

@@ -118,6 +118,8 @@ export interface DetailSessionDto {
   excluded: boolean;
   permissionOk: boolean;
   multiLocation: boolean;
+  /** The session's recorded lighting (Content Engine value, e.g. "golden_hour"). */
+  lighting: string | null;
   photos: DetailPhotoDto[];
 }
 
@@ -133,7 +135,7 @@ function sessionDto(s: LinkedSession, link: LibraryLocation["links"][number], ph
   return {
     id: s.id, name: s.internalName?.trim() || s.displayName, serviceType: s.serviceType, kinds: s.kinds,
     date: s.sessionDate, location: [s.primaryLocation, ...s.secondaryLocations].filter(Boolean).join(" · ") || null,
-    source: link.source, excluded: link.excluded, permissionOk: s.permissionOk, multiLocation: s.multiLocation, photos,
+    source: link.source, excluded: link.excluded, permissionOk: s.permissionOk, multiLocation: s.multiLocation, lighting: s.lightingCondition, photos,
   };
 }
 

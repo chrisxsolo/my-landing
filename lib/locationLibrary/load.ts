@@ -29,6 +29,9 @@ export interface LocationRow {
   tip: string;
   tags: string[];
   environments: string[];
+  /** Photographer-only (lib/photoConditions.ts); absent before the 20261026000006 migration. */
+  light_tags?: string[];
+  crowd_note?: string | null;
   image_url: string | null;
   order: number;
   active: boolean;

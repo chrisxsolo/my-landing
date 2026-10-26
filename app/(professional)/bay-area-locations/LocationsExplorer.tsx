@@ -64,7 +64,7 @@ export default function LocationsExplorer({ locations }: { locations: PublicLoca
           <p className="gg-h1-script gg-afu3"><span className="gg-h1-accent">clean light.</span><span className="gg-cursor gg-blink" /></p>
           <p className="gg-sub gg-afu4">
             My favorite Bay Area locations for portraits, couples, and creative shoots.
-            Filter by region, setting, or the kind of session to narrow it down fast.
+            Filter by region, setting, light, or the kind of session to narrow it down fast.
           </p>
           <div className="gg-actions gg-afu4">
             <a href="https://www.soloxsnaps.com/contact/" className="gg-btn gg-btn--primary">Book a shoot →</a>
@@ -144,6 +144,7 @@ export default function LocationsExplorer({ locations }: { locations: PublicLoca
                     location={location}
                     eager={i < EAGER_CARDS}
                     onEnvironment={(environment) => change({ ...filters, environment })}
+                    onLight={(light) => change({ ...filters, light })}
                   />
                 ))}
               </div>

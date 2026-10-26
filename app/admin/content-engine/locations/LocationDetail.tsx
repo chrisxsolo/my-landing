@@ -133,7 +133,7 @@ export default function LocationDetail({ id, overview, onBack, onChanged, onNoti
       <Header detail={detail} overview={overview} busy={busy} onPatch={(b) => void patch(b)}
         onRegenerate={() => void action({ action: "regenerate" }, "AI text updated")} onDelete={remove} onBack={onBack} />
       <LocationFieldsEditor key={`${detail.row.updated_at}|${detail.row.locked_fields.join(",")}`}
-        row={detail.row} busy={busy} onSave={patch} />
+        row={detail.row} sessions={detail.sessions} busy={busy} onSave={patch} />
       <LocationSessionsPanel sessions={detail.sessions} heroId={detail.hero?.photoId ?? null}
         featuredSessionId={detail.row.featured_session_id} busy={busy} others={others}
         onFeaturedSession={(sessionId) => void patch({ featured_session_id: sessionId })}

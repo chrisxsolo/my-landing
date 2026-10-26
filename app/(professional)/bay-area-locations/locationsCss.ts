@@ -1,5 +1,7 @@
 // Styles for the public location guide, using the sage/glass tokens the
 // professional layout exposes (--ink, --accent, --glass).
+import { C } from "@/lib/colors";
+
 export const LOC_CSS = `
   /* ── STAT CARDS ──────────────────────────────────────────────────────────── */
   .loc-stats { display:grid; gap:14px; grid-template-columns:repeat(3,1fr); margin-top:36px; }
@@ -80,10 +82,14 @@ export const LOC_CSS = `
     background:#fff; border:1px solid rgba(18,24,22,0.1); color:var(--ink-muted, #4b5a55); transition:transform .16s ease;
   }
   .loc-tag:hover { transform:translateY(-1px); }
+  .loc-tag--light { background:${C.proFilmEdge}1f; border-color:${C.proFilmEdge}59; color:${C.inkSoft}; }
+  .loc-tag--light::before { content:"☀"; margin-right:5px; color:${C.proFilmEdge}; }
+  .loc-crowd { margin:14px 0 0; border-radius:11px; padding:10px 14px; background:${C.proFilmEdge}1a; border-left:3px solid ${C.proFilmEdge}; font-size:13px; line-height:1.5; color:var(--ink-muted, #4b5a55); }
+  .loc-crowd strong { margin-right:6px; color:${C.inkSoft}; font-size:10.5px; font-weight:820; letter-spacing:0.1em; text-transform:uppercase; }
   .loc-tag--region { cursor:default; background:rgba(112,139,133,0.12); color:var(--accent, #3d6b5e); border-color:transparent; font-weight:820; letter-spacing:0.06em; text-transform:uppercase; }
 
   /* ── FILTER SELECTS (library) ────────────────────────────────────────────── */
-  .loc-filters { display:grid; gap:12px; grid-template-columns:repeat(4, minmax(0,1fr)); align-items:end; margin-top:16px; }
+  .loc-filters { display:grid; gap:12px; grid-template-columns:repeat(auto-fit, minmax(150px,1fr)); align-items:end; margin-top:16px; }
   @media (max-width:860px) { .loc-filters { grid-template-columns:1fr 1fr; } }
   .loc-select-wrap { min-width:0; }
   .loc-select {

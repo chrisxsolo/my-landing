@@ -1,8 +1,9 @@
 // Pure filtering, sorting and facet counts for the public location guide.
-// Filters combine (region AND environment AND session type AND search).
+// Filters combine (region AND environment AND session type AND light AND search).
 import {
   ENVIRONMENTS, LIBRARY_REGIONS, SESSION_KINDS, environmentLabel, regionLabel, sessionKindLabel,
 } from "@/lib/locationLibrary/taxonomy";
+import { LIGHT_TAGS, lightTagLabel } from "@/lib/photoConditions";
 
 export interface FilterableLocation {
   title: string;
@@ -15,6 +16,7 @@ export interface FilterableLocation {
   region: string;
   tags: string[];
   environments: string[];
+  light_tags: string[];
   kinds: string[];
   order: number;
   photoCount: number;
@@ -29,6 +31,7 @@ export interface LocationFilters {
   region: string;
   environment: string;
   kind: string;
+  light: string;
 }
 
 export const SORTS = [
@@ -39,13 +42,13 @@ export const SORTS = [
 ] as const;
 export type SortValue = (typeof SORTS)[number]["value"];
 
-export const EMPTY_FILTERS: LocationFilters = { query: "", region: ALL, environment: ALL, kind: ALL };
+export const EMPTY_FILTERS: LocationFilters = { query: "", region: ALL, environment: ALL, kind: ALL, light: ALL };
 
 function haystack(l: FilterableLocation): string {
   return [
     l.title, l.city, l.neighborhood ?? "", l.description, l.best_for, l.best_time, l.tip,
     regionLabel(l.region), ...l.tags, ...l.environments.map((e) => environmentLabel(e)),
-    ...l.kinds.map(sessionKindLabel),
+    ...l.kinds.map(sessionKindLabel), ...l.light_tags.map((t) => lightTagLabel(t)),
   ].join(" ").toLowerCase();
 }
 
@@ -53,6 +56,7 @@ export function matchesFilters(l: FilterableLocation, f: LocationFilters): boole
   if (f.region !== ALL && l.region !== f.region) return false;
   if (f.environment !== ALL && !l.environments.includes(f.environment)) return false;
   if (f.kind !== ALL && !l.kinds.includes(f.kind)) return false;
+  if (f.light !== ALL && !l.light_tags.includes(f.light)) return false;
   const q = f.query.trim().toLowerCase();
   return !q || q.split(/\s+/).every((word) => haystack(l).includes(word));
 }
@@ -91,9 +95,10 @@ export function facetOptions(items: readonly FilterableLocation[]) {
     regions: facet(LIBRARY_REGIONS, (v) => regionLabel(v), (v) => items.filter((l) => l.region === v).length),
     environments: facet(ENVIRONMENTS, (v) => environmentLabel(v, true), (v) => items.filter((l) => l.environments.includes(v)).length),
     kinds: facet(SESSION_KINDS, sessionKindLabel, (v) => items.filter((l) => l.kinds.includes(v)).length),
+    lights: facet(LIGHT_TAGS, (v) => lightTagLabel(v), (v) => items.filter((l) => l.light_tags.includes(v)).length),
   };
 }
 
 export function activeFilterCount(f: LocationFilters): number {
-  return [f.region, f.environment, f.kind].filter((v) => v !== ALL).length + (f.query.trim() ? 1 : 0);
+  return [f.region, f.environment, f.kind, f.light].filter((v) => v !== ALL).length + (f.query.trim() ? 1 : 0);
 }
