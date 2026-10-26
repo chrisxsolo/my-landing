@@ -8,7 +8,7 @@
 // /api/admin/page-photos, which refreshes the public pages.
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { PagePhotoReport, PageSummary, PageView, PageViewPhoto } from "@/lib/pagePhotos/adminView";
+import type { PagePhotoReport, PageSummary, PageView, PageViewPhoto, SpotOption } from "@/lib/pagePhotos/adminView";
 import type { CurationAction } from "@/lib/pagePhotos/curationStore";
 import PagePhotoCard from "./PagePhotoCard";
 import PagePhotosSchoolPanel from "./PagePhotosSchoolPanel";
@@ -57,9 +57,11 @@ function PageList({ pages, selected, onSelect }: { pages: PageSummary[]; selecte
   );
 }
 
-function PhotoGrid({ title, note, photos, busyUrl, onAction }: {
+function PhotoGrid({ title, note, photos, busyUrl, onAction, spots, onSpot }: {
   title: string; note?: string; photos: PageViewPhoto[]; busyUrl: string | null;
   onAction: (photo: PageViewPhoto, action: CurationAction) => void;
+  spots: SpotOption[];
+  onSpot: (photo: PageViewPhoto, spotKey: string | null, featured: boolean) => void;
 }) {
   if (photos.length === 0) return null;
   return (
@@ -68,7 +70,10 @@ function PhotoGrid({ title, note, photos, busyUrl, onAction }: {
       {note && <p className="mb-2 text-xs text-slate-500">{note}</p>}
       <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
         {photos.map((photo) => (
-          <PagePhotoCard key={photo.url} photo={photo} busy={busyUrl === photo.url} onAction={(a) => onAction(photo, a)} />
+          <PagePhotoCard
+            key={photo.url} photo={photo} busy={busyUrl === photo.url} onAction={(a) => onAction(photo, a)}
+            spots={spots} onSpot={(spotKey, featured) => onSpot(photo, spotKey, featured)}
+          />
         ))}
       </ul>
     </section>
@@ -123,6 +128,19 @@ export default function PagePhotosTab({ showToast }: Props) {
     }
   }
 
+  async function setSpot(photo: PageViewPhoto, spotKey: string | null, featured: boolean) {
+    if (!selected) return;
+    setBusyUrl(photo.url);
+    try {
+      setView(await request<PageView>("PUT", "", { page: selected, imageUrl: photo.url, spotKey, featured }));
+      notify(spotKey ? (featured ? "Featured for that spot." : "Spot saved.") : "Spot cleared — gallery only.");
+    } catch (err) {
+      notify(err instanceof Error ? err.message : "Save failed", false);
+    } finally {
+      setBusyUrl(null);
+    }
+  }
+
   async function setSchool(portfolioId: number, school: string) {
     try {
       await request("PATCH", "", { portfolioId, school });
@@ -156,9 +174,16 @@ export default function PagePhotosTab({ showToast }: Props) {
                 </a>
               </div>
               {view.shown.length === 0 && <p className="mb-4 text-sm text-slate-500">No eligible photos for this page yet — its gallery stays hidden.</p>}
-              <PhotoGrid title="On the page" note="In display order. The first photo is the hero." photos={view.shown} busyUrl={busyUrl} onAction={act} />
-              <PhotoGrid title="Eligible but not shown" note="Over the page's limit. Pin one to show it." photos={view.overflow} busyUrl={busyUrl} onAction={act} />
-              <PhotoGrid title="Hidden on this page" photos={view.hidden} busyUrl={busyUrl} onAction={act} />
+              {view.spots.length > 0 && (
+                <p className="mb-4 max-w-3xl text-xs text-slate-500">
+                  This school also has a location guide (<a href={`${view.path}/spots`} target="_blank" rel="noreferrer" className="font-semibold text-emerald-700 hover:underline">{view.path}/spots ↗</a>).
+                  Set a photo&apos;s guide spot to show it in that spot&apos;s section; the featured photo leads it. Untagged photos
+                  stay in the guide&apos;s gallery. The hero, pins and hides here apply to both pages.
+                </p>
+              )}
+              <PhotoGrid title="On the page" spots={view.spots} onSpot={setSpot} note="In display order. The first photo is the hero." photos={view.shown} busyUrl={busyUrl} onAction={act} />
+              <PhotoGrid title="Eligible but not shown" spots={view.spots} onSpot={setSpot} note="Over the page's limit. Pin one to show it." photos={view.overflow} busyUrl={busyUrl} onAction={act} />
+              <PhotoGrid title="Hidden on this page" spots={view.spots} onSpot={setSpot} photos={view.hidden} busyUrl={busyUrl} onAction={act} />
             </>
           )}
         </div>

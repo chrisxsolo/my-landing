@@ -1,15 +1,18 @@
 "use client";
 
 // One photo in Admin → Page Photos: thumbnail, where it came from, and the
-// per-page actions (hero, pin + order, hide). Saving is done by the parent.
+// per-page actions (hero, pin + order, hide). On a school page with a location
+// guide it also sets the photo's campus spot. Saving is done by the parent.
 
-import type { PageViewPhoto } from "@/lib/pagePhotos/adminView";
+import type { PageViewPhoto, SpotOption } from "@/lib/pagePhotos/adminView";
 import type { CurationAction } from "@/lib/pagePhotos/curationStore";
 
 type Props = {
   photo: PageViewPhoto;
   busy: boolean;
   onAction: (action: CurationAction) => void;
+  spots: SpotOption[];
+  onSpot: (spotKey: string | null, featured: boolean) => void;
 };
 
 const BTN = "rounded border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40";
@@ -32,7 +35,43 @@ function Badge({ tone, children }: { tone: "green" | "amber" | "slate" | "violet
   return <span className={`rounded px-2 py-0.5 text-[11px] font-bold ${tones[tone]}`}>{children}</span>;
 }
 
-export default function PagePhotoCard({ photo, busy, onAction }: Props) {
+// Campus spot for the school's location guide. Only the photographer sets it;
+// a text hint is offered as a one-click suggestion, never applied on its own.
+function SpotPicker({ photo, busy, spots, onSpot }: Pick<Props, "photo" | "busy" | "spots" | "onSpot">) {
+  if (spots.length === 0) return null;
+  const hint = spots.find((s) => s.key === photo.spotHint);
+  return (
+    <div className="mt-2 border-t border-slate-100 pt-2">
+      <label className="block text-[11px] font-semibold text-slate-600">
+        Guide spot
+        <select
+          className="mt-0.5 w-full rounded border border-slate-300 bg-white px-1.5 py-1 text-xs text-slate-800"
+          value={photo.spotKey ?? ""}
+          disabled={busy}
+          onChange={(e) => onSpot(e.target.value || null, false)}
+        >
+          <option value="">Not tagged (gallery only)</option>
+          {spots.map((s) => <option key={s.key} value={s.key}>{s.name}</option>)}
+        </select>
+      </label>
+      {photo.spotKey && (
+        <button type="button" className={`${BTN} mt-1`} disabled={busy} onClick={() => onSpot(photo.spotKey, !photo.spotFeatured)}>
+          {photo.spotFeatured ? "★ Featured for spot" : "☆ Feature for spot"}
+        </button>
+      )}
+      {hint && (
+        <p className="mt-1 text-[11px] text-slate-500">
+          Photo text mentions {hint.name}.{" "}
+          <button type="button" className="font-semibold text-emerald-700 hover:underline disabled:opacity-40" disabled={busy} onClick={() => onSpot(hint.key, false)}>
+            Confirm
+          </button>
+        </p>
+      )}
+    </div>
+  );
+}
+
+export default function PagePhotoCard({ photo, busy, onAction, spots, onSpot }: Props) {
   const pinned = photo.mode === "pin";
   const hidden = photo.mode === "hide";
   return (
@@ -72,6 +111,7 @@ export default function PagePhotoCard({ photo, busy, onAction }: Props) {
           </>
         )}
       </div>
+      <SpotPicker photo={photo} busy={busy} spots={spots} onSpot={onSpot} />
     </li>
   );
 }

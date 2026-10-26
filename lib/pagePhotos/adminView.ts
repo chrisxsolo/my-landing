@@ -18,6 +18,7 @@ import {
 } from "@/lib/pagePhotos/candidates";
 import { guidePageKey, pagePath, parsePageKey, schoolPageKey } from "@/lib/pagePhotos/pageKeys";
 import { loadPhotoPool, type PhotoPool } from "@/lib/pagePhotos/pool";
+import { spotsForSchool, suggestSpotFromText } from "@/lib/schoolSpots";
 
 const GUIDE_TABLE: Record<LocationGuideType, string> = {
   couples: COUPLES_LOCATION_PHOTOS_TABLE,
@@ -50,9 +51,18 @@ export interface PageViewPhoto {
   why: string;
   mode: "pin" | "hide" | null;
   isHero: boolean;
+  /** Photographer-set campus spot on this school's guide, if any. */
+  spotKey: string | null;
+  spotFeatured: boolean;
+  /** Spot the photo's own text suggests — a hint to confirm, never applied. */
+  spotHint: string | null;
 }
 
+export interface SpotOption { key: string; name: string }
+
 export interface PageView extends PageRef {
+  /** Campus spots this school's location guide has sections for. */
+  spots: SpotOption[];
   shown: PageViewPhoto[];
   overflow: PageViewPhoto[];
   hidden: PageViewPhoto[];
@@ -122,6 +132,7 @@ function curate(loaded: Loaded, key: string): { candidates: PageCandidate[]; cur
 
 function explain(loaded: Loaded, c: PageCandidate): string {
   if (c.explicit) return c.id.startsWith("school:") ? "Content Engine school placement" : "uploaded to this guide";
+  if (c.id.startsWith("session:")) return "school from Content Engine session · live in a journal post";
   const photo = loaded.pool.photos.find((p) => p.url === c.url);
   if (!photo) return "matched";
   const school = photo.schoolSource ? `school from ${photo.schoolSource === "tag" ? "photo tag" : photo.schoolSource === "session" ? "Content Engine session" : "photo text"}` : null;
@@ -129,12 +140,24 @@ function explain(loaded: Loaded, c: PageCandidate): string {
   return [school, place].filter(Boolean).join(" · ") || "matched";
 }
 
-function toViewPhoto(loaded: Loaded, rules: CurationRow[], c: PageCandidate): PageViewPhoto {
+function spotFacts(loaded: Loaded, key: string, c: PageCandidate) {
+  const parsed = parsePageKey(key);
+  if (parsed?.kind !== "grads" || spotsForSchool(parsed.slug).length === 0) {
+    return { spotKey: null, spotFeatured: false, spotHint: null };
+  }
+  const tag = loaded.pool.spotTags.find((t) => t.schoolSlug === parsed.slug && t.imageUrl === c.url);
+  const photo = loaded.pool.photos.find((p) => p.url === c.url);
+  const hint = tag ? null : suggestSpotFromText(parsed.slug, [photo?.title, c.alt].filter(Boolean).join(" · "));
+  return { spotKey: tag?.spotKey ?? null, spotFeatured: tag?.isFeatured ?? false, spotHint: hint?.key ?? null };
+}
+
+function toViewPhoto(loaded: Loaded, key: string, rules: CurationRow[], c: PageCandidate): PageViewPhoto {
   const rule = rules.find((r) => r.imageUrl === c.url);
   return {
     url: c.url, alt: c.alt, width: c.width, height: c.height,
     origin: c.explicit ? "own" : "matched", why: explain(loaded, c),
     mode: rule?.mode ?? null, isHero: rule?.isHero ?? false,
+    ...spotFacts(loaded, key, c),
   };
 }
 
@@ -144,8 +167,10 @@ export async function buildPageView(client: SupabaseClient, key: string): Promis
   if (!ref) return null;
   const { curated } = curate(loaded, key);
   const rules = curationFor(loaded.pool, key);
-  const view = (list: PageCandidate[]) => list.map((c) => toViewPhoto(loaded, rules, c));
-  return { ...ref, shown: view(curated.ordered), overflow: view(curated.overflow), hidden: view(curated.hidden) };
+  const view = (list: PageCandidate[]) => list.map((c) => toViewPhoto(loaded, key, rules, c));
+  const parsed = parsePageKey(key);
+  const spots = parsed?.kind === "grads" ? spotsForSchool(parsed.slug).map(({ key: k, name }) => ({ key: k, name })) : [];
+  return { ...ref, spots, shown: view(curated.ordered), overflow: view(curated.overflow), hidden: view(curated.hidden) };
 }
 
 function sessionsNeedingFacts(pool: PhotoPool): PagePhotoReport["sessionsNeedingFacts"] {
