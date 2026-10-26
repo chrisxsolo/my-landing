@@ -116,6 +116,26 @@ describe("pricing pages render values from the catalog, not hardcoded literals",
     expect(visibleText(html).toLowerCase()).not.toMatch(/\bvideo\b|\breel\b/);
   });
 
+  it("maternity page matches the catalog and doesn't borrow family prices", async () => {
+    const m = PRICING_CATALOG.maternity;
+    const html = await renderPage(() => import("@/app/(professional)/pricing/maternity/page"));
+
+    expectAll(html, [
+      fc(m.price), // $500
+      `+${fc(m.addOns.extraOutfit.price)}`, // +$75
+      `+${fc(m.addOns.secondLocation.price)}`, // +$125
+      `+${fc(m.addOns.expedited.price)}`, // +$150
+      `Minimum ${m.minimumImages} professionally edited images`,
+      "Partner and immediate family included",
+      `${m.durationMinutes / 60}-hour session`,
+      TWO_WEEK,
+      ...POLICY,
+    ]);
+    const text = visibleText(html);
+    expect(text.toLowerCase()).not.toContain("deposit");
+    expect(text).not.toContain(fc(PRICING_CATALOG.families.packages.standard.price)); // $350
+  });
+
   it("elopement page matches the catalog, including the 2-hour base", async () => {
     const e = PRICING_CATALOG.elopement;
     const hours = e.durationMinutes / 60;

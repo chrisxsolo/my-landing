@@ -1,18 +1,11 @@
 import Link from "next/link";
 import { formatCurrency } from "@/lib/pricing";
 import { PRICING_CATALOG } from "@/lib/pricingCatalog";
+import { INQUIRY_SESSION_TYPES } from "@/lib/serviceRegistry";
 import type { ContactFormValues } from "./ContactClient";
 
-const SESSION_TYPES = [
-  "Graduation Portrait",
-  "Family Session",
-  "Maternity Session",
-  "Couples Session",
-  "Elopement / Courthouse Ceremony",
-  "Individual Portrait",
-  "Event Coverage",
-  "Other",
-];
+// Options come from the service registry so every sold service is bookable.
+const SESSION_TYPES = INQUIRY_SESSION_TYPES;
 
 const ELOPEMENT_SESSION_TYPE = "Elopement / Courthouse Ceremony";
 const MATERNITY_SESSION_TYPE = "Maternity Session";

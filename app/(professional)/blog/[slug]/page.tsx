@@ -11,6 +11,7 @@ import { exploreLinksFor, resolvePostService } from "@/lib/blog/postService";
 import { getJournalServicesByPostId } from "@/lib/blog/journalServices";
 import { normalizeCategoryTag } from "@/lib/blog/postCategories";
 import { buildBookingIntentParams } from "@/lib/bookingIntent";
+import { inquirySessionTypeFor } from "@/lib/serviceRegistry";
 import type { ServiceType } from "@/lib/contentEngine/taxonomy";
 import ContentEventBeacon from "@/app/components/ContentEventBeacon";
 
@@ -20,18 +21,9 @@ export const revalidate = 3600;
 
 type Props = { params: Promise<{ slug: string }> };
 
-// Session type to preselect on the inquiry form, matching its options.
-const INQUIRY_SESSION_TYPE: Partial<Record<ServiceType, string>> = {
-  grads: "Graduation Portrait",
-  couples: "Couples Session",
-  families: "Family Session",
-  maternity: "Maternity Session",
-  portraits: "Individual Portrait",
-  events: "Event Coverage",
-};
-
+// Preselects the post's service on the inquiry form.
 function inquiryHrefFor(service: ServiceType | null): string {
-  const sessionType = service ? INQUIRY_SESSION_TYPE[service] : undefined;
+  const sessionType = inquirySessionTypeFor(service);
   if (!sessionType) return "/contact";
   return `/contact?${buildBookingIntentParams({ sourcePage: "journal", sessionType }).toString()}`;
 }
