@@ -41,17 +41,22 @@ function ConfirmForm({ s, onSubmit, busy }: {
   const [city, setCity] = useState("");
   const [county, setCounty] = useState("");
   const [searchArea, setSearchArea] = useState("");
-  const ready = name.trim() && city.trim() && county.trim();
+  const missing = [!name.trim() && "place name", !city.trim() && "city", !county.trim() && "county"].filter(Boolean);
+  const disabled = missing.length > 0 || busy;
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 8, marginTop: 8 }}>
       <div><span style={label}>Place name</span><input style={input} value={name} onChange={(e) => setName(e.target.value)} /></div>
-      <div><span style={label}>City / nearest town</span><input style={input} value={city} placeholder="Davenport" onChange={(e) => setCity(e.target.value)} /></div>
-      <div><span style={label}>County</span><input style={input} value={county} placeholder="Santa Cruz County" onChange={(e) => setCounty(e.target.value)} /></div>
-      <div><span style={label}>Searched as (optional)</span><input style={input} value={searchArea} placeholder="Santa Cruz" onChange={(e) => setSearchArea(e.target.value)} /></div>
-      <button style={{ ...btn(true), alignSelf: "end" }} disabled={!ready || busy}
+      <div><span style={label}>City / nearest town</span><input style={input} value={city} placeholder="e.g. Davenport" onChange={(e) => setCity(e.target.value)} /></div>
+      <div><span style={label}>County</span><input style={input} value={county} placeholder="e.g. Santa Cruz County" onChange={(e) => setCounty(e.target.value)} /></div>
+      <div><span style={label}>Searched as (optional)</span><input style={input} value={searchArea} placeholder="e.g. Santa Cruz" onChange={(e) => setSearchArea(e.target.value)} /></div>
+      <button style={{ ...btn(true), alignSelf: "end", ...(disabled ? { opacity: 0.45, cursor: "not-allowed", boxShadow: "none" } : {}) }}
+        disabled={disabled}
         onClick={() => onSubmit({ action: "confirm_new", name, city, county, searchArea })}>
         {busy ? "Saving…" : "Confirm location"}
       </button>
+      {missing.length > 0 && (
+        <span style={{ alignSelf: "center", fontSize: 12, color: T.inkFaint }}>Fill in the {missing.join(" and ")} to confirm.</span>
+      )}
     </div>
   );
 }
