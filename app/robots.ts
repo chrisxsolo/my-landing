@@ -14,7 +14,10 @@ export default function robots(): MetadataRoute.Robots {
   return {
     rules: {
       userAgent: "*",
-      allow: "/",
+      // /api/availability is the one public, machine-readable API (open dates
+      // only, no private notes). The longer, more specific Allow wins over the
+      // blanket /api/ Disallow; every other API route stays blocked.
+      allow: ["/", "/api/availability"],
       disallow: [
         "/admin",
         "/dashboard",

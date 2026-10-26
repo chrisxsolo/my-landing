@@ -501,14 +501,14 @@ export default function AvailabilityCalendar({ initialDates }: { initialDates: A
       {/* ── HERO ── */}
       <section className="avail-hero">
         <div className="avail-shell">
-          <p className="avail-hero-kicker">Live booking calendar</p>
+          <p className="avail-hero-kicker">Availability calendar</p>
           <h1 className="avail-hero-title">Dates.</h1>
           <p className="avail-hero-sub">
-            {"Current availability is updated regularly. Send your preferred date and I'll confirm the best open window."}
+            {"Availability is updated regularly. Request a date and I'll confirm the best open window. A date is reserved once the contract and retainer are complete."}
           </p>
           <div className="avail-hero-chips">
             <span className="avail-chip">Bay Area campuses</span>
-            <span className="avail-chip">24–48 hr replies</span>
+            <span className="avail-chip">Replies within 24 hours</span>
           </div>
         </div>
       </section>
@@ -596,7 +596,9 @@ export default function AvailabilityCalendar({ initialDates }: { initialDates: A
               <h2>{selected ? formatDate(selected.date) : "Tap an open date"}</h2>
               <p>
                 {selected
-                  ? selected.note || "This date is marked for booking. Send the inquiry and I will confirm timing."
+                  ? selected.status === "hold"
+                    ? "Someone has asked about this date but hasn't booked yet. Request it and I'll let you know if it opens up."
+                    : selected.note || "This date is open. Request it and I'll confirm timing. It is reserved for you once the contract and retainer are complete."
                   : "Open and hold dates show up with color. If a date is not marked, mention it in your inquiry and I can check."}
               </p>
               <Link
@@ -611,8 +613,8 @@ export default function AvailabilityCalendar({ initialDates }: { initialDates: A
                 className="avail-link"
               >
                 {selected
-                  ? selected.status === "hold" ? "Ask about this date →" : "Book this date →"
-                  : "Start inquiry"}
+                  ? "Request This Date →"
+                  : "Send Inquiry"}
               </Link>
             </div>
 
@@ -629,7 +631,7 @@ export default function AvailabilityCalendar({ initialDates }: { initialDates: A
                         moveActive(date.date, false); setSelected(date);
                       }}>
                       <span>{formatDate(date.date)}</span>
-                      <span>{date.status === "available" ? "Open" : "Hold"}</span>
+                      <span>{date.status === "available" ? "Available" : "On hold"}</span>
                     </button>
                   ))}
                 </div>
