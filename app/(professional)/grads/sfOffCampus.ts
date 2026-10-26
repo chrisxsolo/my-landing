@@ -1,10 +1,17 @@
 import type { SchoolSpot } from "@/app/components/SchoolLandingTemplate";
 
-// San Francisco places Chris's SF State graduates book most. Keys equal their
-// place keys (lib/locations/places), so photos from SF State sessions shot
-// there fill each section; a couples session at the same place never does.
-// Nothing here promises an empty background, a visible bridge, or shade.
-export const offCampusSpots: SchoolSpot[] = [
+// The verified San Francisco off-campus locations for graduation sessions,
+// shared by every San Francisco school guide (SF State and USF). This is the
+// only list a SF school guide may recommend off campus: add a place here only
+// when Chris has established it as a graduation recommendation, never because
+// it is near a campus or appears in Content Engine sessions.
+//
+// Keys equal their place keys (lib/locations/places) and the shared spot defs
+// in lib/schoolSpots (SF_OFF_CAMPUS_SPOT_DEFS). Photo tags stay per school, so
+// each guide's section shows that school's own photos from the place; a
+// couples session at the same place never does. Nothing here promises an
+// empty background, a visible bridge, or shade.
+export const SF_OFF_CAMPUS_SPOTS: readonly SchoolSpot[] = [
   {
     key: "palace-of-fine-arts",
     name: "Palace of Fine Arts",
@@ -73,3 +80,10 @@ export const offCampusSpots: SchoolSpot[] = [
     tip: "Because this is a major visitor destination, it can get busy with tourists. Weekdays can be more manageable, though a quiet background isn't guaranteed, and fog, wind, and bridge visibility can change the shot.",
   },
 ];
+
+/** A verified SF off-campus spot by key; throws so a typo fails the build, not the page. */
+export function sfOffCampusSpot(key: string): SchoolSpot {
+  const spot = SF_OFF_CAMPUS_SPOTS.find((s) => s.key === key);
+  if (!spot) throw new Error(`"${key}" is not a verified San Francisco off-campus location`);
+  return spot;
+}

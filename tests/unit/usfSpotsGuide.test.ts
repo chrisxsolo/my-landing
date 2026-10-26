@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { data as usf } from "@/app/(professional)/grads/usf/data";
+import { data as sfState } from "@/app/(professional)/grads/sf-state/data";
+import { SF_OFF_CAMPUS_SPOTS } from "@/app/(professional)/grads/sfOffCampus";
 import { guideCampusSpots, SYNCED_GUIDE_DATA } from "@/app/(professional)/grad-guide/campus-spots/guideSpots";
 import { buildSpotsMetadata } from "@/app/components/SchoolSpotsTemplate";
 import { builtInSchool, schoolMatchesText } from "@/lib/contentEngine/schools";
@@ -18,7 +20,7 @@ import { buildSpotPhotoLayout } from "@/lib/pagePhotos/spotPhotos";
 import { PRICING_CATALOG } from "@/lib/pricingCatalog";
 import { normalizeSchool } from "@/lib/schoolDetection";
 import {
-  GUIDE_SYNCED_CAMPUS_SPOTS, isSchoolSpotKey, sectionSpotKeys, spotKeysByPlace, spotsForSchool, suggestSpotFromText,
+  GUIDE_SYNCED_CAMPUS_SPOTS, isSchoolSpotKey, SF_OFF_CAMPUS_SPOT_DEFS, sectionSpotKeys, spotKeysByPlace, spotsForSchool, suggestSpotFromText,
 } from "@/lib/schoolSpots";
 
 const guide = usf.spotsGuide!;
@@ -31,13 +33,14 @@ const LANDMARK_KEYS = [
   "st-ignatius-church", "st-ignatius-walkway", "gleeson-library", "los-lobos-de-loyola",
   "usf-glass-hallway", "lone-mountain-stairs", "lone-mountain-palm-walkway", "lone-mountain-main-building",
 ];
+const SF_KEYS = SF_OFF_CAMPUS_SPOT_DEFS.map((s) => s.key);
 const spot = (key: string) => usf.spots.find((s) => s.key === key)!;
 
 describe("USF location guide content", () => {
   it("covers Chris's six photo areas in his order, each a registered photo key", () => {
     expect(usf.spots.map((s) => s.key)).toEqual(SECTION_KEYS);
-    expect(spotsForSchool("usf").map((s) => s.key)).toEqual([...LANDMARK_KEYS, "haight-ashbury"]);
-    expect(guide.offCampus!.spots.map((s) => s.key)).toEqual(["haight-ashbury"]);
+    expect(spotsForSchool("usf").map((s) => s.key)).toEqual([...LANDMARK_KEYS, ...SF_KEYS]);
+    expect(guide.offCampus!.spots.map((s) => s.key)).toEqual(SF_KEYS);
   });
 
   it("keeps the walkway and main building as compositions inside their sections, stairs on their own", () => {
@@ -95,10 +98,18 @@ describe("USF location guide content", () => {
     expect(allGuideText).not.toMatch(/parking|minutes? walk|walking time|\bone hour\b|1-hour/i);
   });
 
-  it("presents Haight-Ashbury as an optional, priced neighborhood add-on", () => {
-    const haight = guide.offCampus!.spots[0];
-    expect(haight.role).toBe("Optional add-on location");
-    expect(haight.details!.join(" ")).toMatch(/whole neighborhood rather than one photo spot/);
+  it("recommends off campus only SF State's verified San Francisco locations", () => {
+    expect(guide.offCampus!.spots).toEqual(sfState.spotsGuide!.offCampus!.spots);
+    expect(guide.offCampus!.spots).toEqual([...SF_OFF_CAMPUS_SPOTS]);
+    expect(allGuideText).not.toMatch(/Haight/i);
+    const [a, b, c] = guide.plans!.options;
+    expect(guide.plans!.options).toHaveLength(3);
+    expect(a.body).toMatch(/St\. Ignatius Church, Gleeson Library, the wolf sculpture, the glass hallway when student access allows, and Lone Mountain at sunset/);
+    expect(b.title).toBe("USF + Palace of Fine Arts");
+    expect(c.title).toBe("USF + Legion of Honor");
+  });
+
+  it("prices added locations from the catalog", () => {
     const notes = guide.plans!.notes.join(" ");
     const { secondLocation, extra30Minutes } = PRICING_CATALOG.graduation.addOns;
     expect(notes).toContain(`$${secondLocation.price}`);
@@ -167,7 +178,7 @@ describe("USF landmark hints (admin suggestions only)", () => {
 
 // ── School vs. physical place ───────────────────────────────────────────────
 
-const HAIGHT = KNOWN_PLACES.find((p) => p.key === "haight-ashbury")!;
+const PALACE = KNOWN_PLACES.find((p) => p.key === "palace-of-fine-arts")!;
 const ctx: ResolveContext = { places: KNOWN_PLACES, dbGuides: [] };
 const LONE_MOUNTAIN_GPS = { gpsLatitude: 37.7785, gpsLongitude: -122.4515 };
 const GLEESON_GPS = { gpsLatitude: 37.7765, gpsLongitude: -122.4505 };
@@ -188,33 +199,34 @@ function portfolio(id: number, overrides: Partial<PortfolioSource> = {}): Portfo
   };
 }
 
-describe("Haight-Ashbury is its own place", () => {
-  it("resolves by name and alias, and is off-campus for USF", () => {
-    expect(matchPlacesByName("Haight-Ashbury", KNOWN_PLACES).map((p) => p.key)).toEqual(["haight-ashbury"]);
+describe("off-campus places stay separate from the USF campus", () => {
+  it("USF place-matches only the shared SF off-campus spots; Haight-Ashbury is a known place but no USF spot", () => {
+    expect(spotKeysByPlace("usf")).toEqual(spotKeysByPlace("sf-state"));
+    expect(Object.keys(spotKeysByPlace("usf"))).toEqual(SF_KEYS);
     expect(matchPlacesByName("The Haight", KNOWN_PLACES).map((p) => p.key)).toEqual(["haight-ashbury"]);
-    expect(spotKeysByPlace("usf")).toEqual({ "haight-ashbury": "haight-ashbury" });
+    expect(isSchoolSpotKey("usf", "haight-ashbury")).toBe(false);
   });
 
-  it("a USF + Haight session places photos by their own GPS, never campus frames", () => {
-    const multi = { primaryLocation: "USF", secondaryLocations: ["Haight-Ashbury"] };
-    expect(enginePhotoPlace(engine({ ...multi, gpsLatitude: HAIGHT.latitude!, gpsLongitude: HAIGHT.longitude! }), KNOWN_PLACES)?.key)
-      .toBe("haight-ashbury");
+  it("a USF + Palace session places photos by their own GPS, never campus frames", () => {
+    const multi = { primaryLocation: "USF", secondaryLocations: ["Palace of Fine Arts"] };
+    expect(enginePhotoPlace(engine({ ...multi, gpsLatitude: PALACE.latitude!, gpsLongitude: PALACE.longitude! }), KNOWN_PLACES)?.key)
+      .toBe("palace-of-fine-arts");
     expect(enginePhotoPlace(engine({ ...multi, ...LONE_MOUNTAIN_GPS }), KNOWN_PLACES)).toBeNull();
     expect(enginePhotoPlace(engine({ ...multi, ...GLEESON_GPS }), KNOWN_PLACES)).toBeNull();
     expect(enginePhotoPlace(engine(multi), KNOWN_PLACES)).toBeNull();
   });
 
-  it("school and place stay separate: Haight couples photos never reach the USF page", () => {
-    const usfHaight = resolvePhoto(portfolio(1), engine({ url: "u1", primaryLocation: "Haight-Ashbury" }), ctx);
-    const couplesHaight = resolvePhoto(
+  it("school and place stay separate: Palace couples photos never reach the USF page", () => {
+    const usfPalace = resolvePhoto(portfolio(1), engine({ url: "u1", primaryLocation: "Palace of Fine Arts" }), ctx);
+    const couplesPalace = resolvePhoto(
       portfolio(2, { category: "couples" }),
-      engine({ url: "u2", sessionId: "s2", serviceType: "couples", schoolSlug: null, primaryLocation: "Haight-Ashbury" }),
+      engine({ url: "u2", sessionId: "s2", serviceType: "couples", schoolSlug: null, primaryLocation: "Palace of Fine Arts" }),
       ctx,
     );
-    expect(usfHaight).toMatchObject({ school: "usf", placeKey: "haight-ashbury" });
-    expect(couplesHaight).toMatchObject({ school: null, placeKey: "haight-ashbury" });
+    expect(usfPalace).toMatchObject({ school: "usf", placeKey: "palace-of-fine-arts" });
+    expect(couplesPalace).toMatchObject({ school: null, placeKey: "palace-of-fine-arts" });
     const pool: PhotoPool = {
-      photos: [usfHaight, couplesHaight], explicitSchool: [], sessionSchool: [], curation: [], spotTags: [], errors: [],
+      photos: [usfPalace, couplesPalace], explicitSchool: [], sessionSchool: [], curation: [], spotTags: [], errors: [],
     };
     expect(candidatesForPage(pool, "grads/usf").map((c) => c.url)).toEqual(["u1"]);
   });
@@ -237,7 +249,7 @@ const tag = (imageUrl: string, spotKey: string, isFeatured = false): SpotTag =>
 describe("USF spot photo layout", () => {
   const base = {
     spotKeys: spotsForSchool("usf").map((s) => s.key),
-    eligible: [cand("hero"), cand("a"), cand("b"), cand("h1", "haight-ashbury"), cand("x")],
+    eligible: [cand("hero"), cand("a"), cand("b"), cand("h1", "palace-of-fine-arts"), cand("x")],
     hiddenUrls: new Set<string>(), heroUrl: "hero", fallbacks: {}, placeSpots: spotKeysByPlace("usf"),
   };
 
@@ -246,14 +258,14 @@ describe("USF spot photo layout", () => {
       ...base, tags: [tag("a", "st-ignatius-walkway"), tag("b", "st-ignatius-walkway", true)],
     });
     expect(layout.bySpot["st-ignatius-walkway"].map((p) => p.url)).toEqual(["b", "a"]);
-    expect(layout.bySpot["haight-ashbury"].map((p) => p.source)).toEqual(["place"]);
+    expect(layout.bySpot["palace-of-fine-arts"].map((p) => p.source)).toEqual(["place"]);
     expect(layout.gallery.map((c) => c.url)).toEqual(["x"]);
   });
 
   it("a manual tag beats place evidence", () => {
     const layout = buildSpotPhotoLayout({ ...base, tags: [tag("h1", "lone-mountain-palm-walkway")] });
     expect(layout.bySpot["lone-mountain-palm-walkway"].map((p) => p.url)).toEqual(["h1"]);
-    expect(layout.bySpot["haight-ashbury"]).toEqual([]);
+    expect(layout.bySpot["palace-of-fine-arts"]).toEqual([]);
   });
 });
 

@@ -178,7 +178,7 @@ export const data: SchoolLandingData = {
   whatToWear:
     "Bring the outfit you love; USF's stone architecture and the Lone Mountain greenery suit both classic and richer colors. Lone Mountain can be very windy, so pack hair ties, clips, and bobby pins, a few small clothing clips or safety pins for your gown, and comfortable walking shoes.",
   faqs: [
-    { q: "Is there a travel fee for a USF session?", a: "No. USF is in San Francisco, where travel is included. Adding a second location like Haight-Ashbury is a separate add-on." },
+    { q: "Is there a travel fee for a USF session?", a: "No. USF is in San Francisco, where travel is included. Adding a second location like the Palace of Fine Arts is a separate add-on." },
     { q: "What are the best photo spots at USF?", a: "St. Ignatius Church, Gleeson Library, the Los Lobos de Loyola wolf sculpture, the modern glass hallway when access is authorized, and the Lone Mountain stairs and palm trees. I like finishing at Lone Mountain around sunset." },
     { q: "What if it's foggy or overcast on our session day?", a: "Overcast skies are often excellent at USF. The clouds soften the light, which gives us more flexibility with the time of day. Very heavy cloud can make it darker, so we'll watch the forecast together." },
     { q: "When does USF hold commencement?", a: "USF commencement is typically in late May, which is peak season, so early inquiries are recommended for spring dates." },

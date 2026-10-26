@@ -1,7 +1,7 @@
 import type { SchoolSpotsGuide } from "@/app/components/schoolSpotsGuideTypes";
 import { PRICING_CATALOG } from "@/lib/pricingCatalog";
 import { TRAVEL_POLICY } from "@/lib/travelFee";
-import { offCampusSpots } from "./offCampus";
+import { SF_OFF_CAMPUS_SPOTS } from "../sfOffCampus";
 
 // The SF State photo location guide (/grads/sf-state/spots). Written from
 // Chris's own SF State sessions; landmark names and locations checked against
@@ -106,7 +106,7 @@ export const spotsGuide: SchoolSpotsGuide = {
       "One of the best things about graduating from San Francisco State is having the rest of San Francisco available for your graduation pictures. A lot of my SF State clients choose to take some or all of their graduation photos somewhere beyond campus.",
       "Whether you're looking for beautiful architecture, waterfront scenery, or the Golden Gate Bridge in the background, there are plenty of places to choose from. Here are my favorites.",
     ],
-    spots: offCampusSpots,
+    spots: [...SF_OFF_CAMPUS_SPOTS],
   },
   plans: {
     navLabel: "Multiple locations",

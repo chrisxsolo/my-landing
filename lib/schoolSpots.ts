@@ -36,6 +36,36 @@ export interface SchoolSpotDef {
   parentKey?: string;
 }
 
+/**
+ * The verified San Francisco off-campus graduation locations, shared by the SF
+ * State and USF guides (content in app/(professional)/grads/sfOffCampus.ts).
+ * Each school keeps its own photo tags under the same keys. Only add a place
+ * Chris has established as a graduation recommendation.
+ */
+export const SF_OFF_CAMPUS_SPOT_DEFS: readonly SchoolSpotDef[] = [
+  {
+    key: "palace-of-fine-arts", name: "Palace of Fine Arts", altPlace: "at the Palace of Fine Arts",
+    campusSpotNames: [], placeKey: "palace-of-fine-arts",
+    hintTerms: ["palace of fine arts"],
+  },
+  {
+    key: "legion-of-honor", name: "Legion of Honor", altPlace: "at the Legion of Honor",
+    campusSpotNames: [], placeKey: "legion-of-honor",
+    hintTerms: ["legion of honor"],
+  },
+  {
+    key: "crissy-field", name: "Crissy Field", altPlace: "at Crissy Field",
+    campusSpotNames: [], placeKey: "crissy-field",
+    hintTerms: ["crissy field"],
+  },
+  {
+    key: "golden-gate-bridge-welcome-center", name: "Golden Gate Bridge Welcome Center",
+    altPlace: "near the Golden Gate Bridge Welcome Center",
+    campusSpotNames: [], placeKey: "golden-gate-bridge-welcome-center",
+    hintTerms: ["golden gate bridge welcome center", "bridge welcome center", "golden gate bridge visitor center"],
+  },
+];
+
 export const SCHOOL_SPOTS: Partial<Record<SchoolSlug, readonly SchoolSpotDef[]>> = {
   sjsu: [
     {
@@ -139,27 +169,7 @@ export const SCHOOL_SPOTS: Partial<Record<SchoolSlug, readonly SchoolSpotDef[]>>
       campusSpotNames: [],
       hintTerms: ["garden of remembrance", "ruth asawa", "sfsu waterfall", "sf state waterfall", "sfsu rock garden", "sf state rock garden"],
     },
-    {
-      key: "palace-of-fine-arts", name: "Palace of Fine Arts", altPlace: "at the Palace of Fine Arts",
-      campusSpotNames: [], placeKey: "palace-of-fine-arts",
-      hintTerms: ["palace of fine arts"],
-    },
-    {
-      key: "legion-of-honor", name: "Legion of Honor", altPlace: "at the Legion of Honor",
-      campusSpotNames: [], placeKey: "legion-of-honor",
-      hintTerms: ["legion of honor"],
-    },
-    {
-      key: "crissy-field", name: "Crissy Field", altPlace: "at Crissy Field",
-      campusSpotNames: [], placeKey: "crissy-field",
-      hintTerms: ["crissy field"],
-    },
-    {
-      key: "golden-gate-bridge-welcome-center", name: "Golden Gate Bridge Welcome Center",
-      altPlace: "near the Golden Gate Bridge Welcome Center",
-      campusSpotNames: [], placeKey: "golden-gate-bridge-welcome-center",
-      hintTerms: ["golden gate bridge welcome center", "bridge welcome center", "golden gate bridge visitor center"],
-    },
+    ...SF_OFF_CAMPUS_SPOT_DEFS,
   ],
   // USF: Chris's six guide areas as eight compositions. The church walkway and
   // the Lone Mountain main-building background are children of their guide
@@ -208,11 +218,7 @@ export const SCHOOL_SPOTS: Partial<Record<SchoolSlug, readonly SchoolSpotDef[]>>
       altPlace: "with the Lone Mountain main building behind", campusSpotNames: [], parentKey: "lone-mountain-palm-walkway",
       hintTerms: ["lone mountain main", "lone mountain building", "lone mountain main building"],
     },
-    {
-      key: "haight-ashbury", name: "Haight-Ashbury", altPlace: "in Haight-Ashbury",
-      campusSpotNames: [], placeKey: "haight-ashbury",
-      hintTerms: ["haight ashbury", "haight street", "upper haight"],
-    },
+    ...SF_OFF_CAMPUS_SPOT_DEFS,
   ],
 };
 

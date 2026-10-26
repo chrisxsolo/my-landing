@@ -1,7 +1,7 @@
 import type { SchoolSpotsGuide } from "@/app/components/schoolSpotsGuideTypes";
 import { PRICING_CATALOG } from "@/lib/pricingCatalog";
 import { TRAVEL_POLICY } from "@/lib/travelFee";
-import { offCampusSpots } from "./offCampus";
+import { SF_OFF_CAMPUS_SPOTS, sfOffCampusSpot } from "../sfOffCampus";
 
 // The USF photo location guide (/grads/usf/spots). Written from Chris's own
 // USF sessions. Landmark names checked against USF's own pages: St. Ignatius
@@ -17,9 +17,13 @@ import { offCampusSpots } from "./offCampus";
 //   are unverified, so the page says access must be authorized.
 // - The route is Chris's preferred order, not a measured walk: no durations.
 // - Prices come from the pricing catalog; never type an amount here.
+// - Off-campus places come only from the shared, verified San Francisco list
+//   (../sfOffCampus, the same list as SF State). Never name another place.
 // - Not stated on purpose: parking, transit, walking times, clock times, sun
 //   angles at specific buildings, and interior church or library photography.
 const { secondLocation, extra30Minutes } = PRICING_CATALOG.graduation.addOns;
+const palace = sfOffCampusSpot("palace-of-fine-arts");
+const legion = sfOffCampusSpot("legion-of-honor");
 
 export const spotsGuide: SchoolSpotsGuide = {
   metaTitle: "Best USF Graduation Photo Locations",
@@ -132,9 +136,9 @@ export const spotsGuide: SchoolSpotsGuide = {
     heading: "Want to Take USF Graduation Photos Somewhere Else in San Francisco?",
     intro: [
       "Another great thing about graduating from USF is having so many interesting locations throughout San Francisco. Some graduates prefer to take all their photos on campus, while others want to combine their university portraits with another part of the city.",
-      "For example, we can photograph around St. Ignatius Church, Gleeson Library, and Lone Mountain before heading somewhere like Haight-Ashbury for a different atmosphere. Combining locations is a great way to create a gallery with more variety.",
+      `For example, we can photograph around St. Ignatius Church, Gleeson Library, and Lone Mountain before heading to the ${palace.name} or the ${legion.name} for a different atmosphere. Combining locations is a great way to create a gallery with more variety.`,
     ],
-    spots: offCampusSpots,
+    spots: [...SF_OFF_CAMPUS_SPOTS],
   },
   plans: {
     navLabel: "Multiple locations",
@@ -144,9 +148,9 @@ export const spotsGuide: SchoolSpotsGuide = {
     ],
     optionsHeading: "Example session plans",
     options: [
-      { label: "Option A", title: "Classic USF graduation", body: "Campus only: St. Ignatius Church, Gleeson Library, the wolf sculpture, the glass hallway when authorized, and Lone Mountain at sunset." },
-      { label: "Option B", title: "USF + Haight-Ashbury", body: "Classic campus portraits first, then colorful, more urban photos in Haight-Ashbury at stops we choose together." },
-      { label: "Option C", title: "USF + another San Francisco spot", body: "Campus portraits plus a San Francisco location that fits the look you want. Tell me what you have in mind." },
+      { label: "Option A", title: "Classic USF graduation", body: "Campus only: St. Ignatius Church, Gleeson Library, the wolf sculpture, the glass hallway when student access allows, and Lone Mountain at sunset." },
+      { label: "Option B", title: `USF + ${palace.name}`, body: `Classic campus portraits first, then architectural portraits with the columns at the ${palace.name}.` },
+      { label: "Option C", title: `USF + ${legion.name}`, body: `Campus portraits combined with the grand columns and elegant architecture of the ${legion.name}.` },
     ],
     notesHeading: "Pricing and logistics",
     notes: [
@@ -206,7 +210,7 @@ export const spotsGuide: SchoolSpotsGuide = {
     { q: "Can we take graduation photos with the USF wolf sculpture?", a: "Yes, when the area outside Gleeson Library is accessible. Los Lobos de Loyola is one of my favorite recognizable USF landmarks. We photograph around it without climbing or sitting on the artwork." },
     { q: "Is Lone Mountain windy?", a: "It can be very windy! I recommend bringing hair clips, hair ties, and small clothing clips to help secure your hair and graduation outfit." },
     { q: "What if it's cloudy during my graduation photoshoot?", a: "Cloudy skies can actually be ideal for portraits. The clouds soften the light, which lets us create beautiful photos throughout more of the day." },
-    { q: "Can I take USF graduation photos at multiple locations?", a: "Yes! We can plan a session that combines USF campus portraits with an additional San Francisco location like Haight-Ashbury, depending on coverage time, travel, and the location add-on." },
+    { q: "Can I take USF graduation photos at multiple locations?", a: "Yes! We can plan a session that combines USF campus portraits with an additional San Francisco location like the Palace of Fine Arts or the Legion of Honor, depending on coverage time, travel, and the location add-on." },
     { q: "Will you help me pose?", a: "Absolutely! I'll guide you through the session and help you feel comfortable with both classic graduation poses and more natural photos." },
   ],
 };
