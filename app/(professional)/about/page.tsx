@@ -51,9 +51,8 @@ export const metadata: Metadata = {
 };
 
 // ── PORTRAIT PHOTO ────────────────────────────────────────────────────────────
-// To change: upload to Supabase Storage and paste the URL here.
-const portrait =
-  "https://dmtslzwglpezympptqls.supabase.co/storage/v1/object/public/grad-photos/chris-portrait.jpg";
+// To change: drop a new file in public/images/about/ (or paste a Supabase URL).
+const portrait = "/images/about/chris-solorzano-sunset-beach.webp";
 
 const TURNAROUND_WEEKS = PRICING_CATALOG.standardTurnaroundDays / 7;
 // Package-aware, never one number for every service.
@@ -445,10 +444,10 @@ export default async function ProfessionalAboutPage() {
           <div className="about-portrait-wrap" data-reveal="scale">
             <OptimizedPhoto
               src={portrait}
-              alt="Chris Solorzano"
+              alt="Chris Solorzano smiling on a beach at sunset with a camera on his shoulder"
               sizes="(max-width: 920px) 90vw, 40vw"
               quality={90}
-              objectPosition="center top"
+              objectPosition="center 70%"
             />
           </div>
           <div className="about-bio-text" data-reveal data-delay="2">
