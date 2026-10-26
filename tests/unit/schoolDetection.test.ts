@@ -40,6 +40,21 @@ describe("normalizeSchool", () => {
     expect(normalizeSchool("cal poly")).toBeNull();
   });
 
+  it("does not treat the city's other Berkeley names as UC Berkeley", () => {
+    for (const text of [
+      "Berkeley High School graduation", "Berkeley City College grad", "Berkeley Marina portraits",
+      "Berkeley Rose Garden family session", "Lawrence Berkeley National Lab", "Berkeley College NYC",
+    ]) {
+      expect(normalizeSchool(text), text).toBeNull();
+    }
+  });
+
+  it("still maps Berkeley's own schools and colleges to UC Berkeley", () => {
+    for (const text of ["Berkeley Law", "Berkeley Haas MBA", "Berkeley College of Engineering", "Berkeley grad at Sather Gate"]) {
+      expect(normalizeSchool(text)?.abbreviation, text).toBe("UC Berkeley");
+    }
+  });
+
   it("does not map USF when context points at South Florida", () => {
     expect(normalizeSchool("USF (University of South Florida)")).toBeNull();
   });

@@ -57,7 +57,13 @@ const SCHOOL_DEFS: SchoolDef[] = [
     canonicalName: "University of California, Berkeley", abbreviation: "UC Berkeley",
     patterns: [
       { re: /\b(?:uc|university of california) berkeley\b/, confidence: 1 },
-      { re: /\bberkeley\b/, confidence: 0.9 },
+      // Bare "Berkeley" is the city too: Berkeley High, Berkeley City College,
+      // the marina, the lab and the for-profit Berkeley College aren't UC.
+      // "Berkeley College of <x>" (a UC college) still counts.
+      {
+        re: /(?<!lawrence )\bberkeley\b(?! (?:high|city college|adult school|unified|marina|rose garden|hills|county|springs|heights|(?:national )?lab|college(?! of))\b)/,
+        confidence: 0.9,
+      },
       { re: /\bcal bears?\b/, confidence: 0.9 },
       { re: /\bcal\b(?! state| poly| maritime)/, confidence: 0.5 },
     ],
