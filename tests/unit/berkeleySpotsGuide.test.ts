@@ -8,6 +8,8 @@ import {
   isSchoolSpotKey, normalizeSpotNote, spotsForSchool, SPOT_NOTE_MAX, suggestSpotFromText,
 } from "@/lib/schoolSpots";
 import type { PageCandidate } from "@/lib/pagePhotos/curate";
+import { parseBookingIntent } from "@/lib/bookingIntent";
+import { PRICING_CATALOG } from "@/lib/pricingCatalog";
 
 const guide = berkeley.spotsGuide!;
 const allGuideText = JSON.stringify(berkeley);
@@ -19,7 +21,8 @@ describe("UC Berkeley location guide content", () => {
       "sather-gate", "doe-library-entrance", "doe-library-ledge", "campanile",
       "hearst-mining", "mining-circle", "cherry-blossoms",
     ]);
-    expect([...spotKeys].sort()).toEqual(spotsForSchool("uc-berkeley").map((s) => s.key).sort());
+    // Plus the photo slot for the "Inside Doe Library" section.
+    expect([...spotKeys, "doe-library-interior"].sort()).toEqual(spotsForSchool("uc-berkeley").map((s) => s.key).sort());
   });
 
   it("starts the route at Sather Gate and ends at the front of Doe Library", () => {
@@ -54,6 +57,8 @@ describe("UC Berkeley location guide content", () => {
     expect(inside.paragraphs.join(" ")).toMatch(/posted policy/);
     expect(inside.links!.map((l) => l.href)).toContain("https://www.lib.berkeley.edu/about/filming");
     expect(guide.route.notes.join(" ")).toMatch(/inside Doe Library/);
+    expect(inside.spotKey).toBe("doe-library-interior");
+    expect(isSchoolSpotKey("uc-berkeley", inside.spotKey)).toBe(true);
   });
 
   it("says champagne is allowed unless we're told otherwise on the day, for 21+", () => {
@@ -62,6 +67,16 @@ describe("UC Berkeley location guide content", () => {
     expect(champagne).toMatch(/21 and over/);
     const faq = guide.faqs.find((f) => /champagne/i.test(f.q))!;
     expect(faq.a).toMatch(/unless we're told otherwise on the day/);
+  });
+
+  it("offers the paid champagne add-on with the catalog price and a pre-filled inquiry link", () => {
+    const section = guide.sections!.find((s) => s.id === "champagne")!;
+    const price = `$${PRICING_CATALOG.graduation.addOns.champagne.price}`;
+    expect(section.paragraphs.join(" ")).toContain(`${price} add-on`);
+    expect(guide.faqs.find((f) => /champagne/i.test(f.q))!.a).toContain(price);
+    const url = new URL(section.cta!.href, "https://www.soloxsnaps.com");
+    expect(url.pathname).toBe("/contact");
+    expect(parseBookingIntent(url.searchParams).addOns).toEqual([PRICING_CATALOG.graduation.addOns.champagne.shortLabel]);
   });
 
   it("does not list a travel fee on the Berkeley page", () => {
@@ -123,7 +138,12 @@ describe("UC Berkeley spot hints (admin suggestions only)", () => {
     expect(suggestSpotFromText("uc-berkeley", text)?.key).toBe(key);
   });
 
-  it.each(["Doe Library graduation portrait", "Inside Doe Library reading room", "Sather Gate with the Campanile behind", "Graduate on a lawn"])(
+  it("suggests the interior slot for photos inside the library", () => {
+    expect(suggestSpotFromText("uc-berkeley", "Inside Doe Library reading room")?.key).toBe("doe-library-interior");
+    expect(suggestSpotFromText("uc-berkeley", "UC Berkeley Graduate in Library Wingback Chair")?.key).toBe("doe-library-interior");
+  });
+
+  it.each(["Doe Library graduation portrait", "Sather Gate with the Campanile behind", "Graduate on a lawn"])(
     "gives no hint for ambiguous or unrelated text: %s", (text) => {
       expect(suggestSpotFromText("uc-berkeley", text)).toBeNull();
     },
@@ -147,9 +167,9 @@ describe("UC Berkeley spot photos", () => {
     expect(layout.gallery.map((c) => c.url)).toEqual(["c"]);
   });
 
-  it("never uses the Inside Doe Library campus-spot row as a fallback", () => {
-    const names = spotsForSchool("uc-berkeley").flatMap((s) => s.campusSpotNames);
-    expect(names).not.toContain("Inside Doe Library");
+  it("uses the Inside Doe Library campus-spot photo only for the interior slot", () => {
+    const users = spotsForSchool("uc-berkeley").filter((s) => s.campusSpotNames.includes("Inside Doe Library"));
+    expect(users.map((s) => s.key)).toEqual(["doe-library-interior"]);
   });
 });
 

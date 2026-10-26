@@ -1,4 +1,14 @@
 import type { SchoolSpotsGuide } from "@/app/components/schoolSpotsGuideTypes";
+import { buildBookingIntentParams } from "@/lib/bookingIntent";
+import { formatCurrency } from "@/lib/pricing";
+import { PRICING_CATALOG } from "@/lib/pricingCatalog";
+
+const CHAMPAGNE = PRICING_CATALOG.graduation.addOns.champagne;
+// Opens the inquiry form with the champagne add-on already selected.
+const CHAMPAGNE_INQUIRY = `/contact?${buildBookingIntentParams({
+  sourcePage: "school-spots-page", sessionType: "Graduation Portrait",
+  school: "UC Berkeley", addOns: [CHAMPAGNE.shortLabel],
+})}`;
 
 // The UC Berkeley photo location guide (/grads/uc-berkeley/spots). Written from
 // Chris's own Berkeley sessions; campus facts checked against official pages.
@@ -102,12 +112,15 @@ export const spotsGuide: SchoolSpotsGuide = {
       paragraphs: [
         "Champagne pops are one of my favorite ways to celebrate at Berkeley. My go-to spot is the lawn near Doe Library, with the Campanile rising behind you.",
         "Champagne is allowed in your session unless we're told otherwise on the day. If campus staff or an event on site ask us not to, we'll switch to another celebration shot right there.",
-        "Bring your own bottle. Champagne photos are for graduates 21 and over, we keep the spray away from other people, and we take the bottle and any mess with us.",
+        `You're welcome to bring your own bottle, or I can provide the champagne. It's a ${formatCurrency(CHAMPAGNE.price)} add-on: just request it on your inquiry form and I'll have it ready for your session.`,
+        "Champagne photos are for graduates 21 and over, we keep the spray away from other people, and we take the bottle and any mess with us.",
       ],
+      cta: { label: "Request the champagne add-on", href: CHAMPAGNE_INQUIRY },
     },
     {
       id: "inside-doe-library",
       navLabel: "Inside Doe Library",
+      spotKey: "doe-library-interior",
       heading: "Can We Take Photos Inside Doe Library?",
       paragraphs: [
         "Yes. The inside of Doe Library is beautiful, and graduation photos happen there all the time. It works best earlier in the session, while daylight is still coming through the windows, so I'll fit it in before we finish outside at sunset.",
@@ -145,7 +158,7 @@ export const spotsGuide: SchoolSpotsGuide = {
     { q: "Is UC Berkeley crowded during graduation season?", a: "Yes, it can get extremely busy. I recommend booking on a weekday and earlier in the graduation season if possible. Even then, we may need to wait at popular photo spots." },
     { q: "Can we take cherry blossom graduation photos at Berkeley?", a: "Yes, when the trees are blooming and the area is accessible. March can be a good time to look for blossoms, but the exact timing varies from year to year." },
     { q: "Can we take pictures inside Doe Library?", a: "Yes, graduation photos inside Doe Library happen all the time. We go earlier in the session while there's daylight, keep it quick and quiet for students, and head back outside if staff ask, since the Library's posted policy limits staged graduation photos indoors." },
-    { q: "Can we take champagne-popping graduation photos?", a: "Yes! Champagne is allowed in your session unless we're told otherwise on the day. My favorite spot is the lawn near Doe Library with the Campanile behind you. Bring your own bottle; champagne photos are for graduates 21 and over." },
+    { q: "Can we take champagne-popping graduation photos?", a: `Yes! Champagne is allowed in your session unless we're told otherwise on the day. My favorite spot is the lawn near Doe Library with the Campanile behind you. Bring your own bottle, or request the champagne add-on (${formatCurrency(CHAMPAGNE.price)}) on your inquiry form and I'll provide it. Champagne photos are for graduates 21 and over.` },
     { q: "How many campus locations can we visit?", a: "It depends on your session length, walking distances, crowds, and how much time we spend at each spot. I'll help you prioritize the ones that matter most to you." },
     { q: "Will you help me pose?", a: "Absolutely! I'll give you posing guidance throughout the session, whether you're looking for traditional graduation portraits or more natural, candid photos." },
   ],

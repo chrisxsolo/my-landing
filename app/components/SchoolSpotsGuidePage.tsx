@@ -264,7 +264,12 @@ export default async function SchoolSpotsGuidePage({ data, guide }: Props) {
 
       <Route guide={guide} spots={data.spots} />
 
-      {(guide.sections ?? []).map((section) => <GuideSection key={section.id} section={section} />)}
+      {(guide.sections ?? []).map((section) => (
+        <GuideSection
+          key={section.id} section={section}
+          photos={section.spotKey ? photos.bySpot[section.spotKey] ?? [] : []}
+        />
+      ))}
 
       <Tips schoolShort={data.schoolShort} tips={guide.tips} />
 
