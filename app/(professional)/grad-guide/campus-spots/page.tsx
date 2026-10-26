@@ -7,6 +7,7 @@ import CampusSpotsContent from "./CampusSpotsContent";
 import { getLocationSpots } from "@/lib/gradGuideData";
 import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
 import { withGuideCampusSpots } from "./guideSpots";
+import { withAutoFilledCampusSpots } from "@/lib/campusSpotFill/publicSpots";
 
 // ISR: content now server-fetches (cached); refresh hourly, sooner on admin
 // revalidate. Previously this page was frozen static + client-fetched.
@@ -31,8 +32,9 @@ export const metadata: Metadata = {
 };
 
 export default async function CampusSpotsPage() {
-  // Schools with a location guide (USF) take their spot text from it.
-  const spots = await withGuideCampusSpots(await getLocationSpots());
+  // Schools with a location guide (USF) take their spot text from it. Spots
+  // with no photo of their own then get their automatic photo, if any.
+  const spots = await withAutoFilledCampusSpots(await withGuideCampusSpots(await getLocationSpots()));
   const articleLd = {
     "@context": "https://schema.org",
     "@type": "Article",

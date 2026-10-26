@@ -55,16 +55,25 @@ export function guideCampusSpots(
         icon: row?.icon ?? "📍",
         image_url: row?.image_url ?? sectionPhotoUrl(slug, spot.key, photos),
         order: i,
+        spot_key: spot.key,
       };
     });
 }
 
-/** location_spots rows with each synced school's rows replaced by its guide's spots. */
-export async function withGuideCampusSpots(rows: LocationSpot[]): Promise<LocationSpot[]> {
+type GuidePhotosLoader = (slug: string, schoolShort: string) => Promise<SchoolSpotsGuidePhotos | null>;
+
+/**
+ * location_spots rows with each synced school's rows replaced by its guide's
+ * spots. The public page uses the cached guide photos; the campus-spot photo
+ * sync passes an uncached loader so it sees fresh data.
+ */
+export async function withGuideCampusSpots(
+  rows: LocationSpot[], loadPhotos: GuidePhotosLoader = getSchoolSpotsGuidePhotos,
+): Promise<LocationSpot[]> {
   const synced = await Promise.all(Object.entries(GUIDE_SYNCED_CAMPUS_SPOTS).map(async ([schoolId, slug]) => {
     const data = SYNCED_GUIDE_DATA[slug];
     if (!data) return [];
-    const photos = await getSchoolSpotsGuidePhotos(slug, data.schoolShort).catch((error: unknown) => {
+    const photos = await loadPhotos(slug, data.schoolShort).catch((error: unknown) => {
       console.error(`[campus-spots] ${slug} guide photos failed; using location_spots photos only`, error);
       return null;
     });

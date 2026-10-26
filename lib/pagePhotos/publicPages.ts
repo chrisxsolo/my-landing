@@ -6,10 +6,10 @@ import {
   candidatesForPage, curationFor, GUIDE_PAGE_LIMIT, SCHOOL_PAGE_LIMIT, type GuidePhotoRow,
 } from "@/lib/pagePhotos/candidates";
 import { guidePageKey, schoolPageKey } from "@/lib/pagePhotos/pageKeys";
-import { getPhotoPool } from "@/lib/pagePhotos/pool";
+import { getPhotoPool, type PhotoPool } from "@/lib/pagePhotos/pool";
 import { buildSpotPhotoLayout, campusSpotNameKey, type SpotFallback, type SpotSectionPhoto } from "@/lib/pagePhotos/spotPhotos";
 import { SPOT_SCHOOL_IDS, type SchoolSlug } from "@/lib/contentEngine/taxonomy";
-import { getLocationSpots } from "@/lib/gradGuideData";
+import { getLocationSpots, type LocationSpot } from "@/lib/gradGuideData";
 import { spotKeysByPlace, spotsForSchool } from "@/lib/schoolSpots";
 
 export interface PagePhoto {
@@ -70,10 +70,12 @@ function sectionPhoto(spotKey: string, index: number, p: SpotSectionPhoto): Page
 }
 
 /** Each spot's photo on the campus-spots guide, matched by the spot's known names. */
-async function campusSpotFallbacks(slug: string, schoolShort: string): Promise<Record<string, SpotFallback>> {
+function campusSpotFallbacks(
+  slug: string, schoolShort: string, spotRows: readonly LocationSpot[],
+): Record<string, SpotFallback> {
   const schoolId = SPOT_SCHOOL_IDS[slug as SchoolSlug];
   if (!schoolId) return {};
-  const rows = (await getLocationSpots()).filter((row) => row.school_id === schoolId && row.image_url);
+  const rows = spotRows.filter((row) => row.school_id === schoolId && row.image_url);
   return Object.fromEntries(spotsForSchool(slug).flatMap((spot) => {
     const names = new Set(spot.campusSpotNames.map(campusSpotNameKey));
     const row = rows.find((r) => names.has(campusSpotNameKey(r.name)));
@@ -91,8 +93,10 @@ async function campusSpotFallbacks(slug: string, schoolShort: string): Promise<R
  * already matched to this school can appear — a couples session at the
  * Palace never reaches a school guide.
  */
-export async function getSchoolSpotsGuidePhotos(slug: string, schoolShort: string): Promise<SchoolSpotsGuidePhotos> {
-  const [pool, fallbacks] = await Promise.all([getPhotoPool(), campusSpotFallbacks(slug, schoolShort)]);
+export function buildSchoolSpotsGuidePhotos(
+  pool: PhotoPool | null, spotRows: readonly LocationSpot[], slug: string, schoolShort: string,
+): SchoolSpotsGuidePhotos {
+  const fallbacks = campusSpotFallbacks(slug, schoolShort, spotRows);
   const spotKeys = spotsForSchool(slug).map((spot) => spot.key);
   const key = schoolPageKey(slug);
   const curated = pool
@@ -117,6 +121,12 @@ export async function getSchoolSpotsGuidePhotos(slug: string, schoolShort: strin
       .map(([spot, photos]) => [spot, photos.map((p, i) => sectionPhoto(spot, i, p))])),
     gallery: layout.gallery.map(toPagePhoto),
   };
+}
+
+/** Cached public read of buildSchoolSpotsGuidePhotos. */
+export async function getSchoolSpotsGuidePhotos(slug: string, schoolShort: string): Promise<SchoolSpotsGuidePhotos> {
+  const [pool, spotRows] = await Promise.all([getPhotoPool(), getLocationSpots()]);
+  return buildSchoolSpotsGuidePhotos(pool, spotRows, slug, schoolShort);
 }
 
 /**

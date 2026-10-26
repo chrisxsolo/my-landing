@@ -57,6 +57,8 @@ export interface PhotoPool {
   sessionSchool: ExplicitSchoolPhoto[];
   curation: CurationRow[];
   spotTags: SpotTag[];
+  /** Content Engine session id → the shooting locations typed on it (primary first). */
+  sessionLocations?: Record<string, string[]>;
   /** Read failures. A non-empty list means the pool is incomplete (a bug). */
   errors: string[];
 }
@@ -242,6 +244,11 @@ async function spotTagRows(client: SupabaseClient): Promise<Rows> {
   return (data ?? []) as Rows;
 }
 
+function sessionLocationsOf(rows: readonly EngineSchoolRow[]): Record<string, string[]> {
+  return Object.fromEntries(rows.map(({ source }) => [source.sessionId,
+    [source.primaryLocation, ...source.secondaryLocations].filter((t): t is string => Boolean(t?.trim()))]));
+}
+
 export async function loadPhotoPool(client: SupabaseClient): Promise<PhotoPool> {
   const errors: string[] = [];
   const [portfolio, engine, school, curation, places, dbGuides, posts, spotTags] = await Promise.all([
@@ -280,6 +287,7 @@ export async function loadPhotoPool(client: SupabaseClient): Promise<PhotoPool> 
     sessionSchool: sessionSchoolPhotos(engineRows, journalUrls(posts), portfolioSources, placeOf),
     curation: curation.map(toCurationRow),
     spotTags: spotTags.map(toSpotTag),
+    sessionLocations: sessionLocationsOf(engineRows),
     errors,
   };
 }
@@ -290,7 +298,7 @@ const cachedPool = cachePublicContent(async (): Promise<PhotoPool> => {
   const pool = await loadPhotoPool(createSupabaseServerClient());
   if (pool.errors.length > 0) throw new Error(`photo pool incomplete — ${pool.errors.join("; ")}`);
   return pool;
-}, ["page-photo-pool-v2"]);
+}, ["page-photo-pool-v3"]);
 
 /** Public cached pool, or null when it could not be read (logged as a bug). */
 export async function getPhotoPool(): Promise<PhotoPool | null> {

@@ -47,6 +47,8 @@ export type LocationSpot = {
   icon: string;
   image_url: string | null;
   order: number;
+  /** lib/schoolSpots key, set on spots built from a school's location guide (not a DB column). */
+  spot_key?: string;
 };
 
 // The hub gallery is labeled "Recent grad shoots" — cap it so the page never
