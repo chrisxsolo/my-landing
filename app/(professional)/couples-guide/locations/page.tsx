@@ -97,7 +97,7 @@ export default async function CouplesLocationsHubPage() {
             movement, and pacing throughout, so the session stays natural and relaxed.
           </p>
           <div className="fg-actions fg-afu4">
-            <Link href={COUPLES_CONTACT} className="fg-btn fg-btn--primary">Inquire about a session →</Link>
+            <Link href={COUPLES_CONTACT} className="fg-btn fg-btn--primary">Book a Session →</Link>
             <Link href="/couples-guide" className="fg-btn fg-btn--ghost">Back to the couples guide</Link>
           </div>
         </div>
@@ -141,7 +141,7 @@ export default async function CouplesLocationsHubPage() {
             <h2 className="fg-cta-title">Not sure which location fits?</h2>
             <p className="fg-cta-sub">Tell me about the two of you and the look you want — I&rsquo;ll help you choose the right spot, time, and pacing.</p>
             <div className="fg-cta-actions">
-              <Link href={COUPLES_CONTACT} className="fg-btn fg-btn--ongreen">Inquire about a session →</Link>
+              <Link href={COUPLES_CONTACT} className="fg-btn fg-btn--ongreen">Book a Session →</Link>
               <Link href="/pricing/couples" className="fg-btn fg-btn--onghost">See couples pricing</Link>
             </div>
           </div>

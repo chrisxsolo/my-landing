@@ -173,7 +173,7 @@ export default async function GradPricingPage() {
             </div>
 
             {/* CTA button — links to the contact/booking page */}
-            <Link href="/contact" className={styles.pricingLink}>Book a session</Link>
+            <Link href="/contact" className={styles.pricingLink}>Book a Session</Link>
           </div>
         </div>
       </section>
@@ -233,7 +233,7 @@ export default async function GradPricingPage() {
               <p className={styles.pricingPrice}>{formatCurrency(graduationPricing.baseHourlyRate)}</p>
               <p className={styles.pricingMeta}>per hour</p>
             </div>
-            <Link href="/contact" className={styles.pricingLink}>Book this session</Link>
+            <Link href="/contact" className={styles.pricingLink}>Book This Session</Link>
           </div>
         </div>
 
@@ -304,7 +304,7 @@ export default async function GradPricingPage() {
           </p>
 
           <div className={styles.pricingInvestment}>
-            <Link href="/contact" className={styles.pricingLink}>Inquire about group sessions</Link>
+            <Link href="/contact" className={styles.pricingLink}>Book a Group Session</Link>
           </div>
         </div>
       </section>
@@ -366,7 +366,7 @@ export default async function GradPricingPage() {
               covers outfits, posing, prep, and the best campus spots.
             </p>
           </div>
-          <Link href="/contact" className={styles.pricingLink}>Inquire now</Link>
+          <Link href="/contact" className={styles.pricingLink}>Send Inquiry</Link>
         </div>
       </section>
     </main>

@@ -94,7 +94,7 @@ export default async function PortraitLocationsHubPage() {
             pacing throughout, so the session stays natural and relaxed.
           </p>
           <div className="fg-actions fg-afu4">
-            <Link href={PORTRAIT_CONTACT} className="fg-btn fg-btn--primary">Inquire about a session →</Link>
+            <Link href={PORTRAIT_CONTACT} className="fg-btn fg-btn--primary">Book a Session →</Link>
             <Link href="/portrait-guide" className="fg-btn fg-btn--ghost">Back to the portrait guide</Link>
           </div>
         </div>
@@ -134,7 +134,7 @@ export default async function PortraitLocationsHubPage() {
             <h2 className="fg-cta-title">Not sure which location fits?</h2>
             <p className="fg-cta-sub">Tell me about yourself and the look you want — I&rsquo;ll help you choose the right spot, time, and pacing.</p>
             <div className="fg-cta-actions">
-              <Link href={PORTRAIT_CONTACT} className="fg-btn fg-btn--ongreen">Inquire about a session →</Link>
+              <Link href={PORTRAIT_CONTACT} className="fg-btn fg-btn--ongreen">Book a Session →</Link>
               <Link href="/pricing" className="fg-btn fg-btn--onghost">See pricing</Link>
             </div>
           </div>

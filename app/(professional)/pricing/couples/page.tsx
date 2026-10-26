@@ -129,7 +129,7 @@ export default async function CouplesPricingPage() {
               <span className={styles.pricingChip}>Guided posing</span>
               <span className={styles.pricingChip}>{PRICING_CATALOG.standardTurnaroundDays / 7}-week turnaround</span>
             </div>
-            <Link href="/contact" className={styles.pricingLink}>Inquire About a Couples Session</Link>
+            <Link href="/contact" className={styles.pricingLink}>Book a Couples Session</Link>
           </div>
           <p className={styles.pricingHeroFineprint}>
             Starting at {formatCurrency(couplesPricing.packages.mini.price)} for a {couplesPricing.packages.mini.durationLabel.toLowerCase()}.
@@ -178,7 +178,7 @@ export default async function CouplesPricingPage() {
               <li>Standard {PRICING_CATALOG.standardTurnaroundDays / 7}-week turnaround</li>
             </ul>
             <div className={styles.couplesCardCta}>
-              <Link href="/contact" className={`${styles.pricingLink} ${styles.couplesCardLink}`}>Inquire About a Couples Session</Link>
+              <Link href="/contact" className={`${styles.pricingLink} ${styles.couplesCardLink}`}>Book a Couples Session</Link>
             </div>
           </div>
           );
@@ -250,7 +250,7 @@ export default async function CouplesPricingPage() {
               Send your preferred date, location idea, and session type. I&rsquo;ll confirm availability and send the invoice and contract once everything is set.
             </p>
           </div>
-          <Link href="/contact" className={styles.pricingLink}>Inquire About a Couples Session</Link>
+          <Link href="/contact" className={styles.pricingLink}>Book a Couples Session</Link>
         </div>
       </section>
     </main>

@@ -88,7 +88,7 @@ export default function CouplesFaqClient() {
               Send your date, the session type, and the location you have in mind. Most inquiries receive a response within 24 hours.
             </p>
             <div className="faq-cta-buttons">
-              <Link href={COUPLES_CONTACT} className="faq-link faq-link--primary">Inquire about a session</Link>
+              <Link href={COUPLES_CONTACT} className="faq-link faq-link--primary">Book a Session</Link>
               <Link href="/couples-guide" className="faq-link faq-link--ghost">Read the couples guide</Link>
               <Link href="/pricing/couples" className="faq-link faq-link--ghost">See couples pricing</Link>
             </div>

@@ -93,7 +93,7 @@ export default function PosingContent({ poses: posesFromDb }: { poses: Pose[] })
             <p className="gg-cta-sub">Save these poses on your phone so you can reference them day-of.</p>
             <div className="gg-cta-actions">
               <Link href="/grad-guide/what-to-wear" className="gg-btn gg-btn--ongreen">Next: What to Wear →</Link>
-              <Link href="/contact?school=Graduation" className="gg-btn gg-btn--onghost">Book a shoot</Link>
+              <Link href="/contact?school=Graduation" className="gg-btn gg-btn--onghost">Book a Session</Link>
             </div>
           </div>
         </div>

@@ -7,8 +7,8 @@
 //   3. Package     — Elopement & Courthouse Ceremony (text left, photo right)
 //   4. CTA strip
 //
-// Coverage duration is deliberately NOT advertised: the catalog has no
-// durationMinutes for this service, only the neutral durationLabel.
+// Coverage is advertised as the catalog's 2-hour base (durationMinutes);
+// longer coverage is a custom quote and a second location stays inside it.
 //
 // ALL SHARED STYLES live in app/(professional)/pricing/Pricing.module.css
 // ─────────────────────────────────────────────────────────────────────────────
@@ -136,7 +136,7 @@ export default async function ElopementPricingPage() {
               <span className={styles.pricingChip}>{PRICING_CATALOG.standardTurnaroundDays / 7}-week turnaround</span>
             </div>
 
-            <Link href="/contact" className={styles.pricingLink}>Inquire About an Elopement</Link>
+            <Link href="/contact" className={styles.pricingLink}>Send an Elopement Inquiry</Link>
           </div>
           <p className={styles.pricingHeroFineprint}>
             Starting at {formatCurrency(elopementPricing.startingPrice)} for {elopementPricing.durationLabel}. Longer
@@ -188,7 +188,7 @@ export default async function ElopementPricingPage() {
               <p className={styles.pricingPrice}>{formatCurrency(elopementPricing.startingPrice)}</p>
               <p className={styles.pricingMeta}>starting at</p>
             </div>
-            <Link href="/contact" className={styles.pricingLink}>Inquire About an Elopement</Link>
+            <Link href="/contact" className={styles.pricingLink}>Send an Elopement Inquiry</Link>
           </div>
         </div>
 
@@ -216,7 +216,7 @@ export default async function ElopementPricingPage() {
               need longer, or want a second nearby spot for portraits, and I&rsquo;ll put a quote together.
             </p>
           </div>
-          <Link href="/contact" className={styles.pricingLink}>Inquire now</Link>
+          <Link href="/contact" className={styles.pricingLink}>Send Inquiry</Link>
         </div>
       </section>
     </main>

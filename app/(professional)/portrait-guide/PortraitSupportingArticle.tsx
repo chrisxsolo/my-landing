@@ -78,7 +78,7 @@ export default function PortraitSupportingArticle({ topic }: { topic: Supporting
           <h1 className="fg-h1">{topic.h1}</h1>
           <p className="fg-sub">{topic.intro}</p>
           <div className="fg-actions">
-            <Link href={PORTRAIT_CONTACT} className="fg-btn fg-btn--primary">Inquire about a session →</Link>
+            <Link href={PORTRAIT_CONTACT} className="fg-btn fg-btn--primary">Book a Session →</Link>
             <Link href="/portrait-guide" className="fg-btn fg-btn--ghost">Back to the portrait guide</Link>
           </div>
         </div>
@@ -123,7 +123,7 @@ export default function PortraitSupportingArticle({ topic }: { topic: Supporting
             <h2 className="fg-cta-title">Ready to plan your portraits?</h2>
             <p className="fg-cta-sub">Send your date, what the photos are for, and the look you have in mind — I&rsquo;ll guide the rest.</p>
             <div className="fg-cta-actions">
-              <Link href={PORTRAIT_CONTACT} className="fg-btn fg-btn--ongreen">Inquire about a session →</Link>
+              <Link href={PORTRAIT_CONTACT} className="fg-btn fg-btn--ongreen">Book a Session →</Link>
               <Link href="/pricing" className="fg-btn fg-btn--onghost">See pricing</Link>
             </div>
           </div>

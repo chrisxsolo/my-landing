@@ -88,7 +88,7 @@ export default function PortraitFaqClient() {
               Send your date, what the photos are for, and the location you have in mind. Most inquiries receive a response within 24 hours.
             </p>
             <div className="faq-cta-buttons">
-              <Link href={PORTRAIT_CONTACT} className="faq-link faq-link--primary">Inquire about a session</Link>
+              <Link href={PORTRAIT_CONTACT} className="faq-link faq-link--primary">Book a Session</Link>
               <Link href="/portrait-guide" className="faq-link faq-link--ghost">Read the portrait guide</Link>
               <Link href="/pricing" className="faq-link faq-link--ghost">See pricing</Link>
             </div>

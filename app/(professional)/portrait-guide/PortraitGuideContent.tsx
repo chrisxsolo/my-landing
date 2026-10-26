@@ -77,7 +77,7 @@ export default function PortraitGuideContent({
             with clear posing and direction so you never have to wonder what to do with your hands.
           </p>
           <div className="fg-actions fg-afu4">
-            <Link href={PORTRAIT_CONTACT} className="fg-btn fg-btn--primary">Inquire about a session →</Link>
+            <Link href={PORTRAIT_CONTACT} className="fg-btn fg-btn--primary">Book a Session →</Link>
             <Link href="/portrait-guide/locations" className="fg-btn fg-btn--ghost">Explore portrait photo locations</Link>
           </div>
         </div>
@@ -260,7 +260,7 @@ export default function PortraitGuideContent({
               mind. I&rsquo;ll guide the rest.
             </p>
             <div className="fg-cta-actions">
-              <Link href={PORTRAIT_CONTACT} className="fg-btn fg-btn--ongreen">Inquire about a session →</Link>
+              <Link href={PORTRAIT_CONTACT} className="fg-btn fg-btn--ongreen">Book a Session →</Link>
               <Link href="/pricing" className="fg-btn fg-btn--onghost">See pricing</Link>
             </div>
           </div>

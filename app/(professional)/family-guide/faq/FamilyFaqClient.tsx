@@ -88,7 +88,7 @@ export default function FamilyFaqClient() {
               Send your date, who&rsquo;s joining, and the location you have in mind. Most inquiries receive a response within 24 hours.
             </p>
             <div className="faq-cta-buttons">
-              <Link href={FAMILY_CONTACT} className="faq-link faq-link--primary">Inquire about a session</Link>
+              <Link href={FAMILY_CONTACT} className="faq-link faq-link--primary">Book a Session</Link>
               <Link href="/family-guide" className="faq-link faq-link--ghost">Read the family guide</Link>
               <Link href="/pricing/families" className="faq-link faq-link--ghost">See family pricing</Link>
             </div>

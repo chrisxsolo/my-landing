@@ -110,7 +110,7 @@ export default function GradGuideContent() {
           </p>
           <div className="gg-actions gg-afu4" style={{ justifyContent: "center" }}>
             <Link href="/grad-guide/posing" className="gg-btn gg-btn--primary">Start with posing →</Link>
-            <Link href="/contact?school=Graduation" className="gg-btn gg-btn--ghost">Book a shoot</Link>
+            <Link href="/contact?school=Graduation" className="gg-btn gg-btn--ghost">Book a Session</Link>
           </div>
         </div>
       </section>

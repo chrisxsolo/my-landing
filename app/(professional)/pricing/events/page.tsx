@@ -134,7 +134,7 @@ export default async function EventPricingPage() {
               <span className={styles.pricingChip}>Private online delivery</span>
             </div>
 
-            <Link href="/contact" className={styles.pricingLink}>Inquire about your event</Link>
+            <Link href="/contact" className={styles.pricingLink}>Send an Event Inquiry</Link>
           </div>
         </div>
       </section>
@@ -183,7 +183,7 @@ export default async function EventPricingPage() {
               <p className={styles.pricingPrice}>{formatCurrency(eventPricing.smallEvent.hourlyRate)}</p>
               <p className={styles.pricingMeta}>per hour · {eventPricing.smallEvent.minimumHours}-hour minimum</p>
             </div>
-            <Link href="/contact" className={styles.pricingLink}>Inquire now</Link>
+            <Link href="/contact" className={styles.pricingLink}>Send Inquiry</Link>
           </div>
         </div>
 
@@ -258,7 +258,7 @@ export default async function EventPricingPage() {
             <p className={styles.pricingKicker}>Ready to book?</p>
             <h2 className={styles.pricingTitle} style={{ fontSize: 38 }}>Send the date, location, and event type.</h2>
           </div>
-          <Link href="/contact" className={styles.pricingLink}>Inquire now</Link>
+          <Link href="/contact" className={styles.pricingLink}>Send Inquiry</Link>
         </div>
       </section>
     </main>

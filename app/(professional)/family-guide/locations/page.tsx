@@ -93,7 +93,7 @@ export default async function FamilyLocationsHubPage() {
             guidance throughout while keeping the session natural, candid, and lifestyle-focused.
           </p>
           <div className="fg-actions fg-afu4">
-            <Link href={FAMILY_CONTACT} className="fg-btn fg-btn--primary">Inquire about a session →</Link>
+            <Link href={FAMILY_CONTACT} className="fg-btn fg-btn--primary">Book a Session →</Link>
             <Link href="/family-guide" className="fg-btn fg-btn--ghost">Back to the family guide</Link>
           </div>
         </div>
@@ -133,7 +133,7 @@ export default async function FamilyLocationsHubPage() {
             <h2 className="fg-cta-title">Not sure which location fits?</h2>
             <p className="fg-cta-sub">Tell me about your family and the look you want — I&rsquo;ll help you choose the right spot, time, and pacing.</p>
             <div className="fg-cta-actions">
-              <Link href={FAMILY_CONTACT} className="fg-btn fg-btn--ongreen">Inquire about a session →</Link>
+              <Link href={FAMILY_CONTACT} className="fg-btn fg-btn--ongreen">Book a Session →</Link>
               <Link href="/pricing/families" className="fg-btn fg-btn--onghost">See family pricing</Link>
             </div>
           </div>

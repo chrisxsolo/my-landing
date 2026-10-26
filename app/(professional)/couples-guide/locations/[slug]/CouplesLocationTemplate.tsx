@@ -88,7 +88,7 @@ export default function CouplesLocationTemplate({
           <h1 className="fg-h1">{data.h1}</h1>
           <p className="fg-sub">{data.heroTagline}</p>
           <div className="fg-actions">
-            <Link href={inquireHref} className="fg-btn fg-btn--primary">Inquire about a session →</Link>
+            <Link href={inquireHref} className="fg-btn fg-btn--primary">Book a Session →</Link>
             <Link href="/couples-guide/locations" className="fg-btn fg-btn--ghost">All couples locations</Link>
           </div>
 
@@ -216,7 +216,7 @@ export default function CouplesLocationTemplate({
             <h2 className="fg-cta-title">{data.ctaTitle}</h2>
             <p className="fg-cta-sub">{data.ctaBody}</p>
             <div className="fg-cta-actions">
-              <Link href={inquireHref} className="fg-btn fg-btn--ongreen">Inquire about a session →</Link>
+              <Link href={inquireHref} className="fg-btn fg-btn--ongreen">Book a Session →</Link>
               <Link href="/pricing/couples" className="fg-btn fg-btn--onghost">See couples pricing</Link>
             </div>
           </div>

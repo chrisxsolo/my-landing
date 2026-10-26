@@ -78,7 +78,7 @@ export default function FamilySupportingArticle({ topic }: { topic: SupportingTo
           <h1 className="fg-h1">{topic.h1}</h1>
           <p className="fg-sub">{topic.intro}</p>
           <div className="fg-actions">
-            <Link href={FAMILY_CONTACT} className="fg-btn fg-btn--primary">Inquire about a session →</Link>
+            <Link href={FAMILY_CONTACT} className="fg-btn fg-btn--primary">Book a Session →</Link>
             <Link href="/family-guide" className="fg-btn fg-btn--ghost">Back to the family guide</Link>
           </div>
         </div>
@@ -123,7 +123,7 @@ export default function FamilySupportingArticle({ topic }: { topic: SupportingTo
             <h2 className="fg-cta-title">Ready to plan your family photos?</h2>
             <p className="fg-cta-sub">Send your date, who&rsquo;s joining, and the look you have in mind — I&rsquo;ll guide the rest.</p>
             <div className="fg-cta-actions">
-              <Link href={FAMILY_CONTACT} className="fg-btn fg-btn--ongreen">Inquire about a session →</Link>
+              <Link href={FAMILY_CONTACT} className="fg-btn fg-btn--ongreen">Book a Session →</Link>
               <Link href="/pricing/families" className="fg-btn fg-btn--onghost">See family pricing</Link>
             </div>
           </div>
