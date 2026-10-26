@@ -6,6 +6,7 @@ import {
   LOCKABLE_FIELDS, isEnvironment, isLibraryRegion, isLockableField, regionForPlace, sortEnvironments,
   type LockableField,
 } from "@/lib/locationLibrary/taxonomy";
+import { CROWD_NOTE_MAX, normalizeCrowdNote, parseLightTags } from "@/lib/photoConditions";
 
 export class LocationEditError extends Error {
   constructor(message: string, readonly status: 400 | 404 | 409 = 400) {
@@ -57,9 +58,28 @@ function parseFlags(body: Record<string, unknown>): Record<string, unknown> {
   return fields;
 }
 
-/** { title?, city?, …, environments?, order?, clear_manual_image?, unlock?: string[] } */
+/**
+ * Light tags and the crowd note. Photographer-only: sync and AI never write
+ * them, so saving one needs no lock.
+ */
+function parseConditions(body: Record<string, unknown>): Record<string, unknown> {
+  const fields: Record<string, unknown> = {};
+  if ("light_tags" in body) {
+    const tags = parseLightTags(body.light_tags);
+    if (!tags) throw new LocationEditError("unknown light condition");
+    fields.light_tags = tags;
+  }
+  if ("crowd_note" in body) {
+    const note = normalizeCrowdNote(body.crowd_note);
+    if (note === undefined) throw new LocationEditError(`crowd note must be text up to ${CROWD_NOTE_MAX} characters`);
+    fields.crowd_note = note;
+  }
+  return fields;
+}
+
+/** { title?, city?, …, environments?, light_tags?, crowd_note?, order?, clear_manual_image?, unlock?: string[] } */
 export function parseLocationPatch(body: Record<string, unknown>): ParsedPatch {
-  const fields: Record<string, unknown> = parseFlags(body);
+  const fields: Record<string, unknown> = { ...parseFlags(body), ...parseConditions(body) };
   const lock: LockableField[] = [];
   for (const field of LOCKABLE_FIELDS) {
     if (!(field in body)) continue;

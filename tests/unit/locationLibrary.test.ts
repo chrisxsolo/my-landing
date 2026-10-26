@@ -108,7 +108,7 @@ describe("taxonomy", () => {
 describe("public filters", () => {
   const loc = (over: Partial<FilterableLocation>): FilterableLocation => ({
     title: "X", city: "San Francisco", neighborhood: null, description: "", best_for: "", best_time: "", tip: "",
-    region: "san-francisco", tags: [], environments: [], kinds: [], order: 1, photoCount: 0, sessionCount: 0,
+    region: "san-francisco", tags: [], environments: [], light_tags: [], kinds: [], order: 1, photoCount: 0, sessionCount: 0,
     createdAt: "2026-01-01", ...over,
   });
   const items = [

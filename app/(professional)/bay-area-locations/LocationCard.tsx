@@ -3,6 +3,7 @@ import ExpandableText from "@/app/components/ExpandableText";
 import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 import type { PublicLocationCard } from "@/lib/locationLibrary/publicData";
 import { environmentLabel, regionLabel, sessionKindLabel } from "@/lib/locationLibrary/taxonomy";
+import { lightTagLabel } from "@/lib/photoConditions";
 
 const REGION_EMOJI: Record<string, string> = {
   "south-bay": "🌇", "san-francisco": "🌉", "east-bay": "🌿", peninsula: "🌊", "north-bay": "🌲", coast: "🌊",
@@ -17,11 +18,12 @@ function placeholderEmoji(location: PublicLocationCard): string {
 }
 
 export default function LocationCard({
-  location, eager, onEnvironment,
+  location, eager, onEnvironment, onLight,
 }: {
   location: PublicLocationCard;
   eager: boolean;
   onEnvironment: (env: string) => void;
+  onLight: (light: string) => void;
 }) {
   const region = regionLabel(location.region, true);
   return (
@@ -86,6 +88,10 @@ export default function LocationCard({
           </div>
         ) : null}
 
+        {location.crowd_note ? (
+          <p className="loc-crowd"><strong>Gets busy</strong> {location.crowd_note}</p>
+        ) : null}
+
         {location.kinds.length > 0 ? (
           <p className="loc-kinds">
             <strong>I&apos;ve photographed</strong>{" "}
@@ -98,6 +104,12 @@ export default function LocationCard({
           {location.environments.map((env) => (
             <button key={env} type="button" onClick={() => onEnvironment(env)} className="loc-tag">
               {environmentLabel(env, true)}
+            </button>
+          ))}
+          {location.light_tags.map((light) => (
+            <button key={light} type="button" onClick={() => onLight(light)} className="loc-tag loc-tag--light"
+              aria-label={`Show spots good for ${lightTagLabel(light).toLowerCase()}`}>
+              {lightTagLabel(light, true)}
             </button>
           ))}
         </div>

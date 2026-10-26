@@ -1,14 +1,20 @@
 "use client";
 // Editorial fields + categories. Saving a changed field locks it (sync and AI
 // leave it alone); "Auto" hands one field back to automatic management.
+// Light tags and the crowd note are photographer-only, so they have no lock.
 import { useState } from "react";
 import { T } from "@/app/admin/adminTheme";
 import { btn, card, chip, input as inputStyle, label as labelStyle, sectionTitle } from "@/app/admin/content-engine/[id]/ui";
 import { ENVIRONMENTS, LIBRARY_REGIONS, type LockableField } from "@/lib/locationLibrary/taxonomy";
-import type { LocationRow } from "./locationLibraryApi";
+import type { DetailSessionDto, LocationRow } from "./locationLibraryApi";
+import LocationConditionsFields from "./LocationConditionsFields";
 import { Muted, selectStyle } from "./libraryUi";
 
-type Draft = Record<Exclude<LockableField, "environments">, string> & { environments: string[] };
+type Draft = Record<Exclude<LockableField, "environments">, string> & {
+  environments: string[];
+  light_tags: string[];
+  crowd_note: string;
+};
 
 const TEXT_FIELDS: { field: Exclude<LockableField, "environments" | "region">; label: string; rows?: number }[] = [
   { field: "title", label: "Location name" },
@@ -24,7 +30,7 @@ function draftOf(row: LocationRow): Draft {
   return {
     title: row.title.trim(), city: row.city.trim(), neighborhood: row.neighborhood ?? "", region: row.region,
     description: row.description, best_time: row.best_time, best_for: row.best_for, tip: row.tip,
-    environments: row.environments,
+    environments: row.environments, light_tags: row.light_tags ?? [], crowd_note: row.crowd_note ?? "",
   };
 }
 
@@ -62,9 +68,10 @@ function FieldHead({ text, field, row, busy, onUnlock }: {
 }
 
 export default function LocationFieldsEditor({
-  row, busy, onSave,
+  row, sessions, busy, onSave,
 }: {
   row: LocationRow;
+  sessions: DetailSessionDto[];
   busy: boolean;
   onSave: (body: Record<string, unknown>) => Promise<void>;
 }) {
@@ -121,6 +128,8 @@ export default function LocationFieldsEditor({
             })}
           </div>
         </div>
+        <LocationConditionsFields lightTags={draft.light_tags} crowdNote={draft.crowd_note} sessions={sessions}
+          onLightTags={(tags) => set("light_tags", tags)} onCrowdNote={(note) => set("crowd_note", note)} />
       </div>
       <div style={{ display: "flex", gap: 8, marginTop: 14, alignItems: "center" }}>
         <button type="button" style={{ ...btn(true), opacity: dirty ? 1 : 0.45, cursor: dirty ? "pointer" : "default" }}

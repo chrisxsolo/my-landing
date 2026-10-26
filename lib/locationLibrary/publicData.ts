@@ -8,6 +8,7 @@ import { DRAFT_BAY_AREA_LOCATIONS, slugifyLocation } from "@/lib/bayAreaLocation
 import { loadLibraryLocations, type LibraryLocation } from "@/lib/locationLibrary/load";
 import { loadRelatedContent, type RelatedLink } from "@/lib/locationLibrary/related";
 import { LOCATIONS_TABLE, sortEnvironments } from "@/lib/locationLibrary/taxonomy";
+import { sortLightTags } from "@/lib/photoConditions";
 
 export interface PublicLocationCard {
   id: number;
@@ -22,6 +23,9 @@ export interface PublicLocationCard {
   tip: string;
   tags: string[];
   environments: string[];
+  light_tags: string[];
+  /** Non-null = the place gets busy; the text says when. */
+  crowd_note: string | null;
   kinds: string[];
   image_url: string | null;
   image_alt: string;
@@ -45,6 +49,7 @@ export function toPublicCard(loc: LibraryLocation, related: RelatedLink[]): Publ
     neighborhood: r.neighborhood?.trim() || null,
     description: r.description, best_for: r.best_for, best_time: r.best_time, tip: r.tip,
     tags: r.tags ?? [], environments: sortEnvironments(r.environments ?? []), kinds: loc.kinds,
+    light_tags: sortLightTags(r.light_tags ?? []), crowd_note: r.crowd_note?.trim() || null,
     image_url: loc.hero?.url ?? null, image_alt: altFor(title, city, loc.hero?.alt ?? null),
     photoCount: loc.publicPhotoCount, sessionCount: loc.sessionCount,
     order: r.order, createdAt: r.created_at, related,
@@ -53,7 +58,7 @@ export function toPublicCard(loc: LibraryLocation, related: RelatedLink[]): Publ
 
 function fromDraft(): PublicLocationCard[] {
   return DRAFT_BAY_AREA_LOCATIONS.map((d) => ({
-    ...d, environments: [], kinds: [], image_alt: altFor(d.title, d.city, null),
+    ...d, environments: [], light_tags: [], crowd_note: null, kinds: [], image_alt: altFor(d.title, d.city, null),
     photoCount: 0, sessionCount: 0, createdAt: "", related: [],
   }));
 }
@@ -67,6 +72,7 @@ async function loadPlainRows(): Promise<PublicLocationCard[]> {
     id: r.id, title: String(r.title ?? "").trim(), slug: r.slug, region: r.region, city: String(r.city ?? "").trim(),
     neighborhood: r.neighborhood ?? null, description: r.description ?? "", best_for: r.best_for ?? "",
     best_time: r.best_time ?? "", tip: r.tip ?? "", tags: r.tags ?? [], environments: r.environments ?? [],
+    light_tags: sortLightTags(r.light_tags ?? []), crowd_note: r.crowd_note?.trim() || null,
     kinds: [], image_url: r.image_url ?? null, image_alt: altFor(String(r.title ?? ""), String(r.city ?? ""), null),
     photoCount: 0, sessionCount: 0, order: r.order ?? 0, createdAt: r.created_at ?? "", related: [],
   }));
@@ -91,4 +97,4 @@ async function loadPublicLocations(): Promise<PublicLocationCard[]> {
   }
 }
 
-export const getPublicLocations = cachePublicContent(loadPublicLocations, ["bay-area-library-v1"]);
+export const getPublicLocations = cachePublicContent(loadPublicLocations, ["bay-area-library-v2"]);
