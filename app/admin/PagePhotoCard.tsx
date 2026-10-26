@@ -61,7 +61,9 @@ function SpotPicker({ photo, busy, spots, onSpot }: Pick<Props, "photo" | "busy"
       )}
       {hint && (
         <p className="mt-1 text-[11px] text-slate-500">
-          Photo text mentions {hint.name}.{" "}
+          {photo.spotHintSource === "place"
+            ? `Shot at ${hint.name}: shown in its section until you tag photos for it.`
+            : `Photo text mentions ${hint.name}.`}{" "}
           <button type="button" className="font-semibold text-emerald-700 hover:underline disabled:opacity-40" disabled={busy} onClick={() => onSpot(hint.key, false)}>
             Confirm
           </button>

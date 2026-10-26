@@ -18,7 +18,7 @@ import {
 } from "@/lib/pagePhotos/candidates";
 import { guidePageKey, pagePath, parsePageKey, schoolPageKey } from "@/lib/pagePhotos/pageKeys";
 import { loadPhotoPool, type PhotoPool } from "@/lib/pagePhotos/pool";
-import { spotsForSchool, suggestSpotFromText } from "@/lib/schoolSpots";
+import { spotKeysByPlace, spotsForSchool, suggestSpotFromText } from "@/lib/schoolSpots";
 
 const GUIDE_TABLE: Record<LocationGuideType, string> = {
   couples: COUPLES_LOCATION_PHOTOS_TABLE,
@@ -56,6 +56,8 @@ export interface PageViewPhoto {
   spotFeatured: boolean;
   /** Spot the photo's own text suggests — a hint to confirm, never applied. */
   spotHint: string | null;
+  /** "place" = shot at an off-campus spot's place (shown there automatically); "text" = named in the photo's text. */
+  spotHintSource: "place" | "text" | null;
 }
 
 export interface SpotOption { key: string; name: string }
@@ -143,12 +145,21 @@ function explain(loaded: Loaded, c: PageCandidate): string {
 function spotFacts(loaded: Loaded, key: string, c: PageCandidate) {
   const parsed = parsePageKey(key);
   if (parsed?.kind !== "grads" || spotsForSchool(parsed.slug).length === 0) {
-    return { spotKey: null, spotFeatured: false, spotHint: null };
+    return { spotKey: null, spotFeatured: false, spotHint: null, spotHintSource: null };
   }
   const tag = loaded.pool.spotTags.find((t) => t.schoolSlug === parsed.slug && t.imageUrl === c.url);
   const photo = loaded.pool.photos.find((p) => p.url === c.url);
-  const hint = tag ? null : suggestSpotFromText(parsed.slug, [photo?.title, c.alt].filter(Boolean).join(" · "));
-  return { spotKey: tag?.spotKey ?? null, spotFeatured: tag?.isFeatured ?? false, spotHint: hint?.key ?? null };
+  // Location evidence first (an off-campus spot fills from it automatically),
+  // then the photo's own text, which is only ever a suggestion.
+  const placed = c.placeKey ? spotKeysByPlace(parsed.slug)[c.placeKey] : undefined;
+  const hint = tag ? null : placed
+    ? { key: placed }
+    : suggestSpotFromText(parsed.slug, [photo?.title, c.alt].filter(Boolean).join(" · "));
+  return {
+    spotKey: tag?.spotKey ?? null, spotFeatured: tag?.isFeatured ?? false,
+    spotHint: hint?.key ?? null,
+    spotHintSource: hint ? (placed ? "place" as const : "text" as const) : null,
+  };
 }
 
 function toViewPhoto(loaded: Loaded, key: string, rules: CurationRow[], c: PageCandidate): PageViewPhoto {

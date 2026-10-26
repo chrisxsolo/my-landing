@@ -6,6 +6,12 @@
 // Tags are set by the photographer only. suggestSpotFromText() reads a photo's
 // own title/alt text and is shown in admin as a hint to confirm; it never tags
 // a photo by itself, because AI-written alt text guesses at scenery.
+//
+// An off-campus spot names its verified place (placeKey, lib/locations/places).
+// Its section also shows untagged photos from this school whose location
+// evidence (photo location tag, session location, or GPS for multi-location
+// sessions) is that exact place — until the photographer tags any photo for
+// it, after which the section is only the tagged photos.
 import type { SchoolSlug } from "@/lib/contentEngine/taxonomy";
 
 export const SCHOOL_SPOT_PHOTOS_TABLE = "school_spot_photos";
@@ -20,6 +26,8 @@ export interface SchoolSpotDef {
   campusSpotNames: readonly string[];
   /** Words in a photo's own text that suggest this spot (hint only). */
   hintTerms: readonly string[];
+  /** Known place this off-campus spot is (lib/locations/places key). */
+  placeKey?: string;
 }
 
 export const SCHOOL_SPOTS: Partial<Record<SchoolSlug, readonly SchoolSpotDef[]>> = {
@@ -91,12 +99,68 @@ export const SCHOOL_SPOTS: Partial<Record<SchoolSlug, readonly SchoolSpotDef[]>>
       hintTerms: ["cherry blossom", "cherry blossoms", "cherry tree", "cherry trees"],
     },
   ],
+  // SF State: Chris's five campus spots, then the four San Francisco places
+  // his SF State graduates book most. Off-campus keys equal their place keys.
+  // The library is exterior only; the garden is a memorial, named as such.
+  "sf-state": [
+    {
+      key: "sfsu-entrance-sign", name: "SFSU Entrance Sign", altPlace: "at the SF State entrance sign",
+      campusSpotNames: ["SFSU Sign & Main Entrance"],
+      hintTerms: ["sfsu sign", "sf state sign", "san francisco state sign", "entrance sign", "university sign", "19th and holloway", "19th avenue and holloway"],
+    },
+    {
+      key: "sfsu-main-quad", name: "SFSU Main Quad", altPlace: "on the SF State quad",
+      campusSpotNames: ["Campus Green & Open Quad"],
+      hintTerms: ["main quad", "sfsu quad", "sf state quad", "campus quad"],
+    },
+    {
+      key: "j-paul-leonard-library", name: "J. Paul Leonard Library", altPlace: "outside the J. Paul Leonard Library",
+      campusSpotNames: [],
+      hintTerms: ["j paul leonard", "leonard library", "sfsu library", "sf state library"],
+    },
+    {
+      key: "sfsu-gator-statue", name: "SFSU Gator Statue", altPlace: "with the SF State Gator statue",
+      campusSpotNames: [],
+      hintTerms: ["gator statue", "gator sculpture", "gator spirit statue", "sfsu gator", "sf state gator", "don nasser"],
+    },
+    {
+      key: "garden-of-remembrance", name: "Ruth Asawa Garden of Remembrance", altPlace: "at the Garden of Remembrance",
+      campusSpotNames: [],
+      hintTerms: ["garden of remembrance", "ruth asawa", "sfsu waterfall", "sf state waterfall", "sfsu rock garden", "sf state rock garden"],
+    },
+    {
+      key: "palace-of-fine-arts", name: "Palace of Fine Arts", altPlace: "at the Palace of Fine Arts",
+      campusSpotNames: [], placeKey: "palace-of-fine-arts",
+      hintTerms: ["palace of fine arts"],
+    },
+    {
+      key: "legion-of-honor", name: "Legion of Honor", altPlace: "at the Legion of Honor",
+      campusSpotNames: [], placeKey: "legion-of-honor",
+      hintTerms: ["legion of honor"],
+    },
+    {
+      key: "crissy-field", name: "Crissy Field", altPlace: "at Crissy Field",
+      campusSpotNames: [], placeKey: "crissy-field",
+      hintTerms: ["crissy field"],
+    },
+    {
+      key: "golden-gate-bridge-welcome-center", name: "Golden Gate Bridge Welcome Center",
+      altPlace: "near the Golden Gate Bridge Welcome Center",
+      campusSpotNames: [], placeKey: "golden-gate-bridge-welcome-center",
+      hintTerms: ["golden gate bridge welcome center", "bridge welcome center", "golden gate bridge visitor center"],
+    },
+  ],
 };
 
 export const SPOT_KEY_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
 export function spotsForSchool(slug: string): readonly SchoolSpotDef[] {
   return SCHOOL_SPOTS[slug as SchoolSlug] ?? [];
+}
+
+/** Off-campus spot key per place key, for place-matched section photos. */
+export function spotKeysByPlace(slug: string): Record<string, string> {
+  return Object.fromEntries(spotsForSchool(slug).flatMap((spot) => (spot.placeKey ? [[spot.placeKey, spot.key]] : [])));
 }
 
 export function isSchoolSpotKey(slug: string, key: unknown): key is string {

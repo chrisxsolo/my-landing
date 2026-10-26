@@ -10,7 +10,7 @@ import { getPhotoPool } from "@/lib/pagePhotos/pool";
 import { buildSpotPhotoLayout, campusSpotNameKey, type SpotFallback, type SpotSectionPhoto } from "@/lib/pagePhotos/spotPhotos";
 import { SPOT_SCHOOL_IDS, type SchoolSlug } from "@/lib/contentEngine/taxonomy";
 import { getLocationSpots } from "@/lib/gradGuideData";
-import { spotsForSchool } from "@/lib/schoolSpots";
+import { spotKeysByPlace, spotsForSchool } from "@/lib/schoolSpots";
 
 export interface PagePhoto {
   id: string;
@@ -85,8 +85,11 @@ async function campusSpotFallbacks(slug: string, schoolShort: string): Promise<R
 
 /**
  * The school location guide's photos: the school page's hero, photographer-
- * tagged photos per campus spot, and the remaining eligible photos as the
- * gallery. Uses the school page's own curation (pins, hides, hero).
+ * tagged photos per spot (or, for an off-campus spot, this school's photos
+ * shot at that place), and the remaining eligible photos as the gallery.
+ * Uses the school page's own curation (pins, hides, hero), so only photos
+ * already matched to this school can appear — a couples session at the
+ * Palace never reaches a school guide.
  */
 export async function getSchoolSpotsGuidePhotos(slug: string, schoolShort: string): Promise<SchoolSpotsGuidePhotos> {
   const [pool, fallbacks] = await Promise.all([getPhotoPool(), campusSpotFallbacks(slug, schoolShort)]);
@@ -106,6 +109,7 @@ export async function getSchoolSpotsGuidePhotos(slug: string, schoolShort: strin
     heroUrl: heroCandidate?.url ?? null,
     tags: pool ? pool.spotTags.filter((t) => t.schoolSlug === slug) : [],
     fallbacks,
+    placeSpots: spotKeysByPlace(slug),
   });
   return {
     hero: heroCandidate ? toPagePhoto(heroCandidate) : null,

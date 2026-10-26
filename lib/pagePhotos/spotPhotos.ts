@@ -7,6 +7,10 @@
 //   • A tagged photo must still be eligible for the school page and not hidden
 //     there; a tag never publishes anything.
 //   • Featured first, then the tag's position, then the page's own order.
+//   • An off-campus spot with no tagged photo shows the page's photos whose
+//     location evidence is that exact place (placeSpots), in page order. A
+//     photo tagged to any spot is never moved by this, and one tag for the
+//     spot replaces the automatic picks entirely.
 //   • With no tagged photo, a spot falls back to the photo already chosen for
 //     it on the campus-spots guide (location_spots), unless hidden on the page.
 //   • No photo appears twice: the hero is skipped, each photo lands in at most
@@ -27,6 +31,8 @@ export interface SpotPhotoInput {
   heroUrl: string | null;
   tags: readonly SpotTag[];
   fallbacks: Readonly<Record<string, SpotFallback>>;
+  /** Place key → off-campus spot key (lib/schoolSpots spotKeysByPlace). */
+  placeSpots?: Readonly<Record<string, string>>;
 }
 
 export interface SpotSectionPhoto {
@@ -35,8 +41,8 @@ export interface SpotSectionPhoto {
   width: number | null;
   height: number | null;
   featured: boolean;
-  /** "tag" = photographer-tagged; "campus-spot" = the campus-spots guide photo. */
-  source: "tag" | "campus-spot";
+  /** "tag" = photographer-tagged; "place" = shot at the spot's place; "campus-spot" = the campus-spots guide photo. */
+  source: "tag" | "place" | "campus-spot";
 }
 
 export interface SpotPhotoLayout {
@@ -59,17 +65,31 @@ function taggedFor(spotKey: string, input: SpotPhotoInput, order: Map<string, nu
     });
 }
 
+function placedFor(spotKey: string, input: SpotPhotoInput, used: ReadonlySet<string>): SpotSectionPhoto[] {
+  const taggedUrls = new Set(input.tags.map((t) => t.imageUrl));
+  return input.eligible
+    .filter((c) => c.placeKey && input.placeSpots?.[c.placeKey] === spotKey
+      && !taggedUrls.has(c.url) && !used.has(c.url))
+    .slice(0, SPOT_SECTION_LIMIT)
+    .map((c) => ({ url: c.url, alt: c.alt, width: c.width, height: c.height, featured: false, source: "place" as const }));
+}
+
+function fallbackFor(key: string, input: SpotPhotoInput, used: ReadonlySet<string>): SpotSectionPhoto[] {
+  const fallback = input.fallbacks[key];
+  if (!fallback || input.hiddenUrls.has(fallback.url) || used.has(fallback.url)) return [];
+  return [{ url: fallback.url, alt: fallback.alt, width: null, height: null, featured: true, source: "campus-spot" }];
+}
+
 export function buildSpotPhotoLayout(input: SpotPhotoInput): SpotPhotoLayout {
   const order = new Map(input.eligible.map((c, i) => [c.url, i]));
   const bySpot: Record<string, SpotSectionPhoto[]> = {};
   const used = new Set<string>(input.heroUrl ? [input.heroUrl] : []);
 
   for (const key of input.spotKeys) {
+    const hasTags = input.tags.some((t) => t.spotKey === key);
     const tagged = taggedFor(key, input, order).filter((p) => !used.has(p.url));
-    const fallback = input.fallbacks[key];
-    const photos = tagged.length > 0 || !fallback || input.hiddenUrls.has(fallback.url) || used.has(fallback.url)
-      ? tagged
-      : [{ url: fallback.url, alt: fallback.alt, width: null, height: null, featured: true, source: "campus-spot" as const }];
+    const placed = hasTags ? [] : placedFor(key, input, used);
+    const photos = tagged.length > 0 ? tagged : placed.length > 0 ? placed : fallbackFor(key, input, used);
     photos.forEach((p) => used.add(p.url));
     bySpot[key] = photos;
   }
