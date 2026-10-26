@@ -47,10 +47,12 @@ export async function publishApprovedItem(args: PublishArgs): Promise<PublishOut
 
   // Preflight — location guards the RPC cannot evaluate (item left untouched)
   const { data: pre, error: preError } = await client.from("session_content_items")
-    .select("content_type,payload").eq("id", itemId).maybeSingle();
+    .select("content_type,payload,package_id").eq("id", itemId).maybeSingle();
   if (preError) return { status: "failed", error: preError.message };
   if (!pre) return { status: "blocked", reason: "content item not found" };
-  const blockReason = await publishBlockReason(client, pre.content_type, pre.payload as Record<string, unknown>);
+  const blockReason = await publishBlockReason(
+    client, pre.content_type, pre.payload as Record<string, unknown>, pre.package_id as string,
+  );
   if (blockReason) return { status: "blocked", reason: blockReason };
 
   // Step A — derivatives (item left approved on failure; retryable)

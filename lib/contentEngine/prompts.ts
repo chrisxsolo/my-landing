@@ -9,7 +9,7 @@ import {
 } from "@/lib/contentEngine/taxonomy";
 import { serviceConfigFor } from "@/lib/contentEngine/serviceConfig";
 
-export const PROMPT_VERSION = "2026-10-25.2";
+export const PROMPT_VERSION = "2026-10-26.1";
 
 export interface BuiltPrompt {
   system: string;
@@ -28,7 +28,10 @@ export interface PhotoSummary {
 
 const BRAND =
   "You write for soloxsnaps, a Bay Area photographer (grads, couples, families). " +
-  "Voice: warm, specific, natural — never keyword-stuffed, never invented facts.";
+  "Voice: warm, specific, natural — never keyword-stuffed, never invented facts. " +
+  "Name only the places in the session facts: never recommend, suggest, or pair another " +
+  "location (being near the campus or session is not a reason to mention one), and never " +
+  "say Chris has photographed somewhere the facts do not show.";
 
 // Service-aware system prefix (2026-07-02): the per-service guidance from
 // serviceConfig routes prompt voice/SEO by facts.service_type. grads guidance
