@@ -8,7 +8,7 @@
 // The model never decides which location a session belongs to.
 import { z } from "zod";
 import {
-  callForJson, loadPhotoSummaries, validated, assertKnownPhotos, GenerationError,
+  callForJson, loadPhotoSummaries, validated, assertKnownPhotos, keepKnownPhotoPlacements, GenerationError,
   type ItemSpec, type TargetContext, type TargetResult,
 } from "@/lib/contentEngine/generationTargetCore";
 import { buildGuidePhotoPrompt } from "@/lib/contentEngine/prompts";
@@ -50,9 +50,9 @@ async function placeOnExistingGuide(
   const parsed = placementsResponseSchema.safeParse(json);
   if (!parsed.success) throw new GenerationError(`malformed placements response: ${parsed.error.message}`);
 
-  const itemSpecs: ItemSpec[] = parsed.data.placements.map((raw) => {
+  const placements = keepKnownPhotoPlacements(parsed.data.placements, known, "guide_photo");
+  const itemSpecs: ItemSpec[] = placements.map((raw) => {
     const payload = validated("guide_photo", raw);
-    assertKnownPhotos([payload.session_photo_id as string], known);
     if (payload.guide !== match.guide || payload.location_key !== match.slug) {
       throw new GenerationError(
         `guide placement ${String(payload.guide)}/${String(payload.location_key)} is not this session's location (${match.slug})`,

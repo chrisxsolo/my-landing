@@ -10,7 +10,7 @@ import {
 import { guideTypeForService, isSchoolSlug, SPOT_SCHOOL_IDS } from "@/lib/contentEngine/taxonomy";
 import { downloadOriginal, encodeImageForModel, toImageBlock } from "@/lib/contentEngine/modelImages";
 import {
-  GenerationError, assertKnownPhotos, callForJson, deterministicKeywords, excerptOf,
+  GenerationError, assertKnownPhotos, callForJson, deterministicKeywords, excerptOf, keepKnownPhotoPlacements,
   loadPhotoSummaries, validated, type TargetContext, type TargetResult,
 } from "@/lib/contentEngine/generationTargetCore";
 import {
@@ -199,9 +199,9 @@ async function schoolTarget(ctx: TargetContext): Promise<TargetResult> {
   const parsed = placementsResponseSchema.safeParse(json);
   if (!parsed.success) throw new GenerationError(`malformed placements response: ${parsed.error.message}`);
 
-  const itemSpecs = parsed.data.placements.map((raw) => {
+  const placements = keepKnownPhotoPlacements(parsed.data.placements, known, "school_page_photo");
+  const itemSpecs = placements.map((raw) => {
     const payload = validated("school_page_photo", raw);
-    assertKnownPhotos([payload.session_photo_id as string], known);
     return {
       content_type: "school_page_photo", payload,
       destination: payload.school_slug as string, photoId: payload.session_photo_id as string,
@@ -251,9 +251,9 @@ async function gradSpotTarget(ctx: TargetContext): Promise<TargetResult> {
   const parsed = placementsResponseSchema.safeParse(json);
   if (!parsed.success) throw new GenerationError(`malformed placements response: ${parsed.error.message}`);
 
-  const itemSpecs = parsed.data.placements.map((raw) => {
+  const placements = keepKnownPhotoPlacements(parsed.data.placements, known, "guide_photo");
+  const itemSpecs = placements.map((raw) => {
     const payload = validated("guide_photo", raw);
-    assertKnownPhotos([payload.session_photo_id as string], known);
     if (payload.guide !== "grad" || !spotIds.has(payload.location_key as string)) {
       throw new GenerationError(
         `campus spot ${payload.location_key} is not a ${schoolSlug} spot`,

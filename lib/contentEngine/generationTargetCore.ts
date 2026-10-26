@@ -114,3 +114,31 @@ export function assertKnownPhotos(ids: string[], known: Set<string>) {
   }
 }
 
+function placementPhotoId(raw: unknown): string | null {
+  if (!raw || typeof raw !== "object") return null;
+  const id = (raw as { session_photo_id?: unknown }).session_photo_id;
+  return typeof id === "string" ? id.trim().toLowerCase() : null;
+}
+
+// The model copies 36-character photo ids by hand and sometimes garbles one.
+// Drop just those placements instead of failing the whole step; fail only
+// when the model returned placements and none of them name a real photo.
+export function keepKnownPhotoPlacements(
+  raws: unknown[], known: Set<string>, contentType: string,
+): Record<string, unknown>[] {
+  const kept: Record<string, unknown>[] = [];
+  const dropped: string[] = [];
+  for (const raw of raws) {
+    const id = placementPhotoId(raw);
+    if (id && known.has(id)) kept.push({ ...(raw as Record<string, unknown>), session_photo_id: id });
+    else dropped.push(id ?? String(raw));
+  }
+  if (dropped.length > 0) {
+    console.warn(`${contentType}: dropped ${dropped.length} placement(s) with unknown photo ids`, dropped);
+  }
+  if (raws.length > 0 && kept.length === 0) {
+    throw new GenerationError(`every ${contentType} placement named an unknown photo id: ${dropped.join(", ")}`);
+  }
+  return kept;
+}
+
