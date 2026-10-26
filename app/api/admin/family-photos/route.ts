@@ -157,10 +157,9 @@ export async function PATCH(req: NextRequest) {
       const slug = body.location_slug;
       const id = body.id;
       if (!isValidFamilyLocationSlug(slug) || typeof id !== "string") throw new Error("Invalid hero selection.");
-      // A single hero: feature the chosen photo, unfeature the rest in this location.
-      const clear = await supabase.from(FAMILY_LOCATION_PHOTOS_TABLE).update({ featured: false }).eq("location_slug", slug);
-      if (clear.error) throw clear.error;
-      const { error } = await supabase.from(FAMILY_LOCATION_PHOTOS_TABLE).update({ featured: true }).eq("id", id).eq("location_slug", slug);
+      // A single hero, switched in one statement (set_guide_photo_hero RPC) so two
+      // photos can never both be the hero for this location.
+      const { error } = await supabase.rpc("set_guide_photo_hero", { p_guide: "family", p_slug: slug, p_row_id: id });
       if (error) throw error;
       return NextResponse.json({ hero: id });
     }

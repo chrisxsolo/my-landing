@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FAMILY_PHOTO_LOCATION_OPTIONS, MAX_FAMILY_PHOTO_BYTES, ALLOWED_FAMILY_PHOTO_TYPES } from "@/lib/familyPhotosAdmin";
 import { uploadToSignedTarget } from "@/lib/adminSignedUpload";
+import ExistingPhotoPicker from "@/app/admin/ExistingPhotoPicker";
 
 type Photo = {
   id: string;
@@ -30,6 +31,7 @@ export default function FamilyGuideTab({ showToast }: Props) {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   // Upload form state
   const [file, setFile] = useState<File | null>(null);
@@ -192,9 +194,24 @@ export default function FamilyGuideTab({ showToast }: Props) {
         <span className="text-xs text-slate-500 pb-2">{publishedCount} published · {photos.length} total</span>
       </div>
 
+      {/* Choose an existing Content Engine photo (no re-upload) */}
+      <div className="mb-3 flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white p-4">
+        <div className="min-w-[14rem] flex-1">
+          <p className="text-sm font-bold text-slate-700">Choose an existing photo</p>
+          <p className="text-xs text-slate-500">Use a photo already uploaded through the Content Engine as the hero or a gallery photo. Nothing is re-uploaded.</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setPickerOpen(true)}
+          className="inline-flex items-center rounded-lg border border-emerald-700 px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50"
+        >
+          Choose existing photo
+        </button>
+      </div>
+
       {/* Upload form */}
       <form onSubmit={handleUpload} className="rounded-xl border border-slate-200 bg-slate-50 p-4 mb-6">
-        <p className="text-sm font-bold text-slate-700 mb-3">Upload a photo</p>
+        <p className="text-sm font-bold text-slate-700 mb-3">Upload a new photo</p>
         <div className="grid gap-3 sm:grid-cols-2">
           <input
             ref={fileRef}
@@ -231,7 +248,7 @@ export default function FamilyGuideTab({ showToast }: Props) {
       {loading ? (
         <p className="text-sm text-slate-500">Loading…</p>
       ) : photos.length === 0 ? (
-        <p className="text-sm text-slate-500">No photos yet for this location. Upload one above.</p>
+        <p className="text-sm text-slate-500">No photos yet for this location. Upload one or choose an existing photo above.</p>
       ) : (
         <ul className="space-y-3">
           {photos.map((p, i) => (
@@ -279,6 +296,16 @@ export default function FamilyGuideTab({ showToast }: Props) {
             </li>
           ))}
         </ul>
+      )}
+
+      {pickerOpen && (
+        <ExistingPhotoPicker
+          target={{ guide: "family", slug, label: FAMILY_PHOTO_LOCATION_OPTIONS.find((o) => o.slug === slug)?.label ?? slug }}
+          mode="gallery"
+          onClose={() => setPickerOpen(false)}
+          onDone={() => { setPickerOpen(false); load(slug); }}
+          showToast={showToast}
+        />
       )}
     </div>
   );
