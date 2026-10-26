@@ -145,6 +145,7 @@ export default function EngineDashboard() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Link href="/admin/content-engine/locations" style={{ ...btn(false), textDecoration: "none" }}>📍 Locations</Link>
           <button onClick={() => void openPicker()} style={btn(true)}>
             + New from client session
           </button>
