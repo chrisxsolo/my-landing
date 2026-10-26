@@ -92,6 +92,11 @@ import {
 } from "@/lib/portfolioSeoDescription";
 import PortfolioSeoPanel from "@/app/admin/PortfolioSeoPanel";
 import CaseStudiesTab from "@/app/admin/CaseStudiesTab";
+import PhotoTagEditor from "@/app/admin/photoTagging/PhotoTagEditor";
+import PortfolioTaggingControls from "@/app/admin/photoTagging/PortfolioTaggingControls";
+import TagStatusBadge from "@/app/admin/photoTagging/TagStatusBadge";
+import { usePhotoTagging } from "@/app/admin/photoTagging/usePhotoTagging";
+import { portfolioPhotoKey } from "@/lib/photoTagging/types";
 import { GRAD_SCHOOLS } from "@/lib/portfolioCategoryContent";
 import {
   findMatchingClientSession,
@@ -227,6 +232,11 @@ function AdminDashboard() {
   const [portfolioSeoDraft,setPortfolioSeoDraft]=useState<PortfolioSeoDraft>(EMPTY_PORTFOLIO_SEO_DRAFT);
   const [portfolioSeoSavingId,setPortfolioSeoSavingId]=useState<number|null>(null);
   const [seoBatchMode,setSeoBatchMode]=useState(false);
+  // ── Photo tagging audit (Portfolio tab) ──────────────────────────────
+  const portfolioTagging=usePhotoTagging({enabled:authed&&tab==="portfolio"});
+  const [tagSelectMode,setTagSelectMode]=useState(false);
+  const [tagEditorId,setTagEditorId]=useState<number|null>(null);
+  const visiblePortfolioImages=portfolioImages.filter(img=>portfolioTagging.visible(portfolioPhotoKey(img.id)));
   const [seoBatchSelected,setSeoBatchSelected]=useState<number[]>([]);
   const [seoBatchOpen,setSeoBatchOpen]=useState(false);
   const [seoBatchDraft,setSeoBatchDraft]=useState<PortfolioSeoDraft>(EMPTY_PORTFOLIO_SEO_DRAFT);
@@ -1324,6 +1334,8 @@ function AdminDashboard() {
     }
     setLibraryPushingId(null);
   }
+  // Tag edits change portfolio rows; portfolio edits change tagging status.
+  async function refreshPortfolioTagging(){await Promise.all([portfolioTagging.refresh(),fetchPortfolioImages()]);}
   async function fetchPortfolioImages(){
     setPortfolioLoading(true);
     const{data,error}=await supabase.from('portfolio_images').select('*').order('featured',{ascending:false}).order('sort_order',{ascending:true});
@@ -2713,7 +2725,7 @@ function AdminDashboard() {
               <div className="flex items-center justify-between gap-2 mb-3">
                 <div className="flex items-center gap-2">
                   <p className="text-xs font-black uppercase tracking-widest text-slate-900">Portfolio Images</p>
-                  <span className="text-xs font-bold text-slate-400">({portfolioImages.length})</span>
+                  <span className="text-xs font-bold text-slate-400">({visiblePortfolioImages.length===portfolioImages.length?portfolioImages.length:`${visiblePortfolioImages.length} of ${portfolioImages.length}`})</span>
                 </div>
                 <button onClick={toggleSeoBatchMode}
                   className="text-xs font-bold px-3 py-1.5 rounded-lg border transition-colors"
@@ -2721,6 +2733,8 @@ function AdminDashboard() {
                   {seoBatchMode?"Done selecting":"Select multiple for SEO"}
                 </button>
               </div>
+              <PortfolioTaggingControls tagging={portfolioTagging} selectMode={tagSelectMode} setSelectMode={setTagSelectMode}
+                shownKeys={visiblePortfolioImages.map(img=>portfolioPhotoKey(img.id))} onChanged={refreshPortfolioTagging}/>
               {seoBatchMode&&(
                 <div className="flex items-center justify-between gap-2 mb-3 rounded-xl border px-3 py-2" style={{borderColor:C.borderSubtle,background:C.p3_10}}>
                   <p className="text-xs font-bold text-slate-700">{seoBatchSelected.length} selected · check the grad photos that share the same tags</p>
@@ -2749,14 +2763,23 @@ function AdminDashboard() {
               {portfolioLoading?[...Array(3)].map((_,i)=><div key={i} className="rounded-2xl animate-pulse h-20 mb-3 bg-slate-100"/>):(
                 portfolioImages.length===0?<p className="text-sm text-slate-400 font-medium">No portfolio images yet — upload the first one above.</p>:(
                   <div className="space-y-3">
-                    {portfolioImages.map(image=>{
+                    {visiblePortfolioImages.length===0&&<p className="text-sm text-slate-400 font-medium">No portfolio images match this tagging filter.</p>}
+                    {visiblePortfolioImages.map(image=>{
                       const isGradImage=matchesPortfolioGroup(image,"grads");
                       const batchSelected=seoBatchSelected.includes(image.id);
+                      const tagKey=portfolioPhotoKey(image.id);
+                      const tagSelected=tagSelectMode&&portfolioTagging.selected.has(tagKey);
                       return(
-                      <div key={image.id} className={card} style={editingPortfolioImage?.id===image.id||(seoBatchMode&&batchSelected)?{outline:"2px solid #111827"}:{}}>
+                      <div key={image.id} className={card} style={editingPortfolioImage?.id===image.id||(seoBatchMode&&batchSelected)?{outline:"2px solid #111827"}:tagSelected?{outline:`2px solid ${T.action}`}:{}}>
                         <div className="flex">
                           <div className="w-24 h-24 flex-shrink-0 overflow-hidden bg-slate-100 relative">
                             <img src={image.image_url} className="w-full h-full object-cover"/>
+                            {tagSelectMode&&!seoBatchMode&&(
+                              <button onClick={()=>portfolioTagging.toggle(tagKey)} title={tagSelected?"Deselect":"Select for tagging"} aria-pressed={tagSelected}
+                                className="absolute inset-0 flex items-center justify-center" style={{background:tagSelected?T.scrim:"transparent"}}>
+                                {tagSelected&&<span className="w-6 h-6 rounded-full flex items-center justify-center text-sm font-black" style={{background:T.action,color:T.actionText}}>✓</span>}
+                              </button>
+                            )}
                             {seoBatchMode&&isGradImage&&(
                               <button onClick={()=>toggleSeoBatchSelect(image.id)} title={batchSelected?"Deselect":"Select for batch SEO"}
                                 className="absolute inset-0 flex items-center justify-center transition-colors"
@@ -2775,7 +2798,8 @@ function AdminDashboard() {
                                   {image.featured&&<span className="text-[10px] font-black px-1.5 py-0.5 rounded-md bg-slate-900 text-white">FEATURED</span>}
                                   <p className="text-sm font-black text-slate-900 truncate">{image.title}</p>
                                 </div>
-                                <p className="text-xs text-slate-400">{categoryName(image.category_slug)} · #{image.sort_order}</p>
+                                <p className="text-xs text-slate-400 flex items-center gap-2 flex-wrap">{categoryName(image.category_slug)} · #{image.sort_order}
+                                  <TagStatusBadge photo={portfolioTagging.byKey.get(tagKey)} onClick={()=>setTagEditorId(tagEditorId===image.id?null:image.id)}/></p>
                               </div>
                               <div className="flex gap-2 flex-shrink-0 items-center">
                                 <button
@@ -2797,6 +2821,10 @@ function AdminDashboard() {
                             </div>
                           </div>
                         </div>
+                        {tagEditorId===image.id&&portfolioTagging.report&&portfolioTagging.byKey.get(tagKey)&&(
+                          <div className="p-3"><PhotoTagEditor photo={portfolioTagging.byKey.get(tagKey)!} options={portfolioTagging.report.options}
+                            onChanged={refreshPortfolioTagging} onClose={()=>setTagEditorId(null)}/></div>
+                        )}
                         {portfolioSeoEditorId===image.id&&(
                           <PortfolioSeoPanel
                             draft={portfolioSeoDraft}

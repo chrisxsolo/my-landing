@@ -10,6 +10,7 @@ import { checkAuth } from "@/lib/adminAuth";
 import { engineApi, EngineApiError } from "./engineApi";
 import { STATE_BADGES, sortByActionability } from "./stateBadge";
 import EngineShell from "./EngineShell";
+import TaggingHealthCard from "@/app/admin/photoTagging/TaggingHealthCard";
 import { WORKFLOW_STEPS, stepFromState } from "./WorkflowStepper";
 import { SERVICE_TYPES } from "@/lib/contentEngine/taxonomy";
 import { btn, card, input as inputStyle, overlay as overlayStyle } from "./[id]/ui";
@@ -146,6 +147,7 @@ export default function EngineDashboard() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Link href="/admin/content-engine/locations" style={{ ...btn(false), textDecoration: "none" }}>📍 Locations</Link>
+          <Link href="/admin/content-engine/photos" style={{ ...btn(false), textDecoration: "none" }}>🏷 Photo tagging</Link>
           <button onClick={() => void openPicker()} style={btn(true)}>
             + New from client session
           </button>
@@ -178,6 +180,8 @@ export default function EngineDashboard() {
           );
         })}
       </div>
+
+      <TaggingHealthCard />
 
       {notice && (
         <p role="alert" className="flex items-center gap-2 rounded-xl px-3 py-2 mb-3 text-[13px] font-semibold"

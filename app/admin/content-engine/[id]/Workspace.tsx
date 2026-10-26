@@ -113,7 +113,10 @@ export default function Workspace({ sessionId }: { sessionId: string }) {
         primaryLocation={typeof session.primary_location === "string" ? session.primary_location : null} />
       <PhotosSection sessionId={sessionId} photos={photos}
         aiAllowed={session.ai_processing_allowed as boolean} onChanged={refresh}
-        onPhotosMutated={setPhotos} />
+        onPhotosMutated={setPhotos} factsKey={JSON.stringify([
+          session.service_type, session.school_slug, session.primary_location, session.secondary_locations,
+          photos.length, photos.filter((p) => p.excluded).length, photos.filter((p) => p.public_derivative_url).length,
+        ])} />
       <GenerationSection sessionId={sessionId} session={session} activePackage={data.activePackage}
         items={data.items} aiAllowed={session.ai_processing_allowed as boolean}
         photos={photos} onChanged={refresh} />

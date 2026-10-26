@@ -16,6 +16,8 @@ import { formatDuration } from "@/lib/contentEngine/jobProgress";
 import { btn, card, chip, sectionTitle } from "./ui";
 import AnalysisProgress from "./AnalysisProgress";
 import { ALLOWED_MIME, uploadPhotos, type UploadProgress } from "./photoUpload";
+import TagStatusBadge from "@/app/admin/photoTagging/TagStatusBadge";
+import PhotoTaggingPanel, { useSessionTagging } from "./PhotoTaggingPanel";
 
 interface Props {
   sessionId: string;
@@ -26,6 +28,8 @@ interface Props {
   // a refetch re-signs every thumbnail URL, forcing the browser to reload the
   // whole grid (the old exclude-click slowness).
   onPhotosMutated: (updater: (prev: EnginePhoto[]) => EnginePhoto[]) => void;
+  /** Changes when the session's school / location / service change (tag badges refresh). */
+  factsKey: string;
 }
 
 const STATUS_CHIP: Record<EnginePhoto["analysis_status"], { label: string; color: string }> = {
@@ -74,7 +78,7 @@ async function filesFromEntry(entry: FileSystemEntry): Promise<File[]> {
   return [];
 }
 
-export default function PhotosSection({ sessionId, photos, aiAllowed, onChanged, onPhotosMutated }: Props) {
+export default function PhotosSection({ sessionId, photos, aiAllowed, onChanged, onPhotosMutated, factsKey }: Props) {
   const fileInput = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState<UploadProgress | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
@@ -87,6 +91,8 @@ export default function PhotosSection({ sessionId, photos, aiAllowed, onChanged,
   } | null>(null);
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
+  const tags = useSessionTagging(sessionId, factsKey);
+  const [tagOpenId, setTagOpenId] = useState<string | null>(null);
 
   const uploadFiles = useCallback(async (incoming: File[]) => {
     if (!incoming.length) return;
@@ -307,9 +313,14 @@ export default function PhotosSection({ sessionId, photos, aiAllowed, onChanged,
         </div>
       ) : (
         <p style={{ fontSize: 12, color: T.inkFaint, margin: "10px 0 0" }}>
-          Click a photo to select it for deletion.
+          Click a photo to select it (to tag or delete). Click its colored dot for its tags.
         </p>
       ))}
+
+      {photos.length > 0 && (
+        <PhotoTaggingPanel state={tags} selectedIds={selected} openId={tagOpenId}
+          onClose={() => setTagOpenId(null)} onClearSelection={() => setSelected(new Set())} />
+      )}
 
       {photos.length === 0 ? (
         <p style={{ color: T.inkSoft, textAlign: "center", padding: 24 }}>
@@ -317,7 +328,7 @@ export default function PhotosSection({ sessionId, photos, aiAllowed, onChanged,
         </p>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10, marginTop: 10 }}>
-          {photos.map((photo) => {
+          {photos.filter((photo) => tags.passes(photo.id)).map((photo) => {
             const status = STATUS_CHIP[photo.analysis_status];
             const isSelected = selected.has(photo.id);
             return (
@@ -326,7 +337,7 @@ export default function PhotosSection({ sessionId, photos, aiAllowed, onChanged,
                 border: `1px solid ${isSelected ? T.red : T.border}`, borderRadius: 10, overflow: "hidden",
                 boxShadow: isSelected ? `0 0 0 2px ${T.redBorder}` : undefined,
               }}>
-                <div onClick={() => toggleSelected(photo.id)} title="Click to select for deletion"
+                <div onClick={() => toggleSelected(photo.id)} title="Click to select"
                   style={{ position: "relative", cursor: "pointer" }}>
                   {photo.thumbnailUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element -- short-lived signed URL, next/image can't optimize it
@@ -335,6 +346,8 @@ export default function PhotosSection({ sessionId, photos, aiAllowed, onChanged,
                   ) : (
                     <div style={{ aspectRatio: "1", background: T.inset }} />
                   )}
+                  <TagStatusBadge photo={tags.byPhotoId.get(photo.id)} compact onClick={() => setTagOpenId(photo.id)}
+                    style={{ position: "absolute", top: 6, left: 6 }} />
                   {isSelected && (
                     <span style={{
                       position: "absolute", top: 6, right: 6, width: 22, height: 22,
