@@ -74,7 +74,8 @@ describe("buildSpotPhotoLayout", () => {
 function engine(overrides: Partial<EngineSource> = {}): EngineSource {
   return {
     url: url("e1"), contentHash: "h1", sessionId: "sess", sessionName: "Maya", serviceType: "grads",
-    schoolSlug: "sjsu", primaryLocation: null, publishable: true, excluded: false,
+    schoolSlug: "sjsu", primaryLocation: null, secondaryLocations: [], gpsLatitude: null, gpsLongitude: null,
+    publishable: true, excluded: false,
     quality: 8, width: 4000, height: 6000, ...overrides,
   };
 }

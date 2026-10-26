@@ -23,7 +23,8 @@ function photo(overrides: Partial<PortfolioSource> = {}): PortfolioSource {
 function engine(overrides: Partial<EngineSource> = {}): EngineSource {
   return {
     url: photo().url, contentHash: null, sessionId: "s1", sessionName: "Kim", serviceType: "grads",
-    schoolSlug: "uc-berkeley", primaryLocation: null, publishable: true, excluded: false,
+    schoolSlug: "uc-berkeley", primaryLocation: null, secondaryLocations: [], gpsLatitude: null, gpsLongitude: null,
+    publishable: true, excluded: false,
     quality: 9, width: 4000, height: 6000, ...overrides,
   };
 }

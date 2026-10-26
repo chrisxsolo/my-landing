@@ -19,7 +19,7 @@ import { isSchoolSlug } from "@/lib/contentEngine/taxonomy";
 import { SCHOOL_SPOT_PHOTOS_TABLE } from "@/lib/schoolSpots";
 import type { CurationRow } from "@/lib/pagePhotos/curate";
 import {
-  indexEngineSources, resolvePhoto,
+  enginePhotoPlace, indexEngineSources, resolvePhoto,
   type EngineSource, type PortfolioSource, type ResolvedPhoto,
 } from "@/lib/pagePhotos/resolve";
 
@@ -34,6 +34,8 @@ export interface ExplicitSchoolPhoto {
   height: number | null;
   quality: number | null;
   sessionKey: string;
+  /** Known place the photo was taken at (Content Engine evidence only), else null. */
+  placeKey: string | null;
 }
 
 /** The photographer's campus-spot tag for one photo on one school guide. */
@@ -71,6 +73,7 @@ interface SessionEmbed {
   service_type: string | null;
   school_slug: string | null;
   primary_location: string | null;
+  secondary_locations: string[] | null;
   marketing_permission: boolean | null;
   marketing_permission_revoked_at: string | null;
 }
@@ -109,6 +112,9 @@ function toEngineSource(row: Record<string, unknown>): EngineSource | null {
     serviceType: text(session.service_type),
     schoolSlug: text(session.school_slug),
     primaryLocation: text(session.primary_location),
+    secondaryLocations: (session.secondary_locations ?? []).filter((t) => typeof t === "string"),
+    gpsLatitude: num(row.gps_latitude),
+    gpsLongitude: num(row.gps_longitude),
     publishable: session.marketing_permission === true && !session.marketing_permission_revoked_at,
     excluded: row.excluded === true,
     quality: num(row.quality_score),
@@ -132,6 +138,7 @@ function toExplicitSchool(row: Record<string, unknown>): ExplicitSchoolPhoto | n
     height: num(photo.height),
     quality: num(photo.quality_score),
     sessionKey: `session:${String(photo.photography_session_id)}`,
+    placeKey: null,
   };
 }
 
@@ -158,6 +165,7 @@ function toEngineSchoolRow(row: Record<string, unknown>): EngineSchoolRow | null
  */
 export function sessionSchoolPhotos(
   rows: readonly EngineSchoolRow[], liveJournalUrls: ReadonlySet<string>, portfolio: readonly PortfolioSource[],
+  placeOf: (source: EngineSource) => string | null = () => null,
 ): ExplicitSchoolPhoto[] {
   const portfolioUrls = new Set(portfolio.map((p) => p.url));
   const portfolioHashes = new Set(portfolio.flatMap((p) => (p.contentHash ? [p.contentHash] : [])));
@@ -170,6 +178,7 @@ export function sessionSchoolPhotos(
       alt: alt ?? "Graduation portrait by soloxsnaps",
       caption: null, sortOrder: 0, width: source.width, height: source.height,
       quality: source.quality, sessionKey: `session:${source.sessionId}`,
+      placeKey: placeOf(source),
     }));
 }
 
@@ -240,7 +249,7 @@ export async function loadPhotoPool(client: SupabaseClient): Promise<PhotoPool> 
       .select("id,title,alt,image_url,category_slug,featured,sort_order,width,height,content_hash,school,location,session_label")
       .eq("published", true))),
     settle("session_photos", errors, [] as Rows, () => rows(client.from("session_photos")
-      .select("id,alt_text,public_derivative_url,content_hash,excluded,quality_score,width,height,photography_sessions!inner(id,public_display_name,service_type,school_slug,primary_location,marketing_permission,marketing_permission_revoked_at)")
+      .select("id,alt_text,public_derivative_url,content_hash,excluded,quality_score,width,height,gps_latitude,gps_longitude,photography_sessions!inner(id,public_display_name,service_type,school_slug,primary_location,secondary_locations,marketing_permission,marketing_permission_revoked_at)")
       .not("public_derivative_url", "is", null))),
     settle("school_page_photos", errors, [] as Rows, () => rows(client.from("school_page_photos")
       .select("id,school_slug,alt_override,caption,sort_order,session_photos!inner(public_derivative_url,alt_text,width,height,quality_score,photography_session_id)")
@@ -258,11 +267,17 @@ export async function loadPhotoPool(client: SupabaseClient): Promise<PhotoPool> 
   const findEngine = indexEngineSources(engineRows.map((e) => e.source));
   const portfolioSources = portfolio.map(toPortfolioSource).filter((p): p is PortfolioSource => p !== null);
   const photos = portfolioSources.map((p) => resolvePhoto(p, findEngine(p), { places, dbGuides }));
+  const placeOf = (source: EngineSource) => enginePhotoPlace(source, places)?.key ?? null;
+  const placeOfUrl = (url: string) => {
+    const source = findEngine({ url, contentHash: null });
+    return source ? placeOf(source) : null;
+  };
 
   return {
     photos,
-    explicitSchool: school.map(toExplicitSchool).filter((s): s is ExplicitSchoolPhoto => s !== null),
-    sessionSchool: sessionSchoolPhotos(engineRows, journalUrls(posts), portfolioSources),
+    explicitSchool: school.map(toExplicitSchool).filter((s): s is ExplicitSchoolPhoto => s !== null)
+      .map((s) => ({ ...s, placeKey: placeOfUrl(s.url) })),
+    sessionSchool: sessionSchoolPhotos(engineRows, journalUrls(posts), portfolioSources, placeOf),
     curation: curation.map(toCurationRow),
     spotTags: spotTags.map(toSpotTag),
     errors,

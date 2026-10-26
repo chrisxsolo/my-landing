@@ -12,12 +12,14 @@
 //
 // Place: the photo's location tag, then its session's location, then (older
 // uploads only) its session label — matched by exact place identity, never
-// by scenery. A place reaches a guide only when that guide page exists.
+// by scenery. A session that names several locations places a photo only by
+// that photo's own GPS (no evidence → no place). A place reaches a guide only
+// when that guide page exists; a graduation photo reaches the portrait guide.
 import { detectSchoolsInText } from "@/lib/schoolDetection";
 import { getPhotoTitle } from "@/lib/photoMetadata";
 import { BUILT_IN_SCHOOLS } from "@/lib/contentEngine/schools";
 import { guideTypeForService, isSchoolSlug, SCHOOL_SLUGS, type SchoolSlug } from "@/lib/contentEngine/taxonomy";
-import { matchPlacesByName } from "@/lib/locations/match";
+import { matchPlacesByName, placeAtCoordinates } from "@/lib/locations/match";
 import type { KnownPlace } from "@/lib/locations/places";
 import { findGuideForPlace, type DbGuideRef, type LocationGuideType } from "@/lib/locations/guideCoverage";
 import { guidePageKey, schoolPageKey } from "@/lib/pagePhotos/pageKeys";
@@ -57,6 +59,11 @@ export interface EngineSource {
   serviceType: string | null;
   schoolSlug: string | null;
   primaryLocation: string | null;
+  /** The session's other confirmed shooting locations. */
+  secondaryLocations: readonly string[];
+  /** The photo's own GPS, read from the original file. */
+  gpsLatitude: number | null;
+  gpsLongitude: number | null;
   /** Marketing permission on and never revoked. */
   publishable: boolean;
   excluded: boolean;
@@ -160,27 +167,53 @@ function labelPlace(label: string | null, places: readonly KnownPlace[]): KnownP
   return keys.size === 1 ? parts[0] : null;
 }
 
+/**
+ * Where one Content Engine photo was taken. A session at one location gives
+ * it to every photo. A session at several ("SF State" + "Palace of Fine Arts")
+ * places a photo only when its own GPS falls inside one of the named places,
+ * so campus frames never land on the Palace and photos without GPS stay
+ * unplaced (the school page still shows them).
+ */
+export function enginePhotoPlace(engine: EngineSource, places: readonly KnownPlace[]): KnownPlace | null {
+  const named = [engine.primaryLocation, ...engine.secondaryLocations].filter((t): t is string => Boolean(t?.trim()));
+  const resolved = named.map((text) => singlePlace(text, places));
+  const known = resolved.filter((p): p is KnownPlace => p !== null);
+  const keys = new Set(known.map((p) => p.key));
+  if (known.length === named.length && keys.size === 1) return known[0];
+  if (named.length < 2 || engine.gpsLatitude === null || engine.gpsLongitude === null) return null;
+  const candidates = known.filter((p, i) => known.findIndex((o) => o.key === p.key) === i);
+  const hit = placeAtCoordinates({ latitude: engine.gpsLatitude, longitude: engine.gpsLongitude }, candidates);
+  return hit?.place ?? null;
+}
+
 function resolvePlace(
   photo: PortfolioSource, engine: EngineSource | null, places: readonly KnownPlace[],
 ): { place: KnownPlace | null; source: PlaceSource | null } {
   const tagged = singlePlace(photo.location, places);
   if (tagged) return { place: tagged, source: "tag" };
   if (engine) {
-    const session = singlePlace(engine.primaryLocation, places);
+    const session = enginePhotoPlace(engine, places);
     return session ? { place: session, source: "session" } : { place: null, source: null };
   }
   const labelled = labelPlace(photo.sessionLabel, places);
   return labelled ? { place: labelled, source: "label" } : { place: null, source: null };
 }
 
-/** Which location-guide family a photo can appear in (grads have none). */
+/**
+ * Which location-guide family a photo can appear in. Graduation portraits go
+ * to the portrait guide of the place they were shot at (an SF State session
+ * at the Palace of Fine Arts → /portrait-guide/locations/palace-of-fine-arts),
+ * never to couples or family guides.
+ */
 function guideTypeOf(photo: PortfolioSource, engine: EngineSource | null): LocationGuideType | null {
   if (engine) {
     const type = guideTypeForService(engine.serviceType);
+    if (type === "grad") return "portrait";
     return type === "couples" || type === "family" || type === "portrait" ? type : null;
   }
   if (photo.category === "couples") return "couples";
   if (photo.category === "families") return "family";
+  if (photo.category === "grads") return "portrait";
   return null;
 }
 

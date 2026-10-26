@@ -53,6 +53,13 @@ export const KNOWN_PLACES: readonly KnownPlace[] = [
     latitude: 37.8037, longitude: -122.4651, radiusMeters: 1500,
   },
   {
+    // Its own place, not part of Crissy Field. No coordinates until verified:
+    // Crissy Field's radius reaches the bridge plaza, so GPS could mix them up.
+    ...SF, key: "golden-gate-bridge-welcome-center", name: "Golden Gate Bridge Welcome Center",
+    aliases: ["Golden Gate Bridge Visitor Center", "GGB Welcome Center"],
+    areaTerms: ["Presidio"],
+  },
+  {
     ...SF, key: "lovers-lane", name: "Lovers' Lane",
     aliases: ["Lovers Lane", "Lover's Lane", "Lovers Lane Presidio"],
     areaTerms: ["Presidio"],

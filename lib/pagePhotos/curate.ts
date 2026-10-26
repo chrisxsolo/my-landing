@@ -26,6 +26,8 @@ export interface PageCandidate {
   quality: number | null;
   sortOrder: number;
   sessionKey: string;
+  /** Known place the photo was taken at, from location evidence only. */
+  placeKey?: string | null;
 }
 
 export interface CurationRow {

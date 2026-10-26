@@ -32,7 +32,7 @@ export function candidatesForPage(
         id: `school:${s.id}`, url: s.url, alt: s.alt, caption: s.caption,
         width: s.width, height: s.height, explicit: true, explicitOrder: s.sortOrder,
         featured: byUrl.get(s.url)?.featured ?? false, quality: s.quality,
-        sortOrder: s.sortOrder, sessionKey: s.sessionKey,
+        sortOrder: s.sortOrder, sessionKey: s.sessionKey, placeKey: s.placeKey,
       }))
     : [];
 
@@ -42,7 +42,7 @@ export function candidatesForPage(
       id: `guide:${row.id}`, url: row.image_url, alt: row.alt_text ?? known?.alt ?? "", caption: row.caption,
       width: known?.width ?? null, height: known?.height ?? null, explicit: true, explicitOrder: index,
       featured: row.featured, quality: known?.quality ?? null, sortOrder: index,
-      sessionKey: known?.sessionKey ?? `guide:${row.id}`,
+      sessionKey: known?.sessionKey ?? `guide:${row.id}`, placeKey: known?.placeKey ?? null,
     };
   });
 
@@ -50,6 +50,7 @@ export function candidatesForPage(
     id: `portfolio:${p.portfolioId}`, url: p.url, alt: p.alt, caption: null,
     width: p.width, height: p.height, explicit: false, explicitOrder: 0,
     featured: p.featured, quality: p.quality, sortOrder: p.sortOrder, sessionKey: p.sessionKey,
+    placeKey: p.placeKey,
   }));
 
   // Journal-only Content Engine photos: automatic matches by session school.
@@ -58,6 +59,7 @@ export function candidatesForPage(
         id: `session:${s.id}`, url: s.url, alt: s.alt, caption: s.caption,
         width: s.width, height: s.height, explicit: false, explicitOrder: 0,
         featured: false, quality: s.quality, sortOrder: s.sortOrder, sessionKey: s.sessionKey,
+        placeKey: s.placeKey,
       }))
     : [];
 
