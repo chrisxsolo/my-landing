@@ -51,6 +51,7 @@ export interface SchoolLandingData {
   whatToWear?: string;           // campus-tuned wardrobe guidance
   faqs?: SchoolFaq[];            // 3–4 campus-specific Q&A (drives FAQPage schema)
   spotsGuide?: SchoolSpotsGuide; // long-form /spots location guide (else the compact list)
+  hideTravelNote?: boolean;      // leave the travel-fee line off this school's page
 }
 
 /** Recent journal posts about this campus, via the same matcher the posts use. */
@@ -86,7 +87,7 @@ export function buildSchoolMetadata(data: SchoolLandingData): Metadata {
 // ── TEMPLATE COMPONENT ────────────────────────────────────────────────────────
 
 export default async function SchoolLandingTemplate({ data }: { data: SchoolLandingData }) {
-  const travelNote = getGraduationTravelNote(data.slug);
+  const travelNote = data.hideTravelNote ? undefined : getGraduationTravelNote(data.slug);
   const contactParams = buildBookingIntentParams({
     sourcePage: "school-page",
     sessionType: "Graduation Portrait",
