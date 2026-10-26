@@ -45,8 +45,8 @@ const SERVICE_LINKS: Partial<Record<ServiceType, readonly SiteLink[]>> = {
     { label: "Family pricing", href: "/pricing/families" },
   ],
   maternity: [
+    { label: "Maternity pricing", href: "/pricing/maternity" },
     { label: "Family photo guide", href: "/family-guide" },
-    { label: "Pricing", href: "/pricing" },
   ],
   portraits: [
     { label: "Portrait location guide", href: "/portrait-guide" },

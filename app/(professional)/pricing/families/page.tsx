@@ -155,7 +155,7 @@ export default async function FamilyPricingPage() {
             </div>
 
             {/* CTA button — links to the contact/booking page */}
-            <Link href="/contact" className={styles.pricingLink}>Book a session</Link>
+            <Link href="/contact" className={styles.pricingLink}>Book a Session</Link>
           </div>
         </div>
       </section>
@@ -213,7 +213,7 @@ export default async function FamilyPricingPage() {
               <p className={styles.pricingPrice}>{formatCurrency(familyPricing.packages.standard.price)}</p>
               <p className={styles.pricingMeta}>starting from</p>
             </div>
-            <Link href="/contact" className={styles.pricingLink}>Book this session</Link>
+            <Link href="/contact" className={styles.pricingLink}>Book This Session</Link>
           </div>
         </div>
 
@@ -284,7 +284,7 @@ export default async function FamilyPricingPage() {
               <p className={styles.pricingPrice}>{formatCurrency(familyPricing.packages.extended.price)}</p>
               <p className={styles.pricingMeta}>starting from</p>
             </div>
-            <Link href="/contact" className={styles.pricingLink}>Book this session</Link>
+            <Link href="/contact" className={styles.pricingLink}>Book This Session</Link>
           </div>
         </div>
       </section>
@@ -304,8 +304,13 @@ export default async function FamilyPricingPage() {
             <p className={styles.pricingKicker}>Ready for family photos?</p>
             <h2 className={styles.pricingTitle} style={{ fontSize: 38 }}>Send the people, date, and location.</h2>
           </div>
-          <Link href="/contact" className={styles.pricingLink}>Inquire now</Link>
+          <Link href="/contact" className={styles.pricingLink}>Send Inquiry</Link>
         </div>
+        <p className={styles.pricingCopy} style={{ marginTop: 18, fontSize: 15 }}>
+          Expecting? <Link href="/pricing/maternity">Maternity sessions</Link> are{" "}
+          {formatCurrency(PRICING_CATALOG.maternity.price)} for {PRICING_CATALOG.maternity.durationMinutes / 60} hour,
+          with your partner and immediate family included.
+        </p>
       </section>
     </main>
   );

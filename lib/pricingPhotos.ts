@@ -50,6 +50,23 @@ export function getElopementPricingPhotos(images: Photo[], settings: Settings) {
   return { packageImage, heroImage };
 }
 
+const MATERNITY_PATTERN = /\bmaternity\b|\bexpecting\b|\bpregnan/i;
+
+// Maternity work is filed under couples and family in the library, so it is
+// found by its title and alt text rather than a category. Titles that say
+// "maternity" come first; "expecting"/"pregnancy" shots fill in after.
+export function getMaternityPricingPhotos(images: Photo[], settings: Settings) {
+  const matches = images.filter((image) => MATERNITY_PATTERN.test(`${image.title ?? ""} ${image.alt ?? ""}`));
+  const ranked = [
+    ...matches.filter((image) => /maternity/i.test(image.title ?? "")),
+    ...matches.filter((image) => !/maternity/i.test(image.title ?? "")),
+  ];
+  const packageImage = settings.pricing_maternity_package_image || ranked[0]?.image_url || null;
+  const heroImage = settings.pricing_maternity_hero_image
+    || (ranked.length ? selectDistinctImageUrl(ranked, [packageImage], packageImage) : null);
+  return { packageImage, heroImage };
+}
+
 export function getEventPricingPhotos(images: Photo[], settings: Settings) {
   const events = images.filter((image) => image.category_slug === "events");
   const primaryImage = settings.pricing_event_primary_image || events[0]?.image_url || null;
@@ -65,6 +82,7 @@ export function getPricingCardPhotos(images: Photo[], settings: Settings): Recor
     couples: images.find((image) => image.category_slug === "couples")?.image_url
       ?? settings.pricing_couples_standard_image ?? null,
     elopements: getElopementPricingPhotos(images, settings).heroImage,
+    maternity: getMaternityPricingPhotos(images, settings).heroImage,
   };
 }
 
@@ -83,6 +101,7 @@ export function getPricingPhotoManifest(images: Photo[], settings: Settings): Pr
   const grads = getGradPricingPhotos(images, settings);
   const events = getEventPricingPhotos(images, settings);
   const elopements = getElopementPricingPhotos(images, settings);
+  const maternity = getMaternityPricingPhotos(images, settings);
   return {
     "/pricing": Object.values(getPricingCardPhotos(images, settings)).flatMap((src) => photo(src, sizes.card)),
     "/pricing/families": [
@@ -97,6 +116,10 @@ export function getPricingPhotoManifest(images: Photo[], settings: Settings): Pr
     "/pricing/elopements": [
       ...photo(elopements.heroImage, sizes.hero, 90),
       ...photo(elopements.packageImage, sizes.package),
+    ],
+    "/pricing/maternity": [
+      ...photo(maternity.heroImage, sizes.hero, 90),
+      ...photo(maternity.packageImage, sizes.package),
     ],
     "/pricing/events": [
       ...photo(events.primaryImage, sizes.hero, 90),

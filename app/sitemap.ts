@@ -49,6 +49,7 @@ const STATIC_ROUTES: Array<{
   { path: "/couples-posing-guide", changeFrequency: "monthly", priority: 0.6 },
   { path: "/pricing/families", changeFrequency: "monthly", priority: 0.7 },
   { path: "/pricing/elopements", changeFrequency: "monthly", priority: 0.7 },
+  { path: "/pricing/maternity", changeFrequency: "monthly", priority: 0.7 },
   { path: "/pricing/events", changeFrequency: "monthly", priority: 0.7 },
   { path: "/grad-guide", changeFrequency: "monthly", priority: 0.8 },
   { path: "/grad-guide/what-to-wear", changeFrequency: "monthly", priority: 0.7 },

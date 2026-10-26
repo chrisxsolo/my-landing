@@ -1,6 +1,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // RATES LANDING PAGE  →  soloxsnaps.com/pricing
-// Two cards (Grads + Families) that link to their respective detail pages.
+// One card per service, each linking to its detail page.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { Metadata } from "next";
@@ -16,6 +16,7 @@ const graduationPricing = PRICING_CATALOG.graduation;
 const familyPricing = PRICING_CATALOG.families;
 const couplesPricing = PRICING_CATALOG.couples;
 const elopementPricing = PRICING_CATALOG.elopement;
+const maternityPricing = PRICING_CATALOG.maternity;
 
 // Cached/ISR: refreshed at most hourly, or immediately on admin content saves
 // (POST /api/admin/revalidate).
@@ -45,6 +46,15 @@ const RATES = [
     copy:    "Relaxed family sessions with enough structure for everyone — kids, grandparents, and everyone who says they feel awkward in photos.",
     cta:     "See family pricing",
     chips:   [`From ${formatCurrency(familyPricing.packages.standard.price)}`, "Guided session", "Family-friendly pacing"],
+  },
+  {
+    slug:    "maternity",
+    href:    "/pricing/maternity",
+    kicker:  "Maternity photography",
+    heading: "Maternity rates",
+    copy:    `A ${maternityPricing.durationMinutes / 60}-hour guided session with your partner and immediate family included, at one location, with ${maternityPricing.minimumImages}+ edited images.`,
+    cta:     "See maternity pricing",
+    chips:   [formatCurrency(maternityPricing.price), `${maternityPricing.minimumImages}+ edited images`, "Partner & family included"],
   },
   {
     slug:    "couples",
@@ -148,7 +158,7 @@ export default async function RatesPage() {
       <section className={`${styles.ratesShell} ${styles.ratesFooterNote}`} style={{ animationDelay: "0.56s" }}>
         <p>
           Questions before booking?{" "}
-          <Link href="/contact" className={styles.ratesInlineLink}>Reach out directly →</Link>
+          <Link href="/contact" className={styles.ratesInlineLink}>Send an inquiry →</Link>
         </p>
       </section>
     </main>

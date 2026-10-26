@@ -130,6 +130,7 @@ export const CANONICAL_INTERNAL_LINKS: readonly string[] = [
   "/pricing/families",
   "/pricing/elopements",
   "/pricing/events",
+  "/pricing/maternity",
   "/portfolio/couples",
 ];
 
@@ -159,6 +160,14 @@ export function internalLinksForService(serviceType: ServiceType): readonly stri
       "/family-guide",
       ...FAMILY_LOCATION_KEYS.map((k) => `/family-guide/locations/${k}`),
       "/pricing/families",
+      "/pricing",
+    ];
+  }
+  if (serviceType === "maternity") {
+    return [
+      "/family-guide",
+      ...FAMILY_LOCATION_KEYS.map((k) => `/family-guide/locations/${k}`),
+      "/pricing/maternity",
       "/pricing",
     ];
   }

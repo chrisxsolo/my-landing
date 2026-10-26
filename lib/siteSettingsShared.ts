@@ -44,6 +44,8 @@ export const EDITABLE_SETTING_KEYS = [
   "pricing_couples_standard_image",
   "pricing_couples_engagement_image",
   "pricing_couples_proposal_image",
+  "pricing_maternity_hero_image",
+  "pricing_maternity_package_image",
   "pricing_event_primary_image",
   "pricing_event_secondary_image",
 ] as const;

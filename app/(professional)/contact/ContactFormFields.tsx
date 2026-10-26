@@ -6,6 +6,7 @@ import type { ContactFormValues } from "./ContactClient";
 const SESSION_TYPES = [
   "Graduation Portrait",
   "Family Session",
+  "Maternity Session",
   "Couples Session",
   "Elopement / Courthouse Ceremony",
   "Individual Portrait",
@@ -14,6 +15,7 @@ const SESSION_TYPES = [
 ];
 
 const ELOPEMENT_SESSION_TYPE = "Elopement / Courthouse Ceremony";
+const MATERNITY_SESSION_TYPE = "Maternity Session";
 
 type ContactFormFieldsProps = {
   form: ContactFormValues;
@@ -63,6 +65,7 @@ function SessionFields({ form, onChange }: FieldGroupProps) {
   // and a second location are often unsettled when someone first writes in, and
   // required fields for either would stop the inquiry.
   const showElopementHint = form.sessionType === ELOPEMENT_SESSION_TYPE;
+  const showMaternityHint = form.sessionType === MATERNITY_SESSION_TYPE;
 
   return (
     <>
@@ -95,6 +98,14 @@ function SessionFields({ form, onChange }: FieldGroupProps) {
           whether you want a second nearby spot for portraits. Nothing has to be final yet.{" "}
           <Link href="/pricing/elopements">Elopement rates</Link> start at{" "}
           {formatCurrency(PRICING_CATALOG.elopement.startingPrice)}.
+        </p>
+      ) : null}
+      {showMaternityHint ? (
+        <p className="contact-field-hint contact-field-pop">
+          Partner and immediate family are welcome in the session. It helps to mention how many weeks
+          along you&rsquo;ll be.{" "}
+          <Link href="/pricing/maternity">Maternity sessions</Link> are{" "}
+          {formatCurrency(PRICING_CATALOG.maternity.price)}.
         </p>
       ) : null}
       <div className="form-row">
