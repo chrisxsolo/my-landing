@@ -70,11 +70,15 @@ const SCHOOL_DEFS: SchoolDef[] = [
   },
   {
     canonicalName: "University of San Francisco", abbreviation: "USF",
-    // Bare "usf" is only the Bay Area school when the text isn't about Tampa.
-    reject: /south florida|tampa/,
+    // Bare "usf" is only the Bay Area school when the text isn't about the
+    // University of South Florida (Tampa, the Bulls, its other campuses).
+    // UCSF and SF State never match: "ucsf" isn't the word "usf".
+    // Bare "Florida" is left out on purpose: SF grads' families fly in from there.
+    reject: /south florida|\busf florida\b|\btampa\b|\bbulls\b|\bsarasota\b|\bmanatee\b|\bst pete(?:rsburg)?\b/,
     patterns: [
       { re: /\buniversity of san francisco\b/, confidence: 1 },
       { re: /\busfca\b/, confidence: 1 },
+      { re: /\busf dons\b/, confidence: 1 },
       { re: /\busf\b/, confidence: 0.7 },
     ],
   },

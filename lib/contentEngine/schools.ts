@@ -39,7 +39,7 @@ export const BUILT_IN_SCHOOLS: Record<SchoolSlug, BuiltInSchool> = {
     name: "University of California, Berkeley", shortName: "UC Berkeley",
     aliases: ["Berkeley", "UCB"],
   },
-  usf: { name: "University of San Francisco", shortName: "USF", aliases: ["USFCA"] },
+  usf: { name: "University of San Francisco", shortName: "USF", aliases: ["USFCA", "USF Dons"] },
 };
 
 export const BUILT_IN_SCHOOL_OPTIONS: SchoolOption[] = SCHOOL_SLUGS.map((slug) => ({

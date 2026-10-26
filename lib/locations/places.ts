@@ -101,6 +101,15 @@ export const KNOWN_PLACES: readonly KnownPlace[] = [
     latitude: 37.757, longitude: -122.417, radiusMeters: 1200,
   },
   {
+    // A neighborhood, not one photo point: specific stops are chosen with the
+    // client. Centered on Haight & Ashbury; the radius stays well short of the
+    // USF campus (~0.8 km away) so campus GPS never lands here.
+    ...SF, key: "haight-ashbury", name: "Haight-Ashbury",
+    aliases: ["Haight Ashbury District", "The Haight", "Upper Haight"],
+    areaTerms: ["Haight-Ashbury", "Upper Haight"],
+    latitude: 37.7699, longitude: -122.4469, radiusMeters: 500,
+  },
+  {
     ...SF, key: "yerba-buena-gardens", name: "Yerba Buena Gardens",
     aliases: ["Yerba Buena Garden"], areaTerms: ["SoMa", "South of Market"],
   },

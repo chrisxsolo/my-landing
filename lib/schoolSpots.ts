@@ -28,6 +28,12 @@ export interface SchoolSpotDef {
   hintTerms: readonly string[];
   /** Known place this off-campus spot is (lib/locations/places key). */
   placeKey?: string;
+  /**
+   * A composition inside another spot's guide section (the church walkway
+   * under St. Ignatius Church). Its photos keep their own tag but show in the
+   * parent's section, after the parent's own photos.
+   */
+  parentKey?: string;
 }
 
 export const SCHOOL_SPOTS: Partial<Record<SchoolSlug, readonly SchoolSpotDef[]>> = {
@@ -155,7 +161,67 @@ export const SCHOOL_SPOTS: Partial<Record<SchoolSlug, readonly SchoolSpotDef[]>>
       hintTerms: ["golden gate bridge welcome center", "bridge welcome center", "golden gate bridge visitor center"],
     },
   ],
+  // USF: Chris's six guide areas as eight compositions. The church walkway and
+  // the Lone Mountain main-building background are children of their guide
+  // sections; the stairs stay their own section. "Glass hallway" is Chris's
+  // name for it until the building is confirmed. Bare "Lone Mountain" names
+  // three spots, so it gives no hint; "Lyon Street Steps" is off campus and
+  // must never hint the Lone Mountain stairs.
+  usf: [
+    {
+      key: "st-ignatius-church", name: "St. Ignatius Church", altPlace: "in front of St. Ignatius Church",
+      campusSpotNames: ["In Front of Church", "St. Ignatius Church Steps"],
+      hintTerms: ["st ignatius", "saint ignatius", "st ignatius church", "saint ignatius church"],
+    },
+    {
+      key: "st-ignatius-walkway", name: "St. Ignatius Church Walkway", altPlace: "on the walkway in front of St. Ignatius Church",
+      campusSpotNames: [], parentKey: "st-ignatius-church",
+      hintTerms: ["st ignatius walkway", "saint ignatius walkway", "church walkway"],
+    },
+    {
+      key: "gleeson-library", name: "Gleeson Library | Geschke Center", altPlace: "outside Gleeson Library",
+      campusSpotNames: ["Gleeson Library"],
+      hintTerms: ["gleeson", "gleeson library", "geschke", "geschke center"],
+    },
+    {
+      key: "los-lobos-de-loyola", name: "Los Lobos de Loyola Wolf Sculpture", altPlace: "with the Los Lobos de Loyola wolf sculpture",
+      campusSpotNames: [],
+      hintTerms: ["los lobos", "lobos de loyola", "wolf sculpture", "wolf statue", "wolves sculpture", "wolves and kettle"],
+    },
+    {
+      key: "usf-glass-hallway", name: "USF Glass Hallway", altPlace: "in the USF glass hallway",
+      campusSpotNames: ["Glass Hallway"],
+      hintTerms: ["glass hallway", "glass corridor", "glass hall"],
+    },
+    {
+      key: "lone-mountain-stairs", name: "Lone Mountain Stairs", altPlace: "on the Lone Mountain stairs",
+      campusSpotNames: [],
+      hintTerms: ["lone mountain stairs", "lone mountain steps", "lone mountain staircase"],
+    },
+    {
+      key: "lone-mountain-palm-walkway", name: "Lone Mountain Palm Tree Walkway", altPlace: "under the Lone Mountain palm trees",
+      campusSpotNames: ["Lone Mountain"],
+      hintTerms: ["palm walkway", "palm lined walkway", "palm tree walkway", "lone mountain palm", "lone mountain palms"],
+    },
+    {
+      key: "lone-mountain-main-building", name: "Lone Mountain Main Building Background",
+      altPlace: "with the Lone Mountain main building behind", campusSpotNames: [], parentKey: "lone-mountain-palm-walkway",
+      hintTerms: ["lone mountain main", "lone mountain building", "lone mountain main building"],
+    },
+    {
+      key: "haight-ashbury", name: "Haight-Ashbury", altPlace: "in Haight-Ashbury",
+      campusSpotNames: [], placeKey: "haight-ashbury",
+      hintTerms: ["haight ashbury", "haight street", "upper haight"],
+    },
+  ],
 };
+
+/**
+ * Campus Spots (/grad-guide/campus-spots) schools whose spot text comes from
+ * the school's location guide instead of location_spots rows: location_spots
+ * school_id → school slug. Their location_spots rows still hold the photos.
+ */
+export const GUIDE_SYNCED_CAMPUS_SPOTS: Readonly<Record<string, SchoolSlug>> = { usf: "usf" };
 
 export const SPOT_KEY_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
@@ -166,6 +232,11 @@ export function spotsForSchool(slug: string): readonly SchoolSpotDef[] {
 /** Off-campus spot key per place key, for place-matched section photos. */
 export function spotKeysByPlace(slug: string): Record<string, string> {
   return Object.fromEntries(spotsForSchool(slug).flatMap((spot) => (spot.placeKey ? [[spot.placeKey, spot.key]] : [])));
+}
+
+/** A guide section's photo keys: the spot itself, then its child compositions. */
+export function sectionSpotKeys(slug: string, key: string): string[] {
+  return [key, ...spotsForSchool(slug).filter((spot) => spot.parentKey === key).map((spot) => spot.key)];
 }
 
 export function isSchoolSpotKey(slug: string, key: unknown): key is string {
