@@ -4,17 +4,13 @@
 // professional graduation guide (sage/green, frosted glass).
 
 import type { Metadata } from "next";
-import {
-  DRAFT_BAY_AREA_LOCATIONS,
-  slugifyLocation,
-  type BayAreaLocationEntry,
-} from "@/lib/bayAreaLocations";
-import { createSupabaseServerClient } from "@/lib/supabaseServer";
-import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
+import { getPublicLocations, type PublicLocationCard } from "@/lib/locationLibrary/publicData";
+import { environmentLabel, regionLabel, sessionKindLabel } from "@/lib/locationLibrary/taxonomy";
+import { buildBreadcrumbJsonLd, SITE_URL } from "@/lib/breadcrumbs";
 import LocationsExplorer from "./LocationsExplorer";
 
 // ISR: no request-time data on this page, so serve the cached render and
-// refresh hourly. Admin edits bust it sooner via /api/admin/revalidate.
+// refresh hourly. Library edits and Content Engine syncs bust it sooner.
 export const revalidate = 3600;
 
 const PATH = "/bay-area-locations";
@@ -52,46 +48,7 @@ export const metadata: Metadata = {
   },
 };
 
-function normalizeLocation(raw: Partial<BayAreaLocationEntry>, index: number): BayAreaLocationEntry {
-  return {
-    id: raw.id ?? index + 1,
-    title: raw.title ?? "Untitled location",
-    slug: raw.slug || slugifyLocation(raw.title ?? `location-${index + 1}`),
-    region: raw.region ?? "south-bay",
-    city: raw.city ?? "Bay Area",
-    neighborhood: raw.neighborhood ?? null,
-    description: raw.description ?? "",
-    best_for: raw.best_for ?? "",
-    best_time: raw.best_time ?? "",
-    tip: raw.tip ?? "",
-    tags: Array.isArray(raw.tags) ? raw.tags : [],
-    image_url: raw.image_url ?? null,
-    order: raw.order ?? index + 1,
-    active: raw.active ?? true,
-  };
-}
-
-async function getLocations() {
-  const supabase = createSupabaseServerClient();
-  const { data, error } = await supabase
-    .from("bay_area_locations")
-    .select("*")
-    .eq("active", true)
-    .order("order", { ascending: true });
-
-  if (error) {
-    console.error("Failed to load bay_area_locations", error);
-    return DRAFT_BAY_AREA_LOCATIONS;
-  }
-
-  if (!data || data.length === 0) {
-    return DRAFT_BAY_AREA_LOCATIONS;
-  }
-
-  return data.map((location, index) => normalizeLocation(location, index));
-}
-
-function getLocationsJsonLd(locations: BayAreaLocationEntry[]) {
+function getLocationsJsonLd(locations: PublicLocationCard[]) {
   return {
     "@context": "https://schema.org",
     "@type": "CollectionPage",
@@ -127,40 +84,30 @@ function getLocationsJsonLd(locations: BayAreaLocationEntry[]) {
       name: "Bay Area photo locations",
       numberOfItems: locations.length,
       itemListElement: locations.map((location, index) => {
+        const keywords = [
+          ...location.environments.map((e) => environmentLabel(e)),
+          ...location.kinds.map(sessionKindLabel),
+        ];
+        const properties = [
+          { name: "Region", value: regionLabel(location.region) },
+          { name: "Best for", value: location.best_for },
+          { name: "Best light", value: location.best_time },
+          { name: "Photographer tip", value: location.tip },
+        ].filter((p) => p.value);
         const place: Record<string, unknown> = {
           "@type": "Place",
           name: location.title,
-          description: `${location.description} Best for: ${location.best_for}. Best time: ${location.best_time}.`,
-          keywords: location.tags.join(", "),
+          url: `${SITE_URL}${PATH}#${location.slug}`,
+          description: location.description,
           address: {
             "@type": "PostalAddress",
             addressLocality: location.city,
             addressRegion: "CA",
             addressCountry: "US",
           },
-          additionalProperty: [
-            {
-              "@type": "PropertyValue",
-              name: "Region",
-              value: location.region,
-            },
-            {
-              "@type": "PropertyValue",
-              name: "Best for",
-              value: location.best_for,
-            },
-            {
-              "@type": "PropertyValue",
-              name: "Best time",
-              value: location.best_time,
-            },
-            {
-              "@type": "PropertyValue",
-              name: "Photographer tip",
-              value: location.tip,
-            },
-          ],
+          additionalProperty: properties.map((p) => ({ "@type": "PropertyValue", ...p })),
         };
+        if (keywords.length) place.keywords = keywords.join(", ");
 
         if (location.neighborhood) {
           place.containedInPlace = {
@@ -170,7 +117,7 @@ function getLocationsJsonLd(locations: BayAreaLocationEntry[]) {
         }
 
         if (location.image_url) {
-          place.image = location.image_url;
+          place.image = { "@type": "ImageObject", url: location.image_url, caption: location.image_alt };
         }
 
         return {
@@ -184,7 +131,7 @@ function getLocationsJsonLd(locations: BayAreaLocationEntry[]) {
 }
 
 export default async function BayAreaLocationsPage() {
-  const locations = await getLocations();
+  const locations = await getPublicLocations();
   const locationsJsonLd = getLocationsJsonLd(locations);
   const breadcrumbLd = buildBreadcrumbJsonLd([
     { name: "Home", path: "/" },

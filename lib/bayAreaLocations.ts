@@ -1,3 +1,5 @@
+// Fallback cards for /bay-area-locations when the library has no published
+// rows, plus the shared slug helper. The library itself lives in lib/locationLibrary.
 export type BayAreaLocationEntry = {
   id: number;
   title: string;
@@ -15,82 +17,12 @@ export type BayAreaLocationEntry = {
   active: boolean;
 };
 
-export const BAY_AREA_REGION_OPTIONS = [
-  { value: "south-bay", label: "South Bay", shortLabel: "South Bay" },
-  { value: "san-francisco", label: "San Francisco", shortLabel: "SF" },
-  { value: "east-bay", label: "East Bay", shortLabel: "East Bay" },
-  { value: "peninsula", label: "Peninsula", shortLabel: "Peninsula" },
-  { value: "north-bay", label: "North Bay", shortLabel: "North Bay" },
-] as const;
-
-export const BAY_AREA_FILTER_CHIPS = [
-  { value: "all", label: "All Spots" },
-  { value: "south-bay", label: "South Bay" },
-  { value: "san-francisco", label: "SF" },
-  { value: "east-bay", label: "East Bay" },
-  { value: "peninsula", label: "Peninsula" },
-  { value: "beaches", label: "Beaches" },
-] as const;
-
-export const BAY_AREA_TAG_SUGGESTIONS = [
-  "beaches",
-  "city",
-  "architecture",
-  "gardens",
-  "redwoods",
-  "waterfront",
-  "sunset",
-  "views",
-  "editorial",
-  "nature",
-] as const;
-
-export const EMPTY_BAY_AREA_LOCATION_FORM = {
-  title: "",
-  slug: "",
-  region: "south-bay",
-  city: "",
-  neighborhood: "",
-  description: "",
-  best_for: "",
-  best_time: "",
-  tip: "",
-  tags: "",
-  order: "",
-  active: true,
-};
-
 export function slugifyLocation(value: string) {
   return value
     .toLowerCase()
     .trim()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
-}
-
-export function parseLocationTags(value: string) {
-  return Array.from(
-    new Set(
-      value
-        .split(",")
-        .map((item) => slugifyLocation(item))
-        .filter(Boolean)
-    )
-  );
-}
-
-export function formatLocationTags(tags: string[] | null | undefined) {
-  return (tags ?? []).join(", ");
-}
-
-export function getLocationChipLabel(value: string) {
-  const match = BAY_AREA_REGION_OPTIONS.find((item) => item.value === value);
-  if (match) return match.shortLabel;
-  if (value === "all") return "All Spots";
-  return value
-    .split("-")
-    .map((part) => (part === "sf" ? "SF" : part.charAt(0).toUpperCase() + part.slice(1)))
-    .join(" ");
 }
 
 export const DRAFT_BAY_AREA_LOCATIONS: BayAreaLocationEntry[] = [
