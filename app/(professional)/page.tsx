@@ -30,7 +30,7 @@ export const revalidate = 3600;
 const PAGE_TITLE = "San Francisco Graduation & Couples Photographer";
 const SOCIAL_TITLE = `${PAGE_TITLE} | SoloXSnaps`;
 const description =
-  "Graduation and couples photography in San Francisco and the Bay Area, plus family and maternity sessions. Guided posing, transparent pricing, and private online galleries.";
+  "Graduation and couples photographer in San Francisco and the Bay Area, plus family and maternity sessions. Guided posing and transparent pricing.";
 const CHRIS_PORTRAIT = "/images/about/chris-solorzano-photographer.webp";
 
 export const metadata: Metadata = {

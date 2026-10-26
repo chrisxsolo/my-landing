@@ -36,8 +36,8 @@ export const revalidate = 3600;
 
 // ── SEO metadata (tab title + Google description) ────────────────────────────
 export const metadata: Metadata = {
-  title: "Grad Pricing",
-  description: "Graduation photography pricing by Chris Solorzano — Bay Area grad portraits.",
+  title: "Graduation Photography Pricing",
+  description: `Bay Area graduation photography pricing: sessions from $${PRICING_CATALOG.graduation.baseHourlyRate} with ${PRICING_CATALOG.graduation.standardMinimumImages}+ edited images, group rates from $${PRICING_CATALOG.graduation.groupRates[6]} per person, and campus travel fees listed up front.`,
   alternates: { canonical: "/pricing/grads" },
 };
 

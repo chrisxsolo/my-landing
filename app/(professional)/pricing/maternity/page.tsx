@@ -38,7 +38,7 @@ const DURATION_LABEL = `${maternity.durationMinutes / 60}-hour session`;
 
 export const metadata: Metadata = {
   title: "Maternity Photography Pricing",
-  description: `San Francisco Bay Area maternity photography by Chris Solorzano: ${formatCurrency(maternity.price)} for a ${DURATION_LABEL} with partner and immediate family included, guided posing, and ${maternity.minimumImages}+ edited images.`,
+  description: `Bay Area maternity photography: ${formatCurrency(maternity.price)} for a ${DURATION_LABEL} with your partner and immediate family, guided posing, and ${maternity.minimumImages}+ edited images.`,
   alternates: { canonical: "/pricing/maternity" },
 };
 

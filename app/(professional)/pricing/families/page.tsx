@@ -35,7 +35,7 @@ export const revalidate = 3600;
 // ── SEO metadata (tab title + Google description) ────────────────────────────
 export const metadata: Metadata = {
   title: "Family Pricing",
-  description: "Family photography pricing by Chris Solorzano — Bay Area family portraits.",
+  description: `Bay Area family photography pricing: a ${PRICING_CATALOG.families.packages.standard.durationMinutes}-minute Family Session from $${PRICING_CATALOG.families.packages.standard.price} or a ${PRICING_CATALOG.families.packages.extended.durationMinutes}-minute Extended Family Session at $${PRICING_CATALOG.families.packages.extended.price}, with guided posing.`,
   alternates: { canonical: "/pricing/families" },
 };
 
