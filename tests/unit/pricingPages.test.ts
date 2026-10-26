@@ -106,13 +106,14 @@ describe("pricing pages render values from the catalog, not hardcoded literals",
       `+${fc(c.addOns.extraLocation.price)}`, // +$125
       `+${fc(c.addOns.extra30Minutes.price)}`, // +$175
       `+${fc(c.addOns.expedited.price)}`, // +$150
-      c.addOns.shortFormVideo.displayPrice, // $175+
       c.addOns.advancedRetouching.displayPrice, // $25 / image
       `Minimum ${c.packages.signature.minimumImages}`, // Minimum 60
       TWO_WEEK,
       ...POLICY,
     ]);
     expect(visibleText(html).toLowerCase()).not.toContain("deposit");
+    // Video is not an offered deliverable.
+    expect(visibleText(html).toLowerCase()).not.toMatch(/\bvideo\b|\breel\b/);
   });
 
   it("elopement page matches the catalog, including the 2-hour base", async () => {

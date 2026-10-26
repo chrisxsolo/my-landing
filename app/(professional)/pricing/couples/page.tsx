@@ -78,7 +78,6 @@ const addOns = [
   { label: couplesPricing.addOns.proofingGallery.label, price: `+${formatCurrency(couplesPricing.addOns.proofingGallery.price)}` },
   { label: couplesPricing.addOns.rushPreview.label, price: `+${formatCurrency(couplesPricing.addOns.rushPreview.price)}` },
   { label: couplesPricing.addOns.expedited.label, price: `+${formatCurrency(couplesPricing.addOns.expedited.price)}` },
-  couplesPricing.addOns.shortFormVideo,
   couplesPricing.addOns.advancedRetouching,
   { label: "Travel outside San Francisco",                     price: "based on distance" },
 ] as const;

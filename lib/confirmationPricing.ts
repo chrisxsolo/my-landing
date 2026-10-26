@@ -10,7 +10,7 @@
 // Pure functions — unit tested in tests/unit/confirmationPricing.test.ts.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { BOOKING_POLICY, calculatePaymentSchedule } from "@/lib/pricingCatalog";
+import { BOOKING_POLICY, calculatePaymentScheduleCents } from "@/lib/pricingCatalog";
 import { catalogSessionTotalCents, type PaymentTotalInquiry } from "@/lib/paymentTotalInference";
 
 /** Where the amount shown as "Payment Received" came from. */
@@ -73,7 +73,7 @@ export function resolveConfirmationPricing(input: {
       : EMPTY;
   }
 
-  const { retainer } = calculatePaymentSchedule(totalCents);
+  const { retainer } = calculatePaymentScheduleCents(totalCents);
 
   // Nothing recorded and nothing in the thread: the policy retainer is the
   // best estimate of what they sent to reserve the date.

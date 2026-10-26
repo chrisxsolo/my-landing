@@ -3,6 +3,13 @@ export const BOOKING_POLICY = {
   retainerRefundability: "non-refundable",
   remainingBalanceDeadline: "on or before the session date",
   contractDeadline: "before the session",
+  // Public wording for reply time. "Most" on purpose: never an absolute promise.
+  inquiryResponse: "Most inquiries receive a response within 24 hours.",
+  inquiryResponseShort: "Replies within 24 hours",
+  // The delivered gallery is the only deliverable. Proofing (couples add-on)
+  // picks favorites from a lightly culled gallery; it is not a RAW delivery.
+  rawPolicy:
+    "RAW and unedited images are not provided. Every delivered photograph is professionally selected and edited to reflect the final SoloXSnaps photography style.",
 } as const;
 
 // Explicit extension: tests/pricingCatalog.test.mjs loads this file with
@@ -115,7 +122,6 @@ export const PRICING_CATALOG = {
       proofingGallery: { label: "Client proofing gallery", shortLabel: "Proofing gallery", price: 75 },
       rushPreview: { label: "Rush preview - 5 edited images within 48 hours", shortLabel: "Rush preview", price: 75 },
       expedited: { label: "Expedited full gallery delivery within 72 hours", shortLabel: "72-hour delivery", price: 150 },
-      shortFormVideo: { label: "Short-form video / BTS reel", displayPrice: "$175+" },
       advancedRetouching: { label: "Advanced retouching", displayPrice: "$25 / image" },
     },
     travelFees: {
@@ -142,6 +148,22 @@ export const PRICING_CATALOG = {
       extraLocation: { label: "Additional nearby location", shortLabel: "Extra location", price: 125 },
       extraCoverage: { label: "Additional photography coverage", displayPrice: "Custom quote" },
       travel: { label: "Travel outside the standard service area", displayPrice: `${RATE_PER_MILE_LABEL} + tolls` },
+    },
+  },
+  // One package. Partner and immediate family are included, so a maternity
+  // shoot that includes kids is still this package, not a family session.
+  maternity: {
+    label: "Maternity Session",
+    price: 500,
+    durationMinutes: 60,
+    minimumImages: 30,
+    locations: 1,
+    outfits: 1,
+    addOns: {
+      extraOutfit: { label: "Additional outfit", shortLabel: "Extra outfit", price: 75 },
+      secondLocation: { label: "Second nearby location", shortLabel: "Second location", price: 125 },
+      expedited: { label: "72-hour full gallery delivery", shortLabel: "72-hour delivery", price: 150 },
+      travel: { label: "Travel outside San Francisco", displayPrice: `${RATE_PER_MILE_LABEL} + tolls` },
     },
   },
   families: {
@@ -189,12 +211,26 @@ export function getBookingPolicyItems(): string[] {
   ];
 }
 
+/**
+ * Retainer split in integer cents. An odd cent goes to the retainer, so the
+ * two parts always sum exactly to the total.
+ */
+export function calculatePaymentScheduleCents(totalCents: number): {
+  retainer: number;
+  remainingBalance: number;
+} {
+  const cents = Math.max(0, Math.round(totalCents));
+  const retainer = Math.round((cents * BOOKING_POLICY.retainerPercent) / 100);
+  return { retainer, remainingBalance: cents - retainer };
+}
+
+/** Same split for a total in dollars; the math runs in cents, so $351 → $175.50 / $175.50. */
 export function calculatePaymentSchedule(total: number): {
   retainer: number;
   remainingBalance: number;
 } {
-  const retainer = Math.round(total * (BOOKING_POLICY.retainerPercent / 100));
-  return { retainer, remainingBalance: total - retainer };
+  const { retainer, remainingBalance } = calculatePaymentScheduleCents(Math.round(total * 100));
+  return { retainer: retainer / 100, remainingBalance: remainingBalance / 100 };
 }
 
 export function inferTotalFromRetainer(retainer: number): number {
@@ -214,6 +250,7 @@ export function getGraduationTravelFeeFromText(text: string): number {
 export function getMinimumImageCountForSessionType(sessionType: string): number {
   const normalized = sessionType.toLowerCase();
   if (/\bgraduat|\bgrad\b/.test(normalized)) return PRICING_CATALOG.graduation.standardMinimumImages;
+  if (/\bmaternity\b/.test(normalized)) return PRICING_CATALOG.maternity.minimumImages;
   // Before the couples patterns: an elopement message routinely mentions a
   // "couple" and must not fall through to the couples minimum.
   if (/\belop|courthouse|wedding ceremony/.test(normalized)) return PRICING_CATALOG.elopement.minimumImages;

@@ -17,8 +17,8 @@ test("booking policy uses one 50% non-refundable retainer and balance deadline",
     "on or before the session date",
   );
   assert.deepEqual(calculatePaymentSchedule(351), {
-    retainer: 176,
-    remainingBalance: 175,
+    retainer: 175.5,
+    remainingBalance: 175.5,
   });
   assert.deepEqual(getBookingPolicyItems(), [
     "50% non-refundable retainer to reserve the session.",
@@ -69,7 +69,7 @@ test("every add-on price across categories is pinned", () => {
   assert.equal(couples.proofingGallery.price, 75);
   assert.equal(couples.rushPreview.price, 75);
   assert.equal(couples.expedited.price, 150);
-  assert.equal(couples.shortFormVideo.displayPrice, "$175+");
+  assert.equal("shortFormVideo" in couples, false, "video is not an offered add-on");
   assert.equal(couples.advancedRetouching.displayPrice, "$25 / image");
 
   // Family add-ons are display-only strings. Expedited MUST be $150 — this is the

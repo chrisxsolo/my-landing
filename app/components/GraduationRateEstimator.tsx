@@ -6,6 +6,7 @@ import {
   SCHOOLS,
   calculateGraduationEstimate,
   formatCurrency,
+  isSessionLengthAllowed,
   type SchoolValue,
   type SessionLengthKey,
 } from "@/lib/pricing"
@@ -15,6 +16,16 @@ import { trackEvent } from "@/lib/analytics/visitor"
 import styles from "@/app/components/RateEstimator.module.css"
 
 const graduationPricing = PRICING_CATALOG.graduation
+const GROUP_MINIMUM = graduationPricing.durationRules.groupMinimumSize
+const HEADCOUNT_OPTIONS = [1, 2, 3, 4, 5, 6] as const
+const SESSION_LENGTH_OPTIONS: { value: SessionLengthKey; label: string }[] = [
+  { value: "1hr", label: "1 hour" },
+  { value: "1.5hr", label: "90 minutes" },
+  { value: "2hr", label: "2 hours" },
+]
+const SESSION_LABELS = Object.fromEntries(
+  SESSION_LENGTH_OPTIONS.map(({ value, label }) => [value, label]),
+) as Record<SessionLengthKey, string>
 
 // Styles live in RateEstimator.module.css — shared with CouplesRateEstimator
 // and matched to the pricing detail-page design system (Pricing.module.css).
@@ -22,21 +33,23 @@ const graduationPricing = PRICING_CATALOG.graduation
 export default function GraduationRateEstimator() {
   const [school, setSchool]            = useState<SchoolValue>("uc-berkeley")
   const [people, setPeople]            = useState(1)
-  const [sessionLength, setSessionLen] = useState<SessionLengthKey>("1hr")
+  // The visitor's own pick. The estimate raises it to the group minimum when
+  // needed, and the pick comes back if the group shrinks again.
+  const [requestedLength, setSessionLen] = useState<SessionLengthKey>("1hr")
   const [extraOutfit, setExtraOutfit]  = useState(false)
   const [secondLocation, setSecondLoc] = useState(false)
   const [expedited, setExpedited]      = useState(false)
   const [champagne, setChampagne]      = useState(false)
 
   const estimate = useMemo(
-    () => calculateGraduationEstimate({ school, people, sessionLength, extraOutfit, secondLocation, expedited, champagne }),
-    [school, people, sessionLength, extraOutfit, secondLocation, expedited, champagne]
+    () => calculateGraduationEstimate({ school, people, sessionLength: requestedLength, extraOutfit, secondLocation, expedited, champagne }),
+    [school, people, requestedLength, extraOutfit, secondLocation, expedited, champagne]
   )
+  const sessionLength = estimate.sessionLength
+  const lengthRaised = sessionLength !== requestedLength
 
   const schoolLabel = SCHOOLS.find(s => s.value === school)?.label ?? school
-  const sessionLabelMap: Record<SessionLengthKey, string> = {
-    "1hr": "1 hour", "1.5hr": "90 minutes", "2hr": "2 hours",
-  }
+  const sessionLabelMap = SESSION_LABELS
   const selectedAddOns = [
     extraOutfit    && graduationPricing.addOns.extraOutfit.shortLabel,
     secondLocation && graduationPricing.addOns.secondLocation.shortLabel,
@@ -51,6 +64,7 @@ export default function GraduationRateEstimator() {
     duration: sessionLabelMap[sessionLength],
     addOns: selectedAddOns,
     estimatedTotal: estimate.subtotal,
+    travelPending: estimate.travelMethod === "tbd",
   })
 
   // Funnel events: estimator_start fires once on first interaction;
@@ -78,7 +92,7 @@ export default function GraduationRateEstimator() {
 
   const travelDisplay =
     estimate.travelMethod === "none" ? "Included" :
-    estimate.travelMethod === "tbd"  ? "TBD" :
+    estimate.travelMethod === "tbd"  ? "Confirmed after location review" :
     formatCurrency(estimate.travelFee as number)
 
   return (
@@ -103,8 +117,9 @@ export default function GraduationRateEstimator() {
         <div className={styles.estimatorInputs}>
 
           <div>
-            <label className={styles.estimatorLabel}>School / Location</label>
+            <label htmlFor="grad-estimate-school" className={styles.estimatorLabel}>School / Location</label>
             <select
+              id="grad-estimate-school"
               className={styles.estimatorSelect}
               value={school}
               onChange={e => { markStarted(); setSchool(e.target.value as SchoolValue) }}
@@ -114,32 +129,39 @@ export default function GraduationRateEstimator() {
           </div>
 
           <div>
-            <label className={styles.estimatorLabel}>Number of Graduates</label>
+            <label htmlFor="grad-estimate-people" className={styles.estimatorLabel}>Number of Graduates</label>
             <select
+              id="grad-estimate-people"
               className={styles.estimatorSelect}
               value={people}
               onChange={e => { markStarted(); setPeople(Number(e.target.value)) }}
             >
-              {[1, 2, 3, 4, 5].map(n => (
-                <option key={n} value={n}>{n === 5 ? "5 or more" : String(n)}</option>
+              {HEADCOUNT_OPTIONS.map(n => (
+                <option key={n} value={n}>{n === 6 ? "6 or more" : String(n)}</option>
               ))}
             </select>
           </div>
 
           <div>
-            <label className={styles.estimatorLabel}>Session Length</label>
+            <label htmlFor="grad-estimate-length" className={styles.estimatorLabel}>Session Length</label>
             <select
+              id="grad-estimate-length"
               className={styles.estimatorSelect}
               value={sessionLength}
+              aria-describedby={people >= GROUP_MINIMUM ? "grad-estimate-length-hint" : undefined}
               onChange={e => { markStarted(); setSessionLen(e.target.value as SessionLengthKey) }}
             >
-              <option value="1hr">1 hour</option>
-              <option value="1.5hr">90 minutes</option>
-              <option value="2hr">2 hours</option>
+              {SESSION_LENGTH_OPTIONS.map(({ value, label }) => (
+                <option key={value} value={value} disabled={!isSessionLengthAllowed(people, value)}>
+                  {label}
+                </option>
+              ))}
             </select>
-            {people >= 3 && sessionLength === "1hr" && (
-              <p className={styles.estimatorHint}>
-                Groups of 3+ usually need at least 90 min.
+            {people >= GROUP_MINIMUM && (
+              <p id="grad-estimate-length-hint" className={styles.estimatorHint} aria-live="polite">
+                {lengthRaised
+                  ? `Set to ${SESSION_LABELS[sessionLength]}: groups of ${GROUP_MINIMUM}+ book at least ${graduationPricing.durationRules.groupMinimumMinutes} minutes.`
+                  : `Groups of ${GROUP_MINIMUM}+ book at least ${graduationPricing.durationRules.groupMinimumMinutes} minutes.`}
               </p>
             )}
           </div>
@@ -147,18 +169,18 @@ export default function GraduationRateEstimator() {
 
         {/* ── ADD-ONS ─────────────────────────────────────────────────────── */}
         <div className={styles.estimatorAddons}>
-          <label className={styles.estimatorLabel}>Add-ons</label>
-          <div className={styles.estimatorToggleRow}>
-            <button className={styles.estimatorToggle} data-on={extraOutfit}    onClick={() => { markStarted(); setExtraOutfit(v => !v) }}>
+          <p className={styles.estimatorLabel} id="grad-estimate-addons">Add-ons</p>
+          <div className={styles.estimatorToggleRow} role="group" aria-labelledby="grad-estimate-addons">
+            <button type="button" aria-pressed={extraOutfit} className={styles.estimatorToggle} data-on={extraOutfit}    onClick={() => { markStarted(); setExtraOutfit(v => !v) }}>
               {extraOutfit ? "✓ " : ""}{graduationPricing.addOns.extraOutfit.shortLabel} +{formatCurrency(graduationPricing.addOns.extraOutfit.price)}
             </button>
-            <button className={styles.estimatorToggle} data-on={secondLocation} onClick={() => { markStarted(); setSecondLoc(v => !v) }}>
+            <button type="button" aria-pressed={secondLocation} className={styles.estimatorToggle} data-on={secondLocation} onClick={() => { markStarted(); setSecondLoc(v => !v) }}>
               {secondLocation ? "✓ " : ""}{graduationPricing.addOns.secondLocation.shortLabel} +{formatCurrency(graduationPricing.addOns.secondLocation.price)}
             </button>
-            <button className={styles.estimatorToggle} data-on={expedited}      onClick={() => { markStarted(); setExpedited(v => !v) }}>
+            <button type="button" aria-pressed={expedited} className={styles.estimatorToggle} data-on={expedited}      onClick={() => { markStarted(); setExpedited(v => !v) }}>
               {expedited ? "✓ " : ""}{graduationPricing.addOns.expedited.shortLabel} +{formatCurrency(graduationPricing.addOns.expedited.price)}
             </button>
-            <button className={styles.estimatorToggle} data-on={champagne}      onClick={() => { markStarted(); setChampagne(v => !v) }}>
+            <button type="button" aria-pressed={champagne} className={styles.estimatorToggle} data-on={champagne}      onClick={() => { markStarted(); setChampagne(v => !v) }}>
               {champagne ? "✓ " : ""}{graduationPricing.addOns.champagne.shortLabel} +{formatCurrency(graduationPricing.addOns.champagne.price)}
             </button>
           </div>
@@ -199,7 +221,9 @@ export default function GraduationRateEstimator() {
 
           {/* Total line */}
           <div className={styles.estimatorTotalRow}>
-            <span className={styles.estimatorTotalLabel}>Estimated Total</span>
+            <span className={styles.estimatorTotalLabel}>
+              {estimate.travelMethod === "tbd" ? "Estimated Total (before travel)" : "Estimated Total"}
+            </span>
             <span className={styles.estimatorTotalValue}>{formatCurrency(estimate.subtotal)}</span>
           </div>
         </div>
@@ -209,12 +233,7 @@ export default function GraduationRateEstimator() {
           <Link href={`/contact?${contactParams.toString()}`} className={styles.estimatorCtaPrimary} onClick={markComplete}>
             Inquire About This Estimate
           </Link>
-          <Link
-            href="https://www.soloxsnaps.com/availability"
-            target="_blank"
-            rel="noopener noreferrer"
-            className={styles.estimatorCtaSecondary}
-          >
+          <Link href="/availability" className={styles.estimatorCtaSecondary}>
             Check Availability
           </Link>
         </div>

@@ -52,6 +52,7 @@ export default function CouplesRateEstimator() {
     location: locLabel,
     addOns: selectedAddOns,
     estimatedTotal: estimate.subtotal,
+    travelPending: estimate.travelMethod === "tbd",
   })
 
   // Funnel events: estimator_start once on first interaction; estimator_complete
@@ -76,7 +77,7 @@ export default function CouplesRateEstimator() {
 
   const travelDisplay =
     estimate.travelMethod === "none" ? "Included" :
-    estimate.travelMethod === "tbd"  ? "TBD" :
+    estimate.travelMethod === "tbd"  ? "Confirmed after location review" :
     formatCurrency(estimate.travelFee as number)
 
   return (
@@ -101,8 +102,9 @@ export default function CouplesRateEstimator() {
         <div className={styles.estimatorInputs}>
 
           <div>
-            <label className={styles.estimatorLabel}>Session Type</label>
+            <label htmlFor="couples-estimate-package" className={styles.estimatorLabel}>Session Type</label>
             <select
+              id="couples-estimate-package"
               className={styles.estimatorSelect}
               value={packageKey}
               onChange={e => { markStarted(); setPackageKey(e.target.value as CouplesPackageKey) }}
@@ -118,8 +120,9 @@ export default function CouplesRateEstimator() {
           </div>
 
           <div>
-            <label className={styles.estimatorLabel}>Location / Area</label>
+            <label htmlFor="couples-estimate-location" className={styles.estimatorLabel}>Location / Area</label>
             <select
+              id="couples-estimate-location"
               className={styles.estimatorSelect}
               value={location}
               onChange={e => { markStarted(); setLocation(e.target.value as CouplesLocationValue) }}
@@ -134,24 +137,24 @@ export default function CouplesRateEstimator() {
 
         {/* ── ADD-ONS ─────────────────────────────────────────────────────── */}
         <div className={styles.estimatorAddons}>
-          <label className={styles.estimatorLabel}>Add-ons</label>
-          <div className={styles.estimatorToggleRow}>
-            <button className={styles.estimatorToggle} data-on={extraLocation}  onClick={() => { markStarted(); setExtraLoc(v => !v) }}>
+          <p className={styles.estimatorLabel} id="couples-estimate-addons">Add-ons</p>
+          <div className={styles.estimatorToggleRow} role="group" aria-labelledby="couples-estimate-addons">
+            <button type="button" aria-pressed={extraLocation} className={styles.estimatorToggle} data-on={extraLocation}  onClick={() => { markStarted(); setExtraLoc(v => !v) }}>
               {extraLocation ? "✓ " : ""}{couplesPricing.addOns.extraLocation.shortLabel} +{formatCurrency(couplesPricing.addOns.extraLocation.price)}
             </button>
-            <button className={styles.estimatorToggle} data-on={extraOutfit}    onClick={() => { markStarted(); setExtraOutfit(v => !v) }}>
+            <button type="button" aria-pressed={extraOutfit} className={styles.estimatorToggle} data-on={extraOutfit}    onClick={() => { markStarted(); setExtraOutfit(v => !v) }}>
               {extraOutfit ? "✓ " : ""}{couplesPricing.addOns.extraOutfit.shortLabel} +{formatCurrency(couplesPricing.addOns.extraOutfit.price)}
             </button>
-            <button className={styles.estimatorToggle} data-on={extra30Min}     onClick={() => { markStarted(); setExtra30Min(v => !v) }}>
+            <button type="button" aria-pressed={extra30Min} className={styles.estimatorToggle} data-on={extra30Min}     onClick={() => { markStarted(); setExtra30Min(v => !v) }}>
               {extra30Min ? "✓ " : ""}{couplesPricing.addOns.extra30Minutes.shortLabel} +{formatCurrency(couplesPricing.addOns.extra30Minutes.price)}
             </button>
-            <button className={styles.estimatorToggle} data-on={proofingGallery} onClick={() => { markStarted(); setProofing(v => !v) }}>
+            <button type="button" aria-pressed={proofingGallery} className={styles.estimatorToggle} data-on={proofingGallery} onClick={() => { markStarted(); setProofing(v => !v) }}>
               {proofingGallery ? "✓ " : ""}{couplesPricing.addOns.proofingGallery.shortLabel} +{formatCurrency(couplesPricing.addOns.proofingGallery.price)}
             </button>
-            <button className={styles.estimatorToggle} data-on={rushPreview}    onClick={() => { markStarted(); setRushPreview(v => !v) }}>
+            <button type="button" aria-pressed={rushPreview} className={styles.estimatorToggle} data-on={rushPreview}    onClick={() => { markStarted(); setRushPreview(v => !v) }}>
               {rushPreview ? "✓ " : ""}{couplesPricing.addOns.rushPreview.shortLabel} +{formatCurrency(couplesPricing.addOns.rushPreview.price)}
             </button>
-            <button className={styles.estimatorToggle} data-on={expedited}      onClick={() => { markStarted(); setExpedited(v => !v) }}>
+            <button type="button" aria-pressed={expedited} className={styles.estimatorToggle} data-on={expedited}      onClick={() => { markStarted(); setExpedited(v => !v) }}>
               {expedited ? "✓ " : ""}{couplesPricing.addOns.expedited.shortLabel} +{formatCurrency(couplesPricing.addOns.expedited.price)}
             </button>
           </div>
@@ -185,7 +188,9 @@ export default function CouplesRateEstimator() {
 
           {/* Total line */}
           <div className={styles.estimatorTotalRow}>
-            <span className={styles.estimatorTotalLabel}>Estimated Total</span>
+            <span className={styles.estimatorTotalLabel}>
+              {estimate.travelMethod === "tbd" ? "Estimated Total (before travel)" : "Estimated Total"}
+            </span>
             <span className={styles.estimatorTotalValue}>{formatCurrency(estimate.subtotal)}</span>
           </div>
         </div>
@@ -195,12 +200,7 @@ export default function CouplesRateEstimator() {
           <Link href={`/contact?${contactParams.toString()}`} className={styles.estimatorCtaPrimary} onClick={markComplete}>
             Inquire About This Estimate
           </Link>
-          <Link
-            href="https://www.soloxsnaps.com/availability"
-            target="_blank"
-            rel="noopener noreferrer"
-            className={styles.estimatorCtaSecondary}
-          >
+          <Link href="/availability" className={styles.estimatorCtaSecondary}>
             Check Availability
           </Link>
         </div>

@@ -1,4 +1,4 @@
-import { calculatePaymentSchedule, inferTotalFromRetainer } from "@/lib/pricingCatalog";
+import { calculatePaymentScheduleCents, inferTotalFromRetainer } from "@/lib/pricingCatalog";
 import {
   inferSessionTotalCents,
   parseKnownMoneyCents,
@@ -116,7 +116,7 @@ export function seedFromRelated(
     }
   }
 
-  const schedule = calculatePaymentSchedule(totalCents);
+  const schedule = calculatePaymentScheduleCents(totalCents);
   const d1Paid = Boolean(fullPayment || d1Saved);
   const d2Paid = Boolean(fullPayment || d2Saved);
 
@@ -247,7 +247,7 @@ export function rebalanceAmounts(
 
   if (col === "full" && cents > 0) {
     if (!flags.d1Paid && !flags.d2Paid) {
-      const schedule = calculatePaymentSchedule(cents);
+      const schedule = calculatePaymentScheduleCents(cents);
       next.d1 = formatCents(schedule.retainer);
       next.d2 = formatCents(schedule.remainingBalance);
     } else if (flags.d1Paid && !flags.d2Paid) {

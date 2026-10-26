@@ -66,6 +66,32 @@ export function getGroupRatePerPerson(people: number): number {
   return GROUP_RATE_6_PLUS
 }
 
+// ── GROUP DURATION RULES ─────────────────────────────────────────────────────
+const DURATION_RULES = PRICING_CATALOG.graduation.durationRules
+const SESSION_LENGTH_KEYS = Object.keys(SESSION_LENGTHS) as SessionLengthKey[]
+
+function minutesOf(length: SessionLengthKey): number {
+  return SESSION_LENGTHS[length] * 60
+}
+
+/** Minutes the session price already covers: 60 for 1–2 people, 90 for groups of 3+. */
+export function includedMinutesFor(people: number): number {
+  return people >= DURATION_RULES.groupMinimumSize
+    ? DURATION_RULES.groupMinimumMinutes
+    : DURATION_RULES.standardMinutes
+}
+
+/** Groups of 3+ can't book under the group minimum (90 minutes). */
+export function isSessionLengthAllowed(people: number, length: SessionLengthKey): boolean {
+  return minutesOf(length) >= includedMinutesFor(people)
+}
+
+/** The requested length, raised to the shortest allowed length when it is too short. */
+export function enforceSessionLength(people: number, requested: SessionLengthKey): SessionLengthKey {
+  if (isSessionLengthAllowed(people, requested)) return requested
+  return SESSION_LENGTH_KEYS.find((key) => isSessionLengthAllowed(people, key)) ?? requested
+}
+
 export interface EstimateInput {
   school: SchoolValue
   people: number
@@ -87,55 +113,42 @@ export interface EstimateResult {
   groupNote: string | null
 }
 
-export function calculateGraduationEstimate(input: EstimateInput): EstimateResult {
-  const { school, people, sessionLength, extraOutfit, secondLocation, expedited, champagne } = input
-  const hours = SESSION_LENGTHS[sessionLength]
+export type GraduationEstimate = EstimateResult & { sessionLength: SessionLengthKey }
 
-  // Session base
-  let sessionBase: number
-  if (people <= 1) {
-    sessionBase = GRAD_HOURLY_RATE * hours
-  } else {
-    const ratePerPerson = getGroupRatePerPerson(people)
-    // Group sessions: rate is per person, session length scales the cost
-    // For groups, the per-person rate already implies a full session —
-    // extra hours are charged at the per-person rate x people x (hours - 1)
-    // Base = per-person rate × headcount; extra time = $100 per additional 30 min
-    sessionBase = ratePerPerson * people
-    if (hours > 1) {
-      const extraHalfHours = (hours - 1) * 2
-      sessionBase += extraHalfHours * ADDON_EXTRA_30_MIN
-    }
-  }
+function graduationSessionBase(people: number, sessionLength: SessionLengthKey): number {
+  if (people <= 1) return GRAD_HOURLY_RATE * SESSION_LENGTHS[sessionLength]
+  // Group rate is per person and already covers the included time (60 min, or
+  // the 90-minute group minimum for 3+) — the same rule the contract tool and
+  // the email assistant quote. Time past that is the extra-30-minutes add-on.
+  const extraHalfHours = Math.max(0, minutesOf(sessionLength) - includedMinutesFor(people)) / 30
+  return getGroupRatePerPerson(people) * people + extraHalfHours * ADDON_EXTRA_30_MIN
+}
 
-  // Add-ons
+export function calculateGraduationEstimate(input: EstimateInput): GraduationEstimate {
+  const { school, people, extraOutfit, secondLocation, expedited, champagne } = input
+  const sessionLength = enforceSessionLength(people, input.sessionLength)
+  const sessionBase = graduationSessionBase(people, sessionLength)
+
   let addons = 0
   if (extraOutfit)    addons += ADDON_EXTRA_OUTFIT
   if (secondLocation) addons += ADDON_SECOND_LOCATION
   if (expedited)      addons += ADDON_EXPEDITED
   if (champagne)      addons += ADDON_CHAMPAGNE
 
-  // Travel
   const travelFee = getTravelFeeForSchool(school)
   const travelMethod: EstimateResult["travelMethod"] =
     travelFee === null      ? "none" :
     travelFee === undefined ? "tbd"  :
     "mileage"
 
-  const travelAmount = travelFee ?? 0
+  const subtotal = sessionBase + addons + (travelFee ?? 0)
+  const { retainer: deposit, remainingBalance } = calculatePaymentSchedule(subtotal)
 
-  const subtotal = sessionBase + addons + travelAmount
-  const paymentSchedule = calculatePaymentSchedule(subtotal);
-  const deposit = paymentSchedule.retainer;
-  const remainingBalance = paymentSchedule.remainingBalance;
+  const groupNote = people >= DURATION_RULES.groupMinimumSize
+    ? `Groups of ${DURATION_RULES.groupMinimumSize} or more book at least ${DURATION_RULES.groupMinimumMinutes} minutes for individual and group photos. That time is included in the group rate.`
+    : null
 
-  // Group note
-  const groupNote =
-    people >= PRICING_CATALOG.graduation.durationRules.groupMinimumSize && sessionLength === "1hr"
-      ? "Groups of 3 or more usually need at least 90 minutes for individual and group photos."
-      : null
-
-  return { sessionBase, travelFee, addons, subtotal, deposit, remainingBalance, travelMethod, groupNote }
+  return { sessionBase, travelFee, addons, subtotal, deposit, remainingBalance, travelMethod, groupNote, sessionLength }
 }
 
 export function formatCurrency(amount: number): string {
