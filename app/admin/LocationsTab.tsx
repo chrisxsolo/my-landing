@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { C } from "@/lib/colors";
 import { uploadImage } from "@/lib/uploadImage";
 import ExistingPhotoPicker from "@/app/admin/ExistingPhotoPicker";
+import { GUIDE_SYNCED_CAMPUS_SPOTS } from "@/lib/schoolSpots";
 
 type Spot = { id: number; school_id: string; school_name: string; school_short: string; name: string; description: string; tip: string; icon: string; image_url: string | null; order: number };
 type Props = { showToast: (msg: string, ok?: boolean) => void };
@@ -183,6 +184,11 @@ export default function LocationsTab({ showToast }: Props) {
                 <p className="text-xs font-black uppercase tracking-widest" style={{ color: C.p2 }}>{school.short}</p>
                 <span className="text-xs font-bold text-slate-400">({schoolSpots.length} spots)</span>
               </div>
+              {GUIDE_SYNCED_CAMPUS_SPOTS[school.id] && (
+                <p className="mb-3 text-xs text-slate-500">
+                  The public Campus Spots text for {school.short} comes from its location guide (/grads/{GUIDE_SYNCED_CAMPUS_SPOTS[school.id]}/spots). Photos set here are still used.
+                </p>
+              )}
               <div className="space-y-3">
                 {schoolSpots.map(spot => (
                   <div key={spot.id} className={card} style={editingSpot?.id === spot.id ? { outline: `2px solid ${C.p2}` } : {}}>

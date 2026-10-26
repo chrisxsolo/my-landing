@@ -35,7 +35,7 @@ const schools: Array<{ name: string; href: string; blurb: string }> = [
     name: "USF Graduation Photos",
     href: "/grads/usf",
     blurb:
-      "St. Ignatius Church, Lone Mountain, and the Welch Field views pair classic architecture with the San Francisco skyline. Overcast days keep the white gowns clean and even.",
+      "St. Ignatius Church, Gleeson Library, the wolf sculpture, and a sunset finish under the Lone Mountain palm trees. Overcast days work beautifully too.",
   },
   {
     name: "SF State Graduation Photos",

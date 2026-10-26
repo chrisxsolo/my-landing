@@ -6,6 +6,7 @@ import type { Metadata } from "next";
 import CampusSpotsContent from "./CampusSpotsContent";
 import { getLocationSpots } from "@/lib/gradGuideData";
 import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
+import { withGuideCampusSpots } from "./guideSpots";
 
 // ISR: content now server-fetches (cached); refresh hourly, sooner on admin
 // revalidate. Previously this page was frozen static + client-fetched.
@@ -30,7 +31,8 @@ export const metadata: Metadata = {
 };
 
 export default async function CampusSpotsPage() {
-  const spots = await getLocationSpots();
+  // Schools with a location guide (USF) take their spot text from it.
+  const spots = await withGuideCampusSpots(await getLocationSpots());
   const articleLd = {
     "@context": "https://schema.org",
     "@type": "Article",

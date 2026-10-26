@@ -12,7 +12,7 @@ const SCHOOL_META: Record<string, { emoji: string; tagline: string }> = {
   berkeley: { emoji: "🐻", tagline: "Iconic arches, Sather Gate, golden hillsides" },
   sfsu:     { emoji: "🌉", tagline: "Modern campus meets San Francisco backdrops" },
   csueb:    { emoji: "🦅", tagline: "Bay views, hillside campus, hidden gems" },
-  usf:      { emoji: "⛪", tagline: "Hilltop campus, Golden Gate Park nearby, city views" },
+  usf:      { emoji: "⛪", tagline: "St. Ignatius, Gleeson Library, and a sunset finish at Lone Mountain" },
 };
 
 // Maps this guide's internal school_id to the live /grads/<slug> route segment
@@ -47,11 +47,6 @@ const DRAFT_SPOTS: LocationSpot[] = [
   { id: 19, school_id: "csueb", school_name: "Cal State East Bay", school_short: "CSUEB", name: "Library Terrace & Steps", description: "The library has a multi-level terrace with panoramic views of the Bay and the SF skyline on clear days.", tip: "On clear days you can see SF in the background — check air quality first.", icon: "📚", image_url: null, order: 3 },
   { id: 20, school_id: "csueb", school_name: "Cal State East Bay", school_short: "CSUEB", name: "University Drive Pathway", description: "The main pedestrian pathway through campus lined with trees and light poles. Great for walking shots and candid-style portraits.", tip: "Golden hour from the west end of the path is excellent.", icon: "🌳", image_url: null, order: 4 },
   { id: 21, school_id: "csueb", school_name: "Cal State East Bay", school_short: "CSUEB", name: "Meiklejohn Hall Archway", description: "One of the older buildings on campus with an archway entrance and red brick detail. Classic collegiate feel, good for portrait-style shots.", tip: "Overcast days work well here — consistent soft light through the archway.", icon: "🏛️", image_url: null, order: 5 },
-  { id: 22, school_id: "usf", school_name: "University of San Francisco", school_short: "USF", name: "St. Ignatius Church Steps", description: "The massive twin-towered church is USF's most iconic landmark. The wide stone steps and grand facade give you an immediately recognizable backdrop.", tip: "Shoot facing east in the morning for clean front light on the steps.", icon: "⛪", image_url: null, order: 1 },
-  { id: 23, school_id: "usf", school_name: "University of San Francisco", school_short: "USF", name: "Lone Mountain Summit", description: "The hilltop behind the Lone Mountain building has one of the best 360-degree views in San Francisco — the city skyline, the Bay, and the Golden Gate on clear days.", tip: "Clear mornings in fall and spring are best. Fog usually burns off by 10am.", icon: "🌁", image_url: null, order: 2 },
-  { id: 24, school_id: "usf", school_name: "University of San Francisco", school_short: "USF", name: "Kalmanovitz Hall Archway", description: "The main academic building has a beautiful arched entrance with red brick and ivy detail. Classic collegiate feel — similar energy to Berkeley's Doe Library but far less crowded.", tip: "This spot is shaded most of the day so it works well even at harsh midday sun.", icon: "🏛️", image_url: null, order: 3 },
-  { id: 25, school_id: "usf", school_name: "University of San Francisco", school_short: "USF", name: "Golden Gate Park (5 min away)", description: "A short walk or rideshare from campus. The Panhandle entrance, the rose garden, and the Japanese Tea Garden area all make incredible backdrops.", tip: "The rose garden peaks in April–May. Japanese Tea Garden is best on weekdays.", icon: "🌿", image_url: null, order: 4 },
-  { id: 26, school_id: "usf", school_name: "University of San Francisco", school_short: "USF", name: "The Main Quad & Lawn", description: "The central grassy quad surrounded by the main academic buildings gives you a clean, open shot with classic university architecture on all sides.", tip: "Golden hour from the west catches the brick buildings perfectly.", icon: "🌳", image_url: null, order: 5 },
 ];
 
 const MARQUEE = ["San Jose State", "UC Berkeley", "SF State", "Cal State East Bay", "USF", "Best Spots", "Golden Hour", "Campus Shoots"];
@@ -59,6 +54,7 @@ const marquee = [...MARQUEE, ...MARQUEE];
 
 export default function CampusSpotsContent({ spots: spotsFromDb }: { spots: LocationSpot[] }) {
   // DB rows win; draft spots fill in only for schools the DB doesn't cover yet.
+  // USF has no draft: its spots always come from its location guide (guideSpots.ts).
   let spots = DRAFT_SPOTS;
   if (spotsFromDb.length > 0) {
     const dbSchoolIds = new Set(spotsFromDb.map((s) => s.school_id));
@@ -141,7 +137,7 @@ export default function CampusSpotsContent({ spots: spotsFromDb }: { spots: Loca
                         {spot.image_url ? (
                           <OptimizedPhoto
                             src={spot.image_url}
-                            alt={spot.name}
+                            alt={`${school.short} graduation photo at ${spot.name}`}
                             sizes="(max-width: 760px) 100vw, 36vw"
                           />
                         ) : (
