@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/requireAdmin";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
 import { revalidatePublicContent } from "@/lib/publicRevalidation";
+import { syncCampusSpotPhotosInBackground } from "@/lib/campusSpotFill/autoSync";
 import { buildPagePhotoReport, buildPageView } from "@/lib/pagePhotos/adminView";
 import { applyCuration, isCurationAction, setPortfolioSchool } from "@/lib/pagePhotos/curationStore";
 import { isPageKey, parsePageKey } from "@/lib/pagePhotos/pageKeys";
@@ -73,6 +74,7 @@ export async function POST(req: NextRequest) {
 
     await applyCuration(client, page, imageUrl, action);
     revalidatePublicContent();
+    syncCampusSpotPhotosInBackground();
     return NextResponse.json(await buildPageView(client, page));
   } catch (err) {
     return fail(err, "could not save page curation");
@@ -94,6 +96,7 @@ export async function PATCH(req: NextRequest) {
   try {
     await setPortfolioSchool(createSupabaseAdminClient(), portfolioId, school);
     revalidatePublicContent();
+    syncCampusSpotPhotosInBackground();
     return NextResponse.json({ updated: true });
   } catch (err) {
     return fail(err, "could not save the photo's school");
@@ -130,6 +133,7 @@ export async function PUT(req: NextRequest) {
 
     await setSpotTag(client, parsed.slug, imageUrl, spotKey, featured === true && spotKey !== null);
     revalidatePublicContent();
+    syncCampusSpotPhotosInBackground();
     return NextResponse.json(await buildPageView(client, page as string));
   } catch (err) {
     return fail(err, "could not save the photo's spot");

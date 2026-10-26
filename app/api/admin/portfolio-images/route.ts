@@ -4,6 +4,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/requireAdmin";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
+import { syncCampusSpotPhotosInBackground } from "@/lib/campusSpotFill/autoSync";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +33,7 @@ export async function POST(req: NextRequest) {
     const supabase = createSupabaseAdminClient();
     const { data, error } = await supabase.from(TABLE).insert(rows).select();
     if (error) throw error;
+    syncCampusSpotPhotosInBackground();
     return NextResponse.json({ images: data ?? [] }, { status: 201 });
   } catch (error) {
     console.error("[admin/portfolio-images] POST failed:", error);
@@ -64,6 +66,7 @@ export async function PATCH(req: NextRequest) {
       .maybeSingle();
     if (error) throw error;
     if (!data) return NextResponse.json({ error: "Image not found." }, { status: 404 });
+    syncCampusSpotPhotosInBackground();
     return NextResponse.json({ image: data });
   } catch (error) {
     console.error("[admin/portfolio-images] PATCH failed:", error);
@@ -82,6 +85,7 @@ export async function DELETE(req: NextRequest) {
     const supabase = createSupabaseAdminClient();
     const { error } = await supabase.from(TABLE).delete().eq("id", id);
     if (error) throw error;
+    syncCampusSpotPhotosInBackground();
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("[admin/portfolio-images] DELETE failed:", error);

@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/requireAdmin";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
+import { syncCampusSpotPhotosInBackground } from "@/lib/campusSpotFill/autoSync";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +32,7 @@ export async function POST(req: NextRequest) {
       .select("*")
       .maybeSingle();
     if (error) throw error;
+    syncCampusSpotPhotosInBackground();
     return NextResponse.json({ spot: data });
   } catch (error) {
     console.error("[admin/location-spots] POST failed:", error);
@@ -65,6 +67,7 @@ export async function PATCH(req: NextRequest) {
       .maybeSingle();
     if (error) throw error;
     if (!data) return NextResponse.json({ error: "Location spot not found." }, { status: 404 });
+    syncCampusSpotPhotosInBackground();
     return NextResponse.json({ spot: data });
   } catch (error) {
     console.error("[admin/location-spots] PATCH failed:", error);
@@ -89,6 +92,7 @@ export async function DELETE(req: NextRequest) {
       .eq("id", id);
     if (error) throw error;
     if (!count) return NextResponse.json({ error: "Location spot not found." }, { status: 404 });
+    syncCampusSpotPhotosInBackground();
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("[admin/location-spots] DELETE failed:", error);

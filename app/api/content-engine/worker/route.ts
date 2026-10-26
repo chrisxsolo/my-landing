@@ -22,6 +22,7 @@ import { requireAdmin } from "@/lib/requireAdmin";
 import { drainInBackground, drainOnce } from "@/lib/contentEngine/workerDrain";
 import type { RunWorkerResult } from "@/lib/contentEngine/jobRunner";
 import { sweepLocationLibrary } from "@/lib/locationLibrary/autoSync";
+import { sweepCampusSpotPhotos } from "@/lib/campusSpotFill/autoSync";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -58,7 +59,9 @@ export async function GET(req: NextRequest) {
   }
   // Backstop for the location library: heals any background sync that never ran.
   const locationSweep = await sweepLocationLibrary();
-  return NextResponse.json({ ...result, locationSweep });
+  // Same for campus-spot photos: fills empty spots and drops picks that went private.
+  const campusSpotSweep = await sweepCampusSpotPhotos();
+  return NextResponse.json({ ...result, locationSweep, campusSpotSweep });
 }
 
 export async function POST(req: NextRequest) {

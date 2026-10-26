@@ -5,6 +5,7 @@ import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
 import { assembleSessionStates } from "@/lib/contentEngine/sessionState";
 import { updateSessionFacts } from "@/lib/contentEngine/createSession";
 import { syncSessionInBackground } from "@/lib/locationLibrary/autoSync";
+import { syncCampusSpotPhotosInBackground } from "@/lib/campusSpotFill/autoSync";
 import { isUuid } from "@/lib/contentEngine/uploadConfig";
 
 export const runtime = "nodejs";
@@ -76,6 +77,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     revalidatePublicContent();
     // The location fields decide which library places the session belongs to.
     syncSessionInBackground(id.toLowerCase());
+    syncCampusSpotPhotosInBackground();
     return NextResponse.json(result);
   } catch (err) {
     const message = err instanceof Error ? err.message : "facts update failed";

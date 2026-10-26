@@ -6,6 +6,7 @@ import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
 import { publishApprovedItem } from "@/lib/contentEngine/publishItem";
 import { isUuid } from "@/lib/contentEngine/uploadConfig";
 import { syncItemSessionInBackground } from "@/lib/locationLibrary/autoSync";
+import { syncCampusSpotPhotosInBackground } from "@/lib/campusSpotFill/autoSync";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,6 +40,7 @@ export async function POST(req: NextRequest) {
     if (outcome.status === "failed") return NextResponse.json({ error: outcome.error }, { status: 422 });
     // A published photo can bring the session (and its place) into the location library.
     syncItemSessionInBackground(itemId);
+    syncCampusSpotPhotosInBackground();
     return NextResponse.json(outcome);
   } catch (err) {
     console.error("publish failed unexpectedly", err);
