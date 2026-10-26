@@ -11,6 +11,11 @@
 //
 // To add one: add an entry below — the route, sitemap, and links pick it up
 // automatically. Set `guide` to cross-link an archive back to its planning guide.
+// Set `service` to also include journal posts whose title/slug reads as that
+// service (detectPostService) — Content Engine journals are published with only
+// the generic "professional" tag, so this is how they reach their archive.
+
+import type { ServiceType } from "@/lib/contentEngine/taxonomy";
 
 export type BlogCategoryGuideLink = {
   /** Guide hub, e.g. "/couples-guide". */
@@ -26,6 +31,8 @@ export type BlogCategoryGuideLink = {
 
 export type BlogCategory = {
   slug: string;
+  /** Also include journal posts detected as this service (see lib/blog/categoryPosts). */
+  service?: ServiceType;
   title: string;
   description: string;
   intro: string;
@@ -51,6 +58,7 @@ export const BLOG_CATEGORIES: Record<string, BlogCategory> = {
   },
   "couples-photography": {
     slug: "couples-photography",
+    service: "couples",
     title: "Couples Photography Journal",
     description:
       "Couples photography notes, location guides, and session tips for San Francisco and the Bay Area from SoloXSnaps.",

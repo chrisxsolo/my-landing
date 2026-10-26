@@ -19,7 +19,7 @@ export type PortfolioCategoryContent = {
 export const DEFAULT_PORTFOLIO_CONTENT: PortfolioCategoryContent = {
   eyebrow: "What to expect",
   heading: "A curated look at recent work",
-  body: "A relaxed, fully guided experience from the first message to the final gallery — graduation and family sessions photographed across the Bay Area.",
+  body: "A relaxed, fully guided experience from the first message to the final gallery — graduation, couples, and family sessions photographed across the Bay Area.",
   details: [
     { label: "Where", value: "Campuses, parks & coastline across the Bay Area" },
     { label: "Best light", value: "Golden hour or soft overcast" },
@@ -63,8 +63,8 @@ export const PORTFOLIO_CATEGORY_CONTENT: Record<string, PortfolioCategoryContent
       { label: "Best light", value: "Golden hour glow" },
       { label: "The feel", value: "Connected, candid, easy" },
     ],
-    pricingHref: "/pricing",
-    pricingLabel: "View pricing",
+    pricingHref: "/pricing/couples",
+    pricingLabel: "View couples pricing",
   },
 };
 

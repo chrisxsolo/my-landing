@@ -1,0 +1,100 @@
+"use client";
+
+// Full-screen photo viewer for the couples gallery. Shows the whole frame
+// (object-fit: contain), supports arrow keys, Escape, swipe, and returns focus
+// to the page on close. Body scrolling is locked while open.
+
+import Image from "next/image";
+import { useCallback, useEffect, useRef } from "react";
+import type { CouplesPortfolioPhoto } from "@/lib/couplesPortfolio";
+import styles from "./CouplesPortfolio.module.css";
+
+type Props = {
+  photos: CouplesPortfolioPhoto[];
+  index: number;
+  onChange: (index: number) => void;
+  onClose: () => void;
+};
+
+const SWIPE_THRESHOLD_PX = 40;
+
+export default function CouplesLightbox({ photos, index, onChange, onClose }: Props) {
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const touchStartX = useRef<number | null>(null);
+  const photo = photos[index];
+
+  const move = useCallback(
+    (direction: number) => onChange((index + direction + photos.length) % photos.length),
+    [index, onChange, photos.length],
+  );
+
+  useEffect(() => {
+    const previousFocus = document.activeElement as HTMLElement | null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    closeRef.current?.focus();
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      previousFocus?.focus();
+    };
+  }, []);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+      if (event.key === "ArrowRight") move(1);
+      if (event.key === "ArrowLeft") move(-1);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [move, onClose]);
+
+  function onTouchEnd(clientX: number) {
+    if (touchStartX.current === null) return;
+    const delta = clientX - touchStartX.current;
+    touchStartX.current = null;
+    if (Math.abs(delta) >= SWIPE_THRESHOLD_PX) move(delta < 0 ? 1 : -1);
+  }
+
+  return (
+    <div
+      className={styles.lightbox}
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Photo ${index + 1} of ${photos.length}`}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+      onTouchStart={(event) => { touchStartX.current = event.touches[0]?.clientX ?? null; }}
+      onTouchEnd={(event) => onTouchEnd(event.changedTouches[0]?.clientX ?? 0)}
+    >
+      <div className={styles.lightboxFrame}>
+        <Image
+          key={photo.id}
+          src={photo.image_url}
+          alt={photo.alt}
+          fill
+          sizes="100vw"
+          quality={90}
+          style={{ objectFit: "contain" }}
+        />
+      </div>
+      <p className={styles.lightboxCounter} aria-live="polite">
+        {index + 1} / {photos.length}
+      </p>
+      <button ref={closeRef} type="button" className={styles.lightboxClose} onClick={onClose} aria-label="Close full-screen view">
+        ✕
+      </button>
+      {photos.length > 1 && (
+        <>
+          <button type="button" className={`${styles.lightboxNav} ${styles.lightboxPrev}`} onClick={() => move(-1)} aria-label="Previous photo">
+            ‹
+          </button>
+          <button type="button" className={`${styles.lightboxNav} ${styles.lightboxNext}`} onClick={() => move(1)} aria-label="Next photo">
+            ›
+          </button>
+        </>
+      )}
+    </div>
+  );
+}

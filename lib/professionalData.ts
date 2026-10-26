@@ -36,6 +36,10 @@ export type PortfolioImage = {
   location?: string | null;
   school?: string | null;
   content_hash?: string | null;
+  width?: number | null;
+  height?: number | null;
+  session_label?: string | null;
+  category_hero?: boolean;
 };
 
 export type BlogPost = {
@@ -58,7 +62,7 @@ export type BlogPost = {
 // Exactly the columns normalizeImage reads — avoids select("*") pulling future
 // columns (e.g. updated_at) the public pages never use.
 const PORTFOLIO_IMAGE_COLUMNS =
-  "id,title,alt,image_url,category_id,category_slug,featured,sort_order,created_at,hero_carousel,school";
+  "id,title,alt,image_url,category_id,category_slug,featured,sort_order,created_at,hero_carousel,school,location,width,height,session_label,category_hero";
 
 // Blog listing/sitemap never render the full article, so omit the heavy `body`
 // column. /blog/[slug] uses getBlogPostBySlug, which still selects everything.
@@ -79,7 +83,7 @@ type RawPortfolioImage = Partial<PortfolioImage> & {
 const FALLBACK_PROFILE_IMAGE =
   "https://dmtslzwglpezympptqls.supabase.co/storage/v1/object/public/grad-photos/chris-portrait.jpg";
 
-const VISIBLE_PORTFOLIO_SLUGS = ["grads", "families"];
+const VISIBLE_PORTFOLIO_SLUGS = ["grads", "families", "couples"];
 
 export const FALLBACK_CATEGORIES: PortfolioCategory[] = [
   {
@@ -176,7 +180,12 @@ function normalizeImage(
     hero_carousel: raw.hero_carousel ?? false,
     sort_order: Number(raw.sort_order ?? raw.order ?? index + 1),
     created_at: raw.created_at ?? null,
+    location: raw.location ?? null,
     school: raw.school ?? null,
+    width: raw.width ?? null,
+    height: raw.height ?? null,
+    session_label: raw.session_label ?? null,
+    category_hero: raw.category_hero ?? false,
   };
 }
 
@@ -251,6 +260,7 @@ export async function getPortfolioImages(categories: PortfolioCategory[]) {
     const { data, error } = await supabase
       .from("portfolio_images")
       .select(PORTFOLIO_IMAGE_COLUMNS)
+      .eq("published", true)
       .order("featured", { ascending: false })
       .order("sort_order", { ascending: true });
 

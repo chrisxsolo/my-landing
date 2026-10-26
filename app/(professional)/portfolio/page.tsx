@@ -41,6 +41,7 @@ import CaseStudies from "@/app/(professional)/portfolio/_components/CaseStudies"
 import PortfolioCtaPair from "@/app/(professional)/portfolio/_components/PortfolioCtaPair";
 import styles from "@/app/(professional)/portfolio/Portfolio.module.css";
 import ContentEventBeacon from "@/app/components/ContentEventBeacon";
+import { COUPLES_CATEGORY_SLUG, COUPLES_PORTFOLIO_PATH } from "@/lib/couplesRoutes";
 
 // Reading searchParams already renders this page per-request; the data it
 // reads is served from the tagged public-content cache (lib/publicContentCache)
@@ -72,6 +73,8 @@ export default async function PortfolioPage({
   const { categories, images } = await getPortfolioData();
   const params = await searchParams;
   const requestedCategory = params.category;
+  // Couples has its own landing page; keep old filter links working.
+  if (requestedCategory === COUPLES_CATEGORY_SLUG) redirect(COUPLES_PORTFOLIO_PATH);
   const selected = categories.find((category) => category.slug === requestedCategory);
   if (requestedCategory && !selected) redirect("/portfolio");
   const selectedCategory = selected?.slug;
@@ -166,7 +169,7 @@ export default async function PortfolioPage({
               {categories.map((cat) => (
                 <Link
                   key={cat.slug}
-                  href={`/portfolio?category=${cat.slug}`}
+                  href={cat.slug === COUPLES_CATEGORY_SLUG ? COUPLES_PORTFOLIO_PATH : `/portfolio?category=${cat.slug}`}
                   className={styles.portFilterLink}
                   aria-current={selectedCategory === cat.slug ? "page" : undefined}
                 >

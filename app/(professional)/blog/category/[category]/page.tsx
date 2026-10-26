@@ -10,7 +10,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
-import { getBlogPostSummariesForCategory } from "@/lib/professionalData";
+import { getJournalPostsForCategory } from "@/lib/blog/categoryPosts";
 import { getBlogCategory, getBlogCategorySlugs } from "@/lib/blogCategories";
 import { FAMILY_GUIDE_CSS } from "@/lib/familyGuide/styles";
 
@@ -30,7 +30,7 @@ export async function generateMetadata({
   const cat = getBlogCategory(category);
   if (!cat) return {};
   const path = `/blog/category/${cat.slug}`;
-  const posts = await getBlogPostSummariesForCategory(cat.slug);
+  const posts = await getJournalPostsForCategory(cat.slug);
   return {
     title: cat.title,
     description: cat.description,
@@ -55,7 +55,7 @@ export default async function BlogCategoryPage({
   const cat = getBlogCategory(category);
   if (!cat) notFound();
 
-  const posts = await getBlogPostSummariesForCategory(cat.slug);
+  const posts = await getJournalPostsForCategory(cat.slug);
   const path = `/blog/category/${cat.slug}`;
   const breadcrumbLd = buildBreadcrumbJsonLd([
     { name: "Home", path: "/" },

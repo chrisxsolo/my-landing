@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
-import { getBlogPostSummaries, getBlogPostSummariesForCategory } from "@/lib/professionalData";
+import { getBlogPostSummaries } from "@/lib/professionalData";
+import { getJournalPostsForCategory } from "@/lib/blog/categoryPosts";
 import { getPublishedFamilyLocations } from "@/lib/familyGuide/locations";
 import { getPublishedCouplesLocations } from "@/lib/couplesGuide/locations";
 import { getPublishedPortraitLocations } from "@/lib/portraitGuide/locations";
@@ -79,6 +80,7 @@ const STATIC_ROUTES: Array<{
   { path: "/faq", changeFrequency: "monthly", priority: 0.6 },
   { path: "/faq/graduation", changeFrequency: "monthly", priority: 0.7 },
   { path: "/portfolio", changeFrequency: "weekly", priority: 0.7 },
+  { path: "/portfolio/couples", changeFrequency: "weekly", priority: 0.8 },
   { path: "/blog", changeFrequency: "weekly", priority: 0.7 },
   { path: "/about", changeFrequency: "monthly", priority: 0.6 },
   { path: "/availability", changeFrequency: "weekly", priority: 0.6 },
@@ -146,7 +148,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const categoryResults = await Promise.all(
     getBlogCategorySlugs().map(async (slug) => ({
       slug,
-      count: (await getBlogPostSummariesForCategory(slug)).length,
+      count: (await getJournalPostsForCategory(slug)).length,
     })),
   );
   const categoryEntries: MetadataRoute.Sitemap = categoryResults

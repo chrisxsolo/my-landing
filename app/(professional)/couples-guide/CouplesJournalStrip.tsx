@@ -4,7 +4,7 @@
 // on the parent page already injecting COUPLES_GUIDE_CSS (fg-* classes).
 
 import Link from "next/link";
-import { getBlogPostSummariesForCategory } from "@/lib/professionalData";
+import { getJournalPostsForCategory } from "@/lib/blog/categoryPosts";
 import { COUPLES_JOURNAL_CATEGORY } from "@/lib/couplesGuide/journal";
 
 function formatDate(iso: string) {
@@ -12,7 +12,7 @@ function formatDate(iso: string) {
 }
 
 export default async function CouplesJournalStrip({ heading = "From the couples journal" }: { heading?: string }) {
-  const posts = (await getBlogPostSummariesForCategory(COUPLES_JOURNAL_CATEGORY)).slice(0, 3);
+  const posts = (await getJournalPostsForCategory(COUPLES_JOURNAL_CATEGORY)).slice(0, 3);
   if (posts.length === 0) return null;
 
   return (

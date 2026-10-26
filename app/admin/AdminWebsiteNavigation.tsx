@@ -22,6 +22,7 @@ export const WEBSITE_NAV_GROUPS = [
     label: "Showcase",
     items: [
       { tab: "portfolio", icon: "🖼️", label: "Portfolio" },
+      { tab: "couplesPortfolio", icon: "💑", label: "Couples Portfolio" },
       { tab: "caseStudies", icon: "📖", label: "Case Studies" },
       { tab: "categories", icon: "🏷️", label: "Categories" },
     ],
