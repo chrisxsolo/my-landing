@@ -371,7 +371,11 @@ export default function AvailabilityCalendar({ initialDates }: { initialDates: A
   // ago; without this, dates that have since passed would linger in the calendar
   // and "next windows". This guarantees all past-date filtering runs against the
   // visitor's real current date, never one baked into stale cached markup.
-  useEffect(() => { setToday(new Date()); }, []);
+  // Deferred one tick so the refresh is a callback, not a render-phase update.
+  useEffect(() => {
+    const id = window.setTimeout(() => setToday(new Date()), 0);
+    return () => window.clearTimeout(id);
+  }, []);
 
   // Move focus to the active cell only after a keyboard-driven change, so we
   // never steal focus on mount or when the month is changed by mouse.
