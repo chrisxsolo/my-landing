@@ -18,6 +18,8 @@ export type BookingIntent = {
   location?: string;
   addOns?: string[];
   estimatedTotal?: number;
+  /** The estimate leaves travel out until the exact location is reviewed. */
+  travelPending?: boolean;
 };
 
 // Query-param keys — one source of truth so serialize/parse never drift.
@@ -32,7 +34,10 @@ const PARAM = {
   location: "location",
   addOn: "addOn", // repeated key — one entry per add-on
   estimatedTotal: "estimatedTotal",
+  travel: "travel",
 } as const;
+
+const TRAVEL_PENDING = "pending";
 
 // Legacy key kept only for parsing — older links passed `graduates`.
 const LEGACY_HEADCOUNT_PARAM = "graduates";
@@ -51,6 +56,7 @@ export function buildBookingIntentParams(intent: BookingIntent): URLSearchParams
   if (typeof intent.estimatedTotal === "number") {
     params.set(PARAM.estimatedTotal, String(intent.estimatedTotal));
   }
+  if (intent.travelPending) params.set(PARAM.travel, TRAVEL_PENDING);
   return params;
 }
 
@@ -93,6 +99,8 @@ export function parseBookingIntent(params: ReadableParams): BookingIntent {
   const total = totalRaw ? Number(totalRaw) : NaN;
   if (Number.isFinite(total) && total > 0) intent.estimatedTotal = total;
 
+  if (params.get(PARAM.travel) === TRAVEL_PENDING) intent.travelPending = true;
+
   return intent;
 }
 
@@ -103,6 +111,44 @@ export function headcountToSelectValue(headcount: number): string {
   if (headcount <= 1) return "1";
   if (headcount >= 5) return "5+";
   return String(headcount);
+}
+
+// Form fields an intent can prefill, keyed like the contact form's own values.
+export type IntentPrefill = {
+  sessionType: string;
+  school: string;
+  people: string;
+  date: string;
+  location: string;
+};
+export type IntentPrefillField = keyof IntentPrefill;
+
+export function intentPrefill(intent: BookingIntent): IntentPrefill {
+  return {
+    sessionType: intent.sessionType ?? "",
+    school: intent.school ?? "",
+    people: intent.headcount ? headcountToSelectValue(intent.headcount) : "",
+    date: intent.date ?? "",
+    location: intent.location ?? "",
+  };
+}
+
+/**
+ * Applies a new intent's prefill (e.g. the visitor followed another prefilled
+ * /contact link without a full reload), but never overwrites a field the
+ * visitor has typed into themselves.
+ */
+export function mergeIntentPrefill<T extends IntentPrefill>(
+  current: T,
+  intent: BookingIntent,
+  edited: ReadonlySet<string>,
+): T {
+  const prefill = intentPrefill(intent);
+  const next = { ...current };
+  for (const field of Object.keys(prefill) as IntentPrefillField[]) {
+    if (!edited.has(field)) next[field] = prefill[field] as T[IntentPrefillField];
+  }
+  return next;
 }
 
 export function hasBookingIntent(intent: BookingIntent): boolean {
@@ -130,7 +176,10 @@ export function formatBookingIntentSummary(intent: BookingIntent): string {
   if (intent.headcount) lines.push(`Headcount: ${intent.headcount}`);
   if (intent.duration) lines.push(`Session length: ${intent.duration}`);
   if (intent.addOns?.length) lines.push(`Add-ons: ${intent.addOns.join(", ")}`);
-  if (intent.estimatedTotal) lines.push(`Estimated total: ${formatCurrency(intent.estimatedTotal)}`);
+  if (intent.estimatedTotal) {
+    const suffix = intent.travelPending ? " (before travel)" : "";
+    lines.push(`Estimated total${suffix}: ${formatCurrency(intent.estimatedTotal)}`);
+  }
   if (!lines.length) return "";
   return `— Session request —\n${lines.join("\n")}`;
 }

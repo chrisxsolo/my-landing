@@ -36,9 +36,14 @@ export default function BookingIntentSummary({ intent }: { intent: BookingIntent
 
       {typeof intent.estimatedTotal === "number" && (
         <div className="booking-intent-total">
-          <span>Estimated total</span>
+          <span>{intent.travelPending ? "Estimated total (before travel)" : "Estimated total"}</span>
           <strong>{formatCurrency(intent.estimatedTotal)}</strong>
         </div>
+      )}
+      {typeof intent.estimatedTotal === "number" && intent.travelPending && (
+        <p className="booking-intent-note">
+          The travel fee is confirmed once I review the exact location.
+        </p>
       )}
 
       <p className="booking-intent-note">

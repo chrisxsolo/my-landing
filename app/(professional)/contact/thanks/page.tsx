@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 import Link from "next/link";
+import { INQUIRY_SUBMISSION_STORAGE_KEY as SUBMISSION_KEY } from "@/lib/contactSubmission";
 
 type Submission = {
   name: string;
@@ -12,7 +13,6 @@ type Submission = {
   message: string;
 };
 
-const SUBMISSION_KEY = "inquiry_submitted";
 // The submission is written once by the contact form before navigating here; it
 // never changes while this page is mounted, so there is nothing to subscribe to.
 const noopSubscribe = () => () => {};
@@ -298,7 +298,7 @@ export default function ThanksPage() {
               {data?.name ? `Thank you, ${data.name.split(" ")[0]}.` : "Thank you."}
             </h1>
             <p className="thanks-copy">
-              Your note is in. I will reply within 24 to 48 hours, and a copy of your responses is on the way to your inbox.
+              Your note is in. Most inquiries receive a response within 24 hours, and a copy of your responses is on the way to your inbox.
             </p>
 
             <div className="thanks-actions">
