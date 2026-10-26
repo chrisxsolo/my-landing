@@ -73,6 +73,16 @@ Before finishing any change:
 
 ---
 
+## Deploy — Always
+
+Finished work is always pushed and deployed, never left on a branch or held for a PR:
+run typecheck/lint/tests, apply any new Supabase migration to production
+(`dmtslzwglpezympptqls`), merge into `main`, push (Vercel deploys `main` to
+production), then confirm the production deployment is READY. Details in
+`memory/deploy-workflow.md`.
+
+---
+
 ## Commits
 
 Use this format when asked to commit:
