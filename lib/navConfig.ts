@@ -56,13 +56,38 @@ const MAX_HREF_LEN = 200;
 const MAX_PRIMARY_ITEMS = 16;
 const MAX_CHILDREN = 16;
 
-// ── Default — an exact reproduction of the original hardcoded ProNav ──────────
+// ── Default ───────────────────────────────────────────────────────────────────
+// Used when no nav_config is saved, and by the admin "Reset to default" button.
+// Work · Pricing · Guides · About · Journal, with Book a Session as the CTA;
+// the logo is the Home link and availability is reached from booking flows.
 export const DEFAULT_NAV_CONFIG: NavConfig = {
   primary: [
-    { id: "home", type: "link", label: "Home", href: "/", visible: true },
-    { id: "dates", type: "link", label: "Dates", href: "/availability", visible: true },
-    { id: "about", type: "link", label: "About", href: "/about", visible: true },
-    { id: "blog", type: "link", label: "Journal", href: "/blog", visible: true },
+    {
+      id: "work",
+      type: "group",
+      label: "Work",
+      href: "/portfolio",
+      visible: true,
+      children: [
+        { id: "grad-gallery", label: "Graduation", href: "/portfolio?category=grads" },
+        { id: "couples-gallery", label: "Couples", href: "/portfolio/couples" },
+        { id: "family-gallery", label: "Family", href: "/portfolio?category=families" },
+      ],
+    },
+    {
+      id: "rates",
+      type: "group",
+      label: "Pricing",
+      href: "/pricing",
+      visible: true,
+      children: [
+        { id: "grad-rates", label: "Graduation", href: "/pricing/grads" },
+        { id: "couples-rates", label: "Couples", href: "/pricing/couples" },
+        { id: "family-rates", label: "Family", href: "/pricing/families" },
+        { id: "maternity-rates", label: "Maternity", href: "/pricing/maternity" },
+        { id: "elopement-rates", label: "Elopements", href: "/pricing/elopements" },
+      ],
+    },
     {
       id: "guides",
       type: "group",
@@ -71,41 +96,18 @@ export const DEFAULT_NAV_CONFIG: NavConfig = {
       visible: true,
       children: [
         { id: "grad-guide", label: "Grad guide", href: "/grad-guide" },
-        { id: "family-guide", label: "Family guide", href: "/family-guide" },
         { id: "couples-guide", label: "Couples guide", href: "/couples-guide" },
+        { id: "family-guide", label: "Family guide", href: "/family-guide" },
         { id: "portrait-guide", label: "Portrait guide", href: "/portrait-guide" },
         { id: "locations", label: "Locations", href: "/bay-area-locations" },
         { id: "faq", label: "FAQ", href: "/faq" },
       ],
     },
-    {
-      id: "work",
-      type: "group",
-      label: "Work",
-      href: "/portfolio",
-      visible: true,
-      children: [
-        { id: "grad-gallery", label: "Grad gallery", href: "/portfolio?category=grads" },
-        { id: "family-gallery", label: "Family gallery", href: "/portfolio?category=families" },
-        { id: "couples-gallery", label: "Couples gallery", href: "/portfolio/couples" },
-      ],
-    },
-    {
-      id: "rates",
-      type: "group",
-      label: "Rates",
-      href: "/pricing",
-      visible: true,
-      children: [
-        { id: "couples-rates", label: "Couples rates", href: "/pricing/couples" },
-        { id: "elopement-rates", label: "Elopement rates", href: "/pricing/elopements" },
-        { id: "grad-rates", label: "Grad rates", href: "/pricing/grads" },
-        { id: "family-rates", label: "Family rates", href: "/pricing/families" },
-      ],
-    },
+    { id: "about", type: "link", label: "About", href: "/about", visible: true },
+    { id: "blog", type: "link", label: "Journal", href: "/blog", visible: true },
   ],
   clientLogin: { label: "Client login", href: "/login", visible: true },
-  cta: { label: "Book a shoot", href: "/contact", visible: true },
+  cta: { label: "Book a Session", href: "/contact", visible: true },
 };
 
 // ── Normalization helpers ─────────────────────────────────────────────────────

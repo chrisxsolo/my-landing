@@ -176,6 +176,13 @@ export default async function PortfolioPage({
                   {cat.name}
                 </Link>
               ))}
+              {/* The couples portfolio is its own page, so its tab must not
+                  depend on a couples row existing in portfolio_categories. */}
+              {categories.some((cat) => cat.slug === COUPLES_CATEGORY_SLUG) ? null : (
+                <Link href={COUPLES_PORTFOLIO_PATH} className={styles.portFilterLink}>
+                  Couples
+                </Link>
+              )}
             </nav>
           </div>
         </div>
