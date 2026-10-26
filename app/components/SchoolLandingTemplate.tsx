@@ -32,6 +32,7 @@ export interface SchoolSpot {
   details?: string[];            // long-form paragraphs for the location guide
   photoIdeas?: string[];         // suggested shots at this spot
   tip?: string;                  // photographer's tip for this spot
+  guideLink?: { label: string; href: string }; // this place's own location guide, if one exists
 }
 
 export interface SchoolLandingData {

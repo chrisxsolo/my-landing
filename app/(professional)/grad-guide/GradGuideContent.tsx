@@ -41,7 +41,7 @@ const schools: Array<{ name: string; href: string; blurb: string }> = [
     name: "SF State Graduation Photos",
     href: "/grads/sf-state",
     blurb:
-      "The quad, Malcolm X Plaza, and the library steps give SF State sessions a modern, open feel. We route around the busiest walkways so your shots stay clean.",
+      "The 19th and Holloway entrance sign, the quad, the library, the Gator, and the Garden of Remembrance, plus easy add-ons like the Palace of Fine Arts or the Golden Gate Bridge.",
   },
   {
     name: "CSU East Bay Graduation Photos",

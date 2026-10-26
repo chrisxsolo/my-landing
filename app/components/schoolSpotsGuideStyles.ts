@@ -99,6 +99,28 @@ export const SPOTS_GUIDE_CSS = `
   .spg-tip-title { margin: 0 0 6px; color: ${C.ink}; font-size: 16.5px; font-weight: 840; }
   .spg-tip .spg-copy { margin: 0; font-size: 15px; }
 
+  /* Off-campus places sit on a tinted band, clearly apart from campus. */
+  .spg-band { background: ${C.proAccentSoft}; margin-top: 56px; scroll-margin-top: 90px; }
+  .spg-band .sp-spot { border-top-color: ${C.proAccentBorder}; }
+  .spg-eyebrow {
+    margin: 0 0 8px; color: ${C.proAccent}; font-size: 12.5px; font-weight: 860;
+    letter-spacing: 0.08em; text-transform: uppercase;
+  }
+  .spg-off-list { margin-top: 30px; }
+  .spg-h3 { margin: 30px 0 14px; color: ${C.ink}; font-size: 20px; font-weight: 860; letter-spacing: -0.01em; line-height: 1.25; }
+  .spg-plans { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
+  .spg-plan { padding: 20px 22px; }
+  .spg-plan .spg-copy { margin: 0; font-size: 15px; }
+  .spg-plan-label {
+    display: inline-block; margin: 0 0 8px; padding: 3px 10px; border-radius: 999px;
+    background: ${C.proAccentSoft}; color: ${C.proAccent}; font-size: 12px; font-weight: 820;
+  }
+  .spg-plan-cta {
+    margin-top: 22px; padding: 26px; border-radius: 16px; text-align: center;
+    border: 1px solid ${C.proAccentBorder}; background: ${C.white};
+  }
+  .spg-plan-cta .spg-copy { max-width: 560px; margin: 0 auto 18px; }
+
   @media (max-width: 860px) {
     .spg-hero--photo .spg-hero-grid { grid-template-columns: 1fr; gap: 28px; }
     .spg-hero-frame { justify-self: center; width: min(100%, 520px); max-height: 70vh; }
@@ -117,5 +139,7 @@ export const SPOTS_GUIDE_CSS = `
     .spg-photos--3 .spg-photo:first-child { grid-column: span 2; grid-row: auto; }
     .spg-photos--3 .spg-photo:not(:first-child) { aspect-ratio: 4 / 5; min-height: 0; }
     .spg-card { padding: 20px; }
+    .spg-plans { grid-template-columns: 1fr; }
+    .spg-plan-cta { padding: 22px 18px; }
   }
 `;

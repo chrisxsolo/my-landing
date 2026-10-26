@@ -1,6 +1,7 @@
 // Pieces of the long-form school location guide (SchoolSpotsGuidePage): one
 // campus spot's section and the titled sections after the route (crowds,
 // celebration photos, campus rules). Server components, no client JS.
+import Link from "next/link";
 import type { PagePhoto } from "@/lib/pagePhotos/publicPages";
 import type { SchoolSpot, SchoolSpotPriority } from "./SchoolLandingTemplate";
 import type { SchoolSpotsGuideSection } from "./schoolSpotsGuideTypes";
@@ -49,6 +50,11 @@ export function SpotArticle({ spot, index, photos, locationNote }: SpotProps) {
         )}
         {spot.tip && (
           <p className="spg-tip-callout"><span className="spg-where-label">Photographer&rsquo;s tip:</span> {spot.tip}</p>
+        )}
+        {spot.guideLink && (
+          <p className="spg-fine" style={{ marginTop: 12 }}>
+            <Link href={spot.guideLink.href} className="spg-source">{spot.guideLink.label} →</Link>
+          </p>
         )}
       </div>
     </article>

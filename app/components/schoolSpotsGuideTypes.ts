@@ -1,6 +1,7 @@
 // Content shape for a school's long-form photo location guide
 // (/grads/<slug>/spots). Optional on SchoolLandingData: a school without one
 // keeps the compact spots list. Pure types — no runtime code.
+import type { SchoolSpot } from "./SchoolLandingTemplate";
 import type { SchoolFaq } from "./SchoolSessionGuide";
 
 export interface SchoolSpotsGuideStep {
@@ -27,6 +28,38 @@ export interface SchoolSpotsGuideSection {
   links?: { label: string; href: string }[];
 }
 
+/**
+ * Places beyond campus that graduates book, each with its own photo section.
+ * Spot keys must be lib/schoolSpots keys with a placeKey, so photos from this
+ * school's sessions shot at that place fill the section.
+ */
+export interface SchoolSpotsGuideOffCampus {
+  navLabel: string;
+  heading: string;
+  intro: string[];
+  spots: SchoolSpot[];
+}
+
+/** One example way to plan a session ("SF State + Palace of Fine Arts"). */
+export interface SchoolSpotsGuidePlanOption {
+  label: string;
+  title: string;
+  body: string;
+}
+
+/** Multi-location sessions: example plans, pricing notes, and an inquiry prompt. */
+export interface SchoolSpotsGuidePlans {
+  navLabel: string;
+  heading: string;
+  intro: string[];
+  optionsHeading: string;
+  options: SchoolSpotsGuidePlanOption[];
+  notesHeading: string;
+  /** Pricing and logistics, built from the pricing catalog (never typed by hand). */
+  notes: string[];
+  cta: { heading: string; body: string; label: string };
+}
+
 export interface SchoolSpotsGuide {
   metaTitle: string;
   metaDescription: string;
@@ -44,6 +77,8 @@ export interface SchoolSpotsGuide {
     heading: string;
     paragraphs: string[];
     weather: string;
+    /** Side-by-side condition lists ("Sunny days", "Cloudy days"). */
+    lists?: { label: string; items: string[] }[];
     /** City-center coordinates for computed sunset times (never published). */
     sunsetCoords: { latitude: number; longitude: number };
   };
@@ -55,6 +90,10 @@ export interface SchoolSpotsGuide {
     steps: SchoolSpotsGuideStep[];
     notes: string[];
   };
+  /** Rendered after the route, before the other sections. */
+  offCampus?: SchoolSpotsGuideOffCampus;
+  /** Rendered after offCampus. */
+  plans?: SchoolSpotsGuidePlans;
   sections?: SchoolSpotsGuideSection[];
   tips: SchoolSpotsGuideTip[];
   faqs: SchoolFaq[];

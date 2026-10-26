@@ -16,6 +16,7 @@ import { getSchoolRelatedPosts, type SchoolLandingData, type SchoolSpot } from "
 import type { SchoolSpotsGuide } from "./schoolSpotsGuideTypes";
 import SchoolSessionGuide from "./SchoolSessionGuide";
 import { GuideSection, SpotArticle, spotId } from "./SchoolSpotsGuideParts";
+import { OFF_CAMPUS_ID, OffCampusSection, PLANS_ID, SessionPlansSection } from "./SchoolSpotsGuideExtras";
 import SchoolSunsetTimes from "./SchoolSunsetTimes";
 import { SPOTS_BASE_CSS } from "./schoolSpotsBaseStyles";
 import { SPOTS_GUIDE_CSS } from "./schoolSpotsGuideStyles";
@@ -117,6 +118,8 @@ function JumpNav({ spots, guide }: { spots: SchoolSpot[]; guide: SchoolSpotsGuid
           ))}
           <li><a className="spg-jump-link" href="#best-time">Best time</a></li>
           <li><a className="spg-jump-link" href="#route">{guide.route.navLabel ?? "1-hour route"}</a></li>
+          {guide.offCampus && <li><a className="spg-jump-link" href={`#${OFF_CAMPUS_ID}`}>{guide.offCampus.navLabel}</a></li>}
+          {guide.plans && <li><a className="spg-jump-link" href={`#${PLANS_ID}`}>{guide.plans.navLabel}</a></li>}
           {(guide.sections ?? []).map((section) => (
             <li key={section.id}><a className="spg-jump-link" href={`#${section.id}`}>{section.navLabel}</a></li>
           ))}
@@ -148,6 +151,16 @@ function BestTime({ data, guide }: Props) {
         <div className="spg-card">
           <h2 className="spg-h2">{guide.bestTime.heading}</h2>
           {guide.bestTime.paragraphs.map((p) => <p key={p} className="spg-copy">{p}</p>)}
+          {guide.bestTime.lists && (
+            <div className="spg-tips" style={{ margin: "18px 0 6px" }}>
+              {guide.bestTime.lists.map((list) => (
+                <div key={list.label}>
+                  <p className="spg-ideas-label">{list.label}</p>
+                  <ul className="spg-list">{list.items.map((item) => <li key={item}>{item}</li>)}</ul>
+                </div>
+              ))}
+            </div>
+          )}
           <SchoolSunsetTimes city={data.city.replace(/, [A-Z]{2}$/, "")} coords={guide.bestTime.sunsetCoords} />
           <p className="spg-copy" style={{ marginTop: 16, marginBottom: 0 }}>{guide.bestTime.weather}</p>
         </div>
@@ -227,7 +240,7 @@ export default async function SchoolSpotsGuidePage({ data, guide }: Props) {
     "@context": "https://schema.org",
     "@type": "ItemList",
     name: guide.h1,
-    itemListElement: data.spots.map((spot, i) => ({
+    itemListElement: [...data.spots, ...(guide.offCampus?.spots ?? [])].map((spot, i) => ({
       "@type": "ListItem", position: i + 1, name: spot.name,
       url: `https://www.soloxsnaps.com${spotsPath}#${spotId(spot)}`,
     })),
@@ -263,6 +276,10 @@ export default async function SchoolSpotsGuidePage({ data, guide }: Props) {
       <BestTime data={data} guide={guide} />
 
       <Route guide={guide} spots={data.spots} />
+
+      {guide.offCampus && <OffCampusSection section={guide.offCampus} photosFor={photosFor} notes={spotNotes} />}
+
+      {guide.plans && <SessionPlansSection plans={guide.plans} contactHref={contactHref} />}
 
       {(guide.sections ?? []).map((section) => <GuideSection key={section.id} section={section} />)}
 
