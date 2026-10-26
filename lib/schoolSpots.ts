@@ -52,8 +52,8 @@ export const SCHOOL_SPOTS: Partial<Record<SchoolSlug, readonly SchoolSpotDef[]>>
   ],
   // UC Berkeley: Chris's seven guide spots. The two Doe Library compositions
   // stay separate keys; bare "Doe Library" names both, so it gives no hint.
-  // Never map the "Inside Doe Library" campus-spots row: the Library doesn't
-  // allow staged graduation photos inside its buildings.
+  // The "Inside Doe Library" campus-spots row isn't one of these spots: the
+  // guide covers the interior in its own section, without a photo slot.
   "uc-berkeley": [
     {
       key: "sather-gate", name: "Sather Gate", altPlace: "at Sather Gate",

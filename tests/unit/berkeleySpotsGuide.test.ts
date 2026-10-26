@@ -47,17 +47,26 @@ describe("UC Berkeley location guide content", () => {
     expect(cherry.tip).toMatch(/may not be out/);
   });
 
-  it("never recommends Doe Library's interior and links the Library's policy", () => {
-    expect(allGuideText).not.toMatch(/inside (?:of )?Doe Library (?:is|has|works)/i);
-    const rules = guide.sections!.find((s) => s.id === "campus-rules")!;
-    expect(rules.links!.map((l) => l.href)).toContain("https://www.lib.berkeley.edu/about/filming");
+  it("offers photos inside Doe Library early in the session and still names the Library's policy", () => {
+    const inside = guide.sections!.find((s) => s.id === "inside-doe-library")!;
+    expect(inside.paragraphs.join(" ")).toMatch(/^Yes\./);
+    expect(inside.paragraphs.join(" ")).toMatch(/earlier in the session/);
+    expect(inside.paragraphs.join(" ")).toMatch(/posted policy/);
+    expect(inside.links!.map((l) => l.href)).toContain("https://www.lib.berkeley.edu/about/filming");
+    expect(guide.route.notes.join(" ")).toMatch(/inside Doe Library/);
   });
 
-  it("keeps champagne conditional on current rules and never part of a package", () => {
+  it("says champagne is allowed unless we're told otherwise on the day, for 21+", () => {
     const champagne = guide.sections!.find((s) => s.id === "champagne")!.paragraphs.join(" ");
-    expect(champagne).toMatch(/depend on current university rules/);
-    expect(champagne).toMatch(/never part of a session package/);
-    expect(allGuideText).not.toMatch(/champagne (?:is|popping is) (?:allowed|permitted|fine)/i);
+    expect(champagne).toMatch(/allowed in your session unless we're told otherwise on the day/);
+    expect(champagne).toMatch(/21 and over/);
+    const faq = guide.faqs.find((f) => /champagne/i.test(f.q))!;
+    expect(faq.a).toMatch(/unless we're told otherwise on the day/);
+  });
+
+  it("does not list a travel fee on the Berkeley page", () => {
+    expect(berkeley.hideTravelNote).toBe(true);
+    expect(allGuideText).not.toMatch(/travel fee/i);
   });
 
   it("makes no promises about empty backgrounds, clock times, or session length", () => {
