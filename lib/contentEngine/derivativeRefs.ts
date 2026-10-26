@@ -17,6 +17,8 @@ export interface ReferenceCounts {
   couplesGuide: number;
   portraitGuide: number;
   gradSpots: number;
+  /** Bay Area library cards that chose this photo as their hero. */
+  locationHeroes: number;
   total: number;
 }
 
@@ -24,11 +26,11 @@ export async function countLiveReferences(client: SupabaseClient, photo: Derivat
   const url = photo.public_derivative_url;
   const zero: ReferenceCounts = {
     blogCover: 0, blogExtra: 0, portfolio: 0, schoolActive: 0,
-    familyGuide: 0, couplesGuide: 0, portraitGuide: 0, gradSpots: 0, total: 0,
+    familyGuide: 0, couplesGuide: 0, portraitGuide: 0, gradSpots: 0, locationHeroes: 0, total: 0,
   };
   if (!url) return zero;
 
-  const [blogCover, blogExtra, portfolio, school, family, couples, portrait, gradSpots] = await Promise.all([
+  const [blogCover, blogExtra, portfolio, school, family, couples, portrait, gradSpots, heroes] = await Promise.all([
     client.from("blog_posts").select("id", { count: "exact", head: true }).eq("cover_image_url", url),
     client.from("blog_posts").select("id", { count: "exact", head: true }).contains("extra_image_urls", [url]),
     client.from("portfolio_images").select("id", { count: "exact", head: true }).eq("image_url", url),
@@ -41,6 +43,7 @@ export async function countLiveReferences(client: SupabaseClient, photo: Derivat
     client.from("portrait_location_photos").select("id", { count: "exact", head: true })
       .eq("image_url", url).eq("published", true),
     client.from("location_spots").select("id", { count: "exact", head: true }).eq("image_url", url),
+    client.from("bay_area_locations").select("id", { count: "exact", head: true }).eq("featured_photo_id", photo.id),
   ]);
 
   const counts: ReferenceCounts = {
@@ -52,10 +55,11 @@ export async function countLiveReferences(client: SupabaseClient, photo: Derivat
     couplesGuide: couples.count ?? 0,
     portraitGuide: portrait.count ?? 0,
     gradSpots: gradSpots.count ?? 0,
+    locationHeroes: heroes.count ?? 0,
     total: 0,
   };
   counts.total = counts.blogCover + counts.blogExtra + counts.portfolio
     + counts.schoolActive + counts.familyGuide + counts.couplesGuide
-    + counts.portraitGuide + counts.gradSpots;
+    + counts.portraitGuide + counts.gradSpots + counts.locationHeroes;
   return counts;
 }
