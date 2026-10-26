@@ -11,6 +11,7 @@ import CouplesInspirationEditor, {
   type AdminInspirationImage,
 } from "@/app/admin/CouplesInspirationEditor";
 import CouplesPromptManager from "@/app/admin/CouplesPromptManager";
+import { COUPLES_POSING_REFERENCE_PATH } from "@/lib/couplesRoutes";
 
 type Props = {
   showToast: (message: string, ok?: boolean) => void;
@@ -217,6 +218,7 @@ export default function CouplesPosingGuideTab({ showToast }: Props) {
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-500">Add and edit posing prompts or upload visual references directly from your phone.</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Link href={COUPLES_POSING_REFERENCE_PATH} className="inline-flex min-h-11 items-center rounded-xl px-3 text-sm font-black text-white" style={{ background: C.proAccentDark }}>Open shoot-day reference</Link>
           <Link href="/couples-posing-guide?preview=client" target="_blank" className="inline-flex min-h-11 items-center rounded-xl border px-3 text-sm font-bold" style={{ borderColor: C.proAccentBorder, color: C.proAccent }}>Preview client view</Link>
           <button type="button" onClick={() => navigator.clipboard.writeText(`${window.location.origin}/couples-posing-guide`).then(() => showToast("Public link copied"))} className="min-h-11 rounded-xl px-3 text-sm font-black text-white" style={{ background: C.proAccent }}>Copy public link</button>
         </div>

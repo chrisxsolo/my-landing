@@ -18,6 +18,7 @@ type Draft = {
   title: string;
   category: string;
   instructions: string;
+  variation: string;
   keywords: string;
   display_order: string;
   is_published: boolean;
@@ -27,6 +28,7 @@ const EMPTY_DRAFT: Draft = {
   title: "",
   category: "Walking and Movement",
   instructions: "",
+  variation: "",
   keywords: "",
   display_order: "0",
   is_published: true,
@@ -39,6 +41,7 @@ function promptDraft(prompt: AdminCouplesPosingPrompt): Draft {
     title: prompt.title,
     category: prompt.category,
     instructions: prompt.instructions,
+    variation: prompt.variation ?? "",
     keywords: prompt.keywords.join(", "),
     display_order: String(prompt.display_order),
     is_published: prompt.is_published,
@@ -212,6 +215,10 @@ export default function CouplesPromptManager({
               Directing language
               <textarea className={fieldClass} rows={7} value={draft.instructions} onChange={(event) => setDraft({ ...draft, instructions: event.target.value })} placeholder="Write exactly what you want to say during the session" />
             </label>
+            <label className="grid gap-1.5 text-xs font-bold text-slate-500 md:col-span-2">
+              Optional variation
+              <textarea className={fieldClass} rows={3} value={draft.variation} onChange={(event) => setDraft({ ...draft, variation: event.target.value })} placeholder="A different way to run the pose (shown under the directions on the posing reference)" />
+            </label>
             <label className="grid gap-1.5 text-xs font-bold text-slate-500">
               Search keywords
               <input className={fieldClass} value={draft.keywords} onChange={(event) => setDraft({ ...draft, keywords: event.target.value })} placeholder="kiss, close, standing" />
@@ -253,6 +260,9 @@ export default function CouplesPromptManager({
                   <p className="text-[11px] font-black uppercase tracking-wider" style={{ color: C.proAccent }}>Prompt {prompt.number} · {prompt.category}</p>
                   <h3 className="mt-1 text-lg font-black text-slate-950">{prompt.title}</h3>
                   <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-slate-600">{prompt.instructions}</p>
+                  {prompt.variation && (
+                    <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-slate-500"><span className="font-bold">Variation:</span> {prompt.variation}</p>
+                  )}
                   <p className="mt-2 text-xs font-bold text-slate-400">{prompt.is_published ? "Published" : "Photographer only"} · Order {prompt.display_order}</p>
                 </div>
                 <button type="button" onClick={() => startEditing(prompt)} className="min-h-11 shrink-0 rounded-xl px-3 text-sm font-black" style={{ background: C.proAccentSoft, color: C.proAccent }}>Edit</button>

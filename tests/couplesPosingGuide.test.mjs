@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   COUPLES_POSING_PROMPTS,
+  COUPLES_PROMPT_CATEGORIES,
   filterCouplesPosingPrompts,
   filterInspirationImagesForMode,
   getOwnedStoragePaths,
@@ -53,14 +54,14 @@ test("all 23 couples prompts preserve the supplied title and wording exactly", (
 test("prompt filtering matches title, instructions, category, and keywords", () => {
   assert.deepEqual(filterCouplesPosingPrompts(COUPLES_POSING_PROMPTS, "kiss").map((item) => item.number), [8, 12, 18, 20, 23]);
   assert.deepEqual(filterCouplesPosingPrompts(COUPLES_POSING_PROMPTS, "walking").map((item) => item.number), [1, 2, 3, 4, 5, 6]);
-  assert.deepEqual(filterCouplesPosingPrompts(COUPLES_POSING_PROMPTS, "", "Sitting").map((item) => item.number), [22]);
+  assert.deepEqual(filterCouplesPosingPrompts(COUPLES_POSING_PROMPTS, "", "Sitting Poses").map((item) => item.number), [22]);
 });
 
 test("admin prompt input validates mobile-created prompts", () => {
   const valid = validateCouplesPromptInput({
     title: "  Forehead Touch  ",
     instructions: "  Have them pause and gently touch foreheads.  ",
-    category: "Standing and Intimate",
+    category: "Romantic and Intimate",
     keywords: ["close", " forehead ", "close"],
     is_published: true,
     display_order: 24,
@@ -76,6 +77,25 @@ test("admin prompt input validates mobile-created prompts", () => {
     category: "Unknown",
   });
   assert.equal(invalid.ok, false);
+});
+
+test("prompts use the seven shoot-day categories and keep an optional variation", () => {
+  assert.deepEqual([...COUPLES_PROMPT_CATEGORIES], [
+    "Walking and Movement",
+    "Playful Interactions",
+    "Romantic and Intimate",
+    "Hugs and Embraces",
+    "Sitting Poses",
+    "Lifts and Spins",
+    "Close-Up Details",
+  ]);
+  for (const prompt of COUPLES_POSING_PROMPTS) {
+    assert.ok(COUPLES_PROMPT_CATEGORIES.includes(prompt.category), `${prompt.title} has an unknown category`);
+  }
+  const base = { title: "Forehead Touch", instructions: "Touch foreheads.", category: "Close-Up Details" };
+  assert.equal(validateCouplesPromptInput({ ...base, variation: "  Try it seated.  " }).data.variation, "Try it seated.");
+  assert.equal(validateCouplesPromptInput({ ...base, variation: "   " }).data.variation, null);
+  assert.equal(validateCouplesPromptInput({ ...base, category: "Playful" }).ok, false);
 });
 
 test("database prompt rows expose the prompt number expected by the UI", () => {

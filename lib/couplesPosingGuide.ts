@@ -1,10 +1,13 @@
+// Shoot-day categories, in the order the posing reference shows them. Keep in
+// sync with the couples_posing_category_check constraint in the database.
 export const COUPLES_PROMPT_CATEGORIES = [
   "Walking and Movement",
-  "Playful",
-  "Standing and Intimate",
-  "From Behind",
-  "Sitting",
-  "Piggyback and Lifts",
+  "Playful Interactions",
+  "Romantic and Intimate",
+  "Hugs and Embraces",
+  "Sitting Poses",
+  "Lifts and Spins",
+  "Close-Up Details",
 ] as const;
 
 export const COUPLES_INSPIRATION_CATEGORIES = [
@@ -48,6 +51,7 @@ export type CouplesPosingPrompt = {
   category: CouplesPromptCategory;
   instructions: string;
   keywords: string[];
+  variation?: string | null;
 };
 
 export type AdminCouplesPosingPrompt = CouplesPosingPrompt & {
@@ -105,23 +109,23 @@ export const COUPLES_POSING_PROMPTS: CouplesPosingPrompt[] = [
   prompt(4, "arm-hold-walk", "Arm-Hold Walk", "Walking and Movement", "Have him place one hand in his pocket and leave his other arm hanging naturally\n\nHave her wrap both hands around his free arm and walk very close beside him toward the camera\n\nTell them to alternate between looking where they’re walking and looking at each other", ["walk", "arm", "close"]),
   prompt(5, "swimming-arms-walk", "Swimming Arms Walk", "Walking and Movement", "Have him stand directly behind her while they hold hands\n\nBring their arms outward to the sides and have them walk toward the camera while moving their arms like they’re swimming through water\n\nHave them look at each other as they move", ["walk", "behind", "arms", "swimming"]),
   prompt(6, "walk-away-together", "Walk Away Together", "Walking and Movement", "Have them walk off into the distance together and pretend I’m not there", ["walk", "away", "candid"]),
-  prompt(7, "circle-chase", "Circle Chase", "Playful", "Have them chase each other around in a circle\n\nThe girl should look back at him and smile like she’s barely getting away while the guy runs after her\n\nTell them they’re just playing and not to take the movement too seriously", ["chase", "circle", "run", "playful"]),
-  prompt(8, "playfully-refuse-the-kiss", "Playfully Refuse the Kiss", "Playful", "Have the guy try to kiss her on the cheek while she playfully turns her head away and tries not to let him kiss her\n\nThey should stay close and hold onto each other while doing it", ["kiss", "cheek", "playful"]),
-  prompt(9, "ring-around-the-rosie", "Ring Around the Rosie", "Playful", "Have them hold hands and play Ring Around the Rosie together\n\nLet them spin, laugh, and move naturally", ["spin", "laugh", "hands", "playful"]),
-  prompt(10, "airport-hug", "Airport Hug", "Playful", "Start them far apart and facing away from each other\n\nOn the count of three, have them turn around, run toward each other, and give each other a huge bear hug\n\nTell them to hug like they haven’t seen each other in months and are finally seeing each other at the airport", ["run", "hug", "airport", "playful"]),
-  prompt(11, "chase-catch-and-swing", "Chase, Catch, and Swing", "Playful", "Have the girl run away while the guy chases after her\n\nHave him catch her from behind, wrap his arms around her, pick her up, and swing her around", ["chase", "catch", "lift", "swing"]),
-  prompt(12, "sit-and-kiss-from-behind", "Sit and Kiss From Behind", "Standing and Intimate", "Have the guy sit down\n\nHave the girl stand behind him, lean over him, and go in for a kiss from behind", ["sit", "kiss", "behind"]),
-  prompt(13, "whisper-a-random-answer", "Whisper a Random Answer", "Standing and Intimate", "Have them stand facing each other and hold hands\n\nHave him lean toward her and whisper something into her ear, such as his favorite cereal\n\nPhotograph her reaction rather than the whisper itself", ["whisper", "reaction", "hands", "intimate"]),
-  prompt(14, "smell-her-hair", "Smell Her Hair", "Standing and Intimate", "Have him stand behind her and wrap his arms around her waist\n\nHave them overlap or hold hands around her waist\n\nTell him to smell her hair while she turns her face toward the direction he’s smelling", ["behind", "hair", "hug", "waist"]),
-  prompt(15, "hands-in-back-pockets", "Hands in Back Pockets", "Standing and Intimate", "Have them stand face to face and get extremely close\n\nPlace his hands inside her back pockets and have her place her hands against his chest\n\nHave them gently squish together\n\nUse this for a tighter detail shot", ["hands", "pockets", "close", "detail"]),
-  prompt(16, "walk-up-and-touch-noses", "Walk Up and Touch Noses", "Standing and Intimate", "Have him remain still while she slowly walks toward him\n\nHave her place one arm around his neck and the other around his stomach or waist\n\nTell her to try touching her nose to his nose and then lean into him", ["walk", "nose", "neck", "waist"]),
-  prompt(17, "nose-rub", "Nose Rub", "Standing and Intimate", "Have them stand face to face\n\nHer hands should be on his shoulders and his hands should be around her waist\n\nHave them gently rub their noses together and smile at each other", ["nose", "smile", "waist", "intimate"]),
-  prompt(18, "temple-kiss", "Temple Kiss", "Standing and Intimate", "Have them stand side by side\n\nTell him to pull her closer and kiss her on the temple", ["kiss", "temple", "close"]),
-  prompt(19, "swimming-arms-into-a-hug", "Swimming Arms Into a Hug", "From Behind", "Have him stand behind her with her back against his chest\n\nHave them hold hands and extend their arms outward\n\nTell them to wave their arms around like they’re swimming in place\n\nOn the count of three, have him pull her arms inward and wrap her in a hug", ["behind", "arms", "swimming", "hug"]),
-  prompt(20, "head-on-his-back-and-cheek-kiss", "Head on His Back and Cheek Kiss", "From Behind", "Have her stand behind him and rest her head against his back\n\nHave them hold hands\n\nPlace her far hand, the hand away from the camera, on his cheek and have her gently pull his head toward her\n\nThen have her kiss him on the cheek while he smiles", ["behind", "head", "cheek", "kiss"]),
-  prompt(21, "head-on-his-neck", "Head on His Neck", "From Behind", "Have her stand directly behind him while they hold hands\n\nHave her rest her head against his neck\n\nTell them to look toward each other and make sure he smiles", ["behind", "head", "neck", "smile"]),
-  prompt(22, "seated-cuddle", "Seated Cuddle", "Sitting", "Have him sit down with her sitting between his legs\n\nHer legs should be kicked outward to one side\n\nHave them cuddle closely and tell him to gently hold her cheek", ["sit", "cuddle", "legs", "cheek"]),
-  prompt(23, "piggyback-sway", "Piggyback Sway", "Piggyback and Lifts", "Have her jump onto his back for a piggyback ride\n\nTell them to sway from side to side and look up toward each other\n\nHave her whisper something into his ear, smile near his ear, and give him small kisses on the cheek or ear", ["piggyback", "lift", "sway", "whisper", "kiss"]),
+  prompt(7, "circle-chase", "Circle Chase", "Playful Interactions", "Have them chase each other around in a circle\n\nThe girl should look back at him and smile like she’s barely getting away while the guy runs after her\n\nTell them they’re just playing and not to take the movement too seriously", ["chase", "circle", "run", "playful"]),
+  prompt(8, "playfully-refuse-the-kiss", "Playfully Refuse the Kiss", "Playful Interactions", "Have the guy try to kiss her on the cheek while she playfully turns her head away and tries not to let him kiss her\n\nThey should stay close and hold onto each other while doing it", ["kiss", "cheek", "playful"]),
+  prompt(9, "ring-around-the-rosie", "Ring Around the Rosie", "Playful Interactions", "Have them hold hands and play Ring Around the Rosie together\n\nLet them spin, laugh, and move naturally", ["spin", "laugh", "hands", "playful"]),
+  prompt(10, "airport-hug", "Airport Hug", "Playful Interactions", "Start them far apart and facing away from each other\n\nOn the count of three, have them turn around, run toward each other, and give each other a huge bear hug\n\nTell them to hug like they haven’t seen each other in months and are finally seeing each other at the airport", ["run", "hug", "airport", "playful"]),
+  prompt(11, "chase-catch-and-swing", "Chase, Catch, and Swing", "Lifts and Spins", "Have the girl run away while the guy chases after her\n\nHave him catch her from behind, wrap his arms around her, pick her up, and swing her around", ["chase", "catch", "lift", "swing"]),
+  prompt(12, "sit-and-kiss-from-behind", "Sit and Kiss From Behind", "Romantic and Intimate", "Have the guy sit down\n\nHave the girl stand behind him, lean over him, and go in for a kiss from behind", ["sit", "kiss", "behind"]),
+  prompt(13, "whisper-a-random-answer", "Whisper a Random Answer", "Playful Interactions", "Have them stand facing each other and hold hands\n\nHave him lean toward her and whisper something into her ear, such as his favorite cereal\n\nPhotograph her reaction rather than the whisper itself", ["whisper", "reaction", "hands", "intimate"]),
+  prompt(14, "smell-her-hair", "Smell Her Hair", "Hugs and Embraces", "Have him stand behind her and wrap his arms around her waist\n\nHave them overlap or hold hands around her waist\n\nTell him to smell her hair while she turns her face toward the direction he’s smelling", ["behind", "hair", "hug", "waist"]),
+  prompt(15, "hands-in-back-pockets", "Hands in Back Pockets", "Romantic and Intimate", "Have them stand face to face and get extremely close\n\nPlace his hands inside her back pockets and have her place her hands against his chest\n\nHave them gently squish together\n\nUse this for a tighter detail shot", ["hands", "pockets", "close", "detail"]),
+  prompt(16, "walk-up-and-touch-noses", "Walk Up and Touch Noses", "Hugs and Embraces", "Have him remain still while she slowly walks toward him\n\nHave her place one arm around his neck and the other around his stomach or waist\n\nTell her to try touching her nose to his nose and then lean into him", ["walk", "nose", "neck", "waist"]),
+  prompt(17, "nose-rub", "Nose Rub", "Romantic and Intimate", "Have them stand face to face\n\nHer hands should be on his shoulders and his hands should be around her waist\n\nHave them gently rub their noses together and smile at each other", ["nose", "smile", "waist", "intimate"]),
+  prompt(18, "temple-kiss", "Temple Kiss", "Hugs and Embraces", "Have them stand side by side\n\nTell him to pull her closer and kiss her on the temple", ["kiss", "temple", "close"]),
+  prompt(19, "swimming-arms-into-a-hug", "Swimming Arms Into a Hug", "Hugs and Embraces", "Have him stand behind her with her back against his chest\n\nHave them hold hands and extend their arms outward\n\nTell them to wave their arms around like they’re swimming in place\n\nOn the count of three, have him pull her arms inward and wrap her in a hug", ["behind", "arms", "swimming", "hug"]),
+  prompt(20, "head-on-his-back-and-cheek-kiss", "Head on His Back and Cheek Kiss", "Hugs and Embraces", "Have her stand behind him and rest her head against his back\n\nHave them hold hands\n\nPlace her far hand, the hand away from the camera, on his cheek and have her gently pull his head toward her\n\nThen have her kiss him on the cheek while he smiles", ["behind", "head", "cheek", "kiss"]),
+  prompt(21, "head-on-his-neck", "Head on His Neck", "Romantic and Intimate", "Have her stand directly behind him while they hold hands\n\nHave her rest her head against his neck\n\nTell them to look toward each other and make sure he smiles", ["behind", "head", "neck", "smile"]),
+  prompt(22, "seated-cuddle", "Seated Cuddle", "Sitting Poses", "Have him sit down with her sitting between his legs\n\nHer legs should be kicked outward to one side\n\nHave them cuddle closely and tell him to gently hold her cheek", ["sit", "cuddle", "legs", "cheek"]),
+  prompt(23, "piggyback-sway", "Piggyback Sway", "Lifts and Spins", "Have her jump onto his back for a piggyback ride\n\nTell them to sway from side to side and look up toward each other\n\nHave her whisper something into his ear, smile near his ear, and give him small kisses on the cheek or ear", ["piggyback", "lift", "sway", "whisper", "kiss"]),
 ];
 
 export function filterCouplesPosingPrompts(
@@ -239,6 +243,7 @@ export function validateCouplesPromptInput(input: Record<string, unknown>) {
     data: {
       title,
       instructions,
+      variation: optionalText(input.variation, 2000),
       category,
       keywords: stringList(input.keywords),
       display_order: Number.isFinite(Number(input.display_order))
