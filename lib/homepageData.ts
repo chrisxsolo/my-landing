@@ -5,6 +5,10 @@ type HomepageImage = Pick<
   "id" | "image_url" | "alt" | "category_slug" | "hero_carousel"
 >;
 
+// Anchor for the hero's "Explore Sessions" link. Lives here, not in the client
+// hero component, so the server-rendered services section can import it.
+export const SERVICES_SECTION_ID = "services";
+
 export type HomepageHeroSlide = HomepageImage & {
   objectPosition: string;
   mobileObjectPosition: string;
@@ -257,18 +261,68 @@ export function pickDistinctCategoryImages(
   }).slice(0, count);
 }
 
+// Admin-pinnable featured sessions (site_settings, value = blog post slug).
+export const FEATURED_SESSION_SETTING_KEYS = {
+  grads: "home_featured_grad_post",
+  couples: "home_featured_couples_post",
+} as const;
+
+type FeaturedSlot = { key: keyof typeof FEATURED_SESSION_SETTING_KEYS; category: string; label: string };
+
+// The homepage shows one graduation and one couples session, in that order,
+// because those are the two services it leads with.
+const FEATURED_SLOTS: readonly FeaturedSlot[] = [
+  { key: "grads", category: "graduation", label: "Graduation session" },
+  { key: "couples", category: "couples", label: "Couples session" },
+];
+
+export type FeaturedSessionOptions = {
+  /** Display-category slugs for a post (lib/blog/postCategories). Omit to pick by recency only. */
+  categorize?: (post: BlogPostSummary) => readonly string[];
+  /** Admin pins: blog post slug per slot. A slug that isn't published is ignored. */
+  pinnedSlugs?: Partial<Record<FeaturedSlot["key"], string | null | undefined>>;
+};
+
+function pickFeaturedPosts(
+  posts: BlogPostSummary[],
+  count: number,
+  options: FeaturedSessionOptions,
+): { post: BlogPostSummary; label: string | null }[] {
+  const categorize = options.categorize ?? (() => []);
+  const used = new Set<string>();
+  const take = (post: BlogPostSummary | undefined, label: string | null) => {
+    if (!post || used.has(post.slug)) return null;
+    used.add(post.slug);
+    return { post, label };
+  };
+
+  const slotted = FEATURED_SLOTS.map((slot) => {
+    const pinned = options.pinnedSlugs?.[slot.key];
+    const pinnedPost = pinned ? posts.find((post) => post.slug === pinned) : undefined;
+    return take(pinnedPost, slot.label)
+      ?? take(posts.find((post) => !used.has(post.slug) && categorize(post).includes(slot.category)), slot.label);
+  }).filter((entry) => entry !== null);
+
+  // A service with no published session yet: fill with the newest other posts.
+  const filler = posts
+    .filter((post) => !used.has(post.slug))
+    .map((post) => ({ post, label: null }));
+
+  return [...slotted, ...filler].slice(0, count);
+}
+
 export function buildFeaturedSessions(
   posts: BlogPostSummary[],
   images: HomepageImage[],
   count = 3,
+  options: FeaturedSessionOptions = {},
 ): FeaturedSession[] {
   const availableImages = pickDistinctCategoryImages(images, "grads", count + SCHOOL_FALLBACKS.length);
-  const published = posts
-    .filter((post) => post.slug && post.title)
-    .slice(0, count)
-    .map((post, index) => ({
+  const eligible = posts.filter((post) => post.slug && post.title);
+  const published = pickFeaturedPosts(eligible, count, options)
+    .map(({ post, label }, index) => ({
       title: post.title,
-      location: "Bay Area",
+      location: label ?? "Bay Area",
       description: post.meta_description ?? "See the complete session from wide portraits to the final close-ups.",
       href: `/blog/${post.slug}`,
       imageUrl: post.cover_image_url ?? availableImages[index]?.image_url ?? "",

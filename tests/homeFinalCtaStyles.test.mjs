@@ -5,7 +5,7 @@ import test from "node:test";
 const componentPath = new URL("../app/components/HomeFinalCTA.tsx", import.meta.url);
 const stylesPath = new URL("../app/(professional)/homeDetails.module.css", import.meta.url);
 
-test("the final CTA pricing button keeps light text over the photo", async () => {
+test("the final CTA secondary button keeps light text over the photo", async () => {
   const [component, styles] = await Promise.all([
     readFile(componentPath, "utf8"),
     readFile(stylesPath, "utf8"),
@@ -13,7 +13,7 @@ test("the final CTA pricing button keeps light text over the photo", async () =>
 
   assert.match(
     component,
-    /className=\{`\$\{styles\.button\} \$\{styles\.buttonGhost\} \$\{details\.finalSecondaryButton\}`\}[\s\S]*?>\s*View Pricing/,
+    /className=\{`\$\{styles\.button\} \$\{styles\.buttonGhost\} \$\{details\.finalSecondaryButton\}`\}[\s\S]*?>\s*Check Availability/,
   );
   assert.match(
     styles,

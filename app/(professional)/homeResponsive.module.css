@@ -16,13 +16,24 @@
     border-right: 0;
   }
 
-  .serviceGrid {
-    grid-template-columns: 1fr 1fr;
+  /* Three equal cards stay side by side until phone widths. */
+  .serviceCard {
+    min-height: 460px;
   }
 
-  .serviceCard:first-child {
-    grid-column: 1 / 3;
-    min-height: 620px;
+  .serviceCard h3 {
+    font-size: 24px;
+  }
+}
+
+/* Below ~900px three columns get too narrow for the card copy: stack them. */
+@media (max-width: 900px) {
+  .serviceGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .serviceCard {
+    min-height: 440px;
   }
 }
 
@@ -102,14 +113,9 @@
     grid-template-columns: 1fr;
   }
 
-  .serviceCard:first-child {
-    grid-column: auto;
-    min-height: 520px;
-  }
-
   .serviceCard,
   .sessionCard {
-    min-height: 480px;
+    min-height: 440px;
   }
 }
 
@@ -156,4 +162,14 @@
   .storyGrid {
     grid-auto-rows: 170px;
   }
+}
+
+/* In-page anchor target (hero "Explore Sessions"): clear the fixed nav and
+   skip the focus ring that programmatic focus would otherwise draw. */
+.anchorSection {
+  scroll-margin-top: 64px;
+}
+
+.anchorSection:focus {
+  outline: none;
 }

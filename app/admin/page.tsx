@@ -76,6 +76,7 @@ import CouplesLocationsTab from "@/app/admin/CouplesLocationsTab";
 import CouplesPortfolioTab from "@/app/admin/CouplesPortfolioTab";
 import PortraitLocationsTab from "@/app/admin/PortraitLocationsTab";
 import NavigationTab from "@/app/admin/NavigationTab";
+import HomeFeaturedSessionsPicker from "./HomeFeaturedSessionsPicker";
 import TestimonialsTab from "@/app/admin/TestimonialsTab";
 import CouplesPosingGuideTab from "@/app/admin/CouplesPosingGuideTab";
 import { uploadImage } from "@/lib/uploadImage";
@@ -2604,12 +2605,14 @@ function AdminDashboard() {
               </div>
             </div>
 
+            <HomeFeaturedSessionsPicker settings={siteSettings} savingKey={settingsSaving} onSave={updateSiteSetting}/>
+
             {/* ── Pricing Page Photos ── */}
             <div className={card}>
               <div className="h-[3px]" style={{background:"#111827"}}/>
               <div className="p-6">
                 <h2 className="text-base font-black text-slate-900 mb-1">Pricing Page Photos</h2>
-                <p className="text-xs text-slate-400 mb-5">Pick which portfolio images appear on the grad, family, and couples pricing pages.</p>
+                <p className="text-xs text-slate-400 mb-5">Pick which portfolio images appear on the grad, family, couples, and maternity pricing pages.</p>
                 <div className="space-y-4">
                   {([
                     {key:"pricing_grad_standard_image",label:"Grad package photo",helper:"Shown beside the standard graduation package.",category:"grads"},
@@ -2620,6 +2623,8 @@ function AdminDashboard() {
                     {key:"pricing_couples_standard_image",label:"Couples session photo",helper:"Shown beside the standard couples package.",category:"couples"},
                     {key:"pricing_couples_engagement_image",label:"Engagement session photo",helper:"Shown beside the engagement package.",category:"couples"},
                     {key:"pricing_couples_proposal_image",label:"Proposal coverage photo",helper:"Shown beside the proposal coverage package.",category:"couples"},
+                    {key:"pricing_maternity_hero_image",label:"Maternity page hero",helper:"Background photo at the top of /pricing/maternity. Defaults to a maternity-titled photo.",category:"couples"},
+                    {key:"pricing_maternity_package_image",label:"Maternity package photo",helper:"Shown beside the maternity package.",category:"couples"},
                   ] as {key:string;label:string;helper:string;category:"grads"|"families"|"couples"}[]).map(({key,label,helper,category})=>{
                     // Show every portfolio photo; float this package's category to the top so it's handy without hiding the rest.
                     const pickerImages=[...portfolioImages.filter(img=>matchesPortfolioGroup(img,category)),...portfolioImages.filter(img=>!matchesPortfolioGroup(img,category))];

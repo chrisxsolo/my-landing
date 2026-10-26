@@ -36,6 +36,9 @@ export const EDITABLE_SETTING_KEYS = [
   "home_story_6",
   "home_final_cta",
   "home_about_portrait",
+  // Pinned homepage featured sessions (blog post slugs, not images).
+  "home_featured_grad_post",
+  "home_featured_couples_post",
   "pricing_grad_standard_image",
   "pricing_grad_group_image",
   "pricing_card_families_image",

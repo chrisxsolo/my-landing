@@ -76,15 +76,26 @@
 }
 
 .content h1 {
-  max-width: 760px;
+  max-width: 860px;
   margin: 0;
   color: var(--home-paper);
-  font-size: clamp(3.35rem, 6.3vw, 6.8rem);
+  font-size: clamp(3rem, 5.6vw, 6.1rem);
   font-weight: 900;
   letter-spacing: -0.06em;
   line-height: 0.9;
   text-wrap: balance;
   text-shadow: 0 16px 52px color-mix(in srgb, var(--home-ink) 44%, transparent);
+}
+
+/* Lead-in line of the H1: same heading, smaller and lighter, so the full
+   location + service phrase stays one H1 without wrapping into a wall. */
+.headlinePlace {
+  display: block;
+  margin-bottom: 0.32em;
+  font-size: 0.36em;
+  font-weight: 760;
+  letter-spacing: 0.01em;
+  line-height: 1.15;
 }
 
 .copy {
@@ -282,9 +293,13 @@
   }
 
   .content h1 {
-    max-width: 12ch;
-    font-size: clamp(2.7rem, 11.8vw, 4.7rem);
+    max-width: 13ch;
+    font-size: clamp(2.45rem, 10.6vw, 4.4rem);
     line-height: 0.94;
+  }
+
+  .headlinePlace {
+    font-size: 0.42em;
   }
 
   .copy {
@@ -309,12 +324,17 @@
 }
 
 @media (max-width: 560px) {
+  /* Grows with its content on narrow phones so the headline never slides up
+     under the fixed nav; otherwise the same 78svh frame. */
   .hero {
-    height: 78svh;
-    min-height: 560px;
+    height: auto;
+    min-height: max(560px, 78svh);
+    max-height: none;
   }
 
   .content {
+    height: auto;
+    min-height: max(560px, 78svh);
     padding-bottom: 106px;
   }
 

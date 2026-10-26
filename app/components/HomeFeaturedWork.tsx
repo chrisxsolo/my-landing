@@ -4,6 +4,7 @@ import type { FeaturedSession } from "@/lib/homepageData";
 import type { PortfolioImage } from "@/lib/professionalData";
 import styles from "@/app/(professional)/home.module.css";
 import responsive from "@/app/(professional)/homeResponsive.module.css";
+import { COUPLES_PORTFOLIO_PATH } from "@/lib/couplesRoutes";
 
 type HomeImage = Pick<PortfolioImage, "id" | "image_url" | "alt" | "category_slug">;
 
@@ -17,8 +18,10 @@ export default function HomeFeaturedWork({
   images: HomeImage[];
   featuredSessions: FeaturedSession[];
 }) {
-  const mosaic = images.slice(0, MAX_IMAGES);
   const sessions = featuredSessions.slice(0, MAX_SESSIONS);
+  // Never show a session's cover twice on the same screen.
+  const sessionCovers = new Set(sessions.map((session) => session.imageUrl));
+  const mosaic = images.filter((image) => !sessionCovers.has(image.image_url)).slice(0, MAX_IMAGES);
 
   return (
     <section className={`${styles.section} ${styles.paper} ${responsive.section}`}>
@@ -36,6 +39,9 @@ export default function HomeFeaturedWork({
             <div className={styles.actions}>
               <Link href="/portfolio" className={`${styles.button} ${styles.buttonGhost}`}>
                 View Portfolio
+              </Link>
+              <Link href={COUPLES_PORTFOLIO_PATH} className={`${styles.button} ${styles.buttonGhost}`}>
+                Couples Portfolio
               </Link>
             </div>
           </div>
@@ -72,7 +78,7 @@ export default function HomeFeaturedWork({
               ))}
             </div>
             <div className={styles.actions}>
-              <Link href="/blog" className={`${styles.button} ${styles.buttonGhost}`}>Explore Full Sessions</Link>
+              <Link href="/blog" className={`${styles.button} ${styles.buttonGhost}`}>Browse the Journal</Link>
             </div>
           </>
         ) : null}

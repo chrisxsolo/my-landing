@@ -4,8 +4,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { track } from "@vercel/analytics";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { CSSProperties } from "react";
-import type { HomepageHeroSlide } from "@/lib/homepageData";
+import type { CSSProperties, MouseEvent } from "react";
+import { SERVICES_SECTION_ID, type HomepageHeroSlide } from "@/lib/homepageData";
 import styles from "@/app/components/HomeHero.module.css";
 
 const AUTOPLAY_INTERVAL_MS = 7000;
@@ -42,17 +42,47 @@ function trackHero(action: string) {
   track("Homepage Hero Interaction", { action });
 }
 
+// "Explore Sessions" is a plain #services link that works without JS. With JS
+// it scrolls (smoothly unless reduced motion is requested) and moves focus to
+// the section so keyboard and screen-reader users land there too. The section's
+// scroll-margin-top keeps its heading clear of the fixed nav.
+function scrollToServices(event: MouseEvent<HTMLAnchorElement>, reducedMotion: boolean) {
+  const target = document.getElementById(SERVICES_SECTION_ID);
+  if (!target) return;
+  event.preventDefault();
+  target.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "start" });
+  target.focus({ preventScroll: true });
+  window.history.replaceState(null, "", `#${SERVICES_SECTION_ID}`);
+}
+
 export default function HomeHero({ slides }: { slides: HomepageHeroSlide[] }) {
   const [current, setCurrent] = useState(0);
   const [paused, setPaused] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
+  // Slides whose image is in the DOM. The server HTML carries only the first
+  // (preloaded, high priority), so it gets the page's early bandwidth. Once the
+  // page has loaded, every other slide mounts and downloads in the background,
+  // so they are ready long before anyone picks one; a slide picked even
+  // earlier mounts on the spot.
+  const [mountedThrough, setMountedThrough] = useState(0);
   const currentRef = useRef(0);
 
   const showSlide = useCallback((index: number, action?: string) => {
     const next = (index + slides.length) % slides.length;
     currentRef.current = next;
     setCurrent(next);
+    setMountedThrough((value) => Math.max(value, next));
     if (action) trackHero(action);
+  }, [slides.length]);
+
+  useEffect(() => {
+    const warmNext = () => setMountedThrough(slides.length - 1);
+    if (document.readyState === "complete") {
+      const id = window.setTimeout(warmNext, 0);
+      return () => window.clearTimeout(id);
+    }
+    window.addEventListener("load", warmNext, { once: true });
+    return () => window.removeEventListener("load", warmNext);
   }, [slides.length]);
 
   useEffect(() => {
@@ -110,18 +140,20 @@ export default function HomeHero({ slides }: { slides: HomepageHeroSlide[] }) {
               data-active={index === current}
               aria-hidden={index !== current}
             >
-              <Image
-                src={slide.image_url}
-                alt=""
-                fill
-                sizes="100vw"
-                preload={index === 0}
-                loading={index === 0 ? undefined : "eager"}
-                fetchPriority={index === 0 ? undefined : "low"}
-                quality={index === 0 ? 90 : 85}
-                className={styles.image}
-                style={imageStyle}
-              />
+              {index <= mountedThrough ? (
+                <Image
+                  src={slide.image_url}
+                  alt=""
+                  fill
+                  sizes="100vw"
+                  preload={index === 0}
+                  loading={index === 0 ? undefined : "eager"}
+                  fetchPriority={index === 0 ? "high" : "low"}
+                  quality={index === 0 ? 90 : 85}
+                  className={styles.image}
+                  style={imageStyle}
+                />
+              ) : null}
             </div>
           );
         })}
@@ -130,25 +162,31 @@ export default function HomeHero({ slides }: { slides: HomepageHeroSlide[] }) {
       <div className={styles.overlay} />
       <div className={styles.content}>
         <p className={styles.brand}>SoloXSnaps Photography</p>
-        <h1>Bay Area Portrait Photographer</h1>
+        <h1>
+          <span className={styles.headlinePlace}>San Francisco &amp; Bay Area</span>{" "}
+          Graduation and Couples Photographer
+        </h1>
         <p className={styles.copy}>
-          Bright, natural portraits with clear posing guidance for graduation, couples,
-          families, and lifestyle sessions throughout San Francisco and the Bay Area.
+          Bright, natural photography with guided posing and a relaxed, personalized experience.
+          Capturing graduations, couples, families, and meaningful moments throughout the Bay Area.
         </p>
         <div className={styles.actions}>
+          <a
+            href={`#${SERVICES_SECTION_ID}`}
+            className={styles.primaryAction}
+            onClick={(event) => {
+              trackHero("explore_sessions");
+              scrollToServices(event, reducedMotion);
+            }}
+          >
+            Explore Sessions
+          </a>
           <Link
             href="/availability"
-            className={styles.primaryAction}
+            className={styles.secondaryAction}
             onClick={() => trackHero("check_availability")}
           >
             Check Availability
-          </Link>
-          <Link
-            href="/portfolio"
-            className={styles.secondaryAction}
-            onClick={() => trackHero("view_portfolio")}
-          >
-            View Portfolio
           </Link>
         </div>
       </div>

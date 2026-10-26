@@ -3,7 +3,8 @@ import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 import type { PortfolioImage } from "@/lib/professionalData";
 import styles from "@/app/(professional)/home.module.css";
 import responsive from "@/app/(professional)/homeResponsive.module.css";
-import { PRICING_CATALOG } from "@/lib/pricingCatalog";
+import { PRICING_CATALOG, formatFee } from "@/lib/pricingCatalog";
+import { SERVICES_SECTION_ID } from "@/lib/homepageData";
 
 type HomeImage = Pick<PortfolioImage, "id" | "image_url" | "alt" | "category_slug">;
 
@@ -24,13 +25,21 @@ const SCHOOLS = [
   ["Stanford", "/grads/stanford"],
 ] as const;
 
-function startingAt(price: number) {
-  return `Starting at $${price}`;
-}
+const { couples, families, graduation, maternity } = PRICING_CATALOG;
 
+// Every price line reads from the catalog. The couples mini is named as a
+// 30-minute mini so it is never mistaken for the full-hour session.
+const GRAD_PRICE_LINES = [
+  `Starting at ${formatFee(graduation.baseHourlyRate)}`,
+  `${graduation.standardMinimumImages}+ edited images`,
+];
 const COUPLES_PRICE_LINES = [
-  `${PRICING_CATALOG.couples.packages.mini.durationMinutes}-minute sessions from $${PRICING_CATALOG.couples.packages.mini.price}`,
-  `Full sessions from $${PRICING_CATALOG.couples.packages["1hr"].price}`,
+  `${couples.packages.mini.durationMinutes}-minute mini from ${formatFee(couples.packages.mini.price)}`,
+  `Full sessions from ${formatFee(couples.packages["1hr"].price)}`,
+];
+const FAMILY_PRICE_LINES = [
+  `Family sessions from ${formatFee(families.packages.standard.price)}`,
+  `Maternity sessions ${formatFee(maternity.price)}`,
 ];
 
 function ServiceCard({
@@ -45,10 +54,9 @@ function ServiceCard({
   image: HomeImage;
   title: string;
   copy: string;
-  price: string | string[];
+  price: readonly string[];
   cta: string;
 }) {
-  const priceLines = Array.isArray(price) ? price : [price];
   return (
     <Link href={href} className={`${styles.serviceCard} ${responsive.serviceCard}`}>
       <div className={styles.serviceImage}>
@@ -58,7 +66,7 @@ function ServiceCard({
         <h3>{title}</h3>
         <p>{copy}</p>
         <span className={styles.servicePrice}>
-          {priceLines.map((line) => (
+          {price.map((line) => (
             <span key={line} className={styles.servicePriceLine}>
               {line}
             </span>
@@ -80,12 +88,17 @@ export default function HomeServices({
   cardPortrait: HomeImage;
 }) {
   return (
-    <section id="services" className={`${styles.section} ${styles.tint} ${responsive.section}`}>
+    <section
+      id={SERVICES_SECTION_ID}
+      tabIndex={-1}
+      aria-labelledby="services-heading"
+      className={`${styles.section} ${styles.tint} ${responsive.section} ${responsive.anchorSection}`}
+    >
       <div className={`${styles.shell} ${responsive.shell}`}>
         <div className={`${styles.headerRow} ${responsive.headerRow}`}>
           <div>
             <p className={styles.eyebrow}>Choose your session</p>
-            <h2 className={styles.title}>A clear place to start, whatever you are celebrating</h2>
+            <h2 id="services-heading" className={styles.title}>A clear place to start, whatever you are celebrating</h2>
           </div>
           <p className={`${styles.copy} ${responsive.headerRowCopy}`}>
             {TRUST_POINTS.join(" · ")}
@@ -98,8 +111,8 @@ export default function HomeServices({
             image={cardGrads}
             title="Graduation Photography"
             copy="Campus sessions celebrating your personality, school, and milestone."
-            price={startingAt(PRICING_CATALOG.graduation.baseHourlyRate)}
-            cta="View Graduation Sessions"
+            price={GRAD_PRICE_LINES}
+            cta="View Graduation Pricing"
           />
           <ServiceCard
             href="/pricing/couples"
@@ -107,15 +120,15 @@ export default function HomeServices({
             title="Couples Photography"
             copy="Natural, movement-led photographs for engagements, anniversaries, and everyday chapters."
             price={COUPLES_PRICE_LINES}
-            cta="View Couples Sessions"
+            cta="View Couples Pricing"
           />
           <ServiceCard
             href="/pricing/families"
             image={cardPortrait}
             title="Families & Portraits"
             copy="Guided portraits for families, maternity, individuals, and personal milestones."
-            price={startingAt(PRICING_CATALOG.families.packages.standard.price)}
-            cta="View Family & Portrait Sessions"
+            price={FAMILY_PRICE_LINES}
+            cta="View Family & Maternity Pricing"
           />
         </div>
 

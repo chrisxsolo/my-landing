@@ -7,22 +7,30 @@ import HomeHero from "@/app/components/HomeHero";
 import HomeServices from "@/app/components/HomeServices";
 import HomeTestimonials from "@/app/components/HomeTestimonials";
 import { C } from "@/lib/colors";
-import { buildFeaturedSessions, resolveHomepageImages } from "@/lib/homepageData";
+import {
+  FEATURED_SESSION_SETTING_KEYS,
+  buildFeaturedSessions,
+  resolveHomepageImages,
+} from "@/lib/homepageData";
+import { getJournalServicesByPostId } from "@/lib/blog/journalServices";
+import { resolvePostCategories } from "@/lib/blog/postCategories";
 import {
   getBlogPostSummaries,
   getPortfolioData,
   getSiteSettings,
 } from "@/lib/professionalData";
-import { getFeaturedTestimonials } from "@/lib/testimonialsData";
+import { getFeaturedTestimonials, pickBalancedTestimonials } from "@/lib/testimonialsData";
 import styles from "@/app/(professional)/home.module.css";
 import pageStyles from "@/app/(professional)/HomePage.module.css";
 
 export const revalidate = 3600;
 
-const PAGE_TITLE = "Bay Area Graduation & Couples Photographer";
+// Short enough to show in full in search results (~60 chars with the suffix);
+// the H1 carries the full "San Francisco & Bay Area" phrasing.
+const PAGE_TITLE = "San Francisco Graduation & Couples Photographer";
 const SOCIAL_TITLE = `${PAGE_TITLE} | SoloXSnaps`;
 const description =
-  "SoloXSnaps provides graduation, couples, and portrait photography throughout San Francisco and the Bay Area with clear posing guidance, transparent pricing, and private online galleries.";
+  "Graduation and couples photography in San Francisco and the Bay Area, plus family and maternity sessions. Guided posing, transparent pricing, and private online galleries.";
 const CHRIS_PORTRAIT = "/images/about/chris-solorzano-photographer.webp";
 
 export const metadata: Metadata = {
@@ -32,6 +40,8 @@ export const metadata: Metadata = {
   keywords: [
     "Bay Area graduation photographer",
     "Bay Area couples photographer",
+    "San Francisco graduation photographer",
+    "San Francisco couples photographer",
     "San Francisco photographer",
     "graduation photography Bay Area",
     "Chris Solorzano photographer",
@@ -69,7 +79,7 @@ const COLOR_VARS = {
 
 async function getHomepageTestimonials() {
   try {
-    return await getFeaturedTestimonials(6);
+    return await getFeaturedTestimonials(12);
   } catch (error) {
     console.error("Failed to load featured homepage testimonials", error);
     return [];
@@ -77,14 +87,22 @@ async function getHomepageTestimonials() {
 }
 
 export default async function ProfessionalHomePage() {
-  const [{ images }, settings, posts, featuredTestimonials] = await Promise.all([
+  const [{ images }, settings, posts, featuredTestimonials, servicesByPostId] = await Promise.all([
     getPortfolioData(),
     getSiteSettings(),
     getBlogPostSummaries("professional"),
     getHomepageTestimonials(),
+    getJournalServicesByPostId(),
   ]);
   const home = resolveHomepageImages(settings, images, CHRIS_PORTRAIT);
-  const featuredSessions = buildFeaturedSessions(posts, images, 2);
+  const featuredSessions = buildFeaturedSessions(posts, images, 2, {
+    categorize: (post) =>
+      resolvePostCategories(post, servicesByPostId[String(post.id)] ?? null).map((category) => category.slug),
+    pinnedSlugs: {
+      grads: settings[FEATURED_SESSION_SETTING_KEYS.grads],
+      couples: settings[FEATURED_SESSION_SETTING_KEYS.couples],
+    },
+  });
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -94,7 +112,13 @@ export default async function ProfessionalHomePage() {
     image: home.heroPrimary.image_url,
     founder: { "@type": "Person", name: "Chris Solorzano" },
     areaServed: ["San Francisco", "Bay Area", "San Jose", "Oakland", "Berkeley"],
-    serviceType: ["Graduation photography", "Couples photography", "Portrait photography"],
+    serviceType: [
+      "Graduation photography",
+      "Couples photography",
+      "Family photography",
+      "Maternity photography",
+      "Portrait photography",
+    ],
     sameAs: ["https://www.instagram.com/soloxsnaps"],
   };
 
@@ -112,7 +136,7 @@ export default async function ProfessionalHomePage() {
       />
       <HomeFeaturedWork images={home.storyImages} featuredSessions={featuredSessions} />
       <HomeAboutExperience aboutPortrait={home.aboutPortrait} />
-      <HomeTestimonials testimonials={featuredTestimonials.slice(0, 3)} />
+      <HomeTestimonials testimonials={pickBalancedTestimonials(featuredTestimonials, 3)} />
       <HomeFinalCTA image={home.finalCta} />
     </main>
   );

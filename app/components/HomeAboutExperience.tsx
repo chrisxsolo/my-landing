@@ -66,10 +66,7 @@ export default function HomeAboutExperience({
               personal.
             </p>
             <div className={styles.actions}>
-              <Link href="/about" className={styles.button}>More About Chris</Link>
-              <Link href="/availability" className={`${styles.button} ${styles.buttonGhost}`}>
-                View Availability
-              </Link>
+              <Link href="/about" className={`${styles.button} ${styles.buttonGhost}`}>More About Chris</Link>
             </div>
           </div>
         </div>

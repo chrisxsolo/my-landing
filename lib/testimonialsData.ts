@@ -96,6 +96,23 @@ export function testimonialCategorySlug(sessionType: string | null): string | nu
   return null;
 }
 
+// Homepage mix: one testimonial per advertised service first (graduation,
+// couples, families — the homepage's three cards), then the rest in the
+// admin's display order. A couples review appears automatically once one is
+// approved and featured; until then the slot is simply filled by the next one.
+const HOMEPAGE_SERVICE_ORDER = ["grads", "couples", "families"] as const;
+
+export function pickBalancedTestimonials(
+  testimonials: FeaturedTestimonial[],
+  limit: number,
+): FeaturedTestimonial[] {
+  const firstPerService = HOMEPAGE_SERVICE_ORDER
+    .map((slug) => testimonials.find((t) => testimonialCategorySlug(t.session_type) === slug))
+    .filter((t): t is FeaturedTestimonial => Boolean(t));
+  const chosen = new Set(firstPerService.map((t) => t.id));
+  return [...firstPerService, ...testimonials.filter((t) => !chosen.has(t.id))].slice(0, Math.max(limit, 0));
+}
+
 // Portfolio category proof. Reuses the homepage testimonial query, then keeps
 // only the testimonials whose session_type maps to the requested category.
 // Returns [] when none match, so the proof block renders nothing.

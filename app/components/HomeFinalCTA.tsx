@@ -19,15 +19,15 @@ export default function HomeFinalCTA({ image }: { image: HomeImage }) {
             <h2>Ready to plan your session?</h2>
             <p>
               Share what you are celebrating, your preferred location, and the dates you are considering.
-              You will receive the next steps for confirming availability and securing the session.
+              I&rsquo;ll reply with availability and the next steps for reserving your session.
             </p>
             <div className={styles.actions}>
-              <Link href="/availability" className={styles.button}>Check Availability</Link>
+              <Link href="/contact" className={styles.button}>Book a Session</Link>
               <Link
-                href="/pricing"
+                href="/availability"
                 className={`${styles.button} ${styles.buttonGhost} ${details.finalSecondaryButton}`}
               >
-                View Pricing
+                Check Availability
               </Link>
             </div>
             <p className={details.finalFaqLink}>
