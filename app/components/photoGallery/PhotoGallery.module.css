@@ -1,0 +1,64 @@
+/* Shared full-screen photo viewer (couples portfolio). */
+
+/* ── Lightbox ──────────────────────────────────────────────────────────── */
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  background: var(--lb-backdrop);
+  touch-action: pan-y;
+}
+.lightboxFrame {
+  position: relative;
+  width: min(96vw, 1600px);
+  height: min(86vh, 1200px);
+}
+.lightboxCounter {
+  position: absolute;
+  bottom: max(16px, env(safe-area-inset-bottom));
+  left: 50%;
+  margin: 0;
+  transform: translateX(-50%);
+  color: var(--lb-white-82);
+  font-size: 13px;
+  font-weight: 700;
+}
+.lightboxClose,
+.lightboxNav {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border: 1px solid var(--lb-white-22);
+  border-radius: 999px;
+  background: var(--lb-button);
+  color: var(--lb-white);
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+}
+.lightboxClose {
+  top: max(14px, env(safe-area-inset-top));
+  right: 14px;
+  font-size: 18px;
+}
+.lightboxNav {
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 32px;
+}
+.lightboxPrev {
+  left: 12px;
+}
+.lightboxNext {
+  right: 12px;
+}
+.lightboxClose:focus-visible,
+.lightboxNav:focus-visible {
+  outline: 3px solid var(--lb-focus);
+}
+
+

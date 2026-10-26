@@ -9,7 +9,7 @@ import { useMemo, useState } from "react";
 import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 import { distributeIntoColumns } from "@/lib/masonry";
 import type { CouplesPortfolioPhoto } from "@/lib/couplesPortfolio";
-import CouplesLightbox from "./CouplesLightbox";
+import PhotoLightbox from "@/app/components/photoGallery/PhotoLightbox";
 import styles from "./CouplesPortfolio.module.css";
 
 type Props = { photos: CouplesPortfolioPhoto[] };
@@ -62,7 +62,7 @@ export default function CouplesGallery({ photos }: Props) {
         </div>
       ))}
       {active !== null && (
-        <CouplesLightbox photos={photos} index={active} onChange={setActive} onClose={() => setActive(null)} />
+        <PhotoLightbox photos={photos} index={active} onChange={setActive} onClose={() => setActive(null)} />
       )}
     </>
   );

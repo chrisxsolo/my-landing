@@ -1,17 +1,20 @@
 "use client";
 
-// Full-screen photo viewer for the couples gallery. Shows the whole frame
+// Full-screen photo viewer shared by the couples portfolio and the grad school
+// galleries. Shows the whole frame
 // (object-fit: contain), supports arrow keys, Escape, swipe, keeps Tab inside
 // the dialog, and returns focus to the page on close. Body scrolling is locked
 // while open.
 
 import Image from "next/image";
-import { useCallback, useEffect, useRef } from "react";
-import type { CouplesPortfolioPhoto } from "@/lib/couplesPortfolio";
-import styles from "./CouplesPortfolio.module.css";
+import { useCallback, useEffect, useRef, type CSSProperties } from "react";
+import { C } from "@/lib/colors";
+import styles from "./PhotoGallery.module.css";
+
+export type LightboxPhoto = { id: string | number; image_url: string; alt: string };
 
 type Props = {
-  photos: CouplesPortfolioPhoto[];
+  photos: LightboxPhoto[];
   index: number;
   onChange: (index: number) => void;
   onClose: () => void;
@@ -37,7 +40,18 @@ function keepFocusInside(event: KeyboardEvent, dialog: HTMLElement | null) {
   }
 }
 
-export default function CouplesLightbox({ photos, index, onChange, onClose }: Props) {
+// Colors come from the shared palette, set as variables on the dialog itself so
+// the viewer looks the same on any page that mounts it.
+const LIGHTBOX_VARS = {
+  "--lb-backdrop": C.lightboxBackdrop,
+  "--lb-button": C.lightboxButton,
+  "--lb-white": C.white,
+  "--lb-white-22": C.white_22,
+  "--lb-white-82": C.white_82,
+  "--lb-focus": C.proFilmEdge,
+} as CSSProperties;
+
+export default function PhotoLightbox({ photos, index, onChange, onClose }: Props) {
   const closeRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const touchStartX = useRef<number | null>(null);
@@ -81,6 +95,7 @@ export default function CouplesLightbox({ photos, index, onChange, onClose }: Pr
     <div
       ref={dialogRef}
       className={styles.lightbox}
+      style={LIGHTBOX_VARS}
       role="dialog"
       aria-modal="true"
       aria-label={`Photo ${index + 1} of ${photos.length}`}

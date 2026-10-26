@@ -105,8 +105,6 @@ function pageVars(): CSSProperties {
     "--cp-border": C.proBorder,
     "--cp-shadow": C.proShadow,
     "--cp-film": C.proFilmEdge,
-    "--cp-lightbox": C.lightboxBackdrop,
-    "--cp-lightbox-btn": C.lightboxButton,
   } as CSSProperties;
 }
 
