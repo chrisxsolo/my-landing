@@ -9,4 +9,4 @@ Always push and deploy finished work: commit, push, merge to `main` (Vercel depl
 
 **Why:** Chris said "always push and deploy" (2026-10-26) after a change was left on a feature branch awaiting approval.
 
-**How to apply:** Don't stop at a branch or ask whether to open a PR. Run typecheck/lint/tests first, apply migrations, fast-forward `main`, push, then confirm the Vercel production deployment succeeds. Still ask before destructive or irreversible data changes.
+**How to apply:** Don't stop at a branch or ask whether to open a PR. Run typecheck/lint/tests first, apply migrations, fast-forward `main`, push, then confirm the Vercel production deployment succeeds. SQL needs no approval either (see sql-permission.md).
