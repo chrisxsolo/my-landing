@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { C } from "@/lib/colors";
 import { uploadImage } from "@/lib/uploadImage";
+import ExistingPhotoPicker from "@/app/admin/ExistingPhotoPicker";
 
 type Spot = { id: number; school_id: string; school_name: string; school_short: string; name: string; description: string; tip: string; icon: string; image_url: string | null; order: number };
 type Props = { showToast: (msg: string, ok?: boolean) => void };
@@ -31,6 +32,9 @@ export default function LocationsTab({ showToast }: Props) {
   const [editingSpot, setEditingSpot] = useState<Spot | null>(null);
   const [spotDeleteConfirm, setSpotDeleteConfirm] = useState<number | null>(null);
   const spotFileRef = useRef<HTMLInputElement>(null);
+  // A Content Engine photo chosen with "Choose existing photo" (its public web URL; no upload).
+  const [pickedUrl, setPickedUrl] = useState<string | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   function fetchSpots() {
     supabase.from("location_spots").select("*").order("school_id").order("order", { ascending: true })
@@ -46,6 +50,7 @@ export default function LocationsTab({ showToast }: Props) {
     setEditingSpot(spot);
     setSpotForm({ school_id: spot.school_id, name: spot.name, description: spot.description, tip: spot.tip, icon: spot.icon, order: String(spot.order) });
     setSpotImg(null);
+    setPickedUrl(null);
     setSpotImgPreview(spot.image_url || null);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -54,21 +59,32 @@ export default function LocationsTab({ showToast }: Props) {
     setEditingSpot(null);
     setSpotForm(EMPTY_SPOT);
     setSpotImg(null);
+    setPickedUrl(null);
     setSpotImgPreview(null);
     if (spotFileRef.current) spotFileRef.current.value = "";
+  }
+
+  function onPickedExisting(url: string | null) {
+    setPickerOpen(false);
+    if (!url) return;
+    setSpotImg(null);
+    if (spotFileRef.current) spotFileRef.current.value = "";
+    setPickedUrl(url);
+    setSpotImgPreview(url);
   }
 
   function onSpotImg(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
     if (!f) return;
     setSpotImg(f);
+    setPickedUrl(null);
     setSpotImgPreview(URL.createObjectURL(f));
   }
 
   async function saveSpot() {
     if (!spotForm.name || !spotForm.description || !spotForm.tip) { showToast("Name, description and tip required", false); return; }
     setSpotSaving(true);
-    let image_url: string | null = editingSpot?.image_url ?? null;
+    let image_url: string | null = pickedUrl ?? editingSpot?.image_url ?? null;
     if (spotImg) {
       const url = await uploadImage(spotImg, "locations", showToast);
       if (!url) { setSpotSaving(false); return; }
@@ -84,7 +100,7 @@ export default function LocationsTab({ showToast }: Props) {
       const spot = { school_id: school.id, school_name: school.name, school_short: school.short, name: spotForm.name, description: spotForm.description, tip: spotForm.tip, icon: spotForm.icon, image_url, order: parseInt(spotForm.order) || spots.filter(s => s.school_id === school.id).length + 1 };
       const res = await fetch("/api/admin/location-spots", { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify(spot) });
       if (!res.ok) showToast("Save failed", false);
-      else { showToast("Location added!"); setSpotForm(EMPTY_SPOT); setSpotImg(null); setSpotImgPreview(null); if (spotFileRef.current) spotFileRef.current.value = ""; fetchSpots(); revalidatePublicSite(); }
+      else { showToast("Location added!"); setSpotForm(EMPTY_SPOT); setSpotImg(null); setPickedUrl(null); setSpotImgPreview(null); if (spotFileRef.current) spotFileRef.current.value = ""; fetchSpots(); revalidatePublicSite(); }
     }
     setSpotSaving(false);
   }
@@ -118,7 +134,7 @@ export default function LocationsTab({ showToast }: Props) {
             {spotImgPreview ? (
               <div className="relative w-full h-52 rounded-xl overflow-hidden mb-2">
                 <img src={spotImgPreview} className="w-full h-full object-cover" />
-                <button onClick={() => { setSpotImg(null); setSpotImgPreview(editingSpot?.image_url || null); if (spotFileRef.current) spotFileRef.current.value = ""; }} className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/50 text-white text-sm font-bold flex items-center justify-center">✕</button>
+                <button onClick={() => { setSpotImg(null); setPickedUrl(null); setSpotImgPreview(editingSpot?.image_url || null); if (spotFileRef.current) spotFileRef.current.value = ""; }} className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/50 text-white text-sm font-bold flex items-center justify-center">✕</button>
                 <button onClick={() => spotFileRef.current?.click()} className="absolute bottom-2 right-2 text-xs font-bold text-white px-3 py-1.5 rounded-full" style={{ background: C.p2_20 }}>Change photo</button>
               </div>
             ) : (
@@ -129,6 +145,10 @@ export default function LocationsTab({ showToast }: Props) {
               </button>
             )}
             <input ref={spotFileRef} type="file" accept="image/*" className="hidden" onChange={onSpotImg} />
+            <button type="button" onClick={() => setPickerOpen(true)} className="mt-2 text-xs font-bold px-3 py-1.5 rounded-lg" style={{ background: C.p2_08, color: C.p2 }}>
+              Choose existing photo
+            </button>
+            {pickedUrl && <span className="ml-2 text-xs text-slate-400">Content Engine photo selected — save to apply.</span>}
           </div>
 
           <div className="space-y-3">
@@ -192,6 +212,16 @@ export default function LocationsTab({ showToast }: Props) {
             </div>
           );
         })
+      )}
+
+      {pickerOpen && (
+        <ExistingPhotoPicker
+          target={{ spotSchool: spotForm.school_id, label: `${SCHOOLS.find(s => s.id === spotForm.school_id)?.short ?? spotForm.school_id} campus spots` }}
+          mode="pick"
+          onClose={() => setPickerOpen(false)}
+          onDone={({ url }) => onPickedExisting(url)}
+          showToast={showToast}
+        />
       )}
     </div>
   );
