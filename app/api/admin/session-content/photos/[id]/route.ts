@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePublicContent } from "@/lib/publicRevalidation";
 import { requireAdmin } from "@/lib/requireAdmin";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
 import { isUuid } from "@/lib/contentEngine/uploadConfig";
@@ -52,5 +53,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: "could not update photo" }, { status: 500 });
   }
   if (!data) return NextResponse.json({ error: "photo not found" }, { status: 404 });
+  // Excluding a photo removes it from automatically matched school / guide pages.
+  if ("excluded" in patch) revalidatePublicContent();
   return NextResponse.json({ updated: true });
 }

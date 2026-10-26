@@ -27,6 +27,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 import { getPortfolioData } from "@/lib/professionalData";
+import { getPortfolioSchoolsByUrl } from "@/lib/pagePhotos/publicPages";
 import {
   getFeaturedTestimonials,
   getFeaturedTestimonialsForCategory,
@@ -70,7 +71,13 @@ export default async function PortfolioPage({
   // ── DATA FETCHING ───────────────────────────────────────────────────────────
   // categories → the filter tabs (All, Grads, Families, etc.) from Supabase
   // images     → all portfolio photos from Supabase (featured-first, sort_order)
-  const { categories, images } = await getPortfolioData();
+  const [{ categories, images: rawImages }, schoolsByUrl] = await Promise.all([
+    getPortfolioData(),
+    getPortfolioSchoolsByUrl(),
+  ]);
+  // School chips use the same resolved school as the /grads pages (photo tag,
+  // then Content Engine session, then a single school named in the caption).
+  const images = rawImages.map((img) => ({ ...img, school: schoolsByUrl[img.image_url] ?? null }));
   const params = await searchParams;
   const requestedCategory = params.category;
   // Couples has its own landing page; keep old filter links working.

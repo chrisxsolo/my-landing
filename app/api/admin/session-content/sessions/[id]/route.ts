@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePublicContent } from "@/lib/publicRevalidation";
 import { requireAdmin } from "@/lib/requireAdmin";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
 import { assembleSessionStates } from "@/lib/contentEngine/sessionState";
@@ -70,6 +71,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const result = await updateSessionFacts({
       client: createSupabaseAdminClient(), sessionId: id.toLowerCase(), facts: body,
     });
+    // School / location / service decide which public pages show the photos.
+    revalidatePublicContent();
     return NextResponse.json(result);
   } catch (err) {
     const message = err instanceof Error ? err.message : "facts update failed";

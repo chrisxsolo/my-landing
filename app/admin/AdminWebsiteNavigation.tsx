@@ -23,6 +23,7 @@ export const WEBSITE_NAV_GROUPS = [
     items: [
       { tab: "portfolio", icon: "🖼️", label: "Portfolio" },
       { tab: "couplesPortfolio", icon: "💑", label: "Couples Portfolio" },
+      { tab: "pagePhotos", icon: "🧩", label: "Page Photos" },
       { tab: "caseStudies", icon: "📖", label: "Case Studies" },
       { tab: "categories", icon: "🏷️", label: "Categories" },
     ],

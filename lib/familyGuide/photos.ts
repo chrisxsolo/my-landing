@@ -7,6 +7,7 @@
 // Chris uploads work, so nothing here ever blocks a page from rendering.
 
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
+import { withMatchedGuidePhotos } from "@/lib/pagePhotos/publicPages";
 
 export const FAMILY_LOCATION_PHOTOS_TABLE = "family_location_photos";
 
@@ -35,7 +36,7 @@ function normalize(raw: RawFamilyPhoto): FamilyPhoto | null {
  * Published photos for a single location slug, featured first then by sort order.
  * Returns [] on any error or missing table so the page still renders.
  */
-export async function getFamilyLocationPhotos(slug: string): Promise<FamilyPhoto[]> {
+async function readOwnPhotos(slug: string): Promise<FamilyPhoto[]> {
   try {
     const supabase = createSupabaseServerClient();
     const { data, error } = await supabase
@@ -55,6 +56,14 @@ export async function getFamilyLocationPhotos(slug: string): Promise<FamilyPhoto
     console.error(`family_location_photos load threw for ${slug}`, err);
     return [];
   }
+}
+
+/**
+ * This guide's own uploads plus every public photo matched to the same place
+ * (lib/pagePhotos), in curated order. Own uploads always stay.
+ */
+export async function getFamilyLocationPhotos(slug: string): Promise<FamilyPhoto[]> {
+  return withMatchedGuidePhotos("family", slug, await readOwnPhotos(slug));
 }
 
 /** The featured (or first) photo for a location, used as the hero image. Null when none. */

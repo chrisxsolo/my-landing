@@ -167,6 +167,30 @@ export function normalizeSchool(input: string | null | undefined): NormalizedSch
   return null;
 }
 
+/**
+ * Every school a free-text value mentions, each with its strongest alias
+ * confidence. Unlike normalizeSchool (first match wins), this lets callers
+ * tell "one clear school" apart from "two schools named" — a caption that
+ * mentions both Berkeley and SJSU is ambiguous, not Berkeley.
+ */
+export function detectSchoolsInText(input: string | null | undefined): NormalizedSchool[] {
+  const text = normalizeText(input ?? "");
+  if (!text) return [];
+  return SCHOOL_DEFS.flatMap((def) => {
+    if (def.reject?.test(text)) return [];
+    const hits = def.patterns.filter(({ re }) => re.test(text));
+    if (hits.length === 0) return [];
+    const confidence = Math.max(...hits.map((hit) => hit.confidence));
+    return [{
+      canonicalName: def.canonicalName,
+      displayName: def.canonicalName,
+      abbreviation: def.abbreviation,
+      confidence,
+      matchedFrom: "text",
+    }];
+  });
+}
+
 /** Whether a school-field value is plausibly a real school (even an unknown one). */
 export function isUsableSchoolFieldValue(value: string | null | undefined): boolean {
   const text = normalizeText(value ?? "");

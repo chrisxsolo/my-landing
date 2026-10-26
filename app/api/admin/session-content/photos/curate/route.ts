@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePublicContent } from "@/lib/publicRevalidation";
 import { requireAdmin } from "@/lib/requireAdmin";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
 import { createAnthropicCaller } from "@/lib/contentEngine/aiClient";
@@ -37,6 +38,7 @@ export async function POST(req: NextRequest) {
       sessionId: sessionId.toLowerCase(),
       count,
     });
+    revalidatePublicContent(); // newly excluded photos leave matched school / guide pages
     return NextResponse.json(result);
   } catch (err) {
     const message = err instanceof Error ? err.message : "curation failed";

@@ -8,6 +8,7 @@
 // blocks a page from rendering. Mirrors lib/couplesGuide/photos.ts.
 
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
+import { withMatchedGuidePhotos } from "@/lib/pagePhotos/publicPages";
 
 export const PORTRAIT_LOCATION_PHOTOS_TABLE = "portrait_location_photos";
 
@@ -36,7 +37,7 @@ function normalize(raw: RawPortraitPhoto): PortraitPhoto | null {
  * Published photos for a single location slug, featured first then by sort order.
  * Returns [] on any error or missing table so the page still renders.
  */
-export async function getPortraitLocationPhotos(slug: string): Promise<PortraitPhoto[]> {
+async function readOwnPhotos(slug: string): Promise<PortraitPhoto[]> {
   try {
     const supabase = createSupabaseServerClient();
     const { data, error } = await supabase
@@ -56,6 +57,14 @@ export async function getPortraitLocationPhotos(slug: string): Promise<PortraitP
     console.error(`portrait_location_photos load threw for ${slug}`, err);
     return [];
   }
+}
+
+/**
+ * This guide's own uploads plus every public photo matched to the same place
+ * (lib/pagePhotos), in curated order. Own uploads always stay.
+ */
+export async function getPortraitLocationPhotos(slug: string): Promise<PortraitPhoto[]> {
+  return withMatchedGuidePhotos("portrait", slug, await readOwnPhotos(slug));
 }
 
 /** The featured (or first) photo for a location, used as the hero image. Null when none. */

@@ -9,6 +9,7 @@ import { cachePublicContent } from "@/lib/publicContentCache";
 import { getPublishedCouplesLocations } from "@/lib/couplesGuide/locations";
 import { getDbLocationGuides } from "@/lib/locations/dbGuides";
 import { COUPLES_LOCATION_PHOTOS_TABLE } from "@/lib/couplesGuide/photos";
+import { getMatchedGuideCovers } from "@/lib/pagePhotos/publicPages";
 
 export type LocationCover = { image_url: string; alt: string };
 
@@ -25,7 +26,7 @@ export type FeaturedCouplesLocation = {
 type CoverRow = { location_slug: string; image_url: string; alt_text: string | null };
 
 /** First published photo (featured first, then sort order) for each slug. */
-export const getCouplesLocationCovers = cachePublicContent(
+const getUploadedCovers = cachePublicContent(
   async (slugs: string[]): Promise<Record<string, LocationCover>> => {
     if (slugs.length === 0) return {};
     try {
@@ -51,6 +52,16 @@ export const getCouplesLocationCovers = cachePublicContent(
   },
   ["couples-location-covers"],
 );
+
+/**
+ * Cover per guide: its own uploaded photo when it has one, else the first
+ * public photo matched to that place (lib/pagePhotos).
+ */
+export async function getCouplesLocationCovers(slugs: string[]): Promise<Record<string, LocationCover>> {
+  const uploaded = await getUploadedCovers(slugs);
+  const missing = slugs.filter((slug) => !uploaded[slug]);
+  return missing.length ? { ...(await getMatchedGuideCovers("couples", missing)), ...uploaded } : uploaded;
+}
 
 export async function getFeaturedCouplesLocations(): Promise<FeaturedCouplesLocation[]> {
   const statics = getPublishedCouplesLocations().map((loc) => ({

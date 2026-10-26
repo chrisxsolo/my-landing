@@ -1,41 +1,46 @@
-// DB-backed school gallery (spec §3.5): async server component, renders
-// nothing until published placements exist. Photos go through OptimizedPhoto
-// so Supabase serves resized WebP variants instead of full-res originals.
-import { createSupabaseServerClient } from "@/lib/supabaseServer";
-import { getSchoolGalleryPhotos } from "@/lib/contentEngine/schoolGalleryData";
-import OptimizedPhoto from "@/app/components/OptimizedPhoto";
+// Grad school gallery: real sessions from this campus, right under the hero.
+// Photos come from the shared page-photo pool (lib/pagePhotos) — every public
+// photo matched to this school, curated in the admin Page Photos tab. Renders
+// nothing when the school has no eligible photos, so the page never shows an
+// empty or broken gallery.
+import Link from "next/link";
+import type { CSSProperties } from "react";
+import MasonryGallery from "@/app/components/photoGallery/MasonryGallery";
+import { C } from "@/lib/colors";
+import type { PagePhoto } from "@/lib/pagePhotos/publicPages";
 
-export default async function SchoolGallery({ slug, school }: { slug: string; school: string }) {
-  const photos = await getSchoolGalleryPhotos(createSupabaseServerClient(), slug);
+const GALLERY_VARS = {
+  "--mg-placeholder": C.proAccentSoft,
+  "--mg-focus": C.proAccent,
+} as CSSProperties;
+
+type Props = {
+  slug: string;
+  schoolShort: string;
+  photos: PagePhoto[];
+  /** All eligible photos for this school (shown or not). */
+  matchedCount: number;
+};
+
+export default function SchoolGallery({ slug, schoolShort, photos, matchedCount }: Props) {
   if (photos.length === 0) return null;
+  const more = matchedCount > photos.length + 1;
 
   return (
-    <section className="school-gallery" aria-label={`${school} graduation photo gallery`}>
+    <section className="school-gallery" aria-labelledby="school-gallery-title" style={GALLERY_VARS}>
       <div className="school-shell">
         <p className="school-kicker">Recent work</p>
-        <h2 className="school-section-title">Recent {school} sessions</h2>
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
-          gap: 12,
-          marginTop: 32,
-        }}>
-          {photos.map((photo) => (
-            <figure key={photo.id} style={{ margin: 0 }}>
-              <div style={{ position: "relative", aspectRatio: "4 / 5", borderRadius: 12, overflow: "hidden" }}>
-                <OptimizedPhoto
-                  src={photo.url}
-                  alt={photo.alt}
-                  sizes="(max-width: 520px) 100vw, (max-width: 900px) 50vw, 33vw"
-                  quality={75}
-                />
-              </div>
-              {photo.caption && (
-                <figcaption style={{ fontSize: 13, opacity: 0.75, marginTop: 4 }}>{photo.caption}</figcaption>
-              )}
-            </figure>
-          ))}
+        <h2 id="school-gallery-title" className="school-section-title">Real {schoolShort} grad sessions</h2>
+        <div style={{ marginTop: 28 }}>
+          <MasonryGallery photos={photos} />
         </div>
+        {more && (
+          <p style={{ marginTop: 24 }}>
+            <Link href={`/portfolio?category=grads&school=${slug}`} className="school-link school-link--ghost">
+              See more {schoolShort} sessions in the portfolio
+            </Link>
+          </p>
+        )}
       </div>
     </section>
   );

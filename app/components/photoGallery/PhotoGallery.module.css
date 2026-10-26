@@ -1,4 +1,4 @@
-/* Shared full-screen photo viewer (couples portfolio). */
+/* Shared photo gallery + full-screen viewer (couples portfolio, grad school pages). */
 
 /* ── Lightbox ──────────────────────────────────────────────────────────── */
 .lightbox {
@@ -62,3 +62,59 @@
 }
 
 
+/* ── Masonry ──────────────────────────────────────────────────────────── */
+.masonry {
+  gap: 8px;
+  align-items: flex-start;
+}
+.masonryColumn {
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+  flex-direction: column;
+  gap: 8px;
+}
+.masonryItem {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 10px;
+  background: var(--mg-placeholder);
+  cursor: zoom-in;
+}
+.masonryItem img {
+  transition: transform 0.45s ease;
+}
+.masonryItem:hover img {
+  transform: scale(1.025);
+}
+.masonryItem:focus-visible {
+  outline: 3px solid var(--mg-focus);
+  outline-offset: 2px;
+}
+.masonryMobile {
+  display: flex;
+}
+.masonryWide {
+  display: none;
+}
+@media (min-width: 760px) {
+  .masonry,
+  .masonryColumn {
+    gap: 12px;
+  }
+  .masonryMobile {
+    display: none;
+  }
+  .masonryWide {
+    display: flex;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .masonryItem img {
+    transition: none;
+  }
+}

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePublicContent } from "@/lib/publicRevalidation";
 import { requireAdmin } from "@/lib/requireAdmin";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
 import { isUuid } from "@/lib/contentEngine/uploadConfig";
@@ -56,12 +57,14 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     if (body.action === "confirm_new") {
       const place = await confirmNewPlace(client, parseNewPlaceInput(body), text);
+      revalidatePublicContent(); // a confirmed place can match photos to a guide
       return NextResponse.json({ place, summary: await buildLocationSummary(client, s.id) });
     }
     if (body.action === "link_existing") {
       if (!text) return NextResponse.json({ error: "add a session location first" }, { status: 400 });
       const key = typeof body.key === "string" ? body.key : "";
       const place = await linkToExistingPlace(client, key, text);
+      revalidatePublicContent(); // a confirmed place can match photos to a guide
       return NextResponse.json({ place, summary: await buildLocationSummary(client, s.id) });
     }
     return NextResponse.json({ error: "action must be confirm_new or link_existing" }, { status: 400 });

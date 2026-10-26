@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePublicContent } from "@/lib/publicRevalidation";
 import { requireAdmin } from "@/lib/requireAdmin";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
 import { updatePermissions } from "@/lib/contentEngine/permissions";
@@ -34,6 +35,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     });
     if (result.outcome === "requires_acknowledgement") return NextResponse.json(result, { status: 409 });
     if (result.outcome === "not_found") return NextResponse.json({ error: "session not found" }, { status: 404 });
+    revalidatePublicContent(); // marketing permission gates reuse on school / guide pages
     return NextResponse.json(result);
   } catch (err) {
     const message = err instanceof Error ? err.message : "permission update failed";
