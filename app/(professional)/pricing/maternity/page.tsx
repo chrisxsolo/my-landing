@@ -110,7 +110,7 @@ export default async function MaternityPricingPage() {
         )}
         <div className={styles.pricingShell}>
           <p className={styles.pricingKicker}>Maternity photography</p>
-          <h1 className={styles.pricingTitle}>Maternity photos that feel calm, not staged.</h1>
+          <h1 className={styles.pricingTitle}>Calm, guided maternity photos.</h1>
           <p className={styles.pricingCopy}>
             A relaxed, guided session for you, your partner, and the people closest to you, planned around
             soft light and a pace that stays comfortable.

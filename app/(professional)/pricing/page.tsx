@@ -39,6 +39,15 @@ const RATES = [
     chips:   [`From ${formatCurrency(graduationPricing.baseHourlyRate)} / hr`, `${graduationPricing.standardMinimumImages}+ edited images`, "Bay Area locations"],
   },
   {
+    slug:    "couples",
+    href:    "/pricing/couples",
+    kicker:  "Couples photography",
+    heading: "Couples rates",
+    copy:    `Anniversary photos, engagement sessions, lifestyle portraits, and proposal coverage. Sessions from ${couplesPricing.packages.mini.durationMinutes} minutes to ${couplesPricing.packages.engagement.durationMinutes}+ minutes across Bay Area locations.`,
+    cta:     "See couples pricing",
+    chips:   [`From ${formatCurrency(couplesPricing.packages.mini.price)}`, `${couplesPricing.packages.mini.minimumImages}+ edited images`, "Guided posing"],
+  },
+  {
     slug:    "families",
     href:    "/pricing/families",
     kicker:  "Family photography",
@@ -55,15 +64,6 @@ const RATES = [
     copy:    `A ${maternityPricing.durationMinutes / 60}-hour guided session with your partner and immediate family included, at one location, with ${maternityPricing.minimumImages}+ edited images.`,
     cta:     "See maternity pricing",
     chips:   [formatCurrency(maternityPricing.price), `${maternityPricing.minimumImages}+ edited images`, "Partner & family included"],
-  },
-  {
-    slug:    "couples",
-    href:    "/pricing/couples",
-    kicker:  "Couples photography",
-    heading: "Couples rates",
-    copy:    `Anniversary photos, engagement sessions, lifestyle portraits, and proposal coverage. Sessions from ${couplesPricing.packages.mini.durationMinutes} minutes to ${couplesPricing.packages.engagement.durationMinutes}+ minutes across Bay Area locations.`,
-    cta:     "See couples pricing",
-    chips:   [`From ${formatCurrency(couplesPricing.packages.mini.price)}`, `${couplesPricing.packages.mini.minimumImages}+ edited images`, "Guided posing"],
   },
   {
     slug:    "elopements",

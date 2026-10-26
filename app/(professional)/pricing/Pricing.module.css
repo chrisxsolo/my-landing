@@ -647,7 +647,8 @@
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  padding-top: 78px;
+  /* Clears the fixed nav (~88px tall) when a long headline grows the hero. */
+  padding-top: 112px;
   background-color: #0c0d0c;
   overflow: hidden;
 }
