@@ -16,6 +16,7 @@ import ContextualTestimonials from "@/app/components/ContextualTestimonials";
 import { getContextualTestimonials, testimonialMatchesSchool } from "@/lib/testimonialsData";
 import { getBlogPostSummaries } from "@/lib/professionalData";
 import { detectSchoolLink } from "@/lib/portfolioCategoryContent";
+import type { SchoolSpotsGuide } from "./schoolSpotsGuideTypes";
 
 // ── TYPES ─────────────────────────────────────────────────────────────────────
 
@@ -23,6 +24,11 @@ export interface SchoolSpot {
   name: string;
   description: string;
   bestTime?: string;             // short best-time phrase, surfaced on the /spots page
+  key?: string;                  // lib/schoolSpots key — enables tagged photos on the guide
+  priority?: "must-have" | "recommended";
+  officialName?: string;         // official campus name, e.g. "Diaz Compean Student Union"
+  details?: string[];            // long-form paragraphs for the location guide
+  photoIdeas?: string[];         // suggested shots at this spot
 }
 
 export interface SchoolLandingData {
@@ -41,6 +47,16 @@ export interface SchoolLandingData {
   bestTime?: string;             // campus-specific best time of day / light
   whatToWear?: string;           // campus-tuned wardrobe guidance
   faqs?: SchoolFaq[];            // 3–4 campus-specific Q&A (drives FAQPage schema)
+  spotsGuide?: SchoolSpotsGuide; // long-form /spots location guide (else the compact list)
+}
+
+/** Recent journal posts about this campus, via the same matcher the posts use. */
+export async function getSchoolRelatedPosts(slug: string, limit = 3) {
+  const campusPath = `/grads/${slug}`;
+  return (await getBlogPostSummaries("professional"))
+    .filter((post) => detectSchoolLink(`${post.title} ${post.slug}`)?.href === campusPath)
+    .slice(0, limit)
+    .map((post) => ({ slug: post.slug, title: post.title }));
 }
 
 export function buildSchoolMetadata(data: SchoolLandingData): Metadata {
@@ -94,11 +110,7 @@ export default async function SchoolLandingTemplate({ data }: { data: SchoolLand
 
   // Recent journal sessions for this campus. Reuses the same matcher that builds
   // the in-article link on /blog/[slug], so the campus↔post links stay symmetric.
-  const campusPath = `/grads/${data.slug}`;
-  const relatedPosts = (await getBlogPostSummaries("professional"))
-    .filter((post) => detectSchoolLink(`${post.title} ${post.slug}`)?.href === campusPath)
-    .slice(0, 3)
-    .map((post) => ({ slug: post.slug, title: post.title }));
+  const relatedPosts = await getSchoolRelatedPosts(data.slug);
 
   return (
     <main className="school-page">
