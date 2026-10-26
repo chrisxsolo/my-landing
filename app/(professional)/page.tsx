@@ -31,7 +31,8 @@ const PAGE_TITLE = "San Francisco Graduation & Couples Photographer";
 const SOCIAL_TITLE = `${PAGE_TITLE} | SoloXSnaps`;
 const description =
   "Graduation and couples photographer in San Francisco and the Bay Area, plus family and maternity sessions. Guided posing and transparent pricing.";
-const CHRIS_PORTRAIT = "/images/about/chris-solorzano-photographer.webp";
+// 1200x630 crop for link previews (iMessage, Instagram, Facebook, X).
+const SOCIAL_IMAGE = "/images/about/chris-solorzano-sunset-beach-og.jpg";
 const HOME_ABOUT_PORTRAIT = "/images/about/chris-solorzano-sunset-beach.webp";
 
 export const metadata: Metadata = {
@@ -52,13 +53,13 @@ export const metadata: Metadata = {
     description,
     type: "website",
     siteName: "SoloXSnaps",
-    images: [{ url: CHRIS_PORTRAIT, alt: "San Francisco photographer Chris Solorzano" }],
+    images: [{ url: SOCIAL_IMAGE, width: 1200, height: 630, alt: "San Francisco photographer Chris Solorzano" }],
   },
   twitter: {
     card: "summary_large_image",
     title: SOCIAL_TITLE,
     description,
-    images: [CHRIS_PORTRAIT],
+    images: [SOCIAL_IMAGE],
   },
 };
 
