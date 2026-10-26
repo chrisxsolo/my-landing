@@ -7,7 +7,7 @@
 // pin and order photos, or hide one from just that page. Writes go through
 // /api/admin/page-photos, which refreshes the public pages.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { PagePhotoReport, PageSummary, PageView, PageViewPhoto } from "@/lib/pagePhotos/adminView";
 import type { CurationAction } from "@/lib/pagePhotos/curationStore";
 import PagePhotoCard from "./PagePhotoCard";
@@ -36,7 +36,8 @@ async function request<T>(method: string, query = "", body?: unknown): Promise<T
 
 function PageList({ pages, selected, onSelect }: { pages: PageSummary[]; selected: string | null; onSelect: (key: string) => void }) {
   return (
-    <ul className="space-y-1">
+    // Scrolls on its own below the two-column breakpoint so the photos stay close.
+    <ul className="max-h-72 space-y-1 overflow-y-auto lg:max-h-none lg:overflow-visible">
       {pages.map((page) => (
         <li key={page.key}>
           <button
@@ -75,6 +76,13 @@ function PhotoGrid({ title, note, photos, busyUrl, onAction }: {
 }
 
 export default function PagePhotosTab({ showToast }: Props) {
+  // The admin page passes a new showToast on every render. Reading it through
+  // a ref keeps the loaders stable, so a toast doesn't re-fetch and blank the
+  // photo panel (which also threw the scroll position back up the page).
+  const toastRef = useRef(showToast);
+  useEffect(() => { toastRef.current = showToast; }, [showToast]);
+  const notify = useCallback((message: string, ok?: boolean) => toastRef.current(message, ok), []);
+
   const [report, setReport] = useState<PagePhotoReport | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [view, setView] = useState<PageView | null>(null);
@@ -84,12 +92,12 @@ export default function PagePhotosTab({ showToast }: Props) {
     try {
       const next = await request<PagePhotoReport>("GET");
       setReport(next);
-      if (next.errors.length) showToast(`Some photo sources could not be read: ${next.errors.join("; ")}`, false);
+      if (next.errors.length) notify(`Some photo sources could not be read: ${next.errors.join("; ")}`, false);
       setSelected((current) => current ?? next.pages[0]?.key ?? null);
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "Failed to load page photos", false);
+      notify(err instanceof Error ? err.message : "Failed to load page photos", false);
     }
-  }, [showToast]);
+  }, [notify]);
 
   useEffect(() => { loadReport(); }, [loadReport]);
 
@@ -98,18 +106,18 @@ export default function PagePhotosTab({ showToast }: Props) {
     setView(null);
     request<PageView>("GET", `?page=${encodeURIComponent(selected)}`)
       .then(setView)
-      .catch((err) => showToast(err instanceof Error ? err.message : "Failed to load page", false));
-  }, [selected, showToast]);
+      .catch((err) => notify(err instanceof Error ? err.message : "Failed to load page", false));
+  }, [selected, notify]);
 
   async function act(photo: PageViewPhoto, action: CurationAction) {
     if (!selected) return;
     setBusyUrl(photo.url);
     try {
       setView(await request<PageView>("POST", "", { page: selected, imageUrl: photo.url, action }));
-      showToast(ACTION_MESSAGES[action]);
+      notify(ACTION_MESSAGES[action]);
       loadReport();
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "Save failed", false);
+      notify(err instanceof Error ? err.message : "Save failed", false);
     } finally {
       setBusyUrl(null);
     }
@@ -118,10 +126,10 @@ export default function PagePhotosTab({ showToast }: Props) {
   async function setSchool(portfolioId: number, school: string) {
     try {
       await request("PATCH", "", { portfolioId, school });
-      showToast("School saved — the photo now appears on that school page.");
+      notify("School saved — the photo now appears on that school page.");
       await loadReport();
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "Save failed", false);
+      notify(err instanceof Error ? err.message : "Save failed", false);
     }
   }
 
