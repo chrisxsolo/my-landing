@@ -212,7 +212,8 @@ async function schoolTarget(ctx: TargetContext): Promise<TargetResult> {
 
 // Grad guide = the campus-spots guide: each location_spots row is a single
 // image slot keyed by numeric id, scoped to the session's school. Publishing
-// replaces the spot's current photo, so placements are conservative.
+// replaces the spot's current photo, so only spots with no photo are offered:
+// a photo already on the page is never replaced by a new session.
 async function gradSpotTarget(ctx: TargetContext): Promise<TargetResult> {
   const schoolSlug = ctx.facts.school_slug;
   if (!schoolSlug) {
@@ -228,16 +229,25 @@ async function gradSpotTarget(ctx: TargetContext): Promise<TargetResult> {
       note: `the campus spots guide does not cover ${schoolName(ctx.facts)}`,
     };
   }
-  const { data: spotRows, error } = await ctx.client
+  const { data: allSpotRows, error } = await ctx.client
     .from("location_spots")
-    .select("id,name,description,tip")
+    .select("id,name,description,tip,image_url")
     .eq("school_id", spotSchoolId)
     .order("order", { ascending: true });
   if (error) throw new GenerationError(`could not load campus spots: ${error.message}`);
-  if (!spotRows || spotRows.length === 0) {
+  if (!allSpotRows || allSpotRows.length === 0) {
     return {
       outcome: "skipped", itemSpecs: [], usage: null,
       note: `no campus spots exist for ${schoolSlug} yet`,
+    };
+  }
+  const spotRows = allSpotRows
+    .filter((row) => !row.image_url)
+    .map(({ id, name, description, tip }) => ({ id, name, description, tip }));
+  if (spotRows.length === 0) {
+    return {
+      outcome: "skipped", itemSpecs: [], usage: null,
+      note: `every ${schoolSlug} campus spot already has a photo`,
     };
   }
   const photos = await loadPhotoSummaries(ctx.client, ctx.sessionId);
