@@ -131,6 +131,9 @@ export function suggestSpotFromText(slug: string, text: string): SchoolSpotDef |
 // ── "Where to find it" notes (school_spot_notes) ────────────────────────────
 
 export const SCHOOL_SPOT_NOTES_TABLE = "school_spot_notes";
+
+/** Light tags + crowd notes per spot (vocabulary in lib/photoConditions.ts). */
+export const SCHOOL_SPOT_CONDITIONS_TABLE = "school_spot_conditions";
 export const SPOT_NOTE_MAX = 240;
 
 /**

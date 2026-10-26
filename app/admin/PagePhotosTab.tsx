@@ -14,6 +14,7 @@ import { parsePageKey } from "@/lib/pagePhotos/pageKeys";
 import PagePhotoCard from "./PagePhotoCard";
 import PagePhotosSchoolPanel from "./PagePhotosSchoolPanel";
 import SpotNotesPanel from "./SpotNotesPanel";
+import SpotConditionsPanel from "./SpotConditionsPanel";
 
 type Props = { showToast: (message: string, ok?: boolean) => void };
 
@@ -185,6 +186,9 @@ export default function PagePhotosTab({ showToast }: Props) {
               )}
               {view.spots.length > 0 && (
                 <SpotNotesPanel school={parsePageKey(view.key)?.slug ?? ""} spots={view.spots} showToast={notify} />
+              )}
+              {view.spots.length > 0 && (
+                <SpotConditionsPanel school={parsePageKey(view.key)?.slug ?? ""} spots={view.spots} showToast={notify} />
               )}
               <PhotoGrid title="On the page" spots={view.spots} onSpot={setSpot} note="In display order. The first photo is the hero." photos={view.shown} busyUrl={busyUrl} onAction={act} />
               <PhotoGrid title="Eligible but not shown" spots={view.spots} onSpot={setSpot} note="Over the page's limit. Pin one to show it." photos={view.overflow} busyUrl={busyUrl} onAction={act} />

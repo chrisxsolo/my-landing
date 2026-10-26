@@ -3,6 +3,8 @@
 // celebration photos, campus rules). Server components, no client JS.
 import Link from "next/link";
 import type { PagePhoto } from "@/lib/pagePhotos/publicPages";
+import type { SpotCondition } from "@/lib/pagePhotos/spotConditionStore";
+import { lightTagLabel } from "@/lib/photoConditions";
 import type { SchoolSpot, SchoolSpotPriority } from "./SchoolLandingTemplate";
 import type { SchoolSpotsGuideSection } from "./schoolSpotsGuideTypes";
 import SchoolSpotPhotos from "./SchoolSpotPhotos";
@@ -16,25 +18,34 @@ const PRIORITY_LABELS: Record<SchoolSpotPriority, string> = {
 
 export const spotId = (spot: SchoolSpot) => spot.key ?? spot.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
 
-type SpotProps = { spot: SchoolSpot; index: number; photos: PagePhoto[]; locationNote?: string };
+type SpotProps = {
+  spot: SchoolSpot; index: number; photos: PagePhoto[]; locationNote?: string; conditions?: SpotCondition;
+};
 
-export function SpotArticle({ spot, index, photos, locationNote }: SpotProps) {
+export function SpotArticle({ spot, index, photos, locationNote, conditions }: SpotProps) {
   const mustHave = spot.priority === "must-have";
+  const lightTags = conditions?.lightTags ?? [];
   return (
     <article id={spotId(spot)} className="sp-spot">
       <div className="sp-num">{String(index + 1).padStart(2, "0")}</div>
       <div>
         <h3 className="sp-spot-name">{spot.name}</h3>
-        {(spot.priority || spot.role) && (
+        {(spot.priority || spot.role || lightTags.length > 0) && (
           <div className="spg-chips">
             {spot.priority && (
               <span className={`sp-chip${mustHave ? " spg-chip--must" : ""}`}>{PRIORITY_LABELS[spot.priority]}</span>
             )}
             {spot.role && <span className="sp-chip">{spot.role}</span>}
+            {lightTags.map((tag) => (
+              <span key={tag} className="sp-chip spg-chip--light" title={lightTagLabel(tag)}>{lightTagLabel(tag, true)}</span>
+            ))}
           </div>
         )}
         {locationNote && (
           <p className="spg-where"><span className="spg-where-label">Where to find it:</span> {locationNote}</p>
+        )}
+        {conditions?.crowdNote && (
+          <p className="spg-where"><span className="spg-where-label">Gets busy:</span> {conditions.crowdNote}</p>
         )}
         {(spot.details ?? [spot.description]).map((paragraph) => (
           <p key={paragraph} className="spg-copy">{paragraph}</p>

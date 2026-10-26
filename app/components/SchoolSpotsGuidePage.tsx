@@ -10,6 +10,7 @@ import { buildBookingIntentParams } from "@/lib/bookingIntent";
 import { C } from "@/lib/colors";
 import { getSchoolSpotsGuidePhotos, type PagePhoto } from "@/lib/pagePhotos/publicPages";
 import { getPublicSpotNotes } from "@/lib/pagePhotos/spotNoteStore";
+import { getPublicSpotConditions } from "@/lib/pagePhotos/spotConditionStore";
 import MasonryGallery from "@/app/components/photoGallery/MasonryGallery";
 import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 import { getSchoolRelatedPosts, type SchoolLandingData, type SchoolSpot } from "./SchoolLandingTemplate";
@@ -208,10 +209,11 @@ export default async function SchoolSpotsGuidePage({ data, guide }: Props) {
   const contactHref = `/contact?${buildBookingIntentParams({
     sourcePage: "school-spots-page", sessionType: "Graduation Portrait", school: data.school,
   })}`;
-  const [photos, relatedPosts, spotNotes] = await Promise.all([
+  const [photos, relatedPosts, spotNotes, spotConditions] = await Promise.all([
     getSchoolSpotsGuidePhotos(data.slug, data.schoolShort),
     getSchoolRelatedPosts(data.slug, 4),
     getPublicSpotNotes(data.slug),
+    getPublicSpotConditions(data.slug),
   ]);
   const photosFor = (spot: SchoolSpot) => (spot.key ? photos.bySpot[spot.key] ?? [] : []);
   const mustHaves = guide.mustHaveKeys
@@ -255,6 +257,7 @@ export default async function SchoolSpotsGuidePage({ data, guide }: Props) {
             <SpotArticle
               key={spot.name} spot={spot} index={i} photos={photosFor(spot)}
               locationNote={spot.key ? spotNotes[spot.key] : undefined}
+              conditions={spot.key ? spotConditions[spot.key] : undefined}
             />
           ))}
         </div>
