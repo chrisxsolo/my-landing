@@ -9,6 +9,7 @@ import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
 import { buildBookingIntentParams } from "@/lib/bookingIntent";
 import { C } from "@/lib/colors";
 import { getSchoolSpotsGuidePhotos, type PagePhoto } from "@/lib/pagePhotos/publicPages";
+import { getPublicSpotNotes } from "@/lib/pagePhotos/spotNoteStore";
 import MasonryGallery from "@/app/components/photoGallery/MasonryGallery";
 import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 import { getSchoolRelatedPosts, type SchoolLandingData, type SchoolSpot } from "./SchoolLandingTemplate";
@@ -207,9 +208,10 @@ export default async function SchoolSpotsGuidePage({ data, guide }: Props) {
   const contactHref = `/contact?${buildBookingIntentParams({
     sourcePage: "school-spots-page", sessionType: "Graduation Portrait", school: data.school,
   })}`;
-  const [photos, relatedPosts] = await Promise.all([
+  const [photos, relatedPosts, spotNotes] = await Promise.all([
     getSchoolSpotsGuidePhotos(data.slug, data.schoolShort),
     getSchoolRelatedPosts(data.slug, 4),
+    getPublicSpotNotes(data.slug),
   ]);
   const photosFor = (spot: SchoolSpot) => (spot.key ? photos.bySpot[spot.key] ?? [] : []);
   const mustHaves = guide.mustHaveKeys
@@ -249,7 +251,12 @@ export default async function SchoolSpotsGuidePage({ data, guide }: Props) {
       <section className="sp-list" aria-labelledby="spg-spots-title">
         <div className="sp-shell">
           <h2 id="spg-spots-title" className="spg-h2">{guide.spotsHeading}</h2>
-          {data.spots.map((spot, i) => <SpotArticle key={spot.name} spot={spot} index={i} photos={photosFor(spot)} />)}
+          {data.spots.map((spot, i) => (
+            <SpotArticle
+              key={spot.name} spot={spot} index={i} photos={photosFor(spot)}
+              locationNote={spot.key ? spotNotes[spot.key] : undefined}
+            />
+          ))}
         </div>
       </section>
 

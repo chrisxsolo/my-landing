@@ -122,3 +122,21 @@ export function suggestSpotFromText(slug: string, text: string): SchoolSpotDef |
   const keys = new Set(specific.map((h) => h.spot.key));
   return keys.size === 1 ? specific[0].spot : null;
 }
+
+// ── "Where to find it" notes (school_spot_notes) ────────────────────────────
+
+export const SCHOOL_SPOT_NOTES_TABLE = "school_spot_notes";
+export const SPOT_NOTE_MAX = 240;
+
+/**
+ * A photographer's location note as stored: one plain-text line, whitespace
+ * collapsed, control characters removed. "" / null clears it; undefined means
+ * the value is not acceptable (not a string, or too long).
+ */
+export function normalizeSpotNote(value: unknown): string | null | undefined {
+  if (value === null) return null;
+  if (typeof value !== "string") return undefined;
+  const clean = value.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim();
+  if (clean === "") return null;
+  return clean.length <= SPOT_NOTE_MAX ? clean : undefined;
+}

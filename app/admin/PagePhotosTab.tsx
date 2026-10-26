@@ -10,8 +10,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PagePhotoReport, PageSummary, PageView, PageViewPhoto, SpotOption } from "@/lib/pagePhotos/adminView";
 import type { CurationAction } from "@/lib/pagePhotos/curationStore";
+import { parsePageKey } from "@/lib/pagePhotos/pageKeys";
 import PagePhotoCard from "./PagePhotoCard";
 import PagePhotosSchoolPanel from "./PagePhotosSchoolPanel";
+import SpotNotesPanel from "./SpotNotesPanel";
 
 type Props = { showToast: (message: string, ok?: boolean) => void };
 
@@ -180,6 +182,9 @@ export default function PagePhotosTab({ showToast }: Props) {
                   Set a photo&apos;s guide spot to show it in that spot&apos;s section; the featured photo leads it. Untagged photos
                   stay in the guide&apos;s gallery. The hero, pins and hides here apply to both pages.
                 </p>
+              )}
+              {view.spots.length > 0 && (
+                <SpotNotesPanel school={parsePageKey(view.key)?.slug ?? ""} spots={view.spots} showToast={notify} />
               )}
               <PhotoGrid title="On the page" spots={view.spots} onSpot={setSpot} note="In display order. The first photo is the hero." photos={view.shown} busyUrl={busyUrl} onAction={act} />
               <PhotoGrid title="Eligible but not shown" spots={view.spots} onSpot={setSpot} note="Over the page's limit. Pin one to show it." photos={view.overflow} busyUrl={busyUrl} onAction={act} />

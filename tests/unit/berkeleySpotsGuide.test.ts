@@ -4,7 +4,9 @@ import { buildSpotsMetadata } from "@/app/components/SchoolSpotsTemplate";
 import { builtInSchool, schoolMatchesText } from "@/lib/contentEngine/schools";
 import { buildSpotPhotoLayout } from "@/lib/pagePhotos/spotPhotos";
 import { inferSchoolFromText } from "@/lib/pagePhotos/resolve";
-import { isSchoolSpotKey, spotsForSchool, suggestSpotFromText } from "@/lib/schoolSpots";
+import {
+  isSchoolSpotKey, normalizeSpotNote, spotsForSchool, SPOT_NOTE_MAX, suggestSpotFromText,
+} from "@/lib/schoolSpots";
 import type { PageCandidate } from "@/lib/pagePhotos/curate";
 
 const guide = berkeley.spotsGuide!;
@@ -139,5 +141,21 @@ describe("UC Berkeley spot photos", () => {
   it("never uses the Inside Doe Library campus-spot row as a fallback", () => {
     const names = spotsForSchool("uc-berkeley").flatMap((s) => s.campusSpotNames);
     expect(names).not.toContain("Inside Doe Library");
+  });
+});
+
+describe("normalizeSpotNote", () => {
+  it("stores one clean plain-text line and clears on empty", () => {
+    expect(normalizeSpotNote("  Near the  west\nentrance ")).toBe("Near the west entrance");
+    expect(normalizeSpotNote("")).toBeNull();
+    expect(normalizeSpotNote("   ")).toBeNull();
+    expect(normalizeSpotNote(null)).toBeNull();
+  });
+
+  it("rejects non-text and over-long notes", () => {
+    expect(normalizeSpotNote(42)).toBeUndefined();
+    expect(normalizeSpotNote(undefined)).toBeUndefined();
+    expect(normalizeSpotNote("x".repeat(SPOT_NOTE_MAX + 1))).toBeUndefined();
+    expect(normalizeSpotNote("x".repeat(SPOT_NOTE_MAX))).toHaveLength(SPOT_NOTE_MAX);
   });
 });

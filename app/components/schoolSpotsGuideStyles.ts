@@ -83,6 +83,7 @@ export const SPOTS_GUIDE_CSS = `
   }
   .spg-route a { color: ${C.proAccent}; font-weight: 760; }
 
+  .spg-where { margin: 0 0 14px; color: ${C.inkSoft}; font-size: 15.5px; line-height: 1.6; }
   .spg-where-label { color: ${C.ink}; font-weight: 820; }
   .spg-tip-callout {
     margin: 16px 0 0; padding: 14px 16px; border-radius: 12px; border-left: 3px solid ${C.proAccent};

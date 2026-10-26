@@ -15,9 +15,9 @@ const PRIORITY_LABELS: Record<SchoolSpotPriority, string> = {
 
 export const spotId = (spot: SchoolSpot) => spot.key ?? spot.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
 
-type SpotProps = { spot: SchoolSpot; index: number; photos: PagePhoto[] };
+type SpotProps = { spot: SchoolSpot; index: number; photos: PagePhoto[]; locationNote?: string };
 
-export function SpotArticle({ spot, index, photos }: SpotProps) {
+export function SpotArticle({ spot, index, photos, locationNote }: SpotProps) {
   const mustHave = spot.priority === "must-have";
   return (
     <article id={spotId(spot)} className="sp-spot">
@@ -31,6 +31,9 @@ export function SpotArticle({ spot, index, photos }: SpotProps) {
             )}
             {spot.role && <span className="sp-chip">{spot.role}</span>}
           </div>
+        )}
+        {locationNote && (
+          <p className="spg-where"><span className="spg-where-label">Where to find it:</span> {locationNote}</p>
         )}
         {(spot.details ?? [spot.description]).map((paragraph) => (
           <p key={paragraph} className="spg-copy">{paragraph}</p>
