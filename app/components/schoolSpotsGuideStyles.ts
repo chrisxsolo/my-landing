@@ -46,7 +46,6 @@ export const SPOTS_GUIDE_CSS = `
   .sp-spot { scroll-margin-top: 90px; }
   .spg-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; }
   .spg-chip--must { background: ${C.proAccent}; color: ${C.white}; }
-  .spg-official { margin: -4px 0 12px; color: ${C.mutedSoft}; font-size: 13.5px; font-weight: 700; }
 
   .spg-photos { display: grid; gap: 10px; margin: 18px 0 16px; }
   .spg-photos--1 { grid-template-columns: minmax(0, 1fr); max-width: 520px; }

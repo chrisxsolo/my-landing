@@ -26,7 +26,6 @@ export interface SchoolSpot {
   bestTime?: string;             // short best-time phrase, surfaced on the /spots page
   key?: string;                  // lib/schoolSpots key — enables tagged photos on the guide
   priority?: "must-have" | "recommended";
-  officialName?: string;         // official campus name, e.g. "Diaz Compean Student Union"
   details?: string[];            // long-form paragraphs for the location guide
   photoIdeas?: string[];         // suggested shots at this spot
 }

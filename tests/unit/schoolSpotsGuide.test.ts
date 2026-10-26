@@ -21,9 +21,10 @@ describe("SJSU location guide content", () => {
       .toEqual(["sjsu-sign", "tower-hall-lawn", "student-union"]);
   });
 
-  it("uses the official names for the Student Union and the paseo", () => {
-    expect(sjsu.spots.find((s) => s.key === "student-union")?.officialName).toBe("Diaz Compean Student Union");
-    expect(sjsu.spots.find((s) => s.key === "seventh-street-palms")?.officialName).toBe("Seventh Street Paseo");
+  it("calls the spots just 7th Street and the Student Union (no official-name variants)", () => {
+    expect(allGuideText).not.toMatch(/Diaz Compean|Paseo/i);
+    expect(sjsu.spots.map((s) => s.name)).toContain("Student Union on 7th Street");
+    expect(sjsu.spots.map((s) => s.name)).toContain("7th Street Palm Trees");
   });
 
   it("routes through every spot exactly once and only through real spots", () => {

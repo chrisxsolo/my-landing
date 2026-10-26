@@ -55,7 +55,6 @@ export const data: SchoolLandingData = {
     {
       key: "student-union",
       name: "Student Union on 7th Street",
-      officialName: "Diaz Compean Student Union",
       priority: "must-have",
       description:
         "One of my essential stops. The front of the Student Union along 7th Street gives a completely different look from Tower Hall in the same session.",
@@ -72,7 +71,6 @@ export const data: SchoolLandingData = {
     {
       key: "seventh-street-palms",
       name: "7th Street Palm Trees",
-      officialName: "Seventh Street Paseo",
       priority: "recommended",
       description:
         "The palm-lined stretch of 7th Street brings a California campus feel, natural framing, and depth, which makes it great for walking shots.",

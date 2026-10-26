@@ -36,7 +36,6 @@ function SpotArticle({ spot, index, photos }: { spot: SchoolSpot; index: number;
       <div className="sp-num">{String(index + 1).padStart(2, "0")}</div>
       <div>
         <h3 className="sp-spot-name">{spot.name}</h3>
-        {spot.officialName && <p className="spg-official">Official name: {spot.officialName}</p>}
         {spot.priority && (
           <div className="spg-chips">
             <span className={`sp-chip${mustHave ? " spg-chip--must" : ""}`}>{mustHave ? "Must-have" : "Recommended"}</span>

@@ -35,12 +35,12 @@ export const SCHOOL_SPOTS: Partial<Record<SchoolSlug, readonly SchoolSpotDef[]>>
     {
       key: "student-union", name: "Student Union on 7th Street",
       campusSpotNames: ["Student Union Center"],
-      hintTerms: ["student union", "diaz compean"],
+      hintTerms: ["student union"],
     },
     {
       key: "seventh-street-palms", name: "7th Street Palm Trees",
       campusSpotNames: ["7th Street Palm Trees"],
-      hintTerms: ["palm", "seventh street paseo", "7th street"],
+      hintTerms: ["palm", "7th street", "seventh street"],
     },
     {
       key: "tower-hall-steps", name: "Steps near Tower Hall Lawn",
