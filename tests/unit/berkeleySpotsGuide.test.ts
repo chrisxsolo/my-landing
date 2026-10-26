@@ -61,10 +61,11 @@ describe("UC Berkeley location guide content", () => {
     expect(isSchoolSpotKey("uc-berkeley", inside.spotKey)).toBe(true);
   });
 
-  it("says champagne is allowed unless we're told otherwise on the day, for 21+", () => {
+  it("says champagne is allowed unless we're told otherwise on the day, bring your own or on request", () => {
     const champagne = guide.sections!.find((s) => s.id === "champagne")!.paragraphs.join(" ");
     expect(champagne).toMatch(/allowed in your session unless we're told otherwise on the day/);
-    expect(champagne).toMatch(/21 and over/);
+    expect(champagne).toMatch(/Bring your own bottle, or I can bring one for you on request/);
+    expect(allGuideText).not.toMatch(/21 and over|any mess/);
     const faq = guide.faqs.find((f) => /champagne/i.test(f.q))!;
     expect(faq.a).toMatch(/unless we're told otherwise on the day/);
   });
