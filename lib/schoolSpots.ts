@@ -14,6 +14,8 @@ export interface SchoolSpotDef {
   key: string;
   /** Short label for admin and image alt text. */
   name: string;
+  /** How alt text names the place ("at Sather Gate"); default "at the <name>". */
+  altPlace?: string;
   /** location_spots rows (/grad-guide/campus-spots) that show this same spot. */
   campusSpotNames: readonly string[];
   /** Words in a photo's own text that suggest this spot (hint only). */
@@ -46,6 +48,47 @@ export const SCHOOL_SPOTS: Partial<Record<SchoolSlug, readonly SchoolSpotDef[]>>
       key: "tower-hall-steps", name: "Steps near Tower Hall Lawn",
       campusSpotNames: ["Tower Lawn Steps"],
       hintTerms: ["tower hall steps", "tower lawn steps"],
+    },
+  ],
+  // UC Berkeley: Chris's seven guide spots. The two Doe Library compositions
+  // stay separate keys; bare "Doe Library" names both, so it gives no hint.
+  // Never map the "Inside Doe Library" campus-spots row: the Library doesn't
+  // allow staged graduation photos inside its buildings.
+  "uc-berkeley": [
+    {
+      key: "sather-gate", name: "Sather Gate", altPlace: "at Sather Gate",
+      campusSpotNames: ["Sather Gate"],
+      hintTerms: ["sather gate"],
+    },
+    {
+      key: "doe-library-entrance", name: "Doe Library Front Entrance", altPlace: "at the front of Doe Library",
+      campusSpotNames: ["Front of Doe Library"],
+      hintTerms: ["doe library", "doe memorial library", "front of doe library", "doe library entrance", "doe library steps", "doe library columns"],
+    },
+    {
+      key: "doe-library-ledge", name: "Doe Library Ledge", altPlace: "on the Doe Library ledge",
+      campusSpotNames: ["Doe Library Ledge"],
+      hintTerms: ["doe library", "doe memorial library", "doe library ledge", "doe ledge"],
+    },
+    {
+      key: "campanile", name: "Campanile (Sather Tower)", altPlace: "with the Campanile",
+      campusSpotNames: ["The Campanile"],
+      hintTerms: ["campanile", "sather tower"],
+    },
+    {
+      key: "hearst-mining", name: "Hearst Memorial Mining Building", altPlace: "at the Hearst Memorial Mining Building",
+      campusSpotNames: [],
+      hintTerms: ["hearst mining", "hearst memorial mining"],
+    },
+    {
+      key: "mining-circle", name: "Mining Circle and Rondo II", altPlace: "at Mining Circle",
+      campusSpotNames: [],
+      hintTerms: ["mining circle", "hearst mining circle", "rondo ii", "rondo 2"],
+    },
+    {
+      key: "cherry-blossoms", name: "Cherry Blossoms (seasonal)", altPlace: "under the cherry blossoms",
+      campusSpotNames: ["Cherry Blossoms"],
+      hintTerms: ["cherry blossom", "cherry blossoms", "cherry tree", "cherry trees"],
     },
   ],
 };

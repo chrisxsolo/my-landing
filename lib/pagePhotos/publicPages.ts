@@ -78,7 +78,7 @@ async function campusSpotFallbacks(slug: string, schoolShort: string): Promise<R
     const names = new Set(spot.campusSpotNames.map(campusSpotNameKey));
     const row = rows.find((r) => names.has(campusSpotNameKey(r.name)));
     return row?.image_url
-      ? [[spot.key, { url: row.image_url, alt: `${schoolShort} graduation portrait at the ${spot.name}` }]]
+      ? [[spot.key, { url: row.image_url, alt: `${schoolShort} graduation portrait ${spot.altPlace ?? `at the ${spot.name}`}` }]]
       : [];
   }));
 }

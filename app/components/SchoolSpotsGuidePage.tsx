@@ -14,7 +14,7 @@ import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 import { getSchoolRelatedPosts, type SchoolLandingData, type SchoolSpot } from "./SchoolLandingTemplate";
 import type { SchoolSpotsGuide } from "./schoolSpotsGuideTypes";
 import SchoolSessionGuide from "./SchoolSessionGuide";
-import SchoolSpotPhotos from "./SchoolSpotPhotos";
+import { GuideSection, SpotArticle, spotId } from "./SchoolSpotsGuideParts";
 import SchoolSunsetTimes from "./SchoolSunsetTimes";
 import { SPOTS_BASE_CSS } from "./schoolSpotsBaseStyles";
 import { SPOTS_GUIDE_CSS } from "./schoolSpotsGuideStyles";
@@ -23,47 +23,18 @@ const GALLERY_VARS = { "--mg-placeholder": C.proAccentSoft, "--mg-focus": C.proA
 
 type Props = { data: SchoolLandingData; guide: SchoolSpotsGuide };
 
-const spotId = (spot: SchoolSpot) => spot.key ?? spot.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-
 function jsonLd(value: unknown) {
   return { __html: JSON.stringify(value).replace(/</g, "\\u003c") };
 }
 
-function SpotArticle({ spot, index, photos }: { spot: SchoolSpot; index: number; photos: PagePhoto[] }) {
-  const mustHave = spot.priority === "must-have";
-  return (
-    <article id={spotId(spot)} className="sp-spot">
-      <div className="sp-num">{String(index + 1).padStart(2, "0")}</div>
-      <div>
-        <h3 className="sp-spot-name">{spot.name}</h3>
-        {spot.priority && (
-          <div className="spg-chips">
-            <span className={`sp-chip${mustHave ? " spg-chip--must" : ""}`}>{mustHave ? "Must-have" : "Recommended"}</span>
-          </div>
-        )}
-        {(spot.details ?? [spot.description]).map((paragraph) => (
-          <p key={paragraph} className="spg-copy">{paragraph}</p>
-        ))}
-        <SchoolSpotPhotos photos={photos} />
-        {spot.photoIdeas && spot.photoIdeas.length > 0 && (
-          <>
-            <p className="spg-ideas-label">Photo ideas here</p>
-            <ul className="spg-ideas">
-              {spot.photoIdeas.map((idea) => <li key={idea}>{idea}</li>)}
-            </ul>
-          </>
-        )}
-      </div>
-    </article>
-  );
-}
+type MustHavesProps = { spots: SchoolSpot[]; bySpot: Record<string, PagePhoto[]>; lead: string; heading: string };
 
-function MustHaves({ spots, bySpot, lead }: { spots: SchoolSpot[]; bySpot: Record<string, PagePhoto[]>; lead: string }) {
+function MustHaves({ spots, bySpot, lead, heading }: MustHavesProps) {
   if (spots.length === 0) return null;
   return (
     <section className="spg-musts" aria-labelledby="spg-musts-title">
       <div className="sp-shell">
-        <h2 id="spg-musts-title" className="sp-foot-title">The three must-haves</h2>
+        <h2 id="spg-musts-title" className="sp-foot-title">{heading}</h2>
         <p className="spg-lead">{lead}</p>
         <div className="spg-must-grid">
           {spots.map((spot) => {
@@ -135,7 +106,7 @@ function GuideHero({ data, guide, hero, contactHref }: Props & { hero: PagePhoto
   );
 }
 
-function JumpNav({ spots }: { spots: SchoolSpot[] }) {
+function JumpNav({ spots, guide }: { spots: SchoolSpot[]; guide: SchoolSpotsGuide }) {
   return (
     <nav className="spg-jump" aria-label="On this page">
       <div className="sp-shell">
@@ -144,7 +115,10 @@ function JumpNav({ spots }: { spots: SchoolSpot[] }) {
             <li key={spot.name}><a className="spg-jump-link" href={`#${spotId(spot)}`}>{spot.name}</a></li>
           ))}
           <li><a className="spg-jump-link" href="#best-time">Best time</a></li>
-          <li><a className="spg-jump-link" href="#route">1-hour route</a></li>
+          <li><a className="spg-jump-link" href="#route">{guide.route.navLabel ?? "1-hour route"}</a></li>
+          {(guide.sections ?? []).map((section) => (
+            <li key={section.id}><a className="spg-jump-link" href={`#${section.id}`}>{section.navLabel}</a></li>
+          ))}
           <li><a className="spg-jump-link" href="#tips">Tips</a></li>
         </ul>
       </div>
@@ -238,7 +212,9 @@ export default async function SchoolSpotsGuidePage({ data, guide }: Props) {
     getSchoolRelatedPosts(data.slug, 4),
   ]);
   const photosFor = (spot: SchoolSpot) => (spot.key ? photos.bySpot[spot.key] ?? [] : []);
-  const mustHaves = data.spots.filter((s) => s.priority === "must-have");
+  const mustHaves = guide.mustHaveKeys
+    ? guide.mustHaveKeys.flatMap((key) => data.spots.filter((s) => s.key === key))
+    : data.spots.filter((s) => s.priority === "must-have");
 
   const breadcrumbLd = buildBreadcrumbJsonLd([
     { name: "Home", path: "/" },
@@ -263,9 +239,12 @@ export default async function SchoolSpotsGuidePage({ data, guide }: Props) {
 
       <GuideHero data={data} guide={guide} hero={photos.hero} contactHref={contactHref} />
 
-      <JumpNav spots={data.spots} />
+      <JumpNav spots={data.spots} guide={guide} />
 
-      <MustHaves spots={mustHaves} bySpot={photos.bySpot} lead={guide.mustHaveIntro} />
+      <MustHaves
+        spots={mustHaves} bySpot={photos.bySpot} lead={guide.mustHaveIntro}
+        heading={guide.mustHaveHeading ?? "The three must-haves"}
+      />
 
       <section className="sp-list" aria-labelledby="spg-spots-title">
         <div className="sp-shell">
@@ -277,6 +256,8 @@ export default async function SchoolSpotsGuidePage({ data, guide }: Props) {
       <BestTime data={data} guide={guide} />
 
       <Route guide={guide} spots={data.spots} />
+
+      {(guide.sections ?? []).map((section) => <GuideSection key={section.id} section={section} />)}
 
       <Tips schoolShort={data.schoolShort} tips={guide.tips} />
 

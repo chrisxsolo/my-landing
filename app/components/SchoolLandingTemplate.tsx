@@ -20,14 +20,18 @@ import type { SchoolSpotsGuide } from "./schoolSpotsGuideTypes";
 
 // ── TYPES ─────────────────────────────────────────────────────────────────────
 
+export type SchoolSpotPriority = "must-have" | "highly-recommended" | "recommended" | "seasonal";
+
 export interface SchoolSpot {
   name: string;
   description: string;
   bestTime?: string;             // short best-time phrase, surfaced on the /spots page
   key?: string;                  // lib/schoolSpots key — enables tagged photos on the guide
-  priority?: "must-have" | "recommended";
+  priority?: SchoolSpotPriority;
+  role?: string;                 // where it sits in the session, e.g. "Where I start"
   details?: string[];            // long-form paragraphs for the location guide
   photoIdeas?: string[];         // suggested shots at this spot
+  tip?: string;                  // photographer's tip for this spot
 }
 
 export interface SchoolLandingData {

@@ -14,6 +14,19 @@ export interface SchoolSpotsGuideTip {
   body: string;
 }
 
+/** A titled block after the route: crowds, celebration photos, campus rules. */
+export interface SchoolSpotsGuideSection {
+  /** Anchor id, also the jump-nav target. */
+  id: string;
+  navLabel: string;
+  heading: string;
+  paragraphs: string[];
+  bulletsLabel?: string;
+  bullets?: string[];
+  /** Official sources, opened in a new tab. */
+  links?: { label: string; href: string }[];
+}
+
 export interface SchoolSpotsGuide {
   metaTitle: string;
   metaDescription: string;
@@ -22,6 +35,10 @@ export interface SchoolSpotsGuide {
   intro: string[];
   /** One sentence naming the must-have spots. */
   mustHaveIntro: string;
+  /** Defaults to "The three must-haves". */
+  mustHaveHeading?: string;
+  /** Spots for the must-have cards; defaults to every "must-have" spot. */
+  mustHaveKeys?: string[];
   spotsHeading: string;
   bestTime: {
     heading: string;
@@ -31,11 +48,14 @@ export interface SchoolSpotsGuide {
     sunsetCoords: { latitude: number; longitude: number };
   };
   route: {
+    /** Jump-nav label; defaults to "1-hour route". */
+    navLabel?: string;
     heading: string;
     intro: string[];
     steps: SchoolSpotsGuideStep[];
     notes: string[];
   };
+  sections?: SchoolSpotsGuideSection[];
   tips: SchoolSpotsGuideTip[];
   faqs: SchoolFaq[];
 }

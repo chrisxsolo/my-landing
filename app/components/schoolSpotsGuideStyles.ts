@@ -83,6 +83,17 @@ export const SPOTS_GUIDE_CSS = `
   }
   .spg-route a { color: ${C.proAccent}; font-weight: 760; }
 
+  .spg-where-label { color: ${C.ink}; font-weight: 820; }
+  .spg-tip-callout {
+    margin: 16px 0 0; padding: 14px 16px; border-radius: 12px; border-left: 3px solid ${C.proAccent};
+    background: ${C.proAccentSoft}; color: ${C.inkSoft}; font-size: 15px; line-height: 1.65; text-wrap: pretty;
+  }
+  .spg-list { margin: 0; padding: 0 0 0 20px; list-style: disc; }
+  .spg-list li::marker { color: ${C.proAccent}; }
+  .spg-list li { margin: 0 0 8px; color: ${C.muted}; font-size: 15.5px; line-height: 1.6; }
+  .spg-list li:last-child { margin-bottom: 0; }
+  .spg-source { color: ${C.proAccent}; font-weight: 720; }
+
   .spg-tips { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
   .spg-tip-title { margin: 0 0 6px; color: ${C.ink}; font-size: 16.5px; font-weight: 840; }
   .spg-tip .spg-copy { margin: 0; font-size: 15px; }

@@ -23,7 +23,7 @@ const schools: Array<{ name: string; href: string; blurb: string }> = [
     name: "UC Berkeley Graduation Photos",
     href: "/grads/uc-berkeley",
     blurb:
-      "Sather Gate, the Campanile, and Memorial Glade give Berkeley grads landmark backdrops at any time of day. Mornings are best at Sather Gate before foot traffic builds.",
+      "Sather Gate, the Campanile, and Doe Library give Berkeley grads iconic backdrops. I like to start at Sather Gate and finish at Doe Library around sunset.",
   },
   {
     name: "SJSU Graduation Photos",
