@@ -80,7 +80,7 @@ interface SessionEmbed {
   marketing_permission_revoked_at: string | null;
 }
 
-function toPortfolioSource(row: Record<string, unknown>): PortfolioSource | null {
+export function toPortfolioSource(row: Record<string, unknown>): PortfolioSource | null {
   const url = text(row.image_url);
   if (!url) return null;
   const category = normalizePortfolioCategorySlug(text(row.category_slug));
@@ -104,8 +104,17 @@ function toPortfolioSource(row: Record<string, unknown>): PortfolioSource | null
 
 function toEngineSource(row: Record<string, unknown>): EngineSource | null {
   const url = text(row.public_derivative_url);
+  return url ? engineSourceFrom(row, url) : null;
+}
+
+/**
+ * A session photo row (with its photography_sessions embed) as an engine
+ * source at the given URL. The tagging audit also reads private photos, which
+ * have no derivative yet, so the URL is passed in.
+ */
+export function engineSourceFrom(row: Record<string, unknown>, url: string): EngineSource | null {
   const session = one(row.photography_sessions as One<SessionEmbed>);
-  if (!url || !session) return null;
+  if (!session) return null;
   return {
     url,
     contentHash: text(row.content_hash),

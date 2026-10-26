@@ -253,11 +253,11 @@ const normalize = (text: string) =>
   text.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ");
 
 /**
- * The single spot a photo's own text names, for an admin hint. A term inside
- * a longer matched term doesn't count ("tower hall" in "tower hall steps");
- * two different spots named → no hint.
+ * Every spot a photo's own text names. A term inside a longer matched term
+ * doesn't count ("tower hall" in "tower hall steps"). Bare "Doe Library"
+ * names both Doe Library spots, so it returns both.
  */
-export function suggestSpotFromText(slug: string, text: string): SchoolSpotDef | null {
+export function spotCandidatesFromText(slug: string, text: string): SchoolSpotDef[] {
   const haystack = ` ${normalize(text)} `;
   const hits = spotsForSchool(slug).flatMap((spot) =>
     spot.hintTerms
@@ -265,8 +265,13 @@ export function suggestSpotFromText(slug: string, text: string): SchoolSpotDef |
       .filter((term) => haystack.includes(` ${term} `))
       .map((term) => ({ spot, term })));
   const specific = hits.filter((h) => !hits.some((o) => o.term !== h.term && o.term.includes(h.term)));
-  const keys = new Set(specific.map((h) => h.spot.key));
-  return keys.size === 1 ? specific[0].spot : null;
+  return specific.map((h) => h.spot).filter((spot, i, all) => all.findIndex((o) => o.key === spot.key) === i);
+}
+
+/** The single spot a photo's own text names, for an admin hint. Two different spots named → no hint. */
+export function suggestSpotFromText(slug: string, text: string): SchoolSpotDef | null {
+  const candidates = spotCandidatesFromText(slug, text);
+  return candidates.length === 1 ? candidates[0] : null;
 }
 
 // ── "Where to find it" notes (school_spot_notes) ────────────────────────────
