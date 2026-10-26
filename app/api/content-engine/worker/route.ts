@@ -21,6 +21,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/requireAdmin";
 import { drainInBackground, drainOnce } from "@/lib/contentEngine/workerDrain";
 import type { RunWorkerResult } from "@/lib/contentEngine/jobRunner";
+import { sweepLocationLibrary } from "@/lib/locationLibrary/autoSync";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -55,7 +56,9 @@ export async function GET(req: NextRequest) {
     console.error("content engine worker failed", err);
     return NextResponse.json({ error }, { status: 500 });
   }
-  return NextResponse.json(result);
+  // Backstop for the location library: heals any background sync that never ran.
+  const locationSweep = await sweepLocationLibrary();
+  return NextResponse.json({ ...result, locationSweep });
 }
 
 export async function POST(req: NextRequest) {

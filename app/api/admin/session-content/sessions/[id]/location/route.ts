@@ -7,6 +7,7 @@ import { buildLocationSummary } from "@/lib/contentEngine/locationSummary";
 import {
   LocationConfirmError, confirmNewPlace, linkToExistingPlace, parseNewPlaceInput,
 } from "@/lib/locations/confirmLocation";
+import { syncSessionInBackground } from "@/lib/locationLibrary/autoSync";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -58,6 +59,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     if (body.action === "confirm_new") {
       const place = await confirmNewPlace(client, parseNewPlaceInput(body), text);
       revalidatePublicContent(); // a confirmed place can match photos to a guide
+      syncSessionInBackground(s.id);
       return NextResponse.json({ place, summary: await buildLocationSummary(client, s.id) });
     }
     if (body.action === "link_existing") {
@@ -65,6 +67,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       const key = typeof body.key === "string" ? body.key : "";
       const place = await linkToExistingPlace(client, key, text);
       revalidatePublicContent(); // a confirmed place can match photos to a guide
+      syncSessionInBackground(s.id);
       return NextResponse.json({ place, summary: await buildLocationSummary(client, s.id) });
     }
     return NextResponse.json({ error: "action must be confirm_new or link_existing" }, { status: 400 });

@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/requireAdmin";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
 import { assembleSessionStates } from "@/lib/contentEngine/sessionState";
 import { updateSessionFacts } from "@/lib/contentEngine/createSession";
+import { syncSessionInBackground } from "@/lib/locationLibrary/autoSync";
 import { isUuid } from "@/lib/contentEngine/uploadConfig";
 
 export const runtime = "nodejs";
@@ -73,6 +74,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     });
     // School / location / service decide which public pages show the photos.
     revalidatePublicContent();
+    // The location fields decide which library places the session belongs to.
+    syncSessionInBackground(id.toLowerCase());
     return NextResponse.json(result);
   } catch (err) {
     const message = err instanceof Error ? err.message : "facts update failed";
