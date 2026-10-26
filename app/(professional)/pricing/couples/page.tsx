@@ -157,7 +157,7 @@ export default async function CouplesPricingPage() {
         </p>
       </section>
 
-      <section className={`${styles.pricingShell} ${styles.couplesGrid}`} aria-label="Couples session packages">
+      <section id="packages" style={{ scrollMarginTop: 96 }} className={`${styles.pricingShell} ${styles.couplesGrid}`} aria-label="Couples session packages">
         {packages.map((pkg) => {
           const { kicker, name, price, bestFor, items, durationLabel, minimumImages } = pkg;
           const badge = "badge" in pkg ? pkg.badge : undefined;
@@ -220,7 +220,7 @@ export default async function CouplesPricingPage() {
         </div>
       </section>
 
-      <section className={`${styles.pricingShell} ${styles.couplesAddonsSection}`}>
+      <section id="add-ons" style={{ scrollMarginTop: 96 }} className={`${styles.pricingShell} ${styles.couplesAddonsSection}`}>
         <p className={styles.pricingKicker}>Add-ons</p>
         <h2 className={styles.couplesAddonsHeading}>Customize your session</h2>
         <div className={styles.couplesAddonsGrid}>

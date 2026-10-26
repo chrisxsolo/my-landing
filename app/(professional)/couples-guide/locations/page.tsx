@@ -9,6 +9,8 @@ import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
 import { COUPLES_GUIDE_CSS } from "@/lib/couplesGuide/styles";
 import { locationDisplayName } from "@/lib/couplesGuide/types";
 import { getCouplesLocationListing } from "@/lib/locations/guideListings";
+import { getCouplesLocationCovers } from "@/lib/couplesGuide/featuredLocations";
+import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 
 const SITE_URL = "https://www.soloxsnaps.com";
 const PATH = "/couples-guide/locations";
@@ -39,6 +41,7 @@ export const revalidate = 3600;
 
 export default async function CouplesLocationsHubPage() {
   const locations = await getCouplesLocationListing();
+  const covers = await getCouplesLocationCovers(locations.map((loc) => loc.slug));
 
   const breadcrumbLd = buildBreadcrumbJsonLd([
     { name: "Home", path: "/" },
@@ -107,7 +110,11 @@ export default async function CouplesLocationsHubPage() {
             {locations.map((loc) => (
               <Link key={loc.slug} href={loc.canonicalPath} className="fg-loc" data-reveal data-delay="1">
                 <div className="fg-loc-media">
-                  <div className="fg-loc-ph"><span aria-hidden="true">💞</span><p>Photos coming soon</p></div>
+                  {covers[loc.slug] ? (
+                    <OptimizedPhoto src={covers[loc.slug].image_url} alt={covers[loc.slug].alt || loc.heroAlt} sizes="(max-width: 700px) 100vw, 460px" loading="lazy" quality={75} />
+                  ) : (
+                    <div className="fg-loc-ph"><span aria-hidden="true">💞</span><p>Photos coming soon</p></div>
+                  )}
                 </div>
                 <div className="fg-loc-body">
                   <span className="fg-loc-region">{loc.region}</span>

@@ -34,6 +34,10 @@ export const FAQS: FAQGroup[] = [
         a: "As early as you can, especially for weekend and golden-hour times, which book up first. A few weeks of lead time leaves room to choose a date and location, send the agreement, and plan around the season's sunset. Last-minute sessions are sometimes possible, so it's always worth asking.",
       },
       {
+        q: "How do we book?",
+        a: `Send a message through the contact form with your ideal date, a location idea, and the kind of session you have in mind. I'll reply with availability and next steps. Your date is reserved with a ${BOOKING_POLICY.retainerPercent}% ${BOOKING_POLICY.retainerRefundability} retainer and a signed agreement, and the remaining balance is due ${BOOKING_POLICY.remainingBalanceDeadline}.`,
+      },
+      {
         q: "Is a retainer required?",
         a: `Yes. A ${BOOKING_POLICY.retainerPercent}% ${BOOKING_POLICY.retainerRefundability} retainer reserves your date, the contract is completed ${BOOKING_POLICY.contractDeadline}, and the remaining balance is due ${BOOKING_POLICY.remainingBalanceDeadline}.`,
       },

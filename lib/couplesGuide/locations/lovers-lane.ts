@@ -20,7 +20,7 @@ const loversLane: CouplesLocationData = {
     "forest couples photos San Francisco",
     "romantic photo locations San Francisco",
   ],
-  published: false,
+  published: true,
 
   cardSummary:
     "A historic tree-lined path through the Presidio with greenery, dappled light, and a quiet, romantic feel — woods without leaving the city.",

@@ -21,7 +21,8 @@ function contactHref(name: string) {
 }
 
 const relatedLinks = [
-  { href: "/couples-guide", title: "Couples Photography Guide", desc: "Outfits, prep, light, and planning in one place." },
+  { href: "/couples-guide", title: "Bay Area Couples Photography Guide", desc: "Locations, outfits, light, posing, and pricing in one place." },
+  { href: "/portfolio/couples", title: "Couples Portfolio", desc: "Recent couples sessions across the Bay Area." },
   { href: "/couples-guide/locations", title: "All Couples Photo Locations", desc: "Compare San Francisco couples spots." },
   { href: "/couples-guide/what-to-wear", title: "What to Wear", desc: "Coordinate without matching." },
   { href: "/couples-guide/how-to-prepare", title: "How to Prepare", desc: "Show up relaxed and ready." },
