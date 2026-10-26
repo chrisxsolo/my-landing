@@ -94,6 +94,8 @@ export interface SchoolSpotsGuide {
     steps: SchoolSpotsGuideStep[];
     notes: string[];
   };
+  /** Rendered right after the route, before offCampus (e.g. what to bring). */
+  afterRoute?: SchoolSpotsGuideSection[];
   /** Rendered after the route, before the other sections. */
   offCampus?: SchoolSpotsGuideOffCampus;
   /** Rendered after offCampus. */

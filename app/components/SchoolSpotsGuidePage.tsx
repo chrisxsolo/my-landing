@@ -11,6 +11,7 @@ import { C } from "@/lib/colors";
 import { getSchoolSpotsGuidePhotos, type PagePhoto } from "@/lib/pagePhotos/publicPages";
 import { getPublicSpotNotes } from "@/lib/pagePhotos/spotNoteStore";
 import { getPublicSpotConditions } from "@/lib/pagePhotos/spotConditionStore";
+import { sectionSpotKeys } from "@/lib/schoolSpots";
 import MasonryGallery from "@/app/components/photoGallery/MasonryGallery";
 import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 import { getSchoolRelatedPosts, type SchoolLandingData, type SchoolSpot } from "./SchoolLandingTemplate";
@@ -30,9 +31,9 @@ function jsonLd(value: unknown) {
   return { __html: JSON.stringify(value).replace(/</g, "\\u003c") };
 }
 
-type MustHavesProps = { spots: SchoolSpot[]; bySpot: Record<string, PagePhoto[]>; lead: string; heading: string };
+type MustHavesProps = { spots: SchoolSpot[]; photosFor: (spot: SchoolSpot) => PagePhoto[]; lead: string; heading: string };
 
-function MustHaves({ spots, bySpot, lead, heading }: MustHavesProps) {
+function MustHaves({ spots, photosFor, lead, heading }: MustHavesProps) {
   if (spots.length === 0) return null;
   return (
     <section className="spg-musts" aria-labelledby="spg-musts-title">
@@ -41,7 +42,7 @@ function MustHaves({ spots, bySpot, lead, heading }: MustHavesProps) {
         <p className="spg-lead">{lead}</p>
         <div className="spg-must-grid">
           {spots.map((spot) => {
-            const photo = spot.key ? bySpot[spot.key]?.[0] : undefined;
+            const photo = photosFor(spot)[0];
             return (
               <a key={spot.name} href={`#${spotId(spot)}`} className={`spg-must${photo ? " spg-must--photo" : ""}`}>
                 {photo && (
@@ -119,6 +120,9 @@ function JumpNav({ spots, guide }: { spots: SchoolSpot[]; guide: SchoolSpotsGuid
           ))}
           <li><a className="spg-jump-link" href="#best-time">Best time</a></li>
           <li><a className="spg-jump-link" href="#route">{guide.route.navLabel ?? "1-hour route"}</a></li>
+          {(guide.afterRoute ?? []).map((section) => (
+            <li key={section.id}><a className="spg-jump-link" href={`#${section.id}`}>{section.navLabel}</a></li>
+          ))}
           {guide.offCampus && <li><a className="spg-jump-link" href={`#${OFF_CAMPUS_ID}`}>{guide.offCampus.navLabel}</a></li>}
           {guide.plans && <li><a className="spg-jump-link" href={`#${PLANS_ID}`}>{guide.plans.navLabel}</a></li>}
           {(guide.sections ?? []).map((section) => (
@@ -208,6 +212,7 @@ function GuideFooter({ data, relatedPosts }: { data: SchoolLandingData; relatedP
             <Link href={data.canonicalPath} className="sp-pill">{data.schoolShort} graduation photographer <span aria-hidden>→</span></Link>
             <Link href={`/portfolio?category=grads&school=${data.slug}`} className="sp-pill">Graduation portfolio <span aria-hidden>→</span></Link>
             <Link href="/pricing/grads" className="sp-pill">Grad pricing <span aria-hidden>→</span></Link>
+            <Link href="/grad-guide/campus-spots" className="sp-pill">Bay Area campus spots <span aria-hidden>→</span></Link>
             <Link href="/grad-guide/what-to-wear" className="sp-pill">What to wear <span aria-hidden>→</span></Link>
             <Link href="/grad-guide/posing" className="sp-pill">Posing in cap &amp; gown <span aria-hidden>→</span></Link>
           </div>
@@ -228,7 +233,11 @@ export default async function SchoolSpotsGuidePage({ data, guide }: Props) {
     getPublicSpotNotes(data.slug),
     getPublicSpotConditions(data.slug),
   ]);
-  const photosFor = (spot: SchoolSpot) => (spot.key ? photos.bySpot[spot.key] ?? [] : []);
+  // A section shows its own spot's photos, then its child compositions' photos.
+  const photosFor = (spot: SchoolSpot) => (spot.key
+    ? sectionSpotKeys(data.slug, spot.key).flatMap((key) => photos.bySpot[key] ?? []).slice(0, 3)
+    : []);
+  const sectionPhotos = (key?: string) => (key ? photos.bySpot[key] ?? [] : []);
   const mustHaves = guide.mustHaveKeys
     ? guide.mustHaveKeys.flatMap((key) => data.spots.filter((s) => s.key === key))
     : data.spots.filter((s) => s.priority === "must-have");
@@ -259,7 +268,7 @@ export default async function SchoolSpotsGuidePage({ data, guide }: Props) {
       <JumpNav spots={data.spots} guide={guide} />
 
       <MustHaves
-        spots={mustHaves} bySpot={photos.bySpot} lead={guide.mustHaveIntro}
+        spots={mustHaves} photosFor={photosFor} lead={guide.mustHaveIntro}
         heading={guide.mustHaveHeading ?? "The three must-haves"}
       />
 
@@ -280,15 +289,16 @@ export default async function SchoolSpotsGuidePage({ data, guide }: Props) {
 
       <Route guide={guide} spots={data.spots} />
 
-{guide.offCampus && <OffCampusSection section={guide.offCampus} photosFor={photosFor} notes={spotNotes} />}
+      {(guide.afterRoute ?? []).map((section) => (
+        <GuideSection key={section.id} section={section} photos={sectionPhotos(section.spotKey)} />
+      ))}
+
+      {guide.offCampus && <OffCampusSection section={guide.offCampus} photosFor={photosFor} notes={spotNotes} />}
 
       {guide.plans && <SessionPlansSection plans={guide.plans} contactHref={contactHref} />}
 
       {(guide.sections ?? []).map((section) => (
-        <GuideSection
-          key={section.id} section={section}
-          photos={section.spotKey ? photos.bySpot[section.spotKey] ?? [] : []}
-        />
+        <GuideSection key={section.id} section={section} photos={sectionPhotos(section.spotKey)} />
       ))}
 
       <Tips schoolShort={data.schoolShort} tips={guide.tips} />

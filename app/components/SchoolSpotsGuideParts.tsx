@@ -50,7 +50,10 @@ export function SpotArticle({ spot, index, photos, locationNote, conditions }: S
         {(spot.details ?? [spot.description]).map((paragraph) => (
           <p key={paragraph} className="spg-copy">{paragraph}</p>
         ))}
-        <SchoolSpotPhotos photos={photos} />
+        {spot.notice && (
+          <p className="spg-notice"><span className="spg-where-label">{spot.notice.label}:</span> {spot.notice.text}</p>
+        )}
+        <SchoolSpotPhotos photos={photos} signature={spot.signature} />
         {spot.photoIdeas && spot.photoIdeas.length > 0 && (
           <>
             <p className="spg-ideas-label">Photo ideas here</p>

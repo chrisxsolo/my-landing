@@ -56,6 +56,12 @@ export const SPOTS_GUIDE_CSS = `
   .spg-photos--3 .spg-photo:first-child { grid-row: span 2; }
   .spg-photo { position: relative; overflow: hidden; border-radius: 12px; background: ${C.proAccentSoft}; aspect-ratio: 4 / 5; }
   .spg-photos--3 .spg-photo:not(:first-child) { aspect-ratio: auto; min-height: 140px; }
+  .spg-photos--signature.spg-photos--1 { max-width: 680px; }
+  .spg-photos--signature.spg-photos--2 { max-width: none; }
+  .spg-notice {
+    margin: 0 0 14px; padding: 14px 16px; border-radius: 12px; border: 1px solid ${C.proFilmEdge}59;
+    background: ${C.proFilmEdge}1f; color: ${C.inkSoft}; font-size: 15.5px; line-height: 1.65; text-wrap: pretty;
+  }
 
   .spg-ideas-label { margin: 6px 0 8px; color: ${C.ink}; font-size: 14px; font-weight: 820; }
   .spg-ideas { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 0; padding: 0; list-style: none; }
