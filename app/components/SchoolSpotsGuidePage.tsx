@@ -277,11 +277,16 @@ export default async function SchoolSpotsGuidePage({ data, guide }: Props) {
 
       <Route guide={guide} spots={data.spots} />
 
-      {guide.offCampus && <OffCampusSection section={guide.offCampus} photosFor={photosFor} notes={spotNotes} />}
+{guide.offCampus && <OffCampusSection section={guide.offCampus} photosFor={photosFor} notes={spotNotes} />}
 
       {guide.plans && <SessionPlansSection plans={guide.plans} contactHref={contactHref} />}
 
-      {(guide.sections ?? []).map((section) => <GuideSection key={section.id} section={section} />)}
+      {(guide.sections ?? []).map((section) => (
+        <GuideSection
+          key={section.id} section={section}
+          photos={section.spotKey ? photos.bySpot[section.spotKey] ?? [] : []}
+        />
+      ))}
 
       <Tips schoolShort={data.schoolShort} tips={guide.tips} />
 

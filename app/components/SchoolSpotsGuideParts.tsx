@@ -61,12 +61,18 @@ export function SpotArticle({ spot, index, photos, locationNote }: SpotProps) {
   );
 }
 
-export function GuideSection({ section }: { section: SchoolSpotsGuideSection }) {
+export function GuideSection({ section, photos }: { section: SchoolSpotsGuideSection; photos: PagePhoto[] }) {
   return (
     <section id={section.id} className="spg-section">
       <div className="sp-shell">
         <h2 className="spg-h2">{section.heading}</h2>
         {section.paragraphs.map((p) => <p key={p} className="spg-copy">{p}</p>)}
+        <SchoolSpotPhotos photos={photos} />
+        {section.cta && (
+          <div className="sp-actions" style={{ marginTop: 4 }}>
+            <Link href={section.cta.href} className="sp-btn sp-btn--primary">{section.cta.label}</Link>
+          </div>
+        )}
         {section.bullets && section.bullets.length > 0 && (
           <div className="spg-card" style={{ marginTop: 18 }}>
             {section.bulletsLabel && <p className="spg-ideas-label" style={{ marginTop: 0 }}>{section.bulletsLabel}</p>}

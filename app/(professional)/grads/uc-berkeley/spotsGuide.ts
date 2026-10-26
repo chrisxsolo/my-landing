@@ -1,14 +1,23 @@
 import type { SchoolSpotsGuide } from "@/app/components/schoolSpotsGuideTypes";
+import { buildBookingIntentParams } from "@/lib/bookingIntent";
+import { formatCurrency } from "@/lib/pricing";
+import { PRICING_CATALOG } from "@/lib/pricingCatalog";
+
+const CHAMPAGNE = PRICING_CATALOG.graduation.addOns.champagne;
+// Opens the inquiry form with the champagne add-on already selected.
+const CHAMPAGNE_INQUIRY = `/contact?${buildBookingIntentParams({
+  sourcePage: "school-spots-page", sessionType: "Graduation Portrait",
+  school: "UC Berkeley", addOns: [CHAMPAGNE.shortLabel],
+})}`;
 
 // The UC Berkeley photo location guide (/grads/uc-berkeley/spots). Written from
 // Chris's own Berkeley sessions; campus facts checked against official pages.
 //
 // Internal notes (never published):
-// - Chris finds the inside of Doe Library beautiful with early-session daylight,
-//   but the Library's published rules don't allow staged graduation photos
-//   inside its buildings, so the guide never recommends it.
-// - Champagne: nothing official says it's allowed, so the guide only describes
-//   the composition and makes current rules a precondition.
+// - Inside Doe Library and champagne pops are offered per Chris (2026-10-26):
+//   both happen in his sessions all the time. Champagne copy follows his
+//   wording (no age or cleanup lines). The interior section still names the
+//   Library's posted policy and says we head out if staff ask.
 // - Still to confirm before publishing specifics: where exactly the Doe Library
 //   ledge and the preferred cherry trees are, walking times between stops,
 //   exterior commercial photography rules, and temporary closures/construction.
@@ -72,6 +81,7 @@ export const spotsGuide: SchoolSpotsGuide = {
     ],
     notes: [
       "This is a suggested photography order, not a fixed walking route. I rearrange the middle stops around the light, the crowds, your priorities, and where we meet, to avoid doubling back. The one thing I try to keep is finishing at Doe Library near sunset.",
+      "If you'd like photos inside Doe Library, we do those earlier in the session, while there's still plenty of daylight coming through the windows.",
       "Not every stop fits into every session. If time is limited, I prioritize Sather Gate, the Campanile, and the Doe Library area, then choose other stops based on what you care about most. During busy graduation weeks, I build in extra time for waiting at the popular landmarks.",
     ],
   },
@@ -99,23 +109,23 @@ export const spotsGuide: SchoolSpotsGuide = {
     {
       id: "champagne",
       navLabel: "Champagne photos",
-      heading: "Can We Take Champagne-Popping Photos at Berkeley?",
+      heading: "Champagne-Popping Photos at Berkeley",
       paragraphs: [
-        "For celebratory portraits, I love bringing the Campanile into the background from the lawn near Doe Library. Any champagne or bottle-popping photos depend on current university rules, the law, and whether the activity is permitted at the time of your session.",
-        "Campus rules can cover alcohol, bottles, and spraying drinks, and they can change. Champagne popping is never part of a session package, and I won't plan it unless it's allowed. Your safety, other people on campus, and the grounds come first.",
-        "We'll talk through celebration photos that fit the rules before your session. Cap tosses, jumps, and big, happy moments with family photograph beautifully in the same spot.",
+        "Champagne pops are one of my favorite ways to celebrate at Berkeley. My go-to spot is the lawn near Doe Library, with the Campanile rising behind you.",
+        "Champagne is allowed in your session unless we're told otherwise on the day. If campus staff or an event on site ask us not to, we'll switch to another celebration shot right there.",
+        `Bring your own bottle, or I can bring one for you on request. Champagne is a ${formatCurrency(CHAMPAGNE.price)} add-on: just request it on your inquiry form.`,
       ],
-      links: [
-        { label: "UC Berkeley alcohol and other drugs on campus", href: "https://riskservices.berkeley.edu/alcohol-other-drugs-campus" },
-      ],
+      cta: { label: "Request the champagne add-on", href: CHAMPAGNE_INQUIRY },
     },
     {
-      id: "campus-rules",
-      navLabel: "Campus rules",
-      heading: "Doe Library and Other Campus Rules",
+      id: "inside-doe-library",
+      navLabel: "Inside Doe Library",
+      spotKey: "doe-library-interior",
+      heading: "Can We Take Photos Inside Doe Library?",
       paragraphs: [
-        "UC Berkeley Library's published policy doesn't allow staged graduation photos inside its library buildings, so every Doe Library photo I recommend in this guide is taken outside.",
-        "Campus rules, closures, and construction can change, and some areas may be unavailable on a given day. I check current conditions before your session and adjust the route if a spot is closed.",
+        "Yes. The inside of Doe Library is beautiful, and graduation photos happen there all the time. It works best earlier in the session, while daylight is still coming through the windows, so I'll fit it in before we finish outside at sunset.",
+        "Good to know: the UC Berkeley Library's posted policy says staged graduation photos aren't allowed inside its buildings. Inside, we keep it quick and quiet since students are studying, and if staff ask us to wrap up, we head back outside.",
+        "Campus closures and construction can change, and some areas may be unavailable on a given day. I check current conditions before your session and adjust the route if a spot is closed.",
       ],
       links: [
         { label: "UC Berkeley Library filming and photography", href: "https://www.lib.berkeley.edu/about/filming" },
@@ -147,8 +157,8 @@ export const spotsGuide: SchoolSpotsGuide = {
     { q: "Where should we start our graduation session?", a: "I typically recommend starting at Sather Gate and making our way through campus before finishing at Doe Library." },
     { q: "Is UC Berkeley crowded during graduation season?", a: "Yes, it can get extremely busy. I recommend booking on a weekday and earlier in the graduation season if possible. Even then, we may need to wait at popular photo spots." },
     { q: "Can we take cherry blossom graduation photos at Berkeley?", a: "Yes, when the trees are blooming and the area is accessible. March can be a good time to look for blossoms, but the exact timing varies from year to year." },
-    { q: "Can we take pictures inside Doe Library?", a: "UC Berkeley Library's published policy doesn't allow staged graduation photography inside its library buildings, so I recommend photos around the outside of Doe Library instead." },
-    { q: "Can we take champagne-popping graduation photos?", a: "Champagne-popping photos depend on current university rules and whether the activity is permitted. We can talk through celebration photo ideas that fit the rules before your session." },
+    { q: "Can we take pictures inside Doe Library?", a: "Yes, graduation photos inside Doe Library happen all the time. We go earlier in the session while there's daylight, keep it quick and quiet for students, and head back outside if staff ask, since the Library's posted policy limits staged graduation photos indoors." },
+    { q: "Can we take champagne-popping graduation photos?", a: `Yes! Champagne is allowed in your session unless we're told otherwise on the day. My favorite spot is the lawn near Doe Library with the Campanile behind you. Bring your own bottle, or I can bring one on request: it's a ${formatCurrency(CHAMPAGNE.price)} add-on you can request on your inquiry form.` },
     { q: "How many campus locations can we visit?", a: "It depends on your session length, walking distances, crowds, and how much time we spend at each spot. I'll help you prioritize the ones that matter most to you." },
     { q: "Will you help me pose?", a: "Absolutely! I'll give you posing guidance throughout the session, whether you're looking for traditional graduation portraits or more natural, candid photos." },
   ],

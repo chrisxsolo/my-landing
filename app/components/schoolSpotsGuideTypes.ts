@@ -26,6 +26,10 @@ export interface SchoolSpotsGuideSection {
   bullets?: string[];
   /** Official sources, opened in a new tab. */
   links?: { label: string; href: string }[];
+  /** A lib/schoolSpots key whose tagged photos show in this section. */
+  spotKey?: string;
+  /** An on-site action, e.g. an inquiry link with an add-on selected. */
+  cta?: { label: string; href: string };
 }
 
 /**

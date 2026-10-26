@@ -60,8 +60,8 @@ export const SCHOOL_SPOTS: Partial<Record<SchoolSlug, readonly SchoolSpotDef[]>>
   ],
   // UC Berkeley: Chris's seven guide spots. The two Doe Library compositions
   // stay separate keys; bare "Doe Library" names both, so it gives no hint.
-  // Never map the "Inside Doe Library" campus-spots row: the Library doesn't
-  // allow staged graduation photos inside its buildings.
+  // doe-library-interior isn't a numbered spot: its photos show in the
+  // guide's "Inside Doe Library" section.
   "uc-berkeley": [
     {
       key: "sather-gate", name: "Sather Gate", altPlace: "at Sather Gate",
@@ -77,6 +77,11 @@ export const SCHOOL_SPOTS: Partial<Record<SchoolSlug, readonly SchoolSpotDef[]>>
       key: "doe-library-ledge", name: "Doe Library Ledge", altPlace: "on the Doe Library ledge",
       campusSpotNames: ["Doe Library Ledge"],
       hintTerms: ["doe library", "doe memorial library", "doe library ledge", "doe ledge"],
+    },
+    {
+      key: "doe-library-interior", name: "Inside Doe Library", altPlace: "inside Doe Library",
+      campusSpotNames: ["Inside Doe Library"],
+      hintTerms: ["inside doe library", "doe library interior", "wingback", "library chair", "reading room"],
     },
     {
       key: "campanile", name: "Campanile (Sather Tower)", altPlace: "with the Campanile",
