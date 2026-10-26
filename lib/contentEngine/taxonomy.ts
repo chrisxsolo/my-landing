@@ -130,6 +130,7 @@ export const CANONICAL_INTERNAL_LINKS: readonly string[] = [
   "/pricing/families",
   "/pricing/elopements",
   "/pricing/events",
+  "/portfolio/couples",
 ];
 
 // Service-scoped subset of CANONICAL_INTERNAL_LINKS (spec §8.3): each service
@@ -141,13 +142,14 @@ export function internalLinksForService(serviceType: ServiceType): readonly stri
     // The pre-service-aware full list plus the grad-guide cluster and grad
     // pricing — every other service's pricing page is filtered out.
     return CANONICAL_INTERNAL_LINKS.filter(
-      (l) => !l.startsWith("/pricing/") || l === "/pricing/grads",
+      (l) => (!l.startsWith("/pricing/") || l === "/pricing/grads") && !l.startsWith("/portfolio/"),
     );
   }
   if (serviceType === "couples") {
     return [
       "/couples-guide",
       ...COUPLES_LOCATION_KEYS.map((k) => `/couples-guide/locations/${k}`),
+      "/portfolio/couples",
       "/pricing/couples",
       "/pricing",
     ];

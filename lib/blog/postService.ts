@@ -36,7 +36,8 @@ const SERVICE_LINKS: Partial<Record<ServiceType, readonly SiteLink[]>> = {
     { label: "Bay Area campus spots", href: "/grad-guide/campus-spots" },
   ],
   couples: [
-    { label: "Couples location guide", href: "/couples-guide" },
+    { label: "Couples portfolio", href: "/portfolio/couples" },
+    { label: "Couples photography guide", href: "/couples-guide" },
     { label: "Couples pricing", href: "/pricing/couples" },
   ],
   families: [

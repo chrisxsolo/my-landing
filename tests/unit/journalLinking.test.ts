@@ -128,7 +128,7 @@ describe("detectPostService on the real published slugs", () => {
   });
 
   it("explore links follow the service", () => {
-    expect(exploreLinksFor("couples", null).map((l) => l.href)).toEqual(["/couples-guide", "/pricing/couples", "/availability", "/contact"]);
+    expect(exploreLinksFor("couples", null).map((l) => l.href)).toEqual(["/portfolio/couples", "/couples-guide", "/pricing/couples", "/availability", "/contact"]);
     expect(exploreLinksFor("couples", { label: "x", href: "/grads/sjsu" }).map((l) => l.href)).not.toContain("/grads/sjsu");
     expect(exploreLinksFor(null, null).map((l) => l.href)).toEqual(["/portfolio", "/pricing", "/availability", "/contact"]);
   });

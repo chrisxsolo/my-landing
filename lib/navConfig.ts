@@ -87,6 +87,7 @@ export const DEFAULT_NAV_CONFIG: NavConfig = {
       children: [
         { id: "grad-gallery", label: "Grad gallery", href: "/portfolio?category=grads" },
         { id: "family-gallery", label: "Family gallery", href: "/portfolio?category=families" },
+        { id: "couples-gallery", label: "Couples gallery", href: "/portfolio/couples" },
       ],
     },
     {

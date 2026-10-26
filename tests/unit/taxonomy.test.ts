@@ -167,8 +167,9 @@ describe("service-aware additions (2026-07-02)", () => {
   it("internalLinksForService: grads keeps the pre-service-aware list + grad pricing, never other services' pricing", () => {
     const links = internalLinksForService("grads");
     // everything except per-service pricing pages is the full canonical list
-    expect(links.filter((l) => !l.startsWith("/pricing/")))
-      .toEqual(CANONICAL_INTERNAL_LINKS.filter((l) => !l.startsWith("/pricing/")));
+    const shared = (l: string) => !l.startsWith("/pricing/") && !l.startsWith("/portfolio/");
+    expect(links.filter(shared)).toEqual(CANONICAL_INTERNAL_LINKS.filter(shared));
+    expect(links).not.toContain("/portfolio/couples");
     expect(links).toContain("/pricing/grads");
     expect(links).not.toContain("/pricing/couples");
     expect(links).not.toContain("/pricing/families");
@@ -179,6 +180,7 @@ describe("service-aware additions (2026-07-02)", () => {
     expect(links).toContain("/couples-guide");
     expect(links).toContain("/couples-guide/locations/crissy-field");
     expect(links).toContain("/pricing/couples");
+    expect(links).toContain("/portfolio/couples");
     expect(links).toContain("/pricing");
     expect(links).not.toContain("/pricing/grads");
     expect(links.some((l) => l.startsWith("/grads/"))).toBe(false);
