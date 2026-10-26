@@ -7,7 +7,7 @@ import { T } from "@/app/admin/adminTheme";
 import { engineApi } from "@/app/admin/content-engine/engineApi";
 import { CONTENT_TYPE_LABELS, type EngineItem, type EnginePhoto } from "@/app/admin/content-engine/engineTypes";
 import { pathsForPublishedItem } from "@/lib/contentEngine/publishRevalidation";
-import AddJournalPhotos from "./AddJournalPhotos";
+import PublishedJournalPhotos from "./PublishedJournalPhotos";
 import { btn, card, sectionTitle } from "./ui";
 
 interface Props {
@@ -86,7 +86,7 @@ export default function PublicationHistory({ published, photos, onChanged, viewC
                 )}
               </div>
               {!takenDown && item.content_type === "journal_post" && (
-                <AddJournalPhotos item={item} photos={photos} onChanged={onChanged} />
+                <PublishedJournalPhotos item={item} photos={photos} onChanged={onChanged} />
               )}
             </div>
           );

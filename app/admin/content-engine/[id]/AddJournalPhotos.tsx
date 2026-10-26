@@ -1,7 +1,7 @@
 "use client";
 // Adds more of the session's uploaded photos to an ALREADY-published blog/
-// journal post (publishing seeds only a few). Lists photos not already in the
-// post; selected photos get public derivatives and are appended to the live
+// journal post (publishing seeds only a few). Lists photos not already on the
+// live page; selected photos get public derivatives and are appended to the live
 // post server-side. Shown under the post in Publication history.
 import { useState } from "react";
 import { T } from "@/app/admin/adminTheme";
@@ -10,21 +10,16 @@ import type { EngineItem, EnginePhoto } from "@/app/admin/content-engine/engineT
 import { btn } from "./ui";
 
 const MAX_PER_ADD = 12;
-const asIds = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
 
-export default function AddJournalPhotos({ item, photos, onChanged }: {
-  item: EngineItem; photos: EnginePhoto[]; onChanged: () => void;
+export default function AddJournalPhotos({ item, photos, livePhotoIds, onChanged }: {
+  item: EngineItem; photos: EnginePhoto[]; livePhotoIds: Set<string>; onChanged: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const inPost = new Set<string>([
-    ...asIds(item.payload.photo_ids),
-    ...(typeof item.payload.cover_photo_id === "string" ? [item.payload.cover_photo_id] : []),
-  ]);
-  const candidates = photos.filter((p) => !p.excluded && !inPost.has(p.id));
+  const candidates = photos.filter((p) => !p.excluded && !livePhotoIds.has(p.id));
   if (candidates.length === 0) return null;
 
   const toggle = (id: string) =>

@@ -18,7 +18,12 @@ export function JournalEditor(props: EditorProps) {
   const photoIds = arr(payload.photo_ids);
   const links = Array.isArray(payload.internal_links)
     ? (payload.internal_links as { url: string; label: string }[]) : [];
-  const candidates = photos.filter((p) => !p.excluded && p.analysis_status === "completed");
+  // Selected photos ALWAYS show (even if later excluded in the library), so
+  // nothing in the journal is hidden from the picker; selected ids with no
+  // session photo at all show as "missing" tiles that can be toggled off.
+  const candidates = photos.filter((p) =>
+    photoIds.includes(p.id) || (!p.excluded && p.analysis_status === "completed"));
+  const missingIds = photoIds.filter((id) => !photos.some((p) => p.id === id));
   const service = isServiceType(serviceType) ? serviceType : "grads";
   const linkCandidates = internalLinksForService(service);
   const keywordsPlaceholder = serviceConfigFor(service).keywordsPlaceholder;
@@ -88,6 +93,13 @@ export function JournalEditor(props: EditorProps) {
                   <img src={p.thumbnailUrl} alt={p.alt_text ?? p.original_filename ?? "session photo"}
                     style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                 )}
+                {selected && p.excluded && (
+                  <span style={{
+                    position: "absolute", bottom: 3, left: 3, right: 3, padding: "0 4px",
+                    borderRadius: 6, fontSize: 10, lineHeight: "15px", textAlign: "center",
+                    background: T.scrim, color: T.amber,
+                  }}>excluded in library</span>
+                )}
                 {(selected || isCover) && (
                   <span style={{
                     position: "absolute", top: 3, left: 3, padding: "0 5px",
@@ -100,6 +112,16 @@ export function JournalEditor(props: EditorProps) {
               </button>
             );
           })}
+          {missingIds.map((id) => (
+            <button key={id} disabled={disabled} onClick={() => togglePhoto(id)}
+              title={`Selected photo ${id.slice(0, 8)} no longer exists — click to remove`}
+              style={{
+                width: 84, height: 84, borderRadius: 8, border: `2px dashed ${T.amberBorder}`,
+                background: T.amberBg, color: T.amber, fontSize: 11, cursor: disabled ? "default" : "pointer",
+              }}>
+              missing ✕
+            </button>
+          ))}
         </div>
         <span style={label}>Cover photo</span>
         <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>

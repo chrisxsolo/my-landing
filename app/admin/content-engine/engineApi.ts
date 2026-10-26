@@ -6,6 +6,7 @@ import type {
   EmailFactsResult, EmailFactsFreshness, AnalyzeRoundResult, RunProgress, LocationSummaryDto,
 } from "./engineTypes";
 import type { SchoolOption } from "@/lib/contentEngine/schools";
+import type { LiveJournalPhoto } from "@/lib/contentEngine/journalPhotoMembership";
 
 export class EngineApiError extends Error {
   readonly status: number;
@@ -140,6 +141,15 @@ export const engineApi = {
     request<{ added: number; slug: string; postId: string; totalExtras: number }>(
       "/api/admin/session-content/journal-photos",
       { method: "POST", body: JSON.stringify({ itemId, photoIds }) },
+    ),
+  liveJournalPhotos: (itemId: string) =>
+    request<{ postId: number; slug: string; photos: LiveJournalPhoto[] }>(
+      `/api/admin/session-content/journal-photos?itemId=${itemId}`,
+    ),
+  removeJournalPhoto: (itemId: string, url: string) =>
+    request<{ slug: string; removed: number; remaining: number }>(
+      "/api/admin/session-content/journal-photos",
+      { method: "DELETE", body: JSON.stringify({ itemId, url }) },
     ),
   takedown: (itemId: string) =>
     request<{ removed: boolean; derivativesDeleted: string[] }>("/api/admin/session-content/takedown", {

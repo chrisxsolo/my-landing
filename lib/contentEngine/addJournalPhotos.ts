@@ -1,12 +1,13 @@
 // Amend an already-published journal/blog post with more of the session's
 // uploaded photos (the publisher only seeds a handful at publish time). Builds
 // public derivatives for the new photos, appends them to the live blog_posts
-// row + image_library, and keeps the engine item's payload.photo_ids in sync so
-// the picker and takedown stay accurate. Idempotent: photos already in the post
+// row + image_library, then re-derives the engine item's payload.photo_ids
+// from the live row so the picker and takedown stay accurate. Idempotent: photos already in the post
 // are skipped. Marketing permission is re-checked — the same consent gate as
 // the original publish.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { ensureDerivativesForPhotos } from "@/lib/contentEngine/derivatives";
+import { getLiveJournalPhotos, syncPayloadToLive } from "@/lib/contentEngine/liveJournalPhotos";
 
 export class AddPhotosError extends Error {
   readonly status: number;
@@ -46,7 +47,6 @@ export async function addJournalPhotos(args: AddJournalPhotosArgs): Promise<AddJ
   if (item.status !== "published" || item.published_target_type !== "blog_post" || !item.published_target_id) {
     throw new AddPhotosError("publish this post first, then add more photos");
   }
-  const payload = (item.payload ?? {}) as Record<string, unknown>;
 
   // 2. Session + the same marketing-permission consent gate as publish.
   const { data: pkg } = await client.from("session_content_packages")
@@ -64,10 +64,9 @@ export async function addJournalPhotos(args: AddJournalPhotosArgs): Promise<AddJ
     .eq("id", Number(item.published_target_id)).maybeSingle();
   if (pErr || !post) throw new AddPhotosError("published blog post not found", 404);
 
-  const already = new Set<string>([
-    ...asStringArray(payload.photo_ids),
-    ...(typeof payload.cover_photo_id === "string" ? [payload.cover_photo_id] : []),
-  ]);
+  // "Already in the post" = what the live page shows, not the payload copy.
+  const live = await getLiveJournalPhotos(client, itemId);
+  const already = new Set<string>(live.photos.flatMap((p) => (p.photoId ? [p.photoId] : [])));
   const newIds = [...new Set(photoIds)].filter((id) => !already.has(id));
   if (newIds.length === 0) throw new AddPhotosError("those photos are already in this post");
 
@@ -108,10 +107,8 @@ export async function addJournalPhotos(args: AddJournalPhotosArgs): Promise<AddJ
     );
   }
 
-  // 6. Keep the engine item payload in sync (picker + takedown reference it).
-  const nextPhotoIds = [...new Set([...asStringArray(payload.photo_ids), ...newIds])];
-  await client.from("session_content_items")
-    .update({ payload: { ...payload, photo_ids: nextPhotoIds } }).eq("id", itemId);
+  // 6. Mirror the live row back into the engine item's payload.photo_ids.
+  await syncPayloadToLive(client, itemId);
 
   return {
     added: addUrls.length,
