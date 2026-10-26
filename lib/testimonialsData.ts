@@ -115,12 +115,19 @@ export function pickBalancedTestimonials(
 
 // Portfolio category proof. Reuses the homepage testimonial query, then keeps
 // only the testimonials whose session_type maps to the requested category.
-// Returns [] when none match, so the proof block renders nothing.
+// Returns [] when none match or the query fails, so the proof block renders
+// nothing instead of taking the page (or a static build) down with it.
 export async function getFeaturedTestimonialsForCategory(
   categorySlug: string,
   limit = 3,
 ): Promise<FeaturedTestimonial[]> {
-  const all = await getFeaturedTestimonials(12);
+  let all: FeaturedTestimonial[];
+  try {
+    all = await getFeaturedTestimonials(12);
+  } catch (error) {
+    console.error(`[getFeaturedTestimonialsForCategory] failed to load ${categorySlug} testimonials`, error);
+    return [];
+  }
   return all
     .filter((testimonial) => testimonialCategorySlug(testimonial.session_type) === categorySlug)
     .slice(0, Math.max(limit, 1));
