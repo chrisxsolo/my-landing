@@ -29,7 +29,7 @@ const schools: Array<{ name: string; href: string; blurb: string }> = [
     name: "SJSU Graduation Photos",
     href: "/grads/sjsu",
     blurb:
-      "Tower Hall and the palm trees along 7th Street make San José State one of the most photogenic campuses in the South Bay.",
+      "Tower Hall and the palm trees along 7th Street make San José State one of the most photogenic campuses in the South Bay. Golden hour and sunrise are my favorite times to shoot.",
   },
   {
     name: "USF Graduation Photos",
