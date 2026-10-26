@@ -24,6 +24,46 @@ export function detectPostService(text: string): ServiceType | null {
   return SERVICE_MATCHERS.find(([, re]) => re.test(text))?.[0] ?? null;
 }
 
+// Category slugs (lib/blog/postCategories) that map onto a service's links.
+// Proposals and elopements are couples-family sessions for linking purposes.
+const CATEGORY_SERVICE: Record<string, ServiceType> = {
+  graduation: "grads",
+  couples: "couples",
+  proposals: "couples",
+  elopements: "couples",
+  family: "families",
+  maternity: "maternity",
+  portraits: "portraits",
+  prom: "prom",
+  events: "events",
+};
+
+export type ServiceSignals = {
+  /** Category tags saved on the post (`sites` / legacy `category`). */
+  categoryTags?: readonly (string | null | undefined)[];
+  /** Service of the Content Engine session the post was published from. */
+  engineService?: ServiceType | null;
+  /** Normalizes a tag to a display category slug (normalizeCategoryTag). */
+  tagToCategory?: (tag: string) => string | null;
+  /** Title + slug, for legacy posts with nothing structured. */
+  text: string;
+};
+
+/**
+ * The service a published post is about, most reliable signal first:
+ * 1. an explicit category tag saved on the post,
+ * 2. the Content Engine session it came from,
+ * 3. keywords in its title and slug (legacy posts).
+ * A title that merely mentions a "couple" can't override structured data.
+ */
+export function resolvePostService(signals: ServiceSignals): ServiceType | null {
+  const tagged = (signals.categoryTags ?? [])
+    .map((tag) => (tag && signals.tagToCategory ? signals.tagToCategory(tag) : null))
+    .map((slug) => (slug ? CATEGORY_SERVICE[slug] : undefined))
+    .find((service): service is ServiceType => Boolean(service));
+  return tagged ?? signals.engineService ?? detectPostService(signals.text);
+}
+
 const CLOSING: readonly SiteLink[] = [
   { label: "Check availability", href: "/availability" },
   { label: "Contact", href: "/contact" },

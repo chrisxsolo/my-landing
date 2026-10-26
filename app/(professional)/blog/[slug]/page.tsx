@@ -7,7 +7,11 @@ import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
 import { renderPostBody } from "./postBody";
 import { toPlainText } from "@/lib/blog/markdown";
 import { detectSchoolLink } from "@/lib/portfolioCategoryContent";
-import { detectPostService, exploreLinksFor } from "@/lib/blog/postService";
+import { exploreLinksFor, resolvePostService } from "@/lib/blog/postService";
+import { getJournalServicesByPostId } from "@/lib/blog/journalServices";
+import { normalizeCategoryTag } from "@/lib/blog/postCategories";
+import { buildBookingIntentParams } from "@/lib/bookingIntent";
+import type { ServiceType } from "@/lib/contentEngine/taxonomy";
 import ContentEventBeacon from "@/app/components/ContentEventBeacon";
 
 // Cached/ISR: rebuilt at most hourly, or immediately on admin post saves
@@ -15,6 +19,22 @@ import ContentEventBeacon from "@/app/components/ContentEventBeacon";
 export const revalidate = 3600;
 
 type Props = { params: Promise<{ slug: string }> };
+
+// Session type to preselect on the inquiry form, matching its options.
+const INQUIRY_SESSION_TYPE: Partial<Record<ServiceType, string>> = {
+  grads: "Graduation Portrait",
+  couples: "Couples Session",
+  families: "Family Session",
+  maternity: "Maternity Session",
+  portraits: "Individual Portrait",
+  events: "Event Coverage",
+};
+
+function inquiryHrefFor(service: ServiceType | null): string {
+  const sessionType = service ? INQUIRY_SESSION_TYPE[service] : undefined;
+  if (!sessionType) return "/contact";
+  return `/contact?${buildBookingIntentParams({ sourcePage: "journal", sessionType }).toString()}`;
+}
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", {
@@ -57,14 +77,24 @@ const CSS = `
 
 export default async function ProfessionalBlogPostPage({ params }: Props) {
   const { slug } = await params;
-  const post = await getBlogPostBySlug("professional", slug);
+  const [post, servicesByPostId] = await Promise.all([
+    getBlogPostBySlug("professional", slug),
+    getJournalServicesByPostId(),
+  ]);
   if (!post) notFound();
 
   const extraImages = post.extra_image_urls ?? [];
   const schoolLink = detectSchoolLink(`${post.title} ${post.slug}`);
-  // A school name with no other cue still means a grad post.
-  const service = detectPostService(`${post.title} ${post.slug}`) ?? (schoolLink ? "grads" : null);
-  const exploreLinks = exploreLinksFor(service, schoolLink);
+  const service = resolvePostService({
+    categoryTags: [...(post.sites ?? []), post.category],
+    engineService: servicesByPostId[String(post.id)] ?? null,
+    tagToCategory: (tag) => normalizeCategoryTag(tag)?.slug ?? null,
+    text: `${post.title} ${post.slug}`,
+  }) ?? (schoolLink ? "grads" : null); // a school name alone still means a grad post
+  // Campus links only on graduation posts: a couples shoot on a campus
+  // shouldn't send readers to that school's grad page.
+  const exploreLinks = exploreLinksFor(service, service === "grads" ? schoolLink : null);
+  const inquiryHref = inquiryHrefFor(service);
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -107,7 +137,7 @@ export default async function ProfessionalBlogPostPage({ params }: Props) {
           borderBottom: "1px solid rgba(0,0,0,0.12)",
           paddingBottom: 1,
         }}>
-          ← Back to blog
+          ← Back to the journal
         </Link>
         <p style={{
           fontFamily: "Georgia, 'Times New Roman', serif",
@@ -300,7 +330,7 @@ export default async function ProfessionalBlogPostPage({ params }: Props) {
         }}>
           Want to create something like this?
         </p>
-        <Link href="/contact" style={{
+        <Link href={inquiryHref} style={{
           fontFamily: "Georgia, 'Times New Roman', serif",
           fontSize: "0.75rem",
           letterSpacing: 0,
@@ -314,7 +344,7 @@ export default async function ProfessionalBlogPostPage({ params }: Props) {
           display: "inline-block",
           fontWeight: 820,
         }}>
-          Inquire now
+          Book a Session
         </Link>
       </section>
     </main>

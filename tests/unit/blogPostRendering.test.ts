@@ -16,6 +16,9 @@ import { getAllCouplesLocations } from "@/lib/couplesGuide/locations";
 
 const post = vi.hoisted(() => ({ current: null as Record<string, unknown> | null }));
 vi.mock("@/lib/professionalData", () => ({ getBlogPostBySlug: async () => post.current }));
+// Content Engine service per post id; empty = a legacy post with no session.
+const engineServices = vi.hoisted(() => ({ current: {} as Record<string, string> }));
+vi.mock("@/lib/blog/journalServices", () => ({ getJournalServicesByPostId: async () => engineServices.current }));
 vi.mock("next/image", () => ({ default: () => null }));
 vi.mock("@/app/components/ContentEventBeacon", () => ({ default: () => null }));
 
@@ -97,6 +100,20 @@ describe("public blog page — links below the article match the post", () => {
       slug: "kim-sather-gate-uc-berkeley-class-of-2026", title: "Kim at Sather Gate", body: "A grad session.",
     });
     expect(hrefs(html)).toEqual(expect.arrayContaining(["/grads/uc-berkeley", "/pricing/grads", "/grad-guide"]));
+  });
+
+  it("trusts the Content Engine session over a title that says 'couple'", async () => {
+    engineServices.current = { "31": "grads" };
+    try {
+      const html = await renderPage({
+        id: 31, slug: "a-couple-of-grads-at-sather-gate", title: "A Couple of Grads at Sather Gate", body: "Grads.",
+      });
+      expect(hrefs(html)).toEqual(expect.arrayContaining(["/pricing/grads", "/grad-guide"]));
+      expect(hrefs(html)).not.toContain("/pricing/couples");
+      expect(hrefs(html).some((h) => h.startsWith("/contact?") && h.includes("sessionType=Graduation+Portrait"))).toBe(true);
+    } finally {
+      engineServices.current = {};
+    }
   });
 });
 
