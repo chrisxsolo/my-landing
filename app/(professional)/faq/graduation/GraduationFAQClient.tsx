@@ -104,7 +104,7 @@ export default function GraduationFAQClient() {
             <h2 className="faq-cta-title">Still have a question?</h2>
             <p className="faq-cta-sub">
               Send the date, campus, and anything you&rsquo;re not sure about.
-              I reply within 24 hours.
+              Most inquiries receive a response within 24 hours.
             </p>
             <div className="faq-cta-buttons">
               <Link href="/contact" className="faq-link faq-link--primary">Send a message</Link>

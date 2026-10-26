@@ -16,7 +16,7 @@ export const FAQS: FAQGroup[] = [
     items: [
       {
         q: "How do I book a session?",
-        a: `Send an inquiry through the contact page with your date, campus, and how many people. I'll reply within 24 hours with availability, pricing, and next steps. A ${BOOKING_POLICY.retainerPercent}% ${BOOKING_POLICY.retainerRefundability} retainer reserves your session, and the remaining balance is due ${BOOKING_POLICY.remainingBalanceDeadline}.`,
+        a: `Send an inquiry through the contact page with your date, campus, and how many people. The reply covers availability, pricing, and next steps. ${BOOKING_POLICY.inquiryResponse} A ${BOOKING_POLICY.retainerPercent}% ${BOOKING_POLICY.retainerRefundability} retainer reserves your session, and the remaining balance is due ${BOOKING_POLICY.remainingBalanceDeadline}.`,
       },
       {
         q: "How far in advance should I book?",
@@ -110,7 +110,7 @@ export const FAQS: FAQGroup[] = [
       },
       {
         q: "Do you provide RAW files?",
-        a: "RAW files are not included in standard sessions. The edited gallery is the deliverable. RAW files can be licensed separately starting at $500 — reach out if that's something you need.",
+        a: BOOKING_POLICY.rawPolicy,
       },
       {
         q: "How many photos are edited?",

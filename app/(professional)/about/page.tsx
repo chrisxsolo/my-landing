@@ -55,12 +55,21 @@ export const metadata: Metadata = {
 const portrait =
   "https://dmtslzwglpezympptqls.supabase.co/storage/v1/object/public/grad-photos/chris-portrait.jpg";
 
+const TURNAROUND_WEEKS = PRICING_CATALOG.standardTurnaroundDays / 7;
+// Package-aware, never one number for every service.
+const GALLERY_MINIMUMS = [
+  `${PRICING_CATALOG.graduation.standardMinimumImages}+ for graduation`,
+  `${PRICING_CATALOG.couples.packages.mini.minimumImages}+ for a couples mini`,
+  `${PRICING_CATALOG.couples.packages["1hr"].minimumImages}+ for a 1-hour couples session`,
+  `${PRICING_CATALOG.families.packages.standard.minimumImages}+ for a family session`,
+].join(", ");
+
 // ── PROCESS STEPS ─────────────────────────────────────────────────────────────
 // Format: ["number", "Step name", "Description"]
 const process = [
-  ["01", "Inquiry to booking", `Send the date, campus, and headcount. I reply within 24 hours with availability, pricing, and next steps. A ${BOOKING_POLICY.retainerPercent}% ${BOOKING_POLICY.retainerRefundability} retainer reserves the session.`],
+  ["01", "Inquiry to booking", `Send the date, campus, and headcount. Most inquiries receive a response within 24 hours, with availability, pricing, and next steps. A ${BOOKING_POLICY.retainerPercent}% ${BOOKING_POLICY.retainerRefundability} retainer reserves the session.`],
   ["02", "Session day",         "Campus route, light, and timing are planned before you arrive. I give clear direction throughout so you're never stuck wondering what to do."],
-  ["03", "Gallery delivery", `${PRICING_CATALOG.graduation.standardMinimumImages}+ professionally edited images delivered to a private online gallery within ${PRICING_CATALOG.standardTurnaroundDays / 7} weeks. Clean download link, easy sharing.`],
+  ["03", "Gallery delivery", `Professionally edited images delivered to a private online gallery within ${TURNAROUND_WEEKS} weeks: ${PRICING_CATALOG.graduation.standardMinimumImages}+ for a standard graduation session, with each package's minimum listed on its pricing page. Clean download link, easy sharing.`],
 ];
 
 const CSS = `
@@ -498,8 +507,9 @@ export default async function ProfessionalAboutPage() {
               People stop thinking about the camera and start being themselves.
             </p>
             <p>
-              After the session, you get a private online gallery with 50+ professionally edited images,
-              a clean download link, and a two-week turnaround. Communication throughout is fast, clear,
+              After the session, you get a private online gallery of professionally edited images (the
+              minimum depends on your package: {GALLERY_MINIMUMS}), a clean download link, and a{" "}
+              {TURNAROUND_WEEKS}-week turnaround. Communication throughout is fast, clear,
               and low-friction — no chasing, no guessing, no surprises.
             </p>
           </div>

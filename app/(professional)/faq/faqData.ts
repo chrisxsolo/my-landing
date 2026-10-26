@@ -5,7 +5,11 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { FAQGroup } from "./faqShared";
-import { BOOKING_POLICY, PRICING_CATALOG } from "@/lib/pricingCatalog";
+import { BOOKING_POLICY, PRICING_CATALOG, formatFee as formatCurrency } from "@/lib/pricingCatalog";
+
+const grad = PRICING_CATALOG.graduation;
+const couples = PRICING_CATALOG.couples.packages;
+const families = PRICING_CATALOG.families.packages;
 
 export const FAQS: FAQGroup[] = [
   {
@@ -14,7 +18,7 @@ export const FAQS: FAQGroup[] = [
     items: [
       {
         q: "How do I book a session?",
-        a: `Send an inquiry through the contact page with the type of session you're after, your ideal date, location, and how many people will be in the photos. I'll reply within 24 hours with availability, pricing, and next steps. A ${BOOKING_POLICY.retainerPercent}% ${BOOKING_POLICY.retainerRefundability} retainer reserves your session, and the remaining balance is due ${BOOKING_POLICY.remainingBalanceDeadline}.`,
+        a: `Send an inquiry through the contact page with the type of session you're after, your ideal date, location, and how many people will be in the photos. The reply covers availability, pricing, and next steps. ${BOOKING_POLICY.inquiryResponse} A ${BOOKING_POLICY.retainerPercent}% ${BOOKING_POLICY.retainerRefundability} retainer reserves your session, and the remaining balance is due ${BOOKING_POLICY.remainingBalanceDeadline}.`,
       },
       {
         q: "How far in advance should I book?",
@@ -44,11 +48,11 @@ export const FAQS: FAQGroup[] = [
       },
       {
         q: "How long is a session?",
-        a: "Standard portrait, couples, and maternity sessions run about an hour. Family or group sessions usually need 90 minutes or more to cover individuals plus the combinations. If you want multiple looks or locations, longer sessions are available — just ask.",
+        a: `It depends on the package. Graduation sessions start at ${grad.durationRules.standardMinutes} minutes (groups of ${grad.durationRules.groupMinimumSize} or more book at least ${grad.durationRules.groupMinimumMinutes}). Couples sessions run from ${couples.mini.durationMinutes} minutes for a mini to ${couples.engagement.durationMinutes} minutes for an engagement session, and maternity sessions are ${PRICING_CATALOG.maternity.durationMinutes} minutes. The Family Session is ${families.standard.durationMinutes} minutes and the Extended Family Session is ${families.extended.durationMinutes} minutes. Larger groups, or families who want more combinations and a slower pace with kids, usually do best with the extended session or added time.`,
       },
       {
         q: "How many photos will I receive?",
-        a: `A standard graduation session includes ${PRICING_CATALOG.graduation.standardMinimumImages}+ professionally edited images. Other package minimums vary by session type, length, and group size.`,
+        a: `It depends on the package you book: ${grad.standardMinimumImages}+ edited images for a standard graduation session (${grad.groupMinimumImagesPerPerson}+ per person for groups), ${couples.mini.minimumImages}+ for a couples mini, ${couples["1hr"].minimumImages}+ for a 1-hour couples session, ${families.standard.minimumImages}+ for the Family Session, ${families.extended.minimumImages}+ for the Extended Family Session, and ${PRICING_CATALOG.maternity.minimumImages}+ for a maternity session. Each pricing page lists the minimum for every option.`,
       },
       {
         q: "What kinds of sessions do you shoot?",
@@ -126,7 +130,7 @@ export const FAQS: FAQGroup[] = [
       },
       {
         q: "Do you provide RAW files?",
-        a: "RAW files aren't included in standard sessions — the edited gallery is the deliverable. If you have a specific need for the originals, RAW files can be licensed separately. Reach out and we'll talk it through.",
+        a: `${BOOKING_POLICY.rawPolicy} Couples sessions can add a ${PRICING_CATALOG.couples.addOns.proofingGallery.label.toLowerCase()} (${formatCurrency(PRICING_CATALOG.couples.addOns.proofingGallery.price)}) to pick favorites from a lightly culled gallery before final editing; it is not a RAW or unculled gallery.`,
       },
     ],
   },
@@ -148,7 +152,7 @@ export const FAQS: FAQGroup[] = [
       },
       {
         q: "How much does a session cost?",
-        a: "Pricing depends on the session type, length, and group size. Head to the pricing pages for current rates on couples, families, and graduation sessions — or send an inquiry describing what you have in mind and I'll put together a quote.",
+        a: `Pricing depends on the session type, length, and group size. Graduation sessions start at ${formatCurrency(grad.baseHourlyRate)}, couples sessions at ${formatCurrency(couples.mini.price)} for a ${couples.mini.durationMinutes}-minute mini (${formatCurrency(couples["1hr"].price)} for a full hour), family sessions at ${formatCurrency(families.standard.price)}, and maternity sessions are ${formatCurrency(PRICING_CATALOG.maternity.price)}. The pricing pages list every package and add-on, or send an inquiry describing what you have in mind and I'll put together a quote.`,
       },
     ],
   },

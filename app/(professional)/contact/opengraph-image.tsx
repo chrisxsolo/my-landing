@@ -12,7 +12,7 @@ export default function Image() {
       line1: "Let's book",
       line2: "your session",
       subtitle:
-        "Graduation, couples, family & events. Send your date and location — replies within 24 hours.",
+        "Graduation, couples, family & events. Send your date and location — most replies within 24 hours.",
       url: "soloxsnaps.com/contact",
     }),
     { ...size }

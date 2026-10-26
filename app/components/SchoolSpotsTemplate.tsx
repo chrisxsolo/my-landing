@@ -220,7 +220,7 @@ export default function SchoolSpotsTemplate({ data }: { data: SchoolLandingData 
         <div className="sp-shell">
           <h2 className="sp-cta-title">Ready to shoot at {data.schoolShort}?</h2>
           <p className="sp-cta-sub">
-            Send your date, the spots you have in mind, and your headcount. I&rsquo;ll reply within 24 hours.
+            Send your date, the spots you have in mind, and your headcount. Most inquiries receive a response within 24 hours.
           </p>
           <Link href={`/contact?${contactParams}`} className="sp-btn sp-btn--primary">
             Inquire now

@@ -50,7 +50,7 @@ export default function SchoolLandingDetails({
     { label: "Balance", value: `Due ${BOOKING_POLICY.remainingBalanceDeadline}` },
     { label: "Turnaround", value: `Up to ${PRICING_CATALOG.standardTurnaroundDays / 7} weeks` },
     { label: "Delivery", value: "Private online gallery" },
-    { label: "Response time", value: "Within 24 hours" },
+    { label: "Response time", value: "Usually within 24 hours" },
   ];
 
   return (

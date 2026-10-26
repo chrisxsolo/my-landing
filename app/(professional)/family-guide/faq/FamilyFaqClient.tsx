@@ -85,7 +85,7 @@ export default function FamilyFaqClient() {
           <div className="faq-cta-card">
             <h2 className="faq-cta-title">Still have a question?</h2>
             <p className="faq-cta-sub">
-              Send your date, who&rsquo;s joining, and the location you have in mind. I reply within 24 hours.
+              Send your date, who&rsquo;s joining, and the location you have in mind. Most inquiries receive a response within 24 hours.
             </p>
             <div className="faq-cta-buttons">
               <Link href={FAMILY_CONTACT} className="faq-link faq-link--primary">Inquire about a session</Link>

@@ -117,7 +117,7 @@ export default function FAQClient() {
             <h2 className="faq-cta-title">Still have a question?</h2>
             <p className="faq-cta-sub">
               Tell me what kind of session you&rsquo;re after, your ideal date and
-              location, and anything you&rsquo;re unsure about. I reply within 24 hours.
+              location, and anything you&rsquo;re unsure about. Most inquiries receive a response within 24 hours.
             </p>
             <div className="faq-cta-buttons">
               <Link href="/contact" className="faq-link faq-link--primary">Send a message</Link>

@@ -139,7 +139,7 @@ export const FAQS: FAQGroup[] = [
       },
       {
         q: "Are RAW files included?",
-        a: "No. The edited gallery is the deliverable — every image is fully edited and ready to share or print. RAW files are not included with the session.",
+        a: BOOKING_POLICY.rawPolicy,
       },
     ],
   },

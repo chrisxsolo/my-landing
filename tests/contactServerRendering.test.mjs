@@ -12,7 +12,7 @@ test("contact page keeps static booking content in the server component", async 
   ]);
 
   assert.match(pageSource, /Tell me the date, location, and what this is for\./);
-  assert.match(pageSource, /Within 24 hours\./);
+  assert.match(pageSource, /within 24 hours\./);
   assert.match(pageSource, /What to expect/);
   assert.match(pageSource, /href="\/faq"/);
   assert.match(pageSource, /<OptimizedPhoto/);

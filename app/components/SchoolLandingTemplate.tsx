@@ -459,7 +459,7 @@ export default async function SchoolLandingTemplate({ data }: { data: SchoolLand
                 Ready to book your {data.schoolShort} grad session?
               </h2>
               <p className="school-cta-sub">
-                Send the date, campus, and headcount. I&rsquo;ll reply within 24 hours with availability and next steps.
+                Send the date, campus, and headcount. Most inquiries receive a response within 24 hours, with availability and next steps.
               </p>
               <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
                 <Link href={`/contact?${contactParams}`} className="school-link school-link--primary">

@@ -9,7 +9,7 @@ import { BOOKING_POLICY } from "@/lib/pricingCatalog";
 const PAGE_TITLE = "Book a Bay Area Photography Session";
 const SOCIAL_TITLE = `${PAGE_TITLE} | SoloXSnaps`;
 const DESCRIPTION =
-  "Inquire about graduation, couples, family, and event photography in the Bay Area. Send Chris Solorzano your date, location, and session type — replies within 24 hours.";
+  "Inquire about graduation, couples, family, and event photography in the Bay Area. Send Chris Solorzano your date, location, and session type — most replies within 24 hours.";
 const CONTACT_IMAGE =
   "https://dmtslzwglpezympptqls.supabase.co/storage/v1/object/public/grad-photos/champagne-popping.jpg";
 const EXPECTATIONS = [
@@ -55,9 +55,9 @@ function ContactSidebar() {
     <aside className="contact-sidebar" aria-label="Booking details">
       <div className="contact-side-panel">
         <p className="contact-kicker">Response time</p>
-        <h2>Within 24 hours.</h2>
+        <h2>Usually within 24 hours.</h2>
         <p>
-          Most inquiries are answered within 24 hours. You will get a copy of your responses,
+          Most inquiries receive a response within 24 hours. You will get a copy of your responses,
           and graduation inquiries also receive the graduation guide.
         </p>
       </div>
@@ -100,12 +100,13 @@ export default function ContactPage() {
           <p className="contact-kicker">Start the booking note</p>
           <h1 className="contact-title">Tell me the date, location, and what this is for.</h1>
           <p className="contact-copy">
-            Send the details and I will reply within 24 hours with availability, next steps, and
+            Send the details and I will reply with availability, next steps, and
             anything useful for your session.
           </p>
           <div className="contact-chip-row" aria-label="Available session categories">
             <span className="contact-chip">Graduation</span>
-            <span className="contact-chip">Family</span>
+            <span className="contact-chip">Couples</span>
+            <span className="contact-chip">Family &amp; maternity</span>
             <span className="contact-chip">Bay Area</span>
           </div>
         </div>
