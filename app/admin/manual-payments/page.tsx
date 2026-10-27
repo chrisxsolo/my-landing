@@ -18,6 +18,8 @@ import {
   type AmountCol,
 } from "./helpers";
 import type { InquiryOption, PaymentRow, SavedPayment } from "./types";
+import type { DuplicateCandidate } from "@/lib/paymentLedgerMatches";
+import { fmtDate, fmtMoney } from "@/lib/revenue/format";
 
 type StatusFilter = "all" | "full" | "partial" | "none";
 
@@ -31,6 +33,7 @@ export default function ManualPaymentsPage() {
   const [inquiries, setInquiries] = useState<InquiryOption[]>([]);
   const [payments, setPayments] = useState<SavedPayment[]>([]);
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
+  const [duplicateWarning, setDuplicateWarning] = useState<DuplicateCandidate[] | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
@@ -198,17 +201,23 @@ export default function ManualPaymentsPage() {
     });
   }
 
-  async function saveRows() {
-    setSaving(true); setMessage(null);
+  // confirm=true saves rows the server flagged as likely duplicates of ledger payments.
+  async function saveRows(confirm = false) {
+    setSaving(true); setMessage(null); setDuplicateWarning(null);
     try {
       const payload = readyRows.map(r => ({ ...r, amount: amountForType(r) }));
-      const res = await fetch("/api/admin/manual-payments", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ rows: payload }) });
-      const json = await res.json() as { saved?: SavedPayment[]; error?: string };
+      const res = await fetch("/api/admin/manual-payments", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ rows: payload, confirm }) });
+      const json = await res.json() as { saved?: SavedPayment[]; error?: string; duplicates?: DuplicateCandidate[] };
+      if (res.status === 409 && json.duplicates?.length) {
+        setDuplicateWarning(json.duplicates);
+        return;
+      }
       if (!res.ok) { setMessage({ text: json.error ?? "Could not save payments.", ok: false }); return; }
       const saved = json.saved ?? [];
       setMessage({ text: `${saved.length} payment${saved.length === 1 ? "" : "s"} saved.`, ok: true });
       await loadData(true);
-    } catch {
+    } catch (err) {
+      console.error("[manual-payments] save failed", err);
       setMessage({ text: "Could not save payments.", ok: false });
     } finally {
       setSaving(false);
@@ -256,12 +265,38 @@ export default function ManualPaymentsPage() {
             <button onClick={() => loadData(true)} disabled={loading} className={pill} style={{ background: REV.blueBg, color: REV.blue }}>
               {loading ? "Loading…" : "↻ Refresh"}
             </button>
-            <button onClick={saveRows} disabled={saving || readyRows.length === 0} className={`${pill} text-white`} style={{ background: REV.accent }}
+            <button onClick={() => saveRows()} disabled={saving || readyRows.length === 0} className={`${pill} text-white`} style={{ background: REV.accent }}
               title="Saves only the rows you edited or selected">
               {saving ? "Saving…" : `Save ${readyRows.length || ""} edited/selected`.replace("  ", " ")}
             </button>
           </div>
         </GlassPanel>
+
+        {duplicateWarning && (
+          <div className="rounded-xl px-4 py-3 text-sm" role="alert"
+            style={{ background: REV.redBg, border: "1px solid rgba(220,60,66,0.3)", color: REV.red }}>
+            <p className="font-black">Not saved — these rows look like payments already in the ledger:</p>
+            <ul className="mt-2 space-y-1 text-xs font-bold">
+              {duplicateWarning.map(d => (
+                <li key={d.index}>
+                  {d.client_name} · {fmtMoney(d.amount_cents)} · {fmtDate(d.paid_at)} — already recorded as{" "}
+                  {d.matches.map(m => `#${m.id} ${m.client_name} ${fmtDate(m.paid_at)} (${m.source ?? "ledger"})`).join(", ")}
+                </li>
+              ))}
+            </ul>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button type="button" onClick={() => saveRows(true)} disabled={saving}
+                className="rounded-lg px-3 py-2 text-xs font-black disabled:opacity-40"
+                style={{ background: "rgba(220,60,66,0.2)", color: REV.red }}>
+                Save anyway — these are separate transfers
+              </button>
+              <button type="button" onClick={() => setDuplicateWarning(null)}
+                className="rounded-lg px-3 py-2 text-xs font-black" style={{ background: REV.neutralBg, color: REV.textSoft }}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
 
         {message && (
           <div className="rounded-xl px-4 py-3 text-sm font-bold" role="status"

@@ -18,7 +18,8 @@ import { requireAdmin } from "@/lib/requireAdmin";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { advancePortalSessionForDeposit } from "@/lib/adminPortalSessionUpsert";
 import { buildBookedAvailabilityNote } from "@/lib/clientSessions";
-import { CROSS_SOURCE_WINDOW_MS, SAME_PAYER_WINDOW_MS, findLedgerMatches, type MatchablePayment } from "@/lib/paymentMatching";
+import { findLedgerMatches } from "@/lib/paymentMatching";
+import { loadNearbyLedger } from "@/lib/paymentLedgerMatches";
 
 export const dynamic = "force-dynamic";
 
@@ -117,25 +118,6 @@ async function rejectRows(supabase: SupabaseServerClient, ids: number[]) {
 
   if (error) throw error;
   return NextResponse.json({ ok: true, rejected: count ?? 0 });
-}
-
-const LEDGER_MATCH_SELECT = "id,inquiry_id,client_name,client_email,amount_cents,method,paid_at,source,source_txn_id,invoice";
-
-// Active ledger rows close enough in amount and time to be the same transfer.
-async function loadNearbyLedger(supabase: SupabaseServerClient, rows: StagedRow[]): Promise<MatchablePayment[]> {
-  if (!rows.length) return [];
-  const times = rows.map(r => new Date(r.paid_at).getTime()).filter(t => !Number.isNaN(t));
-  if (!times.length) return [];
-  const pad = Math.max(SAME_PAYER_WINDOW_MS, CROSS_SOURCE_WINDOW_MS);
-  const { data, error } = await supabase
-    .from(PAYMENTS_TABLE)
-    .select(LEDGER_MATCH_SELECT)
-    .eq("status", "active")
-    .in("amount_cents", [...new Set(rows.map(r => r.amount_cents))])
-    .gte("paid_at", new Date(Math.min(...times) - pad).toISOString())
-    .lte("paid_at", new Date(Math.max(...times) + pad).toISOString());
-  if (error) throw error;
-  return (data ?? []) as unknown as MatchablePayment[];
 }
 
 async function approveRows(supabase: SupabaseServerClient, ids: number[], confirmIds: Set<number>) {

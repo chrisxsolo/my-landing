@@ -7,6 +7,7 @@ import {
 } from "@/lib/paymentTotalInference";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { calculatePaymentScheduleCents } from "@/lib/pricingCatalog";
+import { findDuplicateCandidates, loadNearbyLedger } from "@/lib/paymentLedgerMatches";
 
 export const dynamic = "force-dynamic";
 
@@ -72,7 +73,7 @@ function normalizeRow(row: ManualPaymentInput) {
   if (!clientName || amountCents <= 0 || !paidAt) return null;
 
   return {
-    inquiry_id: Number.isFinite(row.inquiry_id) ? row.inquiry_id : null,
+    inquiry_id: typeof row.inquiry_id === "number" && Number.isFinite(row.inquiry_id) ? row.inquiry_id : null,
     client_name: clientName,
     client_email: row.client_email?.trim().toLowerCase() ?? "",
     amount,
@@ -167,7 +168,7 @@ export async function POST(req: NextRequest) {
   const deny = requireAdmin(req);
   if (deny) return deny;
 
-  const body = await req.json() as { rows?: ManualPaymentInput[] } | PaymentPlanInput | ConfirmInquiryPaidInput;
+  const body = await req.json() as { rows?: ManualPaymentInput[]; confirm?: boolean } | PaymentPlanInput | ConfirmInquiryPaidInput;
 
   if ("action" in body && body.action === "mark-payment-state") {
     return markPaymentState(body);
@@ -189,6 +190,20 @@ export async function POST(req: NextRequest) {
   }
 
   const supabase = createSupabaseServerClient();
+
+  // A manual row that matches a payment already in the ledger (same amount,
+  // platform and payer within days) would count the money twice. Refuse it
+  // unless the admin confirms these are separate transfers.
+  if (!("confirm" in body && body.confirm === true)) {
+    const duplicates = findDuplicateCandidates(rows, await loadNearbyLedger(supabase, rows));
+    if (duplicates.length) {
+      return NextResponse.json({
+        error: `${duplicates.length} row${duplicates.length === 1 ? " looks" : "s look"} like a payment already in the ledger.`,
+        duplicates,
+      }, { status: 409 });
+    }
+  }
+
   const { data, error } = await supabase.from(PAYMENTS_TABLE).insert(rows).select(PAYMENT_SELECT);
 
   if (error) {
