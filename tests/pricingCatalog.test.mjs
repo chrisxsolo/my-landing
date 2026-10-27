@@ -131,7 +131,8 @@ test("graduation travel fees are pinned for every school", () => {
   // $0.70 x round-trip miles, rounded up to $5, plus the westbound toll.
   assert.equal(fees["uc-berkeley"], 43.5);
   assert.equal(fees["csueb"], 63.5);
-  assert.equal(fees["sjsu"], 70);
+  // Approved business fee; the formula alone gives $70 (lib/travelFee.ts).
+  assert.equal(fees["sjsu"], 75);
   assert.equal(fees["santa-clara"], 65);
   assert.equal(fees["stanford"], 50);
   assert.equal(fees["other"], undefined);

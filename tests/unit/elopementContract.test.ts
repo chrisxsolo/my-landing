@@ -33,14 +33,18 @@ vi.mock("@anthropic-ai/sdk", () => ({
 
 const { POST } = await import("@/app/api/generate-contract/route");
 
-async function generate(): Promise<string> {
+async function generateWithPricing(): Promise<{ contract: string; pricing?: { status: string; reason?: string } }> {
   const response = await POST(new NextRequest("https://soloxsnaps.com/api/generate-contract", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ inquiry_id: 4242 }),
   }));
-  const body = await response.json() as { contract?: string };
-  return body.contract ?? "";
+  const body = await response.json() as { contract?: string; pricing?: { status: string; reason?: string } };
+  return { contract: body.contract ?? "", pricing: body.pricing };
+}
+
+async function generate(): Promise<string> {
+  return (await generateWithPricing()).contract;
 }
 
 const ELOPEMENT_INQUIRY = {
@@ -57,7 +61,7 @@ const ELOPEMENT_INQUIRY = {
 
 beforeEach(() => {
   mocks.inquiry = { ...ELOPEMENT_INQUIRY };
-  mocks.extracted = JSON.stringify({ totalFee: "$950", sessionTime: "3:00pm-5:00pm", location: "San Francisco City Hall" });
+  mocks.extracted = JSON.stringify({ agreedTotal: 950, sessionTime: "3:00pm-5:00pm", location: "San Francisco City Hall" });
 });
 
 describe("an elopement contract", () => {
@@ -88,5 +92,32 @@ describe("an elopement contract", () => {
     mocks.inquiry = { ...ELOPEMENT_INQUIRY, session_type: "Family Session", message: "family photos for five" };
     const familyContract = await generate();
     expect(familyContract).toContain(`Minimum of ${PRICING_CATALOG.families.packages.standard.minimumImages} edited images`);
+  });
+});
+
+describe("an SJSU graduation contract", () => {
+  const SJSU = { ...ELOPEMENT_INQUIRY, session_type: "Graduation", school: "San Jose State University", location: null, message: "SJSU grad photos" };
+
+  it("keeps an agreed $425 all-in total at $425, not $500", async () => {
+    mocks.inquiry = SJSU;
+    mocks.extracted = JSON.stringify({ agreedTotal: 425, sessionPrice: 350, travelFee: 75, includesTravel: true });
+    const contract = await generate();
+    expect(contract).toContain("$425");
+    expect(contract).toContain("$212.50");
+    expect(contract).not.toContain("$500");
+  });
+
+  it("adds the approved $75 travel fee to a bare $350 session price", async () => {
+    mocks.inquiry = SJSU;
+    mocks.extracted = JSON.stringify({ sessionPrice: 350 });
+    expect(await generate()).toContain("$425");
+  });
+
+  it("asks for review instead of guessing whether $350 includes travel", async () => {
+    mocks.inquiry = SJSU;
+    mocks.extracted = JSON.stringify({ agreedTotal: 350 });
+    const { contract, pricing } = await generateWithPricing();
+    expect(pricing?.status).toBe("review");
+    expect(contract).toContain("[TOTAL FEE — review the price]");
   });
 });

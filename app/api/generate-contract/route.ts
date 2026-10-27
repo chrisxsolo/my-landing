@@ -5,7 +5,9 @@
 // then fills in the standard portrait photography contract template.
 //
 // Body:     { inquiry_id }
-// Response: { contract: "full contract text..." }
+// Response: { contract: "full contract text...", pricing: ContractPricing }
+//   pricing.status "review" = the price could not be settled without guessing;
+//   the contract then carries a placeholder and the admin is told why.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
@@ -16,9 +18,9 @@ import { requireAdmin } from "@/lib/requireAdmin";
 import {
   PRICING_CATALOG,
   calculatePaymentSchedule,
-  getGraduationTravelFeeFromText,
   getMinimumImageCountForSessionType,
 } from "@/lib/pricingCatalog";
+import { parseExtractedPricing, resolveContractPricing } from "@/lib/contractPricing";
 
 export const dynamic = "force-dynamic";
 
@@ -68,10 +70,6 @@ function ordinal(n: number): string {
 function fmtContractDate(dateStr: string): string {
   const d = new Date(dateStr + "T12:00:00");
   return `${d.toLocaleDateString("en-US", { month: "long" })} ${ordinal(d.getDate())}, ${d.getFullYear()}`;
-}
-
-function parseAmount(str: string): number {
-  return parseFloat(str.replace(/[^0-9.]/g, "")) || 0;
 }
 
 function fmtMoney(n: number): string {
@@ -298,7 +296,11 @@ export async function POST(req: NextRequest) {
     system: `Extract photography booking details from emails. Today is ${today}.
 Respond ONLY with valid JSON (no markdown):
 {
-  "totalFee": "agreed price e.g. '$350' — look for dollar amounts, package prices. null if not found",
+  "agreedTotal": "number: the all-in amount the emails call the total, e.g. 425 from 'so $425 total'. null if no total was stated",
+  "sessionPrice": "number: the session price on its own, before add-ons and travel, e.g. 350. null if not stated",
+  "addOns": "array of {label, amount} add-ons the client agreed to, e.g. [{\"label\":\"Extra outfit\",\"amount\":75}]. [] if none",
+  "travelFee": "number: a travel fee amount stated in the emails. null if none",
+  "includesTravel": "true if the emails say the total includes travel, false if they say travel is extra, null if not said",
   "sessionTime": "meeting time e.g. '4:00pm-5:00pm' or '6pm'. null if not found",
   "location": "meeting spot e.g. 'Legion of Honor, San Francisco'. null if not found",
   "sessionDateReadable": "date in readable form e.g. 'May 24th, 2026'. null if not found"
@@ -316,12 +318,19 @@ ${emailContext || "(no email history found)"}`,
     }],
   });
 
-  let extracted = { totalFee: null as string|null, sessionTime: null as string|null, location: null as string|null, sessionDateReadable: null as string|null };
+  let parsed: Record<string, unknown> = {};
   try {
     const raw = extractRes.content[0].type === "text" ? extractRes.content[0].text.trim() : "{}";
-    const parsed = JSON.parse(raw.replace(/^```(?:json)?\s*/i,"").replace(/\s*```$/i,"").trim());
-    extracted = { ...extracted, ...parsed };
-  } catch { /* use defaults */ }
+    parsed = JSON.parse(raw.replace(/^```(?:json)?\s*/i,"").replace(/\s*```$/i,"").trim());
+  } catch (err) {
+    console.error("[generate-contract] could not parse the extracted booking details", err);
+  }
+  const text = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
+  const extracted = {
+    sessionTime: text(parsed.sessionTime),
+    location: text(parsed.location),
+    sessionDateReadable: text(parsed.sessionDateReadable),
+  };
 
   // ── Build contract fields ─────────────────────────────────────────────────
   const effectiveDate = new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
@@ -332,15 +341,16 @@ ${emailContext || "(no email history found)"}`,
   else if (inq.date_in_mind && inq.date_in_mind.toLowerCase() !== "flexible")
                                        sessionDate = inq.date_in_mind;
 
-  const haystack = [inq.school, inq.session_type, inq.message, inq.email].filter(Boolean).join(" ").toLowerCase();
-  const travelFee = getGraduationTravelFeeFromText(haystack);
-
-  let totalFeeStr  = extracted.totalFee ?? "[TOTAL FEE — fill in]";
-  let totalNum     = parseAmount(totalFeeStr);
-  if (totalNum && travelFee) {
-    totalNum    += travelFee;
-    totalFeeStr  = fmtMoney(totalNum);
-  }
+  // Travel follows the shoot location, and is never added to an agreed all-in total.
+  const pricing = resolveContractPricing({
+    sessionType: inq.session_type ?? null,
+    school: inq.school ?? null,
+    location: extracted.location ?? inq.location ?? null,
+    message: inq.message ?? null,
+    people: inq.people ?? null,
+  }, parseExtractedPricing(parsed));
+  const totalNum = pricing.status === "ok" ? pricing.total : 0;
+  const totalFeeStr = totalNum ? fmtMoney(totalNum) : "[TOTAL FEE — review the price]";
   const paymentSchedule = calculatePaymentSchedule(totalNum);
   const retainerStr = totalNum ? fmtMoney(paymentSchedule.retainer) : "[RETAINER — fill in]";
   const remainingStr = totalNum ? fmtMoney(paymentSchedule.remainingBalance) : "[REMAINING — fill in]";
@@ -359,5 +369,5 @@ ${emailContext || "(no email history found)"}`,
     minimumImages: getMinimumImageCountForSessionType(inq.session_type ?? "Graduation"),
   });
 
-  return NextResponse.json({ contract });
+  return NextResponse.json({ contract, pricing });
 }

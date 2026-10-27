@@ -1109,6 +1109,8 @@ export default function ConversationPage() {
       const json = await res.json();
       if (!res.ok || !json.contract) { showToast(json.error ?? "Contract generation failed", false); return; }
       setContractText(json.contract);
+      // The price needs a human: say why instead of letting a placeholder slip through.
+      if (json.pricing?.status === "review") showToast(`Check the contract price: ${json.pricing.reason}`, false);
     } catch {
       showToast("Contract generation failed", false);
     } finally {
