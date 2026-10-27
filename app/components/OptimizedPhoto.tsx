@@ -20,7 +20,9 @@ export default function OptimizedPhoto({
   sizes,
   className,
   priority = false,
-  loading = "eager",
+  // Photos defer until they near the viewport; pass `priority` for the LCP
+  // image and `loading="eager"` for anything else in the first screen.
+  loading = "lazy",
   quality = 85,
   objectPosition,
   unoptimized = false,
