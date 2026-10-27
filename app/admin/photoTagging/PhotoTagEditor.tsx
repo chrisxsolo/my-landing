@@ -103,7 +103,7 @@ export default function PhotoTagEditor({ photo, options, onChanged, onClose }: P
           Eligible for: {photo.pages.map((k) => pagePath(k) ?? k).join(" · ")}
         </p>
       )}
-      <DistributionPreview key={photo.key} photoKey={photo.key} />
+      <DistributionPreview key={photo.key} photoKey={photo.key} onChanged={onChanged} />
       {photo.sessionId && (
         <p style={{ margin: 0, fontSize: 12, color: T.inkSoft }}>
           Session: <Link href={`/admin/content-engine/${photo.sessionId}`} style={{ color: T.blue }}>{photo.sessionName ?? "open"}</Link>
