@@ -11,7 +11,9 @@ import {
   isLightingCondition, isVibe, isRelationshipType, isSchoolSlug,
   normalizeServiceType,
 } from "@/lib/contentEngine/taxonomy";
-import { BUILT_IN_SCHOOLS, schoolMatchesText, type SchoolOption } from "@/lib/contentEngine/schools";
+import {
+  BUILT_IN_SCHOOLS, findSimilarSchool, schoolMatchesText, type SchoolOption,
+} from "@/lib/contentEngine/schools";
 import { firstNameOf } from "@/lib/contentEngine/prefill";
 import { normalizeSchool } from "@/lib/schoolDetection";
 
@@ -100,18 +102,27 @@ const isRealDate = (value: string): boolean => {
  * Model string → school slug. Saved custom schools match exactly first (so
  * "Berkeley City College" can't fall into UC Berkeley's loose alias), then the
  * built-in alias table maps canonicalName → /grads/<slug> via BUILT_IN_SCHOOLS
- * (typed against SCHOOL_SLUGS, so a new page can't be forgotten here).
+ * (typed against SCHOOL_SLUGS, so a new page can't be forgotten here). Last, a
+ * custom school whose name contains every word of the text ("Samuel Merritt"
+ * for a saved "Samuel Merritt University") is taken when it is the only one.
  * Anything else resolves to no school.
  */
 export function coerceSchool(raw: string, customSchools: readonly SchoolOption[] = []): string | null {
   const value = clean(raw);
   if (!value) return null;
   if (isSchoolSlug(value.toLowerCase())) return value.toLowerCase();
-  const custom = customSchools.find((s) => !s.builtIn && schoolMatchesText(s, value));
-  if (custom) return custom.slug;
+  const custom = customSchools.filter((s) => !s.builtIn);
+  const exact = custom.find((s) => schoolMatchesText(s, value));
+  if (exact) return exact.slug;
   const school = normalizeSchool(value);
-  if (!school) return null;
-  return SCHOOL_SLUGS.find((slug) => BUILT_IN_SCHOOLS[slug].name === school.canonicalName) ?? null;
+  if (school) return SCHOOL_SLUGS.find((slug) => BUILT_IN_SCHOOLS[slug].name === school.canonicalName) ?? null;
+  return onlySimilarCustomSchool(value, custom);
+}
+
+function onlySimilarCustomSchool(value: string, custom: readonly SchoolOption[]): string | null {
+  const candidate = { name: value, shortName: null, slug: "" };
+  const similar = custom.filter((s) => findSimilarSchool(candidate, [s]));
+  return similar.length === 1 ? similar[0].slug : null;
 }
 
 export const FIELD_SPECS: Record<EmailFactField, FieldSpec> = {
