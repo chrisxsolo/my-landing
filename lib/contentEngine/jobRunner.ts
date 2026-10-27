@@ -16,6 +16,8 @@ import type { ModelCaller } from "@/lib/contentEngine/aiClient";
 import { executeStep, type StepEnv, type StepResult } from "@/lib/contentEngine/jobSteps";
 
 export const JOB_LEASE_SECONDS = 120;
+/** How long a run whose step threw waits before a worker may retry it. */
+export const RETRY_BACKOFF_SECONDS = 120;
 // How often a long analysis step renews the job lease (and notices a cancel).
 const HEARTBEAT_MS = 10_000;
 export const MAX_JOB_ATTEMPTS = 5;
@@ -195,6 +197,23 @@ export async function runWorkerOnce(args: RunWorkerArgs): Promise<RunWorkerResul
       .eq("status", "running");
   };
 
+  // An unexpected throw (network blip, a provider 5xx that escaped the step's
+  // own retries) gets the same bounded recovery as a crashed worker: the lease
+  // is left to expire after a short back-off, the next claim counts an
+  // attempt, and claim_content_engine_job retires the run as failed once
+  // attempts run out — keeping this error as its last_error.
+  const releaseForRetry = async (lastError: string) => {
+    await client
+      .from("content_engine_jobs")
+      .update({
+        last_error: lastError,
+        lease_expires_at: new Date(clock() + RETRY_BACKOFF_SECONDS * 1000).toISOString(),
+        updated_at: new Date(clock()).toISOString(),
+      })
+      .eq("id", job.id)
+      .eq("status", "running");
+  };
+
   const handOff = async () => {
     await client
       .from("content_engine_jobs")
@@ -221,10 +240,11 @@ export async function runWorkerOnce(args: RunWorkerArgs): Promise<RunWorkerResul
     try {
       step = await executeStep(ctx, job, skip, env);
     } catch (err) {
-      // An unexpected throw is still the admin's problem to see, not a silent
-      // stall: record it and let attempts/lease recovery handle a flake.
-      await finish("failed", message(err));
-      return result({ status: "failed", phase: "done" });
+      // Recorded where the admin sees it, then retried a bounded number of times.
+      const reason = message(err);
+      console.error(`[content-engine] job ${job.id} step threw (attempt ${job.attempts + 1}): ${reason}`);
+      await releaseForRetry(reason);
+      return result({ status: "running", handedOff: false });
     }
 
     for (const type of step.skipTypes ?? []) skip.add(type);

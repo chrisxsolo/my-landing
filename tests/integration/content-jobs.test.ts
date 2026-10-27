@@ -437,6 +437,45 @@ describe("runWorkerOnce", () => {
     expect(peak).toBe(2);
   });
 
+  it("retries a run whose step threw instead of failing it outright", async () => {
+    const { sessionId } = await seedSession();
+    const { job_id } = await enqueue(sessionId);
+
+    // The first read of any content table throws, as a network blip would.
+    let thrown = false;
+    const flaky = new Proxy(service, {
+      get(target, prop, receiver) {
+        if (prop !== "from") return Reflect.get(target, prop, receiver);
+        return (table: string) => {
+          if (!thrown && table !== "content_engine_jobs") {
+            thrown = true;
+            throw new Error("socket hang up");
+          }
+          return target.from(table);
+        };
+      },
+    });
+
+    const first = await runWorkerOnce({ client: flaky, callModel: fakeModel().caller });
+    expect(thrown).toBe(true);
+    expect(first.status).toBe("running");
+    const held = await jobRow(job_id);
+    expect(held.status).toBe("running");
+    expect(held.last_error).toMatch(/socket hang up/);
+    expect(new Date(held.lease_expires_at!).getTime()).toBeGreaterThan(Date.now());
+
+    // After the back-off the next tick reclaims it (one attempt) and finishes.
+    await service.from("content_engine_jobs")
+      .update({ lease_expires_at: new Date(Date.now() - 1000).toISOString() }).eq("id", job_id);
+    for (let i = 0; i < 6; i += 1) {
+      const step = await runWorkerOnce({ client: service, callModel: fakeModel().caller });
+      if (step.status === "succeeded" || !step.picked) break;
+    }
+    const done = await jobRow(job_id);
+    expect(done.status).toBe("succeeded");
+    expect(done.attempts).toBe(1);
+  });
+
   it("retires a run that keeps crashing instead of retrying it forever", async () => {
     const { sessionId } = await seedSession();
     const { job_id } = await enqueue(sessionId);
