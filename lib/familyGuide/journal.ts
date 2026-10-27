@@ -5,6 +5,8 @@
 // FAMILY_JOURNAL_CATEGORY for the family journal strip.
 
 export const FAMILY_JOURNAL_CATEGORY = "family-photography";
+/** The family journal archive. Public pages link it only while it has posts. */
+export const FAMILY_JOURNAL_PATH = `/blog/category/${FAMILY_JOURNAL_CATEGORY}`;
 
 export {
   BLOG_CATEGORIES,

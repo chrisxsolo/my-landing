@@ -10,6 +10,7 @@ import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
 import { FAMILY_GUIDE_CSS } from "@/lib/familyGuide/styles";
 import { locationDisplayName, type FamilyLocationData } from "@/lib/familyGuide/types";
 import type { FamilyPhoto } from "@/lib/familyGuide/photos";
+import { FAMILY_JOURNAL_PATH } from "@/lib/familyGuide/journal";
 import FamilyJournalStrip from "../../FamilyJournalStrip";
 import ContentEventBeacon from "@/app/components/ContentEventBeacon";
 
@@ -26,7 +27,7 @@ const relatedLinks = [
   { href: "/family-guide/how-to-prepare", title: "How to Prepare", desc: "Make session day easy with kids." },
   { href: "/family-guide/faq", title: "Family FAQ", desc: "Booking, kids, delivery, and more." },
   { href: "/pricing/families", title: "Family Pricing", desc: "Session lengths and what's included." },
-  { href: "/blog/category/family-photography", title: "Family Photography Journal", desc: "Location guides and seasonal tips." },
+  { href: FAMILY_JOURNAL_PATH, title: "Family Photography Journal", desc: "Location guides and seasonal tips." },
 ];
 
 function Paragraphs({ items }: { items: string[] }) {
@@ -36,11 +37,15 @@ function Paragraphs({ items }: { items: string[] }) {
 export default function FamilyLocationTemplate({
   data,
   photos,
+  journalHasPosts,
 }: {
   data: FamilyLocationData;
   photos: FamilyPhoto[];
+  /** The journal archive is noindex while empty, so its link waits for a first post. */
+  journalHasPosts: boolean;
 }) {
   const name = locationDisplayName(data);
+  const visibleRelated = journalHasPosts ? relatedLinks : relatedLinks.filter((l) => l.href !== FAMILY_JOURNAL_PATH);
   const hero = photos[0] ?? null;
   const inquireHref = contactHref(name);
 
@@ -194,7 +199,7 @@ export default function FamilyLocationTemplate({
           <p className="fg-sec-kicker" data-reveal>Keep planning</p>
           <h2 className="fg-sec-title" data-reveal>Related family resources</h2>
           <div className="fg-related">
-            {relatedLinks.map((l) => (
+            {visibleRelated.map((l) => (
               <Link key={l.href} href={l.href} data-reveal data-delay="1">
                 <span className="fg-related-title">{l.title}</span>
                 <span className="fg-related-desc">{l.desc}</span>
