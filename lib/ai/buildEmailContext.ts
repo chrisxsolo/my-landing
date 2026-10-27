@@ -12,8 +12,8 @@
 
 import { classifySession } from "./sessionClassifier";
 import { TRAVEL_RATE_LABEL } from "@/lib/travelFee";
-import { buildPricingFacts, buildTravelFact, buildPolicyFacts, buildContactFacts, type PricingFacts } from "./businessFacts";
-import { resolveTravel, type TravelResolution } from "@/lib/travelResolution";
+import { buildPricingFacts, renderTravelFact, buildPolicyFacts, buildContactFacts, type PricingFacts } from "./businessFacts";
+import { resolveTravel, schoolImpliesLocationFor, type TravelResolution } from "@/lib/travelResolution";
 import { parseQuotedPrices, staleQuotedPrices } from "./quotePricing";
 import { buildGoldenHourWindow, goldenHourCaveat, type GoldenHourWindow } from "./goldenHour";
 import { buildThreadDigest, renderThreadDigest, type ThreadDigest, type ThreadMessage } from "./threadDigest";
@@ -282,7 +282,13 @@ export function buildEmailContext(input: BuildEmailContextInput): EmailContext {
   // A shoot outside the city whose travel fee is not in the rate card, on top
   // of a session price that IS. That combination is where a confident-sounding
   // total goes out short by the travel fee.
-  const travelFact = buildTravelFact(inquiry.school, inquiry.location, inquiry.message);
+  // The school stands in for the shoot location only for a graduation, the
+  // same rule the contract applies (lib/contractPricing.ts).
+  const travel = resolveTravel({
+    school: inquiry.school, location: inquiry.location, message: inquiry.message,
+    schoolImpliesLocation: schoolImpliesLocationFor(playbook),
+  });
+  const travelFact = renderTravelFact(travel);
   if (travelFact?.includes("NOT in the rate card") && pricingFacts.verified) {
     warnings.push({
       code: "travel_unverified",
@@ -293,7 +299,6 @@ export function buildEmailContext(input: BuildEmailContextInput): EmailContext {
 
   // ── Thread, administrative status, conversation stage ───────────────────
   const digest = buildThreadDigest(messages, now);
-  const travel = resolveTravel({ school: inquiry.school, location: inquiry.location, message: inquiry.message });
   const confirmedPrices = input.confirmedPrices ?? [];
   const stalePrices = staleQuotedPrices(parseQuotedPrices(digest.quotedPrices), {
     playbook, people: inquiry.people != null ? String(inquiry.people) : null,

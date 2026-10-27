@@ -18,7 +18,7 @@ import {
   calculatePaymentSchedule,
 } from "@/lib/pricingCatalog";
 import { resolvePlaybookKey } from "./sessionClassifier";
-import { resolveTravel } from "@/lib/travelResolution";
+import { resolveTravel, type TravelResolution } from "@/lib/travelResolution";
 
 export type PricingFacts = {
   verified: boolean;
@@ -400,9 +400,13 @@ export function buildTravelFact(
   school: string | null | undefined,
   location?: string | null,
   message?: string | null,
+  options: { schoolImpliesLocation?: boolean } = {},
 ): string | null {
-  const travel = resolveTravel({ school, location, message });
+  return renderTravelFact(resolveTravel({ school, location, message, ...options }));
+}
 
+/** The travel fact for an already-resolved destination. */
+export function renderTravelFact(travel: TravelResolution): string | null {
   // Worded as a constraint on CLAIMS, with relevance left to the stage, so an
   // out-of-city draft only mentions travel when it is quoting a price.
   const unknown = (subject: string) =>

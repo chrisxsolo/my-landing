@@ -15,7 +15,7 @@
 
 import { classifySession } from "./ai/sessionClassifier";
 import { GRAD_HOURLY_RATE, getGroupRatePerPerson } from "./pricing";
-import { resolveTravel, type TravelResolution } from "./travelResolution";
+import { resolveTravel, schoolImpliesLocationFor, type TravelResolution } from "./travelResolution";
 
 export interface ExtractedPricing {
   /** An amount the thread calls the total / all-in price. */
@@ -48,12 +48,13 @@ const money = (n: number) => (Number.isInteger(n) ? `$${n}` : `$${n.toFixed(2)}`
 
 function travelFor(booking: ContractBooking): TravelResolution {
   const service = classifySession(booking.sessionType, booking.message).key;
+  const graduation = schoolImpliesLocationFor(service);
   return resolveTravel({
     school: booking.school,
     location: booking.location,
     // The message may name an out-of-city place; a campus mention alone counts only for a graduation.
-    message: service === "graduation" ? booking.message : null,
-    schoolImpliesLocation: service === "graduation",
+    message: graduation ? booking.message : null,
+    schoolImpliesLocation: graduation,
   });
 }
 

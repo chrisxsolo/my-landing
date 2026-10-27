@@ -119,6 +119,16 @@ export interface TravelInput {
   schoolImpliesLocation?: boolean;
 }
 
+/**
+ * Whether a service's school field stands in for the shoot location. Only a
+ * graduation is shot on the client's campus by default; every surface (Draft
+ * AI, contract, payment totals) asks this one function so a couples client
+ * who lists SJSU is never billed SJSU travel on one surface and not another.
+ */
+export function schoolImpliesLocationFor(service: string | null | undefined): boolean {
+  return service === "graduation";
+}
+
 export function resolveTravel(input: TravelInput): TravelResolution {
   const school = (input.school ?? "").trim();
   const field = (input.location ?? "").trim();
