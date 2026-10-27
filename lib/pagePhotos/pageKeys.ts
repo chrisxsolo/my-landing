@@ -6,6 +6,9 @@
 
 export const PAGE_PHOTO_CURATION_TABLE = "page_photo_curation";
 
+/** The one shared session group for older uploads that belong to no known shoot. */
+export const LEGACY_SESSION_KEY = "legacy";
+
 export const PAGE_KINDS = ["grads", "couples", "family", "portrait"] as const;
 export type PageKind = (typeof PAGE_KINDS)[number];
 

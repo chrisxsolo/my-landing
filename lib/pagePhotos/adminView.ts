@@ -135,6 +135,8 @@ export function curate(loaded: Loaded, key: string): { candidates: PageCandidate
 function explain(loaded: Loaded, c: PageCandidate): string {
   if (c.explicit) return c.id.startsWith("school:") ? "Content Engine school placement" : "uploaded to this guide";
   if (c.id.startsWith("session:")) return "school from Content Engine session · live in a journal post";
+  const journal = loaded.pool.journal.find((j) => j.id === c.id);
+  if (journal) return `from journal post "${journal.postTitle}" · school from the post's title`;
   const photo = loaded.pool.photos.find((p) => p.url === c.url);
   if (!photo) return "matched";
   const school = photo.schoolSource ? `school from ${photo.schoolSource === "tag" ? "photo tag" : photo.schoolSource === "session" ? "Content Engine session" : "photo text"}` : null;

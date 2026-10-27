@@ -4,7 +4,7 @@ import {
   inferSchoolFromText, indexEngineSources, resolvePhoto,
   type EngineSource, type PortfolioSource, type ResolveContext,
 } from "@/lib/pagePhotos/resolve";
-import { pagePath, parsePageKey } from "@/lib/pagePhotos/pageKeys";
+import { LEGACY_SESSION_KEY, pagePath, parsePageKey } from "@/lib/pagePhotos/pageKeys";
 
 const ctx: ResolveContext = {
   places: KNOWN_PLACES,
@@ -147,16 +147,22 @@ describe("resolvePhoto — publication safety", () => {
 });
 
 describe("resolvePhoto — session grouping", () => {
-  it("groups older photos that share a specific title", () => {
+  it("puts every older upload with no shoot on record in the one shared legacy group", () => {
     const a = resolvePhoto(photo({ id: 1, title: "SJSU Golden Hour Graduation Portrait" }), null, ctx);
-    const b = resolvePhoto(photo({ id: 2, title: "SJSU Golden Hour Graduation Portrait" }), null, ctx);
-    expect(a.sessionKey).toBe(b.sessionKey);
+    const b = resolvePhoto(photo({ id: 2, title: "UC Berkeley grad waving navy stole at Doe Library" }), null, ctx);
+    const c = resolvePhoto(photo({ id: 3, title: "Graduation portrait" }), null, ctx);
+    expect(a.sessionKey).toBe(LEGACY_SESSION_KEY);
+    expect(b.sessionKey).toBe(LEGACY_SESSION_KEY);
+    expect(c.sessionKey).toBe(LEGACY_SESSION_KEY);
+    expect(a.sessionDate).toBeNull();
   });
 
-  it("never groups untitled photos by the category placeholder title", () => {
-    const a = resolvePhoto(photo({ id: 3, title: "Graduation portrait" }), null, ctx);
-    const b = resolvePhoto(photo({ id: 4, title: "Graduation portrait" }), null, ctx);
-    expect(a.sessionKey).not.toBe(b.sessionKey);
+  it("keeps real shoots as their own groups: a Content Engine session (with its date) or a session label", () => {
+    const fromEngine = resolvePhoto(photo({ id: 1 }), engine({ sessionId: "trang", sessionDate: "2026-05-23" }), ctx);
+    const labelled = resolvePhoto(photo({ id: 2, sessionLabel: "Kim · May 2026" }), null, ctx);
+    expect(fromEngine.sessionKey).toBe("session:trang");
+    expect(fromEngine.sessionDate).toBe("2026-05-23");
+    expect(labelled.sessionKey).toBe("label:Kim · May 2026");
   });
 });
 

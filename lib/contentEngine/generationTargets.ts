@@ -7,7 +7,9 @@ import {
   buildJournalPrompt, buildPortfolioPickPrompt, buildSchoolPagePhotoPrompt,
   buildGradSpotPrompt, buildInternalLinkPrompt,
 } from "@/lib/contentEngine/prompts";
-import { guideTypeForService, isSchoolSlug, SPOT_SCHOOL_IDS } from "@/lib/contentEngine/taxonomy";
+import {
+  guideTypeForService, isSchoolSlug, portfolioCategoryForService, SPOT_SCHOOL_IDS,
+} from "@/lib/contentEngine/taxonomy";
 import { downloadOriginal, encodeImageForModel, toImageBlock } from "@/lib/contentEngine/modelImages";
 import {
   GenerationError, assertKnownPhotos, callForJson, deterministicKeywords, excerptOf, keepKnownPhotoPlacements,
@@ -163,8 +165,13 @@ async function portfolioTarget(ctx: TargetContext): Promise<TargetResult> {
   const parsed = picksResponseSchema.safeParse(json);
   if (!parsed.success) throw new GenerationError(`malformed picks response: ${parsed.error.message}`);
 
+  // The session's service decides the category (an SF State grad session never
+  // publishes to Families); the model's category only fills in when the
+  // service has no portfolio category of its own.
+  const sessionCategory = portfolioCategoryForService(ctx.facts.service_type);
   const itemSpecs = parsed.data.picks.map((raw) => {
-    const payload = validated("portfolio_pick", raw);
+    const pick = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+    const payload = validated("portfolio_pick", sessionCategory ? { ...pick, category: sessionCategory } : raw);
     assertKnownPhotos([payload.session_photo_id as string], known);
     return {
       content_type: "portfolio_pick", payload,

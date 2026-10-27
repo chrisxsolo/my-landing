@@ -191,7 +191,7 @@ describe("school vs place stay separate", () => {
   );
   const sfsuLegion = resolvePhoto(portfolio(3), engine({ url: "u3", sessionId: "s3", primaryLocation: "Legion of Honor" }), ctx);
   const pool: PhotoPool = {
-    photos: [sfsuPalace, couplesPalace, sfsuLegion], explicitSchool: [], sessionSchool: [], curation: [], spotTags: [], errors: [],
+    photos: [sfsuPalace, couplesPalace, sfsuLegion], explicitSchool: [], sessionSchool: [], journal: [], curation: [], spotTags: [], errors: [],
   };
 
   it("an SF State grad photo at the Palace reaches the SFSU page and the Palace portrait guide", () => {

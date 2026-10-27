@@ -9,8 +9,12 @@
 //      their session's top picks inside the round-robin below
 //   4. automatically matched photos: each session's best first (featured,
 //      then AI quality score), taken round-robin across sessions so one big
-//      shoot can't fill the page with near-identical frames
+//      shoot can't fill the page with near-identical frames. Newer shoots
+//      lead each round; older uploads with no shoot on record share one
+//      group (pageKeys.ts LEGACY_SESSION_KEY) and go last, so they can never
+//      crowd a real session off the page.
 // Pins only reorder photos that are already eligible; a pin never publishes.
+import { LEGACY_SESSION_KEY } from "@/lib/pagePhotos/pageKeys";
 
 export interface PageCandidate {
   id: string;
@@ -26,6 +30,8 @@ export interface PageCandidate {
   quality: number | null;
   sortOrder: number;
   sessionKey: string;
+  /** When the shoot happened (ISO), when known. Newer shoots lead each round. */
+  sessionDate?: string | null;
   /** Known place the photo was taken at, from location evidence only. */
   placeKey?: string | null;
 }
@@ -67,13 +73,27 @@ function bySessionRank(a: PageCandidate, b: PageCandidate): number {
     || a.url.localeCompare(b.url);
 }
 
+const groupDate = (group: readonly PageCandidate[]): string | null =>
+  group.map((c) => c.sessionDate ?? null).filter((d): d is string => d !== null).sort().at(-1) ?? null;
+
+// Real shoots lead, newest first; shoots with no date follow by their best
+// photo; the shared group of older uploads with no shoot on record goes last.
+function byGroupPriority(a: readonly PageCandidate[], b: readonly PageCandidate[]): number {
+  const legacy = Number(a[0].sessionKey === LEGACY_SESSION_KEY) - Number(b[0].sessionKey === LEGACY_SESSION_KEY);
+  if (legacy !== 0) return legacy;
+  const [da, db] = [groupDate(a), groupDate(b)];
+  if (da && db && da !== db) return db.localeCompare(da);
+  if (Boolean(da) !== Boolean(db)) return da ? -1 : 1;
+  return bySessionRank(a[0], b[0]);
+}
+
 /** Best-of-each-session first, then second-best of each, and so on. */
 export function roundRobinBySession(candidates: readonly PageCandidate[]): PageCandidate[] {
   const groups = new Map<string, PageCandidate[]>();
   for (const c of candidates) groups.set(c.sessionKey, [...(groups.get(c.sessionKey) ?? []), c]);
   const ranked = [...groups.values()]
     .map((group) => [...group].sort(bySessionRank))
-    .sort((a, b) => bySessionRank(a[0], b[0]));
+    .sort(byGroupPriority);
   const longest = Math.max(0, ...ranked.map((g) => g.length));
   return Array.from({ length: longest }, (_, round) => ranked.flatMap((g) => (g[round] ? [g[round]] : []))).flat();
 }
