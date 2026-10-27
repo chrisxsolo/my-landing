@@ -11,6 +11,8 @@ const mocks = vi.hoisted(() => ({
   searchQueries: [] as string[],
   updates: [] as { table: string; values: Record<string, unknown> }[],
   upserts: [] as { table: string; values: Record<string, unknown> }[],
+  inserts: [] as { table: string; values: Record<string, unknown> }[],
+  existingRows: {} as Record<string, { id: number }[]>,
 }));
 
 vi.mock("@/lib/requireAdmin", () => ({ requireAdmin: () => null }));
@@ -27,6 +29,17 @@ vi.mock("@/lib/supabaseServer", () => ({
       upsert: async (values: Record<string, unknown>) => {
         mocks.upserts.push({ table, values });
         return { error: null };
+      },
+      insert: async (values: Record<string, unknown>) => {
+        mocks.inserts.push({ table, values });
+        return { error: null };
+      },
+      select: () => {
+        const chain = {
+          eq: () => chain,
+          limit: async () => ({ data: mocks.existingRows[table] ?? [], error: null }),
+        };
+        return chain;
       },
     }),
   }),
@@ -83,6 +96,8 @@ beforeEach(() => {
   mocks.searchQueries.length = 0;
   mocks.updates.length = 0;
   mocks.upserts.length = 0;
+  mocks.inserts.length = 0;
+  mocks.existingRows = {};
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
 
@@ -126,6 +141,38 @@ describe("POST /api/check-payment", () => {
     expect(String(mocks.updates[0].values.payment_note)).toContain("$200");
   });
 
+  it("stages a paid result for revenue review so Paid never sits beside a $0 ledger", async () => {
+    mocks.claudeText = '{"paid": true, "amount": "$200", "method": "Venmo", "note": "Client confirmed the deposit"}';
+    const res = await callRoute();
+    const json = await res.json();
+
+    expect(json.ledger).toBe("staged");
+    expect(mocks.inserts).toHaveLength(1);
+    expect(mocks.inserts[0].table).toBe("payments_staging");
+    expect(mocks.inserts[0].values).toMatchObject({
+      inquiry_id: 42, amount_cents: 20000, method: "Venmo", status: "pending", source: "auto",
+    });
+  });
+
+  it("does not stage a second copy when the payment is already recorded", async () => {
+    mocks.claudeText = '{"paid": true, "amount": "$200", "method": "Venmo", "note": "Client confirmed the deposit"}';
+    mocks.existingRows = { payments: [{ id: 7 }] };
+    const json = await (await callRoute()).json();
+
+    expect(json.ledger).toBe("already_recorded");
+    expect(mocks.inserts).toHaveLength(0);
+  });
+
+  it("warns instead of staging when a paid result has no amount", async () => {
+    mocks.claudeText = '{"paid": true, "amount": null, "method": "Venmo", "note": "Client said they paid"}';
+    const json = await (await callRoute()).json();
+
+    expect(json.paid).toBe(true);
+    expect(json.ledger).toBe("no_amount");
+    expect(json.warning).toContain("nothing was added to revenue");
+    expect(mocks.inserts).toHaveLength(0);
+  });
+
   it("searches client-attributed evidence before generic provider queries", async () => {
     mocks.claudeText = '{"paid": false, "amount": null, "method": null, "note": "No payment evidence found"}';
     await callRoute();
@@ -160,5 +207,7 @@ describe("POST /api/check-payment", () => {
     expect(mocks.updates).toHaveLength(1);
     expect(mocks.updates[0].values.payment_status).toBeUndefined();
     expect(mocks.updates[0].values.payment_note).toBe("No payment evidence found");
+    expect(mocks.inserts).toHaveLength(0);
+    expect(json.ledger).toBeUndefined();
   });
 });

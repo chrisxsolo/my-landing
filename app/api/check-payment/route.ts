@@ -8,7 +8,10 @@
 //   session_date: YYYY-MM-DD — if payment found, marks that date as "booked"
 //
 // Response:
-//   200 { paid, amount, method, note, session_date_booked, evidence, warning? }
+//   200 { paid, amount, method, note, session_date_booked, evidence, ledger?, warning? }
+//       ledger (only when paid): "staged" | "already_recorded" | "no_amount" | "failed"
+//       — a paid result is staged for revenue review so "Paid" never sits
+//       beside a $0 ledger with no trace.
 //   502 { error, code, raw_preview? }  — Gmail or analysis failed; nothing was
 //       written. An analysis failure is an application error, not "unpaid".
 // ─────────────────────────────────────────────────────────────────────────────
@@ -25,6 +28,7 @@ import {
   parsePaymentDetectionResult,
   sanitizeModelPreview,
 } from "@/lib/paymentDetection";
+import { stageDetectedPayment, type LedgerStagingOutcome } from "@/lib/checkPaymentLedger";
 
 export const dynamic = "force-dynamic";
 
@@ -292,6 +296,7 @@ export async function POST(req: NextRequest) {
 
   const validSessionDate = session_date && /^\d{4}-\d{2}-\d{2}$/.test(session_date) ? session_date : null;
   let warning: string | undefined;
+  let ledger: LedgerStagingOutcome | undefined;
 
   if (result.paid) {
     const now = new Date().toISOString();
@@ -314,6 +319,20 @@ export async function POST(req: NextRequest) {
     if (session_date && !validSessionDate) {
       warning = "session_date was not in YYYY-MM-DD format and was not saved.";
     }
+
+    const inquiryId = Number(inquiry_id);
+    ledger = Number.isSafeInteger(inquiryId) && inquiryId > 0
+      ? await stageDetectedPayment(supabase, {
+          inquiryId, clientName: name, clientEmail: email,
+          amount: result.amount, method: result.method, note: result.note,
+          sessionDate: validSessionDate, evidence: emailContext, detectedAt: now,
+        })
+      : "failed";
+    if (ledger === "no_amount") {
+      warning = "Marked paid, but no amount was found, so nothing was added to revenue. Use Mark paid manually to record it.";
+    } else if (ledger === "failed") {
+      warning = "Marked paid, but the payment could not be queued for revenue review. Record it manually.";
+    }
   } else {
     // Record that we checked; non-critical, so a failure only warns.
     const { error: noteError } = await supabase.from(INQUIRIES_TABLE).update({
@@ -334,7 +353,8 @@ export async function POST(req: NextRequest) {
     );
     if (availError) {
       console.error("[check-payment] availability upsert failed:", availError);
-      warning = "Payment saved, but the calendar date could not be marked as booked.";
+      warning = [warning, "Payment saved, but the calendar date could not be marked as booked."]
+        .filter(Boolean).join(" ");
     } else {
       session_date_booked = true;
     }
@@ -347,6 +367,7 @@ export async function POST(req: NextRequest) {
     note:   paymentNote,
     session_date_booked,
     evidence,
+    ...(ledger ? { ledger } : {}),
     ...(warning ? { warning } : {}),
   });
 }

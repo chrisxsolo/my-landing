@@ -845,7 +845,7 @@ export default function ConversationPage() {
       });
       const json = await readJsonSafe(res) as {
         paid?: boolean; note?: string; session_date_booked?: boolean;
-        warning?: string; error?: string;
+        ledger?: string; warning?: string; error?: string;
       };
 
       // A non-ok response means the analysis broke (Gmail, Claude, parsing,
@@ -859,6 +859,7 @@ export default function ConversationPage() {
       if (json.paid) {
         showToast(`Payment confirmed — ${json.note}`);
         if (json.session_date_booked) showToast(`Calendar marked as booked`);
+        if (json.ledger === "staged") showToast("Added to the revenue review queue — approve it in Payments once the money arrives");
         if (json.warning) showToast(json.warning, false);
       } else {
         showToast(json.note || "No payment evidence found", false);
