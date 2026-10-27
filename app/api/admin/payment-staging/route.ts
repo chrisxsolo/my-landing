@@ -8,6 +8,9 @@
 //            whose fingerprint already exists in the ledger are marked
 //            duplicate instead of inserted) and applies the inquiry /
 //            availability side effects that used to happen at sync time.
+//            Rows that look like a transfer already in the ledger under other
+//            evidence (lib/paymentMatching) stay pending and are returned in
+//            `held` unless their id is listed in `confirmIds`.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { type NextRequest, NextResponse } from "next/server";
@@ -15,6 +18,7 @@ import { requireAdmin } from "@/lib/requireAdmin";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { advancePortalSessionForDeposit } from "@/lib/adminPortalSessionUpsert";
 import { buildBookedAvailabilityNote } from "@/lib/clientSessions";
+import { CROSS_SOURCE_WINDOW_MS, SAME_PAYER_WINDOW_MS, findLedgerMatches, type MatchablePayment } from "@/lib/paymentMatching";
 
 export const dynamic = "force-dynamic";
 
@@ -82,7 +86,7 @@ export async function POST(req: NextRequest) {
   const deny = requireAdmin(req);
   if (deny) return deny;
 
-  const body = await req.json().catch(() => null) as { action?: string; ids?: unknown } | null;
+  const body = await req.json().catch(() => null) as { action?: string; ids?: unknown; confirmIds?: unknown } | null;
   const ids = parseIds(body?.ids);
   if (!body || !["approve", "reject"].includes(body.action ?? "") || !ids) {
     return NextResponse.json(
@@ -94,7 +98,10 @@ export async function POST(req: NextRequest) {
   try {
     const supabase = createSupabaseServerClient();
     if (body.action === "reject") return await rejectRows(supabase, ids);
-    return await approveRows(supabase, ids);
+    const confirmIds = new Set(Array.isArray(body.confirmIds)
+      ? body.confirmIds.filter((id): id is number => Number.isInteger(id) && id > 0)
+      : []);
+    return await approveRows(supabase, ids, confirmIds);
   } catch (err) {
     console.error("[payment-staging] POST failed:", err);
     return NextResponse.json({ error: "Failed to update staged payments." }, { status: 500 });
@@ -112,7 +119,26 @@ async function rejectRows(supabase: SupabaseServerClient, ids: number[]) {
   return NextResponse.json({ ok: true, rejected: count ?? 0 });
 }
 
-async function approveRows(supabase: SupabaseServerClient, ids: number[]) {
+const LEDGER_MATCH_SELECT = "id,inquiry_id,client_name,client_email,amount_cents,method,paid_at,source,source_txn_id,invoice";
+
+// Active ledger rows close enough in amount and time to be the same transfer.
+async function loadNearbyLedger(supabase: SupabaseServerClient, rows: StagedRow[]): Promise<MatchablePayment[]> {
+  if (!rows.length) return [];
+  const times = rows.map(r => new Date(r.paid_at).getTime()).filter(t => !Number.isNaN(t));
+  if (!times.length) return [];
+  const pad = Math.max(SAME_PAYER_WINDOW_MS, CROSS_SOURCE_WINDOW_MS);
+  const { data, error } = await supabase
+    .from(PAYMENTS_TABLE)
+    .select(LEDGER_MATCH_SELECT)
+    .eq("status", "active")
+    .in("amount_cents", [...new Set(rows.map(r => r.amount_cents))])
+    .gte("paid_at", new Date(Math.min(...times) - pad).toISOString())
+    .lte("paid_at", new Date(Math.max(...times) + pad).toISOString());
+  if (error) throw error;
+  return (data ?? []) as unknown as MatchablePayment[];
+}
+
+async function approveRows(supabase: SupabaseServerClient, ids: number[], confirmIds: Set<number>) {
   const { data, error } = await supabase
     .from(STAGING_TABLE)
     .select(STAGING_SELECT)
@@ -131,8 +157,11 @@ async function approveRows(supabase: SupabaseServerClient, ids: number[]) {
   if (existingError) throw existingError;
   const taken = new Set((existing ?? []).map(p => p.fingerprint as string));
 
+  const ledger = await loadNearbyLedger(supabase, rows);
+
   let approved = 0;
   let skippedDuplicates = 0;
+  const held: { id: number; matches: number[] }[] = [];
   const reviewedAt = new Date().toISOString();
 
   for (const row of rows) {
@@ -144,7 +173,13 @@ async function approveRows(supabase: SupabaseServerClient, ids: number[]) {
       continue;
     }
 
-    const { error: insertError } = await supabase.from(PAYMENTS_TABLE).insert({
+    const matches = findLedgerMatches({ ...row, id: -row.id }, ledger);
+    if (matches.length && !confirmIds.has(row.id)) {
+      held.push({ id: row.id, matches: matches.map(m => m.id) });
+      continue;
+    }
+
+    const { data: inserted, error: insertError } = await supabase.from(PAYMENTS_TABLE).insert({
       inquiry_id: row.inquiry_id,
       client_name: row.client_name,
       client_email: row.client_email,
@@ -163,7 +198,7 @@ async function approveRows(supabase: SupabaseServerClient, ids: number[]) {
       imported_at: reviewedAt,
       reconciliation_status: "confirmed",
       reconciled_at: reviewedAt,
-    });
+    }).select("id").single<{ id: number }>();
 
     if (insertError) {
       // Unique fingerprint race: treat as duplicate rather than failing the batch.
@@ -176,6 +211,8 @@ async function approveRows(supabase: SupabaseServerClient, ids: number[]) {
     }
 
     taken.add(row.fingerprint);
+    // Later rows in this batch must also see the payment just inserted.
+    ledger.push({ ...row, id: inserted?.id ?? -row.id });
     await supabase.from(STAGING_TABLE)
       .update({ status: "approved", reviewed_at: reviewedAt })
       .eq("id", row.id);
@@ -183,7 +220,7 @@ async function approveRows(supabase: SupabaseServerClient, ids: number[]) {
     approved++;
   }
 
-  return NextResponse.json({ ok: true, approved, skippedDuplicates });
+  return NextResponse.json({ ok: true, approved, skippedDuplicates, held });
 }
 
 // Inquiry + availability + portal-session updates that previously ran inside

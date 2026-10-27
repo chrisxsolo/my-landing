@@ -5,6 +5,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { findDuplicateSuspects, normalizePaymentMethod, type PaymentRow } from "@/lib/paymentFilters";
+import { findLedgerMatches, suggestDuplicateToVoid } from "@/lib/paymentMatching";
 import { fmtDate, fmtMoney } from "@/lib/revenue/format";
 import { summarizePendingReview, type PendingReviewSummary } from "@/lib/paymentSyncShared";
 import { GlassPanel } from "./Glass";
@@ -54,17 +55,20 @@ export default function ReviewQueuePanel({ activeRows, reloadToken, onLedgerChan
   useEffect(() => { loadStaged(); }, [loadStaged, reloadToken]);
   useEffect(() => { onPendingChange?.(summarizePendingReview(staged)); }, [staged, onPendingChange]);
 
-  async function review(action: "approve" | "reject", ids: number[]) {
+  async function review(action: "approve" | "reject", ids: number[], confirmIds: number[] = []) {
     setBusyIds(prev => new Set([...prev, ...ids]));
     setError("");
     try {
       const res = await fetch("/api/admin/payment-staging", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, ids }),
+        body: JSON.stringify({ action, ids, confirmIds }),
       });
-      const json = await res.json() as { ok?: boolean; error?: string };
+      const json = await res.json() as { ok?: boolean; error?: string; held?: { id: number; matches: number[] }[] };
       if (!json.ok) throw new Error(json.error ?? "Review failed");
+      if (json.held?.length) {
+        setError(`${json.held.length} payment${json.held.length === 1 ? "" : "s"} held back: already in the ledger as ${json.held.map(h => h.matches.map(m => `#${m}`).join("/")).join(", ")}. Approve individually only if they are separate transfers.`);
+      }
       await loadStaged();
       if (action === "approve") onLedgerChanged();
     } catch (err) {
@@ -111,6 +115,19 @@ export default function ReviewQueuePanel({ activeRows, reloadToken, onLedgerChan
   }
 
   const duplicateGroups = findDuplicateSuspects(activeRows);
+  const ledgerActive = activeRows.filter(r => r.status === "active");
+  const conflicts = new Map(staged.map(s => [s.id, findLedgerMatches({ ...s, id: -s.id }, ledgerActive)]));
+  const cleanIds = staged.filter(s => !conflicts.get(s.id)?.length).map(s => s.id);
+
+  function approveOne(s: StagedPayment) {
+    const matches = conflicts.get(s.id) ?? [];
+    if (!matches.length) return review("approve", [s.id]);
+    const list = matches.map(m => `#${m.id} ${m.client_name} ${fmtMoney(m.amount_cents)} ${fmtDate(m.paid_at)}`).join("\n");
+    if (window.confirm(`This looks like a payment already in the ledger:\n${list}\n\nApprove anyway as a separate transfer?`)) {
+      review("approve", [s.id], [s.id]);
+    }
+  }
+
   if (!staged.length && !duplicateGroups.length) return null;
 
   return (
@@ -124,11 +141,12 @@ export default function ReviewQueuePanel({ activeRows, reloadToken, onLedgerChan
             {duplicateGroups.length > 0 && `${duplicateGroups.length} possible duplicate group${duplicateGroups.length === 1 ? "" : "s"}`}
           </p>
         </div>
-        {staged.length > 1 && (
-          <button type="button" onClick={() => review("approve", staged.map(s => s.id))} disabled={busyIds.size > 0}
-            className="text-[10px] font-black px-3 py-1.5 rounded-lg disabled:opacity-40"
-            style={{ background: REV.accentBg, color: REV.accent }}>
-            ✓ Approve all {staged.length}
+        {cleanIds.length > 1 && (
+          <button type="button" onClick={() => review("approve", cleanIds)} disabled={busyIds.size > 0}
+            className="text-[10px] font-black px-3 py-2 rounded-lg disabled:opacity-40"
+            style={{ background: REV.accentBg, color: REV.accent }}
+            title="Approves every staged payment that does not match a payment already in the ledger">
+            ✓ Approve {cleanIds.length === staged.length ? `all ${cleanIds.length}` : `${cleanIds.length} without conflicts`}
           </button>
         )}
       </div>
@@ -155,6 +173,11 @@ export default function ReviewQueuePanel({ activeRows, reloadToken, onLedgerChan
                     <span className="text-[10px] font-medium" style={{ color: REV.textFaint }}>{s.source} · {fmtDate(s.paid_at)}</span>
                   </div>
                   {s.client_email && <p className="text-[10px] font-medium mt-0.5" style={{ color: REV.textFaint }}>{s.client_email}</p>}
+                  {(conflicts.get(s.id) ?? []).map(m => (
+                    <p key={m.id} className="text-[10px] font-black mt-1" style={{ color: REV.red }}>
+                      ⚠ Already in ledger as #{m.id} · {m.client_name} · {fmtMoney(m.amount_cents)} · {fmtDate(m.paid_at)} ({m.source}) — approving would count it twice
+                    </p>
+                  ))}
                   {s.evidence && (
                     <p className="text-[10px] font-medium mt-1.5 px-2.5 py-1.5 rounded-lg line-clamp-3 whitespace-pre-wrap"
                       style={{ background: REV.inset, border: `1px solid ${REV.panelBorder}`, color: REV.textSoft }}>
@@ -164,7 +187,7 @@ export default function ReviewQueuePanel({ activeRows, reloadToken, onLedgerChan
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <span className="text-base font-black" style={{ color: REV.orange }}>{fmtMoney(s.amount_cents)}</span>
-                  <button type="button" onClick={() => review("approve", [s.id])} disabled={busy}
+                  <button type="button" onClick={() => approveOne(s)} disabled={busy}
                     className="text-[10px] font-black px-2.5 py-1 rounded-lg disabled:opacity-40"
                     style={{ background: REV.accentBg, color: REV.accent }}>
                     {busy ? "…" : "✓ approve"}
@@ -185,7 +208,7 @@ export default function ReviewQueuePanel({ activeRows, reloadToken, onLedgerChan
             style={{ background: REV.redBg, border: "1px solid rgba(248,113,113,0.25)" }}>
             <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
               <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: REV.red }}>
-                Possible duplicate — same payer &amp; amount within 3 days
+                Possible duplicate — same amount, platform &amp; payer within days
               </p>
               <button type="button" onClick={() => keepAll(group.map(p => p.id))}
                 title="Both payments are real — mark reconciled and stop flagging this pair"
@@ -198,8 +221,11 @@ export default function ReviewQueuePanel({ activeRows, reloadToken, onLedgerChan
               {group.map(p => (
                 <div key={p.id} className="flex items-center justify-between gap-2 flex-wrap">
                   <span className="text-xs font-bold" style={{ color: REV.textSoft }}>
-                    {p.client_name} · {fmtMoney(p.amount_cents)} · {fmtDate(p.paid_at)} · {p.method || "unknown"}
-                    <span className="font-medium" style={{ color: REV.textFaint }}> ({p.source})</span>
+                    #{p.id} {p.client_name} · {fmtMoney(p.amount_cents)} · {fmtDate(p.paid_at)} · {p.method || "unknown"}
+                    <span className="font-medium" style={{ color: REV.textFaint }}> ({p.source}{p.invoice ? ` · inv ${p.invoice}` : ""}{p.source_txn_id ? "" : " · no txn id"})</span>
+                    {suggestDuplicateToVoid(group) === p.id && (
+                      <span className="ml-1.5 text-[9px] font-black px-1.5 py-0.5 rounded-md" style={{ background: REV.redBg, color: REV.red }}>suggested void</span>
+                    )}
                   </span>
                   <button type="button" onClick={() => voidPayment(p.id)}
                     className="text-[10px] font-black px-2 py-0.5 rounded-lg"

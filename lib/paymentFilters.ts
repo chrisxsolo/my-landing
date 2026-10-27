@@ -1,6 +1,8 @@
 // Pure filter/sort/search/export helpers for payment rows returned by
 // GET /api/admin/payments. Kept framework-free so they are unit-testable.
 
+import { groupLikelyDuplicates } from "./paymentMatching";
+
 export type PaymentRow = {
   id: number;
   inquiry_id: number | null;
@@ -136,44 +138,14 @@ export function paymentsToCsv(rows: PaymentRow[]): string {
   return [header, ...lines].join("\n");
 }
 
-const DUPLICATE_WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
-
-function payerKey(row: PaymentRow): string {
-  return (row.client_email || row.client_name).toLowerCase().trim();
-}
-
-// Groups of 2+ ACTIVE rows with the same payer and amount paid within 3 days
-// of each other. Surfaced as suspects for human review — never auto-deleted.
+// Groups of 2+ ACTIVE rows that look like the same transfer (see
+// lib/paymentMatching: same payer + amount within 3 days, or the same amount,
+// platform and a compatible payer recorded by two different imports within
+// 36h). Surfaced as suspects for human review — never auto-deleted.
 // Groups where every row is already marked "reconciled" have been reviewed
 // and dismissed, so they stay hidden.
 export function findDuplicateSuspects(rows: PaymentRow[]): PaymentRow[][] {
-  const buckets = new Map<string, PaymentRow[]>();
-  for (const row of rows) {
-    if (row.status !== "active") continue;
-    const key = `${payerKey(row)}|${row.amount_cents}`;
-    const bucket = buckets.get(key);
-    if (bucket) bucket.push(row);
-    else buckets.set(key, [row]);
-  }
-
-  const groups: PaymentRow[][] = [];
-  for (const bucket of buckets.values()) {
-    if (bucket.length < 2) continue;
-    const sorted = [...bucket].sort(
-      (a, b) => new Date(a.paid_at).getTime() - new Date(b.paid_at).getTime(),
-    );
-    let current: PaymentRow[] = [sorted[0]];
-    for (let i = 1; i < sorted.length; i++) {
-      const prev = new Date(sorted[i - 1].paid_at).getTime();
-      const next = new Date(sorted[i].paid_at).getTime();
-      if (next - prev <= DUPLICATE_WINDOW_MS) {
-        current.push(sorted[i]);
-      } else {
-        if (current.length >= 2) groups.push(current);
-        current = [sorted[i]];
-      }
-    }
-    if (current.length >= 2) groups.push(current);
-  }
-  return groups.filter(group => group.some(r => r.reconciliation_status !== "reconciled"));
+  const active = rows.filter(row => row.status === "active");
+  return groupLikelyDuplicates(active)
+    .filter(group => group.some(r => r.reconciliation_status !== "reconciled"));
 }
