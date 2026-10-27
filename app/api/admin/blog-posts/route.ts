@@ -1,10 +1,14 @@
 // Admin API for blog_posts. Every handler is gated by requireAdmin and uses the
 // service-role client, so the public anon key can never read drafts or write here.
-// Mirrors the testimonials route idiom.
+// Mirrors the testimonials route idiom. Writes accept only the editable columns
+// (lib/blog/postFields), keep the social image on the cover, and refresh the
+// public cache themselves so a saved post is live without a second request.
 
 import { type NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/requireAdmin";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
+import { revalidatePublicContent } from "@/lib/publicRevalidation";
+import { pickEditableFields, rejectedFields, withOgImageFollowingCover, type CoverState } from "@/lib/blog/postFields";
 
 export const dynamic = "force-dynamic";
 
@@ -60,10 +64,17 @@ export async function POST(req: NextRequest) {
   if (!body || typeof body.title !== "string" || typeof body.body !== "string") {
     return NextResponse.json({ error: "Title and body are required." }, { status: 400 });
   }
+  const unknown = rejectedFields(body);
+  if (unknown.length > 0) {
+    return NextResponse.json({ error: `Unknown fields: ${unknown.join(", ")}` }, { status: 400 });
+  }
+  // A new post's social image is its cover unless one was given.
+  const row = withOgImageFollowingCover({ cover_image_url: null, og_image_url: null }, pickEditableFields(body));
   try {
     const supabase = createSupabaseAdminClient();
-    const { data, error } = await supabase.from(TABLE).insert(body).select("id").single();
+    const { data, error } = await supabase.from(TABLE).insert(row).select("id").single();
     if (error) throw error;
+    revalidatePublicContent();
     return NextResponse.json({ id: data.id }, { status: 201 });
   } catch (error) {
     console.error("[admin/blog-posts] POST failed:", error);
@@ -81,17 +92,22 @@ export async function PATCH(req: NextRequest) {
   if (!id || !body || typeof body.updates !== "object" || body.updates === null) {
     return NextResponse.json({ error: "id and updates are required." }, { status: 400 });
   }
+  const requested = body.updates as Record<string, unknown>;
+  const unknown = rejectedFields(requested);
+  if (unknown.length > 0) {
+    return NextResponse.json({ error: `Unknown fields: ${unknown.join(", ")}` }, { status: 400 });
+  }
   try {
     const supabase = createSupabaseAdminClient();
-    const { data, error } = await supabase
-      .from(TABLE)
-      .update(body.updates as Record<string, unknown>)
-      .eq("id", id)
-      .select("id")
-      .maybeSingle();
+    const { data: current, error: readError } = await supabase
+      .from(TABLE).select("id,cover_image_url,og_image_url").eq("id", id).maybeSingle();
+    if (readError) throw readError;
+    if (!current) return NextResponse.json({ error: "Post not found." }, { status: 404 });
+    const updates = withOgImageFollowingCover(current as CoverState, pickEditableFields(requested));
+    const { error } = await supabase.from(TABLE).update(updates).eq("id", id);
     if (error) throw error;
-    if (!data) return NextResponse.json({ error: "Post not found." }, { status: 404 });
-    return NextResponse.json({ ok: true });
+    revalidatePublicContent();
+    return NextResponse.json({ ok: true, updates });
   } catch (error) {
     console.error("[admin/blog-posts] PATCH failed:", error);
     const message = error instanceof Error ? error.message : "Failed to update post.";
@@ -109,6 +125,7 @@ export async function DELETE(req: NextRequest) {
     const supabase = createSupabaseAdminClient();
     const { error } = await supabase.from(TABLE).delete().eq("id", id);
     if (error) throw error;
+    revalidatePublicContent();
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("[admin/blog-posts] DELETE failed:", error);
