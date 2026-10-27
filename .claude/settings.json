@@ -19,7 +19,17 @@
       "Bash(ps -o command= -p 64539)",
       "Bash(awk '{print $NF}')",
       "Bash(gh pr *)",
-      "Bash(gh pr create --base main --head consistency-and-ci --title 'Fix About-facts photos + branch consistency/CI work' --body ' *)"
+      "Bash(gh pr create --base main --head consistency-and-ci --title 'Fix About-facts photos + branch consistency/CI work' --body ' *)",
+      "mcp__Supabase__list_tables",
+      "mcp__Supabase__list_migrations",
+      "mcp__Supabase__get_advisors",
+      "mcp__Supabase__query_logs",
+      "mcp__Supabase__get_project",
+      "mcp__Supabase__list_extensions",
+      "mcp__Supabase__search_docs",
+      "mcp__Supabase__generate_typescript_types",
+      "mcp__Supabase__apply_migration",
+      "mcp__Supabase__execute_sql"
     ]
   }
 }
