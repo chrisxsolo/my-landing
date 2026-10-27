@@ -249,11 +249,18 @@ async function syncPayments(req: NextRequest) {
   const activeInquiries = inquiries.filter(inq => !SKIP_STATUSES.has(inq.status));
   const unpaid = activeInquiries.filter(inq => inq.payment_status !== "paid");
 
-  // Fingerprint dedup set: everything already in the ledger or awaiting review.
-  const [{ data: ledgerFps }, { data: stagedFps }] = await Promise.all([
+  // Fingerprint dedup set: everything already in the ledger or ever staged.
+  // Reviewed rows count too — a rejected detection must not come back as a
+  // fresh pending row on the next sync.
+  const [{ data: ledgerFps, error: ledgerFpError }, { data: stagedFps, error: stagedFpError }] = await Promise.all([
     supabase.from(PAYMENTS_TABLE).select("fingerprint"),
-    supabase.from(STAGING_TABLE).select("fingerprint").eq("status", "pending"),
+    supabase.from(STAGING_TABLE).select("fingerprint"),
   ]);
+  if (ledgerFpError || stagedFpError) {
+    // Without the dedup set every known payment would be re-staged.
+    console.error("[sync-payments] fingerprint load failed:", ledgerFpError ?? stagedFpError);
+    return NextResponse.json({ error: "Couldn't load existing payments, so nothing was synced." }, { status: 500 });
+  }
   const knownFingerprints = new Set<string>(
     [...(ledgerFps ?? []), ...(stagedFps ?? [])]
       .map(row => row.fingerprint as string)
