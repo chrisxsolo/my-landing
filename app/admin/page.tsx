@@ -7,7 +7,7 @@ import { C } from "@/lib/colors";
 import { T, INQ_STATUS, inquiryCardChrome } from "@/app/admin/adminTheme";
 import CommandPalette from "@/app/admin/CommandPalette";
 import AdminWebsiteNavigation from "@/app/admin/AdminWebsiteNavigation";
-import { MOBILE_NAV_ITEMS, TAB_LABELS, isTab, type Tab } from "@/app/admin/adminTabs";
+import { BUSINESS_TABS, MOBILE_NAV_ITEMS, TAB_LABELS, TOOL_TABS, isTab, navItem, type Tab } from "@/app/admin/adminTabs";
 
 function subscribeReducedMotion(onChange:()=>void){
   const mq=window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -1743,8 +1743,8 @@ function AdminDashboard() {
                 <NavBtn t="home" icon="🏠" label="Home"/>
                 <div className="h-px my-2 mx-1" style={{background:T.rowBorder}}/>
                 <p className="text-[10px] font-black uppercase tracking-[0.13em] px-3 pt-0.5 pb-1" style={{color:T.inkFaint}}>Client Work</p>
-                {(["inquiries","clients","testimonials","analytics","payments","funnel","attribution"] as Tab[]).map(t=>(
-                  <NavBtn key={t} t={t} icon={t==="inquiries"?"📬":t==="clients"?"👥":t==="testimonials"?"💬":t==="analytics"?"📊":t==="payments"?"💵":t==="attribution"?"🎯":"📈"} label={TAB_LABELS[t].replace(/^[^\s]+\s/,"")} badge={t==="inquiries"?pendingNavCount:undefined}/>
+                {BUSINESS_TABS.map(navItem).map(({t,icon,label})=>(
+                  <NavBtn key={t} t={t} icon={icon} label={label} badge={t==="inquiries"?pendingNavCount:undefined}/>
                 ))}
                 <div className="h-px my-2 mx-1" style={{background:T.rowBorder}}/>
                 <p className="text-[10px] font-black uppercase tracking-[0.13em] px-3 pt-0.5 pb-1" style={{color:T.inkFaint}}>Website</p>
@@ -1767,8 +1767,8 @@ function AdminDashboard() {
                 </button>
                 <div className="h-px my-2 mx-1" style={{background:T.rowBorder}}/>
                 <p className="text-[10px] font-black uppercase tracking-[0.13em] px-3 pt-0.5 pb-1" style={{color:T.inkFaint}}>Tools</p>
-                {(["ai","chat","format","vault","accounts"] as Tab[]).map(t=>(
-                  <NavBtn key={t} t={t} icon={t==="ai"?"🤖":t==="chat"?"💬":t==="format"?"✨":t==="vault"?"📓":"👤"} label={TAB_LABELS[t].replace(/^[^\s]+\s/,"")}/>
+                {TOOL_TABS.map(navItem).map(({t,icon,label})=>(
+                  <NavBtn key={t} t={t} icon={icon} label={label}/>
                 ))}
               </div>
               <div className="border-t pt-2.5 px-1" style={{borderColor:T.rowBorder}}>
