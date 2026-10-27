@@ -81,7 +81,7 @@ export interface PagePhotoReport {
   sessionsNeedingFacts: { sessionId: string; name: string | null; issue: string }[];
 }
 
-interface Loaded { pool: PhotoPool; pages: PageRef[]; guideRows: Map<string, GuidePhotoRow[]> }
+export interface Loaded { pool: PhotoPool; pages: PageRef[]; guideRows: Map<string, GuidePhotoRow[]> }
 
 async function loadGuideRows(client: SupabaseClient, errors: string[]): Promise<Map<string, GuidePhotoRow[]>> {
   const result = new Map<string, GuidePhotoRow[]>();
@@ -114,13 +114,13 @@ async function listPages(client: SupabaseClient, errors: string[]): Promise<Page
   return [...schools, ...guides];
 }
 
-async function loadAll(client: SupabaseClient): Promise<Loaded> {
+export async function loadAll(client: SupabaseClient): Promise<Loaded> {
   const pool = await loadPhotoPool(client);
   const [pages, guideRows] = await Promise.all([listPages(client, pool.errors), loadGuideRows(client, pool.errors)]);
   return { pool, pages, guideRows };
 }
 
-function curate(loaded: Loaded, key: string): { candidates: PageCandidate[]; curated: CuratedPage } {
+export function curate(loaded: Loaded, key: string): { candidates: PageCandidate[]; curated: CuratedPage } {
   const own = loaded.guideRows.get(key) ?? [];
   const isSchool = parsePageKey(key)?.kind === "grads";
   const candidates = candidatesForPage(loaded.pool, key, own);

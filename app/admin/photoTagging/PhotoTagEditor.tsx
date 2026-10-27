@@ -12,6 +12,7 @@ import { pagePath } from "@/lib/pagePhotos/pageKeys";
 import {
   categoryLabel, type AuditedPhoto, type NotApplicableField, type TagCheck, type TaggingOptions, type TagSuggestion,
 } from "@/lib/photoTagging/types";
+import DistributionPreview from "@/app/admin/photoDistribution/DistributionPreview";
 import SuggestionList from "./SuggestionList";
 import TagFields, { draftToChanges, EMPTY_DRAFT, type TagDraft } from "./TagFields";
 import TagApplyPanel from "./TagApplyPanel";
@@ -101,6 +102,7 @@ export default function PhotoTagEditor({ photo, options, onChanged, onClose }: P
           Eligible for: {photo.pages.map((k) => pagePath(k) ?? k).join(" · ")}
         </p>
       )}
+      <DistributionPreview key={photo.key} photoKey={photo.key} />
       {photo.sessionId && (
         <p style={{ margin: 0, fontSize: 12, color: T.inkSoft }}>
           Session: <Link href={`/admin/content-engine/${photo.sessionId}`} style={{ color: T.blue }}>{photo.sessionName ?? "open"}</Link>
