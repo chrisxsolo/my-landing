@@ -51,8 +51,8 @@ describe("the location outranks the school", () => {
   });
 
   it("keeps the campus fee when the shoot is on campus", () => {
-    expect(buildTravelFact("San Jose State University", null)).toContain("Travel fee for San Jose State University: $70.");
-    expect(buildTravelFact(null, "San Jose State University")).toContain("Travel fee for San Jose State University: $70.");
+    expect(buildTravelFact("San Jose State University", null)).toContain("Travel fee for San Jose State University: $75.");
+    expect(buildTravelFact(null, "San Jose State University")).toContain("Travel fee for San Jose State University: $75.");
     expect(buildTravelFact("University of California, Berkeley", null)).toContain("$43.50");
   });
 

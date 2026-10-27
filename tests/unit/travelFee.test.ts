@@ -81,7 +81,7 @@ describe("verified routes", () => {
   it("price every out-of-city campus from the policy", () => {
     expect(verifiedTravelFee("uc-berkeley")).toBe(43.5);
     expect(verifiedTravelFee("csueb")).toBe(63.5);
-    expect(verifiedTravelFee("sjsu")).toBe(70);
+    expect(verifiedTravelFee("sjsu")).toBe(75); // approved fee; the formula alone gives $70
     expect(verifiedTravelFee("santa-clara")).toBe(65);
     expect(verifiedTravelFee("stanford")).toBe(50);
   });
@@ -150,6 +150,6 @@ describe("the AI gets the fee as a fact", () => {
 
   it("carries no stray dollar figure the validator would treat as quotable", () => {
     const fact = buildTravelFact("San Jose State University", null) ?? "";
-    expect([...fact.matchAll(/\$\d[\d,]*(?:\.\d{2})?/g)].map(([m]) => m)).toEqual(["$70"]);
+    expect([...fact.matchAll(/\$\d[\d,]*(?:\.\d{2})?/g)].map(([m]) => m)).toEqual(["$75"]);
   });
 });

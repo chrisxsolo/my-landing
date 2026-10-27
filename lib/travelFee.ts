@@ -2,7 +2,8 @@
 //
 // Travel fee = round-trip driving miles x $0.70, rounded UP to the next $5,
 // plus the tolls actually paid on the route. Travel inside San Francisco city
-// limits is included in the session price.
+// limits is included in the session price. A destination with a business-
+// approved fee (APPROVED_TRAVEL_FEES) charges that fee instead.
 //
 // The rounding is the business vault's rule (02 Pricing/Travel Fees.md:
 // "round up to nearest $5"). It applies to the mileage charge only; tolls are
@@ -149,9 +150,50 @@ export function calculateTravelFee(route: Pick<VerifiedRoute, "outboundMiles" | 
   return { roundTripMiles, mileageCents, tollCents, totalCents: mileageCents + tollCents };
 }
 
-/** The fee for a verified destination, in dollars (may carry cents, e.g. 43.5). */
-export function verifiedTravelFee(key: VerifiedRouteKey): number {
+/**
+ * Business-approved fees that replace the mileage formula for a destination.
+ *
+ * The formula stays the reference (calculatedTravelFee keeps reporting it),
+ * but an approved fee is what every client-facing surface charges. Distances
+ * and the per-mile rate are never bent to hit an approved number.
+ */
+export interface ApprovedTravelFee {
+  cents: number;
+  approvedOn: string;
+  note: string;
+}
+
+export const APPROVED_TRAVEL_FEES: Partial<Record<VerifiedRouteKey, ApprovedTravelFee>> = {
+  // The formula gives $70 (97.98 mi x $0.70 = $68.59, up to $70); Chris's
+  // approved SJSU fee is $75.
+  sjsu: { cents: 7500, approvedOn: "2026-10-27", note: "Approved SJSU business fee" },
+};
+
+/** The mileage-formula fee, in dollars, before any approved override. Reference only. */
+export function calculatedTravelFee(key: VerifiedRouteKey): number {
   return calculateTravelFee(VERIFIED_ROUTES[key]).totalCents / 100;
+}
+
+/** The fee charged for a verified destination, in dollars (may carry cents, e.g. 43.5). */
+export function verifiedTravelFee(key: VerifiedRouteKey): number {
+  const approved = APPROVED_TRAVEL_FEES[key];
+  return approved ? approved.cents / 100 : calculatedTravelFee(key);
+}
+
+/** Where a destination's fee comes from, for admin views that show the working. */
+export function travelFeeBasis(key: VerifiedRouteKey): {
+  fee: number;
+  calculatedFee: number;
+  roundTripMiles: number;
+  source: "approved" | "mileage";
+} {
+  const calculated = calculateTravelFee(VERIFIED_ROUTES[key]);
+  return {
+    fee: verifiedTravelFee(key),
+    calculatedFee: calculated.totalCents / 100,
+    roundTripMiles: calculated.roundTripMiles,
+    source: APPROVED_TRAVEL_FEES[key] ? "approved" : "mileage",
+  };
 }
 
 /** Client-facing description of the rule, with no origin detail. */
