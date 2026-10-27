@@ -1,8 +1,8 @@
 import { COUPLES_PACKAGES, GRAD_HOURLY_RATE, getGroupRatePerPerson } from "./pricing";
-import {
-  getGraduationTravelFeeFromText,
-  inferTotalFromRetainer,
-} from "./pricingCatalog";
+import { inferTotalFromRetainer } from "./pricingCatalog";
+import { classifySession, type PlaybookKey } from "./ai/sessionClassifier";
+import { detectSchoolsInText } from "./schoolDetection";
+import { resolveTravel, travelFeeAmount } from "./travelResolution";
 
 export const PAYMENT_SOURCE_MANUAL = "auto";
 
@@ -53,10 +53,39 @@ function parsePeopleCount(value: string | number | null | undefined, text: strin
   return explicit ? Math.max(1, Number(explicit[1])) : 1;
 }
 
+/** A campus named with no service at all: the legacy reading, kept as a last resort. */
+const CAMPUS_HINT = /\bcampus\b|sjsu|berkeley|stanford|sf state|santa clara|csueb/;
+
+/**
+ * The service first, then its rate. A university in the text says where
+ * someone studied, not what they booked: an elopement by two SJSU alumni is
+ * an elopement.
+ */
+function serviceOf(inquiry: PaymentTotalInquiry, text: string): PlaybookKey | null {
+  const key = classifySession(inquiry.session_type, inquiry.message).key;
+  if (key) return key;
+  if (inquiry.school || CAMPUS_HINT.test(text)) return "graduation";
+  return null;
+}
+
+/** Graduation rate plus travel to where the shoot is (the campus, unless a location says otherwise). */
+function graduationTotalCents(inquiry: PaymentTotalInquiry, text: string): number {
+  const people = parsePeopleCount(inquiry.people, text);
+  const base = people > 1 ? getGroupRatePerPerson(people) * people : GRAD_HOURLY_RATE;
+  const school = inquiry.school || detectSchoolsInText(text)[0]?.canonicalName || null;
+  const travel = resolveTravel({ school, location: inquiry.location, message: inquiry.message });
+  return Math.round((base + travelFeeAmount(travel)) * 100);
+}
+
+const COUPLES_RATES: Partial<Record<PlaybookKey, number>> = {
+  proposal: COUPLES_PACKAGES.proposal.price,
+  engagement: COUPLES_PACKAGES.engagement.price,
+};
+
 /** Session price from the published rate card alone — session type, group
- *  size, and campus travel fee. Ignores any dollar figure written on the
- *  inquiry, so callers that must not mistake a deposit for the total (the
- *  booking confirmation email) can price the shoot from the catalog. */
+ *  size, and travel to the shoot location. Ignores any dollar figure written
+ *  on the inquiry, so callers that must not mistake a deposit for the total
+ *  (the booking confirmation email) can price the shoot from the catalog. */
 export function catalogSessionTotalCents(inquiry: PaymentTotalInquiry | null | undefined): number {
   if (!inquiry) return 0;
 
@@ -67,23 +96,19 @@ export function catalogSessionTotalCents(inquiry: PaymentTotalInquiry | null | u
     inquiry.location,
   ].filter(Boolean).join(" ").toLowerCase();
 
-  if (/\bgrad|graduat|campus|sjsu|berkeley|stanford|sf state|santa clara|csueb\b/.test(text)) {
-    const people = parsePeopleCount(inquiry.people, text);
-    const base = people > 1 ? getGroupRatePerPerson(people) * people : GRAD_HOURLY_RATE;
-    return Math.round((base + getGraduationTravelFeeFromText(text)) * 100);
-  }
+  const service = serviceOf(inquiry, text);
+  if (service === "graduation") return graduationTotalCents(inquiry, text);
 
   // An elopement starts at $950, but its coverage duration is settled per
   // booking, so the rate card cannot total one. Returning 0 sends the caller to
-  // the price quoted in the thread, and stops "couple portraits after the
-  // ceremony" from being priced off the couples card below.
-  if (/\belop|\bcourthouse\b|\bwedding ceremony\b/.test(text)) return 0;
+  // the price quoted in the thread.
+  if (service === "elopement") return 0;
 
-  if (/\bproposal\b/.test(text)) return COUPLES_PACKAGES.proposal.price * 100;
-  if (/\bengagement\b/.test(text)) return COUPLES_PACKAGES.engagement.price * 100;
+  const fixed = service ? COUPLES_RATES[service] : undefined;
+  if (fixed) return fixed * 100;
   if (/\bsignature\b/.test(text)) return COUPLES_PACKAGES.signature.price * 100;
   if (/\bmini\b/.test(text)) return COUPLES_PACKAGES.mini.price * 100;
-  if (/\bcouple|portrait|anniversary\b/.test(text)) return COUPLES_PACKAGES["1hr"].price * 100;
+  if (service === "couples" || /\bcouple|portrait|anniversary\b/.test(text)) return COUPLES_PACKAGES["1hr"].price * 100;
 
   return 0;
 }
