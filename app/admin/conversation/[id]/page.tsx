@@ -38,6 +38,8 @@ type AiDraftResponse = {
   validation?: DraftValidation | null;
   warnings?: ContextWarning[];
   quote?: DraftQuote | null;
+  /** Rate-card figures the server put back into the draft, with the original text. */
+  pricing?: PricingEnforcement | null;
   usage?: DraftUsage | null;
   budget?: { state: "ok" | "warning" | "over"; message: string | null } | null;
 };
@@ -46,6 +48,7 @@ type AiDraftResponse = {
 // silently drifted out of date the moment the shape changed.
 import type { DraftValidation } from "./ComposePanel";
 import type { DraftQuote } from "./PricingCheck";
+import type { PricingEnforcement } from "@/lib/ai/quotePricing";
 
 type ContextWarning = {
   code: string;
@@ -105,6 +108,8 @@ export default function ConversationPage() {
   const [validation,       setValidation]       = useState<DraftValidation | null>(null);
   const [contextWarnings,  setContextWarnings]  = useState<ContextWarning[]>([]);
   const [draftQuote,       setDraftQuote]       = useState<DraftQuote | null>(null);
+  // What the server corrected in the last AI draft, so the change is visible.
+  const [pricingFix,       setPricingFix]       = useState<PricingEnforcement | null>(null);
   // Earlier quotes Chris confirmed were agreed for this client; sent with every draft request.
   const [confirmedPrices,  setConfirmedPrices]  = useState<number[]>([]);
   const [lastUsage,        setLastUsage]        = useState<DraftUsage | null>(null);
@@ -235,29 +240,30 @@ export default function ConversationPage() {
     if (localAi)       setLastAiDraft(localAi);
     if (localOriginal) setOriginalAiDraft(localOriginal);
 
-    // Only hit the server if localStorage was empty (other device may have saved).
-    // Drafts now sync through /api/admin/drafts (service role) — no browser
-    // access to site_settings.
-    if (!localDraft || !localAi || !localOriginal) {
-      fetch(`/api/admin/drafts?inquiryId=${inquiryId}`)
-        .then((res) => (res.ok ? res.json() : null))
-        .then((data) => {
-          if (!data) return;
-          // Functional updates: the user may have started typing/dictating
-          // before this resolves — never clobber in-progress text with the
-          // older cloud copy. The persist effects below handle localStorage.
-          if (data.draft && !localDraft) {
-            setDraft((prev) => prev || data.draft);
-          }
-          if (data.ai_draft && !localAi) {
-            setLastAiDraft((prev) => prev || data.ai_draft);
-          }
-          if (data.original_ai_draft && !localOriginal) {
-            setOriginalAiDraft((prev) => prev || data.original_ai_draft);
-          }
-        })
-        .catch(() => {});
-    }
+    // Drafts sync through /api/admin/drafts (service role) — no browser access
+    // to site_settings. The call is made even when localStorage has every
+    // draft, because it also carries the rate-card inputs that let
+    // PricingCheck run on a restored draft; a restored draft quoting an old
+    // travel fee used to show no pricing check at all.
+    fetch(`/api/admin/drafts?inquiryId=${inquiryId}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!data) return;
+        if (data.quote) setDraftQuote((prev) => prev ?? data.quote);
+        // Functional updates: the user may have started typing/dictating
+        // before this resolves — never clobber in-progress text with the
+        // older cloud copy. The persist effects below handle localStorage.
+        if (data.draft && !localDraft) {
+          setDraft((prev) => prev || data.draft);
+        }
+        if (data.ai_draft && !localAi) {
+          setLastAiDraft((prev) => prev || data.ai_draft);
+        }
+        if (data.original_ai_draft && !localOriginal) {
+          setOriginalAiDraft((prev) => prev || data.original_ai_draft);
+        }
+      })
+      .catch(() => {});
   }, [inquiryId]);
 
   // Persist compose draft to localStorage whenever it changes
@@ -427,6 +433,7 @@ export default function ConversationPage() {
     setValidation(json.validation ?? null);
     setContextWarnings(json.warnings ?? []);
     setDraftQuote(json.quote ?? null);
+    setPricingFix(json.pricing?.corrections.length ? json.pricing : null);
     setLastUsage(json.usage ?? null);
     if (json.budget?.message) showToast(json.budget.message, json.budget.state === "ok");
   }
@@ -1386,6 +1393,7 @@ export default function ConversationPage() {
             validation={validation}
             contextWarnings={contextWarnings}
             quote={draftQuote}          onConfirmEarlier={confirmEarlierQuote}
+            pricingFix={pricingFix}
             lastUsage={lastUsage}
             onToggleVoice={toggleVoice}
             onFocusKeyboard={focusComposeForDictation}

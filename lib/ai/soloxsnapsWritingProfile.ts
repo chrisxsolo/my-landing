@@ -143,6 +143,8 @@ Ask which university if it isn't known yet. Confirm availability only from the v
 
   proposal: `This needs coordination, so ask rather than assume. Cover: the location, the timing, whether they want you hidden until the moment (ask — don't assume), how long the coverage runs, and travel if the spot is outside San Francisco. Ask about family or friends joining for photos afterward when it fits. Quote the proposal rate plainly.`,
 
+  maternity: `Thank them and congratulate them once, warmly. Confirm how far along they will be on the date, the location, and who is joining; partner and kids are part of the maternity session, so never move them to a family package. Recommend golden hour when it fits. Quote the session price when they asked or the date is close to settled.`,
+
   family: `Thank them and say you'd love to photograph the family. Confirm how many people, the location, and the time. Recommend golden hour when it fits. Quote the session price. If they mentioned something hard — a loss, an illness, someone visiting for the last time — acknowledge it in one sincere sentence and move on to being useful. Do not write a sympathy card.`,
 
   portrait: `Keep it simple and practical. Cover location, time of day, session length, and price. Ask what the photos are for if that changes the approach.`,

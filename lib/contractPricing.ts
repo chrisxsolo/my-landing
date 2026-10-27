@@ -11,11 +11,17 @@
 //                   the shoot location (rate card first, a quoted figure only
 //                   where the rate card has none)
 // Anything that cannot be settled without guessing returns "review", and the
-// contract carries a placeholder instead of a number.
+// contract carries a placeholder instead of a number. That includes an agreed
+// total only a superseded travel fee explains ($420 = $350 + the old $70 SJSU
+// formula fee): the same staleQuotedPrices check Draft AI runs.
 
 import { classifySession } from "./ai/sessionClassifier";
-import { GRAD_HOURLY_RATE, getGroupRatePerPerson } from "./pricing";
-import { resolveTravel, type TravelResolution } from "./travelResolution";
+import { buildQuoteInputForInquiry } from "./ai/inquiryQuote";
+import { staleQuotedPrices } from "./ai/quotePricing";
+import type { ThreadMessage } from "./ai/threadDigest";
+import { graduationSessionPrice } from "./pricing";
+import { PRICING_CATALOG } from "./pricingCatalog";
+import { resolveTravel, schoolImpliesLocationFor, type TravelResolution } from "./travelResolution";
 
 export interface ExtractedPricing {
   /** An amount the thread calls the total / all-in price. */
@@ -36,6 +42,8 @@ export interface ContractBooking {
   location: string | null;
   message: string | null;
   people?: string | number | null;
+  /** The email thread, so a total built on an older quoted travel fee is caught. */
+  messages?: readonly ThreadMessage[];
 }
 
 export interface PriceLine { label: string; amount: number }
@@ -48,25 +56,40 @@ const money = (n: number) => (Number.isInteger(n) ? `$${n}` : `$${n.toFixed(2)}`
 
 function travelFor(booking: ContractBooking): TravelResolution {
   const service = classifySession(booking.sessionType, booking.message).key;
+  const graduation = schoolImpliesLocationFor(service);
   return resolveTravel({
     school: booking.school,
     location: booking.location,
     // The message may name an out-of-city place; a campus mention alone counts only for a graduation.
-    message: service === "graduation" ? booking.message : null,
-    schoolImpliesLocation: service === "graduation",
+    message: graduation ? booking.message : null,
+    schoolImpliesLocation: graduation,
   });
 }
 
 /** Rate-card session prices this booking could have been quoted at. */
 function catalogSessionPrices(booking: ContractBooking): number[] {
   const service = classifySession(booking.sessionType, booking.message).key;
+  if (service === "maternity") return [PRICING_CATALOG.maternity.price];
   if (service !== "graduation") return [];
   const people = Number(String(booking.people ?? "1").match(/\d+/)?.[0] ?? 1) || 1;
-  return people > 1 ? [getGroupRatePerPerson(people) * people] : [GRAD_HOURLY_RATE];
+  return [graduationSessionPrice(people)];
+}
+
+/** Whether only an outdated travel figure explains this agreed total. */
+function isStaleAgreedTotal(total: number, travel: TravelResolution, booking: ContractBooking): boolean {
+  const messages = booking.messages ?? [];
+  const { input } = buildQuoteInputForInquiry(booking, { travel, messages });
+  return staleQuotedPrices([total], input, messages).length > 0;
 }
 
 function fromAgreedTotal(total: number, extracted: ExtractedPricing, travel: TravelResolution, booking: ContractBooking): ContractPricing {
   const lines = [{ label: "Agreed total", amount: total }];
+  if (travel.kind === "verified" && isStaleAgreedTotal(total, travel, booking)) {
+    return {
+      status: "review", total: null, lines,
+      reason: `The thread agrees ${money(total)}, which only an outdated travel fee explains. The approved travel fee for ${travel.place} is ${money(travel.fee)}. Confirm the current total, or that the earlier quote was agreed, before sending.`,
+    };
+  }
   const travelDue = travel.kind === "verified" || travel.kind === "unknown";
   // An agreed total equal to a bare session price, with travel due and the
   // thread silent on whether it is included, could be either. Don't guess.

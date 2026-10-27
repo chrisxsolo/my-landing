@@ -14,7 +14,7 @@
 //   correctDraftPricing  rewrites only the mismatched figures, nothing else
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { GRAD_HOURLY_RATE, getGroupRatePerPerson } from "@/lib/pricing";
+import { getGroupRatePerPerson, graduationSessionPrice, includedMinutesFor } from "@/lib/pricing";
 import { calculatedTravelFee, APPROVED_TRAVEL_FEES, type VerifiedRouteKey } from "@/lib/travelFee";
 import type { TravelResolution } from "@/lib/travelResolution";
 import type { ThreadMessage } from "./threadDigest";
@@ -36,6 +36,15 @@ export interface QuoteMismatch {
   expected: number;
   /** The exact text that carries the wrong figure, for highlighting and correction. */
   excerpt: string;
+  /**
+   * True when `expected` is the rate card's own figure and nothing else
+   * explains the stated one: a verified travel fee, or a total that is right
+   * once that fee is put back. False for a travel amount at a location with
+   * no verified fee, and for a total the rate card can only guess at (it may
+   * carry an add-on the draft priced wrongly). Only a certain mismatch may be
+   * corrected without the admin.
+   */
+  certain: boolean;
 }
 
 export interface DraftQuoteCheck {
@@ -55,6 +64,8 @@ export interface QuoteInput {
   travel: TravelResolution;
   /** Prices the admin confirmed as agreed for this client; never flagged. */
   confirmedPrices?: number[];
+  /** The graduation length the client asked for, in minutes; the included length when absent. */
+  durationMinutes?: number;
 }
 
 const MONEY = String.raw`\$\s?([\d,]+(?:\.\d{2})?)`;
@@ -91,13 +102,23 @@ function travelLabel(travel: TravelResolution): string {
   return travel.campus === "sjsu" ? "SJSU travel fee" : `Travel fee (${travel.place})`;
 }
 
+/** "Graduation session", with the headcount and any non-standard length spelled out. */
+function graduationLabel(people: number, durationMinutes: number | undefined): string {
+  const headcount = people > 1 ? ` (${people} × ${money(getGroupRatePerPerson(people))})` : "";
+  const length = durationMinutes && durationMinutes !== includedMinutesFor(people) ? `, ${durationMinutes} min` : "";
+  return `Graduation session${headcount}${length}`;
+}
+
 /** The session line the rate card can name without guessing, or null. */
 function sessionLine(input: QuoteInput, draftPrices: number[]): QuoteLine | null {
   if (input.playbook === "graduation") {
     const people = peopleCount(input.people);
-    if (people <= 1) return { kind: "session", label: "Graduation session", amount: GRAD_HOURLY_RATE };
-    const rate = getGroupRatePerPerson(people);
-    return { kind: "session", label: `Graduation session (${people} × ${money(rate)})`, amount: rate * people };
+    // One duration rule for every surface (lib/pricing.ts).
+    return {
+      kind: "session",
+      label: graduationLabel(people, input.durationMinutes),
+      amount: graduationSessionPrice(people, input.durationMinutes),
+    };
   }
   // Other services offer several packages: use the one the draft names, if exactly one.
   const named = input.basePrices.filter((p) => draftPrices.includes(p));
@@ -175,7 +196,9 @@ export function checkDraftQuote(draft: string, input: QuoteInput): DraftQuoteChe
   for (const f of figures(draft, TRAVEL_FIGURE)) {
     if (confirmed.has(f.amount) || f.amount === expectedTravel) continue;
     // Included or unknown travel has no amount the draft may state.
-    mismatches.push({ kind: "travel", stated: f.amount, expected: expectedTravel ?? 0, excerpt: f.excerpt });
+    mismatches.push({
+      kind: "travel", stated: f.amount, expected: expectedTravel ?? 0, excerpt: f.excerpt, certain: expectedTravel !== null,
+    });
   }
 
   if (breakdown) {
@@ -185,10 +208,9 @@ export function checkDraftQuote(draft: string, input: QuoteInput): DraftQuoteChe
     for (const f of figures(draft, TOTAL_FIGURE)) {
       if (confirmed.has(f.amount) || valid.has(f.amount)) continue;
       // Re-base the stated total on the right travel fee when that explains it.
-      const expected = travelWrong && valid.has(f.amount - travelWrong.stated + travelWrong.expected)
-        ? f.amount - travelWrong.stated + travelWrong.expected
-        : breakdown.total;
-      mismatches.push({ kind: "total", stated: f.amount, expected, excerpt: f.excerpt });
+      const rebased = travelWrong ? f.amount - travelWrong.stated + travelWrong.expected : NaN;
+      const certain = valid.has(rebased);
+      mismatches.push({ kind: "total", stated: f.amount, expected: certain ? rebased : breakdown.total, excerpt: f.excerpt, certain });
     }
   }
   return { breakdown, mismatches, quotesPrice: true };
@@ -206,6 +228,30 @@ export function correctDraftPricing(draft: string, check: DraftQuoteCheck): stri
     const fixed = m.excerpt.replace(/\$\s?[\d,]+(?:\.\d{2})?/, money(m.expected));
     return text.replace(m.excerpt, fixed);
   }, draft);
+}
+
+export interface PricingEnforcement {
+  /** The draft as it was before the rate card's figures replaced the model's; null when nothing changed. */
+  originalDraft: string | null;
+  /** The figures that were replaced, in draft order. */
+  corrections: QuoteMismatch[];
+}
+
+/**
+ * The draft with every CERTAIN mismatch corrected, for the server to apply
+ * before the draft reaches the admin. An ambiguous figure (a travel amount
+ * for an unrouted location, a total the rate card can only guess at) is left
+ * in place and stays flagged by validation; nothing here guesses.
+ */
+export function enforceDraftPricing(draft: string, input: QuoteInput): PricingEnforcement & { draft: string } {
+  const check = checkDraftQuote(draft, input);
+  const corrections = check.mismatches.filter((m) => m.certain);
+  if (corrections.length === 0) return { draft, originalDraft: null, corrections: [] };
+  return {
+    draft: correctDraftPricing(draft, { ...check, mismatches: corrections }),
+    originalDraft: draft,
+    corrections,
+  };
 }
 
 /** Thread prices as numbers ("$1,200" → 1200). */

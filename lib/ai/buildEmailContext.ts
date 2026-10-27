@@ -12,9 +12,9 @@
 
 import { classifySession } from "./sessionClassifier";
 import { TRAVEL_RATE_LABEL } from "@/lib/travelFee";
-import { buildPricingFacts, buildTravelFact, buildPolicyFacts, buildContactFacts, type PricingFacts } from "./businessFacts";
-import { resolveTravel, type TravelResolution } from "@/lib/travelResolution";
-import { parseQuotedPrices, staleQuotedPrices } from "./quotePricing";
+import { renderTravelFact, buildPolicyFacts, buildContactFacts, type PricingFacts } from "./businessFacts";
+import type { TravelResolution } from "@/lib/travelResolution";
+import { buildQuoteInputForInquiry } from "./inquiryQuote";
 import { buildGoldenHourWindow, goldenHourCaveat, type GoldenHourWindow } from "./goldenHour";
 import { buildThreadDigest, renderThreadDigest, type ThreadDigest, type ThreadMessage } from "./threadDigest";
 import { selectExamples, type ApprovedExample, type ExampleScenario } from "./approvedExamples";
@@ -266,11 +266,11 @@ export function buildEmailContext(input: BuildEmailContextInput): EmailContext {
   }
 
   // ── Pricing ─────────────────────────────────────────────────────────────
-  const pricingFacts = buildPricingFacts({
-    sessionType: inquiry.sessionType,
-    message: inquiry.message,
-    people: inquiry.people,
-  });
+  // The same inputs a restored draft and the contract check against
+  // (lib/ai/inquiryQuote.ts), so no surface prices from its own copy.
+  const confirmedPrices = input.confirmedPrices ?? [];
+  const quote = buildQuoteInputForInquiry(inquiry, { messages, confirmedPrices });
+  const { facts: pricingFacts, travel, stalePrices } = quote;
   if (!pricingFacts.verified) {
     warnings.push({
       code: "pricing_unverified",
@@ -282,7 +282,7 @@ export function buildEmailContext(input: BuildEmailContextInput): EmailContext {
   // A shoot outside the city whose travel fee is not in the rate card, on top
   // of a session price that IS. That combination is where a confident-sounding
   // total goes out short by the travel fee.
-  const travelFact = buildTravelFact(inquiry.school, inquiry.location, inquiry.message);
+  const travelFact = renderTravelFact(travel);
   if (travelFact?.includes("NOT in the rate card") && pricingFacts.verified) {
     warnings.push({
       code: "travel_unverified",
@@ -293,12 +293,6 @@ export function buildEmailContext(input: BuildEmailContextInput): EmailContext {
 
   // ── Thread, administrative status, conversation stage ───────────────────
   const digest = buildThreadDigest(messages, now);
-  const travel = resolveTravel({ school: inquiry.school, location: inquiry.location, message: inquiry.message });
-  const confirmedPrices = input.confirmedPrices ?? [];
-  const stalePrices = staleQuotedPrices(parseQuotedPrices(digest.quotedPrices), {
-    playbook, people: inquiry.people != null ? String(inquiry.people) : null,
-    basePrices: pricingFacts.basePrices, addOnPrices: pricingFacts.addOnPrices, travel, confirmedPrices,
-  }, messages);
   if (stalePrices.length > 0 && travel.kind === "verified") {
     warnings.push({
       code: "stale_quoted_price",

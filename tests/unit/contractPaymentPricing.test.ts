@@ -79,6 +79,33 @@ describe("contract pricing", () => {
   });
 });
 
+describe("an agreed total built on a superseded travel fee", () => {
+  const oldQuote = {
+    body: "My sessions start at $350, plus a $70 travel fee for SJSU, so $420 total",
+    fromMe: true,
+    timestamp: "2026-10-01T12:00:00Z",
+  };
+
+  it("goes to review instead of into the contract", () => {
+    const pricing = resolveContractPricing({ ...sjsuGrad, messages: [oldQuote] }, { ...none, agreedTotal: 420 });
+    expect(pricing.status).toBe("review");
+    expect(pricing.total).toBeNull();
+    expect(pricing.status === "review" && pricing.reason).toMatch(/\$420.*outdated travel fee.*\$75/);
+  });
+
+  it("is caught from the formula fee alone when the thread is not loaded", () => {
+    expect(resolveContractPricing(sjsuGrad, { ...none, agreedTotal: 420 })).toMatchObject({ status: "review", total: null });
+  });
+
+  it("leaves the current all-in total and a deliberate custom price alone", () => {
+    expect(resolveContractPricing({ ...sjsuGrad, messages: [oldQuote] }, { ...none, agreedTotal: 425 }))
+      .toMatchObject({ status: "ok", total: 425 });
+    const custom = { body: "I can do $275 given the short notice", fromMe: true, timestamp: "2026-10-02T12:00:00Z" };
+    expect(resolveContractPricing({ ...sjsuGrad, messages: [custom] }, { ...none, agreedTotal: 275 }))
+      .toMatchObject({ status: "ok", total: 275 });
+  });
+});
+
 describe("payment total inference", () => {
   it("does not price an elopement as a graduation because it names a university", () => {
     const elopement = { session_type: "Elopement", message: "We both graduated from SJSU and want to elope at City Hall", school: null, location: null, people: 2 };

@@ -20,6 +20,34 @@ const STANDARD_TURNAROUND_DAYS = 14;
 
 const RATE_PER_MILE_LABEL = `${TRAVEL_RATE_LABEL} / mile (round trip)`;
 
+/**
+ * An add-on with one price. The display text is derived, never typed: the
+ * family add-ons used to be stored as strings ("$125") with the AI's numeric
+ * list typed by hand beside them, which is two places for one price.
+ */
+function pricedAddOn<L extends string>(label: L, price: number, per?: string) {
+  const displayPrice = per ? `${formatFee(price)} / ${per}` : formatFee(price);
+  return { label, price, displayPrice };
+}
+
+/** An add-on priced as a range; either end is a legitimate quote. */
+function rangedAddOn<L extends string>(label: L, priceMin: number, priceMax: number) {
+  return { label, priceMin, priceMax, displayPrice: `${formatFee(priceMin)}-${formatFee(priceMax)}` };
+}
+
+/**
+ * Every dollar figure an add-on list can be quoted at, for the validator: a
+ * fixed price, or both ends of a range. Add-ons with only descriptive text
+ * (a per-mile rate, "Custom quote") contribute nothing.
+ */
+export function addOnPriceValues(addOns: Readonly<Record<string, object>>): number[] {
+  return Object.values(addOns).flatMap((addOn) => {
+    if ("price" in addOn && typeof addOn.price === "number") return [addOn.price];
+    if ("priceMin" in addOn && "priceMax" in addOn) return [Number(addOn.priceMin), Number(addOn.priceMax)];
+    return [];
+  });
+}
+
 export const PRICING_CATALOG = {
   standardTurnaroundDays: STANDARD_TURNAROUND_DAYS,
   graduation: {
@@ -172,10 +200,10 @@ export const PRICING_CATALOG = {
       extended: { label: "Extended Family Session", price: 500, durationMinutes: 60, minimumImages: 30 },
     },
     addOns: {
-      extraLocation: { label: "Additional nearby location", displayPrice: "$125" },
-      expedited: { label: "72-hour full gallery delivery", displayPrice: "$150" },
-      extendedFamily: { label: "Extended family members", displayPrice: "$50-$75" },
-      extra30Minutes: { label: "Additional time", displayPrice: "$100 / 30 min" },
+      extraLocation: pricedAddOn("Additional nearby location", 125),
+      expedited: pricedAddOn("72-hour full gallery delivery", 150),
+      extendedFamily: rangedAddOn("Extended family members", 50, 75),
+      extra30Minutes: pricedAddOn("Additional time", 100, "30 min"),
     },
   },
   events: {

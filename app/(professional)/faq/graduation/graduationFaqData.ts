@@ -5,7 +5,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { FAQGroup } from "../faqShared";
-import { BOOKING_POLICY, PRICING_CATALOG } from "@/lib/pricingCatalog";
+import { BOOKING_POLICY, PRICING_CATALOG, formatFee } from "@/lib/pricingCatalog";
 
 const graduationPricing = PRICING_CATALOG.graduation;
 
@@ -128,7 +128,7 @@ export const FAQS: FAQGroup[] = [
       },
       {
         q: "Is there a travel fee?",
-        a: `San Francisco locations (SF State, USF, and anywhere within SF city limits) have no travel fee. Travel fees apply outside SF: UC Berkeley ($${graduationPricing.travelFees["uc-berkeley"]}), CSU East Bay ($${graduationPricing.travelFees.csueb}), Santa Clara ($${graduationPricing.travelFees["santa-clara"]}), SJSU ($${graduationPricing.travelFees.sjsu}), and Stanford ($${graduationPricing.travelFees.stanford}).`,
+        a: `San Francisco locations (SF State, USF, and anywhere within SF city limits) have no travel fee. Travel fees apply outside SF: UC Berkeley (${formatFee(graduationPricing.travelFees["uc-berkeley"])}), CSU East Bay (${formatFee(graduationPricing.travelFees.csueb)}), Santa Clara (${formatFee(graduationPricing.travelFees["santa-clara"])}), SJSU (${formatFee(graduationPricing.travelFees.sjsu)}), and Stanford (${formatFee(graduationPricing.travelFees.stanford)}).`,
       },
       {
         q: "Can we shoot at multiple locations?",

@@ -8,7 +8,9 @@
 
 import { useMemo } from "react";
 import { T, Icon, MonoLabel } from "../ui";
-import { checkDraftQuote, correctDraftPricing, type QuoteInput } from "@/lib/ai/quotePricing";
+import {
+  checkDraftQuote, correctDraftPricing, type PricingEnforcement, type QuoteInput,
+} from "@/lib/ai/quotePricing";
 
 export type DraftQuote = { input: QuoteInput; stalePrices: number[] };
 
@@ -18,11 +20,31 @@ type Props = {
   onDraft: (next: string) => void;
   /** The admin confirms earlier quoted figures were agreed for this client. */
   onConfirmEarlier: (prices: number[]) => void;
+  /** Figures the server already replaced in this draft, shown so the change is visible. */
+  pricingFix?: PricingEnforcement | null;
 };
 
 const money = (n: number) => (Number.isInteger(n) ? `$${n.toLocaleString("en-US")}` : `$${n.toFixed(2)}`);
 
-export default function PricingCheck({ draft, quote, onDraft, onConfirmEarlier }: Props) {
+/** What the server changed before the draft arrived, with the model's text on request. */
+function ServerCorrections({ fix }: { fix: PricingEnforcement }) {
+  return (
+    <div className="space-y-1" style={{ color: T.inkFaint }}>
+      <p className="leading-snug">
+        Corrected before it reached you:{" "}
+        {fix.corrections.map((c) => `${money(c.stated)} ${c.kind} to ${money(c.expected)}`).join(", ")}.
+      </p>
+      {fix.originalDraft && (
+        <details>
+          <summary className="cursor-pointer">Show the draft as written</summary>
+          <pre className="whitespace-pre-wrap mt-1" style={{ fontFamily: "inherit" }}>{fix.originalDraft}</pre>
+        </details>
+      )}
+    </div>
+  );
+}
+
+export default function PricingCheck({ draft, quote, onDraft, onConfirmEarlier, pricingFix = null }: Props) {
   const check = useMemo(() => (quote ? checkDraftQuote(draft, quote.input) : null), [draft, quote]);
   if (!quote || !check?.quotesPrice) return null;
   const { breakdown, mismatches } = check;
@@ -32,6 +54,7 @@ export default function PricingCheck({ draft, quote, onDraft, onConfirmEarlier }
     <div className="px-3 py-2 rounded-xl text-xs space-y-2"
       style={{ background: T.inset, border: `1px solid ${mismatches.length ? T.redBorder : T.border}` }}>
       <MonoLabel>Pricing from the rate card</MonoLabel>
+      {pricingFix && pricingFix.corrections.length > 0 && <ServerCorrections fix={pricingFix} />}
       {breakdown ? (
         <table className="w-full" style={{ color: T.ink }}>
           <thead>

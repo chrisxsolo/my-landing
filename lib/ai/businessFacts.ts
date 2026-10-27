@@ -15,10 +15,12 @@
 import {
   PRICING_CATALOG,
   BOOKING_POLICY,
+  addOnPriceValues,
   calculatePaymentSchedule,
 } from "@/lib/pricingCatalog";
+import { graduationSessionPrice } from "@/lib/pricing";
 import { resolvePlaybookKey } from "./sessionClassifier";
-import { resolveTravel } from "@/lib/travelResolution";
+import { resolveTravel, type TravelResolution } from "@/lib/travelResolution";
 
 export type PricingFacts = {
   verified: boolean;
@@ -64,7 +66,7 @@ function graduationFacts(peopleCount: number): PricingFacts {
       // "2 people for 1.5hours", the facts said nothing about what a longer
       // group session costs, and the model spent its whole output budget
       // reasoning about it and returned a truncated draft.
-      lines.push(`The group rate covers the standard ${grad.durationRules.standardMinutes}-minute session. A longer booking adds the extra 30 minutes add-on at ${money(grad.addOns.extra30Minutes.price)} per 30 minutes, so ${peopleCount} graduates for 90 minutes is ${money(total)} plus ${money(grad.addOns.extra30Minutes.price)}, ${money(total + grad.addOns.extra30Minutes.price)} total.`);
+      lines.push(`The group rate covers the standard ${grad.durationRules.standardMinutes}-minute session. A longer booking adds the extra 30 minutes add-on at ${money(grad.addOns.extra30Minutes.price)} per 30 minutes, so ${peopleCount} graduates for 90 minutes is ${money(total)} plus ${money(grad.addOns.extra30Minutes.price)}, ${money(graduationSessionPrice(peopleCount, 90))} total.`);
     }
   }
 
@@ -81,11 +83,12 @@ function graduationFacts(peopleCount: number): PricingFacts {
   return {
     verified: true,
     lines,
-    // Both the per-person rate and the group total are quotable figures, and a
-    // longer booking is a multiple of the hourly rate.
+    // Both the per-person rate and the group total are quotable figures. A
+    // single graduate's longer bookings are priced by the one duration rule in
+    // lib/pricing.ts, the same one the public estimator shows.
     basePrices: peopleCount <= 1
-      ? [grad.baseHourlyRate, grad.baseHourlyRate * 1.5, grad.baseHourlyRate * 2]
-      : [perPerson, perPerson * peopleCount],
+      ? grad.durationRules.allowedMinutes.map((minutes) => graduationSessionPrice(1, minutes))
+      : [perPerson, graduationSessionPrice(peopleCount)],
     addOnPrices: [
       grad.addOns.extraOutfit.price, grad.addOns.secondLocation.price,
       grad.addOns.extra30Minutes.price, grad.addOns.expedited.price,
@@ -200,10 +203,31 @@ function familyFacts(peopleCount: number): PricingFacts {
     verified: true,
     lines,
     basePrices: [families.packages.standard.price, families.packages.extended.price],
-    // These are display ranges in the catalog, so the low and high ends of each
-    // are both legitimate.
-    addOnPrices: [125, 150, 50, 75, 100],
+    // Read off the catalog: a fixed price, or both ends of a range.
+    addOnPrices: addOnPriceValues(families.addOns),
     needsManualQuote,
+  };
+}
+
+/**
+ * The maternity session: one package, partner and immediate family included.
+ *
+ * Travel is described without its per-mile rate on purpose: the validator
+ * treats every figure here as quotable, and a mileage rate is not a price.
+ */
+function maternityFacts(): PricingFacts {
+  const maternity = PRICING_CATALOG.maternity;
+  const { extraOutfit, secondLocation, expedited } = maternity.addOns;
+  return {
+    verified: true,
+    lines: [
+      `${maternity.label}: ${money(maternity.price)}, ${maternity.durationMinutes}-minute session, ${maternity.minimumImages}+ edited images, ${maternity.locations} location and ${maternity.outfits} outfit. Partner and immediate family, kids included, are part of this package, so it is never a family session.`,
+      `Add-ons: extra outfit ${money(extraOutfit.price)}, second nearby location ${money(secondLocation.price)}, 72-hour gallery ${money(expedited.price)}.`,
+      "Travel outside San Francisco is calculated separately from round-trip distance. There is no flat travel fee, so state an amount only if one is given to you as a verified fact.",
+    ],
+    basePrices: [maternity.price],
+    addOnPrices: [extraOutfit.price, secondLocation.price, expedited.price],
+    needsManualQuote: null,
   };
 }
 
@@ -370,6 +394,7 @@ export function buildPricingFacts(input: BusinessFactsInput): PricingFacts {
     case "engagement": return couplesFacts("engagement");
     case "couples":    return couplesFacts(detectCouplesPackage(sessionType, message), true);
     case "family":     return familyFacts(people);
+    case "maternity":  return maternityFacts();
     case "event":      return eventFacts();
     case "headshot":   return unpricedSessionFacts("headshot");
     case "portrait":   return unpricedSessionFacts("individual portrait");
@@ -400,9 +425,13 @@ export function buildTravelFact(
   school: string | null | undefined,
   location?: string | null,
   message?: string | null,
+  options: { schoolImpliesLocation?: boolean } = {},
 ): string | null {
-  const travel = resolveTravel({ school, location, message });
+  return renderTravelFact(resolveTravel({ school, location, message, ...options }));
+}
 
+/** The travel fact for an already-resolved destination. */
+export function renderTravelFact(travel: TravelResolution): string | null {
   // Worded as a constraint on CLAIMS, with relevance left to the stage, so an
   // out-of-city draft only mentions travel when it is quoting a price.
   const unknown = (subject: string) =>

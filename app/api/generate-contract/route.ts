@@ -21,10 +21,22 @@ import {
   getMinimumImageCountForSessionType,
 } from "@/lib/pricingCatalog";
 import { parseExtractedPricing, resolveContractPricing } from "@/lib/contractPricing";
+import type { ThreadMessage } from "@/lib/ai/threadDigest";
 
 export const dynamic = "force-dynamic";
 
-type MimePart = { mimeType?: string; body?: { data?: string }; parts?: MimePart[] };
+type MimePart = {
+  mimeType?: string;
+  body?: { data?: string };
+  parts?: MimePart[];
+  headers?: { name?: string; value?: string }[];
+};
+
+/** Whether Chris sent this message: anything not from the client's address. */
+function sentByMe(payload: MimePart, clientEmail: string): boolean {
+  const from = payload.headers?.find((h) => h.name?.toLowerCase() === "from")?.value ?? "";
+  return !from.toLowerCase().includes(clientEmail.toLowerCase());
+}
 
 function decodeBody(data: string): string {
   try {
@@ -260,6 +272,7 @@ export async function POST(req: NextRequest) {
 
   // ── Fetch email thread ────────────────────────────────────────────────────
   let emailContext = "";
+  let threadMessages: ThreadMessage[] = [];
   const tokens = await getValidTokens();
   if (tokens) {
     const auth = `Bearer ${tokens.access_token}`;
@@ -271,18 +284,24 @@ export async function POST(req: NextRequest) {
     if (searchRes.ok) {
       const searchData = await searchRes.json() as { messages?: { id: string }[] };
       const ids = (searchData.messages ?? []).map(m => m.id).slice(0, 12);
-      const bodies = await Promise.all(ids.map(async id => {
+      const fetched = await Promise.all(ids.map(async (id): Promise<ThreadMessage | null> => {
         try {
           const r = await fetch(
             `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=full`,
             { headers: { Authorization: auth } }
           );
-          if (!r.ok) return "";
-          const msg = await r.json() as { payload?: MimePart; snippet?: string };
-          return (extractBestText(msg.payload ?? {}) || msg.snippet || "").slice(0, 2000);
-        } catch { return ""; }
+          if (!r.ok) return null;
+          const msg = await r.json() as { payload?: MimePart; snippet?: string; internalDate?: string };
+          const body = (extractBestText(msg.payload ?? {}) || msg.snippet || "").slice(0, 2000);
+          if (!body) return null;
+          return { body, fromMe: sentByMe(msg.payload ?? {}, inq.email), timestamp: Number(msg.internalDate ?? 0) };
+        } catch (err) {
+          console.error(`[generate-contract] could not read message ${id}`, err);
+          return null;
+        }
       }));
-      emailContext = bodies.filter(Boolean).map((b, i) => `--- Email ${i + 1} ---\n${b}`).join("\n\n");
+      threadMessages = fetched.filter((m): m is ThreadMessage => m !== null);
+      emailContext = threadMessages.map((m, i) => `--- Email ${i + 1} ---\n${m.body}`).join("\n\n");
     }
   }
 
@@ -348,6 +367,8 @@ ${emailContext || "(no email history found)"}`,
     location: extracted.location ?? inq.location ?? null,
     message: inq.message ?? null,
     people: inq.people ?? null,
+    // Lets an agreed total built on a superseded travel fee go to review.
+    messages: threadMessages,
   }, parseExtractedPricing(parsed));
   const totalNum = pricing.status === "ok" ? pricing.total : 0;
   const totalFeeStr = totalNum ? fmtMoney(totalNum) : "[TOTAL FEE — review the price]";

@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   BOOKING_POLICY,
   PRICING_CATALOG,
+  addOnPriceValues,
   calculatePaymentSchedule,
   getBookingPolicyItems,
   getMinimumImageCountForSessionType,
@@ -72,13 +73,19 @@ test("every add-on price across categories is pinned", () => {
   assert.equal("shortFormVideo" in couples, false, "video is not an offered add-on");
   assert.equal(couples.advancedRetouching.displayPrice, "$25 / image");
 
-  // Family add-ons are display-only strings. Expedited MUST be $150 — this is the
-  // exact value that drifted to $75 on the live family page (regression lock).
+  // Family add-ons are stored as numbers and the display text is derived from
+  // them. Expedited MUST be $150 — this is the exact value that drifted to $75
+  // on the live family page (regression lock).
   const family = PRICING_CATALOG.families.addOns;
+  assert.equal(family.extraLocation.price, 125);
+  assert.equal(family.expedited.price, 150);
+  assert.deepEqual([family.extendedFamily.priceMin, family.extendedFamily.priceMax], [50, 75]);
+  assert.equal(family.extra30Minutes.price, 100);
   assert.equal(family.extraLocation.displayPrice, "$125");
   assert.equal(family.expedited.displayPrice, "$150");
   assert.equal(family.extendedFamily.displayPrice, "$50-$75");
   assert.equal(family.extra30Minutes.displayPrice, "$100 / 30 min");
+  assert.deepEqual(addOnPriceValues(family), [125, 150, 50, 75, 100]);
 
   // Event add-ons.
   const events = PRICING_CATALOG.events.addOns;

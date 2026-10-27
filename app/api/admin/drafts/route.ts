@@ -6,14 +6,22 @@
 // Kept separate from /api/admin/site-settings so that endpoint's allowlist stays
 // strictly the non-secret public image/cover keys.
 //
-//   GET    ?inquiryId=42                  → { draft, ai_draft, original_ai_draft }
+//   GET    ?inquiryId=42                  → { draft, ai_draft, original_ai_draft, quote }
 //   PUT    { inquiryId, draft?, ai_draft?, original_ai_draft? } → upsert provided
 //   DELETE { inquiryId, kinds? }          → delete (default: draft + ai_draft)
+//
+// `quote` is the rate card's inputs for this inquiry (lib/ai/inquiryQuote),
+// computed from the inquiry row with no model call. A restored draft used to
+// come back without one, so the pricing check never ran on it: a stored draft
+// quoting the old $70 SJSU travel fee restored silently.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { type NextRequest, NextResponse } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { requireAdmin } from "@/lib/requireAdmin";
+import { buildQuoteInputForInquiry, type QuoteSubject } from "@/lib/ai/inquiryQuote";
+import type { QuoteInput } from "@/lib/ai/quotePricing";
 import {
   DRAFT_KEY_PREFIXES,
   type DraftKind,
@@ -24,6 +32,33 @@ import {
 export const dynamic = "force-dynamic";
 
 const MAX_DRAFT_LEN = 100_000;
+const INQUIRIES_TABLE = "inquiries";
+const QUOTE_COLUMNS = "session_type, message, school, location, people";
+
+type RestoredQuote = { input: QuoteInput; stalePrices: number[] };
+
+/**
+ * The pricing inputs for the inquiry, or null when the row cannot be read.
+ * Without the Gmail thread there are no earlier quoted prices to call stale;
+ * the draft's own figures are still checked against the rate card.
+ */
+async function fetchInquiryQuote(supabase: SupabaseClient, inquiryId: string): Promise<RestoredQuote | null> {
+  try {
+    const { data, error } = await supabase
+      .from(INQUIRIES_TABLE).select(QUOTE_COLUMNS).eq("id", inquiryId).maybeSingle();
+    if (error) throw error;
+    if (!data) return null;
+    const row = data as { session_type?: string | null; message?: string | null; school?: string | null; location?: string | null; people?: string | number | null };
+    const subject: QuoteSubject = {
+      sessionType: row.session_type, message: row.message, school: row.school, location: row.location, people: row.people,
+    };
+    const { input, stalePrices } = buildQuoteInputForInquiry(subject);
+    return { input, stalePrices };
+  } catch (err) {
+    console.error("[admin/drafts] quote inputs unavailable:", err);
+    return null;
+  }
+}
 
 export async function GET(req: NextRequest) {
   const deny = requireAdmin(req);
@@ -37,7 +72,10 @@ export async function GET(req: NextRequest) {
   try {
     const keys = DRAFT_KEY_PREFIXES.map((k) => draftKey(k, inquiryId!));
     const supabase = createSupabaseServerClient();
-    const { data, error } = await supabase.from("site_settings").select("key,value").in("key", keys);
+    const [{ data, error }, quote] = await Promise.all([
+      supabase.from("site_settings").select("key,value").in("key", keys),
+      fetchInquiryQuote(supabase, inquiryId!),
+    ]);
     if (error) throw error;
 
     const byKey = new Map((data ?? []).map((r) => [r.key, r.value]));
@@ -45,6 +83,7 @@ export async function GET(req: NextRequest) {
       draft: byKey.get(draftKey("draft", inquiryId!)) ?? null,
       ai_draft: byKey.get(draftKey("ai_draft", inquiryId!)) ?? null,
       original_ai_draft: byKey.get(draftKey("original_ai_draft", inquiryId!)) ?? null,
+      quote,
     });
   } catch (err) {
     console.error("[admin/drafts] GET failed:", err);

@@ -102,6 +102,7 @@ const SERVICE_FLAT_RATES = {
   "proposal":        750,
   "elopement":       950, // Elopement & Courthouse Ceremony, 2-hour base. A
                           // floor Chris edits when the coverage runs longer.
+  "maternity":       500, // Maternity Session (60 min, partner + kids included)
 };
 
 const SERVICE_LABELS = {
@@ -111,6 +112,7 @@ const SERVICE_LABELS = {
   "engagement":      "Engagement Session",
   "proposal":        "Proposal Session",
   "elopement":       "Elopement & Courthouse Ceremony",
+  "maternity":       "Maternity Session",
   "graduation":      "Graduation Session",
 };
 
@@ -121,6 +123,8 @@ function detectServiceType(inq) {
 
   const t = `${inq.session_type || ""} ${inq.message || ""}`.toLowerCase().replace(/-/g, " ");
   if (t.includes("elope") || t.includes("courthouse")) return "elopement";
+  // Before couples and family: partner and kids are part of the maternity package.
+  if (t.includes("matern"))          return "maternity";
   if (t.includes("proposal"))        return "proposal";
   if (t.includes("engagement"))      return "engagement";
   if (t.includes("couple") || t.includes("anniversary")) return "couples";
