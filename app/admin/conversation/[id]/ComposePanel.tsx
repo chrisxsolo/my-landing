@@ -6,6 +6,7 @@
 import type { RefObject } from "react";
 import { T, Icon, Spinner, Panel, PanelHead, MonoLabel } from "../ui";
 import PricingCheck, { type DraftQuote } from "./PricingCheck";
+import type { PricingEnforcement } from "@/lib/ai/quotePricing";
 
 type DraftIssue = {
   type: string;
@@ -63,6 +64,8 @@ type Props = {
   /** Rate-card inputs for the live pricing check; null before a draft is generated. */
   quote: DraftQuote | null;
   onConfirmEarlier: (prices: number[]) => void;
+  /** Figures the server replaced in the last AI draft; null when it changed nothing. */
+  pricingFix: PricingEnforcement | null;
   lastUsage: DraftUsage | null;
   onToggleVoice: () => void;
   onFocusKeyboard: () => void;
@@ -78,7 +81,7 @@ export default function ComposePanel({
   subject, onSubject, draft, onDraft, composeRef, messagesCount, myEmail,
   voiceActive, voiceError, draftLoading, polishLoading, editLoading, exampleSaving,
   draftSaving, draftSaved, sendLoading, feedback, onFeedback,
-  validation, contextWarnings, quote, onConfirmEarlier, lastUsage, onToggleVoice, onFocusKeyboard,
+  validation, contextWarnings, quote, onConfirmEarlier, pricingFix, lastUsage, onToggleVoice, onFocusKeyboard,
   onPolish, onGenerate, onEdit, onApproveExample, onSaveDraft, onSend,
 }: Props) {
   const canSend = Boolean(subject.trim() && draft.trim()) && !sendLoading;
@@ -202,7 +205,7 @@ export default function ComposePanel({
             ))}
           </div>
         )}
-        <PricingCheck draft={draft} quote={quote} onDraft={onDraft} onConfirmEarlier={onConfirmEarlier} />
+        <PricingCheck draft={draft} quote={quote} onDraft={onDraft} onConfirmEarlier={onConfirmEarlier} pricingFix={pricingFix} />
         {/* Facts and prose are reported separately on purpose. The old copy
             said "format and facts check out", which read as "send it" — but
             nothing here assesses whether the email sounds like Chris. */}

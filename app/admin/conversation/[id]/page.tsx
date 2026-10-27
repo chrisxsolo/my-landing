@@ -38,6 +38,8 @@ type AiDraftResponse = {
   validation?: DraftValidation | null;
   warnings?: ContextWarning[];
   quote?: DraftQuote | null;
+  /** Rate-card figures the server put back into the draft, with the original text. */
+  pricing?: PricingEnforcement | null;
   usage?: DraftUsage | null;
   budget?: { state: "ok" | "warning" | "over"; message: string | null } | null;
 };
@@ -46,6 +48,7 @@ type AiDraftResponse = {
 // silently drifted out of date the moment the shape changed.
 import type { DraftValidation } from "./ComposePanel";
 import type { DraftQuote } from "./PricingCheck";
+import type { PricingEnforcement } from "@/lib/ai/quotePricing";
 
 type ContextWarning = {
   code: string;
@@ -105,6 +108,8 @@ export default function ConversationPage() {
   const [validation,       setValidation]       = useState<DraftValidation | null>(null);
   const [contextWarnings,  setContextWarnings]  = useState<ContextWarning[]>([]);
   const [draftQuote,       setDraftQuote]       = useState<DraftQuote | null>(null);
+  // What the server corrected in the last AI draft, so the change is visible.
+  const [pricingFix,       setPricingFix]       = useState<PricingEnforcement | null>(null);
   // Earlier quotes Chris confirmed were agreed for this client; sent with every draft request.
   const [confirmedPrices,  setConfirmedPrices]  = useState<number[]>([]);
   const [lastUsage,        setLastUsage]        = useState<DraftUsage | null>(null);
@@ -428,6 +433,7 @@ export default function ConversationPage() {
     setValidation(json.validation ?? null);
     setContextWarnings(json.warnings ?? []);
     setDraftQuote(json.quote ?? null);
+    setPricingFix(json.pricing?.corrections.length ? json.pricing : null);
     setLastUsage(json.usage ?? null);
     if (json.budget?.message) showToast(json.budget.message, json.budget.state === "ok");
   }
@@ -1387,6 +1393,7 @@ export default function ConversationPage() {
             validation={validation}
             contextWarnings={contextWarnings}
             quote={draftQuote}          onConfirmEarlier={confirmEarlierQuote}
+            pricingFix={pricingFix}
             lastUsage={lastUsage}
             onToggleVoice={toggleVoice}
             onFocusKeyboard={focusComposeForDictation}

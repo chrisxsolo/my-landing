@@ -5,8 +5,9 @@
 import { describe, expect, it } from "vitest";
 import { buildEmailContext } from "@/lib/ai/buildEmailContext";
 import { validateEmailDraft, quoteInputOf } from "@/lib/ai/validateEmailDraft";
-import { authoritativeQuote, checkDraftQuote, correctDraftPricing } from "@/lib/ai/quotePricing";
-import { AVAILABILITY, NOW, inquiry, message } from "./fixtures";
+import { authoritativeQuote, checkDraftQuote, correctDraftPricing, enforceDraftPricing } from "@/lib/ai/quotePricing";
+import { generateDraft } from "@/lib/ai/emailOperations";
+import { AVAILABILITY, NOW, fakeCaller, inquiry, message } from "./fixtures";
 
 function sjsu(opts: { people?: number; thread?: ReturnType<typeof message>[]; confirmed?: number[] } = {}) {
   return buildEmailContext({
@@ -82,6 +83,42 @@ describe("validation against the approved fee", () => {
       messages: [], availability: AVAILABILITY, threadLoaded: true, now: NOW,
     });
     expect(types("Hi Sarah,\n\nIt's $350 plus a $75 travel fee", sf)).toContain("pricing_mismatch");
+  });
+});
+
+describe("server-side correction", () => {
+  const generate = (reply: string, overrides: Parameters<typeof inquiry>[0] = {}) => generateDraft({
+    inquiry: inquiry({ school: "San Jose State University", people: 1, ...overrides }),
+    messages: [], availability: AVAILABILITY, threadLoaded: true, now: NOW, rules: [], threadText: null,
+  }, fakeCaller(reply));
+
+  it("puts the approved fee and total into a draft that quoted $70 SJSU travel", async () => {
+    const result = await generate(OLD_DRAFT);
+    expect(result.draft).toBe(GOOD_DRAFT);
+    expect(result.pricing.originalDraft).toBe(OLD_DRAFT);
+    expect(result.pricing.corrections.map((c) => [c.kind, c.stated, c.expected])).toEqual([["travel", 70, 75], ["total", 420, 425]]);
+    expect(result.validation.issues.map((i) => i.type)).not.toContain("pricing_mismatch");
+  });
+
+  it("changes nothing when the figures are right", async () => {
+    const result = await generate(GOOD_DRAFT);
+    expect(result.draft).toBe(GOOD_DRAFT);
+    expect(result.pricing).toEqual({ originalDraft: null, corrections: [] });
+  });
+
+  it("leaves an unverifiable travel amount flagged rather than guessing one", async () => {
+    const draft = "Hi Sarah,\n\nA couples session is $450, plus a $90 travel fee for Point Reyes, so $540 total";
+    const result = await generate(draft, { sessionType: "Couples", school: null, location: "Point Reyes" });
+    expect(result.draft).toBe(draft);
+    expect(result.pricing.corrections).toEqual([]);
+    const mismatch = result.validation.issues.find((i) => i.type === "pricing_mismatch");
+    expect(mismatch?.description).toContain("no travel amount is verified");
+  });
+
+  it("does not rewrite a total the rate card can only guess at", () => {
+    const check = checkDraftQuote("Hi Sarah,\n\nIt's $350 plus a $75 travel fee for SJSU, so $480 total", quoteInputOf(sjsu()));
+    expect(check.mismatches).toEqual([expect.objectContaining({ kind: "total", stated: 480, certain: false })]);
+    expect(enforceDraftPricing("so $480 total for SJSU with a $75 travel fee", quoteInputOf(sjsu())).corrections).toEqual([]);
   });
 });
 

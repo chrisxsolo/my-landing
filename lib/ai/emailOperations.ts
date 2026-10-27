@@ -9,7 +9,8 @@
 
 import { buildEmailContext, type BuildEmailContextInput, type EmailContext } from "./buildEmailContext";
 import { buildSystemPrompt, buildGenerateUserPrompt } from "./emailPrompt";
-import { validateEmailDraft, type ValidationResult } from "./validateEmailDraft";
+import { validateEmailDraft, quoteInputOf, type ValidationResult } from "./validateEmailDraft";
+import { enforceDraftPricing, type PricingEnforcement } from "./quotePricing";
 import { selectPromptRules, type WritingRule } from "./writingRules";
 import { PERMANENT_RULES, PHRASING_CORRECTIONS } from "./soloxsnapsWritingProfile";
 import type { EmailModelCaller, EmailCallResult } from "./emailModel";
@@ -66,9 +67,36 @@ export function stripParagraphPeriods(text: string): string {
     .join("\n");
 }
 
+/**
+ * Cleans the model's text, puts the rate card's figures where the model's
+ * disagree with it, and validates what is actually returned.
+ *
+ * The correction runs server-side because the panel's one-click fix was the
+ * only place it happened, and a draft saved before Chris pressed it kept the
+ * wrong figure. Only a mismatch the rate card is certain of is corrected (a
+ * $70 SJSU fee becomes $75, and a $420 total built on it becomes $425); an
+ * ambiguous amount is left for him and stays flagged. Validation runs on the
+ * corrected text so the issues describe the draft he is actually shown.
+ */
+function finishDraft(
+  raw: string,
+  context: EmailContext,
+  stopReason: string | null,
+): Pick<OperationResult, "draft" | "validation" | "pricing"> {
+  const cleaned = stripParagraphPeriods(stripSignoff(cleanDraft(raw)));
+  const { draft, originalDraft, corrections } = enforceDraftPricing(cleaned, quoteInputOf(context));
+  return {
+    draft,
+    validation: validateEmailDraft(draft, context, stopReason),
+    pricing: { originalDraft, corrections },
+  };
+}
+
 export type OperationResult = {
   draft: string;
   validation: ValidationResult;
+  /** Rate-card figures put back into the draft before it was returned, if any. */
+  pricing: PricingEnforcement;
   context: EmailContext;
   usage: UsageRecord;
   estimatedCostUsd: number;
@@ -169,11 +197,8 @@ export async function generateDraft(
       ? `${userPrompt}\n\n${regenerationBlock(input.previousDraft, input.chrisInstruction)}`
       : userPrompt,
   });
-  const draft = stripParagraphPeriods(stripSignoff(cleanDraft(result.text)));
-
   return {
-    draft,
-    validation: validateEmailDraft(draft, context, result.stopReason),
+    ...finishDraft(result.text, context, result.stopReason),
     context,
     usage: toUsageRecord("generate", result, input.isRegeneration),
     estimatedCostUsd: 0,
@@ -223,11 +248,8 @@ Any date, time, or price you keep or introduce must still come from the verified
 Output the revised email body only.`;
 
   const result = await call({ system: buildEditSystem(context, input.rules), userPrompt });
-  const draft = stripParagraphPeriods(stripSignoff(cleanDraft(result.text)));
-
   return {
-    draft,
-    validation: validateEmailDraft(draft, context, result.stopReason),
+    ...finishDraft(result.text, context, result.stopReason),
     context,
     usage: toUsageRecord("refine", result),
     estimatedCostUsd: 0,
@@ -261,11 +283,8 @@ ${input.rawDraft}
 Output the polished email body only.`;
 
   const result = await call({ system, userPrompt });
-  const draft = stripParagraphPeriods(stripSignoff(cleanDraft(result.text)));
-
   return {
-    draft,
-    validation: validateEmailDraft(draft, context, result.stopReason),
+    ...finishDraft(result.text, context, result.stopReason),
     context,
     usage: toUsageRecord("polish", result),
     estimatedCostUsd: 0,
@@ -294,11 +313,8 @@ Do not introduce any new date, time, or price, and do not drop one to save words
 Output the shorter email body only.`;
 
   const result = await call({ system: buildEditSystem(context, input.rules), userPrompt });
-  const draft = stripParagraphPeriods(stripSignoff(cleanDraft(result.text)));
-
   return {
-    draft,
-    validation: validateEmailDraft(draft, context, result.stopReason),
+    ...finishDraft(result.text, context, result.stopReason),
     context,
     usage: toUsageRecord("shorten", result),
     estimatedCostUsd: 0,
@@ -352,11 +368,8 @@ ${PERMANENT_RULES.map((rule) => `- ${rule}`).join("\n")}
 Output the rewritten email body only.`;
 
   const result = await call({ system, userPrompt });
-  const draft = stripParagraphPeriods(stripSignoff(cleanDraft(result.text)));
-
   return {
-    draft,
-    validation: validateEmailDraft(draft, context, result.stopReason),
+    ...finishDraft(result.text, context, result.stopReason),
     context,
     usage: toUsageRecord("naturalize", result),
     estimatedCostUsd: 0,

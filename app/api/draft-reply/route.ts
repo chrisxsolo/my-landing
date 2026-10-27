@@ -10,7 +10,7 @@
 //   shorten    — cut length, keep every fact
 //   naturalize — pull the wording back toward Chris's voice
 //
-// Response: { draft, validation, warnings, quote, usage, budget }
+// Response: { draft, validation, warnings, quote, pricing, usage, budget }
 //
 // Learning moved out to POST /api/ai/learn, which is deterministic and makes
 // no API call. It used to run here as a second request whose only job was
@@ -240,6 +240,9 @@ export async function POST(req: NextRequest) {
       // The rate card's inputs for this inquiry, so the panel can re-check
       // prices live as the draft is edited (lib/ai/quotePricing).
       quote: { input: quoteInputOf(result.context), stalePrices: result.context.pricing.stalePrices },
+      // Figures the rate card replaced before the draft came back, with the
+      // text as the model wrote it, so the panel can show what changed.
+      pricing: result.pricing,
       usage: {
         model: result.usage.model,
         input_tokens: result.usage.input_tokens,
