@@ -29,7 +29,7 @@ import type { PhotoReview } from "@/lib/photoTagging/reviews";
 import { statusOf, tagChecks, type FactValue, type PhotoFacts } from "@/lib/photoTagging/rules";
 import { suggestTags } from "@/lib/photoTagging/suggest";
 import {
-  canonicalCategory, enginePhotoKey, portfolioPhotoKey, type AuditedPhoto,
+  canonicalCategory, enginePhotoKey, isLocationEvidence, portfolioPhotoKey, type AuditedPhoto, type LocationEvidence,
 } from "@/lib/photoTagging/types";
 
 type Row = Record<string, unknown>;
@@ -61,6 +61,8 @@ interface EngineRow {
   excluded: boolean;
   analysisText: string;
   gps: { latitude: number; longitude: number } | null;
+  /** session_photos.photo_location_evidence, when recorded. */
+  locationEvidence: LocationEvidence | null;
   source: EngineSource;
 }
 
@@ -82,6 +84,7 @@ function toEngineRow(row: Row): EngineRow | null {
     excluded: row.excluded === true,
     analysisText: [text(row.title), text(row.alt_text), text(row.description), tags].filter(Boolean).join(" · "),
     gps: lat !== null && lng !== null ? { latitude: lat, longitude: lng } : null,
+    locationEvidence: isLocationEvidence(row.photo_location_evidence) ? row.photo_location_evidence : null,
     source,
   };
 }
@@ -121,14 +124,15 @@ function placeName(key: string | null, places: readonly KnownPlace[]): string | 
 function ownLocation(engine: EngineRow | null): FactValue | null {
   const value = engine?.source.photoLocation;
   if (!value) return null;
-  return { value, source: engine.source.photoLocationSource === "gps" ? "GPS" : "photo tag" };
+  const stored = engine.source.photoLocationSource ?? null;
+  return { value, source: stored === "gps" ? "GPS" : "photo tag", evidence: engine.locationEvidence ?? stored };
 }
 
 /** Photo's own location tag, else its Content Engine photo's location, else the place its (legacy) session label names. */
 function portfolioLocation(
   source: PortfolioSource, engine: EngineRow | null, resolved: ResolvedPhoto, places: readonly KnownPlace[],
 ): FactValue | null {
-  if (source.location) return { value: source.location, source: "photo tag" };
+  if (source.location) return { value: source.location, source: "photo tag", evidence: "manual" };
   const own = ownLocation(engine);
   if (own) return own;
   const labelled = resolved.placeSource === "label" ? placeName(resolved.placeKey, places) : null;
@@ -186,7 +190,8 @@ function portfolioDraft(row: Row, source: PortfolioSource, engine: EngineRow | n
     target: { key, source: "portfolio", portfolioId: source.id, enginePhotoId: null, sessionId: resolved.engineSessionId,
       url: published ? source.url : null, category, school: school?.value ?? null,
       location: location?.value ?? null, spot: spot?.value ?? null,
-      stored: { school: source.school, location: source.location, spot: storedSpot(spot) } },
+      stored: { school: source.school, location: source.location, spot: storedSpot(spot) },
+      storedLocationSource: source.location ? "manual" : null },
     vision: { imageUrl: source.url, storagePath: null },
   };
 }
@@ -218,7 +223,8 @@ function engineDraft(engine: EngineRow, lib: LoadedLibrary): Draft {
     },
     target: { key, source: "engine", portfolioId: null, enginePhotoId: engine.id, sessionId: s.sessionId, url: engine.url,
       category, school: school?.value ?? null, location: location?.value ?? null, spot: spot?.value ?? null,
-      stored: { school: s.schoolSlug, location: s.photoLocation ?? null, spot: storedSpot(spot) } },
+      stored: { school: s.schoolSlug, location: s.photoLocation ?? null, spot: storedSpot(spot) },
+      storedLocationSource: s.photoLocation ? s.photoLocationSource ?? null : null },
     vision: { imageUrl: engine.url, storagePath: engine.storagePath },
   };
 }

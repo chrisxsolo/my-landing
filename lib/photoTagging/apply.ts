@@ -68,10 +68,13 @@ async function writePortfolio(
 }
 
 async function writePhotoLocation(client: SupabaseClient, write: Extract<TagWrite, { kind: "photo" }>): Promise<void> {
-  const { location, source } = write.patch;
+  const { location, source, evidence } = write.patch;
   const patch = location === null
-    ? { photo_location: null, photo_location_source: null, photo_location_confirmed_at: null }
-    : { photo_location: location, photo_location_source: source, photo_location_confirmed_at: new Date().toISOString() };
+    ? { photo_location: null, photo_location_source: null, photo_location_evidence: null, photo_location_confirmed_at: null }
+    : {
+      photo_location: location, photo_location_source: source, photo_location_evidence: evidence,
+      photo_location_confirmed_at: new Date().toISOString(),
+    };
   await updateOne(client.from(SESSION_PHOTOS_TABLE).update(patch).eq("id", write.enginePhotoId).select("id"), "the photo");
 }
 

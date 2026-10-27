@@ -28,7 +28,9 @@ import { previewPlan } from "@/lib/photoTagging/preview";
 import { needsVision, runVision, VISION_BATCH_MAX } from "@/lib/photoTagging/aiSuggest";
 import { loadAudit, signPrivateThumbs, toReport, type LoadedAudit } from "@/lib/photoTagging/library";
 import { dismissSuggestion, loadReviews, setNotApplicable } from "@/lib/photoTagging/reviews";
-import { isPhotoKey, NOT_APPLICABLE_FIELDS, type NotApplicableField, type TagChanges } from "@/lib/photoTagging/types";
+import {
+  isLocationEvidence, isPhotoKey, NOT_APPLICABLE_FIELDS, type NotApplicableField, type TagChanges,
+} from "@/lib/photoTagging/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -56,12 +58,14 @@ function changesOf(value: unknown): TagChanges | null {
   const c = value as Record<string, unknown>;
   if (c.category !== undefined && (typeof c.category !== "string" || !/^[a-z-]{2,40}$/.test(c.category))) return null;
   if (![c.school, c.location, c.spot].every(optionalText)) return null;
+  if (c.evidence !== undefined && !isLocationEvidence(c.evidence)) return null;
   const changes: TagChanges = {};
   if (typeof c.category === "string") changes.category = c.category;
   for (const field of ["school", "location", "spot"] as const) {
     if (c[field] !== undefined) changes[field] = c[field] as string | null;
   }
-  return Object.keys(changes).length > 0 ? changes : null;
+  if (Object.keys(changes).length === 0) return null;
+  return isLocationEvidence(c.evidence) ? { ...changes, evidence: c.evidence } : changes;
 }
 
 function afterWrite(result: ApplyResult): void {

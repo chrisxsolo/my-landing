@@ -20,6 +20,32 @@ export type Confidence = "high" | "medium";
 export type SuggestionOrigin = "session" | "siblings" | "gps" | "location" | "caption" | "analysis" | "vision";
 export type PhotoSource = "portfolio" | "engine";
 
+/**
+ * What a stored photo location rests on (session_photos.photo_location_evidence),
+ * most trustworthy first. Vision is supporting evidence only: no automated
+ * path ever assigns a place from it.
+ */
+export const LOCATION_EVIDENCE_LEVELS = ["manual", "session", "gps", "vision"] as const;
+export type LocationEvidence = (typeof LOCATION_EVIDENCE_LEVELS)[number];
+
+export const EVIDENCE_LABELS: Record<LocationEvidence, string> = {
+  manual: "set by the photographer",
+  session: "from the session's facts",
+  gps: "from the photo's GPS",
+  vision: "from AI image analysis",
+};
+
+export function isLocationEvidence(value: unknown): value is LocationEvidence {
+  return typeof value === "string" && (LOCATION_EVIDENCE_LEVELS as readonly string[]).includes(value);
+}
+
+/** The evidence level a suggestion's origin amounts to. AI-written text and vision are both image analysis. */
+export function evidenceOf(origin: SuggestionOrigin): LocationEvidence {
+  if (origin === "gps") return "gps";
+  if (origin === "session" || origin === "siblings" || origin === "location") return "session";
+  return "vision";
+}
+
 /** Fields the photographer may mark "not applicable" (category and school never are). */
 export const NOT_APPLICABLE_FIELDS = ["location", "spot"] as const satisfies readonly TagField[];
 export type NotApplicableField = (typeof NOT_APPLICABLE_FIELDS)[number];
@@ -35,6 +61,8 @@ export interface TagCheck {
   source: string | null;
   /** Why the field is missing or not applicable. */
   note: string | null;
+  /** For a stored photo location: what it rests on. Absent when not recorded or not a location. */
+  evidence?: LocationEvidence | null;
 }
 
 export interface TagSuggestion {
@@ -138,6 +166,8 @@ export interface TagChanges {
   school?: string | null;
   location?: string | null;
   spot?: string | null;
+  /** What a location being set rests on (default "manual": the photographer chose it with no suggestion behind it). */
+  evidence?: LocationEvidence;
 }
 
 export const CATEGORY_LABELS: Record<string, string> = {

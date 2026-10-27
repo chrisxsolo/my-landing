@@ -54,7 +54,7 @@ describe("a location edit on a Content Engine photo", () => {
     const plan = planTagChanges([target(1)], { location: "Legion of Honor" }, false);
     expect(plan.writes).toEqual([{
       kind: "photo", enginePhotoId: engineId(1), sessionId: SESSION_ID,
-      patch: { location: "Legion of Honor", source: "manual" },
+      patch: { location: "Legion of Honor", source: "manual", evidence: "manual" },
     }]);
     expect(plan.writes.some((w) => w.kind === "session")).toBe(false);
     expect(plan.outcomes).toEqual([expect.objectContaining({ key: `engine:${engineId(1)}`, field: "location", result: "updated", scope: "photo" })]);
