@@ -13,6 +13,7 @@ import { usePhotoTagging, type PhotoTagging } from "@/app/admin/photoTagging/use
 
 export interface SessionTagging {
   tagging: PhotoTagging;
+  sessionId: string;
   /** Audit entry for a session photo id. */
   byPhotoId: Map<string, AuditedPhoto>;
   /** Whether a session photo passes the tagging filter. */
@@ -35,7 +36,7 @@ export function useSessionTagging(sessionId: string, factsKey: string): SessionT
     const photo = byPhotoId.get(photoId);
     return photo ? visible(photo.key) : filter.filter === "all";
   }, [byPhotoId, visible, filter]);
-  return { tagging, byPhotoId, passes };
+  return { tagging, sessionId, byPhotoId, passes };
 }
 
 interface Props {
@@ -47,7 +48,7 @@ interface Props {
 }
 
 export default function PhotoTaggingPanel({ state, selectedIds, openId, onClose, onClearSelection }: Props) {
-  const { tagging, byPhotoId } = state;
+  const { tagging, byPhotoId, sessionId } = state;
   const { report } = tagging;
   const photos = useMemo(() => [...byPhotoId.values()], [byPhotoId]);
   if (!report) return tagging.error ? <p style={{ fontSize: 12 }}>Tagging status unavailable: {tagging.error}</p> : null;
@@ -56,7 +57,7 @@ export default function PhotoTaggingPanel({ state, selectedIds, openId, onClose,
   return (
     <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
       <PhotoTagToolbar photos={photos} options={report.options} filter={tagging.filter} setFilter={tagging.setFilter} compact />
-      <ReviewQueue photos={photos} options={report.options} onChanged={tagging.refresh} />
+      <ReviewQueue photos={photos} options={report.options} onChanged={tagging.refresh} sessionId={sessionId} />
       {open && <PhotoTagEditor photo={open} options={report.options} onChanged={tagging.refresh} onClose={onClose} />}
       {selected.length > 0 && (
         <BulkTagBar photos={selected} options={report.options} onChanged={tagging.refresh} onClear={onClearSelection} />

@@ -10,7 +10,7 @@ import { T } from "@/app/admin/adminTheme";
 import { btn, card } from "@/app/admin/content-engine/[id]/ui";
 import { pagePath } from "@/lib/pagePhotos/pageKeys";
 import {
-  categoryLabel, type AuditedPhoto, type NotApplicableField, type TagCheck, type TaggingOptions, type TagSuggestion,
+  categoryLabel, EVIDENCE_LABELS, type AuditedPhoto, type NotApplicableField, type TagCheck, type TaggingOptions, type TagSuggestion,
 } from "@/lib/photoTagging/types";
 import DistributionPreview from "@/app/admin/photoDistribution/DistributionPreview";
 import SuggestionList from "./SuggestionList";
@@ -34,7 +34,8 @@ interface Props {
 
 function CheckRow({ check }: { check: TagCheck }) {
   const color = check.state === "missing" && check.critical ? T.red : STATE_TONE[check.state];
-  const text = check.state === "ok" ? `${check.value}${check.source ? ` · from ${check.source}` : ""}`
+  const evidence = check.evidence ? ` · ${EVIDENCE_LABELS[check.evidence]}` : "";
+  const text = check.state === "ok" ? `${check.value}${check.source ? ` · from ${check.source}` : ""}${evidence}`
     : check.state === "missing" ? `Missing — ${check.note}` : `Not applicable — ${check.note}`;
   return (
     <div style={{ display: "flex", gap: 8, fontSize: 13, alignItems: "baseline" }}>
