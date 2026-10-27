@@ -44,6 +44,7 @@ yarn-error.log*
 next-env.d.ts
 .superpowers
 .worktrees
+.claude/worktrees/
 
 # local test database
 # supabase/test/prod-baseline.sql is committed (schema-only, zero data rows) so
