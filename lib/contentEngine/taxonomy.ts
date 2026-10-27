@@ -229,6 +229,16 @@ export function guideTypeForService(serviceType: unknown): GuideType | null {
   return null;
 }
 
+// The portfolio category a session's service type publishes to. The service
+// is a fact the photographer set on the session; the AI's per-photo
+// suggested_category is only a guess, so it may fill in only when the
+// service names no portfolio category (prom, events, other).
+export function portfolioCategoryForService(serviceType: unknown): PortfolioCategory | null {
+  const normalized = normalizeServiceType(serviceType);
+  return normalized && (PORTFOLIO_CATEGORIES as readonly string[]).includes(normalized)
+    ? (normalized as PortfolioCategory) : null;
+}
+
 export const isServiceType = has(SERVICE_TYPES);
 export const isVibe = has(VIBES);
 export const isRelationshipType = has(RELATIONSHIP_TYPES);
