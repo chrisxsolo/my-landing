@@ -115,6 +115,7 @@ export function syncItemSessionInBackground(itemId: string): void {
 export async function sweepLocationLibrary(): Promise<{ sessions: number; errors: number } | null> {
   try {
     const run = await syncAllSessionsLogged("worker");
+    if (run.skipped) return null;
     if (!run.result) {
       console.error("[location-library] sweep failed", run.thrown ?? run.error);
       return null;

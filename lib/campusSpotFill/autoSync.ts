@@ -3,7 +3,8 @@
 //     belong (portfolio save, Content Engine publish / facts / location,
 //     Page Photos edit, campus spot edit) — queued after the response, so a
 //     sync problem can never fail the admin's own action
-//   • on every worker tick (about every 5 minutes) as the backstop, which also
+//   • on worker ticks (scheduled every 5 minutes, but GitHub often delays
+//     them by hours — the Content Sync Health card shows the last one) as the backstop, which also
 //     covers the first backfill after deploy
 //   • on demand from Admin → photo sync (a run or a retry of a failed run)
 // Each run is idempotent, so overlapping runs are safe, and each is logged in
@@ -63,8 +64,11 @@ export function syncCampusSpotPhotosInBackground(): void {
 /** The worker-tick backstop. Never throws. */
 export async function sweepCampusSpotPhotos(): Promise<{ filled: number; released: number } | null> {
   try {
-    const report = await runCampusSpotSync("worker");
-    return { filled: report.claimed.length, released: report.released.length };
+    const run = await runCampusSpotSyncLogged("worker");
+    if (run.skipped) return null;
+    if ("thrown" in run) throw run.thrown;
+    if (!run.result) throw new Error(run.error ?? "campus spot sync returned no report");
+    return { filled: run.result.claimed.length, released: run.result.released.length };
   } catch (err) {
     console.error("[campus-spots] sweep failed", err);
     return null;

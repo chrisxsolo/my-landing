@@ -44,13 +44,37 @@ export interface LoggedRun<T> {
   error: string | null;
   result: T | null;
   thrown?: unknown;
+  /** Another run of the same kind and scope was already in progress, so this one did nothing. */
+  skipped?: boolean;
 }
+
+/** A run still "running" after this long died without finishing (a sweep ends in well under a minute). */
+export const STALE_RUN_MS = 15 * 60 * 1000;
+export const STALLED_RUN_ERROR = "never finished — the sync stopped before reporting (timeout or crash)";
+const UNIQUE_VIOLATION = "23505";
 
 const RUN_COLUMNS = "id,kind,scope,status,trigger,started_at,finished_at,error,detail,retry_of";
 
 const clip = (s: string) => s.slice(0, 2000);
 
-async function startRun(client: SupabaseClient, opts: SyncRunOptions): Promise<number | null> {
+// Closes runs of this kind that died mid-way, so they show as failed and stop
+// blocking new runs. Best effort: a failure here never blocks the sync.
+async function closeStalledRuns(client: SupabaseClient, kind: SyncKind): Promise<void> {
+  const cutoff = new Date(Date.now() - STALE_RUN_MS).toISOString();
+  try {
+    const { error } = await client.from(PHOTO_SYNC_RUNS_TABLE)
+      .update({ status: "error", error: STALLED_RUN_ERROR, finished_at: new Date().toISOString() })
+      .eq("kind", kind).eq("status", "running").lt("started_at", cutoff);
+    if (error) console.warn(`[photo-sync] could not close stalled ${kind} runs: ${error.message}`);
+  } catch (err) {
+    console.warn(`[photo-sync] could not close stalled ${kind} runs`, err);
+  }
+}
+
+type StartResult = { id: number | null; busy: boolean };
+
+async function startRun(client: SupabaseClient, opts: SyncRunOptions): Promise<StartResult> {
+  await closeStalledRuns(client, opts.kind);
   const { data, error } = await client.from(PHOTO_SYNC_RUNS_TABLE).insert({
     kind: opts.kind,
     scope: opts.scope ?? null,
@@ -58,10 +82,12 @@ async function startRun(client: SupabaseClient, opts: SyncRunOptions): Promise<n
     retry_of: opts.retryOf ?? null,
   }).select("id").single();
   if (error) {
+    // The one-running-run-per-kind-and-scope index: another run is in progress.
+    if (error.code === UNIQUE_VIOLATION) return { id: null, busy: true };
     console.warn(`[photo-sync] could not log the ${opts.kind} run: ${error.message}`);
-    return null;
+    return { id: null, busy: false };
   }
-  return (data as { id: number }).id;
+  return { id: (data as { id: number }).id, busy: false };
 }
 
 async function finishRun(client: SupabaseClient, id: number | null, status: "ok" | "error", outcome: SyncOutcome): Promise<void> {
@@ -86,7 +112,12 @@ export async function runLogged<T>(
   run: () => Promise<T>,
   summarize: (result: T) => SyncOutcome = () => ({}),
 ): Promise<LoggedRun<T>> {
-  const runId = await startRun(client, opts);
+  const { id: runId, busy } = await startRun(client, opts);
+  if (busy) {
+    const scope = opts.scope ? `session ${opts.scope.slice(0, 8)}` : "full";
+    console.info(`[photo-sync] ${opts.kind} (${scope}) already running — skipped`);
+    return { runId: null, ok: false, error: `A ${opts.kind.replace("_", " ")} sync is already running.`, result: null, skipped: true };
+  }
   try {
     const result = await run();
     const outcome = summarize(result);
@@ -112,6 +143,7 @@ export async function recordSyncRun<T>(
 ): Promise<T> {
   const logged = await runLogged(client, opts, run, summarize);
   if ("thrown" in logged) throw logged.thrown;
+  if (logged.skipped) throw new Error(logged.error ?? "sync already running");
   return logged.result as T;
 }
 
@@ -148,16 +180,33 @@ export async function loadSyncRun(client: SupabaseClient, id: number): Promise<S
 
 export interface SyncHealth {
   lastOk: Partial<Record<SyncKind, string>>;
-  /** Failed runs not followed by a later successful run of the same kind and scope. */
+  /** Newest run of each kind, whatever its outcome. */
+  lastAttempt: Partial<Record<SyncKind, string>>;
+  /** Newest run started by the background worker — the worker's heartbeat. */
+  lastWorkerRun: string | null;
+  /** Failed (or stalled) runs not followed by a later successful run of the same kind and scope. */
   unresolvedFailures: SyncRunRow[];
 }
 
+/** A "running" row older than STALE_RUN_MS is reported as the failure it is. Pure. */
+export function withStalledAsFailed(run: SyncRunRow, now: number): SyncRunRow {
+  if (run.status !== "running") return run;
+  const started = new Date(run.startedAt).getTime();
+  if (Number.isNaN(started) || now - started < STALE_RUN_MS) return run;
+  return { ...run, status: "error", error: run.error ?? STALLED_RUN_ERROR };
+}
+
 /** Summarises runs (newest first). Pure. */
-export function summarizeSyncRuns(runs: readonly SyncRunRow[]): SyncHealth {
+export function summarizeSyncRuns(runs: readonly SyncRunRow[], now = Date.now()): SyncHealth {
   const lastOk: Partial<Record<SyncKind, string>> = {};
+  const lastAttempt: Partial<Record<SyncKind, string>> = {};
+  let lastWorkerRun: string | null = null;
   const settled = new Set<string>();
   const unresolvedFailures: SyncRunRow[] = [];
-  for (const run of runs) {
+  for (const raw of runs) {
+    const run = withStalledAsFailed(raw, now);
+    lastAttempt[run.kind] ??= run.startedAt;
+    if (run.trigger === "worker") lastWorkerRun ??= run.startedAt;
     const key = `${run.kind}:${run.scope ?? "*"}`;
     if (run.status === "ok") {
       lastOk[run.kind] ??= run.finishedAt ?? run.startedAt;
@@ -171,5 +220,5 @@ export function summarizeSyncRuns(runs: readonly SyncRunRow[]): SyncHealth {
     settled.add(key);
     unresolvedFailures.push(run);
   }
-  return { lastOk, unresolvedFailures };
+  return { lastOk, lastAttempt, lastWorkerRun, unresolvedFailures };
 }
