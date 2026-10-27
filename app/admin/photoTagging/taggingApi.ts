@@ -1,4 +1,5 @@
 // Fetch client for /api/admin/photo-tagging. Cookie auth rides along (same origin).
+import type { ChangeLogRow } from "@/lib/photoChangeLog/entries";
 import type { ApplyResult } from "@/lib/photoTagging/apply";
 import type { PreviewResult } from "@/lib/photoTagging/preview";
 import type { TagChanges, TaggingReport, NotApplicableField } from "@/lib/photoTagging/types";
@@ -10,7 +11,7 @@ export type PreviewResponse = PreviewResult;
 
 /** What a tag write asks for: explicit values, or every safe high-confidence suggestion. */
 export type TagRequest =
-  | { kind: "changes"; keys: string[]; changes: TagChanges; replace: boolean }
+  | { kind: "changes"; keys: string[]; changes: TagChanges; replace: boolean; /** Noted in the change history ("undo"). */ reason?: string }
   | { kind: "high"; keys?: string[]; photoOnly?: boolean };
 
 export interface VisionResponse {
@@ -34,7 +35,7 @@ const post = <T,>(body: Record<string, unknown>) => request<T>({ method: "POST",
 
 function bodyOf(req: TagRequest): Record<string, unknown> {
   return req.kind === "changes"
-    ? { keys: req.keys, changes: req.changes, replace: req.replace }
+    ? { keys: req.keys, changes: req.changes, replace: req.replace, ...(req.reason ? { reason: req.reason } : {}) }
     : { high: true, ...(req.keys ? { keys: req.keys } : {}), photoOnly: req.photoOnly === true };
 }
 
@@ -47,6 +48,9 @@ export const taggingApi = {
     post<{ updated: number }>({ action: "mark-na", keys, field, on }),
   dismiss: (key: string, suggestionId: string) => post<{ dismissed: boolean }>({ action: "dismiss", key, suggestionId }),
   aiSuggest: (keys: string[], force = false) => post<VisionResponse>({ action: "ai-suggest", keys, force }),
+  history: (key?: string, limit = 50) =>
+    request<{ changes: ChangeLogRow[] }>(undefined, `?history=1&limit=${limit}${key ? `&key=${encodeURIComponent(key)}` : ""}`),
+  restore: (logId: number) => post<ApplyResponse>({ action: "restore", logId }),
 };
 
 function reasons(r: Pick<ApplyResult, "outcomes">, result: string): string {

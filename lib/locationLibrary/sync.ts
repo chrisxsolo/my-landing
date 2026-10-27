@@ -4,8 +4,11 @@
 // link), and only auto links that stopped matching are removed. Nothing here
 // calls a model — the AI profile runs separately on the drafts it creates.
 // Every read is paged past PostgREST's row cap and throws on a failed page, so
-// a link is never removed because of a partial read.
+// a link is never removed because of a partial read. Each change to a
+// session's links is recorded in photo_change_log as a "system" change.
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { linkChangeEntry } from "@/lib/photoChangeLog/entries";
+import { logChanges } from "@/lib/photoChangeLog/log";
 import { medianCoordinates, matchPlacesByName, type Coordinates } from "@/lib/locations/match";
 import type { KnownPlace } from "@/lib/locations/places";
 import { loadKnownPlaces } from "@/lib/locations/registry";
@@ -147,15 +150,22 @@ async function writeSessionStatus(
   if (error) console.error(`[location-library] could not record sync status for ${sessionId}`, error.message);
 }
 
+/** The location ids a session is linked to after the plan: current links minus removals, plus the new auto links. */
+function linksAfter(links: readonly SessionLinkRef[], plan: SyncPlan, linkedIds: readonly number[]): number[] {
+  const removed = new Set(plan.removeLinkIds);
+  return [...links.filter((l) => !l.excluded && !removed.has(l.id)).map((l) => l.locationId), ...linkedIds];
+}
+
 async function applyPlan(
-  client: SupabaseClient, ctx: SyncContext, sessionId: string, plan: SyncPlan,
+  client: SupabaseClient, ctx: SyncContext, sessionId: string, plan: SyncPlan, links: readonly SessionLinkRef[],
 ): Promise<number[]> {
   const created: number[] = [];
   for (const place of plan.createFor) created.push(await createDraft(client, ctx, place));
 
-  const linkRows = plan.linkKeys
+  const linkedIds = plan.linkKeys
     .map((key) => rowForKey(ctx.rows, key)?.id)
-    .filter((id): id is number => id !== undefined)
+    .filter((id): id is number => id !== undefined);
+  const linkRows = linkedIds
     .map((locationId) => ({ location_id: locationId, photography_session_id: sessionId, source: "auto" }));
   if (linkRows.length > 0) {
     const { error } = await client.from(LOCATION_SESSIONS_TABLE)
@@ -167,6 +177,9 @@ async function applyPlan(
       .in("id", plan.removeLinkIds).eq("source", "auto").eq("excluded", false);
     if (error) throw new Error(`could not remove stale links: ${error.message}`);
   }
+  const before = links.filter((l) => !l.excluded).map((l) => l.locationId);
+  const change = linkChangeEntry(sessionId, before, linksAfter(links, plan, linkedIds), plan.message);
+  if (change) await logChanges(client, [change]);
   return created;
 }
 
@@ -179,8 +192,9 @@ export async function syncSessionLocations(
     const ctx = opts.ctx ?? await loadSyncContext(client);
     const session = await loadSyncSession(client, sessionId);
     if (!session) return { ...base, status: "error", message: "session not found" };
-    const plan = planSessionSync(session, ctx.places, ctx.rows, await loadSessionLinks(client, sessionId));
-    const createdLocationIds = dryRun ? [] : await applyPlan(client, ctx, sessionId, plan);
+    const links = await loadSessionLinks(client, sessionId);
+    const plan = planSessionSync(session, ctx.places, ctx.rows, links);
+    const createdLocationIds = dryRun ? [] : await applyPlan(client, ctx, sessionId, plan, links);
     if (dryRun) simulateDrafts(ctx, plan.createFor);
     if (!dryRun) await writeSessionStatus(client, sessionId, plan.status, plan.message);
     return {
