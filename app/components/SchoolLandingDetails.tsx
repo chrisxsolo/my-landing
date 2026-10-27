@@ -11,7 +11,6 @@ type Props = {
   schoolShort: string;
   slug: string;
   bodyIntro: string;
-  travelNote?: string;
   sessionNote?: string;
   spots: SchoolSpot[];
 };
@@ -27,7 +26,6 @@ export default function SchoolLandingDetails({
   schoolShort,
   slug,
   bodyIntro,
-  travelNote,
   sessionNote,
   spots,
 }: Props) {
@@ -61,9 +59,6 @@ export default function SchoolLandingDetails({
             <p className="school-kicker">About this location</p>
             <h2 className="school-section-title">Grad sessions at {schoolShort}</h2>
             <p className="school-body-copy">{bodyIntro}</p>
-            {travelNote && (
-              <p className="school-body-copy" style={{ color: "#667f79", fontSize: 15 }}>{travelNote}</p>
-            )}
             {sessionNote && (
               <p className="school-body-copy" style={{ color: "#667f79", fontSize: 15 }}>{sessionNote}</p>
             )}

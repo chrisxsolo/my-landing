@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
-import { PRICING_CATALOG, getGraduationTravelNote } from "@/lib/pricingCatalog";
+import { PRICING_CATALOG } from "@/lib/pricingCatalog";
 import { buildBookingIntentParams } from "@/lib/bookingIntent";
 import SchoolLandingDetails from "./SchoolLandingDetails";
 import { SCHOOL_LANDING_CSS } from "./schoolLandingStyles";
@@ -55,7 +55,6 @@ export interface SchoolLandingData {
   whatToWear?: string;           // campus-tuned wardrobe guidance
   faqs?: SchoolFaq[];            // 3–4 campus-specific Q&A (drives FAQPage schema)
   spotsGuide?: SchoolSpotsGuide; // long-form /spots location guide (else the compact list)
-  hideTravelNote?: boolean;      // leave the travel-fee line off this school's page
 }
 
 /** Recent journal posts about this campus, via the same matcher the posts use. */
@@ -91,7 +90,6 @@ export function buildSchoolMetadata(data: SchoolLandingData): Metadata {
 // ── TEMPLATE COMPONENT ────────────────────────────────────────────────────────
 
 export default async function SchoolLandingTemplate({ data }: { data: SchoolLandingData }) {
-  const travelNote = data.hideTravelNote ? undefined : getGraduationTravelNote(data.slug);
   const contactParams = buildBookingIntentParams({
     sourcePage: "school-page",
     sessionType: "Graduation Portrait",
@@ -175,7 +173,6 @@ export default async function SchoolLandingTemplate({ data }: { data: SchoolLand
         schoolShort={data.schoolShort}
         slug={data.slug}
         bodyIntro={data.bodyIntro}
-        travelNote={travelNote}
         sessionNote={data.sessionNote}
         spots={data.spots}
       />

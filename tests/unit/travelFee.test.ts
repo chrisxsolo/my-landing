@@ -14,7 +14,6 @@ import {
 import {
   PRICING_CATALOG,
   getGraduationTravelFeeFromText,
-  getGraduationTravelNote,
 } from "@/lib/pricingCatalog";
 import { calculateCouplesEstimate, calculateGraduationEstimate, formatCurrency } from "@/lib/pricing";
 import { catalogSessionTotalCents } from "@/lib/paymentTotalInference";
@@ -121,7 +120,6 @@ describe("one fee everywhere", () => {
     expect(formatCurrency(estimate.subtotal)).toBe("$393.50");
     expect(catalogSessionTotalCents({ session_type: "Graduation", school: "UC Berkeley", message: "", location: null, people: 1 })).toBe(39350);
     expect(getGraduationTravelFeeFromText("stanford grad")).toBe(50);
-    expect(getGraduationTravelNote("uc-berkeley")).toBe("Berkeley sessions include a $43.50 travel fee from San Francisco.");
     expect(calculateCouplesEstimate({ packageKey: "1hr", location: "santa-clara", extraLocation: false, extraOutfit: false, extra30Min: false, proofingGallery: false, rushPreview: false, expedited: false }).subtotal).toBe(515);
   });
 });

@@ -163,5 +163,4 @@ export const data: SchoolLandingData = {
     { q: "How early should I book a Berkeley grad session?", a: "Spring is peak season and fills quickly. Booking early also gives you a better chance at a weekday earlier in the season, which is usually easier than the busiest graduation dates." },
   ],
   spotsGuide,
-  hideTravelNote: true,
 };

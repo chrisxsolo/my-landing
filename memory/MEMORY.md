@@ -8,3 +8,4 @@
 - [SEO Growth Initiative](project-seo-growth.md) — graduation SEO project; branch feat/technical-seo-foundation; foundation done, roadmap phases pending
 - [Deploy Workflow](deploy-workflow.md) — always push, merge to main, apply migrations, and confirm the Vercel deploy
 - [SQL Permission](sql-permission.md) — run any Supabase SQL (incl. writes/migrations) without asking first
+- [No Travel Fee in Guides](no-travel-fee-in-guides.md) — campus/location guides never mention a travel fee

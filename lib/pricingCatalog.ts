@@ -270,18 +270,3 @@ export function formatFee(amount: number): string {
     ? `$${amount.toLocaleString("en-US")}`
     : `$${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
-
-const CAMPUS_SHORT_NAMES: Partial<Record<keyof typeof PRICING_CATALOG.graduation.travelFees, string>> = {
-  "uc-berkeley": "Berkeley",
-  sjsu: "SJSU",
-  csueb: "CSU East Bay",
-  "santa-clara": "Santa Clara",
-  stanford: "Stanford",
-};
-
-export function getGraduationTravelNote(school: keyof typeof PRICING_CATALOG.graduation.travelFees): string {
-  const fee = PRICING_CATALOG.graduation.travelFees[school];
-  if (fee === null) return "No travel fee for San Francisco locations.";
-  if (typeof fee === "number") return `${CAMPUS_SHORT_NAMES[school]} sessions include a ${formatFee(fee)} travel fee from San Francisco.`;
-  return "Travel fee will be confirmed after the exact location is reviewed.";
-}

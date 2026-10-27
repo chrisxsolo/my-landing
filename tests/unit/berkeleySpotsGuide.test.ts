@@ -81,7 +81,6 @@ describe("UC Berkeley location guide content", () => {
   });
 
   it("does not list a travel fee on the Berkeley page", () => {
-    expect(berkeley.hideTravelNote).toBe(true);
     expect(allGuideText).not.toMatch(/travel fee/i);
   });
 

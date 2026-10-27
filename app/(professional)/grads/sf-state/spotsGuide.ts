@@ -1,6 +1,5 @@
 import type { SchoolSpotsGuide } from "@/app/components/schoolSpotsGuideTypes";
 import { PRICING_CATALOG } from "@/lib/pricingCatalog";
-import { TRAVEL_POLICY } from "@/lib/travelFee";
 import { SF_OFF_CAMPUS_SPOTS } from "../sfOffCampus";
 
 // The SF State photo location guide (/grads/sf-state/spots). Written from
@@ -128,7 +127,6 @@ export const spotsGuide: SchoolSpotsGuide = {
     notes: [
       `A second nearby location is currently a $${secondLocation.price} add-on. For three or four stops, I'll confirm the add-ons, coverage time, and travel with you before you book.`,
       `Travel between stops takes time from the session, so multi-location plans usually need extra coverage. An extra 30 minutes is currently $${extra30Minutes.price}.`,
-      `Travel within ${TRAVEL_POLICY.includedArea} is included. Locations outside the city may add a travel fee.`,
       "A four-location session needs much more than basic coverage, so we'll plan the time around the stops you choose instead of squeezing them in.",
     ],
     cta: {

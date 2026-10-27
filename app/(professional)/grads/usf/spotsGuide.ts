@@ -1,6 +1,5 @@
 import type { SchoolSpotsGuide } from "@/app/components/schoolSpotsGuideTypes";
 import { PRICING_CATALOG } from "@/lib/pricingCatalog";
-import { TRAVEL_POLICY } from "@/lib/travelFee";
 import { SF_OFF_CAMPUS_SPOTS, sfOffCampusSpot } from "../sfOffCampus";
 
 // The USF photo location guide (/grads/usf/spots). Written from Chris's own
@@ -156,7 +155,6 @@ export const spotsGuide: SchoolSpotsGuide = {
     notes: [
       `A second nearby location is currently a $${secondLocation.price} add-on. I'll confirm the add-ons, coverage time, and travel with you before you book.`,
       `Travel between stops takes time from the session, so multi-location plans usually need extra coverage. An extra 30 minutes is currently $${extra30Minutes.price}.`,
-      `Travel within ${TRAVEL_POLICY.includedArea} is included. Locations outside the city may add a travel fee.`,
       "When we add a location, finishing at Lone Mountain at sunset may not fit, so we'll decide together which stop gets the best light.",
     ],
     cta: {

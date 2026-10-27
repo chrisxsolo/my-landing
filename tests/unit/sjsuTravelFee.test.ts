@@ -7,7 +7,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { calculatedTravelFee, travelFeeBasis, verifiedTravelFee, VERIFIED_ROUTES, TRAVEL_POLICY } from "@/lib/travelFee";
-import { PRICING_CATALOG, getGraduationTravelNote, calculatePaymentSchedule } from "@/lib/pricingCatalog";
+import { PRICING_CATALOG, calculatePaymentSchedule } from "@/lib/pricingCatalog";
 import { calculateGraduationEstimate, getTravelFeeForSchool } from "@/lib/pricing";
 import { catalogSessionTotalCents } from "@/lib/paymentTotalInference";
 import { buildTravelFact } from "@/lib/ai/businessFacts";
@@ -54,7 +54,6 @@ describe("one SJSU price on every surface", () => {
   it("uses $75 in the catalog, landing copy and FAQ", () => {
     expect(PRICING_CATALOG.graduation.travelFees.sjsu).toBe(75);
     expect(getTravelFeeForSchool("sjsu")).toBe(75);
-    expect(getGraduationTravelNote("sjsu")).toBe("SJSU sessions include a $75 travel fee from San Francisco.");
     const faq = JSON.stringify(FAQS);
     expect(faq).toContain("SJSU ($75)");
     expect(faq).not.toContain("SJSU ($70)");
