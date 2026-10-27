@@ -1,63 +1,30 @@
 // Decides which existing public photo fills an EMPTY spot on
 // /grad-guide/campus-spots. Pure — the sync, the backfill report and the tests
-// all call it, so they can never disagree.
-//
-// Candidates are only photos already matched to the spot's school page
-// (/grads/<slug>, lib/pagePhotos): the school is settled there (photo tag >
-// Content Engine session school > the photo's own text naming exactly one
-// school), and the photo is public, cleared for marketing and not hidden.
-// So a UC Berkeley photo can never reach an SJSU spot.
-//
-// Which spot a photo shows, strongest evidence first:
-//   1. tag     — the photographer tagged it with this spot (Admin → Page Photos)
-//   2. place   — an off-campus spot, and the photo's location evidence is that exact place
-//   3. session — its Content Engine session names one location, that location
-//                names this spot, and the photo's own text names no other spot
-//   4. text    — the photo's own title / alt names this spot and no other
-// A photo tagged with a different spot never matches by place, session or text.
-// Two spots named, or no spot named → no match. Scenery is never evidence.
+// all call it, so they can never disagree. Which evidence may place a photo
+// lives in lib/campusSpotFill/evidence.ts.
 //
 // Existing photos always win: a spot that already shows a photo is never
-// planned, and a previous automatic pick stays until it stops being public,
-// the spot gets a chosen photo, or the photographer tags it elsewhere.
-import { sectionSpotKeys, spotsForSchool, suggestSpotFromText } from "@/lib/schoolSpots";
+// planned, and a photo tagged for a spot replaces an automatic pick there.
+// A previous automatic pick is re-checked on every run and released when
+//   • the spot left the page or now shows a chosen photo
+//   • the photo stopped being public for that school (unpublished, hidden,
+//     excluded, marketing permission revoked, school changed)
+//   • the page now shows the same photo at another spot
+//   • its evidence no longer holds (a tag removed, a session or photo
+//     location changed) — the spot is re-planned in the same run
+import {
+  matchEvidence, type FillCandidate, type FillEvidence, type Match, type SpotSlot,
+} from "@/lib/campusSpotFill/evidence";
+import { sectionSpotKeys } from "@/lib/schoolSpots";
+
+export { matchEvidence };
+export type { FillCandidate, FillEvidence, Match, PhotoLocationFact, SpotSlot } from "@/lib/campusSpotFill/evidence";
 
 export const CAMPUS_SPOT_AUTO_PHOTOS_TABLE = "campus_spot_auto_photos";
 export const CLAIM_CAMPUS_SPOT_PHOTO_RPC = "claim_campus_spot_photo";
 
-export type FillEvidence = "tag" | "place" | "session" | "text";
-
-const EVIDENCE_RANK: Record<FillEvidence, number> = { tag: 0, place: 1, session: 2, text: 3 };
 // Photos without an AI score (older uploads) rank as solid, not top picks.
 const UNSCORED_QUALITY = 6;
-
-/** One campus spot as the page shows it without automatic photos. */
-export interface SpotSlot {
-  schoolSlug: string;
-  spotKey: string;
-  name: string;
-  /** The photo already shown (a chosen location_spots photo or a guide section photo). */
-  shownUrl: string | null;
-}
-
-/** One photo eligible for its school page, with the facts that can place it. */
-export interface FillCandidate {
-  url: string;
-  schoolSlug: string;
-  /** The photo's own title and alt text. */
-  text: string;
-  width: number | null;
-  height: number | null;
-  quality: number | null;
-  featured: boolean;
-  /** Position in the school page's curated order. */
-  order: number;
-  placeKey: string | null;
-  /** The photographer's spot tag on this school, if any. */
-  tag: { spotKey: string; featured: boolean } | null;
-  /** Locations typed on its Content Engine session (empty for older uploads). */
-  sessionLocations: readonly string[];
-}
 
 export interface AutoRow {
   schoolSlug: string;
@@ -77,41 +44,13 @@ export interface FillPlan {
   unmatched: { slot: SpotSlot; reason: string }[];
 }
 
-interface Match { evidence: FillEvidence; detail: string }
+interface Scored { photo: FillCandidate; match: Match }
 
 const slotId = (schoolSlug: string, spotKey: string) => `${schoolSlug}:${spotKey}`;
-
-function sessionSpot(slug: string, locations: readonly string[]): string | null {
-  if (locations.length !== 1) return null;
-  return suggestSpotFromText(slug, locations[0])?.key ?? null;
-}
-
-/** Why this photo shows this spot, or null when it is not proven. */
-export function matchEvidence(slot: SpotSlot, photo: FillCandidate): Match | null {
-  if (photo.schoolSlug !== slot.schoolSlug) return null;
-  const keys = new Set(sectionSpotKeys(slot.schoolSlug, slot.spotKey));
-  if (photo.tag) {
-    return keys.has(photo.tag.spotKey) ? { evidence: "tag", detail: `tagged ${photo.tag.spotKey}` } : null;
-  }
-  const def = spotsForSchool(slot.schoolSlug).find((spot) => spot.key === slot.spotKey);
-  if (def?.placeKey && photo.placeKey === def.placeKey) {
-    return { evidence: "place", detail: `shot at ${def.placeKey}` };
-  }
-  const fromText = suggestSpotFromText(slot.schoolSlug, photo.text)?.key ?? null;
-  const fromSession = sessionSpot(slot.schoolSlug, photo.sessionLocations);
-  if (fromSession && keys.has(fromSession) && (!fromText || keys.has(fromText))) {
-    return { evidence: "session", detail: `session location "${photo.sessionLocations[0]}"` };
-  }
-  if (fromText && keys.has(fromText) && (!fromSession || keys.has(fromSession))) {
-    return { evidence: "text", detail: `photo text names ${fromText}` };
-  }
-  return null;
-}
-
 const isPortrait = (p: FillCandidate) => (p.width && p.height ? p.height >= p.width : true);
 
-function rank(a: { photo: FillCandidate; match: Match }, b: { photo: FillCandidate; match: Match }): number {
-  return EVIDENCE_RANK[a.match.evidence] - EVIDENCE_RANK[b.match.evidence]
+function rank(a: Scored, b: Scored): number {
+  return a.match.strength - b.match.strength
     || Number(b.photo.tag?.featured ?? false) - Number(a.photo.tag?.featured ?? false)
     || (b.photo.quality ?? UNSCORED_QUALITY) - (a.photo.quality ?? UNSCORED_QUALITY)
     || Number(isPortrait(b.photo)) - Number(isPortrait(a.photo))
@@ -119,15 +58,55 @@ function rank(a: { photo: FillCandidate; match: Match }, b: { photo: FillCandida
     || a.photo.order - b.photo.order;
 }
 
+interface PlanContext {
+  slotById: ReadonlyMap<string, SpotSlot>;
+  photoByKey: ReadonlyMap<string, FillCandidate>;
+  shownUrls: ReadonlySet<string>;
+}
+
 /** Why a previous automatic pick must go, or null to keep it. */
-function releaseReason(row: AutoRow, slot: SpotSlot | undefined, photo: FillCandidate | undefined): string | null {
+function releaseReason(row: AutoRow, ctx: PlanContext): string | null {
+  const slot = ctx.slotById.get(slotId(row.schoolSlug, row.spotKey));
   if (!slot) return "the spot is no longer on the page";
   if (slot.shownUrl) return "the spot now shows a chosen photo";
+  const photo = ctx.photoByKey.get(`${row.schoolSlug}|${row.imageUrl}`);
   if (!photo) return "the photo is no longer public for this school";
+  if (ctx.shownUrls.has(row.imageUrl)) return "the page already shows this photo at another spot";
   if (photo.tag && !sectionSpotKeys(row.schoolSlug, row.spotKey).includes(photo.tag.spotKey)) {
     return `the photographer tagged it ${photo.tag.spotKey}`;
   }
-  return null;
+  return matchEvidence(slot, photo) ? null : "its location evidence no longer holds";
+}
+
+/** A photographer-tagged photo for this slot that nothing else uses yet. */
+function freeTaggedPhoto(slot: SpotSlot, candidates: readonly FillCandidate[], used: ReadonlySet<string>): boolean {
+  return candidates.some((photo) => photo.tag && !used.has(photo.url) && matchEvidence(slot, photo)?.evidence === "tag");
+}
+
+function reviewExisting(
+  slots: readonly SpotSlot[], candidates: readonly FillCandidate[], existing: readonly AutoRow[],
+): Pick<FillPlan, "keep" | "release"> {
+  const ctx: PlanContext = {
+    slotById: new Map(slots.map((s) => [slotId(s.schoolSlug, s.spotKey), s])),
+    photoByKey: new Map(candidates.map((p) => [`${p.schoolSlug}|${p.url}`, p])),
+    shownUrls: new Set(slots.flatMap((s) => (s.shownUrl ? [s.shownUrl] : []))),
+  };
+  const release: FillPlan["release"] = [];
+  const valid: AutoRow[] = [];
+  for (const row of existing) {
+    const reason = releaseReason(row, ctx);
+    if (reason) release.push({ row, reason });
+    else valid.push(row);
+  }
+  // A spot tag is the photographer's choice: it replaces a weaker automatic pick.
+  const used = new Set([...ctx.shownUrls, ...valid.map((row) => row.imageUrl)]);
+  const keep = valid.filter((row) => {
+    const slot = ctx.slotById.get(slotId(row.schoolSlug, row.spotKey)) as SpotSlot;
+    if (row.evidence === "tag" || !freeTaggedPhoto(slot, candidates, used)) return true;
+    release.push({ row, reason: "a photo tagged for this spot replaces it" });
+    return false;
+  });
+  return { keep, release };
 }
 
 /**
@@ -138,17 +117,7 @@ function releaseReason(row: AutoRow, slot: SpotSlot | undefined, photo: FillCand
 export function planFill(
   slots: readonly SpotSlot[], candidates: readonly FillCandidate[], existing: readonly AutoRow[],
 ): FillPlan {
-  const slotById = new Map(slots.map((s) => [slotId(s.schoolSlug, s.spotKey), s]));
-  const photoByUrl = new Map(candidates.map((p) => [`${p.schoolSlug}|${p.url}`, p]));
-  const keep: AutoRow[] = [];
-  const release: FillPlan["release"] = [];
-  for (const row of existing) {
-    const reason = releaseReason(row, slotById.get(slotId(row.schoolSlug, row.spotKey)),
-      photoByUrl.get(`${row.schoolSlug}|${row.imageUrl}`));
-    if (reason) release.push({ row, reason });
-    else keep.push(row);
-  }
-
+  const { keep, release } = reviewExisting(slots, candidates, existing);
   const used = new Set<string>([
     ...slots.flatMap((s) => (s.shownUrl ? [s.shownUrl] : [])),
     ...keep.map((row) => row.imageUrl),
@@ -161,7 +130,7 @@ export function planFill(
     if (slot.shownUrl || filled.has(slotId(slot.schoolSlug, slot.spotKey))) continue;
     const matches = candidates
       .map((photo) => ({ photo, match: matchEvidence(slot, photo) }))
-      .filter((m): m is { photo: FillCandidate; match: Match } => m.match !== null);
+      .filter((m): m is Scored => m.match !== null);
     const best = matches.filter((m) => !used.has(m.photo.url)).sort(rank)[0];
     if (!best) {
       unmatched.push({
