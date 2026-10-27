@@ -11,6 +11,7 @@ import { engineApi, EngineApiError } from "./engineApi";
 import { STATE_BADGES, sortByActionability } from "./stateBadge";
 import EngineShell from "./EngineShell";
 import TaggingHealthCard from "@/app/admin/photoTagging/TaggingHealthCard";
+import ContentHealthCard from "./ContentHealthCard";
 import { WORKFLOW_STEPS, stepFromState } from "./WorkflowStepper";
 import { SERVICE_TYPES } from "@/lib/contentEngine/taxonomy";
 import { btn, card, input as inputStyle, overlay as overlayStyle } from "./[id]/ui";
@@ -181,6 +182,7 @@ export default function EngineDashboard() {
         })}
       </div>
 
+      <ContentHealthCard />
       <TaggingHealthCard />
 
       {notice && (
