@@ -65,7 +65,8 @@ export default function ActionBar({ items, marketingPermission, onChanged }: Pro
       }
       onChanged();
     }
-    if (problems.length > 0) setNotice(problems.join(" · "));
+    // Block reasons can span lines (which place, the excerpt, how to fix it).
+    if (problems.length > 0) setNotice(problems.join("\n\n"));
     setBusy(null);
     onChanged();
   };
@@ -81,7 +82,12 @@ export default function ActionBar({ items, marketingPermission, onChanged }: Pro
         {approved.length > 0 && publishBlocked && (
           <span style={{ color: T.amber }}> — enable Marketing permission above to publish</span>
         )}
-        {notice && <span style={{ color: T.red }}> — {notice}</span>}
+        {notice && (
+          <span role="alert" style={{
+            display: "block", marginTop: 4, color: T.red, whiteSpace: "pre-line",
+            maxHeight: "40vh", overflowY: "auto",
+          }}>{notice}</span>
+        )}
       </span>
       <span style={{ display: "flex", gap: 8 }}>
         {drafts.length > 0 && (
