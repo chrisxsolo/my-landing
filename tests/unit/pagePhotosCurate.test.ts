@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { curatePage, roundRobinBySession, type CurationRow, type PageCandidate } from "@/lib/pagePhotos/curate";
+import { LEGACY_SESSION_KEY } from "@/lib/pagePhotos/pageKeys";
 
 function c(url: string, overrides: Partial<PageCandidate> = {}): PageCandidate {
   return {
@@ -67,6 +68,46 @@ describe("curatePage", () => {
   it("is deterministic — running it twice gives the same page", () => {
     const input = [c("a", { sessionKey: "x" }), c("b", { sessionKey: "y" }), c("c", { sessionKey: "x" })];
     expect(urls(curatePage(input, [], { limit: 10 }).ordered)).toEqual(urls(curatePage(input, [], { limit: 10 }).ordered));
+  });
+});
+
+describe("a new session against older single uploads", () => {
+  // Production on 2026-10-27: /grads/uc-berkeley had ~21 older uploads, each
+  // its own "session", plus Kim (8 frames) and Trang (8 frames). With a
+  // 13-photo cap Trang got one slot.
+  const legacy = Array.from({ length: 21 }, (_, i) => c(`old-${i}`, { sessionKey: LEGACY_SESSION_KEY, quality: null }));
+  const kim = Array.from({ length: 8 }, (_, i) => c(`kim-${i}`, { sessionKey: "session:kim", sessionDate: "2026-05-21", quality: 9 - (i % 3) }));
+  const trang = Array.from({ length: 8 }, (_, i) => c(`trang-${i}`, { sessionKey: "session:trang", sessionDate: "2026-05-23", quality: 8 - (i % 3) }));
+  const all = [...legacy, ...kim, ...trang];
+  const countOf = (list: PageCandidate[], prefix: string) => list.filter((x) => x.url.startsWith(prefix)).length;
+
+  it("gives each real session a fair share of the page and leads with the newest", () => {
+    const { ordered } = curatePage(all, [], { limit: 13, preferPortraitHero: true, mixPlacements: true });
+    expect(ordered).toHaveLength(13);
+    expect(countOf(ordered, "trang-")).toBeGreaterThanOrEqual(4);
+    expect(countOf(ordered, "kim-")).toBeGreaterThanOrEqual(4);
+    expect(countOf(ordered, "old-")).toBeGreaterThanOrEqual(4);
+    expect(ordered[0].url).toMatch(/^trang-/);
+  });
+
+  it("keeps manual pins and hides authoritative over the automatic order", () => {
+    const { ordered, hidden } = curatePage(all, [rule("old-7", "pin", 1, true), rule("trang-0", "hide")], {
+      limit: 13, preferPortraitHero: true, mixPlacements: true,
+    });
+    expect(ordered[0].url).toBe("old-7");
+    expect(urls(hidden)).toEqual(["trang-0"]);
+    expect(urls(ordered)).not.toContain("trang-0");
+    expect(countOf(ordered, "trang-")).toBeGreaterThanOrEqual(4);
+  });
+
+  it("orders groups newest shoot first, undated shoots next, the legacy group last", () => {
+    const out = roundRobinBySession([
+      c("legacy", { sessionKey: LEGACY_SESSION_KEY, quality: 10 }),
+      c("labelled", { sessionKey: "label:Kim · May 2026", quality: 10 }),
+      c("older", { sessionKey: "session:a", sessionDate: "2026-05-21", quality: 10 }),
+      c("newer", { sessionKey: "session:b", sessionDate: "2026-05-23", quality: 1 }),
+    ]);
+    expect(urls(out)).toEqual(["newer", "older", "labelled", "legacy"]);
   });
 });
 

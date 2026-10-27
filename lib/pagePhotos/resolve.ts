@@ -17,13 +17,12 @@
 // places a photo only by that photo's own GPS (no evidence → no place). A place reaches a guide only
 // when that guide page exists; a graduation photo reaches the portrait guide.
 import { detectSchoolsInText } from "@/lib/schoolDetection";
-import { getPhotoTitle } from "@/lib/photoMetadata";
 import { BUILT_IN_SCHOOLS } from "@/lib/contentEngine/schools";
 import { guideTypeForService, isSchoolSlug, SCHOOL_SLUGS, type SchoolSlug } from "@/lib/contentEngine/taxonomy";
 import { matchPlacesByName, placeAtCoordinates } from "@/lib/locations/match";
 import type { KnownPlace } from "@/lib/locations/places";
 import { findGuideForPlace, type DbGuideRef, type LocationGuideType } from "@/lib/locations/guideCoverage";
-import { guidePageKey, schoolPageKey } from "@/lib/pagePhotos/pageKeys";
+import { guidePageKey, LEGACY_SESSION_KEY, schoolPageKey } from "@/lib/pagePhotos/pageKeys";
 
 /** Text-only school matches below this confidence never place a photo ("Cal" is 0.5). */
 export const TEXT_SCHOOL_MIN_CONFIDENCE = 0.9;
@@ -57,6 +56,8 @@ export interface EngineSource {
   contentHash: string | null;
   sessionId: string;
   sessionName: string | null;
+  /** The shoot date (photography_sessions.session_date, ISO), for recency. */
+  sessionDate?: string | null;
   serviceType: string | null;
   schoolSlug: string | null;
   primaryLocation: string | null;
@@ -94,6 +95,8 @@ export interface ResolvedPhoto {
   height: number | null;
   quality: number | null;
   sessionKey: string;
+  /** When the shoot happened (Content Engine sessions only), for recency. */
+  sessionDate: string | null;
   sessionLabel: string | null;
   engineSessionId: string | null;
   school: SchoolSlug | null;
@@ -235,15 +238,16 @@ function eligibility(engine: EngineSource | null): { eligible: boolean; reason: 
   return { eligible: true, reason: null };
 }
 
-// Groups frames from one shoot so the page can spread them out. Older uploads
-// have no session; photos sharing an identical, specific title were captioned
-// as a set. The category placeholder ("Graduation portrait") says nothing about
-// the shoot, so untitled photos each stand alone.
+// Groups frames from one shoot so the page can spread them out (curate.ts
+// takes one photo per group per round). A Content Engine session or an admin
+// session label names a real shoot. Everything else is an older upload with no
+// shoot on record; those all share ONE group, because giving each its own
+// group let twenty single-photo "sessions" outvote a real session of eight
+// frames and leave it one slot on a thirteen-photo page.
 function sessionKeyOf(photo: PortfolioSource, engine: EngineSource | null): string {
   if (engine) return `session:${engine.sessionId}`;
   if (photo.sessionLabel) return `label:${photo.sessionLabel}`;
-  const placeholder = getPhotoTitle({ title: null, categorySlug: photo.category });
-  return photo.title.trim() === placeholder ? `photo:${photo.id}` : `title:${photo.title.trim().toLowerCase()}`;
+  return LEGACY_SESSION_KEY;
 }
 
 export function resolvePhoto(
@@ -272,6 +276,7 @@ export function resolvePhoto(
     height: photo.height ?? engine?.height ?? null,
     quality: engine?.quality ?? null,
     sessionKey: sessionKeyOf(photo, engine),
+    sessionDate: engine?.sessionDate ?? null,
     sessionLabel: photo.sessionLabel,
     engineSessionId: engine?.sessionId ?? null,
     school: school.school,
