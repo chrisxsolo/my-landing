@@ -1,23 +1,22 @@
 "use client";
 // Section 5 — Publication history (spec §7.4): permanent across packages, with
 // live link, Revalidate (site-wide cache invalidation — targeted Step-C runs
-// at publish; this is the recovery affordance), and per-item Takedown.
+// at publish; this is the recovery affordance), and per-item Takedown. The
+// published journal's images are managed in LiveJournalSection near the top.
 import { useState } from "react";
 import { T } from "@/app/admin/adminTheme";
 import { engineApi } from "@/app/admin/content-engine/engineApi";
-import { CONTENT_TYPE_LABELS, type EngineItem, type EnginePhoto } from "@/app/admin/content-engine/engineTypes";
+import { CONTENT_TYPE_LABELS, type EngineItem } from "@/app/admin/content-engine/engineTypes";
 import { pathsForPublishedItem } from "@/lib/contentEngine/publishRevalidation";
-import PublishedJournalPhotos from "./PublishedJournalPhotos";
 import { btn, card, sectionTitle } from "./ui";
 
 interface Props {
   published: EngineItem[];
-  photos: EnginePhoto[];
   onChanged: () => void;
   viewCounts: Record<string, number>;
 }
 
-export default function PublicationHistory({ published, photos, onChanged, viewCounts }: Props) {
+export default function PublicationHistory({ published, onChanged, viewCounts }: Props) {
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   if (published.length === 0) return null;
@@ -66,7 +65,7 @@ export default function PublicationHistory({ published, photos, onChanged, viewC
             item.content_type === "journal_post" ? 1 : 0
           ];
           return (
-            <div key={item.id} style={{ display: "grid", gap: 4, opacity: takenDown ? 0.55 : 1 }}>
+            <div key={item.id} style={{ opacity: takenDown ? 0.55 : 1 }}>
               <div style={{
                 display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13,
               }}>
@@ -85,9 +84,6 @@ export default function PublicationHistory({ published, photos, onChanged, viewC
                   </button>
                 )}
               </div>
-              {!takenDown && item.content_type === "journal_post" && (
-                <PublishedJournalPhotos item={item} photos={photos} onChanged={onChanged} />
-              )}
             </div>
           );
         })}

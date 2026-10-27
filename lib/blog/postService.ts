@@ -99,9 +99,16 @@ const DEFAULT_LINKS: readonly SiteLink[] = [
   { label: "Pricing", href: "/pricing" },
 ];
 
-/** Links shown below a post: its service's guide + pricing, then booking. */
-export function exploreLinksFor(service: ServiceType | null, schoolLink: SiteLink | null): SiteLink[] {
+/**
+ * Links shown below a post: the school page (grad posts), the place the
+ * session was shot when it has a published entry in the location library,
+ * then its service's guide + pricing, then booking.
+ */
+export function exploreLinksFor(
+  service: ServiceType | null, schoolLink: SiteLink | null, locationLink: SiteLink | null = null,
+): SiteLink[] {
   const own = (service && SERVICE_LINKS[service]) || DEFAULT_LINKS;
   const school = service === "grads" && schoolLink ? [schoolLink] : [];
-  return [...school, ...own, ...CLOSING];
+  const location = locationLink && !school.some((l) => l.href === locationLink.href) ? [locationLink] : [];
+  return [...school, ...location, ...own, ...CLOSING];
 }

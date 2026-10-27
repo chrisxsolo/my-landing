@@ -46,6 +46,7 @@ const LINK = {
   textDecorationColor: C.proAccentBorder,
   textUnderlineOffset: "3px",
 } as const;
+const HR = { border: 0, borderTop: `1px solid ${C.proAccentBorder}`, margin: "36px auto", width: 72 } as const;
 
 function renderInline(nodes: Inline[]): ReactNode[] {
   return nodes.map((n, i) => {
@@ -75,6 +76,8 @@ function renderBlock(block: Block, key: number): ReactNode {
       return <blockquote key={key} style={QUOTE}>{renderInline(block.children)}</blockquote>;
     case "paragraph":
       return <p key={key} style={PARA}>{renderInline(block.children)}</p>;
+    case "hr":
+      return <hr key={key} style={HR} />;
   }
 }
 

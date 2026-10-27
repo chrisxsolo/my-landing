@@ -3,10 +3,14 @@
 //
 // Bodies come in two shapes and both must keep working:
 //  - Content Engine posts are Markdown: [links](/path), ## headings, **bold**,
-//    *italic*, - lists, > quotes.
+//    *italic*, ***both***, - lists, > quotes, --- rules. Image syntax is not
+//    rendered (photos live in the post's cover and gallery): ![alt](url) comes
+//    out as its alt text.
 //  - Older hand-written posts are plain text with blank-line-separated blocks,
 //    where headings were inferred (emoji lines, short lines above bullets).
-//    Those inference rules are kept exactly so old posts render as before.
+//    Those inference rules are kept so old posts render as before — except a
+//    call-to-action line such as "📸 Book Your Session", which is a sentence
+//    lead-in, not a section title, and stays a paragraph.
 //
 // Safety: the tree only ever holds text and vetted link targets. Nothing is
 // passed through as HTML, so raw <script> or javascript: links in a body come
@@ -22,7 +26,8 @@ export type Block =
   | { type: "heading"; level: 2 | 3; children: Inline[] }
   | { type: "paragraph"; children: Inline[] }
   | { type: "list"; ordered: boolean; items: Inline[][] }
-  | { type: "quote"; children: Inline[] };
+  | { type: "quote"; children: Inline[] }
+  | { type: "hr" };
 
 const SITE_ORIGIN = /^https?:\/\/(?:www\.)?soloxsnaps\.com(?=\/|$)/i;
 const SAFE_EXTERNAL = /^(?:https?:\/\/|mailto:|tel:)/i;
@@ -38,10 +43,13 @@ export function safeHref(raw: string): { href: string; internal: boolean } | nul
 
 // ── Inline ──────────────────────────────────────────────────────────────────
 
-type Rule = { re: RegExp; build: (m: RegExpExecArray, inLink: boolean) => Inline | Inline[] };
+type Rule = { re: RegExp; build: (m: RegExpExecArray, inLink: boolean) => Inline | Inline[]; isLink?: boolean };
 
 const RULES: Rule[] = [
+  // Images are never rendered inline; the alt text stands in for the picture.
+  { re: /!\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/, build: (m) => ({ type: "text", value: unescape(m[1]) }) },
   {
+    isLink: true,
     re: /\[([^\]]+)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/,
     build: (m) => {
       const target = safeHref(m[2]);
@@ -49,6 +57,7 @@ const RULES: Rule[] = [
       return target ? { type: "link", ...target, children } : children;
     },
   },
+  { re: /\*\*\*(?=\S)([\s\S]*?\S)\*\*\*/, build: (m, l) => ({ type: "strong", children: [{ type: "em", children: parseInline(m[1], l) }] }) },
   { re: /\*\*(?=\S)([\s\S]*?\S)\*\*/, build: (m, l) => ({ type: "strong", children: parseInline(m[1], l) }) },
   { re: /(?<!\w)__(?=\S)([\s\S]*?\S)__(?!\w)/, build: (m, l) => ({ type: "strong", children: parseInline(m[1], l) }) },
   { re: /\*(?=[^\s*])([^*]*?[^\s*])\*/, build: (m, l) => ({ type: "em", children: parseInline(m[1], l) }) },
@@ -57,8 +66,8 @@ const RULES: Rule[] = [
 
 function earliestMatch(text: string, inLink: boolean) {
   let best: { m: RegExpExecArray; rule: Rule } | null = null;
-  RULES.forEach((rule, i) => {
-    if (inLink && i === 0) return; // no links inside link text
+  RULES.forEach((rule) => {
+    if (inLink && rule.isLink) return; // no links inside link text
     const m = rule.re.exec(text);
     if (m && (!best || m.index < best.m.index)) best = { m, rule };
   });
@@ -88,7 +97,7 @@ export function toPlainText(body: string): string {
   const flatten = (nodes: Inline[]): string =>
     nodes.map((n) => (n.type === "text" ? n.value : flatten(n.children))).join("");
   return parseBody(body)
-    .map((b) => (b.type === "list" ? b.items.map(flatten).join(" ") : flatten(b.children)))
+    .map((b) => (b.type === "hr" ? "" : b.type === "list" ? b.items.map(flatten).join(" ") : flatten(b.children)))
     .join(" ")
     .replace(/\s+/g, " ")
     .trim();
@@ -100,10 +109,14 @@ const BULLET = /^[•*-]\s+/;
 const ORDERED = /^\d{1,3}[.)]\s+/;
 const HEADING = /^(#{1,6})\s+(.+?)\s*#*$/;
 const QUOTE = /^>\s?/;
+const RULE = /^(?:-{3,}|\*{3,}|_{3,})$/;
+// "📸 Book Your Session" leads into a booking sentence; it is not a section.
+const CTA_LINE = /\b(?:book(?:ing|ed)?|inquir\w*|contact)\b/i;
 
-type LineKind = "heading" | "bullet" | "ordered" | "quote" | "text";
+type LineKind = "heading" | "rule" | "bullet" | "ordered" | "quote" | "text";
 
 function kindOf(line: string): LineKind {
+  if (RULE.test(line)) return "rule";
   if (HEADING.test(line)) return "heading";
   if (BULLET.test(line)) return "bullet";
   if (ORDERED.test(line)) return "ordered";
@@ -111,17 +124,18 @@ function kindOf(line: string): LineKind {
   return "text";
 }
 
-const isEmojiHeading = (line: string) => /^\p{Extended_Pictographic}/u.test(line);
+const isEmojiHeading = (line: string) => /^\p{Extended_Pictographic}/u.test(line) && !CTA_LINE.test(line);
 const linesOf = (block: string) => block.split(/\n/).map((l) => l.trim()).filter(Boolean);
 const isListKind = (k: LineKind | undefined) => k === "bullet" || k === "ordered";
+const isSoloKind = (k: LineKind) => k === "heading" || k === "rule";
 
-/** Consecutive lines of the same kind (each heading line is its own group). */
+/** Consecutive lines of the same kind (each heading or rule line is its own group). */
 function groupLines(lines: string[]): { kind: LineKind; lines: string[] }[] {
   const groups: { kind: LineKind; lines: string[] }[] = [];
   for (const line of lines) {
     const kind = kindOf(line);
     const last = groups[groups.length - 1];
-    if (last && last.kind === kind && kind !== "heading") last.lines.push(line);
+    if (last && last.kind === kind && !isSoloKind(kind)) last.lines.push(line);
     else groups.push({ kind, lines: [line] });
   }
   return groups;
@@ -134,6 +148,7 @@ function headingBlock(line: string): Block {
 }
 
 function groupToBlock(kind: LineKind, lines: string[]): Block {
+  if (kind === "rule") return { type: "hr" };
   if (kind === "heading") return headingBlock(lines[0]);
   if (isListKind(kind)) {
     const marker = kind === "bullet" ? BULLET : ORDERED;

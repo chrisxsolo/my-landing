@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { C } from "@/lib/colors";
 import { uploadImage } from "@/lib/uploadImage";
 import { GRAD_SCHOOL_OPTIONS, GRAD_LOCATION_OPTIONS, GRAD_SESSION_OPTIONS } from "@/lib/portfolioSeoDescription";
+import BlogPostImages from "@/app/admin/BlogPostImages";
 
 type BlogCategory = "journal" | "professional";
 type BlogPost = { id: number; title: string; body: string; published_at: string; slug: string; cover_image_url: string | null; extra_image_urls: string[]; category?: BlogCategory | string | null; sites?: string[] | null; meta_description?: string | null; meta_keywords?: string | null; cover_image_alt?: string | null; extra_image_alts?: string[] | null };
@@ -87,6 +88,7 @@ export default function BlogTab({ showToast }: Props) {
   const [postSaving, setPostSaving] = useState(false);
   const [editingPost, setEditingPost] = useState<BlogPost | null>(null);
   const [postDeleteConfirm, setPostDeleteConfirm] = useState<number | null>(null);
+  const [imagesOpenId, setImagesOpenId] = useState<number | null>(null);
   const [seoGeneratingId, setSeoGeneratingId] = useState<number | null>(null);
   const [journalDraft, setJournalDraft] = useState("");
   const [aiDropFiles, setAiDropFiles] = useState<File[]>([]);
@@ -101,12 +103,21 @@ export default function BlogTab({ showToast }: Props) {
 
   useEffect(() => { fetchPosts(); }, []);
 
-  async function fetchPosts() {
+  async function fetchPosts(): Promise<BlogPost[]> {
     setPostsLoading(true);
     const res = await fetch("/api/admin/blog-posts", { credentials: "include" });
     const json = await res.json().catch(() => ({}));
-    if (res.ok && Array.isArray(json.posts)) setPosts(json.posts);
+    const list: BlogPost[] = res.ok && Array.isArray(json.posts) ? json.posts : [];
+    if (res.ok) setPosts(list);
     setPostsLoading(false);
+    return list;
+  }
+
+  // The live row changed outside the edit form (cover replaced, gallery photo
+  // removed, revision restored): refetch, and reload the form if it shows that post.
+  async function onLiveImagesChanged(postId: number) {
+    const fresh = (await fetchPosts()).find(p => p.id === postId);
+    if (fresh && editingPost?.id === postId) startEditPost(fresh);
   }
 
   function startEditPost(post: BlogPost) {
@@ -205,9 +216,18 @@ export default function BlogTab({ showToast }: Props) {
     } finally { setAiGenerating(false); }
   }
 
-  // Fire-and-forget: refresh the cached /blog pages after a post change so it
-  // shows up immediately instead of waiting for hourly ISR.
-  function revalidatePublicSite() { fetch("/api/admin/revalidate", { method: "POST" }).catch(() => {}); }
+  // Refresh the cached /blog pages after a change made by a route that does not
+  // revalidate itself (AI auto-post, SEO generation). The blog-posts API
+  // revalidates on its own writes. A failure is said out loud: the hourly ISR
+  // window is the backstop, but the admin should know the page may lag.
+  function revalidatePublicSite() {
+    fetch("/api/admin/revalidate", { method: "POST", credentials: "include" })
+      .then(res => { if (!res.ok) throw new Error(`revalidate responded ${res.status}`); })
+      .catch(err => {
+        console.error("[blog] public cache refresh failed:", err);
+        showToast("Saved, but the public pages did not refresh — they update within the hour", false);
+      });
+  }
 
   async function savePost() {
     if (!postForm.title || !postForm.body) { showToast("Title and body required", false); return; }
@@ -226,12 +246,12 @@ export default function BlogTab({ showToast }: Props) {
     if (editingPost) {
       const res = await fetch("/api/admin/blog-posts", { method: "PATCH", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ id: editingPost.id, updates: payload }) });
       if (!res.ok) showToast("Update failed", false);
-      else { await syncImagesToLibrary(editingPost.id, slug, postForm.title, cover_image_url, extra_image_urls); showToast("Post updated!"); cancelEditPost(); fetchPosts(); revalidatePublicSite(); }
+      else { await syncImagesToLibrary(editingPost.id, slug, postForm.title, cover_image_url, extra_image_urls); showToast("Post updated!"); cancelEditPost(); fetchPosts(); }
     } else {
       const res = await fetch("/api/admin/blog-posts", { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify(payload) });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || !json.id) showToast("Save failed — " + (json.error ?? ""), false);
-      else { await syncImagesToLibrary(json.id, slug, postForm.title, cover_image_url, extra_image_urls); showToast("Post published!"); cancelEditPost(); fetchPosts(); revalidatePublicSite(); }
+      else { await syncImagesToLibrary(json.id, slug, postForm.title, cover_image_url, extra_image_urls); showToast("Post published!"); cancelEditPost(); fetchPosts(); }
     }
     setPostSaving(false);
   }
@@ -242,7 +262,6 @@ export default function BlogTab({ showToast }: Props) {
     setPosts(p => p.filter(x => x.id !== id));
     setPostDeleteConfirm(null);
     if (editingPost?.id === id) cancelEditPost();
-    revalidatePublicSite();
     showToast("Post deleted");
   }
 
@@ -457,6 +476,7 @@ export default function BlogTab({ showToast }: Props) {
                           {(post.sites && post.sites.length > 0 ? post.sites : [post.category === "professional" ? "professional" : "journal"]).includes("professional") && (
                             <a href={`/blog/${post.slug}`} target="_blank" className="text-xs font-bold px-3 py-1.5 rounded-lg" style={{ background: C.p1_08, color: C.p1 }}>Blog →</a>
                           )}
+                          <button onClick={() => setImagesOpenId(imagesOpenId === post.id ? null : post.id)} title="Every image the live page renders, with remove / replace and revision history" className="text-xs font-bold px-3 py-1.5 rounded-lg" style={{ background: imagesOpenId === post.id ? C.p1 : C.p1_08, color: imagesOpenId === post.id ? C.white : C.p1 }}>{imagesOpenId === post.id ? "Hide photos" : "Live photos"}</button>
                           <button onClick={() => generateSeoForPost(post)} disabled={seoGeneratingId === post.id} title="Analyze photos + text and write SEO metadata" className="text-xs font-bold px-3 py-1.5 rounded-lg" style={{ background: C.p3_10, color: C.ink, opacity: seoGeneratingId === post.id ? 0.6 : 1 }}>{seoGeneratingId === post.id ? "✨ Generating…" : "✨ SEO"}</button>
                           {editingPost?.id !== post.id && <button onClick={() => startEditPost(post)} className="text-xs font-bold px-3 py-1.5 rounded-lg" style={{ background: C.p2_08, color: C.p2 }}>Edit</button>}
                           {postDeleteConfirm === post.id ? (
@@ -469,6 +489,9 @@ export default function BlogTab({ showToast }: Props) {
                       </div>
                     </div>
                   </div>
+                  {imagesOpenId === post.id && (
+                    <BlogPostImages postId={post.id} showToast={showToast} onChanged={() => { void onLiveImagesChanged(post.id); }} />
+                  )}
                 </div>
               ))}
             </div>

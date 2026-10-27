@@ -20,7 +20,7 @@ const CATEGORY_DEFS: readonly CategoryDef[] = [
   { slug: "couples", label: "Couples", services: ["couples"], aliases: ["couple", "couples", "engagement", "engagements", "anniversary"] },
   { slug: "proposals", label: "Proposals", services: [], aliases: ["proposal", "proposals"] },
   { slug: "elopements", label: "Elopements", services: [], aliases: ["elope", "elopement", "elopements"] },
-  { slug: "family", label: "Family", services: ["families"], aliases: ["family", "families"] },
+  { slug: "family", label: "Families", services: ["families"], aliases: ["family", "families"] },
   { slug: "maternity", label: "Maternity", services: ["maternity"], aliases: ["maternity"] },
   { slug: "portraits", label: "Portraits", services: ["portraits"], aliases: ["portrait", "portraits", "headshot", "headshots"] },
   { slug: "prom", label: "Prom", services: ["prom"], aliases: ["prom"] },

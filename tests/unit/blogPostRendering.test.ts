@@ -19,6 +19,9 @@ vi.mock("@/lib/professionalData", () => ({ getBlogPostBySlug: async () => post.c
 // Content Engine service per post id; empty = a legacy post with no session.
 const engineServices = vi.hoisted(() => ({ current: {} as Record<string, string> }));
 vi.mock("@/lib/blog/journalServices", () => ({ getJournalServicesByPostId: async () => engineServices.current }));
+// Published location-library guide per post id; empty = the session's place has no public guide.
+const locationLinks = vi.hoisted(() => ({ current: {} as Record<string, { label: string; href: string }> }));
+vi.mock("@/lib/blog/journalLocations", () => ({ getJournalLocationLinksByPostId: async () => locationLinks.current }));
 vi.mock("next/image", () => ({ default: () => null }));
 vi.mock("@/app/components/ContentEventBeacon", () => ({ default: () => null }));
 
@@ -102,6 +105,20 @@ describe("public blog page — links below the article match the post", () => {
     expect(hrefs(html)).toEqual(expect.arrayContaining(["/grads/uc-berkeley", "/pricing/grads", "/grad-guide"]));
   });
 
+  it("links the session's location guide only when that guide is published in the location library", async () => {
+    const without = hrefs(belowArticle(await renderPage()));
+    expect(without.some((h) => h.startsWith("/bay-area-locations"))).toBe(false);
+
+    locationLinks.current = { "20": { label: "Shark Fin Cove photo location guide", href: "/bay-area-locations#shark-fin-cove" } };
+    try {
+      const html = belowArticle(await renderPage());
+      expect(hrefs(html)[0]).toBe("/bay-area-locations#shark-fin-cove");
+      expect(visibleText(html)).toContain("Shark Fin Cove photo location guide");
+    } finally {
+      locationLinks.current = {};
+    }
+  });
+
   it("trusts the Content Engine session over a title that says 'couple'", async () => {
     engineServices.current = { "31": "grads" };
     try {
@@ -146,6 +163,25 @@ describe("Markdown renderer — semantic elements", () => {
     const html = renderBody("file_name_here and 5 * 3 * 2");
     expect(html).not.toContain("<em>");
   });
+
+  it("renders ***bold italic*** as strong + em", () => {
+    expect(renderBody("a ***big*** moment")).toMatch(/<p [^>]*>a <strong><em>big<\/em><\/strong> moment<\/p>/);
+  });
+
+  it("renders --- (and *** / ___) as a horizontal rule, never as text", () => {
+    const html = renderBody("Before.\n\n---\n\nAfter.\n\n***\n\n___");
+    expect(html.match(/<hr/g)).toHaveLength(3);
+    expect(visibleText(html)).not.toMatch(/---|\*\*\*|___/);
+    expect(parseBody("Before.\n\n---\n\nAfter.").map((b) => b.type)).toEqual(["paragraph", "hr", "paragraph"]);
+    expect(toPlainText("Before.\n\n---\n\nAfter.")).toBe("Before. After.");
+  });
+
+  it("shows an image's alt text instead of raw ![alt](url) syntax", () => {
+    const html = renderBody("Look: ![Kim at Sather Gate](https://cdn.example/kim.jpg \"title\") and ![](https://cdn.example/x.jpg) done.");
+    expect(html).not.toContain("<img");
+    expect(html).not.toContain("](");
+    expect(visibleText(html)).toContain("Look: Kim at Sather Gate and done.");
+  });
 });
 
 describe("Markdown renderer — untrusted content is safe", () => {
@@ -173,13 +209,21 @@ describe("Markdown renderer — untrusted content is safe", () => {
 describe("older plain-text posts render as before", () => {
   it("keeps the inferred headings and bullets", () => {
     const html = renderBody([
-      "Intro paragraph.", "📸 Book Your Session", "What we covered", "- Sather Gate\n- Doe Library",
+      "Intro paragraph.", "🎓 What the day looked like", "What we covered", "- Sather Gate\n- Doe Library",
       "Things to bring\n• Cap\n• Gown",
     ].join("\n\n"));
     expect(html.match(/<h2/g)).toHaveLength(3);
-    expect(html).toMatch(/<h2 [^>]*>📸 Book Your Session<\/h2>/);
+    expect(html).toMatch(/<h2 [^>]*>🎓 What the day looked like<\/h2>/);
     expect(html).toMatch(/<h2 [^>]*>What we covered<\/h2><ul/);
     expect(html).toMatch(/<h2 [^>]*>Things to bring<\/h2><ul [^>]*><li [^>]*>Cap<\/li>/);
+  });
+
+  it("keeps a call-to-action emoji line as a paragraph, not a heading (posts 1 and 3)", () => {
+    for (const line of ["📸 Book Your Session", "📩 Inquire about dates", "☎️ Contact me for availability", "✨ Booking is open"]) {
+      const html = renderBody(`Story.\n\n${line}\n\nIf you're graduating, I'm currently booking.`);
+      expect(html, line).not.toContain("<h2");
+      expect(html, line).toMatch(new RegExp(`<p [^>]*>${line.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}</p>`));
+    }
   });
 
   it("plain text comes out unchanged", () => {

@@ -4,7 +4,9 @@ import { requireAdmin } from "@/lib/requireAdmin";
 import { PUBLIC_CONTENT_CACHE_TAG } from "@/lib/publicContentCache";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
 import { addJournalPhotos, AddPhotosError } from "@/lib/contentEngine/addJournalPhotos";
-import { getLiveJournalPhotos, JournalPhotosError, removeJournalPhoto } from "@/lib/contentEngine/liveJournalPhotos";
+import {
+  getLiveJournalPhotos, JournalPhotosError, removeJournalPhoto, replaceJournalCover, syncPayloadToLive,
+} from "@/lib/contentEngine/liveJournalPhotos";
 import { isUuid } from "@/lib/contentEngine/uploadConfig";
 
 export const runtime = "nodejs";
@@ -68,8 +70,9 @@ function errorResponse(err: unknown, fallback: string) {
   return NextResponse.json({ error: fallback }, { status: 500 });
 }
 
-// The photos the LIVE post shows (cover + gallery), each matched to its
-// session photo when possible — the editor's view of a published journal.
+// Every image the LIVE post renders (cover, gallery, social image), each
+// matched to its session photo when possible, plus where the saved draft
+// differs from the page — the editor's view of a published journal.
 export async function GET(req: NextRequest) {
   const deny = requireAdmin(req);
   if (deny) return deny;
@@ -96,12 +99,48 @@ export async function DELETE(req: NextRequest) {
   const itemId = typeof body.itemId === "string" ? body.itemId.toLowerCase() : "";
   if (!isUuid(itemId)) return NextResponse.json({ error: "itemId must be a uuid" }, { status: 400 });
   const url = typeof body.url === "string" ? body.url.trim() : "";
-  if (!/^https:\/\/\S+$/.test(url)) return NextResponse.json({ error: "url must be an https URL" }, { status: 400 });
+  if (!HTTPS_URL.test(url)) return NextResponse.json({ error: "url must be an https URL" }, { status: 400 });
   try {
     const result = await removeJournalPhoto(createSupabaseAdminClient(), itemId, url);
     revalidateJournal(result.slug);
     return NextResponse.json(result);
   } catch (err) {
     return errorResponse(err, "could not remove the photo");
+  }
+}
+
+const HTTPS_URL = /^https:\/\/\S+$/;
+
+// Edits to the live post that are not a plain removal:
+//   replace-cover — the cover and the social image change together, from a
+//                   photo already in the post or published from the session;
+//   sync-payload  — rewrite the saved draft's selection from the live page.
+export async function PATCH(req: NextRequest) {
+  const deny = requireAdmin(req);
+  if (deny) return deny;
+  let body: { itemId?: unknown; action?: unknown; url?: unknown; keepOldInGallery?: unknown };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "invalid JSON body" }, { status: 400 });
+  }
+  const itemId = typeof body.itemId === "string" ? body.itemId.toLowerCase() : "";
+  if (!isUuid(itemId)) return NextResponse.json({ error: "itemId must be a uuid" }, { status: 400 });
+  const client = createSupabaseAdminClient();
+  try {
+    if (body.action === "sync-payload") {
+      const photos = await syncPayloadToLive(client, itemId);
+      return NextResponse.json({ synced: true, photos });
+    }
+    if (body.action === "replace-cover") {
+      const url = typeof body.url === "string" ? body.url.trim() : "";
+      if (!HTTPS_URL.test(url)) return NextResponse.json({ error: "url must be an https URL" }, { status: 400 });
+      const result = await replaceJournalCover(client, itemId, url, body.keepOldInGallery === true);
+      revalidateJournal(result.slug);
+      return NextResponse.json(result);
+    }
+    return NextResponse.json({ error: "action must be replace-cover or sync-payload" }, { status: 400 });
+  } catch (err) {
+    return errorResponse(err, "could not update the post");
   }
 }
