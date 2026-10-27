@@ -1,5 +1,5 @@
 import { COUPLES_PACKAGES, GRAD_HOURLY_RATE, getGroupRatePerPerson } from "./pricing";
-import { inferTotalFromRetainer } from "./pricingCatalog";
+import { PRICING_CATALOG, inferTotalFromRetainer } from "./pricingCatalog";
 import { classifySession, type PlaybookKey } from "./ai/sessionClassifier";
 import { detectSchoolsInText } from "./schoolDetection";
 import { resolveTravel, travelFeeAmount } from "./travelResolution";
@@ -77,10 +77,19 @@ function graduationTotalCents(inquiry: PaymentTotalInquiry, text: string): numbe
   return Math.round((base + travelFeeAmount(travel)) * 100);
 }
 
-const COUPLES_RATES: Partial<Record<PlaybookKey, number>> = {
+// Fixed-price services the rate card totals on its own. Family has two
+// packages, so it is resolved from the text below.
+const FIXED_RATES: Partial<Record<PlaybookKey, number>> = {
   proposal: COUPLES_PACKAGES.proposal.price,
   engagement: COUPLES_PACKAGES.engagement.price,
+  maternity: PRICING_CATALOG.maternity.price,
 };
+
+/** Family packages: the extended package when the text asks for it, else standard. */
+function familyRate(text: string): number {
+  const { standard, extended } = PRICING_CATALOG.families.packages;
+  return /\bextended\b/.test(text) ? extended.price : standard.price;
+}
 
 /** Session price from the published rate card alone — session type, group
  *  size, and travel to the shoot location. Ignores any dollar figure written
@@ -104,7 +113,9 @@ export function catalogSessionTotalCents(inquiry: PaymentTotalInquiry | null | u
   // the price quoted in the thread.
   if (service === "elopement") return 0;
 
-  const fixed = service ? COUPLES_RATES[service] : undefined;
+  if (service === "family") return familyRate(text) * 100;
+
+  const fixed = service ? FIXED_RATES[service] : undefined;
   if (fixed) return fixed * 100;
   if (/\bsignature\b/.test(text)) return COUPLES_PACKAGES.signature.price * 100;
   if (/\bmini\b/.test(text)) return COUPLES_PACKAGES.mini.price * 100;

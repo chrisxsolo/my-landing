@@ -127,6 +127,12 @@ describe("payment total inference", () => {
     expect(catalogSessionTotalCents(grad)).toBe(42500);
   });
 
+  it("prices maternity and both family packages from the rate card", () => {
+    expect(catalogSessionTotalCents({ session_type: "Maternity Session", message: "Due in March", school: null, location: null })).toBe(50000);
+    expect(catalogSessionTotalCents({ session_type: "Family Session", message: "Us and our two kids", school: null, location: null })).toBe(35000);
+    expect(catalogSessionTotalCents({ session_type: "Family Session", message: "Extended family of 12 for the holidays", school: null, location: null })).toBe(50000);
+  });
+
   it("keeps an explicitly agreed client-specific price", () => {
     const grad = { session_type: "Graduation", school: "SJSU", location: null, message: "", payment_note: "Agreed total $400" };
     expect(inferSessionTotalCents(grad)).toBe(40000);
