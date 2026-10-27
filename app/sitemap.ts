@@ -6,6 +6,9 @@ import { getPublishedCouplesLocations } from "@/lib/couplesGuide/locations";
 import { getPublishedPortraitLocations } from "@/lib/portraitGuide/locations";
 import { indexableDbGuidePaths } from "@/lib/locations/guideListings";
 import { getBlogCategorySlugs } from "@/lib/blogCategories";
+import { getSchoolSpotsGuidePhotos } from "@/lib/pagePhotos/publicPages";
+import { BUILT_IN_SCHOOLS } from "@/lib/contentEngine/schools";
+import { SCHOOL_SLUGS, type SchoolSlug } from "@/lib/contentEngine/taxonomy";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // app/sitemap.ts — programmatic sitemap served at /sitemap.xml
@@ -36,13 +39,6 @@ const STATIC_ROUTES: Array<{
   { path: "/grads/csueb", changeFrequency: "monthly", priority: 0.9 },
   { path: "/grads/santa-clara", changeFrequency: "monthly", priority: 0.9 },
   { path: "/grads/stanford", changeFrequency: "monthly", priority: 0.9 },
-  { path: "/grads/uc-berkeley/spots", changeFrequency: "monthly", priority: 0.8 },
-  { path: "/grads/sjsu/spots", changeFrequency: "monthly", priority: 0.8 },
-  { path: "/grads/usf/spots", changeFrequency: "monthly", priority: 0.8 },
-  { path: "/grads/sf-state/spots", changeFrequency: "monthly", priority: 0.8 },
-  { path: "/grads/csueb/spots", changeFrequency: "monthly", priority: 0.8 },
-  { path: "/grads/santa-clara/spots", changeFrequency: "monthly", priority: 0.8 },
-  { path: "/grads/stanford/spots", changeFrequency: "monthly", priority: 0.8 },
   { path: "/pricing", changeFrequency: "monthly", priority: 0.8 },
   { path: "/pricing/grads", changeFrequency: "monthly", priority: 0.8 },
   { path: "/pricing/couples", changeFrequency: "monthly", priority: 0.7 },
@@ -90,6 +86,28 @@ const STATIC_ROUTES: Array<{
   { path: "/terms", changeFrequency: "yearly", priority: 0.2 },
 ];
 
+// /grads/<slug>/spots: a campus whose spot sections show photos is a richer
+// page than one that is text only, so the two get different weights.
+const SPOTS_PRIORITY = { withPhotos: 0.8, textOnly: 0.5 } as const;
+
+async function spotsGuideHasPhotos(slug: SchoolSlug): Promise<boolean> {
+  try {
+    const photos = await getSchoolSpotsGuidePhotos(slug, BUILT_IN_SCHOOLS[slug].shortName);
+    return Object.values(photos.bySpot).some((section) => section.length > 0);
+  } catch (err) {
+    console.error(`[sitemap] could not read spot photos for ${slug}; keeping the higher priority`, err);
+    return true;
+  }
+}
+
+async function spotsGuideEntries(): Promise<MetadataRoute.Sitemap> {
+  return Promise.all(SCHOOL_SLUGS.map(async (slug) => ({
+    url: `${SITE_URL}/grads/${slug}/spots`,
+    changeFrequency: "monthly" as const,
+    priority: (await spotsGuideHasPhotos(slug)) ? SPOTS_PRIORITY.withPhotos : SPOTS_PRIORITY.textOnly,
+  })));
+}
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Static routes intentionally omit lastModified: we have no real
   // per-page modification timestamps, and stamping "now" on every hourly
@@ -99,6 +117,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     changeFrequency: route.changeFrequency,
     priority: route.priority,
   }));
+  const spotsEntries = await spotsGuideEntries();
 
   // Pull dynamic posts. /blog/[slug] is the server-rendered, canonical version
   // of every published entry. (The former /journal section has been retired.)
@@ -160,5 +179,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.6,
     }));
 
-  return [...staticEntries, ...familyLocationEntries, ...couplesLocationEntries, ...portraitLocationEntries, ...dbGuideEntries, ...categoryEntries, ...blogEntries];
+  return [
+    ...staticEntries, ...spotsEntries, ...familyLocationEntries, ...couplesLocationEntries,
+    ...portraitLocationEntries, ...dbGuideEntries, ...categoryEntries, ...blogEntries,
+  ];
 }
