@@ -10,6 +10,7 @@ import { engineApi } from "@/app/admin/content-engine/engineApi";
 import type { EngineItem, EnginePhoto } from "@/app/admin/content-engine/engineTypes";
 import type { LiveJournalPhoto } from "@/lib/contentEngine/journalPhotoMembership";
 import supabaseImageLoader from "@/lib/supabaseImageLoader";
+import { CONTENT_STATUS } from "@/lib/contentStatus";
 import AddJournalPhotos from "./AddJournalPhotos";
 import { btn, chip } from "./ui";
 
@@ -29,7 +30,7 @@ function PhotoTile({ photo, busy, onRemove }: {
         <img src={supabaseImageLoader({ src: photo.url, width: THUMB_WIDTH })} alt={photo.alt || "journal photo"}
           loading="lazy" style={{ width: "100%", aspectRatio: "1", objectFit: "cover", display: "block" }} />
         <span style={{ ...chip(T.green, T.greenBg), position: "absolute", top: 5, left: 5, fontSize: 10 }}>
-          {isCover ? "Live · cover" : "Live"}
+          {isCover ? `${CONTENT_STATUS.published.label} · cover` : CONTENT_STATUS.published.label}
         </span>
       </div>
       <div style={{ padding: "5px 6px", display: "grid", gap: 4 }}>

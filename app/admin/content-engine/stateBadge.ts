@@ -1,16 +1,18 @@
 // Derived-state badges + the spec §7.1 actionability sort:
 // failed/interrupted → approved-waiting → drafts-for-review → in-progress →
-// uploaded-not-analyzed → done. Colors come from the Darkroom theme (adminTheme).
+// uploaded-not-analyzed → done. Content states read from the shared
+// CONTENT_STATUS vocabulary; the pipeline-only states keep their own words.
 import { T } from "@/app/admin/adminTheme";
+import { CONTENT_STATUS } from "@/lib/contentStatus";
 import type { SessionEngineState } from "@/lib/contentEngine/state";
 
 export const STATE_BADGES: Record<SessionEngineState, { label: string; color: string; bg: string }> = {
-  failed:              { label: "Failed",            color: T.red,      bg: T.redBg },
+  failed:              CONTENT_STATUS.failed,
   publishing:          { label: "Publishing…",       color: T.blue,     bg: T.blueBg },
   partially_published: { label: "Partly published",  color: T.amber,    bg: T.amberBg },
-  published:           { label: "Published",         color: T.green,    bg: T.greenBg },
-  reviewed:            { label: "Ready to publish",  color: T.violet,   bg: T.violetBg },
-  generated:           { label: "Drafts ready",      color: T.amber,    bg: T.amberBg },
+  published:           CONTENT_STATUS.published,
+  reviewed:            CONTENT_STATUS.approved,
+  generated:           CONTENT_STATUS.needs_review,
   analyzing:           { label: "Analyzing…",        color: T.blue,     bg: T.blueBg },
   analyzed:            { label: "Analyzed",          color: T.blue,     bg: T.blueBg },
   uploaded:            { label: "Uploaded",          color: T.inkSoft,  bg: T.neutralBg },

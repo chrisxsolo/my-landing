@@ -3,19 +3,34 @@
 import type { CSSProperties, ReactNode } from "react";
 import { T } from "@/app/admin/adminTheme";
 import { chip } from "@/app/admin/content-engine/[id]/ui";
+import { CONTENT_STATUS, type ContentStatusMeta } from "@/lib/contentStatus";
 
+const statusChip = ({ label, color, bg }: ContentStatusMeta) => ({ label, style: chip(color, bg) });
+
+// Keyed by LocationStatus (lib/locationLibrary/adminView statusOf).
 export const STATUS_CHIP: Record<string, { label: string; style: CSSProperties }> = {
-  published: { label: "Published", style: chip(T.green, T.greenBg) },
-  review: { label: "Review needed", style: chip(T.amber, T.amberBg) },
-  unpublished: { label: "Unpublished", style: chip(T.inkSoft, T.neutralBg) },
+  published: statusChip(CONTENT_STATUS.published),
+  review: statusChip(CONTENT_STATUS.needs_review),
+  unpublished: statusChip(CONTENT_STATUS.hidden),
 };
 
-export const SYNC_CHIP: Record<string, { label: string; style: CSSProperties }> = {
+// A session's location sync. Its stored "needs_review" means the place could
+// not be resolved, which is not content review, so it gets its own key here.
+type SyncChipKey = "synced" | "needs_location" | "waiting" | "error";
+const SYNC_CHIP: Record<SyncChipKey, { label: string; style: CSSProperties }> = {
   synced: { label: "Synced", style: chip(T.green, T.greenBg) },
-  needs_review: { label: "Needs a location", style: chip(T.amber, T.amberBg) },
+  needs_location: { label: "Needs a location", style: chip(T.amber, T.amberBg) },
   waiting: { label: "Waiting for approval", style: chip(T.blue, T.blueBg) },
   error: { label: "Error", style: chip(T.red, T.redBg) },
 };
+const neutralChip = (label: string) => ({ label, style: chip(T.inkFaint, T.neutralBg) });
+
+/** The stored sync status (SyncStatus, or null before any sync) → its chip. */
+export function syncChipFor(status: string | null): { label: string; style: CSSProperties } {
+  if (!status) return neutralChip("Not synced");
+  const key = status === "needs_review" ? "needs_location" : status;
+  return Object.hasOwn(SYNC_CHIP, key) ? SYNC_CHIP[key as SyncChipKey] : neutralChip(status);
+}
 
 export const HERO_LABEL: Record<string, string> = {
   featured_photo: "Selected",

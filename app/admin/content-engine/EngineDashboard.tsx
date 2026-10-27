@@ -14,6 +14,7 @@ import TaggingHealthCard from "@/app/admin/photoTagging/TaggingHealthCard";
 import ContentHealthCard from "./ContentHealthCard";
 import { WORKFLOW_STEPS, stepFromState } from "./WorkflowStepper";
 import { SERVICE_TYPES } from "@/lib/contentEngine/taxonomy";
+import { CONTENT_STATUS } from "@/lib/contentStatus";
 import { btn, card, input as inputStyle, overlay as overlayStyle } from "./[id]/ui";
 import type { EngineSessionRow, SessionEngineState } from "./engineTypes";
 
@@ -125,10 +126,14 @@ export default function EngineDashboard() {
   // Each tile doubles as the filter for the sessions in that state, so the
   // count you want to act on is one click from the list that holds it.
   const tiles: { label: string; sub: string; value: number; accent: string; filter: SessionEngineState }[] = [
-    { label: "Drafts", sub: "awaiting approval", value: totals.draft, accent: T.amber, filter: "generated" },
-    { label: "Approved", sub: "ready to publish", value: totals.approved, accent: T.violet, filter: "reviewed" },
-    { label: "Published", sub: "live on the site", value: totals.published, accent: T.green, filter: "published" },
-    { label: "Attention", sub: "failed items", value: totals.failed, accent: T.red, filter: "failed" },
+    { label: CONTENT_STATUS.needs_review.label, sub: "drafts awaiting approval", value: totals.draft,
+      accent: CONTENT_STATUS.needs_review.color, filter: "generated" },
+    { label: CONTENT_STATUS.approved.label, sub: "ready to publish", value: totals.approved,
+      accent: CONTENT_STATUS.approved.color, filter: "reviewed" },
+    { label: CONTENT_STATUS.published.label, sub: "live on the site", value: totals.published,
+      accent: CONTENT_STATUS.published.color, filter: "published" },
+    { label: CONTENT_STATUS.failed.label, sub: "items needing attention", value: totals.failed,
+      accent: CONTENT_STATUS.failed.color, filter: "failed" },
   ];
 
   return (
