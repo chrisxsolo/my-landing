@@ -4,6 +4,7 @@
 // placementActions.ts performs the edits. Nothing here invents a destination:
 // every type below is a table or setting that already shows photos.
 import type { EditableSettingKey } from "@/lib/siteSettingsShared";
+import type { LivePhotoRole } from "@/lib/contentEngine/journalPhotoMembership";
 import type { LocationGuideType } from "@/lib/locations/guideCoverage";
 import { pagePath, parsePageKey } from "@/lib/pagePhotos/pageKeys";
 import { DISTRIBUTION_EDITORS } from "@/lib/photoSync/distribution";
@@ -26,7 +27,7 @@ export type PlacementTarget =
   | { kind: "campus-spot-tag"; schoolSlug: string; spotKey: string }
   | { kind: "campus-spot-auto"; schoolSlug: string; spotKey: string }
   | { kind: "guide"; guide: LocationGuideType; rowId: string }
-  | { kind: "journal"; postId: number; role: "cover" | "gallery" }
+  | { kind: "journal"; postId: number; role: LivePhotoRole }
   | { kind: "site-slot"; key: EditableSettingKey }
   | { kind: "hero-carousel"; portfolioId: number }
   | { kind: "bay-area-location"; locationId: number }
@@ -59,7 +60,8 @@ export interface PlacementFacts {
   pages: { key: string; label: string; shown: boolean; pinned: boolean; explicitId: string | null }[];
   campusSpots: { spotId: number | null; schoolSlug: string; spotKey: string; spotName: string; origin: "manual" | "tag" | "auto" }[];
   guides: { guide: LocationGuideType; rowId: string; slug: string; name: string; published: boolean; featured: boolean }[];
-  journal: { postId: number; slug: string; title: string; role: "cover" | "gallery"; published: boolean }[];
+  /** engineSessionId names the Content Engine session that published the post, when one did. */
+  journal: { postId: number; slug: string; title: string; role: LivePhotoRole; published: boolean; engineSessionId: string | null }[];
   siteSlots: EditableSettingKey[];
   /** Homepage featured-session slots whose pinned post has this photo as its cover. */
   featuredSessions: { key: EditableSettingKey; postSlug: string }[];
@@ -70,6 +72,7 @@ export interface PlacementFacts {
 export const PLACEMENT_EDITORS = {
   ...DISTRIBUTION_EDITORS,
   blog: "/admin?tab=blog",
+  contentEngine: "/admin/content-engine",
   home: "/admin?tab=home",
   caseStudies: "/admin?tab=caseStudies",
   couplesGuide: "/admin?tab=couplesLocations",
@@ -152,12 +155,21 @@ function guidePlacements(facts: PlacementFacts): Placement[] {
   }, facts));
 }
 
+const JOURNAL_ROLE_DETAIL: Record<LivePhotoRole, string> = { cover: "cover", gallery: "gallery", og: "social image" };
+
+/** Engine-published posts are edited in their session's workspace, older posts in Blog. */
+export function journalEditorHref(engineSessionId: string | null): string {
+  return engineSessionId ? `${PLACEMENT_EDITORS.contentEngine}/${engineSessionId}` : PLACEMENT_EDITORS.blog;
+}
+
+// Removing a gallery photo and replacing the cover (with its social image) are
+// the two edits the journal endpoints offer; everything else is editor work.
 function journalPlacements(facts: PlacementFacts): Placement[] {
   return facts.journal.map((j) => finish({
     id: `journal:${j.postId}:${j.role}`, type: "journal", name: `Journal · ${j.title}`,
-    detail: `${j.role} · ${j.slug}${j.published ? "" : " · unpublished"}`, published: j.published,
-    publicPath: `/blog/${j.slug}`, editorHref: PLACEMENT_EDITORS.blog, origin: "manual",
-    canRemove: j.role === "gallery", canReplace: true, target: { kind: "journal", postId: j.postId, role: j.role },
+    detail: `${JOURNAL_ROLE_DETAIL[j.role]} · ${j.slug}${j.published ? "" : " · unpublished"}`, published: j.published,
+    publicPath: `/blog/${j.slug}`, editorHref: journalEditorHref(j.engineSessionId), origin: "manual",
+    canRemove: j.role === "gallery", canReplace: j.role === "cover", target: { kind: "journal", postId: j.postId, role: j.role },
   }, facts));
 }
 

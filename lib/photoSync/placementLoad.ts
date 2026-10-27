@@ -4,6 +4,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { readAutoRows } from "@/lib/campusSpotFill/store";
 import { schoolSlugForSpot, spotKeyOf } from "@/lib/campusSpotFill/pageSpots";
+import { buildLivePhotoList, type LivePostImages } from "@/lib/contentEngine/journalPhotoMembership";
 import { LOCATION_GUIDE_TYPES, type LocationGuideType } from "@/lib/locations/guideCoverage";
 import { GUIDE_PHOTO_TABLE } from "@/lib/guidePhotoLibrary/load";
 import { FEATURED_SESSION_SETTING_KEYS } from "@/lib/homepageData";
@@ -27,7 +28,7 @@ const BLOG_POSTS_TABLE = "blog_posts";
 const SITE_SETTINGS_TABLE = "site_settings";
 const BAY_AREA_LOCATIONS_TABLE = "bay_area_locations";
 const CASE_STUDIES_TABLE = "portfolio_case_studies";
-const BLOG_POST_COLUMNS = "id,slug,title,published_at,cover_image_url,extra_image_urls";
+const BLOG_POST_COLUMNS = "id,slug,title,published_at,cover_image_url,cover_image_alt,extra_image_urls,extra_image_alts,og_image_url";
 const CASE_STUDY_COLUMNS = "id,title,active,cover_image_url,preview_image_urls";
 
 async function rows(query: PromiseLike<{ data: unknown; error: { message: string } | null }>, label: string): Promise<Row[]> {
@@ -124,14 +125,15 @@ function guidesFor(loaded: Loaded, batch: Batch, url: string): PlacementFacts["g
   }));
 }
 
+/** The roles a URL plays in a post, from the inventory builder the journal editors use (lib/blog/publishedImages). */
 function journalFor(batch: Batch, url: string): PlacementFacts["journal"] {
   return batch.posts.flatMap((post) => {
-    const base = { postId: Number(post.id), slug: String(post.slug), title: text(post.title) ?? String(post.slug),
-      published: isLivePost({ publishedAt: text(post.published_at) }) };
-    return [
-      ...(post.cover_image_url === url ? [{ ...base, role: "cover" as const }] : []),
-      ...(strings(post.extra_image_urls).includes(url) ? [{ ...base, role: "gallery" as const }] : []),
-    ];
+    const live = buildLivePhotoList(post as unknown as LivePostImages, new Map());
+    const roles = [...new Set(live.filter((p) => p.url === url && !p.fallback).map((p) => p.role))];
+    return roles.map((role) => ({
+      postId: Number(post.id), slug: String(post.slug), title: text(post.title) ?? String(post.slug), role,
+      published: isLivePost({ publishedAt: text(post.published_at) }), engineSessionId: null,
+    }));
   });
 }
 

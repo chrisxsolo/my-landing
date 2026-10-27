@@ -18,7 +18,8 @@ import { EDITABLE_SETTING_KEYS } from "@/lib/siteSettingsShared";
 import {
   classifyDistribution, type CampusSpotPick, type Destination, type PagePlacement,
 } from "@/lib/photoSync/distribution";
-import { buildPlacements, type Placement } from "@/lib/photoSync/placements";
+import { loadPostImageInventory } from "@/lib/blog/publishedImages";
+import { buildPlacements, type Placement, type PlacementFacts } from "@/lib/photoSync/placements";
 import { loadEngineFacts, loadPlacementFacts } from "@/lib/photoSync/placementLoad";
 import type { AddTarget } from "@/lib/photoSync/placementActions";
 
@@ -125,6 +126,23 @@ function addOptionsFor(destinations: readonly Destination[], enginePhotoId: stri
   return [...pages, ...slots];
 }
 
+/**
+ * The posts' own image inventory (the same one the journal editors show) for
+ * the handful of posts that carry this photo: exact roles, and the Content
+ * Engine session that published the post, so the editor link opens its
+ * workspace. One photo at a time — the batched facts stay as they are.
+ */
+async function withJournalInventory(client: SupabaseClient, facts: PlacementFacts): Promise<PlacementFacts> {
+  const posts = [...new Map(facts.journal.map((j) => [j.postId, j])).values()];
+  if (posts.length === 0) return facts;
+  const inventories = await Promise.all(posts.map((j) => loadPostImageInventory(client, j.postId)));
+  const journal = inventories.flatMap((inv, i) => {
+    const roles = [...new Set(inv.photos.filter((p) => p.url === facts.url && !p.fallback).map((p) => p.role))];
+    return roles.map((role) => ({ ...posts[i], title: inv.title, slug: inv.slug, role, engineSessionId: inv.engine?.sessionId ?? null }));
+  });
+  return { ...facts, journal };
+}
+
 export interface DistributionLookup { key?: string | null; url?: string | null }
 
 export async function loadPhotoDistribution(client: SupabaseClient, lookup: DistributionLookup): Promise<PhotoDistribution | null> {
@@ -147,7 +165,8 @@ export async function loadPhotoDistribution(client: SupabaseClient, lookup: Dist
     pageLabels: Object.fromEntries(loaded.pages.map((p) => [p.key, p.label])),
     schoolHasSpots: Boolean(photo.school && isSchoolSlug(photo.school) && spotsForSchool(photo.school).length > 0),
   });
-  const placementFacts = url ? facts.get(url) : undefined;
+  const batched = url ? facts.get(url) : undefined;
+  const placementFacts = batched ? await withJournalInventory(client, batched) : undefined;
   return {
     photo: {
       key: photo.key, title: photo.title, url, category: photo.category, school: photo.school, published: photo.published,

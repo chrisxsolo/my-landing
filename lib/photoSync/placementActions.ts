@@ -15,8 +15,8 @@ import { applyCuration } from "@/lib/pagePhotos/curationStore";
 import { setSpotTag } from "@/lib/pagePhotos/spotTagStore";
 import { isPageKey } from "@/lib/pagePhotos/pageKeys";
 import { isEditableSettingKey, type EditableSettingKey } from "@/lib/siteSettingsShared";
+import { loadPostImageRow, PostImagesError, removePostGalleryImage, replacePostCover } from "@/lib/blog/publishedImages";
 import { loadEngineFacts } from "@/lib/photoSync/placementLoad";
-import { removeJournalGalleryPhoto, replaceJournalPhoto } from "@/lib/photoSync/placementActionsJournal";
 import { PlacementActionError } from "@/lib/photoSync/placementErrors";
 import type { PlacementTarget } from "@/lib/photoSync/placements";
 
@@ -125,6 +125,35 @@ async function featuredLocationPhoto(client: SupabaseClient, locationId: number,
   return "Featured photo replaced";
 }
 
+/** The journal endpoints' refusals (status + message) shown as this inspector's own. */
+async function journalEdit<T>(work: () => Promise<T>): Promise<T> {
+  try {
+    return await work();
+  } catch (err) {
+    if (err instanceof PostImagesError) throw new PlacementActionError(err.message, err.status);
+    throw err;
+  }
+}
+
+// The journal endpoints (lib/blog/publishedImages) offer two edits: remove one
+// gallery photo, or replace the cover together with the social image. A
+// gallery or social-image swap is editor work, so it is refused here.
+async function journalPlacement(
+  client: SupabaseClient, target: Extract<PlacementTarget, { kind: "journal" }>, url: string, newUrl: string | null,
+): Promise<string> {
+  return journalEdit(async () => {
+    if (!newUrl) {
+      const result = await removePostGalleryImage(client, target.postId, url);
+      return `Removed from the gallery of ${result.slug}`;
+    }
+    if (target.role !== "cover") throw new PlacementActionError("only the cover can be replaced here — edit the gallery in the post's editor");
+    const post = await loadPostImageRow(client, target.postId);
+    if (post.cover_image_url !== url) throw new PlacementActionError("that photo is no longer this post's cover", 409);
+    const result = await replacePostCover(client, { postId: target.postId, url: newUrl, keepOldInGallery: false });
+    return `Cover (and social image) of ${result.slug} replaced`;
+  });
+}
+
 async function removePlacement(client: SupabaseClient, target: PlacementTarget, url: string): Promise<string> {
   switch (target.kind) {
     case "portfolio":
@@ -144,8 +173,7 @@ async function removePlacement(client: SupabaseClient, target: PlacementTarget, 
     case "guide":
       await updateShowing(client, GUIDE_PHOTO_TABLE[target.guide], target.rowId, "image_url", url, { published: false }, "unpublish the guide photo");
       return "Unpublished from the guide gallery (the row is kept)";
-    case "journal":
-      return removeJournalGalleryPhoto(client, target.postId, url);
+    case "journal": return journalPlacement(client, target, url, null);
     case "site-slot": return siteSlot(client, target.key, url, null);
     case "bay-area-location": return featuredLocationPhoto(client, target.locationId, null);
     case "case-study": return caseStudy(client, target, url, null);
@@ -171,7 +199,7 @@ async function replacePlacement(
     case "guide":
       await updateShowing(client, GUIDE_PHOTO_TABLE[target.guide], target.rowId, "image_url", url, { image_url: newUrl, ...alt("alt_text") }, "replace the guide photo");
       return "Guide photo replaced";
-    case "journal": return replaceJournalPhoto(client, target.postId, target.role, url, newUrl, newAlt);
+    case "journal": return journalPlacement(client, target, url, newUrl);
     case "site-slot": return siteSlot(client, target.key, url, newUrl);
     case "bay-area-location": return featuredLocationPhoto(client, target.locationId, newUrl);
     case "case-study": return caseStudy(client, target, url, newUrl);
