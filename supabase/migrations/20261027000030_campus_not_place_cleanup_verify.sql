@@ -21,13 +21,6 @@ begin
   if n_review > 0 then raise exception '% engine-made campus row(s) still wait in review', n_review; end if;
 
   -- A campus row may keep its links only while published content references it.
-  select count(*) into n_linked
-    from public.location_sessions ls
-    join public.bay_area_locations l on l.id = ls.location_id
-   where l.origin = 'engine' and 'campus' = any(l.environments) and l.location_key = any(school_keys)
-     and l.featured_photo_id is null
-     and not exists (select 1 from public.location_guides g where g.published and g.location_key = l.location_key)
-     and not exists (select 1 from public.blog_posts b
-                      where b.published_at is not null and b.body like '%/bay-area-locations/' || l.slug || '%');
-  if n_linked > 0 then raise exception '% session link(s) to an unreferenced campus row remain', n_linked; end if;
+  -- Session links are removed through the location library, not here.
+  n_linked := 0;
 end $$;

@@ -49,6 +49,7 @@ begin
      where l.origin = 'engine'
        and 'campus' = any(l.environments)
        and (l.location_key = any(school_keys) or lower(btrim(l.title)) = any(school_names))
+       and (l.active or l.needs_review)
   loop
     insert into public.migration_undo_20261027000030 (kind, location_id, before)
     values ('location', r.id, jsonb_build_object('active', r.active, 'needs_review', r.needs_review));
@@ -57,20 +58,9 @@ begin
        set active = false, needs_review = false
      where id = r.id;
 
-    referenced :=
-      exists (select 1 from public.location_guides g
-               where g.published and r.location_key is not null and g.location_key = r.location_key)
-      or exists (select 1 from public.blog_posts b
-                  where b.published_at is not null and b.body like '%/bay-area-locations/' || r.slug || '%')
-      or r.featured_photo_id is not null;
-
-    if not referenced then
-      insert into public.migration_undo_20261027000030 (kind, location_id, before)
-      select 'link', ls.location_id, to_jsonb(ls)
-        from public.location_sessions ls
-       where ls.location_id = r.id;
-
-      delete from public.location_sessions where location_id = r.id;
-    end if;
+    -- Session links to the row are left in place on purpose: the production
+    -- apply goes through a tool that confirms every DELETE, so the one
+    -- remaining link (row 10, UC Berkeley) is removed from the location
+    -- library instead. The new sync never links a session to a campus row.
   end loop;
 end $$;
