@@ -6,7 +6,7 @@ import type { AdminInquiry } from "@/lib/adminInquiries";
 import { findDuplicateSuspects } from "@/lib/paymentFilters";
 import { suggestDuplicateToVoid } from "@/lib/paymentMatching";
 import type { LedgerRow } from "./enrich";
-import { findPaidInquiriesWithoutLedger, suggestInquiryLinks, type LinkAction } from "./linking";
+import { findPaidInquiriesWithoutLedger, namesAgree, suggestInquiryLinks, type LinkAction } from "./linking";
 
 export type IssueSeverity = "high" | "medium" | "low";
 
@@ -120,15 +120,7 @@ export function findQualityIssues(rows: LedgerRow[], inquiries: AdminInquiry[] =
   }
 
   // 2. Unlinked payments grouped into a single issue per payer.
-  const unlinkedByPayer = new Map<string, LedgerRow[]>();
-  for (const p of active) {
-    if (p.inquiry_id != null) continue;
-    const key = (p.client_email || p.client_name).toLowerCase().trim();
-    const list = unlinkedByPayer.get(key);
-    if (list) list.push(p);
-    else unlinkedByPayer.set(key, [p]);
-  }
-  for (const [, group] of unlinkedByPayer) {
+  for (const group of groupUnlinkedByPayer(active)) {
     const linkActions = suggestInquiryLinks(group, inquiries);
     issues.push({
       id: `unlinked-${group.map(p => p.id).join("-")}`,
@@ -170,6 +162,23 @@ export function findQualityIssues(rows: LedgerRow[], inquiries: AdminInquiry[] =
 
   const order: Record<IssueSeverity, number> = { high: 0, medium: 1, low: 2 };
   return issues.sort((a, b) => order[a.severity] - order[b.severity]);
+}
+
+// One group per payer. Rows with an email group by email; a row with no email
+// joins the first group whose payer name agrees with it (an import that
+// dropped the email must not look like a second client).
+function groupUnlinkedByPayer(active: LedgerRow[]): LedgerRow[][] {
+  const groups: { key: string; name: string; rows: LedgerRow[] }[] = [];
+  const unlinked = active.filter(p => p.inquiry_id == null);
+  for (const p of [...unlinked].sort((a, b) => (b.client_email ? 1 : 0) - (a.client_email ? 1 : 0))) {
+    const email = p.client_email.toLowerCase().trim();
+    const match = email
+      ? groups.find(g => g.key === email)
+      : groups.find(g => namesAgree(g.name, p.client_name));
+    if (match) match.rows.push(p);
+    else groups.push({ key: email || p.client_name.toLowerCase().trim(), name: p.client_name, rows: [p] });
+  }
+  return groups.map(g => g.rows);
 }
 
 function paidWithoutLedgerIssues(rows: LedgerRow[], inquiries: AdminInquiry[]): QualityIssue[] {

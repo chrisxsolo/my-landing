@@ -117,3 +117,16 @@ describe("cross-import duplicate finding", () => {
     expect(dup?.suggestedVoidId).toBe(177);
   });
 });
+
+describe("unlinked payer grouping", () => {
+  it("folds a no-email import row into the same payer's email group", () => {
+    const rows = [
+      row({ id: 177, client_name: "Allen Mata", client_email: "", amount_cents: 19000 }),
+      row({ id: 178, client_name: "Allen Mata", client_email: "", amount_cents: 19000, payment_type: "deposit_2", paid_at: "2026-02-21T20:00:00Z" }),
+      row({ id: 222, client_name: "Allen Mata", client_email: "a@example.com", amount_cents: 19000, source_txn_id: "gmail:1" }),
+      row({ id: 300, client_name: "Allen Smith", client_email: "", amount_cents: 5000 }),
+    ];
+    const unlinked = findQualityIssues(rows).filter(i => i.rule === "unlinkedClient");
+    expect(unlinked.map(i => i.paymentIds.sort())).toEqual([[177, 178, 222], [300]]);
+  });
+});
