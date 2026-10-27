@@ -7,6 +7,7 @@ import { useState } from "react";
 import { fmtMoney, fmtDate } from "@/lib/revenue/format";
 import type { LedgerRow } from "@/lib/revenue/enrich";
 import { countBySeverity, type QualityIssue } from "@/lib/revenue/quality";
+import type { LinkAction } from "@/lib/revenue/linking";
 import type { PendingReviewSummary } from "@/lib/paymentSyncShared";
 import ReviewQueuePanel from "./ReviewQueuePanel";
 import { EmptyState, GlassPanel, InfoTip, SectionHeader } from "./Glass";
@@ -31,25 +32,38 @@ export default function QualitySection({
   const counts = countBySeverity(issues);
   const visibleIssues = showAll ? issues : issues.slice(0, 6);
 
-  // Dismiss = mark the involved rows "reconciled" (audited via reconciled_at).
-  async function dismiss(issue: QualityIssue) {
-    setBusyId(issue.id);
+  async function act(issueId: string, url: string, method: "PATCH" | "POST", body: unknown) {
+    setBusyId(issueId);
     setError("");
     try {
-      const res = await fetch("/api/admin/payments", {
-        method: "PATCH",
+      const res = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids: issue.paymentIds, reconciliation_status: "reconciled" }),
+        body: JSON.stringify(body),
       });
       const json = await res.json() as { ok?: boolean; error?: string };
-      if (!json.ok) throw new Error(json.error ?? "Update failed");
+      if (!res.ok || !json.ok) throw new Error(json.error ?? "Update failed");
       onLedgerChanged();
     } catch (err) {
+      console.error("[QualitySection] action failed:", err);
       setError(err instanceof Error ? err.message : "Update failed");
     } finally {
       setBusyId(null);
     }
   }
+
+  // Dismiss = mark the involved rows "reconciled" (audited via reconciled_at).
+  const dismiss = (issue: QualityIssue) =>
+    act(issue.id, "/api/admin/payments", "PATCH", { ids: issue.paymentIds, reconciliation_status: "reconciled" });
+
+  // Link only moves the payment under an inquiry; amounts and status are untouched.
+  const link = (issue: QualityIssue, action: LinkAction) =>
+    act(issue.id, "/api/admin/payments", "PATCH", { ids: action.paymentIds, inquiry_id: action.inquiryId });
+
+  const voidSuggested = (issue: QualityIssue, paymentId: number) => {
+    if (!window.confirm(`Void payment #${paymentId}? It stays in the ledger as voided and stops counting as revenue.`)) return;
+    act(issue.id, "/api/void-payment", "POST", { paymentId, action: "void" });
+  };
 
   return (
     <div className="space-y-4">
@@ -67,7 +81,7 @@ export default function QualitySection({
                   {counts[sev]} {sev}
                 </span>
               ))}
-              <InfoTip text="Deterministic rules over the entire ledger (not affected by dashboard filters): duplicates, unlinked payments, missing dates/platforms, personal-transfer keywords, backfilled imports, balances without retainers. Dismissing marks rows reconciled with an audit timestamp." />
+              <InfoTip text="Deterministic rules over the entire ledger (not affected by dashboard filters): duplicates (including one transfer recorded by two imports), unlinked payments, inquiries marked paid with no ledger payment, missing dates/platforms, personal-transfer keywords, backfilled imports, balances without retainers. Dismissing marks rows reconciled with an audit timestamp; linking changes only which inquiry a payment belongs to." />
             </span>
           } />
         {error && <p className="text-xs font-bold mb-2" style={{ color: REV.red }}>{error}</p>}
@@ -101,14 +115,40 @@ export default function QualitySection({
                         })}
                       </div>
                     </div>
+                    <div className="flex flex-col gap-1.5 items-stretch flex-shrink-0 w-full sm:w-auto">
+                    {issue.suggestedVoidId && (
+                      <button type="button" onClick={() => voidSuggested(issue, issue.suggestedVoidId!)} disabled={busyId === issue.id}
+                        className="text-[10px] font-black px-2.5 py-2 rounded-lg disabled:opacity-40"
+                        style={{ background: REV.redBg, color: REV.red }}
+                        title="Void the copy with the least transaction evidence">
+                        ✕ Void duplicate #{issue.suggestedVoidId}
+                      </button>
+                    )}
+                    {(issue.linkActions ?? []).map(action => (
+                      <button key={`${action.inquiryId}-${action.paymentIds.join("-")}`} type="button"
+                        onClick={() => link(issue, action)} disabled={busyId === issue.id}
+                        className="text-[10px] font-black px-2.5 py-2 rounded-lg disabled:opacity-40 text-left"
+                        style={{ background: REV.accentBg, color: REV.accent }}
+                        title={action.evidence === "email" ? "Payer email matches this inquiry" : "Payer name matches this inquiry — check before linking"}>
+                        ↳ Link to {action.label} {action.evidence === "email" ? "· email match" : "· name match"}
+                      </button>
+                    ))}
+                    {issue.inquiryId && (
+                      <a href={`/admin/conversation/${issue.inquiryId}`} target="_blank" rel="noopener noreferrer"
+                        className="text-[10px] font-black px-2.5 py-2 rounded-lg text-center"
+                        style={{ background: REV.neutralBg, color: REV.textSoft }}>
+                        Open inquiry #{issue.inquiryId} ↗
+                      </a>
+                    )}
                     {issue.dismissible && (
                       <button type="button" onClick={() => dismiss(issue)} disabled={busyId === issue.id}
-                        className="text-[10px] font-black px-2.5 py-1.5 rounded-lg disabled:opacity-40 flex-shrink-0"
+                        className="text-[10px] font-black px-2.5 py-2 rounded-lg disabled:opacity-40"
                         style={{ background: REV.accentBg, color: REV.accent }}
                         title="Reviewed — mark these rows reconciled and stop flagging them">
                         {busyId === issue.id ? "…" : "✓ Reviewed, dismiss"}
                       </button>
                     )}
+                    </div>
                   </div>
                 </div>
               );
