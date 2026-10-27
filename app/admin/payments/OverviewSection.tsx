@@ -7,6 +7,7 @@ import { fmtMoney, fmtShare } from "@/lib/revenue/format";
 import { safeDelta, type PeriodSummary } from "@/lib/revenue/calc";
 import { CountUp, DeltaChip, GlassPanel, InfoTip, Skeleton, Sparkline } from "./Glass";
 import { REV } from "./palette";
+import type { PendingReviewSummary } from "@/lib/paymentSyncShared";
 
 type Props = {
   loading: boolean;
@@ -21,14 +22,17 @@ type Props = {
   periodLabel: string;
   compareLabel: string | null;
   isSeasonalHigh: boolean;
+  ytdCents: number;
+  pendingReview: PendingReviewSummary;
   onDrillLedger: () => void;
   onDrillReceivables: () => void;
+  onDrillReview: () => void;
 };
 
 export default function OverviewSection({
   loading, summary, prevSummary, sparkValues, outstandingCents, outstandingCount,
   collectionRate, top5ClientShare, clientCount, periodLabel, compareLabel,
-  isSeasonalHigh, onDrillLedger, onDrillReceivables,
+  isSeasonalHigh, ytdCents, pendingReview, onDrillLedger, onDrillReceivables, onDrillReview,
 }: Props) {
   const s = summary;
   const p = prevSummary;
@@ -48,6 +52,17 @@ export default function OverviewSection({
     label: string; cents?: number; text?: string; prev?: number | null;
     tip: string; sub?: string; color?: string; onClick?: () => void; invert?: boolean;
   }[] = [
+    {
+      label: "Year to date", cents: ytdCents, prev: null, color: REV.accent,
+      sub: "collected since Jan 1",
+      tip: "Confirmed collected revenue from January 1 of this year to today, with the service/school/method filters applied but independent of the selected period.",
+    },
+    {
+      label: "Awaiting approval", cents: pendingReview.cents, prev: null, color: REV.orange,
+      sub: pendingReview.count ? `${pendingReview.count} detected payment${pendingReview.count === 1 ? "" : "s"} — not yet revenue` : "queue is empty",
+      tip: "Payments detected in Gmail that sit in the review queue. They are not counted as revenue until you approve them; the queue flags any that duplicate a ledger payment.",
+      onClick: onDrillReview,
+    },
     {
       label: "Outstanding (est.)", cents: outstandingCents, prev: null, color: REV.amber,
       sub: outstandingCount ? `${outstandingCount} open booking${outstandingCount === 1 ? "" : "s"}` : "nothing open",

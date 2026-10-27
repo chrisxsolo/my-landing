@@ -139,12 +139,16 @@ export default function RevenueDashboard() {
   );
 
   const summary = useMemo(() => summarizePeriod(periodRows), [periodRows]);
+  const ytdCents = useMemo(() => {
+    const ytd = buildPresetPeriod("ytd", new Date());
+    return summarizePeriod(dimensionRows.filter(p => paymentMatchesPeriod(p, ytd))).collectedCents;
+  }, [dimensionRows]);
   const prevSummary = useMemo(() => (compRows ? summarizePeriod(compRows) : null), [compRows]);
 
   const receivables = useMemo(() => buildReceivables(dimensionRows, inquiries), [dimensionRows, inquiries]);
   const outstandingCents = totalOutstandingCents(receivables);
 
-  const issues = useMemo(() => findQualityIssues(enriched), [enriched]);
+  const issues = useMemo(() => findQualityIssues(enriched, inquiries), [enriched, inquiries]);
 
   const sparkValues = useMemo(
     () => bucketSeries(periodRows, period, autoGranularity(period)).map(pt => pt.cents),
@@ -282,8 +286,11 @@ export default function RevenueDashboard() {
             periodLabel={period.label}
             compareLabel={compPeriod?.label ?? null}
             isSeasonalHigh={isSeasonalHigh}
+            ytdCents={ytdCents}
+            pendingReview={pendingReview}
             onDrillLedger={() => scrollTo("rev-ledger")}
             onDrillReceivables={() => scrollTo("rev-receivables")}
+            onDrillReview={() => scrollTo("rev-quality")}
           />
         </Reveal>
 
