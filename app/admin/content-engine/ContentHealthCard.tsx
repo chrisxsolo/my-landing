@@ -53,8 +53,7 @@ function FailureRow({ failure, busy, onRetry }: { failure: SyncFailureDto; busy:
       <Link href={href} style={{ color: T.red, fontWeight: 700, textDecoration: "none" }}>
         {SYNC_KIND_LABELS[failure.kind]}
       </Link>
-      <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-        title={failure.error ?? undefined}>
+      <span style={{ flex: "1 1 200px", minWidth: 0, overflowWrap: "anywhere" }} title={failure.error ?? undefined}>
         {scope} · {when(failure.startedAt)}{failure.error ? ` · ${failure.error}` : ""}
       </span>
       <button type="button" style={{ ...btn(false), marginLeft: "auto", flexShrink: 0, minHeight: 44 }} disabled={busy} onClick={onRetry}>
@@ -103,8 +102,7 @@ function JobFailures({ jobs }: { jobs: ContentHealthReport["jobs"] }) {
       {value.recentFailures.map((f) => (
         <li key={f.jobId} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: T.inkSoft, flexWrap: "wrap" }}>
           <span style={{ color: T.red, fontWeight: 700 }}>Run failed</span>
-          <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}
-            title={f.error ?? undefined}>
+          <span style={{ flex: "1 1 200px", minWidth: 0, overflowWrap: "anywhere" }} title={f.error ?? undefined}>
             {when(f.at)} · {f.attempts} attempt{f.attempts === 1 ? "" : "s"}{f.error ? ` · ${f.error}` : ""}
           </span>
           <Link href={sessionEditorPath(f.sessionId)}
