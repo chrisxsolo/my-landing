@@ -21,9 +21,13 @@
 // executor can report exactly which photo fields failed. Photos of one
 // session asking for different session-level values are a conflict: nothing
 // is written for them.
+//
+// A location the photographer set (stored source "manual") is never
+// overwritten by an automated plan (apply-high, a sync), Replace or not. Only
+// a person, through an explicit edit with Replace on, can change it.
 import { isSchoolSlug } from "@/lib/contentEngine/taxonomy";
 import { isSchoolSpotKey } from "@/lib/schoolSpots";
-import type { PhotoSource, TagChanges, TagField } from "@/lib/photoTagging/types";
+import type { LocationEvidence, PhotoSource, TagChanges, TagField } from "@/lib/photoTagging/types";
 
 export type LocationSource = "manual" | "gps";
 
@@ -42,11 +46,13 @@ export interface PlanTarget {
   spot: string | null;
   /** What the column a write would change holds now, when it differs from the effective value. */
   stored?: Partial<Record<TagField, string | null>>;
+  /** Who set the stored location: "manual" blocks every automated overwrite. */
+  storedLocationSource?: LocationSource | null;
 }
 
 export interface PortfolioPatch { category?: string; school?: string | null; location?: string | null }
 export interface SessionPatch { school_slug?: string | null }
-export interface PhotoPatch { location: string | null; source: LocationSource }
+export interface PhotoPatch { location: string | null; source: LocationSource; evidence: LocationEvidence | null }
 
 export type TagWrite =
   | { kind: "portfolio"; portfolioId: number; patch: PortfolioPatch }
@@ -89,9 +95,18 @@ interface TargetPlan {
   outcomes: TagOutcome[];
 }
 
-interface Ctx { t: PlanTarget; replace: boolean; locationSource: LocationSource; plan: TargetPlan }
+interface Ctx {
+  t: PlanTarget;
+  replace: boolean;
+  locationSource: LocationSource;
+  evidence: LocationEvidence;
+  /** No person chose these values (apply-high, a sync): a photographer-set location is off limits. */
+  automated: boolean;
+  plan: TargetPlan;
+}
 
 const KEPT = "already set — turn on Replace to overwrite";
+const MANUAL_WINS = "set by the photographer — an automated step never overwrites it";
 const blank = (v: string | null | undefined) => v === null || v === undefined || v.trim() === "";
 const clean = (v: string | null) => (v === null ? null : v.trim().slice(0, 200) || null);
 
@@ -159,12 +174,15 @@ function planLocation(ctx: Ctx, raw: string | null): void {
   const next = clean(raw);
   const d = decide(t.location, next, ctx.replace);
   if (d !== "write") return notWritten(ctx, "location", d);
+  if (ctx.automated && !blank(t.location) && t.storedLocationSource === "manual") {
+    return note(ctx, "location", "kept", { reason: MANUAL_WINS });
+  }
   if (t.source === "portfolio" && t.portfolioId !== null) {
     ctx.plan.portfolio.location = next;
     return updated(ctx, "location", next, `portfolio:${t.portfolioId}`);
   }
   if (!t.enginePhotoId) return note(ctx, "location", "skipped", { reason: "this photo has no Content Engine record" });
-  ctx.plan.photo = { location: next, source: ctx.locationSource };
+  ctx.plan.photo = { location: next, source: ctx.locationSource, evidence: next === null ? null : ctx.evidence };
   updated(ctx, "location", next, `photo:${t.enginePhotoId}`);
 }
 
@@ -181,8 +199,13 @@ function planSpot(ctx: Ctx, spotKey: string | null, school: { school: string | n
   updated(ctx, "spot", spotKey, `spot:${slug}:${t.url}`);
 }
 
-function planTarget(t: PlanTarget, changes: TagChanges, replace: boolean, locationSource: LocationSource): TargetPlan {
-  const ctx: Ctx = { t, replace, locationSource, plan: { portfolio: {}, session: {}, photo: null, spot: null, outcomes: [] } };
+function planTarget(item: PlanItem, replace: boolean, automated: boolean): TargetPlan {
+  const { target: t, changes } = item;
+  const ctx: Ctx = {
+    t, replace, automated, locationSource: item.locationSource ?? "manual",
+    evidence: changes.evidence ?? item.locationEvidence ?? "manual",
+    plan: { portfolio: {}, session: {}, photo: null, spot: null, outcomes: [] },
+  };
   const category = changes.category !== undefined ? planCategory(ctx, changes.category) : t.category;
   const school = changes.school !== undefined ? planSchool(ctx, changes.school, category) : { school: t.school };
   if (changes.location !== undefined) planLocation(ctx, changes.location);
@@ -240,16 +263,28 @@ function assemble(planned: readonly Planned[]): TagPlan {
   return { writes, outcomes: holdBlocked(planned, blocked) };
 }
 
-export interface PlanItem { target: PlanTarget; changes: TagChanges; locationSource?: LocationSource }
+export interface PlanItem {
+  target: PlanTarget;
+  changes: TagChanges;
+  locationSource?: LocationSource;
+  /** What a location being set rests on; changes.evidence wins when given. */
+  locationEvidence?: LocationEvidence;
+}
+
+export interface PlanOptions {
+  /** True when no person chose the values (apply-high, a sync). */
+  automated?: boolean;
+}
 
 /** One plan for several photos, each with its own requested changes. */
-export function planItems(items: readonly PlanItem[], replace: boolean): TagPlan {
-  return assemble(items.map((i) => ({ t: i.target, plan: planTarget(i.target, i.changes, replace, i.locationSource ?? "manual") })));
+export function planItems(items: readonly PlanItem[], replace: boolean, opts: PlanOptions = {}): TagPlan {
+  return assemble(items.map((i) => ({ t: i.target, plan: planTarget(i, replace, opts.automated === true) })));
 }
 
 /** One plan applying the same changes to many photos. */
 export function planTagChanges(
-  targets: readonly PlanTarget[], changes: TagChanges, replace: boolean, locationSource: LocationSource = "manual",
+  targets: readonly PlanTarget[], changes: TagChanges, replace: boolean,
+  locationSource: LocationSource = "manual", opts: PlanOptions = {},
 ): TagPlan {
-  return planItems(targets.map((target) => ({ target, changes, locationSource })), replace);
+  return planItems(targets.map((target) => ({ target, changes, locationSource })), replace, opts);
 }

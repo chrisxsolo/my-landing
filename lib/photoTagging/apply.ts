@@ -11,9 +11,13 @@
 //
 // Results are counted per photo field: an outcome is "updated" only when the
 // write carrying it succeeded; otherwise it is "failed" with that write's error.
+// Every updated field is then recorded in photo_change_log (who, before,
+// after); a failed log write is logged to the console and never fails the apply.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { updateSessionFacts } from "@/lib/contentEngine/createSession";
 import { setSpotTag } from "@/lib/pagePhotos/spotTagStore";
+import { entriesFromOutcomes, type ChangeActor } from "@/lib/photoChangeLog/entries";
+import { logChanges } from "@/lib/photoChangeLog/log";
 import type { LibraryEntry } from "@/lib/photoTagging/assemble";
 import { planTagChanges, writeIdOf, type TagOutcome, type TagPlan, type TagWrite } from "@/lib/photoTagging/plan";
 import {
@@ -68,10 +72,13 @@ async function writePortfolio(
 }
 
 async function writePhotoLocation(client: SupabaseClient, write: Extract<TagWrite, { kind: "photo" }>): Promise<void> {
-  const { location, source } = write.patch;
+  const { location, source, evidence } = write.patch;
   const patch = location === null
-    ? { photo_location: null, photo_location_source: null, photo_location_confirmed_at: null }
-    : { photo_location: location, photo_location_source: source, photo_location_confirmed_at: new Date().toISOString() };
+    ? { photo_location: null, photo_location_source: null, photo_location_evidence: null, photo_location_confirmed_at: null }
+    : {
+      photo_location: location, photo_location_source: source, photo_location_evidence: evidence,
+      photo_location_confirmed_at: new Date().toISOString(),
+    };
   await updateOne(client.from(SESSION_PHOTOS_TABLE).update(patch).eq("id", write.enginePhotoId).select("id"), "the photo");
 }
 
@@ -105,7 +112,14 @@ export function summarize(plan: TagPlan, errors: ReadonlyMap<string, string>): A
   };
 }
 
-export async function executePlan(client: SupabaseClient, plan: TagPlan): Promise<ApplyResult> {
+export interface ExecuteOptions {
+  /** Who is making the change (default "manual": an admin edit). */
+  actor?: ChangeActor;
+  /** Why, for the history ("undo", "restore #12", "apply-high"). */
+  reason?: string | null;
+}
+
+export async function executePlan(client: SupabaseClient, plan: TagPlan, opts: ExecuteOptions = {}): Promise<ApplyResult> {
   let categories: Promise<CategoryRow[]> | null = null;
   const lazyCategories = () => (categories ??= loadCategories(client));
   const errors = new Map<string, string>();
@@ -124,7 +138,9 @@ export async function executePlan(client: SupabaseClient, plan: TagPlan): Promis
       errors.set(id, message);
     }
   }
-  return summarize(plan, errors);
+  const result = summarize(plan, errors);
+  await logChanges(client, entriesFromOutcomes(result.outcomes, opts.actor ?? "manual", opts.reason ?? null));
+  return result;
 }
 
 /** The plan for an explicit edit on the chosen photos. */

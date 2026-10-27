@@ -95,7 +95,7 @@ export default function PhotoLibrary({ initialFilter }: { initialFilter: TagFilt
         </div>
       </section>
 
-      {report && <ReviewQueue photos={scoped} options={report.options} onChanged={tagging.refresh} onOpen={setOpenKey} />}
+      {report && <ReviewQueue photos={scoped} options={report.options} onChanged={tagging.refresh} onOpen={setOpenKey} thumbs={thumbs} />}
       {report && selectedPhotos.length > 0 && (
         <BulkTagBar photos={selectedPhotos} options={report.options} onChanged={tagging.refresh} onClear={tagging.clearSelection} />
       )}

@@ -195,7 +195,7 @@ describe("planHighConfidence holds back conflicts", () => {
     const plan = planHighConfidence([entry(engineTarget(1), [
       suggestion("location", "Crissy Field", { origin: "gps" }), suggestion("spot", "sather-gate", { confidence: "medium", origin: "vision" }),
     ])]);
-    expect(plan.writes).toEqual([expect.objectContaining({ kind: "photo", patch: { location: "Crissy Field", source: "gps" } })]);
+    expect(plan.writes).toEqual([expect.objectContaining({ kind: "photo", patch: { location: "Crissy Field", source: "gps", evidence: "gps" } })]);
   });
 
   it("preserves existing values (never replaces)", () => {

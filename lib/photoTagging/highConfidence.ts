@@ -8,11 +8,16 @@
 //   · photos of one session ask for different session-level values (plan.ts)
 // photoOnly skips session-wide suggestions (a Content Engine photo's
 // university), which the photographer confirms on their own.
+// Evidence rules (owner): a location is assigned only from records — the
+// photo's GPS inside a verified place (evidence gps) or the session's facts
+// (evidence session). Image analysis (caption, analysis text, AI vision) is
+// supporting evidence only: it is never applied here, whatever confidence it
+// carries, and a photographer-set location is never overwritten (plan.ts).
 // Safe to repeat: an applied field is no longer missing, so it is never
 // suggested again — re-running after a partial failure only retries the rest.
 import type { LibraryEntry } from "@/lib/photoTagging/assemble";
 import { outcome, planItems, type LocationSource, type PlanItem, type TagOutcome, type TagPlan } from "@/lib/photoTagging/plan";
-import type { TagChanges, TagSuggestion } from "@/lib/photoTagging/types";
+import { evidenceOf, type LocationEvidence, type TagChanges, type TagSuggestion } from "@/lib/photoTagging/types";
 
 export interface HighOptions { photoOnly?: boolean }
 
@@ -37,24 +42,31 @@ function hold(entry: LibraryEntry, field: BulkField, high: readonly TagSuggestio
   return null;
 }
 
+/** A location suggestion an automated step may act on: records, never image analysis. */
+const fromRecords = (s: TagSuggestion) => s.field !== "location" || evidenceOf(s.origin) !== "vision";
+
 function choose(entry: LibraryEntry, opts: HighOptions): Choice {
   const changes: TagChanges = {};
   const held: TagOutcome[] = [];
   let locationSource: LocationSource = "manual";
+  let locationEvidence: LocationEvidence = "manual";
   for (const field of BULK_FIELDS) {
     const all = entry.photo.suggestions.filter((s) => s.field === field);
-    const high = all.filter((s) => s.confidence === "high");
+    const high = all.filter((s) => s.confidence === "high" && fromRecords(s));
     if (high.length === 0) continue;
     const blocked = hold(entry, field, high, all, opts);
     if (blocked) { held.push(blocked); continue; }
     changes[field] = high[0].value;
-    if (field === "location" && high[0].origin === "gps") locationSource = "gps";
+    if (field === "location") {
+      locationEvidence = evidenceOf(high[0].origin);
+      if (high[0].origin === "gps") locationSource = "gps";
+    }
   }
-  return { item: { target: entry.target, changes, locationSource }, held };
+  return { item: { target: entry.target, changes, locationSource, locationEvidence }, held };
 }
 
 export function planHighConfidence(entries: readonly LibraryEntry[], opts: HighOptions = {}): TagPlan {
   const choices = entries.map((e) => choose(e, opts));
-  const plan = planItems(choices.map((c) => c.item), false);
+  const plan = planItems(choices.map((c) => c.item), false, { automated: true });
   return { writes: plan.writes, outcomes: [...plan.outcomes, ...choices.flatMap((c) => c.held)] };
 }

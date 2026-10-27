@@ -161,7 +161,8 @@ function toSession(s: Record<string, unknown>, places: readonly KnownPlace[]): L
   const primaryLocation = (s.primary_location as string | null) ?? null;
   const secondaryLocations = (s.secondary_locations as string[] | null) ?? [];
   const resolved = resolveSessionPlaces(
-    { id: s.id as string, primaryLocation, secondaryLocations, gps: null, approved: true }, places,
+    { id: s.id as string, primaryLocation, secondaryLocations, schoolSlug: (s.school_slug as string | null) ?? null, gps: null, approved: true },
+    places,
   );
   const name = (s.public_display_name as string | null)?.trim() || "Untitled session";
   return {
@@ -185,7 +186,7 @@ function toSession(s: Record<string, unknown>, places: readonly KnownPlace[]): L
 }
 
 export const SESSION_COLUMNS =
-  "id,public_display_name,internal_client_name,service_type,relationship_type,primary_location,secondary_locations," +
+  "id,public_display_name,internal_client_name,service_type,relationship_type,primary_location,secondary_locations,school_slug," +
   "session_date,start_time,lighting_condition,vibe,marketing_permission,marketing_permission_revoked_at," +
   "location_sync_status,location_sync_message,location_synced_at";
 

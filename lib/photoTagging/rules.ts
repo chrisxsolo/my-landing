@@ -14,7 +14,7 @@
 // Status: any critical field missing → needs · any other field missing →
 // partial · otherwise full.
 import {
-  categoryLabel, type NotApplicableField, type TagCheck, type TagStatus, type TagSuggestion,
+  categoryLabel, type LocationEvidence, type NotApplicableField, type TagCheck, type TagStatus, type TagSuggestion,
 } from "@/lib/photoTagging/types";
 
 export interface FactValue {
@@ -23,6 +23,8 @@ export interface FactValue {
   /** What a person reads, when it differs from the value ("UC Berkeley"). */
   label?: string;
   source: string;
+  /** A stored photo location's evidence level, when recorded. */
+  evidence?: LocationEvidence | null;
 }
 
 export interface PhotoFacts {
@@ -40,6 +42,7 @@ export interface PhotoFacts {
 
 const ok = (field: TagCheck["field"], critical: boolean, fact: FactValue): TagCheck => ({
   field, state: "ok", critical, value: fact.label ?? fact.value, source: fact.source, note: null,
+  ...(fact.evidence ? { evidence: fact.evidence } : {}),
 });
 const missing = (field: TagCheck["field"], critical: boolean, note: string): TagCheck => ({
   field, state: "missing", critical, value: null, source: null, note,

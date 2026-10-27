@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { KNOWN_PLACES } from "@/lib/locations/places";
 import { assembleLibrary, type LoadedLibrary } from "@/lib/photoTagging/assemble";
-import { buildReviewQueue, safeKeys } from "@/lib/photoTagging/reviewQueue";
+import { buildReviewQueue, EMPTY_QUEUE_FILTER, filterQueue, safeKeys, sortByNewest } from "@/lib/photoTagging/reviewQueue";
+import type { PhotoReview } from "@/lib/photoTagging/reviews";
+import type { TagSuggestion } from "@/lib/photoTagging/types";
 
 const BASE = "https://x.supabase.co/storage/v1/object/public/grad-photos/";
 const engineId = (n: number) => `22222222-2222-4222-8222-${String(n).padStart(12, "0")}`;
@@ -67,5 +69,42 @@ describe("review queue", () => {
     const school = queue.find((i) => i.key === `engine:${engineId(7)}` && i.field === "school")!;
     expect(school.safe).toBe(false); // a university on an engine photo sets the whole session
     expect(safeKeys(queue)).toContain(`engine:${engineId(6)}`);
+  });
+
+  it("describes each item: what is about, saved vs suggested, evidence, why and what to do", () => {
+    const [item] = queueOf(library({ engine: [engineRow(8, { primary_location: "Crissy Field" })] }));
+    expect(item).toMatchObject({
+      kind: "categorization", field: "location", sessionId: `11111111-1111-4111-8111-${String(8).padStart(12, "0")}`,
+      sessionName: "Session 8", before: null, evidence: "session facts · high", url: null,
+    });
+    expect(item.explanation).toMatch(/No location is saved/);
+    expect(item.recommended).toBe("Accept Crissy Field.");
+  });
+
+  it("files a vision-only location as a low-confidence AI suggestion that is never safe", () => {
+    const key = `engine:${engineId(9)}`;
+    const vision: TagSuggestion = {
+      id: "location:Ocean Beach", field: "location", value: "Ocean Beach", label: "Ocean Beach", confidence: "medium",
+      origin: "vision", reason: "the image shows a wide sandy beach", appliesTo: "photo",
+    };
+    const review: PhotoReview = { key, notApplicable: [], dismissed: [], ai: [vision], aiInputHash: "h", aiAnalyzedAt: "2026-10-27T00:00:00Z" };
+    const queue = queueOf(library({ engine: [engineRow(9, {})], reviews: new Map([[key, review]]) }));
+    const item = queue.find((i) => i.key === key && i.field === "location")!;
+    expect(item).toMatchObject({ kind: "vision", safe: false, evidence: "AI vision · needs approval" });
+    expect(item.explanation).toMatch(/Looks alone never confirm a place/);
+    expect(safeKeys(queue)).not.toContain(key);
+  });
+
+  it("filters by issue type, session and school, and sorts dated items newest first", () => {
+    const queue = queueOf(library({
+      portfolio: [portfolioRow(10, { school: "usf" }), portfolioRow(11)],
+      engine: [engineRow(12, { primary_location: "Crissy Field" })],
+    }));
+    expect(filterQueue(queue, { ...EMPTY_QUEUE_FILTER, kind: "school" }).map((i) => i.key)).toEqual(["portfolio:11"]);
+    expect(filterQueue(queue, { ...EMPTY_QUEUE_FILTER, school: "usf" }).every((i) => i.key === "portfolio:10")).toBe(true);
+    expect(filterQueue(queue, { ...EMPTY_QUEUE_FILTER, sessionId: `11111111-1111-4111-8111-${String(12).padStart(12, "0")}` }).map((i) => i.key))
+      .toEqual([`engine:${engineId(12)}`]);
+    const dated = [{ ...queue[0], id: "a", createdAt: "2026-01-01T00:00:00Z" }, { ...queue[0], id: "b", createdAt: "2026-06-01T00:00:00Z" }, queue[1]];
+    expect(sortByNewest(dated).map((i) => i.id)).toEqual(["b", "a", queue[1].id]);
   });
 });

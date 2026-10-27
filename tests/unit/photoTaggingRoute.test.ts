@@ -18,6 +18,10 @@ const mocks = vi.hoisted(() => ({
   revalidated: 0,
   campusSyncs: 0,
   sessionSyncs: [] as string[],
+  /** The history options the route hands executePlan (who / why). */
+  logOpts: null as unknown,
+  /** The photo_change_log row a restore reads. */
+  logRow: null as unknown,
 }));
 
 vi.mock("@/lib/requireAdmin", () => ({ requireAdmin: () => null }));
@@ -32,7 +36,11 @@ vi.mock("@/lib/photoTagging/library", async (importOriginal) => ({
 }));
 vi.mock("@/lib/photoTagging/apply", async (importOriginal) => ({
   ...(await importOriginal<object>()),
-  executePlan: async () => { mocks.executed += 1; return mocks.result; },
+  executePlan: async (_client: unknown, _plan: unknown, opts: unknown) => { mocks.executed += 1; mocks.logOpts = opts; return mocks.result; },
+}));
+vi.mock("@/lib/photoChangeLog/log", () => ({
+  loadChangeLog: async () => [],
+  loadChangeLogRow: async () => mocks.logRow,
 }));
 
 const { POST } = await import("@/app/api/admin/photo-tagging/route");
@@ -56,6 +64,8 @@ beforeEach(() => {
   mocks.revalidated = 0;
   mocks.campusSyncs = 0;
   mocks.sessionSyncs = [];
+  mocks.logOpts = null;
+  mocks.logRow = null;
   mocks.result = {
     updated: 1, failed: 0, kept: 0, skipped: 0, conflicts: 0, outcomes: [], failures: [], sessionIds: [S1],
   } satisfies ApplyResult;
@@ -96,5 +106,33 @@ describe("photo tagging writes", () => {
     mocks.result = { ...(mocks.result as ApplyResult), updated: 0, failed: 1, sessionIds: [] };
     await post({ action: "apply", keys: [`engine:${PHOTO}`], changes: { location: "Crissy Field" } });
     expect(mocks.revalidated + mocks.campusSyncs + mocks.sessionSyncs.length).toBe(0);
+  });
+
+  it("accepts an evidence level on a location and refuses an unknown one", async () => {
+    expect((await post({ action: "apply", keys: [`engine:${PHOTO}`], changes: { location: "Crissy Field", evidence: "session" } })).status).toBe(200);
+    expect((await post({ action: "apply", keys: [`engine:${PHOTO}`], changes: { location: "Crissy Field", evidence: "guess" } })).status).toBe(400);
+  });
+});
+
+describe("the change history", () => {
+  it("records an admin edit as manual (with its reason) and apply-high as system", async () => {
+    await post({ action: "apply", keys: [`engine:${PHOTO}`], changes: { location: "Crissy Field" }, reason: "undo" });
+    expect(mocks.logOpts).toEqual({ actor: "manual", reason: "undo" });
+    await post({ action: "apply-high" });
+    expect(mocks.logOpts).toMatchObject({ actor: "system" });
+  });
+
+  it("restores a logged tag field as a new manual change, and refuses non-tag fields", async () => {
+    mocks.logRow = { id: 7, key: `engine:${PHOTO}`, field: "location", oldValue: "Crissy Field", newValue: "Ocean Beach", actor: "system", reason: null, createdAt: "2026-10-27T00:00:00Z" };
+    const res = await post({ action: "restore", logId: 7 });
+    expect(res.status).toBe(200);
+    expect(mocks.executed).toBe(1);
+    expect(mocks.logOpts).toEqual({ actor: "manual", reason: "restore #7" });
+
+    mocks.logRow = { ...(mocks.logRow as object), field: "library_links", oldValue: { locationIds: [1] } };
+    expect((await post({ action: "restore", logId: 7 })).status).toBe(422);
+    mocks.logRow = null;
+    expect((await post({ action: "restore", logId: 8 })).status).toBe(404);
+    expect(mocks.executed).toBe(1);
   });
 });

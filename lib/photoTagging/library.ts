@@ -24,7 +24,7 @@ type Rows = Record<string, unknown>[];
 export const PORTFOLIO_COLUMNS =
   "id,title,alt,image_url,category_slug,featured,sort_order,width,height,content_hash,school,location,session_label,published";
 const ENGINE_COLUMNS = "id,storage_path,public_derivative_url,content_hash,excluded,title,alt_text,description,tags,"
-  + "quality_score,width,height,gps_latitude,gps_longitude,photo_location,photo_location_source,"
+  + "quality_score,width,height,gps_latitude,gps_longitude,photo_location,photo_location_source,photo_location_evidence,"
   + "photography_sessions!inner(id,public_display_name,service_type,school_slug,primary_location,secondary_locations,marketing_permission,marketing_permission_revoked_at)";
 
 async function rows(query: PromiseLike<{ data: unknown; error: { message: string } | null }>): Promise<Rows> {

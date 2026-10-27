@@ -3,6 +3,8 @@ import { revalidatePublicContent } from "@/lib/publicRevalidation";
 import { requireAdmin } from "@/lib/requireAdmin";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
 import { isUuid } from "@/lib/contentEngine/uploadConfig";
+import { summarizePlacements } from "@/lib/photoExclusion/kinds";
+import { listPhotoPlacements } from "@/lib/photoExclusion/placements";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -55,5 +57,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!data) return NextResponse.json({ error: "photo not found" }, { status: 404 });
   // Excluding a photo removes it from automatically matched school / guide pages.
   if ("excluded" in patch) revalidatePublicContent();
-  return NextResponse.json({ updated: true });
+  // Explicit placements (journal galleries, portfolio, guide tables) are NOT
+  // pulled automatically — the owner decides that. The response lists them so
+  // the admin can see exactly where the excluded photo still shows.
+  if (patch.excluded !== true) return NextResponse.json({ updated: true });
+  try {
+    const livePlacements = await listPhotoPlacements(admin, id.toLowerCase());
+    return NextResponse.json({ updated: true, livePlacements, livePlacementSummary: summarizePlacements(livePlacements) });
+  } catch (err) {
+    console.error("[session-photos] excluded, but could not list its live placements", err);
+    return NextResponse.json({ updated: true, livePlacements: null, livePlacementsError: err instanceof Error ? err.message : "lookup failed" });
+  }
 }

@@ -82,7 +82,7 @@ export function useTagApply(onChanged: () => Promise<void> | void): TagApply {
     setUndoList([]);
     let restored = 0;
     for (const req of list) {
-      const r = await taggingApi.write({ kind: "changes", keys: req.keys, changes: req.changes, replace: true });
+      const r = await taggingApi.write({ kind: "changes", keys: req.keys, changes: req.changes, replace: true, reason: "undo" });
       restored += r.updated;
       if (r.failed > 0) throw new Error(`Undo stopped: ${r.failures[0] ?? "a write failed"} (${restored} restored)`);
     }
