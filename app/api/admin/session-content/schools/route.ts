@@ -1,6 +1,7 @@
 // Schools for Session facts: GET lists built-in + custom schools; POST adds a
 // custom school (admin only). A duplicate returns 409 with the existing school
-// so the picker can offer to select it instead.
+// so the picker can offer to select it instead; a look-alike returns the same
+// 409 with match "similar" until the body carries confirmSimilar: true.
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/requireAdmin";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
@@ -37,13 +38,16 @@ export async function POST(req: NextRequest) {
 
   const input = validateNewSchool(body as Record<string, unknown>);
   if (!input.ok) return NextResponse.json({ error: input.error }, { status: 422 });
+  const allowSimilar = (body as Record<string, unknown>).confirmSimilar === true;
 
   try {
-    const result = await createCustomSchool(createSupabaseAdminClient(), input.value);
+    const result = await createCustomSchool(createSupabaseAdminClient(), input.value, { allowSimilar });
     if (!result.created) {
+      const label = schoolLabel(result.existing);
       return NextResponse.json({
-        error: `${schoolLabel(result.existing)} is already saved`,
+        error: result.match === "duplicate" ? `${label} is already saved` : `this looks like ${label}, which is already saved`,
         existing: result.existing,
+        match: result.match,
       }, { status: 409 });
     }
     return NextResponse.json({ school: result.school }, { status: 201 });

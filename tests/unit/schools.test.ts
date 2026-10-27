@@ -1,8 +1,11 @@
 import { describe, it, expect } from "vitest";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import {
-  BUILT_IN_SCHOOLS, BUILT_IN_SCHOOL_OPTIONS, filterSchools, findDuplicateSchool,
-  schoolMatchKey, suggestSchoolSlug, validateNewSchool, type SchoolOption,
+  BUILT_IN_SCHOOLS, BUILT_IN_SCHOOL_OPTIONS, CUSTOM_SCHOOLS_TABLE, filterSchools, findDuplicateSchool,
+  findSimilarSchool, matchSchoolCandidate, schoolMatchKey, suggestSchoolSlug, validateNewSchool,
+  type SchoolOption,
 } from "@/lib/contentEngine/schools";
+import { createCustomSchool } from "@/lib/contentEngine/schoolStore";
 import { SCHOOL_SLUGS } from "@/lib/contentEngine/taxonomy";
 import { normalizeSchool } from "@/lib/schoolDetection";
 import { buildSessionFactsSnapshot } from "@/lib/contentEngine/payloads";
@@ -19,6 +22,11 @@ const UC_LAW: SchoolOption = {
   builtIn: false,
 };
 const ALL = [...BUILT_IN_SCHOOL_OPTIONS, UC_LAW];
+const custom = (slug: string, name: string, shortName: string | null = null): SchoolOption =>
+  ({ slug, name, shortName, aliases: [], builtIn: false });
+const SAMUEL_MERRITT = custom("samuel-merritt", "Samuel Merritt University");
+const DOMINICAN = custom("dominican", "Dominican University of California", "Dominican");
+const DUGONI = custom("uop-dugoni", "University of the Pacific, Arthur A. Dugoni School of Dentistry", "Pacific Dugoni");
 
 describe("built-in school registry", () => {
   it("covers exactly the page-backed school slugs", () => {
@@ -47,6 +55,27 @@ describe("schoolMatchKey", () => {
 
   it("has nothing left for purely generic names", () => {
     expect(schoolMatchKey("The University")).toBe("");
+  });
+
+  // Real inquiry spellings that used to come out as different keys.
+  it("drops a trailing 'in <city>'", () => {
+    expect(schoolMatchKey("Samuel Merritt University in Oakland")).toBe(schoolMatchKey("Samuel Merritt University"));
+    expect(schoolMatchKey("Samuel Merritt University in Oakland")).toBe("merritt samuel");
+  });
+
+  it("spells out CA", () => {
+    expect(schoolMatchKey("Dominican University of CA")).toBe(schoolMatchKey("Dominican University of California"));
+  });
+
+  it("maps the former UC Hastings name onto UC Law SF", () => {
+    const current = schoolMatchKey("UC Law SF");
+    expect(schoolMatchKey("UC Hastings")).toBe(current);
+    expect(schoolMatchKey("Hastings College of the Law")).toBe(current);
+    expect(schoolMatchKey(UC_LAW.name)).toBe(current);
+  });
+
+  it("does not drop a word that only happens to be preceded by 'in' mid-name", () => {
+    expect(schoolMatchKey("Institute in Design and Arts Oakland Campus")).toBe("arts design institute oakland");
   });
 });
 
@@ -86,6 +115,48 @@ describe("findDuplicateSchool", () => {
       .toBeNull();
     expect(findDuplicateSchool({ name: "Foothill College", shortName: null, slug: "foothill-college" }, ALL)).toBeNull();
   });
+
+  it("matches a saved alias and a candidate's own aliases", () => {
+    const withAlias: SchoolOption = { ...UC_LAW, aliases: ["Hastings"] };
+    expect(findDuplicateSchool({ name: "Hastings", shortName: null, slug: "hastings" }, [withAlias])?.slug).toBe(UC_LAW.slug);
+    const candidate = { name: "Some New School", shortName: null, slug: "some-new", aliases: ["UC Law SF"] };
+    expect(findDuplicateSchool(candidate, ALL)?.slug).toBe(UC_LAW.slug);
+  });
+
+  it("treats the real inquiry spellings as the saved school", () => {
+    const dup = (name: string, schools: SchoolOption[]) =>
+      findDuplicateSchool({ name, shortName: null, slug: "x-new" }, schools)?.slug ?? null;
+    expect(dup("UC Hastings", ALL)).toBe(UC_LAW.slug);
+    expect(dup("Samuel Merritt University in Oakland", [SAMUEL_MERRITT])).toBe(SAMUEL_MERRITT.slug);
+    expect(dup("Dominican University of CA", [DOMINICAN])).toBe(DOMINICAN.slug);
+  });
+});
+
+describe("findSimilarSchool / matchSchoolCandidate", () => {
+  const candidate = (name: string) => ({ name, shortName: null, slug: "x-new" });
+
+  it("suggests the saved school whose name contains every word of the shorter one", () => {
+    expect(findSimilarSchool(candidate("Samuel Merritt"), [SAMUEL_MERRITT])?.slug).toBe(SAMUEL_MERRITT.slug);
+    expect(findSimilarSchool(candidate("Samuel Merritt University, Oakland"), [SAMUEL_MERRITT])?.slug)
+      .toBe(SAMUEL_MERRITT.slug);
+    expect(findSimilarSchool(candidate("uop dugoni"), [DUGONI])?.slug).toBe(DUGONI.slug);
+  });
+
+  it("never suggests from a single shared word or from place names alone", () => {
+    expect(findSimilarSchool(candidate("California College of the Arts"), ALL)).toBeNull();
+    expect(findSimilarSchool(candidate("Stanford Law"), ALL)).toBeNull();
+    expect(findSimilarSchool(candidate("Foothill College"), ALL)).toBeNull();
+    // "UC Law SF" shares "san francisco" with USF and "uc" with UC Berkeley — neither is it.
+    expect(findSimilarSchool({ ...UC_LAW, slug: "x-new" }, BUILT_IN_SCHOOL_OPTIONS)).toBeNull();
+    expect(findSimilarSchool(candidate("UC Berkeley School of Law"), ALL)).toBeNull();
+  });
+
+  it("reports an exact match as a duplicate and a look-alike as similar", () => {
+    expect(matchSchoolCandidate(candidate("UC Law San Francisco"), ALL)).toEqual({ school: UC_LAW, kind: "duplicate" });
+    expect(matchSchoolCandidate(candidate("Samuel Merritt University, Oakland"), [...ALL, SAMUEL_MERRITT]))
+      .toEqual({ school: SAMUEL_MERRITT, kind: "similar" });
+    expect(matchSchoolCandidate(candidate("Foothill College"), ALL)).toBeNull();
+  });
 });
 
 describe("filterSchools", () => {
@@ -112,8 +183,19 @@ describe("validateNewSchool", () => {
   it("accepts the UC Law SF example and tidies whitespace", () => {
     const result = validateNewSchool({ name: `  ${UC_LAW.name}  `, shortName: " UC  Law SF ", slug: "" });
     expect(result).toEqual({
-      ok: true, value: { name: UC_LAW.name, shortName: "UC Law SF", slug: "uc-law-san-francisco" },
+      ok: true, value: { name: UC_LAW.name, shortName: "UC Law SF", slug: "uc-law-san-francisco", aliases: [] },
     });
+  });
+
+  it("keeps other names, tidied and de-duplicated, from an array or a comma list", () => {
+    const fromList = validateNewSchool({ name: UC_LAW.name, aliases: " UC Hastings , Hastings Law,, UC Hastings" });
+    expect(fromList.ok && fromList.value.aliases).toEqual(["UC Hastings", "Hastings Law"]);
+    const fromArray = validateNewSchool({ name: UC_LAW.name, aliases: ["UC Hastings"] });
+    expect(fromArray.ok && fromArray.value.aliases).toEqual(["UC Hastings"]);
+  });
+
+  it("rejects markup inside an alias", () => {
+    expect(validateNewSchool({ name: UC_LAW.name, aliases: ["<b>Hastings</b>"] }).ok).toBe(false);
   });
 
   it("requires a name", () => {
@@ -197,6 +279,69 @@ describe("email auto-fill recognizes custom schools", () => {
   it("prefers an exact custom match over a loose built-in alias", () => {
     const bcc: SchoolOption = { slug: "berkeley-city-college", name: "Berkeley City College", shortName: null, aliases: [], builtIn: false };
     expect(coerceSchool("Berkeley City College", [...ALL, bcc])).toBe("berkeley-city-college");
+  });
+
+  it("maps the real inquiry spellings onto saved custom schools", () => {
+    const saved = [...ALL, SAMUEL_MERRITT, DOMINICAN, DUGONI];
+    expect(coerceSchool("Samuel Merritt University in Oakland", saved)).toBe("samuel-merritt");
+    expect(coerceSchool("Dominican University of CA", saved)).toBe("dominican");
+    expect(coerceSchool("UC Hastings", saved)).toBe("uc-law-san-francisco");
+    expect(coerceSchool("uop dugoni", saved)).toBe("uop-dugoni");
+  });
+
+  it("falls back to the one look-alike custom school, never to several or to a built-in", () => {
+    const twin = custom("samuel-merritt-nursing", "Samuel Merritt School of Nursing");
+    expect(coerceSchool("Samuel Merritt University, Oakland campus", [...ALL, SAMUEL_MERRITT, twin])).toBe("samuel-merritt");
+    expect(coerceSchool("Samuel Merritt nursing program, Oakland", [...ALL, SAMUEL_MERRITT, twin])).toBeNull();
+    expect(coerceSchool("UC Berkeley School of Law", ALL)).toBe("uc-berkeley"); // built-in detection, as before
+  });
+});
+
+// A Supabase stand-in that records every table touched and answers the given
+// saved rows / the inserted row, so the store can run without a database.
+function recordingClient(tables: string[], saved: SchoolOption[] = []): SupabaseClient {
+  const from = (table: string) => {
+    tables.push(table);
+    const rows = saved.map((s) => ({ slug: s.slug, name: s.name, short_name: s.shortName, aliases: s.aliases }));
+    const result = { data: rows, error: null };
+    const chain = {
+      select: () => chain, order: () => Promise.resolve(result), eq: () => chain,
+      maybeSingle: () => Promise.resolve({ data: null, error: null }),
+      insert: (row: Record<string, unknown>) => ({
+        select: () => ({
+          single: () => Promise.resolve({
+            data: { slug: row.slug, name: row.name, short_name: row.short_name, aliases: row.aliases }, error: null,
+          }),
+        }),
+      }),
+    };
+    return chain;
+  };
+  return { from } as unknown as SupabaseClient;
+}
+
+describe("createCustomSchool", () => {
+  it("writes the aliases and touches only the schools table — nothing is published", async () => {
+    const tables: string[] = [];
+    const result = await createCustomSchool(recordingClient(tables), {
+      name: UC_LAW.name, shortName: "UC Law SF", slug: UC_LAW.slug, aliases: ["UC Hastings"],
+    });
+    expect(result).toEqual({ created: true, school: { ...UC_LAW, aliases: ["UC Hastings"] } });
+    expect(new Set(tables)).toEqual(new Set([CUSTOM_SCHOOLS_TABLE]));
+  });
+
+  it("refuses a look-alike until the admin confirms it is a different school", async () => {
+    const candidate = { name: "Samuel Merritt University, Oakland", shortName: null, slug: "samuel-merritt-oakland" };
+    const refused = await createCustomSchool(recordingClient([], [SAMUEL_MERRITT]), candidate);
+    expect(refused).toMatchObject({ created: false, match: "similar", existing: { slug: "samuel-merritt" } });
+    const confirmed = await createCustomSchool(recordingClient([], [SAMUEL_MERRITT]), candidate, { allowSimilar: true });
+    expect(confirmed.created).toBe(true);
+  });
+
+  it("still blocks an exact duplicate even when similar ones are allowed", async () => {
+    const candidate = { name: "San Francisco State University", shortName: null, slug: "sfsu-2" };
+    const result = await createCustomSchool(recordingClient([]), candidate, { allowSimilar: true });
+    expect(result).toMatchObject({ created: false, match: "duplicate", existing: { slug: "sf-state" } });
   });
 
   it("lists custom schools in the extraction prompt only when they exist", () => {
