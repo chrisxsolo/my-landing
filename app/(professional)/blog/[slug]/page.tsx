@@ -9,6 +9,7 @@ import { toPlainText } from "@/lib/blog/markdown";
 import { detectSchoolLink } from "@/lib/portfolioCategoryContent";
 import { exploreLinksFor, resolvePostService } from "@/lib/blog/postService";
 import { getJournalServicesByPostId } from "@/lib/blog/journalServices";
+import { getJournalLocationLinksByPostId } from "@/lib/blog/journalLocations";
 import { normalizeCategoryTag } from "@/lib/blog/postCategories";
 import { buildBookingIntentParams } from "@/lib/bookingIntent";
 import { inquirySessionTypeFor } from "@/lib/serviceRegistry";
@@ -69,9 +70,10 @@ const CSS = `
 
 export default async function ProfessionalBlogPostPage({ params }: Props) {
   const { slug } = await params;
-  const [post, servicesByPostId] = await Promise.all([
+  const [post, servicesByPostId, locationLinksByPostId] = await Promise.all([
     getBlogPostBySlug("professional", slug),
     getJournalServicesByPostId(),
+    getJournalLocationLinksByPostId(),
   ]);
   if (!post) notFound();
 
@@ -84,8 +86,11 @@ export default async function ProfessionalBlogPostPage({ params }: Props) {
     text: `${post.title} ${post.slug}`,
   }) ?? (schoolLink ? "grads" : null); // a school name alone still means a grad post
   // Campus links only on graduation posts: a couples shoot on a campus
-  // shouldn't send readers to that school's grad page.
-  const exploreLinks = exploreLinksFor(service, service === "grads" ? schoolLink : null);
+  // shouldn't send readers to that school's grad page. The location guide
+  // appears only when the session's place is published in the location library.
+  const exploreLinks = exploreLinksFor(
+    service, service === "grads" ? schoolLink : null, locationLinksByPostId[String(post.id)] ?? null,
+  );
   const inquiryHref = inquiryHrefFor(service);
 
   const jsonLd = {
