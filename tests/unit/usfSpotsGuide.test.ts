@@ -226,7 +226,7 @@ describe("off-campus places stay separate from the USF campus", () => {
     expect(usfPalace).toMatchObject({ school: "usf", placeKey: "palace-of-fine-arts" });
     expect(couplesPalace).toMatchObject({ school: null, placeKey: "palace-of-fine-arts" });
     const pool: PhotoPool = {
-      photos: [usfPalace, couplesPalace], explicitSchool: [], sessionSchool: [], curation: [], spotTags: [], errors: [],
+      photos: [usfPalace, couplesPalace], explicitSchool: [], sessionSchool: [], journal: [], curation: [], spotTags: [], errors: [],
     };
     expect(candidatesForPage(pool, "grads/usf").map((c) => c.url)).toEqual(["u1"]);
   });

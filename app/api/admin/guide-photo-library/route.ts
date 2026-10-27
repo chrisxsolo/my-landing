@@ -1,7 +1,12 @@
 // Admin API for the "Choose existing photo" picker, shared by every location
-// guide (couples / family / portrait galleries) and the grad campus spots.
+// guide (couples / family / portrait galleries), the grad campus spots, and
+// any flow that just needs a photo URL (library=1: journal covers, the
+// placement inspector's replace).
 //
-// GET   browse the Content Engine library, ranked for one target.
+// GET   browse the library, ranked for one target. Content Engine photos
+//       first; with scope=all, published Portfolio photos and the images of
+//       older journal posts follow (lib/guidePhotoLibrary/extraSources.ts).
+//       Each photo carries how many public pages show it now.
 // POST  action "approve": build the photo's public web copy (the same single
 //         derivative the engine makes on publish) and return its URL.
 //       action "attach": link the photo to a guide gallery via the
@@ -16,9 +21,16 @@ import { requireAdmin } from "@/lib/requireAdmin";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
 import { isUuid } from "@/lib/contentEngine/uploadConfig";
 import { ensureDerivativesForPhotos } from "@/lib/contentEngine/derivatives";
+import { GRAD_SCHOOLS } from "@/lib/portfolioCategoryContent";
 import { PUBLIC_CONTENT_CACHE_TAG } from "@/lib/publicContentCache";
+import { loadAll } from "@/lib/pagePhotos/adminView";
+import { buildPlacements, countLivePages } from "@/lib/photoSync/placements";
+import { loadPlacementFacts } from "@/lib/photoSync/placementLoad";
 import { isGuideTarget, locationOptions, rankLibrary, type LibraryFilters, type LibraryTarget } from "@/lib/guidePhotoLibrary/rank";
-import { engineSchoolForSpot, isValidGuideSlug, loadLibrary, toPickerPhotos } from "@/lib/guidePhotoLibrary/load";
+import { extraPickerPhotos } from "@/lib/guidePhotoLibrary/extraSources";
+import {
+  engineSchoolForSpot, isValidGuideSlug, loadLibrary, toPickerPhotos, type PickerPhoto,
+} from "@/lib/guidePhotoLibrary/load";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,7 +47,8 @@ function jsonError(error: unknown, fallback: string) {
   return NextResponse.json({ error: message }, { status });
 }
 
-function parseTarget(params: { guide?: unknown; slug?: unknown; spotSchool?: unknown }): LibraryTarget {
+function parseTarget(params: { guide?: unknown; slug?: unknown; spotSchool?: unknown; library?: unknown }): LibraryTarget {
+  if (params.library === "1") return { kind: "library" };
   if (typeof params.spotSchool === "string" && params.spotSchool) {
     return { kind: "gradSpot", spotSchoolId: params.spotSchool };
   }
@@ -44,33 +57,53 @@ function parseTarget(params: { guide?: unknown; slug?: unknown; spotSchool?: unk
   return { kind: "guide", guide: params.guide, slug: params.slug as string };
 }
 
+/** Public pages showing each photo now, from one batch of placement queries. */
+async function withUsage(client: SupabaseClient, loaded: Awaited<ReturnType<typeof loadAll>>, photos: PickerPhoto[]): Promise<PickerPhoto[]> {
+  const urls = photos.flatMap((p) => (p.webUrl ? [p.webUrl] : []));
+  const facts = await loadPlacementFacts(client, loaded, urls);
+  return photos.map((p) => {
+    const fact = p.webUrl ? facts.get(p.webUrl) : undefined;
+    return { ...p, usedOnPages: fact ? countLivePages(buildPlacements(fact)) : null };
+  });
+}
+
 export async function GET(req: NextRequest) {
   const deny = requireAdmin(req);
   if (deny) return deny;
   try {
     const sp = req.nextUrl.searchParams;
-    const target = parseTarget({ guide: sp.get("guide"), slug: sp.get("slug"), spotSchool: sp.get("spotSchool") });
+    const target = parseTarget({ guide: sp.get("guide"), slug: sp.get("slug"), spotSchool: sp.get("spotSchool"), library: sp.get("library") });
     const filters: LibraryFilters = {
       q: sp.get("q") ?? undefined,
       location: sp.get("location") || undefined,
       category: sp.get("category") || undefined,
+      school: sp.get("school") || undefined,
       scope: sp.get("scope") === "all" ? "all" : "suggested",
     };
     const page = Math.max(0, Number.parseInt(sp.get("page") ?? "0", 10) || 0);
 
     const client = createSupabaseAdminClient();
-    const lib = await loadLibrary(client, target);
+    const [lib, loaded] = await Promise.all([loadLibrary(client, target), loadAll(client)]);
     const spotSchool = target.kind === "gradSpot" ? engineSchoolForSpot(target.spotSchoolId) : null;
     const ranked = rankLibrary(lib.photos, lib.sessions, target, filters, spotSchool);
-    const slice = ranked.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+    const engineUrls = new Set(lib.photos.flatMap((p) => (lib.rows.get(p.id)?.public_derivative_url ? [lib.rows.get(p.id)!.public_derivative_url as string] : [])));
+    const extras = filters.scope === "all" && !filters.location
+      ? extraPickerPhotos(loaded.pool, engineUrls, { q: filters.q, category: filters.category, school: filters.school })
+      : [];
+    const total = ranked.length + extras.length;
+    const from = page * PAGE_SIZE;
+    const engineSlice = ranked.slice(from, from + PAGE_SIZE);
+    const extraSlice = extras.slice(Math.max(0, from - ranked.length), Math.max(0, from + PAGE_SIZE - ranked.length));
+    const photos = [...await toPickerPhotos(client, engineSlice, lib), ...extraSlice];
 
     return NextResponse.json({
-      photos: await toPickerPhotos(client, slice, lib),
-      total: ranked.length,
+      photos: await withUsage(client, loaded, photos),
+      total,
       page,
       pageSize: PAGE_SIZE,
       locations: locationOptions(lib.sessions.values()),
       categories: [...new Set([...lib.sessions.values()].map((s) => s.serviceType))].sort(),
+      schools: GRAD_SCHOOLS,
     });
   } catch (error) {
     return jsonError(error, "Failed to load the photo library.");

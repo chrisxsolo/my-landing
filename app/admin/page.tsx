@@ -101,6 +101,7 @@ import TagStatusBadge from "@/app/admin/photoTagging/TagStatusBadge";
 import { usePhotoTagging } from "@/app/admin/photoTagging/usePhotoTagging";
 import { portfolioPhotoKey } from "@/lib/photoTagging/types";
 import { GRAD_SCHOOLS } from "@/lib/portfolioCategoryContent";
+import { normalizePortfolioCategorySlug } from "@/lib/photoMetadata";
 import {
   findMatchingClientSession,
   getClientSessionEmailMatches,
@@ -252,7 +253,9 @@ function AdminDashboard() {
   const [categoryDeleteConfirm,setCategoryDeleteConfirm]=useState<number|null>(null);
 
   // ── Batch upload ─────────────────────────────────────────────────────
-  type BatchItem = { id: number; file: File; preview: string; category_slug: string; title: string; location: string; hash: string; };
+  // school: a /grads page slug (GRAD_SCHOOLS); only meaningful for graduation photos.
+  type BatchItem = { id: number; file: File; preview: string; category_slug: string; title: string; location: string; school: string; hash: string; };
+  const isGradCategory=(slug:string)=>normalizePortfolioCategorySlug(slug)==="grads";
   const [batchItems, setBatchItems] = useState<BatchItem[]>([]);
   const [batchSaving, setBatchSaving] = useState(false);
   const [batchSelected, setBatchSelected] = useState<Set<number>>(new Set());
@@ -1111,7 +1114,7 @@ function AdminDashboard() {
       const hash=await fileHash(f);
       if(seen.has(hash)){dupes++;continue;}
       seen.add(hash);
-      additions.push({id:batchIdRef.current++,file:f,preview:URL.createObjectURL(f),category_slug:defaultCat,title:f.name.replace(/\.[^.]+$/,"").replace(/[-_]/g," "),location:"",hash});
+      additions.push({id:batchIdRef.current++,file:f,preview:URL.createObjectURL(f),category_slug:defaultCat,title:f.name.replace(/\.[^.]+$/,"").replace(/[-_]/g," "),location:"",school:"",hash});
     }
     if(additions.length)setBatchItems(prev=>[...prev,...additions]);
     if(dupes>0)showToast(`Skipped ${dupes} duplicate photo${dupes!==1?"s":""}`,true);
@@ -1167,7 +1170,8 @@ function AdminDashboard() {
       const successfulUploads=uploads.filter(u=>u.url);
       const rows=successfulUploads.map((u,idx)=>{
         const cat=categories.find(c=>c.slug===u.item.category_slug);
-        return {title:u.item.title||"Portfolio image",alt:u.item.title||"Portfolio image",image_url:u.url,category_id:cat?.id??null,category_slug:u.item.category_slug,location:u.item.location.trim()||null,content_hash:u.item.hash,featured:false,sort_order:portfolioImages.length+idx+1};
+        const school=isGradCategory(u.item.category_slug)&&u.item.school?u.item.school:null;
+        return {title:u.item.title||"Portfolio image",alt:u.item.title||"Portfolio image",image_url:u.url,category_id:cat?.id??null,category_slug:u.item.category_slug,location:u.item.location.trim()||null,school,content_hash:u.item.hash,featured:false,sort_order:portfolioImages.length+idx+1};
       });
       if(!rows.length){showToast("Upload failed — photos kept for retry",false);return;}
       const res=await fetch('/api/admin/portfolio-images',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify(rows)});
@@ -1194,11 +1198,14 @@ function AdminDashboard() {
     const existingUrls=new Set((existing??[]).map(r=>r.image_url));
     const toImport=gradPhotos.filter(p=>p.image_url&&!existingUrls.has(p.image_url));
     if(!toImport.length){showToast("All grad photos already imported",true);setImporting(false);return;}
-    const gradCat=categories.find(c=>c.slug==="grads");
+    // The category table's slug is "graduation" ("grads" is only the display alias),
+    // so look it up by normalized slug and never save a row with no category.
+    const gradCat=categories.find(c=>isGradCategory(c.slug));
+    if(!gradCat){showToast("No graduation category exists yet — add it under Categories first",false);setImporting(false);return;}
     let count=0;
     for(let i=0;i<toImport.length;i++){
       const p=toImport[i];
-      const res=await fetch('/api/admin/portfolio-images',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({title:p.caption||"Graduation portrait",alt:p.caption||"Bay Area graduation portrait by Chris Solorzano",image_url:p.image_url,category_id:gradCat?.id??null,category_slug:"grads",featured:i<6,sort_order:portfolioImages.length+count+1})});
+      const res=await fetch('/api/admin/portfolio-images',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({title:p.caption||"Graduation portrait",alt:p.caption||"Bay Area graduation portrait by Chris Solorzano",image_url:p.image_url,category_id:gradCat.id,category_slug:gradCat.slug,featured:i<6,sort_order:portfolioImages.length+count+1})});
       if(res.ok)count++;
     }
     setImporting(false);
@@ -2468,6 +2475,12 @@ function AdminDashboard() {
                                 {categories.map(c=><option key={c.slug} value={c.slug}>{c.name}</option>)}
                               </select>
                               <input list="batch-location-options" className="flex-1 min-w-0 px-2 py-1 rounded-lg text-xs font-medium text-slate-800 outline-none border border-slate-200 bg-white" placeholder="Location (optional)" value={item.location} onChange={e=>setBatchItems(prev=>prev.map(x=>x.id===item.id?{...x,location:e.target.value}:x))}/>
+                              {isGradCategory(item.category_slug)&&(
+                                <select aria-label="School" className="flex-1 min-w-0 px-2 py-1 rounded-lg text-xs font-medium text-slate-800 outline-none border border-slate-200 bg-white" value={item.school} onChange={e=>setBatchItems(prev=>prev.map(x=>x.id===item.id?{...x,school:e.target.value}:x))}>
+                                  <option value="">School (optional)</option>
+                                  {GRAD_SCHOOLS.map(s=><option key={s.slug} value={s.slug}>{s.label}</option>)}
+                                </select>
+                              )}
                             </div>
                           </div>
                           <button onClick={()=>removeBatchItem(item.id)} className="w-7 h-7 rounded-full bg-slate-200 text-slate-500 text-xs font-bold flex-shrink-0 flex items-center justify-center hover:bg-red-100 hover:text-red-500 transition-colors">✕</button>

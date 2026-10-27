@@ -1,6 +1,7 @@
 // Builds one page's candidate list from the pool: its explicit placements plus
 // every eligible photo automatically matched to it (portfolio photos, and for
-// school pages also Content Engine photos already live in a journal post).
+// school pages also Content Engine photos already live in a journal post and
+// the images of older journal posts that name the school).
 // Pure — shared by the public pages and the admin preview.
 import type { PageCandidate } from "@/lib/pagePhotos/curate";
 import { parsePageKey } from "@/lib/pagePhotos/pageKeys";
@@ -50,7 +51,15 @@ export function candidatesForPage(
     id: `portfolio:${p.portfolioId}`, url: p.url, alt: p.alt, caption: null,
     width: p.width, height: p.height, explicit: false, explicitOrder: 0,
     featured: p.featured, quality: p.quality, sortOrder: p.sortOrder, sessionKey: p.sessionKey,
-    placeKey: p.placeKey,
+    sessionDate: p.sessionDate, placeKey: p.placeKey,
+  }));
+
+  // Older journal posts (no Content Engine session): automatic matches by the
+  // school the post names; each post is one shoot, dated by its publication.
+  const journal: PageCandidate[] = pool.journal.filter((j) => j.pages.includes(pageKey)).map((j, index) => ({
+    id: j.id, url: j.url, alt: j.alt, caption: null, width: null, height: null,
+    explicit: false, explicitOrder: 0, featured: false, quality: null, sortOrder: index,
+    sessionKey: j.sessionKey, sessionDate: j.publishedAt, placeKey: null,
   }));
 
   // Journal-only Content Engine photos: automatic matches by session school.
@@ -63,7 +72,7 @@ export function candidatesForPage(
       }))
     : [];
 
-  return [...school, ...guide, ...matched, ...session];
+  return [...school, ...guide, ...matched, ...session, ...journal];
 }
 
 export function curationFor(pool: PhotoPool, pageKey: string) {
