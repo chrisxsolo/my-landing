@@ -28,7 +28,7 @@ export const SF_OFF_CAMPUS_SPOTS: readonly SchoolSpot[] = [
       "Walking and candid photos",
     ],
     tip: "The Palace of Fine Arts can get extremely busy with tourists, visitors, and other photographers. I recommend weekdays when possible, and even then, expect some people in the background and leave a little extra time.",
-    guideLink: { label: "Palace of Fine Arts portrait location guide", href: "/portrait-guide/locations/palace-of-fine-arts" },
+    guideLink: { label: "Palace of Fine Arts location guide", href: "/couples-guide/locations/palace-of-fine-arts" },
   },
   {
     key: "legion-of-honor",

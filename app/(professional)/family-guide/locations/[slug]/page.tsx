@@ -10,6 +10,7 @@ import FamilyLocationTemplate from "./FamilyLocationTemplate";
 import { getAllFamilyLocations } from "@/lib/familyGuide/locations";
 import { findFamilyLocation } from "@/lib/locations/guideListings";
 import { getFamilyLocationPhotos } from "@/lib/familyGuide/photos";
+import { familyJournalHasPosts } from "@/lib/familyGuide/journalPosts";
 
 export const revalidate = 3600;
 // Hand-written locations are prebuilt; database guides (approved Content
@@ -60,6 +61,6 @@ export default async function FamilyLocationPage({
   const data = await findFamilyLocation(slug);
   if (!data) notFound();
 
-  const photos = await getFamilyLocationPhotos(data.slug);
-  return <FamilyLocationTemplate data={data} photos={photos} />;
+  const [photos, journalHasPosts] = await Promise.all([getFamilyLocationPhotos(data.slug), familyJournalHasPosts()]);
+  return <FamilyLocationTemplate data={data} photos={photos} journalHasPosts={journalHasPosts} />;
 }

@@ -19,7 +19,7 @@ const palaceOfFineArts: CouplesLocationData = {
     "romantic photoshoot San Francisco",
     "Marina District couples photos",
   ],
-  published: false,
+  published: true,
 
   cardSummary:
     "Grand rotunda columns, a calm reflecting lagoon, and pockets of greenery make this one of the most recognizably romantic backdrops in San Francisco.",

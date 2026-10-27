@@ -5,7 +5,7 @@
 
 import Link from "next/link";
 import { getBlogPostSummariesForCategory } from "@/lib/professionalData";
-import { FAMILY_JOURNAL_CATEGORY } from "@/lib/familyGuide/journal";
+import { FAMILY_JOURNAL_CATEGORY, FAMILY_JOURNAL_PATH } from "@/lib/familyGuide/journal";
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
@@ -32,7 +32,7 @@ export default async function FamilyJournalStrip({ heading = "From the family jo
           ))}
         </div>
         <p style={{ marginTop: 16 }}>
-          <Link href={`/blog/category/${FAMILY_JOURNAL_CATEGORY}`} className="fg-inline-link">
+          <Link href={FAMILY_JOURNAL_PATH} className="fg-inline-link">
             Read more in the family photography journal →
           </Link>
         </p>

@@ -11,7 +11,9 @@ import { FAMILY_GUIDE_CSS, FG_MARQUEE } from "@/lib/familyGuide/styles";
 import { locationDisplayName } from "@/lib/familyGuide/types";
 import type { FamilyLocationSummary } from "@/lib/familyGuide/types";
 import { SUPPORTING_TOPICS } from "@/lib/familyGuide/supporting";
+import { FAMILY_JOURNAL_PATH } from "@/lib/familyGuide/journal";
 import FamilyJournalStrip from "./FamilyJournalStrip";
+import GuideLocationsEmpty from "@/app/components/GuideLocationsEmpty";
 
 // Concise hub previews — each links to the full dedicated page (no duplicated copy).
 const topicPreviews = [
@@ -26,6 +28,7 @@ const FAMILY_CONTACT = "/contact?sessionType=Family+Session";
 type HubImage = { image_url: string; alt: string };
 
 // Guide cards — each routes to a dedicated, indexable page (no anchor-only nav).
+// The journal card is dropped while the archive is empty (it renders noindex then).
 const cards = [
   { href: "/family-guide/locations", title: "Family Photo Locations", desc: "Beautiful San Francisco and Bay Area spots, with the best fit, light, and access for each.", emoji: "📍" },
   { href: "/family-guide/what-to-wear", title: "What to Wear", desc: "Coordinate without matching — colors, layers, and comfort that photograph well outdoors.", emoji: "👕" },
@@ -33,7 +36,7 @@ const cards = [
   { href: "/family-guide/what-to-expect", title: "What to Expect", desc: "From inquiry to gallery delivery — the guided, relaxed way a session actually flows.", emoji: "🧭" },
   { href: "/family-guide/best-time-for-family-photos", title: "Best Time for Family Photos", desc: "Golden hour, fog, fall light, and working around young kids' schedules.", emoji: "🌅" },
   { href: "/family-guide/faq", title: "Family Session FAQ", desc: "Booking, kids, grandparents, delivery, and fall timing — answered.", emoji: "❓" },
-  { href: "/blog/category/family-photography", title: "Family Photography Journal", desc: "Notes, location guides, and seasonal tips for Bay Area families.", emoji: "📓" },
+  { href: FAMILY_JOURNAL_PATH, title: "Family Photography Journal", desc: "Notes, location guides, and seasonal tips for Bay Area families.", emoji: "📓" },
   { href: FAMILY_CONTACT, title: "Book a Family Session", desc: "Send your date, location, and who's joining — I reply with availability and next steps.", emoji: "📅" },
 ];
 
@@ -52,10 +55,13 @@ const marquee = [...FG_MARQUEE, ...FG_MARQUEE];
 export default function FamilyGuideContent({
   locations,
   galleryImages,
+  journalHasPosts,
 }: {
   locations: FamilyLocationSummary[];
   galleryImages: HubImage[];
+  journalHasPosts: boolean;
 }) {
+  const visibleCards = journalHasPosts ? cards : cards.filter((c) => c.href !== FAMILY_JOURNAL_PATH);
   return (
     <main className="fg-page">
       <style>{FAMILY_GUIDE_CSS}</style>
@@ -98,7 +104,7 @@ export default function FamilyGuideContent({
           <p className="fg-sec-kicker" data-reveal>The guide</p>
           <h2 className="fg-sec-title" data-reveal>Plan your family session</h2>
           <div className="fg-cards">
-            {cards.map((c, i) => (
+            {visibleCards.map((c, i) => (
               <Link key={c.title} href={c.href} className="fg-card glass-shimmer" data-reveal data-delay={String((i % 5) + 1)}>
                 <span className="fg-card-bar" />
                 <span className="fg-card-arrow" aria-hidden="true">↗</span>
@@ -187,6 +193,7 @@ export default function FamilyGuideContent({
             <Link href="/family-guide/locations" className="fg-inline-link">full locations guide</Link>{" "}
             covers the fit, light, and access for each.
           </p>
+          {locations.length === 0 && <GuideLocationsEmpty service="Family" />}
           <div className="fg-locs">
             {locations.map((loc) => (
               <Link key={loc.slug} href={loc.canonicalPath} className="fg-loc" data-reveal data-delay="1">

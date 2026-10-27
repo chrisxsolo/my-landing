@@ -8,6 +8,7 @@ import FamilyGuideContent from "./FamilyGuideContent";
 import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
 import { getPortfolioData } from "@/lib/professionalData";
 import { getFamilyLocationListing } from "@/lib/locations/guideListings";
+import { familyJournalHasPosts } from "@/lib/familyGuide/journalPosts";
 
 // Cached/ISR: refreshed hourly, or immediately on admin content saves
 // (POST /api/admin/revalidate revalidates the root layout).
@@ -56,7 +57,7 @@ export default async function FamilyGuidePage() {
     .slice(0, 6)
     .map((img) => ({ image_url: img.image_url, alt: img.alt }));
 
-  const locations = await getFamilyLocationListing();
+  const [locations, journalHasPosts] = await Promise.all([getFamilyLocationListing(), familyJournalHasPosts()]);
 
   const articleLd = {
     "@context": "https://schema.org",
@@ -84,7 +85,7 @@ export default async function FamilyGuidePage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd).replace(/</g, "\\u003c") }}
       />
-      <FamilyGuideContent locations={locations} galleryImages={galleryImages} />
+      <FamilyGuideContent locations={locations} galleryImages={galleryImages} journalHasPosts={journalHasPosts} />
     </>
   );
 }

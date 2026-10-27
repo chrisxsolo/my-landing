@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import NextLink from "next/link";
 import { C } from "@/lib/colors";
 import TrackedLink from "./TrackedLink";
@@ -5,6 +6,15 @@ import LinksAnalytics from "./LinksAnalytics";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 
 export const dynamic = 'force-dynamic'
+
+// The Instagram link hub: its own title (the root layout appends " | SoloXSnaps")
+// and noindex, since it is a utility page for followers, not a search landing page.
+export const metadata: Metadata = {
+  title: "Links",
+  description:
+    "Chris Solorzano's link hub: book a session, see graduation pricing and availability, and read the prep guides.",
+  robots: { index: false, follow: true },
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PROFILE CONFIG — edit these values to update your profile

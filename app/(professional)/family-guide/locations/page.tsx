@@ -9,6 +9,7 @@ import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
 import { FAMILY_GUIDE_CSS } from "@/lib/familyGuide/styles";
 import { locationDisplayName } from "@/lib/familyGuide/types";
 import { getFamilyLocationListing } from "@/lib/locations/guideListings";
+import GuideLocationsEmpty from "@/app/components/GuideLocationsEmpty";
 
 const SITE_URL = "https://www.soloxsnaps.com";
 const PATH = "/family-guide/locations";
@@ -102,6 +103,7 @@ export default async function FamilyLocationsHubPage() {
       {/* ── Location cards ───────────────────────────────────────────────── */}
       <section className="fg-section">
         <div className="fg-shell--wide">
+          {locations.length === 0 && <GuideLocationsEmpty service="Family" />}
           <div className="fg-locs">
             {locations.map((loc) => (
               <Link key={loc.slug} href={loc.canonicalPath} className="fg-loc" data-reveal data-delay="1">
