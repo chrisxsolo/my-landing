@@ -3,11 +3,14 @@
 // winner), links are insert-if-absent (never flips an excluded or manual
 // link), and only auto links that stopped matching are removed. Nothing here
 // calls a model — the AI profile runs separately on the drafts it creates.
+// Every read is paged past PostgREST's row cap and throws on a failed page, so
+// a link is never removed because of a partial read.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { medianCoordinates, matchPlacesByName, type Coordinates } from "@/lib/locations/match";
 import type { KnownPlace } from "@/lib/locations/places";
 import { loadKnownPlaces } from "@/lib/locations/registry";
 import { slugifyLocation } from "@/lib/bayAreaLocations";
+import { fetchAllPages } from "@/lib/supabasePaging";
 import {
   planSessionSync, rowForKey, type LibraryRowRef, type SessionLinkRef, type SyncPlan, type SyncSession,
 } from "@/lib/locationLibrary/syncPlan";
@@ -31,13 +34,15 @@ export interface SessionSyncReport {
 
 const PG_UNIQUE_VIOLATION = "23505";
 
+type Row = Record<string, unknown>;
+
 export async function loadSyncContext(client: SupabaseClient): Promise<SyncContext> {
-  const [places, rowsRes] = await Promise.all([
+  const [places, rowData] = await Promise.all([
     loadKnownPlaces(client),
-    client.from(LOCATIONS_TABLE).select("id,location_key,alias_keys,slug,title,order"),
+    fetchAllPages<Row>((from, to) => client.from(LOCATIONS_TABLE)
+      .select("id,location_key,alias_keys,slug,title,order").order("id").range(from, to), "library locations"),
   ]);
-  if (rowsRes.error) throw new Error(`could not load library locations: ${rowsRes.error.message}`);
-  const rows = (rowsRes.data ?? []).map((r) => ({
+  const rows = rowData.map((r) => ({
     id: r.id as number,
     locationKey: (r.location_key as string | null) ?? null,
     aliasKeys: (r.alias_keys as string[] | null) ?? [],
@@ -49,19 +54,18 @@ export async function loadSyncContext(client: SupabaseClient): Promise<SyncConte
 }
 
 async function loadSyncSession(client: SupabaseClient, sessionId: string): Promise<SyncSession | null> {
-  const [sessionRes, photosRes] = await Promise.all([
+  // Every photo counts: the median GPS of a partial read can name another place.
+  const [sessionRes, photos] = await Promise.all([
     client.from("photography_sessions")
       .select("id,primary_location,secondary_locations,marketing_permission,marketing_permission_revoked_at")
       .eq("id", sessionId).maybeSingle(),
-    client.from("session_photos")
-      .select("gps_latitude,gps_longitude,public_derivative_url")
-      .eq("photography_session_id", sessionId).eq("excluded", false),
+    fetchAllPages<Row>((from, to) => client.from("session_photos")
+      .select("id,gps_latitude,gps_longitude,public_derivative_url")
+      .eq("photography_session_id", sessionId).eq("excluded", false).order("id").range(from, to), "session photos"),
   ]);
   if (sessionRes.error) throw new Error(`could not load session: ${sessionRes.error.message}`);
-  if (photosRes.error) throw new Error(`could not load session photos: ${photosRes.error.message}`);
   const s = sessionRes.data;
   if (!s) return null;
-  const photos = photosRes.data ?? [];
   const points: Coordinates[] = photos
     .filter((p) => typeof p.gps_latitude === "number" && typeof p.gps_longitude === "number")
     .map((p) => ({ latitude: p.gps_latitude as number, longitude: p.gps_longitude as number }));
@@ -76,10 +80,10 @@ async function loadSyncSession(client: SupabaseClient, sessionId: string): Promi
 }
 
 async function loadSessionLinks(client: SupabaseClient, sessionId: string): Promise<SessionLinkRef[]> {
-  const { data, error } = await client.from(LOCATION_SESSIONS_TABLE)
-    .select("id,location_id,source,excluded").eq("photography_session_id", sessionId);
-  if (error) throw new Error(`could not load session links: ${error.message}`);
-  return (data ?? []).map((l) => ({
+  const data = await fetchAllPages<Row>((from, to) => client.from(LOCATION_SESSIONS_TABLE)
+    .select("id,location_id,source,excluded").eq("photography_session_id", sessionId).order("id").range(from, to),
+  "session links");
+  return data.map((l) => ({
     id: l.id as string, locationId: l.location_id as number,
     source: l.source as "auto" | "manual", excluded: !!l.excluded,
   }));
@@ -236,10 +240,10 @@ export async function syncAllSessions(
   const dryRun = opts.dryRun ?? false;
   const ctx = await loadSyncContext(client);
   const claims = await claimLegacyRows(client, ctx, dryRun);
-  const { data, error } = await client.from("photography_sessions").select("id").order("created_at");
-  if (error) throw new Error(`could not list sessions: ${error.message}`);
+  const list = await fetchAllPages<Row>((from, to) => client.from("photography_sessions")
+    .select("id").order("created_at").order("id").range(from, to), "sessions");
   const sessions: SessionSyncReport[] = [];
-  for (const s of data ?? []) {
+  for (const s of list) {
     sessions.push(await syncSessionLocations(client, s.id as string, { dryRun, ctx }));
   }
   return { claims, sessions, dryRun };

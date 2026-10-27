@@ -15,6 +15,7 @@ import {
 import { loadKnownPlaces, loadPublishedDbGuides } from "@/lib/locations/registry";
 import { guideTypeForService, internalLinksForService, type ServiceType } from "@/lib/contentEngine/taxonomy";
 import type { PendingGuideLink, SessionFactsSnapshot } from "@/lib/contentEngine/payloads";
+import { fetchAllPages } from "@/lib/supabasePaging";
 
 export interface SessionLocation {
   resolution: LocationResolution;
@@ -37,13 +38,17 @@ export function topTags(tagLists: string[][], count = HINT_COUNT): string[] {
     .slice(0, count).map(([tag]) => tag);
 }
 
+// Every photo counts: the median GPS of a partial read (a session past the
+// 1000-row cap) can name another place.
 async function photoEvidence(client: SupabaseClient, sessionId: string) {
-  const { data, error } = await client.from("session_photos")
-    .select("gps_latitude,gps_longitude,tags")
-    .eq("photography_session_id", sessionId)
-    .eq("excluded", false);
-  if (error) throw new Error(`could not load photo location evidence: ${error.message}`);
-  const rows = data ?? [];
+  const rows = await fetchAllPages<{ gps_latitude: unknown; gps_longitude: unknown; tags: string[] | null }>(
+    (from, to) => client.from("session_photos")
+      .select("id,gps_latitude,gps_longitude,tags")
+      .eq("photography_session_id", sessionId)
+      .eq("excluded", false)
+      .order("id").range(from, to),
+    "photo location evidence",
+  );
   const points: Coordinates[] = rows
     .filter((r) => typeof r.gps_latitude === "number" && typeof r.gps_longitude === "number")
     .map((r) => ({ latitude: r.gps_latitude as number, longitude: r.gps_longitude as number }));
