@@ -25,6 +25,7 @@ import TrendSection from "./TrendSection";
 import CompositionSection from "./CompositionSection";
 import ClientsSection from "./ClientsSection";
 import ReceivablesPanel from "./ReceivablesPanel";
+import PendingReviewBanner from "./PendingReviewBanner";
 import LedgerSection from "./LedgerSection";
 import QualitySection from "./QualitySection";
 import InsightsSection from "./InsightsSection";
@@ -51,6 +52,7 @@ export default function RevenueDashboard() {
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState("");
   const [stagingReloadToken, setStagingReloadToken] = useState(0);
+  const [pendingReview, setPendingReview] = useState<PendingReviewSummary>({ count: 0, cents: 0 });
   const reduced = useReducedMotion();
 
   const load = useCallback(async () => {
@@ -264,6 +266,8 @@ export default function RevenueDashboard() {
           </div>
         )}
 
+        <PendingReviewBanner summary={pendingReview} onReview={() => scrollTo("rev-quality")} />
+
         <Reveal id="rev-overview" delay={0}>
           <OverviewSection
             loading={loading}
@@ -332,6 +336,7 @@ export default function RevenueDashboard() {
             allRows={enriched}
             stagingReloadToken={stagingReloadToken}
             onLedgerChanged={load}
+            onPendingChange={setPendingReview}
           />
         </Reveal>
 

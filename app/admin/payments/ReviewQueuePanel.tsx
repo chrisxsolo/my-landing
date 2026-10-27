@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { findDuplicateSuspects, normalizePaymentMethod, type PaymentRow } from "@/lib/paymentFilters";
 import { fmtDate, fmtMoney } from "@/lib/revenue/format";
+import { summarizePendingReview, type PendingReviewSummary } from "@/lib/paymentSyncShared";
 import { GlassPanel } from "./Glass";
 import { METHOD_META, REV } from "./palette";
 
@@ -31,9 +32,10 @@ type Props = {
   activeRows: PaymentRow[]; // ledger rows for duplicate detection
   reloadToken: number; // bump to refetch staged rows (e.g. after a sync)
   onLedgerChanged: () => void; // parent reloads payments after approvals/voids
+  onPendingChange?: (summary: PendingReviewSummary) => void; // queue total for the dashboard banner
 };
 
-export default function ReviewQueuePanel({ activeRows, reloadToken, onLedgerChanged }: Props) {
+export default function ReviewQueuePanel({ activeRows, reloadToken, onLedgerChanged, onPendingChange }: Props) {
   const [staged, setStaged] = useState<StagedPayment[]>([]);
   const [busyIds, setBusyIds] = useState<Set<number>>(new Set());
   const [error, setError] = useState("");
@@ -50,6 +52,7 @@ export default function ReviewQueuePanel({ activeRows, reloadToken, onLedgerChan
   }, []);
 
   useEffect(() => { loadStaged(); }, [loadStaged, reloadToken]);
+  useEffect(() => { onPendingChange?.(summarizePendingReview(staged)); }, [staged, onPendingChange]);
 
   async function review(action: "approve" | "reject", ids: number[]) {
     setBusyIds(prev => new Set([...prev, ...ids]));

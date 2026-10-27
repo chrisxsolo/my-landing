@@ -7,6 +7,7 @@ import { useState } from "react";
 import { fmtMoney, fmtDate } from "@/lib/revenue/format";
 import type { LedgerRow } from "@/lib/revenue/enrich";
 import { countBySeverity, type QualityIssue } from "@/lib/revenue/quality";
+import type { PendingReviewSummary } from "@/lib/paymentSyncShared";
 import ReviewQueuePanel from "./ReviewQueuePanel";
 import { EmptyState, GlassPanel, InfoTip, SectionHeader } from "./Glass";
 import { REV, SEVERITY_META } from "./palette";
@@ -18,9 +19,12 @@ type Props = {
   allRows: LedgerRow[];
   stagingReloadToken: number;
   onLedgerChanged: () => void;
+  onPendingChange?: (summary: PendingReviewSummary) => void;
 };
 
-export default function QualitySection({ loading, issues, rowsById, allRows, stagingReloadToken, onLedgerChanged }: Props) {
+export default function QualitySection({
+  loading, issues, rowsById, allRows, stagingReloadToken, onLedgerChanged, onPendingChange,
+}: Props) {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [showAll, setShowAll] = useState(false);
@@ -50,7 +54,8 @@ export default function QualitySection({ loading, issues, rowsById, allRows, sta
   return (
     <div className="space-y-4">
       {/* Staged imports + duplicate suspects (existing approval workflow) */}
-      <ReviewQueuePanel activeRows={allRows} reloadToken={stagingReloadToken} onLedgerChanged={onLedgerChanged} />
+      <ReviewQueuePanel activeRows={allRows} reloadToken={stagingReloadToken}
+        onLedgerChanged={onLedgerChanged} onPendingChange={onPendingChange} />
 
       <GlassPanel className="p-5">
         <SectionHeader kicker="Data quality" title="Reconciliation checks" accent={REV.orange}
