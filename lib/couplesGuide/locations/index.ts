@@ -25,14 +25,16 @@ export const COUPLES_LOCATIONS: CouplesLocationData[] = [
 ];
 
 // Publishing model (per the "don't index thin pages" directive):
-//   - Every location is LISTED on the hubs and REACHABLE by URL (the written copy
-//     is genuinely useful), and is statically generated.
-//   - `published` controls SEARCH visibility only: a location is added to the
+//   - Every location is REACHABLE by URL and statically generated (the written copy
+//     is genuinely useful). Public hubs and related links list ONLY published
+//     locations, so no public page points search engines at a noindex guide;
+//     admin screens still see every location.
+//   - `published` controls search and listing visibility: a location is added to the
 //     sitemap and is indexable ONLY when published === true. Unpublished pages
 //     render with a noindex robots tag and are kept out of the sitemap until they
 //     have a credible set of photos. Flip `published: true` in the config to go live.
 
-/** All locations — used for routing/static params and the hub listings. */
+/** All locations — routing/static params, admin screens, and the content engine. */
 export function getAllCouplesLocations(): CouplesLocationData[] {
   return COUPLES_LOCATIONS;
 }
@@ -47,9 +49,9 @@ export function getCouplesLocation(slug: string): CouplesLocationData | null {
   return COUPLES_LOCATIONS.find((loc) => loc.slug === slug) ?? null;
 }
 
-/** Lightweight summaries for the locations hub grid and JSON-LD (all locations). */
+/** Lightweight summaries for the public hub grids and JSON-LD (published locations only). */
 export function getCouplesLocationSummaries(): CouplesLocationSummary[] {
-  return getAllCouplesLocations().map((loc) => ({
+  return getPublishedCouplesLocations().map((loc) => ({
     slug: loc.slug,
     name: loc.name,
     displayName: loc.displayName,
