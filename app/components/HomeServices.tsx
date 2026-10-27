@@ -5,6 +5,7 @@ import styles from "@/app/(professional)/home.module.css";
 import responsive from "@/app/(professional)/homeResponsive.module.css";
 import { PRICING_CATALOG, formatFee } from "@/lib/pricingCatalog";
 import { SERVICES_SECTION_ID } from "@/lib/homepageData";
+import { GRAD_SCHOOL_LINKS } from "@/lib/portfolioCategoryContent";
 
 type HomeImage = Pick<PortfolioImage, "id" | "image_url" | "alt" | "category_slug">;
 
@@ -16,14 +17,9 @@ const TRUST_POINTS = [
   `${TURNAROUND_WEEKS}-week turnaround`,
 ] as const;
 
-const SCHOOLS = [
-  ["UC Berkeley", "/grads/uc-berkeley"],
-  ["SJSU", "/grads/sjsu"],
-  ["USF", "/grads/usf"],
-  ["San Francisco State", "/grads/sf-state"],
-  ["CSU East Bay", "/grads/csueb"],
-  ["Stanford", "/grads/stanford"],
-] as const;
+// Every school with a live /grads/<slug> page, from the shared registry, so a
+// new campus guide shows up here without a hand edit.
+const SCHOOLS = GRAD_SCHOOL_LINKS;
 
 const { couples, families, graduation, maternity } = PRICING_CATALOG;
 
@@ -134,9 +130,9 @@ export default function HomeServices({
 
         <p className={styles.serviceNote}>
           I photograph graduates across{" "}
-          {SCHOOLS.map(([name, href], index) => (
+          {SCHOOLS.map(({ label, href }, index) => (
             <span key={href}>
-              <Link href={href}>{name}</Link>
+              <Link href={href}>{label}</Link>
               {index < SCHOOLS.length - 2 ? ", " : null}
               {index === SCHOOLS.length - 2 ? ", and " : null}
             </span>

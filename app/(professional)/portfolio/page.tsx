@@ -51,6 +51,9 @@ import { COUPLES_CATEGORY_SLUG, COUPLES_PORTFOLIO_PATH } from "@/lib/couplesRout
 // Max photos shown per view — keeps the page to curated proof, not a 100-image
 // wall. The audit's target is "your best 24–36"; 30 sits in the middle.
 const CURATED_LIMIT = 30;
+// The wall's first row (4 columns on desktop) is in the first screen, so it
+// loads eagerly; everything below waits until scrolled near.
+const FIRST_ROW_PHOTOS = 4;
 
 export const metadata: Metadata = {
   title: "Portfolio",
@@ -226,13 +229,14 @@ export default async function PortfolioPage({
       <section className={styles.portGallery} aria-label={`${selected?.name ?? "Selected work"} photos`}>
         {displayImages.length > 0 ? (
           <div className={styles.portImageWall}>
-            {displayImages.map((image) => (
+            {displayImages.map((image, index) => (
               <figure key={image.id} className={styles.portFigure} data-category={image.category_slug}>
                 <OptimizedPhoto
                   src={image.image_url}
                   alt={image.alt}
                   className={styles.portImg}
                   sizes="(max-width: 760px) 50vw, (max-width: 980px) 33vw, 25vw"
+                  loading={index < FIRST_ROW_PHOTOS ? "eager" : "lazy"}
                   quality={75}
                 />
               </figure>

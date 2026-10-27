@@ -104,6 +104,9 @@
 }
 
 .proDropdownWrap { position: relative; }
+/* Closed menus stay in the HTML for crawlers; `hidden` must beat the display
+   values the open-state rules below set. */
+.proNavDropdown[hidden], .proMobileSubmenu[hidden], .proMobilePanel[hidden] { display: none; }
 .proNavDropdown {
   position: absolute;
   top: calc(100% + 10px);
