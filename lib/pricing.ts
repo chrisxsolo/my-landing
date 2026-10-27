@@ -92,6 +92,26 @@ export function enforceSessionLength(people: number, requested: SessionLengthKey
   return SESSION_LENGTH_KEYS.find((key) => isSessionLengthAllowed(people, key)) ?? requested
 }
 
+/**
+ * The graduation session price for a headcount and length. The estimator,
+ * Draft AI's facts, the quote check and the contract all read it from here,
+ * so the duration rule lives in one place.
+ *
+ * One graduate books by the hour. A group pays the per-person rate, which
+ * covers the included time (60 minutes, or the 90-minute minimum for 3+), and
+ * time past that is the extra-30-minutes add-on.
+ *
+ * The public pricing page presents both an hourly rate and a "$100 / 30 min"
+ * extended-time add-on for the single session, which disagree at 90 minutes
+ * ($525 by the hour, $450 with the add-on). Which one is the rule is the
+ * owner's call; until it is made, this keeps what the estimator has shown.
+ */
+export function graduationSessionPrice(people: number, durationMinutes: number = includedMinutesFor(people)): number {
+  if (people <= 1) return GRAD_HOURLY_RATE * (durationMinutes / 60)
+  const extraHalfHours = Math.max(0, durationMinutes - includedMinutesFor(people)) / 30
+  return getGroupRatePerPerson(people) * people + extraHalfHours * ADDON_EXTRA_30_MIN
+}
+
 export interface EstimateInput {
   school: SchoolValue
   people: number
@@ -115,19 +135,10 @@ export interface EstimateResult {
 
 export type GraduationEstimate = EstimateResult & { sessionLength: SessionLengthKey }
 
-function graduationSessionBase(people: number, sessionLength: SessionLengthKey): number {
-  if (people <= 1) return GRAD_HOURLY_RATE * SESSION_LENGTHS[sessionLength]
-  // Group rate is per person and already covers the included time (60 min, or
-  // the 90-minute group minimum for 3+) — the same rule the contract tool and
-  // the email assistant quote. Time past that is the extra-30-minutes add-on.
-  const extraHalfHours = Math.max(0, minutesOf(sessionLength) - includedMinutesFor(people)) / 30
-  return getGroupRatePerPerson(people) * people + extraHalfHours * ADDON_EXTRA_30_MIN
-}
-
 export function calculateGraduationEstimate(input: EstimateInput): GraduationEstimate {
   const { school, people, extraOutfit, secondLocation, expedited, champagne } = input
   const sessionLength = enforceSessionLength(people, input.sessionLength)
-  const sessionBase = graduationSessionBase(people, sessionLength)
+  const sessionBase = graduationSessionPrice(people, minutesOf(sessionLength))
 
   let addons = 0
   if (extraOutfit)    addons += ADDON_EXTRA_OUTFIT

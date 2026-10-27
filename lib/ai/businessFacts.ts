@@ -17,6 +17,7 @@ import {
   BOOKING_POLICY,
   calculatePaymentSchedule,
 } from "@/lib/pricingCatalog";
+import { graduationSessionPrice } from "@/lib/pricing";
 import { resolvePlaybookKey } from "./sessionClassifier";
 import { resolveTravel, type TravelResolution } from "@/lib/travelResolution";
 
@@ -64,7 +65,7 @@ function graduationFacts(peopleCount: number): PricingFacts {
       // "2 people for 1.5hours", the facts said nothing about what a longer
       // group session costs, and the model spent its whole output budget
       // reasoning about it and returned a truncated draft.
-      lines.push(`The group rate covers the standard ${grad.durationRules.standardMinutes}-minute session. A longer booking adds the extra 30 minutes add-on at ${money(grad.addOns.extra30Minutes.price)} per 30 minutes, so ${peopleCount} graduates for 90 minutes is ${money(total)} plus ${money(grad.addOns.extra30Minutes.price)}, ${money(total + grad.addOns.extra30Minutes.price)} total.`);
+      lines.push(`The group rate covers the standard ${grad.durationRules.standardMinutes}-minute session. A longer booking adds the extra 30 minutes add-on at ${money(grad.addOns.extra30Minutes.price)} per 30 minutes, so ${peopleCount} graduates for 90 minutes is ${money(total)} plus ${money(grad.addOns.extra30Minutes.price)}, ${money(graduationSessionPrice(peopleCount, 90))} total.`);
     }
   }
 
@@ -81,11 +82,12 @@ function graduationFacts(peopleCount: number): PricingFacts {
   return {
     verified: true,
     lines,
-    // Both the per-person rate and the group total are quotable figures, and a
-    // longer booking is a multiple of the hourly rate.
+    // Both the per-person rate and the group total are quotable figures. A
+    // single graduate's longer bookings are priced by the one duration rule in
+    // lib/pricing.ts, the same one the public estimator shows.
     basePrices: peopleCount <= 1
-      ? [grad.baseHourlyRate, grad.baseHourlyRate * 1.5, grad.baseHourlyRate * 2]
-      : [perPerson, perPerson * peopleCount],
+      ? grad.durationRules.allowedMinutes.map((minutes) => graduationSessionPrice(1, minutes))
+      : [perPerson, graduationSessionPrice(peopleCount)],
     addOnPrices: [
       grad.addOns.extraOutfit.price, grad.addOns.secondLocation.price,
       grad.addOns.extra30Minutes.price, grad.addOns.expedited.price,

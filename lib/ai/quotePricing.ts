@@ -14,7 +14,7 @@
 //   correctDraftPricing  rewrites only the mismatched figures, nothing else
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { GRAD_HOURLY_RATE, getGroupRatePerPerson } from "@/lib/pricing";
+import { getGroupRatePerPerson, graduationSessionPrice, includedMinutesFor } from "@/lib/pricing";
 import { calculatedTravelFee, APPROVED_TRAVEL_FEES, type VerifiedRouteKey } from "@/lib/travelFee";
 import type { TravelResolution } from "@/lib/travelResolution";
 import type { ThreadMessage } from "./threadDigest";
@@ -64,6 +64,8 @@ export interface QuoteInput {
   travel: TravelResolution;
   /** Prices the admin confirmed as agreed for this client; never flagged. */
   confirmedPrices?: number[];
+  /** The graduation length the client asked for, in minutes; the included length when absent. */
+  durationMinutes?: number;
 }
 
 const MONEY = String.raw`\$\s?([\d,]+(?:\.\d{2})?)`;
@@ -100,13 +102,23 @@ function travelLabel(travel: TravelResolution): string {
   return travel.campus === "sjsu" ? "SJSU travel fee" : `Travel fee (${travel.place})`;
 }
 
+/** "Graduation session", with the headcount and any non-standard length spelled out. */
+function graduationLabel(people: number, durationMinutes: number | undefined): string {
+  const headcount = people > 1 ? ` (${people} × ${money(getGroupRatePerPerson(people))})` : "";
+  const length = durationMinutes && durationMinutes !== includedMinutesFor(people) ? `, ${durationMinutes} min` : "";
+  return `Graduation session${headcount}${length}`;
+}
+
 /** The session line the rate card can name without guessing, or null. */
 function sessionLine(input: QuoteInput, draftPrices: number[]): QuoteLine | null {
   if (input.playbook === "graduation") {
     const people = peopleCount(input.people);
-    if (people <= 1) return { kind: "session", label: "Graduation session", amount: GRAD_HOURLY_RATE };
-    const rate = getGroupRatePerPerson(people);
-    return { kind: "session", label: `Graduation session (${people} × ${money(rate)})`, amount: rate * people };
+    // One duration rule for every surface (lib/pricing.ts).
+    return {
+      kind: "session",
+      label: graduationLabel(people, input.durationMinutes),
+      amount: graduationSessionPrice(people, input.durationMinutes),
+    };
   }
   // Other services offer several packages: use the one the draft names, if exactly one.
   const named = input.basePrices.filter((p) => draftPrices.includes(p));

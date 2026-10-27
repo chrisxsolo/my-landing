@@ -11,9 +11,12 @@ import {
   calculateCouplesEstimate,
   calculateGraduationEstimate,
   enforceSessionLength,
+  graduationSessionPrice,
   isSessionLengthAllowed,
   type EstimateInput,
 } from "@/lib/pricing";
+import { buildPricingFacts } from "@/lib/ai/businessFacts";
+import { authoritativeQuote } from "@/lib/ai/quotePricing";
 
 const BASE: EstimateInput = {
   school: "usf",
@@ -86,6 +89,27 @@ describe("graduation group duration minimum", () => {
     const estimate = calculateGraduationEstimate({ ...BASE, people: 3, sessionLength: "1hr" });
     expect(estimate.sessionLength).toBe("1.5hr");
     expect(estimate.groupNote).toMatch(/at least 90 minutes/);
+  });
+});
+
+describe("one graduation duration rule", () => {
+  it("is what the estimator, Draft AI facts and quote check all price from", () => {
+    for (const people of [1, 2, 3, 6]) {
+      for (const [length, minutes] of [["1hr", 60], ["1.5hr", 90], ["2hr", 120]] as const) {
+        if (!isSessionLengthAllowed(people, length)) continue;
+        expect(calculateGraduationEstimate({ ...BASE, people, sessionLength: length }).sessionBase)
+          .toBe(graduationSessionPrice(people, minutes));
+      }
+    }
+    expect(buildPricingFacts({ sessionType: "Graduation", message: "", people: 1 }).basePrices)
+      .toEqual([60, 90, 120].map((minutes) => graduationSessionPrice(1, minutes)));
+    expect(buildPricingFacts({ sessionType: "Graduation", message: "", people: 2 }).lines.join(" "))
+      .toContain(`$${graduationSessionPrice(2, 90)} total`);
+    const input = { playbook: "graduation", people: "2", basePrices: [], addOnPrices: [], travel: { kind: "none" as const } };
+    expect(authoritativeQuote({ ...input, durationMinutes: 90 })?.lines[0]).toEqual({
+      kind: "session", label: "Graduation session (2 × $300), 90 min", amount: graduationSessionPrice(2, 90),
+    });
+    expect(authoritativeQuote(input)?.lines[0].amount).toBe(graduationSessionPrice(2));
   });
 });
 

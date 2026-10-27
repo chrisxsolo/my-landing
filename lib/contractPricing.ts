@@ -19,7 +19,7 @@ import { classifySession } from "./ai/sessionClassifier";
 import { buildQuoteInputForInquiry } from "./ai/inquiryQuote";
 import { staleQuotedPrices } from "./ai/quotePricing";
 import type { ThreadMessage } from "./ai/threadDigest";
-import { GRAD_HOURLY_RATE, getGroupRatePerPerson } from "./pricing";
+import { graduationSessionPrice } from "./pricing";
 import { PRICING_CATALOG } from "./pricingCatalog";
 import { resolveTravel, schoolImpliesLocationFor, type TravelResolution } from "./travelResolution";
 
@@ -72,7 +72,7 @@ function catalogSessionPrices(booking: ContractBooking): number[] {
   if (service === "maternity") return [PRICING_CATALOG.maternity.price];
   if (service !== "graduation") return [];
   const people = Number(String(booking.people ?? "1").match(/\d+/)?.[0] ?? 1) || 1;
-  return people > 1 ? [getGroupRatePerPerson(people) * people] : [GRAD_HOURLY_RATE];
+  return [graduationSessionPrice(people)];
 }
 
 /** Whether only an outdated travel figure explains this agreed total. */
