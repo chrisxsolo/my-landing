@@ -82,7 +82,8 @@ import TestimonialsTab from "@/app/admin/TestimonialsTab";
 import CouplesPosingGuideTab from "@/app/admin/CouplesPosingGuideTab";
 import { uploadImage } from "@/lib/uploadImage";
 import { parsePositivePaymentCents } from "@/lib/paymentAmount";
-import { describePaymentSyncOutcome } from "@/lib/paymentSyncShared";
+import { describePaymentSyncOutcome, formatReviewDollars, summarizePendingReview, type PendingReviewSummary } from "@/lib/paymentSyncShared";
+import { averageBookingCents, headlineRevenue } from "@/lib/revenue/headline";
 import {
   type GradLocationOption,
   type GradSchoolOption,
@@ -128,7 +129,7 @@ type Tab = "home"|WebsiteTab|"analytics"|"payments"|"inquiries"|"clients"|"testi
 type ImageLibraryRow = { id:number; title:string; alt:string|null; image_url:string; source_type:string; source_post_id:number|null; source_post_slug:string|null; source_role:string; in_portfolio:boolean; created_at:string; };
 type Inquiry = AdminInquiry;
 type AdminSessionsResponse = { sessions?: AdminClientSessionDTO[]; session?: AdminClientSessionDTO; error?: string; };
-type AdminPaymentSummaryRow = { inquiry_id:number|null; amount:string; client_email:string; payment_type:string|null };
+type AdminPaymentSummaryRow = { inquiry_id:number|null; amount:string; amount_cents:number|null; client_email:string; client_name:string; payment_type:string|null; status:string|null; source:string|null; note:string|null; paid_at:string|null; session_date:string|null };
 
 function fmt12h(t:string|null):string{
   if(!t)return"";
@@ -334,6 +335,8 @@ function AdminDashboard() {
   // ── Inquiries ─────────────────────────────────────────────────────────
   const [inquiries,setInquiries]=useState<Inquiry[]>([]);
   const [inquiriesLoading,setInquiriesLoading]=useState(false);
+  const [ledgerPayments,setLedgerPayments]=useState<AdminPaymentSummaryRow[]>([]);
+  const [pendingPaymentReview,setPendingPaymentReview]=useState<PendingReviewSummary>({count:0,cents:0});
   const [finalPaymentIds,setFinalPaymentIds]=useState<Set<number>>(new Set());
   const [deposit1Amounts,setDeposit1Amounts]=useState<Map<number,string>>(new Map());
   const [cardPaymentId,setCardPaymentId]=useState<number|null>(null);
@@ -804,6 +807,12 @@ function AdminDashboard() {
         console.error("[admin] payments summary failed", err);
         return { payments: [] };
       });
+    // Detected-but-unapproved payments: shown on the Home card so revenue that
+    // is waiting in the review queue is never mistaken for missing revenue.
+    fetch("/api/admin/payment-staging")
+      .then(res => res.json() as Promise<{ staged?: { amount_cents: number | null }[] }>)
+      .then(json => setPendingPaymentReview(summarizePendingReview(json.staged ?? [])))
+      .catch(err => console.error("[admin] payment review queue load failed", err));
     const [inquiryRows, paymentJson] = await Promise.all([
       loadAdminInquiries().catch(err => {
         console.error("[admin] inquiries load failed",err);
@@ -813,6 +822,7 @@ function AdminDashboard() {
       paymentsReq,
     ]);
     const paymentRows = paymentJson.payments ?? [];
+    setLedgerPayments(paymentRows);
     const dep2 = paymentRows.filter(p => p.payment_type === "deposit_2" && p.inquiry_id);
     const dep1 = paymentRows.filter(p => p.payment_type === "deposit_1");
     setInquiries(inquiryRows);
@@ -1830,18 +1840,13 @@ function AdminDashboard() {
             .sort((a,b)=>new Date(a.session_date!+"T12:00:00").getTime()-new Date(b.session_date!+"T12:00:00").getTime())
             .slice(0,5);
 
-          // Revenue this month (paid sessions with payment detected this month)
-          const parsePayment=(inq:Inquiry)=>{
-            const match=(inq.payment_note||"").match(/\$?([\d,]+(?:\.\d{2})?)/);
-            return match?parseFloat(match[1].replace(",","")):0;
-          };
-          const monthRevenue=inquiries
-            .filter(inq=>inq.payment_status==="paid"&&inq.payment_detected_at&&new Date(inq.payment_detected_at)>=monthStart)
-            .reduce((sum,inq)=>sum+parsePayment(inq),0);
-          const prevMonthStart=new Date(now.getFullYear(),now.getMonth()-1,1);
-          const prevMonthRevenue=inquiries
-            .filter(inq=>inq.payment_status==="paid"&&inq.payment_detected_at&&new Date(inq.payment_detected_at)>=prevMonthStart&&new Date(inq.payment_detected_at)<monthStart)
-            .reduce((sum,inq)=>sum+parsePayment(inq),0);
+          // Revenue: confirmed ledger payments by paid date (same rules as the Revenue tab).
+          const revenue=headlineRevenue(ledgerPayments,now);
+          const monthRevenue=revenue.thisMonthCents/100;
+          const prevMonthRevenue=revenue.lastMonthCents/100;
+          const revenueSub=pendingPaymentReview.count>0
+            ?`this month · ${formatReviewDollars(pendingPaymentReview.cents)} awaiting approval`
+            :`this month · ${formatReviewDollars(revenue.ytdCents)} year to date`;
 
           // Quick stats
           const totalClients=new Set(inquiries.map(i=>i.email.toLowerCase())).size;
@@ -1933,7 +1938,7 @@ function AdminDashboard() {
               {/* Stats — clickable, animated */}
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 mb-5">
                 {([
-                  {label:"Revenue",value:Math.round(monthRevenue),prefix:"$",sub:"collected this month",accent:T.green,go:"payments" as Tab},
+                  {label:"Revenue",value:Math.round(monthRevenue),prefix:"$",sub:revenueSub,accent:T.green,go:"payments" as Tab},
                   {label:"Booked",value:confirmedSessions,prefix:"",sub:"confirmed sessions",accent:T.violet,go:"clients" as Tab},
                   {label:"New",value:newThisMonth,prefix:"",sub:"inquiries this month",accent:T.amber,go:"inquiries" as Tab},
                   {label:"Clients",value:totalClients,prefix:"",sub:"all-time clients",accent:T.blue,go:"clients" as Tab},
@@ -2078,8 +2083,8 @@ function AdminDashboard() {
                     const leads=inquiries
                       .filter(i=>i.payment_status!=="paid"&&active(i)&&(i.reply_sent_at||i.status==="responded")&&new Date(i.created_at).getTime()>=leadCutoff)
                       .sort((a,b)=>new Date(b.created_at).getTime()-new Date(a.created_at).getTime());
-                    const paidAmounts=inquiries.filter(i=>i.payment_status==="paid").map(parsePayment).filter(n=>n>0);
-                    const avgPaid=paidAmounts.length?paidAmounts.reduce((a,b)=>a+b,0)/paidAmounts.length:350;
+                    const avgBooking=averageBookingCents(ledgerPayments);
+                    const avgPaid=avgBooking!==null?avgBooking/100:350;
                     const atStake=Math.round(leads.length*avgPaid);
                     const markDelivered=async(i:Inquiry)=>{
                       const ts=new Date().toISOString();
