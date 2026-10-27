@@ -5,11 +5,14 @@
 //     A spot with no lib/schoolSpots definition can't be matched and is skipped.
 //   • fillCandidates: one school page's eligible photos, with the facts the
 //     matcher needs. Same curated list as /grads/<slug>, so hidden photos and
-//     photos of other schools never qualify.
+//     photos of other schools never qualify. With photo facts (the sync), a
+//     blocked photo (excluded, permission revoked, unpublished) is dropped and
+//     each photo carries its own confirmed location and GPS place.
 //   • applyAutoPhotos: shows an automatic photo only on a spot with no photo,
 //     only while that photo is still eligible, and never twice on the page.
 import type { LocationSpot } from "@/lib/gradGuideData";
 import type { AutoRow, FillCandidate, SpotSlot } from "@/lib/campusSpotFill/match";
+import type { PhotoFacts } from "@/lib/campusSpotFill/photoFacts";
 import { curatePage } from "@/lib/pagePhotos/curate";
 import { candidatesForPage, curationFor } from "@/lib/pagePhotos/candidates";
 import { schoolPageKey } from "@/lib/pagePhotos/pageKeys";
@@ -58,26 +61,32 @@ export function campusSpotSlots(spots: readonly LocationSpot[]): SpotSlot[] {
 const sessionIdOf = (sessionKey: string) => (sessionKey.startsWith("session:") ? sessionKey.slice(8) : null);
 
 /** One school page's eligible photos, in its curated order. */
-export function fillCandidates(pool: PhotoPool, slug: SchoolSlug): FillCandidate[] {
+export function fillCandidates(pool: PhotoPool, slug: SchoolSlug, facts?: PhotoFacts): FillCandidate[] {
   const key = schoolPageKey(slug);
   const { ordered, overflow } = curatePage(candidatesForPage(pool, key), curationFor(pool, key), {
     limit: Number.MAX_SAFE_INTEGER, preferPortraitHero: true, mixPlacements: true,
   });
   const titleByUrl = new Map(pool.photos.map((p) => [p.url, p.title]));
   const tagByUrl = new Map(pool.spotTags.filter((t) => t.schoolSlug === slug).map((t) => [t.imageUrl, t]));
-  return [...ordered, ...overflow].map((c, order) => {
-    const sessionId = sessionIdOf(c.sessionKey);
-    const tag = tagByUrl.get(c.url);
-    return {
-      url: c.url,
-      schoolSlug: slug,
-      text: [titleByUrl.get(c.url), c.alt].filter(Boolean).join(" · "),
-      width: c.width, height: c.height, quality: c.quality, featured: c.featured, order,
-      placeKey: c.placeKey ?? null,
-      tag: tag ? { spotKey: tag.spotKey, featured: tag.isFeatured } : null,
-      sessionLocations: sessionId ? pool.sessionLocations?.[sessionId] ?? [] : [],
-    };
-  });
+  return [...ordered, ...overflow]
+    .filter((c) => !facts?.get(c.url)?.blocked)
+    .map((c, order) => {
+      const sessionId = sessionIdOf(c.sessionKey);
+      const tag = tagByUrl.get(c.url);
+      const fact = facts?.get(c.url);
+      return {
+        url: c.url,
+        schoolSlug: slug,
+        text: [titleByUrl.get(c.url), c.alt].filter(Boolean).join(" · "),
+        width: c.width, height: c.height, quality: c.quality, featured: c.featured, order,
+        placeKey: c.placeKey ?? null,
+        tag: tag ? { spotKey: tag.spotKey, featured: tag.isFeatured } : null,
+        sessionLocations: sessionId ? pool.sessionLocations?.[sessionId] ?? [] : [],
+        fromSession: sessionId !== null,
+        photoLocation: fact?.photoLocation ?? null,
+        gpsPlace: fact?.gpsPlace ?? null,
+      };
+    });
 }
 
 /** Eligible photo URLs per school, for the render-time check. */

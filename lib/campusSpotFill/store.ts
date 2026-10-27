@@ -9,6 +9,7 @@ import {
   CAMPUS_SPOT_AUTO_PHOTOS_TABLE, CLAIM_CAMPUS_SPOT_PHOTO_RPC,
   type AutoRow, type Claim, type FillEvidence,
 } from "@/lib/campusSpotFill/match";
+import { loadBlockedUrls } from "@/lib/campusSpotFill/photoFacts";
 
 // Deployed ahead of its migration: no automatic photos instead of an error.
 const MISSING_TABLE_CODES = new Set(["42P01", "PGRST205"]);
@@ -32,6 +33,13 @@ export async function readAutoRows(client: SupabaseClient): Promise<AutoRow[]> {
   }
   if (error) throw new Error(`could not read automatic spot photos: ${error.message}`);
   return ((data ?? []) as Record<string, unknown>[]).map(toAutoRow).filter((r): r is AutoRow => r !== null);
+}
+
+/** The picks the public page may show: a photo excluded or without marketing permission is dropped. */
+export async function readPublicAutoRows(client: SupabaseClient): Promise<AutoRow[]> {
+  const rows = await readAutoRows(client);
+  const blocked = await loadBlockedUrls(client, rows.map((r) => r.imageUrl));
+  return rows.filter((r) => !blocked.has(r.imageUrl));
 }
 
 export async function releaseAutoRow(client: SupabaseClient, row: AutoRow): Promise<void> {

@@ -7,12 +7,14 @@ import { cachePublicContent } from "@/lib/publicContentCache";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { getPhotoPool } from "@/lib/pagePhotos/pool";
 import { applyAutoPhotos, eligibleUrlsBySchool } from "@/lib/campusSpotFill/pageSpots";
-import { readAutoRows } from "@/lib/campusSpotFill/store";
+import { readPublicAutoRows } from "@/lib/campusSpotFill/store";
 
-// A failed read throws out of the wrapper, so it is never cached.
+// A failed read throws out of the wrapper, so it is never cached. A pick whose
+// Content Engine photo was excluded or lost marketing permission is dropped
+// here at render time, before the next sync releases it.
 const getAutoRows = cachePublicContent(
-  async () => readAutoRows(createSupabaseServerClient()),
-  ["campus-spot-auto-photos-v1"],
+  async () => readPublicAutoRows(createSupabaseServerClient()),
+  ["campus-spot-auto-photos-v2"],
 );
 
 export async function withAutoFilledCampusSpots(spots: LocationSpot[]): Promise<LocationSpot[]> {
