@@ -15,6 +15,7 @@
 import {
   PRICING_CATALOG,
   BOOKING_POLICY,
+  addOnPriceValues,
   calculatePaymentSchedule,
 } from "@/lib/pricingCatalog";
 import { graduationSessionPrice } from "@/lib/pricing";
@@ -202,9 +203,8 @@ function familyFacts(peopleCount: number): PricingFacts {
     verified: true,
     lines,
     basePrices: [families.packages.standard.price, families.packages.extended.price],
-    // These are display ranges in the catalog, so the low and high ends of each
-    // are both legitimate.
-    addOnPrices: [125, 150, 50, 75, 100],
+    // Read off the catalog: a fixed price, or both ends of a range.
+    addOnPrices: addOnPriceValues(families.addOns),
     needsManualQuote,
   };
 }
