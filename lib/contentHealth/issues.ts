@@ -8,6 +8,11 @@ const PHOTO_TAGGING_PATH = "/admin/content-engine/photos";
 /** The Campus Spots tab of the main admin (LocationsTab). */
 export const CAMPUS_SPOTS_EDITOR_PATH = "/admin?tab=locations";
 export const LOCATION_LIBRARY_PATH = "/admin/content-engine/locations";
+export const CONTENT_ENGINE_PATH = "/admin/content-engine";
+const PORTFOLIO_EDITOR_PATH = "/admin?tab=portfolio";
+
+/** Where a failed sync or run of one session is fixed. */
+export const sessionEditorPath = (sessionId: string) => `${CONTENT_ENGINE_PATH}/${sessionId}`;
 
 export const SYNC_KIND_LABELS: Record<SyncKind, string> = {
   campus_spots: "Campus spots",
@@ -29,6 +34,8 @@ export interface HealthItem {
   /** Extra context, or why the count is unavailable. */
   detail: string | null;
   href: string;
+  /** A count to know, not a problem to fix: never shown in warning colors. */
+  informational?: boolean;
 }
 
 function item<T>(
@@ -42,8 +49,15 @@ function item<T>(
 
 /** One row per tracked issue, in the order the card lists them. */
 export function healthItems(report: ContentHealthReport): HealthItem[] {
-  const { tagging, campusSpots, locationGuides } = report;
+  const { tagging, campusSpots, locationGuides, jobs, publishedPhotos } = report;
   return [
+    { ...item("published-photos", "Published photos", PORTFOLIO_EDITOR_PATH, publishedPhotos, (v) => v.published),
+      informational: true },
+    item("failed-runs", "Failed content runs (30 days)", CONTENT_ENGINE_PATH, jobs, (v) => v.recentFailures.length),
+    item("waiting-runs", "Content runs waiting", CONTENT_ENGINE_PATH, jobs, (v) => v.queued + v.stalled,
+      (v) => (v.waitingTooLong > 0 || v.stalled > 0
+        ? `${v.waitingTooLong + v.stalled} waiting over 6h or stalled — check the worker`
+        : null)),
     item("needs-tagging", "Photos needing tagging", taggingHref("needs"), tagging, (v) => v.needsTagging),
     item("grads-missing-school", "Grads missing school", taggingHref("grads-missing-school"), tagging,
       (v) => v.gradsMissingSchool),

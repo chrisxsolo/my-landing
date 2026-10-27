@@ -4,6 +4,7 @@
 import type { SyncKind, SyncRunRow } from "@/lib/photoSync/runLog";
 import { summarizeSyncRuns } from "@/lib/photoSync/runLog";
 import type { TagCounts } from "@/lib/photoTagging/types";
+import type { JobsHealthDto } from "@/lib/contentHealth/jobs";
 
 export type HealthPart<T> = { ok: true; value: T } | { ok: false; error: string };
 
@@ -18,7 +19,20 @@ export interface SyncFailureDto {
 
 export interface SyncHealthDto {
   lastOk: Partial<Record<SyncKind, string>>;
+  lastAttempt: Partial<Record<SyncKind, string>>;
+  /** Newest sync started by the background worker: its heartbeat. */
+  lastWorkerRun: string | null;
   failures: SyncFailureDto[];
+}
+
+/** The worker should tick every few minutes; this long without a tick is worth a look. */
+export const WORKER_QUIET_MS = 6 * 60 * 60 * 1000;
+
+/** True when the worker has not ticked recently (or never has). Pure. */
+export function workerLooksIdle(lastWorkerRun: string | null, now = Date.now()): boolean {
+  if (!lastWorkerRun) return true;
+  const at = new Date(lastWorkerRun).getTime();
+  return Number.isNaN(at) || now - at > WORKER_QUIET_MS;
 }
 
 export interface TaggingHealthDto {
@@ -38,8 +52,14 @@ export interface GuideReviewDto {
   awaitingReview: number;
 }
 
+export interface PublishedPhotosDto {
+  published: number;
+}
+
 export interface ContentHealthReport {
   sync: HealthPart<SyncHealthDto>;
+  jobs: HealthPart<JobsHealthDto>;
+  publishedPhotos: HealthPart<PublishedPhotosDto>;
   tagging: HealthPart<TaggingHealthDto>;
   campusSpots: HealthPart<CampusSpotHealthDto>;
   locationGuides: HealthPart<GuideReviewDto>;
@@ -57,10 +77,12 @@ export async function settlePart<T>(label: string, run: () => Promise<T>): Promi
 }
 
 /** Last success per kind and failures not since resolved, from runs newest first. */
-export function syncHealthFrom(runs: readonly SyncRunRow[]): SyncHealthDto {
-  const { lastOk, unresolvedFailures } = summarizeSyncRuns(runs);
+export function syncHealthFrom(runs: readonly SyncRunRow[], now = Date.now()): SyncHealthDto {
+  const { lastOk, lastAttempt, lastWorkerRun, unresolvedFailures } = summarizeSyncRuns(runs, now);
   return {
     lastOk,
+    lastAttempt,
+    lastWorkerRun,
     failures: unresolvedFailures.map((r) => ({
       runId: r.id, kind: r.kind, scope: r.scope, error: r.error, startedAt: r.startedAt,
     })),
