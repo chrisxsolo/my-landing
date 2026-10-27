@@ -3,13 +3,19 @@
 // syncSessionInBackground; it runs after the response (next/server after()),
 // so a sync problem can never fail the admin's own action. New drafts get an
 // AI profile in the same background run; the admin can always regenerate.
+// Every sync is logged in photo_sync_runs (lib/photoSync/runLog): a session
+// that failed is visible in the admin and can be retried from there.
 import { after } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
 import { createAnthropicCaller } from "@/lib/contentEngine/aiClient";
 import { revalidatePublicContent } from "@/lib/publicRevalidation";
+import { runLogged, type LoggedRun, type SyncTrigger } from "@/lib/photoSync/runLog";
 import { generateLocationProfile } from "@/lib/locationLibrary/profile";
-import { syncAllSessions, syncSessionLocations, type SessionSyncReport } from "@/lib/locationLibrary/sync";
+import {
+  syncAllSessions, syncSessionLocations, type FullSyncReport, type SessionSyncReport,
+} from "@/lib/locationLibrary/sync";
+import { summarizeFullSync, summarizeSessionSync } from "@/lib/locationLibrary/syncSummary";
 
 /** Profiles the drafts a sync created. Without an API key the drafts simply wait for review. */
 export async function profileNewDrafts(client: SupabaseClient, locationIds: number[]): Promise<void> {
@@ -19,12 +25,42 @@ export async function profileNewDrafts(client: SupabaseClient, locationIds: numb
   for (const id of locationIds) await generateLocationProfile(client, callModel, id);
 }
 
-export async function syncSessionNow(sessionId: string): Promise<SessionSyncReport> {
+/** After a sync: profile its new drafts (a profile failure never fails the sync), then refresh the public pages. */
+async function finishSync(client: SupabaseClient, createdIds: number[], revalidate: boolean): Promise<void> {
+  try {
+    await profileNewDrafts(client, createdIds);
+  } catch (err) {
+    console.error("[location-library] could not profile new drafts", err);
+  }
+  if (revalidate) revalidatePublicContent();
+}
+
+/** One logged session sync. Never throws: a failure is in the result (and in photo_sync_runs). */
+export async function syncSessionLogged(
+  sessionId: string, trigger: SyncTrigger, retryOf: number | null = null,
+): Promise<LoggedRun<SessionSyncReport>> {
   const client = createSupabaseAdminClient();
-  const report = await syncSessionLocations(client, sessionId);
-  await profileNewDrafts(client, report.createdLocationIds);
-  if (report.status !== "error") revalidatePublicContent();
-  return report;
+  const run = await runLogged(client, { kind: "location_library", scope: sessionId, trigger, retryOf },
+    () => syncSessionLocations(client, sessionId), summarizeSessionSync);
+  if (run.result) await finishSync(client, run.result.createdLocationIds, run.result.status !== "error");
+  return run;
+}
+
+export async function syncSessionNow(sessionId: string): Promise<SessionSyncReport> {
+  const run = await syncSessionLogged(sessionId, "admin");
+  if ("thrown" in run) throw run.thrown;
+  return run.result as SessionSyncReport;
+}
+
+/** One logged sync of every session. Never throws. */
+export async function syncAllSessionsLogged(
+  trigger: SyncTrigger, retryOf: number | null = null,
+): Promise<LoggedRun<FullSyncReport>> {
+  const client = createSupabaseAdminClient();
+  const run = await runLogged(client, { kind: "location_library", scope: null, trigger, retryOf },
+    () => syncAllSessions(client), summarizeFullSync);
+  if (run.result) await finishSync(client, run.result.sessions.flatMap((s) => s.createdLocationIds), true);
+  return run;
 }
 
 /** Queues a session sync after the response. Never throws into the caller. */
@@ -78,10 +114,12 @@ export function syncItemSessionInBackground(itemId: string): void {
  */
 export async function sweepLocationLibrary(): Promise<{ sessions: number; errors: number } | null> {
   try {
-    const client = createSupabaseAdminClient();
-    const report = await syncAllSessions(client);
-    await profileNewDrafts(client, report.sessions.flatMap((s) => s.createdLocationIds));
-    revalidatePublicContent();
+    const run = await syncAllSessionsLogged("worker");
+    if (!run.result) {
+      console.error("[location-library] sweep failed", run.thrown ?? run.error);
+      return null;
+    }
+    const report = run.result;
     return { sessions: report.sessions.length, errors: report.sessions.filter((s) => s.status === "error").length };
   } catch (err) {
     console.error("[location-library] sweep failed", err);

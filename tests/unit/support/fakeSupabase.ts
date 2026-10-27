@@ -105,7 +105,8 @@ class Query implements PromiseLike<{ data: unknown; error: { message: string } |
   private write() {
     const list = Array.isArray(this.payload) ? (this.payload as Row[]) : [this.payload as Row];
     if (this.kind === "insert" || this.kind === "upsert") {
-      const added = list.map((r, i) => ({ id: this.rows().length + i + 1, ...r }));
+      const next = Math.max(0, ...this.rows().map((r) => (typeof r.id === "number" ? r.id : 0))) + 1;
+      const added = list.map((r, i) => ({ id: next + i, ...r }));
       this.rows().push(...added);
       this.fake.ops.push({ table: this.table, kind: this.kind, payload: this.payload, matched: added });
       const data = this.returning ? (this.one ? added[0] : added) : null;
