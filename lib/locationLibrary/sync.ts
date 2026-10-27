@@ -9,6 +9,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { medianCoordinates, matchPlacesByName, type Coordinates } from "@/lib/locations/match";
 import type { KnownPlace } from "@/lib/locations/places";
 import { loadKnownPlaces } from "@/lib/locations/registry";
+import type { CampusEvidence } from "@/lib/locationLibrary/campusEvidence";
 import { slugifyLocation } from "@/lib/bayAreaLocations";
 import { fetchAllPages } from "@/lib/supabasePaging";
 import {
@@ -29,6 +30,8 @@ export interface SessionSyncReport {
   createdLocationIds: number[];
   linkedKeys: string[];
   removedLinks: number;
+  /** Schools / campus spots the location named — recorded on the session, never made into places. */
+  campus: CampusEvidence[];
   dryRun: boolean;
 }
 
@@ -57,7 +60,7 @@ async function loadSyncSession(client: SupabaseClient, sessionId: string): Promi
   // Every photo counts: the median GPS of a partial read can name another place.
   const [sessionRes, photos] = await Promise.all([
     client.from("photography_sessions")
-      .select("id,primary_location,secondary_locations,marketing_permission,marketing_permission_revoked_at")
+      .select("id,primary_location,secondary_locations,school_slug,marketing_permission,marketing_permission_revoked_at")
       .eq("id", sessionId).maybeSingle(),
     fetchAllPages<Row>((from, to) => client.from("session_photos")
       .select("id,gps_latitude,gps_longitude,public_derivative_url")
@@ -74,6 +77,7 @@ async function loadSyncSession(client: SupabaseClient, sessionId: string): Promi
     id: s.id as string,
     primaryLocation: (s.primary_location as string | null) ?? null,
     secondaryLocations: (s.secondary_locations as string[] | null) ?? [],
+    schoolSlug: (s.school_slug as string | null) ?? null,
     gps: medianCoordinates(points),
     approved: permissionOk && photos.some((p) => !!p.public_derivative_url),
   };
@@ -170,7 +174,7 @@ export async function syncSessionLocations(
   client: SupabaseClient, sessionId: string, opts: { dryRun?: boolean; ctx?: SyncContext } = {},
 ): Promise<SessionSyncReport> {
   const dryRun = opts.dryRun ?? false;
-  const base = { sessionId, createdKeys: [], createdLocationIds: [], linkedKeys: [], removedLinks: 0, dryRun };
+  const base = { sessionId, createdKeys: [], createdLocationIds: [], linkedKeys: [], removedLinks: 0, campus: [], dryRun };
   try {
     const ctx = opts.ctx ?? await loadSyncContext(client);
     const session = await loadSyncSession(client, sessionId);
@@ -182,7 +186,7 @@ export async function syncSessionLocations(
     return {
       ...base, status: plan.status, message: plan.message,
       createdKeys: plan.createFor.map((p) => p.key), createdLocationIds,
-      linkedKeys: plan.linkKeys, removedLinks: plan.removeLinkIds.length,
+      linkedKeys: plan.linkKeys, removedLinks: plan.removeLinkIds.length, campus: plan.campus,
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : "location sync failed";

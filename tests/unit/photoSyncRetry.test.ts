@@ -17,7 +17,7 @@ const RUNS = "photo_sync_runs";
 
 const session = (over: Partial<SessionSyncReport>): SessionSyncReport => ({
   sessionId: SESSION_ID, status: "synced", message: "Matched Palace of Fine Arts.", createdKeys: [],
-  createdLocationIds: [], linkedKeys: ["palace-of-fine-arts"], removedLinks: 0, dryRun: false, ...over,
+  createdLocationIds: [], linkedKeys: ["palace-of-fine-arts"], removedLinks: 0, campus: [], dryRun: false, ...over,
 });
 
 describe("sync run summaries", () => {

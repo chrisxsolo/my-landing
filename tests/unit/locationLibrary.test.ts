@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { KNOWN_PLACES } from "@/lib/locations/places";
+import { KNOWN_PLACES, type KnownPlace } from "@/lib/locations/places";
 import { planSessionSync, resolveSessionPlaces, type SyncSession } from "@/lib/locationLibrary/syncPlan";
 import { chooseHero, classifyPhoto, rankPublicPhotos, type MemberPhoto, type MemberSession } from "@/lib/locationLibrary/membership";
 import { applyFilters, facetOptions, EMPTY_FILTERS, type FilterableLocation } from "@/lib/locationLibrary/publicFilters";
@@ -9,7 +9,64 @@ import { parseLocationProfile } from "@/lib/locationLibrary/profilePrompt";
 
 const place = (key: string) => KNOWN_PLACES.find((p) => p.key === key)!;
 const session = (primary: string | null, extra: Partial<SyncSession> = {}): SyncSession => ({
-  id: "s1", primaryLocation: primary, secondaryLocations: [], gps: null, approved: true, ...extra,
+  id: "s1", primaryLocation: primary, secondaryLocations: [], schoolSlug: null, gps: null, approved: true, ...extra,
+});
+
+/** The production verified_locations row the owner confirmed for a Berkeley graduation (a campus, not a place). */
+const UC_BERKELEY_ROW: KnownPlace = {
+  key: "uc-berkeley", name: "UC Berkeley", aliases: ["Sather gate, doe library"], city: "Berkeley", county: "Alameda County",
+  state: "CA", searchArea: "Berkeley", region: "East Bay", areaTerms: [], verifiedFacts: [],
+};
+
+describe("campus text is evidence for the campus-spot guide, never a place", () => {
+  it("classifies a graduation session's campus spots as campus and resolves no place", () => {
+    const r = resolveSessionPlaces(session("Sather gate, doe library", { schoolSlug: "uc-berkeley" }), KNOWN_PLACES);
+    expect(r.places).toEqual([]);
+    expect(r.unresolved).toEqual([]);
+    expect(r.campus).toHaveLength(1);
+    expect(r.campus[0].schoolSlug).toBe("uc-berkeley");
+    expect(r.campus[0].spotKeys).toEqual(expect.arrayContaining(["sather-gate", "doe-library-entrance", "doe-library-ledge"]));
+  });
+
+  it("recognises a school name with no session school, including the owner's Stanford case", () => {
+    const stanford = resolveSessionPlaces(session("Stanford University"), KNOWN_PLACES);
+    expect(stanford.campus.map((c) => c.schoolSlug)).toEqual(["stanford"]);
+    expect(stanford.unresolved).toEqual([]);
+    expect(resolveSessionPlaces(session("UC Berkeley campus"), KNOWN_PLACES).campus.map((c) => c.schoolSlug)).toEqual(["uc-berkeley"]);
+  });
+
+  it("never links or drafts a verified_locations row that is really a campus", () => {
+    const places = [...KNOWN_PLACES, UC_BERKELEY_ROW];
+    const plan = planSessionSync(session("Sather gate, doe library", { schoolSlug: "uc-berkeley" }), places, [], []);
+    expect(plan).toMatchObject({ status: "synced", createFor: [], linkKeys: [] });
+    expect(plan.campus[0].schoolSlug).toBe("uc-berkeley");
+    expect(plan.message).toMatch(/Campus: UC Berkeley/);
+    // Typing the school's own name resolves the same way, even without a session school.
+    expect(planSessionSync(session("UC Berkeley"), places, [], []).linkKeys).toEqual([]);
+  });
+
+  it("keeps off-campus graduation places as places (a Legion of Honor SF State graduation)", () => {
+    const r = resolveSessionPlaces(session("Legion of honor", { schoolSlug: "sf-state" }), KNOWN_PLACES);
+    expect(r.places.map((p) => p.key)).toEqual(["legion-of-honor"]);
+    expect(r.campus).toEqual([]);
+    // Haight-Ashbury is a place a USF graduate books, not a USF campus spot.
+    expect(resolveSessionPlaces(session("Haight-Ashbury", { schoolSlug: "usf" }), KNOWN_PLACES).places.map((p) => p.key)).toEqual(["haight-ashbury"]);
+  });
+
+  it("splits a mixed text: campus parts become evidence, the rest resolve as places", () => {
+    const r = resolveSessionPlaces(session("Sather Gate, Palace of Fine Arts", { schoolSlug: "uc-berkeley" }), KNOWN_PLACES);
+    expect(r.places.map((p) => p.key)).toEqual(["palace-of-fine-arts"]);
+    expect(r.campus[0]).toMatchObject({ schoolSlug: "uc-berkeley", spotKeys: ["sather-gate"] });
+    // Unknown text with no school stays "needs review" exactly as before.
+    expect(resolveSessionPlaces(session("Sather Gate"), KNOWN_PLACES).unresolved).toHaveLength(1);
+  });
+
+  it("drops a stale auto link to a campus row once the session resolves as campus", () => {
+    const rows = [{ id: 10, locationKey: "uc-berkeley", aliasKeys: [] }];
+    const links = [{ id: "l", locationId: 10, source: "auto" as const, excluded: false }];
+    const plan = planSessionSync(session("Sather gate, doe library", { schoolSlug: "uc-berkeley" }), [...KNOWN_PLACES, UC_BERKELEY_ROW], rows, links);
+    expect(plan.removeLinkIds).toEqual(["l"]);
+  });
 });
 
 describe("resolveSessionPlaces", () => {

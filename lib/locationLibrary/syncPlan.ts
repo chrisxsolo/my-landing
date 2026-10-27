@@ -3,6 +3,14 @@
 // Identity only — a session location is matched by name/alias (qualifiers
 // must fit the place's geography) or, when no name was entered, by photo GPS.
 // Scenery never identifies a place; anything unclear goes to review.
+//
+// Campuses come first and are never places: text naming a school or one of
+// its on-campus spots ("Sather gate, doe library") is recorded as campus
+// evidence for the session and handed to the campus-spot guide, so no
+// bay_area_locations row or link is ever made from it.
+import {
+  campusOfPlace, campusPlaceEvidence, mergeCampusEvidence, splitCampusText, type CampusEvidence,
+} from "@/lib/locationLibrary/campusEvidence";
 import {
   matchPlacesByName, resolveLocation, type Coordinates, type LocationResolution,
 } from "@/lib/locations/match";
@@ -14,6 +22,8 @@ export interface SyncSession {
   id: string;
   primaryLocation: string | null;
   secondaryLocations: string[];
+  /** The graduate's school (photography_sessions.school_slug), when set. */
+  schoolSlug: string | null;
   /** Median photo GPS, when originals carried it. */
   gps: Coordinates | null;
   /** At least one approved photo (public web copy) and marketing permission. */
@@ -39,11 +49,16 @@ export interface UnresolvedLocation {
   candidates: string[];
 }
 
-export interface SyncPlan {
-  status: SyncStatus;
-  message: string;
+export interface ResolvedSession {
   places: KnownPlace[];
   unresolved: UnresolvedLocation[];
+  /** Schools / campus spots the location text names — not places. */
+  campus: CampusEvidence[];
+}
+
+export interface SyncPlan extends ResolvedSession {
+  status: SyncStatus;
+  message: string;
   /** Matched places with no library row yet — become review drafts. */
   createFor: KnownPlace[];
   /** Place keys whose rows need an auto link (rows may be created first). */
@@ -97,32 +112,49 @@ export function rowForKey(rows: readonly LibraryRowRef[], key: string): LibraryR
   return rows.find((r) => r.locationKey === key) ?? rows.find((r) => r.aliasKeys.includes(key)) ?? null;
 }
 
-/** All places the session's entered locations (or GPS) identify, plus what is unclear. */
-export function resolveSessionPlaces(
-  session: SyncSession, places: readonly KnownPlace[],
-): { places: KnownPlace[]; unresolved: UnresolvedLocation[] } {
+/** Campus text first, then each remaining part as a place. */
+function resolveOne(
+  text: string, session: SyncSession, places: readonly KnownPlace[], isPrimary: boolean, out: ResolvedSession,
+): void {
+  const split = splitCampusText(text, session.schoolSlug);
+  out.campus.push(...split.campus);
+  for (const part of split.remainder) {
+    const r = resolveText(part, session.gps, places, isPrimary);
+    for (const place of r.places) {
+      const campus = campusPlaceEvidence(place, part);
+      if (campus) out.campus.push(campus);
+      else if (!out.places.some((p) => p.key === place.key)) out.places.push(place);
+    }
+    if (r.unresolved) out.unresolved.push(r.unresolved);
+  }
+}
+
+/** All places the session's entered locations (or GPS) identify, what is campus, and what is unclear. */
+export function resolveSessionPlaces(session: SyncSession, places: readonly KnownPlace[]): ResolvedSession {
   const primary = session.primaryLocation?.trim() || null;
   const texts = [primary, ...session.secondaryLocations.map((t) => t.trim())].filter((t): t is string => !!t);
-  const found = new Map<string, KnownPlace>();
-  const unresolved: UnresolvedLocation[] = [];
+  const out: ResolvedSession = { places: [], unresolved: [], campus: [] };
 
   if (texts.length === 0) {
     const byGps = resolveLocation({ sessionLocation: null, gps: session.gps, visualHints: [] }, places);
-    if (byGps.status === "verified") found.set(byGps.place.key, byGps.place);
-    else unresolved.push(unresolvedFrom(byGps)!);
+    if (byGps.status === "verified" && !campusOfPlace(byGps.place)) out.places.push(byGps.place);
+    else if (byGps.status !== "verified") out.unresolved.push(unresolvedFrom(byGps)!);
   }
-  texts.forEach((text, i) => {
-    const r = resolveText(text, session.gps, places, i === 0 && text === primary);
-    r.places.forEach((p) => found.set(p.key, p));
-    if (r.unresolved) unresolved.push(r.unresolved);
-  });
-  return { places: [...found.values()], unresolved };
+  texts.forEach((text, i) => resolveOne(text, session, places, i === 0 && text === primary, out));
+  return { ...out, campus: mergeCampusEvidence(out.campus) };
 }
 
 function reviewMessage(unresolved: UnresolvedLocation[]): string {
   return unresolved
     .map((u) => (u.text ? `"${u.text}": ${u.reason}` : u.reason))
     .join("; ");
+}
+
+/** "Campus: UC Berkeley (Sather Gate, Doe Library Front Entrance) — campus-spot guide, not a Bay Area place." */
+export function campusMessage(campus: readonly CampusEvidence[]): string {
+  if (campus.length === 0) return "";
+  const list = campus.map((c) => (c.spotKeys.length ? `${c.schoolName} (${c.spotKeys.join(", ")})` : c.schoolName));
+  return `Campus: ${list.join("; ")} — kept with the campus-spot guide, not a Bay Area place.`;
 }
 
 const NO_CHANGES = { createFor: [], linkKeys: [], removeLinkIds: [] };
@@ -137,7 +169,7 @@ export function planSessionSync(
   if (!session.approved) {
     return {
       status: "waiting", message: "No approved photos yet — the session joins the library once a photo is published.",
-      places: resolved.places, unresolved: resolved.unresolved, ...NO_CHANGES,
+      ...resolved, ...NO_CHANGES,
     };
   }
 
@@ -151,11 +183,13 @@ export function planSessionSync(
 
   const status: SyncStatus = resolved.unresolved.length > 0 ? "needs_review" : "synced";
   const names = resolved.places.map((p) => p.name).join(", ");
-  const message = status === "needs_review"
-    ? `${names ? `Matched ${names}. ` : ""}Needs a location: ${reviewMessage(resolved.unresolved)}`
-    : `Matched ${names}.`;
+  const matched = names ? `Matched ${names}. ` : "";
+  const message = [
+    status === "needs_review" ? `${matched}Needs a location: ${reviewMessage(resolved.unresolved)}` : matched.trim(),
+    campusMessage(resolved.campus),
+  ].filter(Boolean).join(" ") || "No place to match.";
   return {
-    status, message, places: resolved.places, unresolved: resolved.unresolved,
+    status, message, ...resolved,
     createFor, linkKeys: resolved.places.map((p) => p.key), removeLinkIds,
   };
 }
