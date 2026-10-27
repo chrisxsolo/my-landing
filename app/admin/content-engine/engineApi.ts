@@ -7,6 +7,7 @@ import type {
 } from "./engineTypes";
 import type { SchoolOption } from "@/lib/contentEngine/schools";
 import type { LiveJournalPhoto } from "@/lib/contentEngine/journalPhotoMembership";
+import type { PostImageInventory, ReplaceCoverResult } from "@/lib/blog/publishedImages";
 
 export class EngineApiError extends Error {
   readonly status: number;
@@ -142,15 +143,24 @@ export const engineApi = {
       "/api/admin/session-content/journal-photos",
       { method: "POST", body: JSON.stringify({ itemId, photoIds }) },
     ),
+  // Every image the live post renders, plus the saved draft's drift from it.
   liveJournalPhotos: (itemId: string) =>
-    request<{ postId: number; slug: string; photos: LiveJournalPhoto[] }>(
-      `/api/admin/session-content/journal-photos?itemId=${itemId}`,
-    ),
+    request<PostImageInventory>(`/api/admin/session-content/journal-photos?itemId=${itemId}`),
   removeJournalPhoto: (itemId: string, url: string) =>
     request<{ slug: string; removed: number; remaining: number }>(
       "/api/admin/session-content/journal-photos",
       { method: "DELETE", body: JSON.stringify({ itemId, url }) },
     ),
+  // Cover and social image change together; the old cover moves to the gallery or leaves.
+  replaceJournalCover: (itemId: string, url: string, keepOldInGallery: boolean) =>
+    request<ReplaceCoverResult>("/api/admin/session-content/journal-photos", {
+      method: "PATCH", body: JSON.stringify({ itemId, action: "replace-cover", url, keepOldInGallery }),
+    }),
+  // Rewrites the saved draft's photo selection from the live page.
+  syncJournalPayload: (itemId: string) =>
+    request<{ synced: true; photos: LiveJournalPhoto[] }>("/api/admin/session-content/journal-photos", {
+      method: "PATCH", body: JSON.stringify({ itemId, action: "sync-payload" }),
+    }),
   takedown: (itemId: string) =>
     request<{ removed: boolean; derivativesDeleted: string[] }>("/api/admin/session-content/takedown", {
       method: "POST", body: JSON.stringify({ itemId }),
