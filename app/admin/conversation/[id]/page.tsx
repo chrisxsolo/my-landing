@@ -37,6 +37,7 @@ type AiDraftResponse = {
   error?: string;
   validation?: DraftValidation | null;
   warnings?: ContextWarning[];
+  quote?: DraftQuote | null;
   usage?: DraftUsage | null;
   budget?: { state: "ok" | "warning" | "over"; message: string | null } | null;
 };
@@ -44,6 +45,7 @@ type AiDraftResponse = {
 // One definition, shared with the panel that renders it. The duplicate here
 // silently drifted out of date the moment the shape changed.
 import type { DraftValidation } from "./ComposePanel";
+import type { DraftQuote } from "./PricingCheck";
 
 type ContextWarning = {
   code: string;
@@ -102,6 +104,9 @@ export default function ConversationPage() {
   // the compose panel so an unverified fact is visible before Chris sends.
   const [validation,       setValidation]       = useState<DraftValidation | null>(null);
   const [contextWarnings,  setContextWarnings]  = useState<ContextWarning[]>([]);
+  const [draftQuote,       setDraftQuote]       = useState<DraftQuote | null>(null);
+  // Earlier quotes Chris confirmed were agreed for this client; sent with every draft request.
+  const [confirmedPrices,  setConfirmedPrices]  = useState<number[]>([]);
   const [lastUsage,        setLastUsage]        = useState<DraftUsage | null>(null);
   const [editLoading,      setEditLoading]      = useState<null | "shorten" | "naturalize">(null);
   const [exampleSaving,    setExampleSaving]    = useState(false);
@@ -401,7 +406,17 @@ export default function ConversationPage() {
       })),
       latest_message_body: latestBody,
       latest_message_from: lastMsg ? (lastMsg.isMe ? "me" : "client") : null,
+      confirmed_prices:    confirmedPrices,
     };
+  }
+
+  // Keeps an earlier quote for this client. The check clears at once; the
+  // next generation is told the quote is agreed.
+  function confirmEarlierQuote(prices: number[]): void {
+    const next = [...new Set([...confirmedPrices, ...prices])];
+    setConfirmedPrices(next);
+    setDraftQuote((q) => q && { input: { ...q.input, confirmedPrices: next }, stalePrices: [] });
+    showToast("Earlier quote kept for this client. Regenerate to write it into the draft.");
   }
 
   // Applies a successful AI response. Shared so every operation surfaces
@@ -411,6 +426,7 @@ export default function ConversationPage() {
     setLastAiDraft(json.draft);
     setValidation(json.validation ?? null);
     setContextWarnings(json.warnings ?? []);
+    setDraftQuote(json.quote ?? null);
     setLastUsage(json.usage ?? null);
     if (json.budget?.message) showToast(json.budget.message, json.budget.state === "ok");
   }
@@ -1368,6 +1384,7 @@ export default function ConversationPage() {
             feedback={feedback}         onFeedback={setFeedback}
             validation={validation}
             contextWarnings={contextWarnings}
+            quote={draftQuote}          onConfirmEarlier={confirmEarlierQuote}
             lastUsage={lastUsage}
             onToggleVoice={toggleVoice}
             onFocusKeyboard={focusComposeForDictation}

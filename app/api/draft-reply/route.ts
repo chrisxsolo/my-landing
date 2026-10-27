@@ -10,7 +10,7 @@
 //   shorten    — cut length, keep every fact
 //   naturalize — pull the wording back toward Chris's voice
 //
-// Response: { draft, validation, warnings, usage, budget }
+// Response: { draft, validation, warnings, quote, usage, budget }
 //
 // Learning moved out to POST /api/ai/learn, which is deterministic and makes
 // no API call. It used to run here as a second request whose only job was
@@ -31,6 +31,7 @@ import {
 } from "@/lib/ai/emailOperations";
 import type { ThreadMessage } from "@/lib/ai/threadDigest";
 import type { InquiryInput } from "@/lib/ai/buildEmailContext";
+import { quoteInputOf } from "@/lib/ai/validateEmailDraft";
 import { fetchInquiryAdminRow } from "@/lib/ai/aiEmailStore";
 
 export const dynamic = "force-dynamic";
@@ -67,9 +68,17 @@ type Body = {
   feedback?: string | null;
   raw_draft?: string | null;
   is_regeneration?: boolean;
+  /** Earlier quotes the admin confirmed as agreed for this client. */
+  confirmed_prices?: unknown;
   // Legacy field names still sent by older clients.
   previous_draft?: string | null;
 };
+
+/** At most 10 positive dollar amounts; anything else is ignored. */
+function confirmedPricesOf(value: unknown): number[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((v): v is number => typeof v === "number" && Number.isFinite(v) && v > 0 && v < 100_000).slice(0, 10);
+}
 
 /**
  * Maps a payload onto a mode.
@@ -161,6 +170,7 @@ export async function POST(req: NextRequest) {
   const key = dedupKey([
     mode, body.email, body.message, currentDraft,
     body.feedback, body.raw_draft, body.latest_message_body,
+    confirmedPricesOf(body.confirmed_prices).join(","),
   ]);
 
   try {
@@ -188,6 +198,7 @@ export async function POST(req: NextRequest) {
         // Every mode gets it, so stage detection is the same whether this is a
         // fresh draft or a refinement of one.
         latestClientMessage: body.latest_message_from === "me" ? null : (body.latest_message_body ?? null),
+        confirmedPrices: confirmedPricesOf(body.confirmed_prices),
       };
 
       const call = createEmailModelCaller(apiKey, modelConfig);
@@ -226,6 +237,9 @@ export async function POST(req: NextRequest) {
       mode,
       validation: result.validation,
       warnings: result.context.warnings,
+      // The rate card's inputs for this inquiry, so the panel can re-check
+      // prices live as the draft is edited (lib/ai/quotePricing).
+      quote: { input: quoteInputOf(result.context), stalePrices: result.context.pricing.stalePrices },
       usage: {
         model: result.usage.model,
         input_tokens: result.usage.input_tokens,

@@ -5,6 +5,7 @@
 
 import type { RefObject } from "react";
 import { T, Icon, Spinner, Panel, PanelHead, MonoLabel } from "../ui";
+import PricingCheck, { type DraftQuote } from "./PricingCheck";
 
 type DraftIssue = {
   type: string;
@@ -59,6 +60,9 @@ type Props = {
   feedback: string;       onFeedback: (v: string) => void;
   validation: DraftValidation | null;
   contextWarnings: ContextWarning[];
+  /** Rate-card inputs for the live pricing check; null before a draft is generated. */
+  quote: DraftQuote | null;
+  onConfirmEarlier: (prices: number[]) => void;
   lastUsage: DraftUsage | null;
   onToggleVoice: () => void;
   onFocusKeyboard: () => void;
@@ -74,7 +78,7 @@ export default function ComposePanel({
   subject, onSubject, draft, onDraft, composeRef, messagesCount, myEmail,
   voiceActive, voiceError, draftLoading, polishLoading, editLoading, exampleSaving,
   draftSaving, draftSaved, sendLoading, feedback, onFeedback,
-  validation, contextWarnings, lastUsage, onToggleVoice, onFocusKeyboard,
+  validation, contextWarnings, quote, onConfirmEarlier, lastUsage, onToggleVoice, onFocusKeyboard,
   onPolish, onGenerate, onEdit, onApproveExample, onSaveDraft, onSend,
 }: Props) {
   const canSend = Boolean(subject.trim() && draft.trim()) && !sendLoading;
@@ -82,9 +86,12 @@ export default function ComposePanel({
 
   // A high-severity issue means the draft states something unverified. It stays
   // editable and sendable — Chris is the one deciding — but it is never silent.
-  const blockingIssues = (validation?.issues ?? []).filter(i => i.severity === "high");
+  // With rate-card inputs present, PricingCheck re-checks prices live as the
+  // draft is edited, so the server's snapshot of those issues is left to it.
+  const livePricing    = (code: string) => quote !== null && (code === "pricing_mismatch" || code === "stale_quoted_price");
+  const blockingIssues = (validation?.issues ?? []).filter(i => i.severity === "high" && !livePricing(i.type));
   const softIssues     = (validation?.issues ?? []).filter(i => i.severity !== "high");
-  const highWarnings   = contextWarnings.filter(w => w.severity === "high");
+  const highWarnings   = contextWarnings.filter(w => w.severity === "high" && !livePricing(w.code));
   const otherWarnings  = contextWarnings.filter(w => w.severity === "medium");
 
   return (
@@ -195,6 +202,7 @@ export default function ComposePanel({
             ))}
           </div>
         )}
+        <PricingCheck draft={draft} quote={quote} onDraft={onDraft} onConfirmEarlier={onConfirmEarlier} />
         {/* Facts and prose are reported separately on purpose. The old copy
             said "format and facts check out", which read as "send it" — but
             nothing here assesses whether the email sounds like Chris. */}
