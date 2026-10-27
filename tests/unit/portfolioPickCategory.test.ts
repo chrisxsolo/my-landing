@@ -30,7 +30,7 @@ function ctx(serviceType: SessionFactsSnapshot["service_type"], modelCategory: s
   return {
     client: fakeClient(), model: "test", sessionId: "s", packageId: "p", facts,
     callModel: async () => ({
-      model: "test", usage: { inputTokens: 1, outputTokens: 1 },
+      model: "test", usage: { input_tokens: 1, output_tokens: 1 },
       text: JSON.stringify({ picks: [{ session_photo_id: PHOTO, category: modelCategory, title: "Tara", alt_text: "Tara", featured: false }] }),
     }),
   } as TargetContext;
