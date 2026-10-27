@@ -15,7 +15,11 @@
 //           for emails to/from that client and asks Claude if any contains
 //           payment evidence. Fingerprint = payer|amount|date|method.
 //
-// Returns: { staged: [...], total: number }
+// Returns: { staged: [...], total, pendingReview: { count, cents }, warnings }
+//   total counts rows staged by THIS run; pendingReview counts every staged
+//   row still awaiting approval (none of it is in revenue yet).
+// 502 { code: "GMAIL_SEARCH_FAILED" } when every notification search failed —
+//   a Gmail outage must never read as "no payments found".
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
@@ -23,7 +27,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { getValidTokens } from "@/lib/gmailTokens";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { requireAdmin } from "@/lib/requireAdmin";
-import { parsePaymentSyncMonth, withGmailMonthFilter } from "@/lib/paymentSyncShared";
+import { parsePaymentSyncMonth, summarizePendingReview, withGmailMonthFilter } from "@/lib/paymentSyncShared";
 import { paymentFingerprint } from "@/lib/paymentFingerprint";
 
 export const dynamic = "force-dynamic";
@@ -102,17 +106,24 @@ type PaymentInfo = {
   paymentType:  string; // "deposit_1" | "deposit_2" | "full" | "other"
 };
 
-async function searchMessageIds(query: string, auth: string, maxResults: number): Promise<string[]> {
+// null = the search request failed (rate limit, auth, network); [] = no matches.
+async function searchMessageIds(query: string, auth: string, maxResults: number): Promise<string[] | null> {
   try {
     const res = await fetch(
       `https://gmail.googleapis.com/gmail/v1/users/me/messages` +
       `?q=${encodeURIComponent(query)}&maxResults=${maxResults}`,
       { headers: { Authorization: auth } }
     );
-    if (!res.ok) return [];
+    if (!res.ok) {
+      console.error(`[sync-payments] Gmail search failed (${res.status}) for query:`, query);
+      return null;
+    }
     const data = await res.json() as { messages?: { id: string }[] };
     return (data.messages ?? []).map(m => m.id);
-  } catch { return []; }
+  } catch (err) {
+    console.error("[sync-payments] Gmail search request error:", err);
+    return null;
+  }
 }
 
 // Returns body text AND the actual email send date from the Date header / internalDate
@@ -276,7 +287,7 @@ async function syncPayments(req: NextRequest) {
   // PASS 1 — Known payment sender notification emails
   // ═══════════════════════════════════════════════════════════════════════════
 
-  const [pixiesetIds, venmoIds, zelleIds, paypalIds, cashIds] = await Promise.all([
+  const pass1Results = await Promise.all([
     searchMessageIds(withGmailMonthFilter(`subject:"Payment on the way" "invoice"`, syncMonth), auth, 50),
     searchMessageIds(withGmailMonthFilter(`from:venmo@venmo.com "paid you"`, syncMonth), auth, 50),
     searchMessageIds(withGmailMonthFilter(`from:no-reply@zelle.com "sent you"`, syncMonth), auth, 50),
@@ -284,7 +295,19 @@ async function syncPayments(req: NextRequest) {
     searchMessageIds(withGmailMonthFilter(`(from:cash@square.com OR from:no-reply@cash.app) "sent you"`, syncMonth), auth, 50),
   ]);
 
-  const pass1Ids = [...new Set([...pixiesetIds, ...venmoIds, ...zelleIds, ...paypalIds, ...cashIds])];
+  if (pass1Results.every(ids => ids === null)) {
+    return NextResponse.json(
+      { error: "Gmail search failed, so no payments were checked. Try Sync again in a minute.", code: "GMAIL_SEARCH_FAILED" },
+      { status: 502 },
+    );
+  }
+  const warnings: string[] = [];
+  const failedPass1 = pass1Results.filter(ids => ids === null).length;
+  if (failedPass1) {
+    warnings.push(`${failedPass1} of ${pass1Results.length} payment-notification searches failed; results may be incomplete.`);
+  }
+
+  const pass1Ids = [...new Set(pass1Results.flatMap(ids => ids ?? []))];
   const pass1Messages = await Promise.all(pass1Ids.map(id => fetchMessage(id, auth)));
 
   // Extract payment info in batches of 5
@@ -387,6 +410,7 @@ async function syncPayments(req: NextRequest) {
   const clientSweepInquiries = syncMonth ? activeInquiries : unpaid;
   const stillUnpaid = clientSweepInquiries.filter(inq => !handledInquiries.has(inq.id));
 
+  let failedClientSearches = 0;
   for (const inq of stillUnpaid) {
     const [threadIds, paymentMentionIds] = await Promise.all([
       searchMessageIds(withGmailMonthFilter(`from:${inq.email} OR to:${inq.email}`, syncMonth), auth, 10),
@@ -396,7 +420,8 @@ async function syncPayments(req: NextRequest) {
       ),
     ]);
 
-    const ids = [...new Set([...threadIds, ...paymentMentionIds])].slice(0, 12);
+    if (threadIds === null || paymentMentionIds === null) failedClientSearches++;
+    const ids = [...new Set([...(threadIds ?? []), ...(paymentMentionIds ?? [])])].slice(0, 12);
     if (!ids.length) continue;
 
     const messages = await Promise.all(ids.map(id => fetchMessage(id, auth)));
@@ -457,7 +482,22 @@ async function syncPayments(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ staged, total: staged.length });
+  if (failedClientSearches) {
+    warnings.push(`Gmail search failed for ${failedClientSearches} client${failedClientSearches === 1 ? "" : "s"}; they were not checked.`);
+  }
+
+  const { data: pendingRows, error: pendingError } = await supabase
+    .from(STAGING_TABLE)
+    .select("amount_cents")
+    .eq("status", "pending");
+  if (pendingError) console.error("[sync-payments] pending review count failed:", pendingError);
+
+  return NextResponse.json({
+    staged,
+    total: staged.length,
+    pendingReview: pendingError ? null : summarizePendingReview(pendingRows ?? []),
+    warnings,
+  });
 }
 
 export async function POST(req: NextRequest) {

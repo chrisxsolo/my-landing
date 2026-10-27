@@ -29,3 +29,47 @@ export function withGmailMonthFilter(query: string, month: PaymentSyncMonth | nu
   if (!month) return query;
   return `${query} ${buildGmailMonthFilter(month.year, month.month)}`;
 }
+
+/** Staged payments that are detected but not yet counted as revenue. */
+export type PendingReviewSummary = {
+  count: number;
+  cents: number;
+};
+
+export function summarizePendingReview(rows: { amount_cents: number | null }[]): PendingReviewSummary {
+  return rows.reduce<PendingReviewSummary>(
+    (acc, row) => ({ count: acc.count + 1, cents: acc.cents + (row.amount_cents ?? 0) }),
+    { count: 0, cents: 0 },
+  );
+}
+
+export function formatReviewDollars(cents: number): string {
+  const hasCents = cents % 100 !== 0;
+  return `$${(cents / 100).toLocaleString("en-US", {
+    minimumFractionDigits: hasCents ? 2 : 0,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+/**
+ * One-line sync result for the admin UI. "Synced" alone is misleading because
+ * the sync only stages rows: revenue changes when they are approved.
+ */
+export function describePaymentSyncOutcome(input: {
+  total: number;
+  pendingReview?: PendingReviewSummary | null;
+  warnings?: string[];
+}): string {
+  const parts = [`${input.total} new payment${input.total === 1 ? "" : "s"} found.`];
+  const pending = input.pendingReview;
+  if (pending && pending.count > 0) {
+    parts.push(
+      `${pending.count} payment${pending.count === 1 ? "" : "s"} (${formatReviewDollars(pending.cents)}) ` +
+      "awaiting your approval — not counted in revenue until approved.",
+    );
+  } else {
+    parts.push("Nothing awaiting approval.");
+  }
+  if (input.warnings?.length) parts.push(`⚠ ${input.warnings.join(" ")}`);
+  return parts.join(" ");
+}
