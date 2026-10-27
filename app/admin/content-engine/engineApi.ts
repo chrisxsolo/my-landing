@@ -40,8 +40,9 @@ export const engineApi = {
     request<WorkspaceData>(`/api/admin/session-content/sessions/${sessionId}`),
   listSchools: () =>
     request<{ schools: SchoolOption[] }>("/api/admin/session-content/schools"),
-  // 409 carries body.existing: the school this would duplicate.
-  createSchool: (input: { name: string; shortName: string; slug: string }) =>
+  // 409 carries body.existing (the school this would duplicate) and body.match
+  // ("duplicate" blocks; "similar" is a suggestion confirmSimilar overrides).
+  createSchool: (input: { name: string; shortName: string; slug: string; aliases: string[]; confirmSimilar?: boolean }) =>
     request<{ school: SchoolOption }>("/api/admin/session-content/schools", {
       method: "POST", body: JSON.stringify(input),
     }),

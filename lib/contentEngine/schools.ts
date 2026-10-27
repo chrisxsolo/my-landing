@@ -60,15 +60,31 @@ export function schoolLabel(school: Pick<SchoolOption, "name" | "shortName">): s
 // abbreviations spelled out and filler words dropped, so these all agree:
 //   "UC Law SF" · "UC Law San Francisco" ·
 //   "University of California College of the Law, San Francisco"
+// A trailing "in <city>" ("Samuel Merritt University in Oakland") is dropped
+// too, and a well-known former name resolves to the current one (UC Hastings →
+// UC Law SF), so inquiry spellings land on the school already saved.
 
 const EXPANSIONS: Record<string, string[]> = {
   uc: ["university", "california"],
   csu: ["california", "state", "university"],
   cal: ["california"],
+  ca: ["california"],
   sf: ["san", "francisco"],
   sj: ["san", "jose"],
+  uop: ["university", "pacific"],
 };
 const FILLER = new Set(["of", "the", "at", "and", "in", "college", "university", "school", "campus"]);
+// The longest place name "in" may introduce at the end: "in San Rafael".
+const TRAILING_PLACE_MAX_WORDS = 3;
+
+// Former names people still write. Every old spelling maps onto the current
+// school's spelling, so one key comes out of all of them.
+const RENAMED_SCHOOLS: { formerly: string[]; now: string }[] = [
+  {
+    formerly: ["UC Hastings", "Hastings College of the Law", "UC Hastings College of the Law", "Hastings Law"],
+    now: "UC Law SF",
+  },
+];
 
 function words(text: string): string[] {
   return text
@@ -82,9 +98,28 @@ function words(text: string): string[] {
     .filter(Boolean);
 }
 
-export function schoolMatchKey(text: string): string {
-  const tokens = words(text).flatMap((w) => EXPANSIONS[w] ?? [w]).filter((w) => !FILLER.has(w));
+/** "samuel merritt university in oakland" → "samuel merritt university". */
+function dropTrailingPlace(tokens: string[]): string[] {
+  const at = tokens.lastIndexOf("in");
+  const trailing = tokens.length - at - 1;
+  if (at < 1 || trailing < 1 || trailing > TRAILING_PLACE_MAX_WORDS) return tokens;
+  return tokens.slice(0, at);
+}
+
+function rawMatchKey(text: string): string {
+  const tokens = dropTrailingPlace(words(text))
+    .flatMap((w) => EXPANSIONS[w] ?? [w])
+    .filter((w) => !FILLER.has(w));
   return [...new Set(tokens)].sort().join(" ");
+}
+
+const RENAMED_KEYS = new Map<string, string>(
+  RENAMED_SCHOOLS.flatMap(({ formerly, now }) => formerly.map((old) => [rawMatchKey(old), rawMatchKey(now)] as const)),
+);
+
+export function schoolMatchKey(text: string): string {
+  const key = rawMatchKey(text);
+  return RENAMED_KEYS.get(key) ?? key;
 }
 
 function keysOf(school: { name: string; shortName?: string | null; aliases?: string[]; slug?: string }): string[] {
@@ -100,18 +135,61 @@ export function schoolMatchesText(school: SchoolOption, text: string): boolean {
   return school.slug === text.trim().toLowerCase() || (key !== "" && keysOf(school).includes(key));
 }
 
-export interface SchoolCandidate { name: string; shortName: string | null; slug: string }
+export interface SchoolCandidate { name: string; shortName: string | null; slug: string; aliases?: string[] }
 
-/** An existing school this candidate would duplicate, or null. */
+/** An existing school this candidate would duplicate (same slug or same key), or null. */
 export function findDuplicateSchool(
   candidate: SchoolCandidate, schools: readonly SchoolOption[],
 ): SchoolOption | null {
-  const candidateKeys = new Set(keysOf({ name: candidate.name, shortName: candidate.shortName }));
+  const candidateKeys = new Set(keysOf(candidate));
   for (const school of schools) {
     if (school.slug === candidate.slug) return school;
     if (keysOf(school).some((k) => candidateKeys.has(k))) return school;
   }
   return null;
+}
+
+// A one-word key ("stanford", or "california" from the "Cal" alias) sits inside
+// too many names to suggest anything; two words ("samuel merritt") are specific —
+// unless they are all places or regions ("san francisco", "uc berkeley" →
+// "berkeley california"), which half the Bay Area's schools share.
+const SIMILAR_MIN_WORDS = 2;
+const PLACE_WORDS = new Set([
+  "san", "francisco", "jose", "oakland", "berkeley", "california", "state", "bay", "east", "north", "south",
+  "west", "santa", "clara", "cruz", "hayward", "sacramento", "davis", "city", "area", "county",
+]);
+
+/** The shorter key names something specific and every word of it appears in the longer one. */
+function keysOverlap(a: string, b: string): boolean {
+  const [shorter, longer] = a.length <= b.length ? [a.split(" "), b.split(" ")] : [b.split(" "), a.split(" ")];
+  if (shorter.length < SIMILAR_MIN_WORDS || shorter.every((w) => PLACE_WORDS.has(w))) return false;
+  const have = new Set(longer);
+  return shorter.every((w) => have.has(w));
+}
+
+/**
+ * An existing school this candidate probably means — one name is a subset of
+ * the other ("Samuel Merritt" vs "Samuel Merritt University, Oakland"). A
+ * suggestion, not a block: the admin can confirm it is a different school.
+ */
+export function findSimilarSchool(
+  candidate: SchoolCandidate, schools: readonly SchoolOption[],
+): SchoolOption | null {
+  const candidateKeys = keysOf(candidate);
+  return schools.find((school) =>
+    keysOf(school).some((k) => candidateKeys.some((c) => keysOverlap(c, k)))) ?? null;
+}
+
+export type SchoolMatch = { school: SchoolOption; kind: "duplicate" | "similar" };
+
+/** Exact duplicate first (a hard block), then a look-alike (a suggestion). */
+export function matchSchoolCandidate(
+  candidate: SchoolCandidate, schools: readonly SchoolOption[],
+): SchoolMatch | null {
+  const duplicate = findDuplicateSchool(candidate, schools);
+  if (duplicate) return { school: duplicate, kind: "duplicate" };
+  const similar = findSimilarSchool(candidate, schools);
+  return similar ? { school: similar, kind: "similar" } : null;
 }
 
 /** Search for the picker: substring over every name, then whole-key match. */
@@ -149,8 +227,22 @@ export function suggestSchoolSlug(name: string, shortName: string | null): strin
 
 const tidy = (v: unknown) => (typeof v === "string" ? v.replace(/\s+/g, " ").trim() : "");
 
+const ALIASES_MAX = 10;
+
+type AliasesResult = { ok: true; aliases: string[] } | { ok: false; error: string };
+
+/** Other spellings ("UC Hastings"), as an array or one comma-separated string. */
+function validateAliases(input: unknown): AliasesResult {
+  const raw = Array.isArray(input) ? input : typeof input === "string" ? input.split(",") : [];
+  const aliases = [...new Set(raw.map(tidy).filter(Boolean))];
+  if (aliases.length > ALIASES_MAX) return { ok: false, error: `at most ${ALIASES_MAX} other names` };
+  const bad = aliases.find((a) => a.length > SHORT_NAME_MAX || !NAME_CHARS.test(a));
+  if (bad) return { ok: false, error: `other name "${bad}" is too long or has characters that aren't allowed` };
+  return { ok: true, aliases };
+}
+
 export type NewSchoolResult =
-  | { ok: true; value: SchoolCandidate }
+  | { ok: true; value: Required<SchoolCandidate> }
   | { ok: false; error: string };
 
 /** Server-side (and form-side) validation of an Add School submission. */
@@ -171,5 +263,7 @@ export function validateNewSchool(input: Record<string, unknown>): NewSchoolResu
   if (!KEBAB.test(slug) || slug.length < 2 || slug.length > SCHOOL_SLUG_MAX) {
     return { ok: false, error: "slug must be lowercase words joined by hyphens (e.g. uc-law-san-francisco)" };
   }
-  return { ok: true, value: { name, shortName, slug } };
+  const aliases = validateAliases(input.aliases);
+  if (!aliases.ok) return aliases;
+  return { ok: true, value: { name, shortName, slug, aliases: aliases.aliases } };
 }

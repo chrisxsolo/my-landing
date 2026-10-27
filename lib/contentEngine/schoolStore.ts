@@ -3,8 +3,8 @@
 // school goes through here, so a custom school added once is valid everywhere.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
-  BUILT_IN_SCHOOL_OPTIONS, CUSTOM_SCHOOLS_TABLE, builtInSchool, findDuplicateSchool,
-  schoolMatchKey, type SchoolCandidate, type SchoolOption,
+  BUILT_IN_SCHOOL_OPTIONS, CUSTOM_SCHOOLS_TABLE, builtInSchool, findDuplicateSchool, matchSchoolCandidate,
+  schoolMatchKey, type SchoolCandidate, type SchoolMatch, type SchoolOption,
 } from "@/lib/contentEngine/schools";
 import { buildSessionFactsSnapshot, type SessionFactsSnapshot } from "@/lib/contentEngine/payloads";
 
@@ -36,29 +36,38 @@ export async function findSchool(client: SupabaseClient, slug: string): Promise<
 
 export type CreateSchoolResult =
   | { created: true; school: SchoolOption }
-  | { created: false; existing: SchoolOption };
+  | { created: false; existing: SchoolOption; match: SchoolMatch["kind"] };
+
+export interface CreateSchoolOptions {
+  /** The admin confirmed a look-alike (findSimilarSchool) is a different school. */
+  allowSimilar?: boolean;
+}
 
 /**
  * Inserts a validated candidate unless it duplicates an existing school by
- * slug or normalized name/short name/alias. A unique violation (double submit,
- * two tabs) resolves to the row that won.
+ * slug or normalized name/short name/alias (a hard block), or looks like one
+ * (a suggestion the caller can override with allowSimilar). A unique violation
+ * (double submit, two tabs) resolves to the row that won.
  */
 export async function createCustomSchool(
-  client: SupabaseClient, candidate: SchoolCandidate,
+  client: SupabaseClient, candidate: SchoolCandidate, options: CreateSchoolOptions = {},
 ): Promise<CreateSchoolResult> {
-  const existing = findDuplicateSchool(candidate, await listSchools(client));
-  if (existing) return { created: false, existing };
+  const match = matchSchoolCandidate(candidate, await listSchools(client));
+  if (match && (match.kind === "duplicate" || !options.allowSimilar)) {
+    return { created: false, existing: match.school, match: match.kind };
+  }
 
   const { data, error } = await client.from(CUSTOM_SCHOOLS_TABLE).insert({
     slug: candidate.slug,
     name: candidate.name,
     short_name: candidate.shortName,
     name_key: schoolMatchKey(candidate.name),
+    aliases: candidate.aliases ?? [],
   }).select(COLUMNS).single();
 
   if (error?.code === "23505") {
     const winner = findDuplicateSchool(candidate, await listSchools(client));
-    if (winner) return { created: false, existing: winner };
+    if (winner) return { created: false, existing: winner, match: "duplicate" };
   }
   if (error) throw new Error(`could not save school: ${error.message}`);
   return { created: true, school: toOption(data as SchoolRow) };

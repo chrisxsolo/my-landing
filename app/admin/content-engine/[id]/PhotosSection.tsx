@@ -32,6 +32,8 @@ interface Props {
   factsKey: string;
 }
 
+// Tap zone around the 22px selected check (the visual stays small).
+const CHECK_TAP_ZONE = 32;
 const STATUS_CHIP: Record<EnginePhoto["analysis_status"], { label: string; color: string }> = {
   pending: { label: "pending", color: T.inkSoft },
   processing: { label: "processing…", color: T.blue },
@@ -349,19 +351,23 @@ export default function PhotosSection({ sessionId, photos, aiAllowed, onChanged,
                   <TagStatusBadge photo={tags.byPhotoId.get(photo.id)} compact onClick={() => setTagOpenId(photo.id)}
                     style={{ position: "absolute", top: 6, left: 6 }} />
                   {isSelected && (
-                    <span style={{
-                      position: "absolute", top: 6, right: 6, width: 22, height: 22,
-                      background: T.red, color: "#131114", borderRadius: 999,
+                    // A 32px tap zone around the small check, so a thumb can hit it.
+                    <span aria-label="Selected" style={{
+                      position: "absolute", top: 0, right: 0, width: CHECK_TAP_ZONE, height: CHECK_TAP_ZONE,
                       display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 13, fontWeight: 800,
-                    }}>✓</span>
+                    }}>
+                      <span style={{
+                        width: 22, height: 22, background: T.red, color: T.page, borderRadius: 999,
+                        display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 800,
+                      }}>✓</span>
+                    </span>
                   )}
                 </div>
-                <figcaption style={{ padding: 6, fontSize: 11, display: "flex", justifyContent: "space-between", gap: 4 }}>
+                <figcaption style={{ padding: "2px 6px", fontSize: 11, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4 }}>
                   <span style={chip(status.color, T.inset)} title={photo.analysis_error ?? undefined}>
                     {status.label}{photo.quality_score ? ` · ${photo.quality_score}` : ""}
                   </span>
-                  <button style={{ ...btn(false), padding: "0 6px", fontSize: 11 }}
+                  <button style={{ ...btn(false), padding: "0 10px", fontSize: 11 }}
                     onClick={() => void toggleExcluded(photo)}>
                     {photo.excluded ? "Include" : "Exclude"}
                   </button>

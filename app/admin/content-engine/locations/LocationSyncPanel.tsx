@@ -7,10 +7,10 @@ import { useState } from "react";
 import { T } from "@/app/admin/adminTheme";
 import { btn, card, chip, sectionTitle } from "@/app/admin/content-engine/[id]/ui";
 import { libraryApi, type SyncReport, type SyncSessionDto } from "./locationLibraryApi";
-import { Muted, SYNC_CHIP, formatWhen } from "./libraryUi";
+import { Muted, formatWhen, syncChipFor } from "./libraryUi";
 
 function SessionLine({ s, busy, onResync }: { s: SyncSessionDto; busy: boolean; onResync: () => void }) {
-  const status = s.status ? SYNC_CHIP[s.status] : { label: "Not synced", style: chip(T.inkFaint, T.neutralBg) };
+  const status = syncChipFor(s.status);
   return (
     <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", padding: "8px 0", borderTop: `1px solid ${T.rowBorder}` }}>
       <span style={{ flex: "1 1 220px", minWidth: 0 }}>

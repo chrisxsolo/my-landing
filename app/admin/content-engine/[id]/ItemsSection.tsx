@@ -6,6 +6,7 @@ import { useState } from "react";
 import { T } from "@/app/admin/adminTheme";
 import { engineApi } from "@/app/admin/content-engine/engineApi";
 import { CONTENT_TYPE_LABELS, type EngineItem, type EnginePhoto } from "@/app/admin/content-engine/engineTypes";
+import { CONTENT_STATUS } from "@/lib/contentStatus";
 import { useAutosave } from "./useAutosave";
 import { JournalEditor } from "./editorsJournal";
 import { LocationGuideEditor } from "./editorsLocationGuide";
@@ -25,9 +26,13 @@ const EDITORS: Record<string, (props: EditorProps) => React.ReactElement> = {
   location_guide: LocationGuideEditor,
 };
 
-const STATUS_COLORS: Record<EngineItem["status"], string> = {
-  draft: T.amber, approved: T.violet, rejected: T.inkFaint,
-  publishing: T.blue, published: T.green, failed: T.red,
+// Shared content vocabulary for the states it covers; the two in-flight-only
+// item states keep their own words.
+const ITEM_STATUS: Record<EngineItem["status"], { label: string; color: string }> = {
+  draft: CONTENT_STATUS.draft, approved: CONTENT_STATUS.approved, published: CONTENT_STATUS.published,
+  failed: CONTENT_STATUS.failed,
+  rejected: { label: "Rejected", color: T.inkFaint },
+  publishing: { label: "Publishing…", color: T.blue },
 };
 
 function ItemCard({ item, photos, onChanged, serviceType }: {
@@ -65,8 +70,8 @@ function ItemCard({ item, photos, onChanged, serviceType }: {
         <strong style={{ fontSize: 14 }}>{CONTENT_TYPE_LABELS[item.content_type] ?? item.content_type}</strong>
         <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
           <span style={{ fontSize: 11, color: T.inkSoft }}>{saveLine}</span>
-          <span style={chip(STATUS_COLORS[item.status], T.inset)} title={item.error ?? item.rejection_reason ?? undefined}>
-            {item.status}
+          <span style={chip(ITEM_STATUS[item.status].color, T.inset)} title={item.error ?? item.rejection_reason ?? undefined}>
+            {ITEM_STATUS[item.status].label}
           </span>
           {(item.status === "draft" || item.status === "failed") && (
             <button style={btn(true)} onClick={() => void act("approve")}>Approve</button>
