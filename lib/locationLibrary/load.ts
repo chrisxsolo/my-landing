@@ -1,9 +1,12 @@
 // Server-only reads that assemble library locations with their sessions and
-// derived photos. A fixed number of queries regardless of library size (rows,
+// derived photos. A fixed set of queries regardless of library size (rows,
 // links, sessions, photos, overrides, places) — never one query per location.
+// Every read is paged past PostgREST's row cap and throws on a failed page,
+// so a large library is never silently cut short.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { KnownPlace } from "@/lib/locations/places";
 import { loadKnownPlaces } from "@/lib/locations/registry";
+import { fetchAllPages } from "@/lib/supabasePaging";
 import {
   chooseHero, classifyPhotos, rankPublicPhotos,
   type ClassifiedPhoto, type HeroChoice, type MemberPhoto, type MemberSession, type OverrideMode,
@@ -14,7 +17,8 @@ import {
   sessionKindsFor, sortKinds, type SessionKind,
 } from "@/lib/locationLibrary/taxonomy";
 
-const PAGE_ROWS = 1000;
+/** Ids per `.in()` filter, so the request URL stays well under proxy limits. */
+const IN_CHUNK = 200;
 
 export interface LocationRow {
   id: number;
@@ -101,43 +105,56 @@ export interface LoadOptions {
   publishedOnly?: boolean;
 }
 
-function check<T>(res: { data: T | null; error: { message: string } | null }, what: string): T {
-  if (res.error) throw new Error(`could not load ${what}: ${res.error.message}`);
-  return (res.data ?? []) as T;
+type Row = Record<string, unknown>;
+type PageQuery = PromiseLike<{ data: unknown; error: { message: string } | null }>;
+
+/**
+ * Every row matching an id list. Long lists are split so the request URL
+ * stays short; each part is read page by page and a failed page throws.
+ */
+async function readIn(
+  ids: readonly (string | number)[], label: string, page: (chunk: (string | number)[], from: number, to: number) => PageQuery,
+): Promise<Row[]> {
+  const out: Row[] = [];
+  for (let i = 0; i < ids.length; i += IN_CHUNK) {
+    const chunk = ids.slice(i, i + IN_CHUNK);
+    out.push(...await fetchAllPages<Row>((from, to) => page(chunk, from, to), label));
+  }
+  return out;
 }
 
 async function loadRows(client: SupabaseClient, opts: LoadOptions): Promise<LocationRow[]> {
-  let q = client.from(LOCATIONS_TABLE).select("*").order("order").order("id");
-  if (opts.ids) q = q.in("id", opts.ids);
-  if (opts.publishedOnly) q = q.eq("active", true);
-  return check(await q, "library locations") as LocationRow[];
+  return fetchAllPages<LocationRow>((from, to) => {
+    let q = client.from(LOCATIONS_TABLE).select("*").order("order").order("id");
+    if (opts.ids) q = q.in("id", opts.ids);
+    if (opts.publishedOnly) q = q.eq("active", true);
+    return q.range(from, to);
+  }, "library locations");
+}
+
+function toLibraryPhoto(p: Row): LibraryPhoto {
+  return {
+    id: p.id as string,
+    sessionId: p.photography_session_id as string,
+    storagePath: p.storage_path as string,
+    publicUrl: (p.public_derivative_url as string | null) ?? null,
+    excluded: !!p.excluded,
+    qualityScore: (p.quality_score as number | null) ?? null,
+    sortOrder: (p.sort_order as number) ?? 0,
+    gpsLatitude: (p.gps_latitude as number | null) ?? null,
+    gpsLongitude: (p.gps_longitude as number | null) ?? null,
+    altText: (p.alt_text as string | null) ?? null,
+    title: (p.title as string | null) ?? null,
+    description: (p.description as string | null) ?? null,
+    tags: (p.tags as string[] | null) ?? [],
+  };
 }
 
 async function loadPhotos(client: SupabaseClient, sessionIds: string[]): Promise<LibraryPhoto[]> {
-  if (sessionIds.length === 0) return [];
-  const out: LibraryPhoto[] = [];
-  for (let from = 0; ; from += PAGE_ROWS) {
-    const rows = check(await client.from("session_photos")
-      .select("id,photography_session_id,storage_path,public_derivative_url,excluded,quality_score,sort_order,gps_latitude,gps_longitude,alt_text,title,description,tags")
-      .in("photography_session_id", sessionIds)
-      .order("id").range(from, from + PAGE_ROWS - 1), "session photos") as Record<string, unknown>[];
-    out.push(...rows.map((p) => ({
-      id: p.id as string,
-      sessionId: p.photography_session_id as string,
-      storagePath: p.storage_path as string,
-      publicUrl: (p.public_derivative_url as string | null) ?? null,
-      excluded: !!p.excluded,
-      qualityScore: (p.quality_score as number | null) ?? null,
-      sortOrder: (p.sort_order as number) ?? 0,
-      gpsLatitude: (p.gps_latitude as number | null) ?? null,
-      gpsLongitude: (p.gps_longitude as number | null) ?? null,
-      altText: (p.alt_text as string | null) ?? null,
-      title: (p.title as string | null) ?? null,
-      description: (p.description as string | null) ?? null,
-      tags: (p.tags as string[] | null) ?? [],
-    })));
-    if (rows.length < PAGE_ROWS) return out;
-  }
+  const rows = await readIn(sessionIds, "session photos", (chunk, from, to) => client.from("session_photos")
+    .select("id,photography_session_id,storage_path,public_derivative_url,excluded,quality_score,sort_order,gps_latitude,gps_longitude,alt_text,title,description,tags")
+    .in("photography_session_id", chunk).order("id").range(from, to));
+  return rows.map(toLibraryPhoto);
 }
 
 function toSession(s: Record<string, unknown>, places: readonly KnownPlace[]): LinkedSession {
@@ -210,25 +227,25 @@ export async function loadLibraryLocations(client: SupabaseClient, opts: LoadOpt
   const ids = rows.map((r) => r.id);
   if (ids.length === 0) return { locations: [], sessions: new Map(), places };
 
-  const [linkData, overrideData] = await Promise.all([
-    client.from(LOCATION_SESSIONS_TABLE).select("id,location_id,photography_session_id,source,excluded").in("location_id", ids),
-    client.from(PHOTO_OVERRIDES_TABLE).select("location_id,session_photo_id,mode").in("location_id", ids),
+  const [linkData, overrides] = await Promise.all([
+    readIn(ids, "location links", (chunk, from, to) => client.from(LOCATION_SESSIONS_TABLE)
+      .select("id,location_id,photography_session_id,source,excluded").in("location_id", chunk).order("id").range(from, to)),
+    readIn(ids, "photo overrides", (chunk, from, to) => client.from(PHOTO_OVERRIDES_TABLE)
+      .select("location_id,session_photo_id,mode").in("location_id", chunk)
+      .order("location_id").order("session_photo_id").range(from, to)),
   ]);
-  const links = (check(linkData, "location links") as Record<string, unknown>[]).map((l) => ({
+  const links = linkData.map((l) => ({
     id: l.id as string, locationId: l.location_id as number, sessionId: l.photography_session_id as string,
     source: l.source as "auto" | "manual", excluded: !!l.excluded,
   }));
-  const overrides = check(overrideData, "photo overrides") as Record<string, unknown>[];
 
   const sessionIds = [...new Set(links.map((l) => l.sessionId))];
   const [sessionRows, photos] = await Promise.all([
-    sessionIds.length
-      ? client.from("photography_sessions").select(SESSION_COLUMNS).in("id", sessionIds)
-      : Promise.resolve({ data: [], error: null }),
+    readIn(sessionIds, "sessions", (chunk, from, to) => client.from("photography_sessions")
+      .select(SESSION_COLUMNS).in("id", chunk).order("id").range(from, to)),
     loadPhotos(client, sessionIds),
   ]);
-  const sessions = new Map((check(sessionRows, "sessions") as unknown as Record<string, unknown>[])
-    .map((s) => [s.id as string, toSession(s, places)]));
+  const sessions = new Map(sessionRows.map((s) => [s.id as string, toSession(s, places)]));
   const photosBySession = groupBy(photos, (p) => p.sessionId);
   const linksByLocation = groupBy(links, (l) => l.locationId);
   const overridesByLocation = groupBy(overrides, (o) => o.location_id as number);

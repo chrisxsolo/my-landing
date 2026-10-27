@@ -7,6 +7,7 @@ import { loadLibraryLocations, SESSION_COLUMNS, type LibraryLocation, type Linke
 import { rowForKey } from "@/lib/locationLibrary/syncPlan";
 import { loadRelatedContent, type RelatedLink } from "@/lib/locationLibrary/related";
 import type { PhotoState } from "@/lib/locationLibrary/membership";
+import { fetchAllPages } from "@/lib/supabasePaging";
 
 const THUMB_WIDTH = 360;
 const THUMB_TTL_SECONDS = 3600;
@@ -67,15 +68,15 @@ function summary(loc: LibraryLocation): LocationSummaryDto {
 }
 
 async function loadSyncSessions(client: SupabaseClient, locations: LibraryLocation[]): Promise<SyncSessionDto[]> {
-  const { data, error } = await client.from("photography_sessions").select(SESSION_COLUMNS).order("created_at", { ascending: false });
-  if (error) throw new Error(`could not load sessions: ${error.message}`);
+  const data = await fetchAllPages((from, to) => client.from("photography_sessions").select(SESSION_COLUMNS)
+    .order("created_at", { ascending: false }).order("id").range(from, to), "sessions");
   const bySession = new Map<string, { id: number; title: string }[]>();
   for (const loc of locations) {
     for (const link of loc.links.filter((l) => !l.excluded)) {
       bySession.set(link.sessionId, [...(bySession.get(link.sessionId) ?? []), { id: loc.row.id, title: loc.row.title.trim() }]);
     }
   }
-  return ((data ?? []) as unknown as Record<string, unknown>[]).map((s) => ({
+  return data.map((s) => ({
     id: s.id as string,
     name: (s.public_display_name as string | null)?.trim() || (s.internal_client_name as string | null)?.trim() || "Untitled session",
     serviceType: s.service_type as string,

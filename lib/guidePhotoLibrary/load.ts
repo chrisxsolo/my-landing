@@ -10,6 +10,7 @@ import { PORTRAIT_LOCATION_PHOTOS_TABLE, isValidPortraitLocationSlug } from "@/l
 import { loadKnownPlaces } from "@/lib/locations/registry";
 import { matchPlacesByName, normalizePlaceName } from "@/lib/locations/match";
 import type { KnownPlace } from "@/lib/locations/places";
+import { fetchAllPages } from "@/lib/supabasePaging";
 import type { GuideTarget, LibraryPhoto, LibrarySession, LibraryTarget, RankedPhoto } from "@/lib/guidePhotoLibrary/rank";
 
 export const GUIDE_PHOTO_TABLE: Record<GuideTarget, string> = {
@@ -34,7 +35,6 @@ export function engineSchoolForSpot(spotSchoolId: string): string | null {
   return hit ? hit[0] : null;
 }
 
-const PAGE_ROWS = 1000; // PostgREST's default max rows per request
 const THUMB_WIDTH = 480;
 const THUMB_TTL_SECONDS = 3600;
 
@@ -92,17 +92,19 @@ export function toLibrarySession(row: SessionRow, places: readonly KnownPlace[])
   };
 }
 
-async function loadAllPhotos(client: SupabaseClient): Promise<PhotoRow[]> {
-  const out: PhotoRow[] = [];
-  for (let from = 0; ; from += PAGE_ROWS) {
-    const { data, error } = await client.from("session_photos")
-      .select("id,photography_session_id,storage_path,public_derivative_url,excluded,quality_score,sort_order,alt_text")
-      .order("created_at").order("id")
-      .range(from, from + PAGE_ROWS - 1);
-    if (error) throw new Error(`could not load session photos: ${error.message}`);
-    out.push(...((data ?? []) as PhotoRow[]));
-    if ((data ?? []).length < PAGE_ROWS) return out;
-  }
+// Paged past PostgREST's row cap; a failed page throws. Stopping on a short
+// page would end early whenever the server caps lower than the page size.
+function loadAllPhotos(client: SupabaseClient): Promise<PhotoRow[]> {
+  return fetchAllPages<PhotoRow>((from, to) => client.from("session_photos")
+    .select("id,photography_session_id,storage_path,public_derivative_url,excluded,quality_score,sort_order,alt_text")
+    .order("created_at").order("id").range(from, to), "session photos");
+}
+
+// Every session: a photo whose session is missing would drop out of the picker.
+function loadAllSessions(client: SupabaseClient): Promise<SessionRow[]> {
+  return fetchAllPages<SessionRow>((from, to) => client.from("photography_sessions")
+    .select("id,public_display_name,internal_client_name,service_type,school_slug,primary_location,secondary_locations,session_date,marketing_permission,marketing_permission_revoked_at")
+    .order("id").range(from, to), "sessions");
 }
 
 async function loadGuideRows(client: SupabaseClient, target: LibraryTarget) {
@@ -124,16 +126,14 @@ export interface LoadedLibrary {
 }
 
 export async function loadLibrary(client: SupabaseClient, target: LibraryTarget): Promise<LoadedLibrary> {
-  const [sessionsRes, photoRows, guideRows, places] = await Promise.all([
-    client.from("photography_sessions")
-      .select("id,public_display_name,internal_client_name,service_type,school_slug,primary_location,secondary_locations,session_date,marketing_permission,marketing_permission_revoked_at"),
+  const [sessionRows, photoRows, guideRows, places] = await Promise.all([
+    loadAllSessions(client),
     loadAllPhotos(client),
     loadGuideRows(client, target),
     loadKnownPlaces(client),
   ]);
-  if (sessionsRes.error) throw new Error(`could not load sessions: ${sessionsRes.error.message}`);
 
-  const sessions = new Map(((sessionsRes.data ?? []) as SessionRow[]).map((s) => [s.id, toLibrarySession(s, places)]));
+  const sessions = new Map(sessionRows.map((s) => [s.id, toLibrarySession(s, places)]));
   const photos: LibraryPhoto[] = photoRows.map((p) => ({
     id: p.id,
     sessionId: p.photography_session_id,

@@ -3,16 +3,19 @@
 //
 // Reads everything fresh (no page cache), plans with lib/campusSpotFill/match,
 // then releases stale automatic picks and claims new ones. Never writes
-// location_spots, so a chosen photo can't be overwritten. A pool that could
-// not be read completely aborts the run: missing data must never look like
+// location_spots, so a chosen photo can't be overwritten. Any read that could
+// not complete (the pool, the paged photo facts, the spots, the existing
+// picks) aborts the run BEFORE any write: missing data must never look like
 // "this photo is no longer public".
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { withGuideCampusSpots } from "@/app/(professional)/grad-guide/campus-spots/guideSpots";
 import type { LocationSpot } from "@/lib/gradGuideData";
+import { loadKnownPlaces } from "@/lib/locations/registry";
 import { loadPhotoPool } from "@/lib/pagePhotos/pool";
 import { buildSchoolSpotsGuidePhotos } from "@/lib/pagePhotos/publicPages";
 import { planFill, type FillPlan } from "@/lib/campusSpotFill/match";
 import { CAMPUS_SPOT_SCHOOLS, campusSpotSlots, fillCandidates, spotKeyOf } from "@/lib/campusSpotFill/pageSpots";
+import { loadPhotoFacts } from "@/lib/campusSpotFill/photoFacts";
 import { claimSpotPhoto, readAutoRows, releaseAutoRow } from "@/lib/campusSpotFill/store";
 
 export interface CampusSpotSyncReport {
@@ -55,13 +58,16 @@ async function applyPlan(client: SupabaseClient, plan: FillPlan): Promise<{ clai
 export async function syncCampusSpotPhotos(
   client: SupabaseClient, { apply }: { apply: boolean },
 ): Promise<CampusSpotSyncReport> {
-  const [rows, pool, existing] = await Promise.all([loadSpotRows(client), loadPhotoPool(client), readAutoRows(client)]);
+  const [rows, pool, existing, facts] = await Promise.all([
+    loadSpotRows(client), loadPhotoPool(client), readAutoRows(client),
+    loadKnownPlaces(client).then((places) => loadPhotoFacts(client, places)),
+  ]);
   if (pool.errors.length > 0) throw new Error(`photo pool incomplete — ${pool.errors.join("; ")}`);
 
   const spots = await withGuideCampusSpots(rows,
     async (slug, schoolShort) => buildSchoolSpotsGuidePhotos(pool, rows, slug, schoolShort));
   const slots = campusSpotSlots(spots);
-  const candidates = CAMPUS_SPOT_SCHOOLS.flatMap((slug) => fillCandidates(pool, slug));
+  const candidates = CAMPUS_SPOT_SCHOOLS.flatMap((slug) => fillCandidates(pool, slug, facts));
   const plan = planFill(slots, candidates, existing);
   const { claimed, lost } = apply ? await applyPlan(client, plan) : { claimed: plan.claim, lost: 0 };
 

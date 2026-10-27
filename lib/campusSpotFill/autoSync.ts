@@ -5,19 +5,44 @@
 //     sync problem can never fail the admin's own action
 //   • on every worker tick (about every 5 minutes) as the backstop, which also
 //     covers the first backfill after deploy
-// Each run is idempotent, so overlapping runs are safe.
+//   • on demand from Admin → photo sync (a run or a retry of a failed run)
+// Each run is idempotent, so overlapping runs are safe, and each is logged in
+// photo_sync_runs (lib/photoSync/runLog) so a failure is visible and retryable.
 import { after } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
 import { revalidatePublicContent } from "@/lib/publicRevalidation";
+import { runLogged, type LoggedRun, type SyncOutcome, type SyncTrigger } from "@/lib/photoSync/runLog";
 import { syncCampusSpotPhotos, type CampusSpotSyncReport } from "@/lib/campusSpotFill/sync";
 
-export async function runCampusSpotSync(): Promise<CampusSpotSyncReport> {
-  const report = await syncCampusSpotPhotos(createSupabaseAdminClient(), { apply: true });
-  if (report.claimed.length > 0 || report.released.length > 0) {
-    console.info(`[campus-spots] filled ${report.claimed.length}, released ${report.released.length}`);
-    revalidatePublicContent();
-  }
-  return report;
+/** What the run log keeps of a campus-spot report. Pure. */
+export function summarizeCampusSpotSync(report: CampusSpotSyncReport): SyncOutcome {
+  return {
+    detail: {
+      filled: report.claimed.length, released: report.released.length, kept: report.kept.length,
+      lostRaces: report.lostRaces, unmatched: report.unmatched.length,
+    },
+  };
+}
+
+/** One logged, applied sync. Never throws: a failure is in the result (and the log). */
+export async function runCampusSpotSyncLogged(
+  trigger: SyncTrigger, retryOf: number | null = null,
+): Promise<LoggedRun<CampusSpotSyncReport>> {
+  const client = createSupabaseAdminClient();
+  return runLogged(client, { kind: "campus_spots", scope: null, trigger, retryOf }, async () => {
+    const report = await syncCampusSpotPhotos(client, { apply: true });
+    if (report.claimed.length > 0 || report.released.length > 0) {
+      console.info(`[campus-spots] filled ${report.claimed.length}, released ${report.released.length}`);
+      revalidatePublicContent();
+    }
+    return report;
+  }, summarizeCampusSpotSync);
+}
+
+export async function runCampusSpotSync(trigger: SyncTrigger = "admin"): Promise<CampusSpotSyncReport> {
+  const run = await runCampusSpotSyncLogged(trigger);
+  if ("thrown" in run) throw run.thrown;
+  return run.result as CampusSpotSyncReport;
 }
 
 /** Queues a sync after the response. Never throws into the caller. */
@@ -38,7 +63,7 @@ export function syncCampusSpotPhotosInBackground(): void {
 /** The worker-tick backstop. Never throws. */
 export async function sweepCampusSpotPhotos(): Promise<{ filled: number; released: number } | null> {
   try {
-    const report = await runCampusSpotSync();
+    const report = await runCampusSpotSync("worker");
     return { filled: report.claimed.length, released: report.released.length };
   } catch (err) {
     console.error("[campus-spots] sweep failed", err);

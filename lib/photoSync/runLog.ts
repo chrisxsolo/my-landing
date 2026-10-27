@@ -37,6 +37,17 @@ export interface SyncOutcome {
   detail?: Record<string, unknown>;
 }
 
+/** A logged run's outcome. */
+export interface LoggedRun<T> {
+  runId: number | null;
+  ok: boolean;
+  error: string | null;
+  result: T | null;
+  thrown?: unknown;
+}
+
+const RUN_COLUMNS = "id,kind,scope,status,trigger,started_at,finished_at,error,detail,retry_of";
+
 const clip = (s: string) => s.slice(0, 2000);
 
 async function startRun(client: SupabaseClient, opts: SyncRunOptions): Promise<number | null> {
@@ -65,9 +76,33 @@ async function finishRun(client: SupabaseClient, id: number | null, status: "ok"
 }
 
 /**
- * Runs a sync and logs it. `summarize` turns the sync's own report into a
- * status: a report carrying an error is logged as failed. A thrown error is
- * logged and re-thrown, so callers keep their existing error handling.
+ * Runs a sync, logs it, and reports the outcome without throwing. `summarize`
+ * turns the sync's own report into a status: a report carrying an error is
+ * logged as failed. `thrown` holds the sync's own error when it threw.
+ */
+export async function runLogged<T>(
+  client: SupabaseClient,
+  opts: SyncRunOptions,
+  run: () => Promise<T>,
+  summarize: (result: T) => SyncOutcome = () => ({}),
+): Promise<LoggedRun<T>> {
+  const runId = await startRun(client, opts);
+  try {
+    const result = await run();
+    const outcome = summarize(result);
+    await finishRun(client, runId, outcome.error ? "error" : "ok", outcome);
+    return { runId, ok: !outcome.error, error: outcome.error ?? null, result };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    await finishRun(client, runId, "error", { error: message });
+    return { runId, ok: false, error: message, result: null, thrown: err };
+  }
+}
+
+/**
+ * Runs a sync and logs it. A report carrying an error is logged as failed; a
+ * thrown error is logged and re-thrown, so callers keep their existing error
+ * handling.
  */
 export async function recordSyncRun<T>(
   client: SupabaseClient,
@@ -75,17 +110,9 @@ export async function recordSyncRun<T>(
   run: () => Promise<T>,
   summarize: (result: T) => SyncOutcome = () => ({}),
 ): Promise<T> {
-  const id = await startRun(client, opts);
-  try {
-    const result = await run();
-    const outcome = summarize(result);
-    await finishRun(client, id, outcome.error ? "error" : "ok", outcome);
-    return result;
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    await finishRun(client, id, "error", { error: message });
-    throw err;
-  }
+  const logged = await runLogged(client, opts, run, summarize);
+  if ("thrown" in logged) throw logged.thrown;
+  return logged.result as T;
 }
 
 function toRow(r: Record<string, unknown>): SyncRunRow {
@@ -106,10 +133,17 @@ function toRow(r: Record<string, unknown>): SyncRunRow {
 /** The most recent runs, newest first. */
 export async function loadRecentSyncRuns(client: SupabaseClient, limit = 50): Promise<SyncRunRow[]> {
   const { data, error } = await client.from(PHOTO_SYNC_RUNS_TABLE)
-    .select("id,kind,scope,status,trigger,started_at,finished_at,error,detail,retry_of")
+    .select(RUN_COLUMNS)
     .order("started_at", { ascending: false }).order("id", { ascending: false }).limit(limit);
   if (error) throw new Error(`could not load photo sync runs: ${error.message}`);
   return ((data ?? []) as Record<string, unknown>[]).map(toRow);
+}
+
+/** One run by id, or null when there is none. */
+export async function loadSyncRun(client: SupabaseClient, id: number): Promise<SyncRunRow | null> {
+  const { data, error } = await client.from(PHOTO_SYNC_RUNS_TABLE).select(RUN_COLUMNS).eq("id", id).maybeSingle();
+  if (error) throw new Error(`could not load photo sync run ${id}: ${error.message}`);
+  return data ? toRow(data as Record<string, unknown>) : null;
 }
 
 export interface SyncHealth {
