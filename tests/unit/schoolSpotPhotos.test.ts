@@ -115,7 +115,7 @@ describe("sessionSchoolPhotos (Content Engine photos live in a journal post)", (
 
 describe("candidatesForPage with session photos", () => {
   const pool: PhotoPool = {
-    photos: [], explicitSchool: [], curation: [], spotTags: [], errors: [],
+    photos: [], explicitSchool: [], journal: [], curation: [], spotTags: [], errors: [],
     sessionSchool: sessionSchoolPhotos([row(), row({ url: url("e2"), schoolSlug: "stanford" }, "p2")], new Set([url("e1"), url("e2")]), []),
   };
 

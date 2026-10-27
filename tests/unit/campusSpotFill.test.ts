@@ -17,7 +17,7 @@ function portfolio(id: number, title: string, overrides: Partial<PortfolioSource
 function poolOf(photos: PortfolioSource[], extra: Partial<PhotoPool> = {}): PhotoPool {
   return {
     photos: photos.map((p) => resolvePhoto(p, null, { places: [], dbGuides: [] })),
-    explicitSchool: [], sessionSchool: [], curation: [], spotTags: [], errors: [], ...extra,
+    explicitSchool: [], sessionSchool: [], journal: [], curation: [], spotTags: [], errors: [], ...extra,
   };
 }
 
