@@ -7,6 +7,8 @@
 //
 // Where each field lives:
 //   portfolio photo   → portfolio_images.category_slug / school / location
+//                       (school: any registered school — built-in or custom;
+//                       the executor refuses a slug the registry does not know)
 //   engine-only photo → location: THAT photo's session_photos.photo_location
 //                       (a session can cover several places, so one photo's
 //                       location never moves another photo)
@@ -156,7 +158,6 @@ function planSchool(ctx: Ctx, raw: string | null, category: string | null): { sc
   const d = decide(t.school, next, ctx.replace);
   const skip = (reason: string) => { note(ctx, "school", "skipped", { reason }); return { school: t.school }; };
   if (category !== "grads") return skip("only graduation photos take a university");
-  if (t.source === "portfolio" && next !== null && !isSchoolSlug(next)) return skip("portfolio photos take a school that has a /grads page");
   if (d !== "write") { notWritten(ctx, "school", d); return { school: t.school }; }
   if (t.source === "portfolio" && t.portfolioId !== null) {
     ctx.plan.portfolio.school = next;

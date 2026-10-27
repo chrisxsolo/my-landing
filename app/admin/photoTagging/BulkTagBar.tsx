@@ -72,7 +72,7 @@ export default function BulkTagBar({ photos, options, onChanged, onClear }: Prop
         <button type="button" style={btn(false)} onClick={onClear}>Clear selection</button>
       </div>
       <TagFields draft={draft} setDraft={(d) => { setDraft(d); tagApply.cancel(); }} options={options} allowCategory={anyPortfolio}
-        builtInSchoolsOnly={anyPortfolio} currentSchool={commonSchool(photos)} showSchool={grads} />
+        currentSchool={commonSchool(photos)} showSchool={grads} />
       {anyEngine && (
         <p style={{ margin: 0, fontSize: 12, color: T.inkSoft }}>
           Content Engine photos take their university from the session, so a university applies to the whole session.

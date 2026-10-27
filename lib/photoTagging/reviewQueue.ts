@@ -186,6 +186,11 @@ export function filterQueue(items: readonly QueueItem[], f: QueueFilter): QueueI
     && (!f.school || i.school === f.school));
 }
 
+/** A photo item (Portfolio or Content Engine photo): its tags are edited in place, in the tag editor. */
+export function isPhotoItem(item: Pick<QueueItem, "key">): boolean {
+  return item.key.startsWith("portfolio:") || item.key.startsWith("engine:");
+}
+
 /** Photo keys whose queue items can all be approved in bulk. */
 export function safeKeys(items: readonly QueueItem[]): string[] {
   return [...new Set(items.filter((i) => i.safe).map((i) => i.key))];

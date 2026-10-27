@@ -3,7 +3,8 @@
 // loader (pool.ts) gathers the rows, this module only reasons about them.
 //
 // School (grads photos only), strongest evidence first:
-//   1. the photo's own school tag (portfolio_images.school, set in admin)
+//   1. the photo's own school tag (portfolio_images.school, set in admin); a
+//      custom school (no /grads page) still settles the question — no text lookup
 //   2. its Content Engine session's school (a stable slug, read live — fixing
 //      a session's school moves its photos on the next render)
 //   3. the photo's own title / alt / session text naming exactly one school
@@ -151,6 +152,9 @@ export function inferSchoolFromText(text: string): SchoolResult {
 function resolveSchool(photo: PortfolioSource, engine: EngineSource | null): SchoolResult {
   if (photo.category !== "grads") return { school: null, source: null, note: null };
   if (isSchoolSlug(photo.school)) return { school: photo.school, source: "tag", note: null };
+  // A custom school set by hand is the answer, even though it has no page: the
+  // photo's text is never consulted once the photographer has decided.
+  if (photo.school) return { school: null, source: null, note: `school "${photo.school}" has no school page` };
   if (engine?.schoolSlug) {
     return isSchoolSlug(engine.schoolSlug)
       ? { school: engine.schoolSlug, source: "session", note: null }

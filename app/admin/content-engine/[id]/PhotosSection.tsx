@@ -6,7 +6,7 @@
 // in parallel server-side; Resume = same button). While analysis runs, chips
 // and counts update from a light status poll — never a full refetch, which
 // would re-sign every thumbnail.
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { T } from "@/app/admin/adminTheme";
 import { engineApi } from "@/app/admin/content-engine/engineApi";
 import type { EnginePhoto, PhotoStatusRow } from "@/app/admin/content-engine/engineTypes";
@@ -17,6 +17,7 @@ import { btn, card, chip, sectionTitle } from "./ui";
 import AnalysisProgress from "./AnalysisProgress";
 import { ALLOWED_MIME, uploadPhotos, type UploadProgress } from "./photoUpload";
 import TagStatusBadge from "@/app/admin/photoTagging/TagStatusBadge";
+import { enginePhotoKey } from "@/lib/photoTagging/types";
 import PhotoTaggingPanel, { useSessionTagging } from "./PhotoTaggingPanel";
 
 interface Props {
@@ -95,6 +96,9 @@ export default function PhotosSection({ sessionId, photos, aiAllowed, onChanged,
   const [deleting, setDeleting] = useState(false);
   const tags = useSessionTagging(sessionId, factsKey);
   const [tagOpenId, setTagOpenId] = useState<string | null>(null);
+  // The grid's signed thumbnails, by audit key, so the tag editor can show a private photo.
+  const tagThumbs = useMemo(() => Object.fromEntries(photos.flatMap((p) =>
+    (p.thumbnailUrl ? [[enginePhotoKey(p.id), p.thumbnailUrl]] : []))), [photos]);
 
   const uploadFiles = useCallback(async (incoming: File[]) => {
     if (!incoming.length) return;
@@ -320,7 +324,7 @@ export default function PhotosSection({ sessionId, photos, aiAllowed, onChanged,
       ))}
 
       {photos.length > 0 && (
-        <PhotoTaggingPanel state={tags} selectedIds={selected} openId={tagOpenId}
+        <PhotoTaggingPanel state={tags} selectedIds={selected} openId={tagOpenId} thumbs={tagThumbs}
           onClose={() => setTagOpenId(null)} onClearSelection={() => setSelected(new Set())} />
       )}
 

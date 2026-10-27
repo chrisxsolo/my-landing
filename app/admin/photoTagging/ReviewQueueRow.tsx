@@ -8,7 +8,7 @@
 import { T } from "@/app/admin/adminTheme";
 import { btn, chip } from "@/app/admin/content-engine/[id]/ui";
 import supabaseImageLoader from "@/lib/supabaseImageLoader";
-import { QUEUE_LABELS, type QueueAction, type QueueItem } from "@/lib/photoTagging/reviewQueue";
+import { isPhotoItem, QUEUE_LABELS, type QueueAction, type QueueItem } from "@/lib/photoTagging/reviewQueue";
 import { evidenceOf, type TaggingOptions, type TagSuggestion } from "@/lib/photoTagging/types";
 import { schoolFilterLabel } from "@/lib/reviewQueue/findingItems";
 import { valueLabel } from "./TagApplyPanel";
@@ -74,8 +74,10 @@ function PhotoButtons({ item, h }: { item: QueueItem; h: RowHandlers }) {
       {item.options.length > 0 && (
         <button type="button" style={{ ...btn(false), ...TOUCH }} disabled={h.busy} onClick={() => h.onReject(item)} title="Never suggest these again">Reject</button>
       )}
-      {h.onOpen && item.key.startsWith("engine:") || h.onOpen && item.key.startsWith("portfolio:")
-        ? <button type="button" style={{ ...btn(false), ...TOUCH }} onClick={() => h.onOpen?.(item.key)}>Edit</button> : null}
+      {h.onOpen && isPhotoItem(item) && (
+        <button type="button" style={{ ...btn(item.options.length === 0), ...TOUCH }} onClick={() => h.onOpen?.(item.key)}
+          title="Open this photo's tags — set or change its university, location and campus spot by hand">Edit</button>
+      )}
     </>
   );
 }
@@ -101,7 +103,7 @@ function FindingButtons({ item, h }: { item: QueueItem; h: RowHandlers }) {
 export default function ReviewQueueRow({ item, options, thumbs, h }: {
   item: QueueItem; options: TaggingOptions; thumbs: Record<string, string>; h: RowHandlers;
 }) {
-  const isPhotoItem = item.key.startsWith("engine:") || item.key.startsWith("portfolio:");
+  const photoItem = isPhotoItem(item);
   return (
     <li style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: 10, borderRadius: 12, background: T.inset, border: `1px solid ${T.border}` }}>
       <Thumb item={item} thumbs={thumbs} />
@@ -114,11 +116,11 @@ export default function ReviewQueueRow({ item, options, thumbs, h }: {
         <p style={{ margin: 0, fontSize: 13, color: T.inkSoft }}>{item.explanation}</p>
         <p style={{ margin: 0, fontSize: 13, color: T.ink }}>→ {item.recommended}</p>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {isPhotoItem && item.kind !== "excluded-live" ? <PhotoButtons item={item} h={h} /> : null}
+          {photoItem && item.kind !== "excluded-live" ? <PhotoButtons item={item} h={h} /> : null}
           {item.kind === "grad-no-school" && item.href ? (
             <a href={item.href} style={{ ...btn(false), ...TOUCH, textDecoration: "none", display: "inline-flex", alignItems: "center" }}>Session facts</a>
           ) : null}
-          {!isPhotoItem || item.kind === "excluded-live" ? <FindingButtons item={item} h={h} /> : null}
+          {!photoItem || item.kind === "excluded-live" ? <FindingButtons item={item} h={h} /> : null}
         </div>
       </div>
     </li>

@@ -93,15 +93,15 @@ function schoolLabel(slug: string, custom: ReadonlyMap<string, string>): string 
   return isSchoolSlug(slug) ? BUILT_IN_SCHOOLS[slug].shortName : custom.get(slug) ?? slug;
 }
 
-function schoolFact(resolved: ResolvedPhoto, engine: EngineSource | null, lib: LoadedLibrary): PhotoFacts["school"] {
+/** The photo's school: the page-resolved one, else a custom (page-less) school from its own tag or its session. */
+function schoolFact(resolved: ResolvedPhoto, tag: string | null, engine: EngineSource | null, lib: LoadedLibrary): PhotoFacts["school"] {
   if (resolved.school) {
     return { value: resolved.school, label: schoolLabel(resolved.school, lib.customSchools),
       source: SCHOOL_SOURCE[resolved.schoolSource ?? "tag"], builtIn: true };
   }
-  const custom = engine?.schoolSlug;
-  return custom && !isSchoolSlug(custom)
-    ? { value: custom, label: schoolLabel(custom, lib.customSchools), source: "session", builtIn: false }
-    : null;
+  const custom = tag && !isSchoolSlug(tag) ? { slug: tag, source: "photo tag" }
+    : engine?.schoolSlug && !isSchoolSlug(engine.schoolSlug) ? { slug: engine.schoolSlug, source: "session" } : null;
+  return custom ? { value: custom.slug, label: schoolLabel(custom.slug, lib.customSchools), source: custom.source, builtIn: false } : null;
 }
 
 function spotFact(school: string | null, url: string | null, placeKey: string | null, lib: LoadedLibrary): FactValue | null {
@@ -168,7 +168,7 @@ function portfolioDraft(row: Row, source: PortfolioSource, engine: EngineRow | n
   const key = portfolioPhotoKey(source.id);
   const resolved = resolvePhoto(source, engine?.url ? engine.source : null, lib);
   const category = canonicalCategory(text(row.category_slug));
-  const school = schoolFact(resolved, engine?.url ? engine.source : null, lib);
+  const school = schoolFact(resolved, source.school, engine?.url ? engine.source : null, lib);
   const published = row.published !== false;
   const location = portfolioLocation(source, engine, resolved, lib.places);
   const spot = spotFact(school?.value ?? null, source.url, resolved.placeKey, lib);

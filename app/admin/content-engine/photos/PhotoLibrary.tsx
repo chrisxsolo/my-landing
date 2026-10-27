@@ -1,7 +1,8 @@
 "use client";
 // Every Portfolio and Content Engine photo in one grid with its tagging
 // status — the connected library. Click a photo to select it for bulk
-// tagging; click its status badge to open the tag editor. Paged, lazy-loaded
+// tagging; click its status badge (or Edit in the review queue) to open the
+// tag editor as a modal. Paged, lazy-loaded
 // thumbnails keep it fast as the library grows.
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -10,7 +11,7 @@ import { btn, card, sectionTitle } from "@/app/admin/content-engine/[id]/ui";
 import supabaseImageLoader from "@/lib/supabaseImageLoader";
 import type { AuditedPhoto, TagFilter } from "@/lib/photoTagging/types";
 import BulkTagBar from "@/app/admin/photoTagging/BulkTagBar";
-import PhotoTagEditor from "@/app/admin/photoTagging/PhotoTagEditor";
+import PhotoTagDialog from "@/app/admin/photoTagging/PhotoTagDialog";
 import PhotoTagToolbar from "@/app/admin/photoTagging/PhotoTagToolbar";
 import ReviewQueue from "@/app/admin/photoTagging/ReviewQueue";
 import TagStatusBadge from "@/app/admin/photoTagging/TagStatusBadge";
@@ -100,7 +101,7 @@ export default function PhotoLibrary({ initialFilter }: { initialFilter: TagFilt
         <BulkTagBar photos={selectedPhotos} options={report.options} onChanged={tagging.refresh} onClear={tagging.clearSelection} />
       )}
       {report && open && (
-        <PhotoTagEditor photo={open} options={report.options} onChanged={tagging.refresh} onClose={() => setOpenKey(null)} />
+        <PhotoTagDialog photo={open} options={report.options} thumb={thumbs[open.key]} onChanged={tagging.refresh} onClose={() => setOpenKey(null)} />
       )}
 
       {tagging.loading ? <p style={{ color: T.inkSoft }}>Checking every photo…</p> : shown.length === 0 ? (
@@ -109,7 +110,7 @@ export default function PhotoLibrary({ initialFilter }: { initialFilter: TagFilt
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10 }}>
           {pagePhotos.map((p) => (
             <Tile key={p.key} photo={p} src={thumbOf(p, thumbs)} selected={selected.has(p.key)}
-              onSelect={() => tagging.toggle(p.key)} onOpen={() => { setOpenKey(p.key); window.scrollTo({ top: 0, behavior: "smooth" }); }} />
+              onSelect={() => tagging.toggle(p.key)} onOpen={() => setOpenKey(p.key)} />
           ))}
         </div>
       )}

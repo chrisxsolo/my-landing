@@ -9,6 +9,7 @@ import Link from "next/link";
 import { T } from "@/app/admin/adminTheme";
 import { btn, card } from "@/app/admin/content-engine/[id]/ui";
 import { pagePath } from "@/lib/pagePhotos/pageKeys";
+import supabaseImageLoader from "@/lib/supabaseImageLoader";
 import {
   categoryLabel, EVIDENCE_LABELS, type AuditedPhoto, type NotApplicableField, type TagCheck, type TaggingOptions, type TagSuggestion,
 } from "@/lib/photoTagging/types";
@@ -25,11 +26,21 @@ const FIELD_LABEL: Record<TagCheck["field"], string> = {
 };
 const STATE_TONE: Record<TagCheck["state"], string> = { ok: T.green, missing: T.amber, na: T.inkFaint };
 
-interface Props {
+export interface PhotoTagEditorProps {
   photo: AuditedPhoto;
   options: TaggingOptions;
   onChanged: () => Promise<void> | void;
   onClose: () => void;
+  /** Signed thumbnail for a private Content Engine photo (public photos use their own URL). */
+  thumb?: string | null;
+}
+
+const PREVIEW_WIDTH = 640;
+
+/** A preview the photographer can recognise the photo by: the public image, else the signed thumbnail. */
+function previewSrc(photo: AuditedPhoto, thumb: string | null | undefined): string | null {
+  if (photo.url) return supabaseImageLoader({ src: photo.url, width: PREVIEW_WIDTH, quality: 70 });
+  return thumb ?? null;
 }
 
 function CheckRow({ check }: { check: TagCheck }) {
@@ -45,13 +56,14 @@ function CheckRow({ check }: { check: TagCheck }) {
   );
 }
 
-export default function PhotoTagEditor({ photo, options, onChanged, onClose }: Props) {
+export default function PhotoTagEditor({ photo, options, onChanged, onClose, thumb }: PhotoTagEditorProps) {
   const [draft, setDraft] = useState<TagDraft>(EMPTY_DRAFT);
   const tagApply = useTagApply(onChanged);
   const { busy, run } = tagApply;
   const check = (field: TagCheck["field"]) => photo.checks.find((c) => c.field === field);
   const isEngine = photo.source === "engine";
   const grads = (draft.category || photo.category) === "grads";
+  const preview = previewSrc(photo, thumb);
 
   const save = () => {
     const changes = draftToChanges(draft);
@@ -96,7 +108,15 @@ export default function PhotoTagEditor({ photo, options, onChanged, onClose }: P
         <button type="button" style={btn(false)} onClick={onClose}>Close</button>
       </div>
 
-      <div style={{ display: "grid", gap: 4 }}>{photo.checks.map((c) => <CheckRow key={c.field} check={c} />)}</div>
+      <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "flex-start" }}>
+        {preview && (
+          // eslint-disable-next-line @next/next/no-img-element -- pre-sized transform / signed URL
+          <img src={preview} alt={photo.title} style={{ width: 180, maxWidth: "100%", borderRadius: 10, objectFit: "cover", background: T.inset, flex: "0 0 auto" }} />
+        )}
+        <div style={{ display: "grid", gap: 4, flex: "1 1 260px", minWidth: 0 }}>
+          {photo.checks.map((c) => <CheckRow key={c.field} check={c} />)}
+        </div>
+      </div>
 
       {photo.pages.length > 0 && (
         <p style={{ margin: 0, fontSize: 12, color: T.inkSoft }}>
@@ -114,7 +134,7 @@ export default function PhotoTagEditor({ photo, options, onChanged, onClose }: P
       <SuggestionList suggestions={photo.suggestions} busy={busy} onAccept={accept} onDismiss={(s) => void dismiss(s)} />
 
       <TagFields draft={draft} setDraft={setDraft} options={options} allowCategory={!isEngine}
-        builtInSchoolsOnly={!isEngine} currentSchool={photo.school} showSchool={grads}
+        currentSchool={photo.school} showSchool={grads}
         current={{ category: categoryLabel(photo.category), school: check("school")?.state === "ok" ? check("school")?.value ?? "" : "",
           location: check("location")?.state === "ok" ? check("location")?.value ?? "" : "",
           spot: check("spot")?.state === "ok" ? check("spot")?.value ?? "" : "" }} />

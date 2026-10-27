@@ -1,7 +1,8 @@
 // Executes a tag plan (lib/photoTagging/plan.ts). Server-only, service role.
 // Writes ONLY categorization fields, through the same code paths the admin
 // already uses:
-//   portfolio_images.category_slug/category_id/school/location
+//   portfolio_images.category_slug/category_id/school/location (school must be
+//     a registered slug — built-in or content_engine_schools — like a session's)
 //   session_photos.photo_location (+ source, confirmed_at) — one photo only
 //   photography_sessions facts via updateSessionFacts (same validation as Session facts)
 //   school_spot_photos via setSpotTag (same as Page Photos)
@@ -15,6 +16,7 @@
 // after); a failed log write is logged to the console and never fails the apply.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { updateSessionFacts } from "@/lib/contentEngine/createSession";
+import { findSchool } from "@/lib/contentEngine/schoolStore";
 import { setSpotTag } from "@/lib/pagePhotos/spotTagStore";
 import { entriesFromOutcomes, type ChangeActor } from "@/lib/photoChangeLog/entries";
 import { logChanges } from "@/lib/photoChangeLog/log";
@@ -61,6 +63,10 @@ async function writePortfolio(
 ): Promise<void> {
   const { category, ...rest } = write.patch;
   const patch: Record<string, unknown> = { ...rest };
+  // Same registry the session facts use: built-in schools plus content_engine_schools.
+  if (typeof rest.school === "string" && !(await findSchool(client, rest.school))) {
+    throw new Error(`unknown school "${rest.school}" — add it to the school list first`);
+  }
   if (category !== undefined) {
     // The table stores raw category slugs (graduation, family); find the real row.
     const row = (await categories()).find((c) => canonicalCategory(c.slug) === category);
