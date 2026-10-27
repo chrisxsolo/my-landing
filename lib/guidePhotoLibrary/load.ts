@@ -3,6 +3,7 @@
 // and thumbnails for one page of results. Never writes.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { ORIGINALS_BUCKET } from "@/lib/contentEngine/uploadConfig";
+import { PUBLIC_IMAGE_WEB_COPIES } from "@/lib/imageWebCopies";
 import { SPOT_SCHOOL_IDS } from "@/lib/contentEngine/taxonomy";
 import { COUPLES_LOCATION_PHOTOS_TABLE, isValidCouplesLocationSlug } from "@/lib/couplesPhotosAdmin";
 import { FAMILY_LOCATION_PHOTOS_TABLE, isValidFamilyLocationSlug } from "@/lib/familyPhotosAdmin";
@@ -146,11 +147,20 @@ export async function loadLibrary(client: SupabaseClient, target: LibraryTarget)
   return { sessions, photos, rows: new Map(photoRows.map((p) => [p.id, p])) };
 }
 
-/** Supabase render URL for a public object (same transform the site's image loader uses). */
+const OBJECT_PREFIX = "/storage/v1/object/public/";
+const RENDER_PREFIX = "/storage/v1/render/image/public/";
+
+/**
+ * Supabase render URL for a public object (same transform the site's image
+ * loader uses, including the web copies that stand in for originals too big
+ * to transform). Never the full-resolution original.
+ */
 export function publicThumbUrl(publicUrl: string, width = THUMB_WIDTH): string {
   try {
     const url = new URL(publicUrl);
-    url.pathname = url.pathname.replace("/storage/v1/object/public/", "/storage/v1/render/image/public/");
+    if (!url.pathname.startsWith(OBJECT_PREFIX)) return publicUrl;
+    const storagePath = url.pathname.slice(OBJECT_PREFIX.length);
+    url.pathname = RENDER_PREFIX + (PUBLIC_IMAGE_WEB_COPIES[storagePath] ?? storagePath);
     url.searchParams.set("width", String(width));
     url.searchParams.set("quality", "70");
     url.searchParams.set("resize", "contain");
@@ -160,11 +170,17 @@ export function publicThumbUrl(publicUrl: string, width = THUMB_WIDTH): string {
   }
 }
 
+export type PickerSource = "engine" | "portfolio" | "journal";
+
 export interface PickerPhoto {
   id: string;
+  /** engine = Content Engine photo (uuid id); portfolio / journal = extraSources.ts. */
+  source: PickerSource;
   sessionId: string;
   sessionName: string;
   serviceType: string;
+  /** /grads school slug, when known. */
+  schoolSlug: string | null;
   locationLabel: string | null;
   thumbUrl: string | null;
   webUrl: string | null;
@@ -174,6 +190,10 @@ export interface PickerPhoto {
   excluded: boolean;
   qualityScore: number | null;
   inGuide: RankedPhoto["inGuide"];
+  /** Where the photo comes from, for non-engine sources ("Journal · <post>"). */
+  originLabel: string | null;
+  /** Public pages showing the photo now (lib/photoSync/placements countLivePages); null = not counted. */
+  usedOnPages: number | null;
 }
 
 /** Shapes one page for the client; private originals get short-lived signed thumbnails. */
@@ -194,9 +214,11 @@ export async function toPickerPhotos(
     }
     return {
       id: p.id,
+      source: "engine",
       sessionId: p.sessionId,
       sessionName: session.name,
       serviceType: session.serviceType,
+      schoolSlug: session.schoolSlug,
       locationLabel: session.locationLabel,
       thumbUrl,
       webUrl: row.public_derivative_url,
@@ -206,6 +228,8 @@ export async function toPickerPhotos(
       excluded: p.excluded,
       qualityScore: p.qualityScore,
       inGuide: p.inGuide,
+      originLabel: null,
+      usedOnPages: null,
     };
   }));
 }

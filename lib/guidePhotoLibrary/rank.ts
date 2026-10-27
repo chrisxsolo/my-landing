@@ -20,7 +20,9 @@ export type GuideTarget = (typeof GUIDE_TARGETS)[number];
 
 export type LibraryTarget =
   | { kind: "guide"; guide: GuideTarget; slug: string }
-  | { kind: "gradSpot"; spotSchoolId: string };
+  | { kind: "gradSpot"; spotSchoolId: string }
+  /** No destination to rank for (a journal cover, a replacement): every photo is a suggestion. */
+  | { kind: "library" };
 
 /** approved = has a public web copy; needs_approval = private original only. */
 export type PhotoStatus = "approved" | "needs_approval" | "no_permission";
@@ -75,6 +77,8 @@ export interface LibraryFilters {
   location?: string;
   /** An engine service_type. */
   category?: string;
+  /** A /grads school slug (LibrarySession.schoolSlug). */
+  school?: string;
   /** "suggested" keeps tiers 0-2; "all" shows the whole library. */
   scope?: "suggested" | "all";
 }
@@ -90,6 +94,7 @@ export function photoTier(
   target: LibraryTarget,
   spotSchoolSlug: string | null = null,
 ): number {
+  if (target.kind === "library") return SUGGESTED_MAX_TIER;
   if (target.kind === "guide") {
     if (photo.inGuide) return 0;
     if (session.placeKeys.includes(target.slug)) return 1;
@@ -134,6 +139,7 @@ export function rankLibrary(
     if (!session) continue;
     if (filters.category && session.serviceType !== filters.category) continue;
     if (filters.location && session.locationKey !== filters.location) continue;
+    if (filters.school && session.schoolSlug !== filters.school) continue;
     if (filters.q && !matchesQuery(session, filters.q)) continue;
     const tier = photoTier(photo, session, target, spotSchoolSlug);
     if (scope === "suggested" && tier > SUGGESTED_MAX_TIER) continue;

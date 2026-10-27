@@ -1,35 +1,48 @@
 "use client";
 
-// "Choose existing photo" — a reusable modal that browses photos already
-// uploaded through the Content Engine and puts one to work without a new upload.
+// "Choose existing photo" — a reusable modal that browses photos the site
+// already has (Content Engine, Portfolio, older journal posts) and puts one to
+// work without a new upload.
 //
 //   mode "gallery"  (couples / family / portrait location galleries)
 //     Set as hero image  → links the photo to the guide, publishes it, and makes
 //                          it the hero in one step; the old hero stays in the gallery.
 //     Add as draft       → links it as an unpublished gallery photo.
-//   mode "pick"     (grad campus spots: a single image slot)
+//     (Content Engine photos only: the guide RPC links by session photo id.)
+//   mode "pick"     (grad campus spots, journal covers, placement replacements)
 //     Use this photo     → returns the photo's public web URL to the caller.
 //
-// Photos without a public web copy are "Not approved": the admin must tick the
-// approval box first, which builds that one web copy (as the engine does on
-// publish). All reads/writes go through /api/admin/guide-photo-library.
+// Targets rank the Content Engine library for one destination; the `library`
+// target (no destination) suits a journal cover or a replacement and browses
+// everything by default. Photos without a public web copy are "Not approved":
+// the admin must tick the approval box first, which builds that one web copy
+// (as the engine does on publish). All reads/writes go through
+// /api/admin/guide-photo-library; every thumbnail is a resized render, never
+// the original.
 
 import { useCallback, useEffect, useState } from "react";
-import ExistingPhotoTile, { tierLabel, type PickerPhoto } from "@/app/admin/ExistingPhotoTile";
+import ExistingPhotoTile, { tierLabel, usageLabel, type PickerPhoto } from "@/app/admin/ExistingPhotoTile";
 
 const API = "/api/admin/guide-photo-library";
 
 export type PickerTarget =
   | { guide: "couples" | "family" | "portrait"; slug: string; label: string }
-  | { spotSchool: string; label: string };
+  | { spotSchool: string; label: string }
+  | { library: true; label: string };
+
+export type PickerMode = "gallery" | "pick";
+
+export interface PickerResult { url: string | null; alt: string | null }
 
 type Props = {
   target: PickerTarget;
-  mode: "gallery" | "pick";
+  mode: PickerMode;
   onClose: () => void;
   /** gallery: called after a successful attach. pick: called with the chosen web URL. */
-  onDone: (result: { url: string | null; alt: string | null }) => void;
+  onDone: (result: PickerResult) => void;
   showToast: (message: string, ok?: boolean) => void;
+  /** Preselects the school filter (a /grads slug). */
+  school?: string;
 };
 
 type Library = {
@@ -38,12 +51,14 @@ type Library = {
   pageSize: number;
   locations: { key: string; label: string }[];
   categories: string[];
+  schools: { slug: string; label: string }[];
 };
 
-const EMPTY: Library = { photos: [], total: 0, pageSize: 48, locations: [], categories: [] };
+const EMPTY: Library = { photos: [], total: 0, pageSize: 48, locations: [], categories: [], schools: [] };
 const CONTROL = "rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800";
 
 function targetQuery(target: PickerTarget): string {
+  if ("library" in target) return "library=1";
   return "spotSchool" in target
     ? `spotSchool=${encodeURIComponent(target.spotSchool)}`
     : `guide=${target.guide}&slug=${encodeURIComponent(target.slug)}`;
@@ -56,14 +71,16 @@ async function postJson(body: Record<string, unknown>) {
   return json as Record<string, unknown>;
 }
 
-export default function ExistingPhotoPicker({ target, mode, onClose, onDone, showToast }: Props) {
+export default function ExistingPhotoPicker({ target, mode, onClose, onDone, showToast, school: initialSchool = "" }: Props) {
   const [lib, setLib] = useState<Library>(EMPTY);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
   const [query, setQuery] = useState("");
   const [location, setLocation] = useState("");
   const [category, setCategory] = useState("");
-  const [scope, setScope] = useState<"suggested" | "all">("suggested");
+  const [school, setSchool] = useState(initialSchool);
+  const isLibrary = "library" in target;
+  const [scope, setScope] = useState<"suggested" | "all">(isLibrary ? "all" : "suggested");
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<PickerPhoto | null>(null);
   const isSpot = "spotSchool" in target;
@@ -82,6 +99,7 @@ export default function ExistingPhotoPicker({ target, mode, onClose, onDone, sho
       if (query) params.set("q", query);
       if (location) params.set("location", location);
       if (category) params.set("category", category);
+      if (school) params.set("school", school);
       const res = await fetch(`${API}?${tq}&${params}`);
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Failed to load photos");
@@ -92,7 +110,7 @@ export default function ExistingPhotoPicker({ target, mode, onClose, onDone, sho
     } finally {
       setLoading(false);
     }
-  }, [tq, scope, page, query, location, category, showToast]);
+  }, [tq, scope, page, query, location, category, school, showToast]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -118,14 +136,14 @@ export default function ExistingPhotoPicker({ target, mode, onClose, onDone, sho
           <div>
             <h3 className="text-lg font-bold text-slate-800">Choose an existing photo</h3>
             <p className="text-sm text-slate-500">
-              From the Content Engine for <span className="font-semibold text-slate-700">{target.label}</span>. Nothing is re-uploaded.
+              Photos already on the site, for <span className="font-semibold text-slate-700">{target.label}</span>. Nothing is re-uploaded.
             </p>
           </div>
           <button type="button" onClick={onClose} aria-label="Close" className="h-9 w-9 rounded-full bg-slate-100 text-lg font-bold text-slate-600 hover:bg-slate-200">×</button>
         </header>
 
         <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-5 py-3">
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search sessions…" aria-label="Search by session name" className={`${CONTROL} min-w-[12rem] flex-1`} />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search sessions, titles, posts…" aria-label="Search by session name" className={`${CONTROL} min-w-[12rem] flex-1`} />
           <select value={location} onChange={(e) => resetPage(setLocation)(e.target.value)} aria-label="Filter by location" className={CONTROL}>
             <option value="">All locations</option>
             {lib.locations.map((l) => <option key={l.key} value={l.key}>{l.label}</option>)}
@@ -133,6 +151,10 @@ export default function ExistingPhotoPicker({ target, mode, onClose, onDone, sho
           <select value={category} onChange={(e) => resetPage(setCategory)(e.target.value)} aria-label="Filter by category" className={CONTROL}>
             <option value="">All categories</option>
             {lib.categories.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <select value={school} onChange={(e) => resetPage(setSchool)(e.target.value)} aria-label="Filter by school" className={CONTROL}>
+            <option value="">All schools</option>
+            {lib.schools.map((s) => <option key={s.slug} value={s.slug}>{s.label}</option>)}
           </select>
           <div className="flex rounded-lg border border-slate-300 p-0.5 text-xs font-semibold">
             {(["suggested", "all"] as const).map((s) => (
@@ -177,7 +199,7 @@ export default function ExistingPhotoPicker({ target, mode, onClose, onDone, sho
 type BarProps = {
   photo: PickerPhoto;
   target: PickerTarget;
-  mode: "gallery" | "pick";
+  mode: PickerMode;
   isSpot: boolean;
   onDone: Props["onDone"];
   showToast: Props["showToast"];
@@ -189,9 +211,10 @@ function SelectionBar({ photo, target, mode, isSpot, onDone, showToast }: BarPro
   const needsApproval = photo.status === "needs_approval";
   const blocked = photo.status === "no_permission" || (needsApproval && !approved);
   const isHero = photo.inGuide?.hero && photo.inGuide.published;
+  const engineOnly = mode === "gallery" && photo.source !== "engine";
 
   async function attach(hero: boolean) {
-    if ("spotSchool" in target) return;
+    if (!("guide" in target)) return;
     if (hero && !confirm(`Make this the hero image for ${target.label}? It will be published. The current hero stays in the gallery.`)) return;
     setBusy(true);
     try {
@@ -225,9 +248,10 @@ function SelectionBar({ photo, target, mode, isSpot, onDone, showToast }: BarPro
       <div className="min-w-0 flex-1 text-sm">
         <p className="truncate font-semibold text-slate-800">{photo.sessionName}</p>
         <p className="text-xs text-slate-500">
-          {[tierLabel(photo, isSpot), photo.locationLabel, photo.qualityScore ? `quality ${photo.qualityScore}/10` : null].filter(Boolean).join(" · ")}
+          {[photo.originLabel, tierLabel(photo, isSpot), photo.locationLabel, photo.qualityScore ? `quality ${photo.qualityScore}/10` : null, usageLabel(photo)].filter(Boolean).join(" · ")}
         </p>
         {photo.status === "no_permission" && <p className="text-xs font-semibold text-red-700">This session has no marketing permission, so it can&apos;t be used publicly.</p>}
+        {engineOnly && <p className="text-xs font-semibold text-amber-800">Only Content Engine photos can be linked to a guide gallery; this one is a {photo.source} image.</p>}
         {needsApproval && (
           <label className="mt-1 flex items-center gap-2 text-xs font-semibold text-amber-800">
             <input type="checkbox" checked={approved} onChange={(e) => setApproved(e.target.checked)} />
@@ -241,10 +265,10 @@ function SelectionBar({ photo, target, mode, isSpot, onDone, showToast }: BarPro
         </button>
       ) : (
         <div className="flex flex-wrap gap-2">
-          <button type="button" disabled={blocked || busy || !!photo.inGuide} onClick={() => attach(false)} className={`${btn} border border-slate-300 bg-white text-slate-700 hover:bg-slate-100`}>
+          <button type="button" disabled={blocked || busy || engineOnly || !!photo.inGuide} onClick={() => attach(false)} className={`${btn} border border-slate-300 bg-white text-slate-700 hover:bg-slate-100`}>
             Add as draft
           </button>
-          <button type="button" disabled={blocked || busy || !!isHero} onClick={() => attach(true)} className={`${btn} bg-emerald-700 text-white hover:bg-emerald-800`}>
+          <button type="button" disabled={blocked || busy || engineOnly || !!isHero} onClick={() => attach(true)} className={`${btn} bg-emerald-700 text-white hover:bg-emerald-800`}>
             {busy ? "Working…" : isHero ? "Already the hero" : "Set as hero image"}
           </button>
         </div>
