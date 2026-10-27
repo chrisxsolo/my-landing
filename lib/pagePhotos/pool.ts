@@ -17,6 +17,7 @@ import type { DbGuideRef } from "@/lib/locations/guideCoverage";
 import { PAGE_PHOTO_CURATION_TABLE } from "@/lib/pagePhotos/pageKeys";
 import { isSchoolSlug } from "@/lib/contentEngine/taxonomy";
 import { SCHOOL_SPOT_PHOTOS_TABLE } from "@/lib/schoolSpots";
+import { fetchAllPages } from "@/lib/supabasePaging";
 import type { CurationRow } from "@/lib/pagePhotos/curate";
 import {
   enginePhotoPlace, indexEngineSources, resolvePhoto,
@@ -253,6 +254,27 @@ async function spotTagRows(client: SupabaseClient): Promise<Rows> {
   return (data ?? []) as Rows;
 }
 
+const PORTFOLIO_IMAGES_TABLE = "portfolio_images";
+const SESSION_PHOTOS_TABLE = "session_photos";
+const POOL_PORTFOLIO_COLUMNS =
+  "id,title,alt,image_url,category_slug,featured,sort_order,width,height,content_hash,school,location,session_label";
+const POOL_ENGINE_COLUMNS = "id,alt_text,public_derivative_url,content_hash,excluded,quality_score,width,height,"
+  + "gps_latitude,gps_longitude,"
+  + "photography_sessions!inner(id,public_display_name,service_type,school_slug,primary_location,secondary_locations,"
+  + "marketing_permission,marketing_permission_revoked_at)";
+
+// Both tables can outgrow PostgREST's 1000-row page, so they are read page by
+// page (ordered by id) and a failed page fails the whole read.
+function publishedPortfolioRows(client: SupabaseClient): Promise<Rows> {
+  return fetchAllPages((from, to) => client.from(PORTFOLIO_IMAGES_TABLE).select(POOL_PORTFOLIO_COLUMNS)
+    .eq("published", true).order("id").range(from, to), PORTFOLIO_IMAGES_TABLE);
+}
+
+function publicSessionPhotoRows(client: SupabaseClient): Promise<Rows> {
+  return fetchAllPages((from, to) => client.from(SESSION_PHOTOS_TABLE).select(POOL_ENGINE_COLUMNS)
+    .not("public_derivative_url", "is", null).order("id").range(from, to), SESSION_PHOTOS_TABLE);
+}
+
 function sessionLocationsOf(rows: readonly EngineSchoolRow[]): Record<string, string[]> {
   return Object.fromEntries(rows.map(({ source }) => [source.sessionId,
     [source.primaryLocation, ...source.secondaryLocations].filter((t): t is string => Boolean(t?.trim()))]));
@@ -261,12 +283,8 @@ function sessionLocationsOf(rows: readonly EngineSchoolRow[]): Record<string, st
 export async function loadPhotoPool(client: SupabaseClient): Promise<PhotoPool> {
   const errors: string[] = [];
   const [portfolio, engine, school, curation, places, dbGuides, posts, spotTags] = await Promise.all([
-    settle("portfolio_images", errors, [] as Rows, () => rows(client.from("portfolio_images")
-      .select("id,title,alt,image_url,category_slug,featured,sort_order,width,height,content_hash,school,location,session_label")
-      .eq("published", true))),
-    settle("session_photos", errors, [] as Rows, () => rows(client.from("session_photos")
-      .select("id,alt_text,public_derivative_url,content_hash,excluded,quality_score,width,height,gps_latitude,gps_longitude,photography_sessions!inner(id,public_display_name,service_type,school_slug,primary_location,secondary_locations,marketing_permission,marketing_permission_revoked_at)")
-      .not("public_derivative_url", "is", null))),
+    settle(PORTFOLIO_IMAGES_TABLE, errors, [] as Rows, () => publishedPortfolioRows(client)),
+    settle(SESSION_PHOTOS_TABLE, errors, [] as Rows, () => publicSessionPhotoRows(client)),
     settle("school_page_photos", errors, [] as Rows, () => rows(client.from("school_page_photos")
       .select("id,school_slug,alt_override,caption,sort_order,session_photos!inner(public_derivative_url,alt_text,width,height,quality_score,photography_session_id)")
       .eq("active", true))),
