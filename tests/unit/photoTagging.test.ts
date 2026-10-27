@@ -122,11 +122,14 @@ describe("other categories", () => {
 });
 
 describe("Content Engine photos", () => {
-  it("inherits the session's university and location", () => {
+  it("inherits the session's university, but only a suggestion of its location", () => {
     const [photo] = audit(library({ engine: [engineRow(1, {}, { primary_location: "Gleeson Library" })] }));
     expect(photo.source).toBe("engine");
     expect(check(photo, "school")).toMatchObject({ state: "ok", value: "USF", source: "session" });
-    expect(check(photo, "location").state).toBe("ok");
+    expect(check(photo, "location").state).toBe("missing");
+    expect(photo.suggestions).toContainEqual(expect.objectContaining({
+      field: "location", value: "Gleeson Library", confidence: "high", origin: "session", appliesTo: "photo",
+    }));
   });
 
   it("flags every photo of a grads session with no school, and suggests one from its location", () => {
@@ -163,7 +166,7 @@ describe("Content Engine photos", () => {
     const [photo] = audit(library({
       engine: [engineRow(7, {}, { school_slug: null, primary_location: "Stanford University" })], reviews,
     }));
-    expect(photo.suggestions).toEqual([]);
+    expect(photo.suggestions.filter((s) => s.field === "school")).toEqual([]);
   });
 
   it("only offers stored vision suggestions for fields that are still missing", () => {
@@ -197,7 +200,7 @@ describe("counts and filters", () => {
 
 describe("bulk tagging plan", () => {
   const target = (overrides: Partial<PlanTarget> = {}): PlanTarget => ({
-    key: "portfolio:1", source: "portfolio", portfolioId: 1, sessionId: null, url: `${BASE}p1.jpg`,
+    key: "portfolio:1", source: "portfolio", portfolioId: 1, enginePhotoId: null, sessionId: null, url: `${BASE}p1.jpg`,
     category: "grads", school: null, location: null, spot: null, ...overrides,
   });
 
@@ -236,7 +239,9 @@ describe("bulk tagging plan", () => {
 
   it("uses the new school when the same edit sets school and spot", () => {
     const plan = planTagChanges([target()], { school: "uc-berkeley", spot: "campanile" }, false);
-    expect(plan.writes).toContainEqual({ kind: "spot", school: "uc-berkeley", url: `${BASE}p1.jpg`, spotKey: "campanile" });
+    expect(plan.writes).toContainEqual({
+      kind: "spot", school: "uc-berkeley", url: `${BASE}p1.jpg`, spotKey: "campanile", dependsOn: "portfolio:1",
+    });
   });
 
   it("refuses a university on a non-graduation photo", () => {

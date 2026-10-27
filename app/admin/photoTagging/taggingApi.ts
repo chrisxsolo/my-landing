@@ -1,16 +1,17 @@
 // Fetch client for /api/admin/photo-tagging. Cookie auth rides along (same origin).
+import type { ApplyResult } from "@/lib/photoTagging/apply";
+import type { PreviewResult } from "@/lib/photoTagging/preview";
 import type { TagChanges, TaggingReport, NotApplicableField } from "@/lib/photoTagging/types";
-import type { TagOutcome } from "@/lib/photoTagging/plan";
 
 const PATH = "/api/admin/photo-tagging";
 
-export interface ApplyResponse {
-  updated: number;
-  kept: number;
-  skipped: number;
-  outcomes: TagOutcome[];
-  failures: string[];
-}
+export type ApplyResponse = ApplyResult;
+export type PreviewResponse = PreviewResult;
+
+/** What a tag write asks for: explicit values, or every safe high-confidence suggestion. */
+export type TagRequest =
+  | { kind: "changes"; keys: string[]; changes: TagChanges; replace: boolean }
+  | { kind: "high"; keys?: string[]; photoOnly?: boolean };
 
 export interface VisionResponse {
   analyzed: string[];
@@ -31,26 +32,34 @@ async function request<T>(init?: RequestInit, query = ""): Promise<T> {
 
 const post = <T,>(body: Record<string, unknown>) => request<T>({ method: "POST", body: JSON.stringify(body) });
 
+function bodyOf(req: TagRequest): Record<string, unknown> {
+  return req.kind === "changes"
+    ? { keys: req.keys, changes: req.changes, replace: req.replace }
+    : { high: true, ...(req.keys ? { keys: req.keys } : {}), photoOnly: req.photoOnly === true };
+}
+
 export const taggingApi = {
   load: (sessionId?: string) => request<TaggingReport>(undefined, sessionId ? `?session=${sessionId}` : ""),
   thumbs: () => request<{ thumbs: Record<string, string> }>(undefined, "?thumbs=1"),
-  apply: (keys: string[], changes: TagChanges, replace: boolean) =>
-    post<ApplyResponse>({ action: "apply", keys, changes, replace }),
-  applyHigh: (keys?: string[]) => post<ApplyResponse>({ action: "apply-high", ...(keys ? { keys } : {}) }),
+  preview: (req: TagRequest) => post<PreviewResponse>({ action: "preview", ...bodyOf(req) }),
+  write: (req: TagRequest) => post<ApplyResponse>({ action: req.kind === "changes" ? "apply" : "apply-high", ...bodyOf(req) }),
   markNotApplicable: (keys: string[], field: NotApplicableField, on: boolean) =>
     post<{ updated: number }>({ action: "mark-na", keys, field, on }),
   dismiss: (key: string, suggestionId: string) => post<{ dismissed: boolean }>({ action: "dismiss", key, suggestionId }),
   aiSuggest: (keys: string[], force = false) => post<VisionResponse>({ action: "ai-suggest", keys, force }),
 };
 
-/** One-line human summary of an apply result. */
-export function applySummary(r: ApplyResponse): string {
+function reasons(r: Pick<ApplyResult, "outcomes">, result: string): string {
+  const list = [...new Set(r.outcomes.filter((o) => o.result === result).map((o) => o.reason))].filter(Boolean);
+  return list.length ? ` (${list.slice(0, 2).join("; ")})` : "";
+}
+
+/** One-line human summary of an apply result; ok is false whenever any write failed. */
+export function applySummary(r: ApplyResult): { text: string; ok: boolean } {
   const parts = [`${r.updated} field(s) updated`];
+  if (r.failed > 0) parts.push(`${r.failed} FAILED: ${r.failures[0] ?? "write failed"} — run it again to retry`);
+  if (r.conflicts > 0) parts.push(`${r.conflicts} held back${reasons(r, "conflict")}`);
   if (r.kept > 0) parts.push(`${r.kept} kept (already set — use Replace to overwrite)`);
-  if (r.skipped > 0) {
-    const reasons = [...new Set(r.outcomes.filter((o) => o.result === "skipped").map((o) => o.reason))].filter(Boolean);
-    parts.push(`${r.skipped} skipped${reasons.length ? ` (${reasons.slice(0, 2).join("; ")})` : ""}`);
-  }
-  if (r.failures.length > 0) parts.push(`${r.failures.length} failed: ${r.failures[0]}`);
-  return parts.join(" · ");
+  if (r.skipped > 0) parts.push(`${r.skipped} skipped${reasons(r, "skipped")}`);
+  return { text: parts.join(" · "), ok: r.failed === 0 };
 }

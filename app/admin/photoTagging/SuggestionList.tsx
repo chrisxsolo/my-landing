@@ -1,6 +1,7 @@
 "use client";
 // Tag suggestions for one photo. Accept fills the field (never overwrites);
 // Dismiss records the rejection so the suggestion is never offered again.
+// Competing suggestions (records that disagree) are marked "Pick one".
 import { T } from "@/app/admin/adminTheme";
 import { btn, chip } from "@/app/admin/content-engine/[id]/ui";
 import type { TagSuggestion } from "@/lib/photoTagging/types";
@@ -26,7 +27,7 @@ export default function SuggestionList({ suggestions, busy, onAccept, onDismiss 
           padding: "6px 8px", borderRadius: 10, background: T.inset, border: `1px solid ${T.border}`,
         }}>
           <span style={chip(s.confidence === "high" ? T.green : T.amber, s.confidence === "high" ? T.greenBg : T.amberBg)}>
-            {s.confidence === "high" ? "High" : "Needs approval"}
+            {s.competing ? "Pick one" : s.confidence === "high" ? "High" : "Needs approval"}
           </span>
           <span style={{ fontSize: 13, color: T.ink, fontWeight: 700 }}>
             {FIELD_LABEL[s.field]}: {s.label}
