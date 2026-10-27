@@ -2,6 +2,8 @@
 // Tag editor for one photo, opened from its status badge: what is present /
 // missing / not applicable, suggestions to accept or dismiss, the tag inputs,
 // "not applicable" marks, and an on-demand AI look for what records can't answer.
+// A save that reaches other photos (a Content Engine photo's university is
+// its session's) is previewed and waits for confirmation; Undo restores it.
 import { useState } from "react";
 import Link from "next/link";
 import { T } from "@/app/admin/adminTheme";
@@ -12,8 +14,10 @@ import {
 } from "@/lib/photoTagging/types";
 import SuggestionList from "./SuggestionList";
 import TagFields, { draftToChanges, EMPTY_DRAFT, type TagDraft } from "./TagFields";
+import TagApplyPanel from "./TagApplyPanel";
 import TagStatusBadge from "./TagStatusBadge";
-import { applySummary, taggingApi } from "./taggingApi";
+import { taggingApi } from "./taggingApi";
+import { useTagApply } from "./useTagApply";
 
 const FIELD_LABEL: Record<TagCheck["field"], string> = {
   category: "Category", school: "University", location: "Location", spot: "Campus spot",
@@ -41,34 +45,20 @@ function CheckRow({ check }: { check: TagCheck }) {
 
 export default function PhotoTagEditor({ photo, options, onChanged, onClose }: Props) {
   const [draft, setDraft] = useState<TagDraft>(EMPTY_DRAFT);
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
+  const tagApply = useTagApply(onChanged);
+  const { busy, run } = tagApply;
   const check = (field: TagCheck["field"]) => photo.checks.find((c) => c.field === field);
   const isEngine = photo.source === "engine";
   const grads = (draft.category || photo.category) === "grads";
 
-  async function run(action: () => Promise<string>) {
-    setBusy(true);
-    setMessage(null);
-    try {
-      setMessage({ text: await action(), ok: true });
-      await onChanged();
-    } catch (err) {
-      console.error("[photo-tagging] editor action failed", err);
-      setMessage({ text: err instanceof Error ? err.message : "update failed", ok: false });
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const save = () => run(async () => {
+  const save = () => {
     const changes = draftToChanges(draft);
-    if (Object.keys(changes).length === 0) return "Nothing to save — pick a value first";
-    const result = await taggingApi.apply([photo.key], changes, true);
+    if (Object.keys(changes).length === 0) return tagApply.showToast("Nothing to save — pick a value first", false);
     setDraft(EMPTY_DRAFT);
-    return applySummary(result);
-  });
-  const accept = (s: TagSuggestion) => run(async () => applySummary(await taggingApi.apply([photo.key], { [s.field]: s.value }, false)));
+    void tagApply.submit({ kind: "changes", keys: [photo.key], changes, replace: true });
+  };
+  const accept = (s: TagSuggestion) =>
+    void tagApply.submit({ kind: "changes", keys: [photo.key], changes: { [s.field]: s.value }, replace: false });
   const dismiss = (s: TagSuggestion) => run(async () => { await taggingApi.dismiss(photo.key, s.id); return "Suggestion dismissed"; });
   const markNa = (field: NotApplicableField, on: boolean) =>
     run(async () => { await taggingApi.markNotApplicable([photo.key], field, on); return on ? "Marked not applicable" : "Mark removed"; });
@@ -114,11 +104,11 @@ export default function PhotoTagEditor({ photo, options, onChanged, onClose }: P
       {photo.sessionId && (
         <p style={{ margin: 0, fontSize: 12, color: T.inkSoft }}>
           Session: <Link href={`/admin/content-engine/${photo.sessionId}`} style={{ color: T.blue }}>{photo.sessionName ?? "open"}</Link>
-          {isEngine ? " — university and location apply to every photo of this session" : ""}
+          {isEngine ? " — its university applies to every photo of this session; its location is this photo's own" : ""}
         </p>
       )}
 
-      <SuggestionList suggestions={photo.suggestions} busy={busy} onAccept={(s) => void accept(s)} onDismiss={(s) => void dismiss(s)} />
+      <SuggestionList suggestions={photo.suggestions} busy={busy} onAccept={accept} onDismiss={(s) => void dismiss(s)} />
 
       <TagFields draft={draft} setDraft={setDraft} options={options} allowCategory={!isEngine}
         builtInSchoolsOnly={!isEngine} currentSchool={photo.school} showSchool={grads}
@@ -127,7 +117,7 @@ export default function PhotoTagEditor({ photo, options, onChanged, onClose }: P
           spot: check("spot")?.state === "ok" ? check("spot")?.value ?? "" : "" }} />
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-        <button type="button" style={btn(true)} disabled={busy} onClick={() => void save()}>{busy ? "Saving…" : "Save tags"}</button>
+        <button type="button" style={btn(true)} disabled={busy} onClick={save}>{busy ? "Saving…" : "Save tags"}</button>
         {naField("location")}
         {grads && naField("spot")}
         {photo.status !== "full" && (
@@ -137,7 +127,7 @@ export default function PhotoTagEditor({ photo, options, onChanged, onClose }: P
           </button>
         )}
       </div>
-      {message && <p style={{ margin: 0, fontSize: 13, color: message.ok ? T.green : T.red }}>{message.text}</p>}
+      <TagApplyPanel apply={tagApply} options={options} titleOf={() => photo.title} />
     </div>
   );
 }
