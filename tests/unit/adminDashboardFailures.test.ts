@@ -36,7 +36,7 @@ describe("batch upload recovery", () => {
     let queue = original;
     let saving = false;
     const handler = loadAdminHandler("saveBatchImages", {
-      ...common(), batchItems: original, categories: [], portfolioImages: [],
+      ...common(), batchItems: original, categories: [], portfolioImages: [], isGradCategory: () => false,
       fetch: failure === "network" ? async () => { throw new Error("offline"); } : failure === "partial" ? async () => Response.json({}) : failingFetch,
       setBatchSaving: (v: boolean) => { saving = v; },
       setBatchItems: (v: typeof queue | ((p: typeof queue) => typeof queue)) => { queue = typeof v === "function" ? v(queue) : v; },
