@@ -18,6 +18,7 @@ import {
   calculatePaymentSchedule,
 } from "@/lib/pricingCatalog";
 import { resolvePlaybookKey } from "./sessionClassifier";
+import { resolveTravel } from "@/lib/travelResolution";
 
 export type PricingFacts = {
   verified: boolean;
@@ -386,138 +387,38 @@ export function buildPricingFacts(input: BusinessFactsInput): PricingFacts {
   }
 }
 
-/** Campuses the graduation rate card prices travel for. */
-const CAMPUS_FEES: [RegExp, keyof typeof PRICING_CATALOG.graduation.travelFees][] = [
-  [/sf ?state|san francisco state|sfsu/, "sf-state"],
-  [/usf|university of san francisco/, "usf"],
-  // CSU East Bay before Berkeley: "Cal State East Bay" would otherwise match
-  // Berkeley's bare "cal" and be billed Berkeley's fee.
-  [/csueb|cal state east bay|east bay|hayward/, "csueb"],
-  [/uc ?berkeley|berkeley|cal\b(?! state)/, "uc-berkeley"],
-  [/sjsu|san jose state/, "sjsu"],
-  [/santa clara|scu/, "santa-clara"],
-  [/stanford/, "stanford"],
-  [/san francisco|\bsf\b/, "sf-other"],
-];
-
-/**
- * A location that names an actual campus, for the one case where a travel fee
- * can be read off a location. Tighter than CAMPUS_FEES on purpose: that list
- * matches a school FIELD, where a bare "east bay" does mean CSU East Bay.
- */
-const NAMED_CAMPUSES: [RegExp, keyof typeof PRICING_CATALOG.graduation.travelFees][] = [
-  [/\bcsueb\b|cal state east bay|california state university,? east bay/, "csueb"],
-  [/\bsjsu\b|san jose state/, "sjsu"],
-  [/santa clara university|\bscu\b/, "santa-clara"],
-  [/stanford university|stanford campus/, "stanford"],
-  [/uc ?berkeley|university of california,? berkeley|berkeley campus/, "uc-berkeley"],
-];
-
-function namedCampusFee(normalizedLocation: string): number | null {
-  const fees = PRICING_CATALOG.graduation.travelFees;
-  for (const [pattern, key] of NAMED_CAMPUSES) {
-    if (!pattern.test(normalizedLocation)) continue;
-    const fee = fees[key];
-    return typeof fee === "number" ? fee : null;
-  }
-  return null;
-}
-
-/** Places that are plainly inside San Francisco, where no travel fee applies. */
-const IN_SAN_FRANCISCO =
-  /san francisco|\bsf\b|crissy|baker beach|lands end|palace of fine arts|golden gate park|dolores|presidio|sutro|twin peaks|city hall|legion of honor|ocean beach|marshall'?s beach|bernal|alamo square|fort point|mission district|stern grove|botanical garden/;
-
-/**
- * Somewhere outside the city. Used only to decide whether travel needs
- * raising, never to derive an amount: the number is not in the rate card for
- * most of these, and guessing one is the expensive mistake.
- */
-const OUTSIDE_SAN_FRANCISCO =
-  /oakland|berkeley|alameda|richmond|san jose|santa clara|sunnyvale|palo alto|stanford|menlo park|woodside|filoli|redwood city|san mateo|burlingame|peninsula|half moon bay|pacifica|rockaway|daly city|marin|sausalito|tiburon|muir|point reyes|stinson|napa|sonoma|santa cruz|davenport|monterey|walnut creek|livermore|fremont|hayward|concord|dublin|pleasanton|gilroy|morgan hill|san rafael|novato|petaluma|vallejo|east bay|south bay|north bay|wine country/;
-
-/** The first out-of-city place named in the message, if any. */
-function placeInMessage(message: string): string {
-  const match = message.toLowerCase().match(OUTSIDE_SAN_FRANCISCO);
-  return match ? match[0] : "";
-}
-
 /**
  * Travel, as a verified fee, an explicit unknown, or nothing when the shoot is
  * in the city.
  *
- * Reads the LOCATION as well as the school, and prefers it. Two reasons, both
- * from real threads. Travel follows where the camera goes, not where the
- * client studies: Chris re-quoted a Santa Clara graduate who moved the shoot
- * to Filoli ("since the location would be changing from Santa Clara University
- * to Filoli, the travel fee would be updated accordingly"). And the fee used
- * to exist only for graduations, because it was keyed on `school` alone, so a
- * Point Reyes elopement, a Muir Woods proposal, and a pumpkin-patch family
- * session an hour south all produced no travel fact at all and the draft
- * quoted the bare session price.
+ * Reads the LOCATION as well as the school, and prefers it. Travel follows
+ * where the camera goes, not where the client studies: Chris re-quoted a Santa
+ * Clara graduate who moved the shoot to Filoli. The decision itself lives in
+ * lib/travelResolution.ts, shared with the contract and payment totals.
  */
 export function buildTravelFact(
   school: string | null | undefined,
   location?: string | null,
   message?: string | null,
 ): string | null {
-  const campus = (school ?? "").trim();
-  const field = (location ?? "").trim();
+  const travel = resolveTravel({ school, location, message });
 
-  // The location field is not reliably a location. One real inquiry carried
-  // "September 28" in it, with the actual place ("Shark Fin Cove Davenport")
-  // in the message, which produced the line "the travel fee for September 28
-  // is not in the rate card". So the field is used when it names somewhere
-  // recognisable, and the message is consulted otherwise.
-  const fieldNamesAPlace = Boolean(field) && (
-    NAMED_CAMPUSES.some(([pattern]) => pattern.test(field.toLowerCase()))
-    || IN_SAN_FRANCISCO.test(field.toLowerCase())
-    || OUTSIDE_SAN_FRANCISCO.test(field.toLowerCase())
-  );
-  const place = fieldNamesAPlace ? field : placeInMessage(message ?? "") || (campus ? "" : field);
-  if (!place && !campus) return null;
-
-  // Worded as a constraint on CLAIMS, with relevance left to the stage. The
-  // previous wording ("say the travel fee depends on the exact location and
-  // that you'll confirm it") was an instruction to write a sentence, so every
-  // out-of-city draft carried a travel-fee paragraph whether or not the client
-  // had asked about money.
+  // Worded as a constraint on CLAIMS, with relevance left to the stage, so an
+  // out-of-city draft only mentions travel when it is quoting a price.
   const unknown = (subject: string) =>
     `${subject} is outside San Francisco, so a travel fee applies, but its amount is NOT in the rate card. Never state a travel-fee amount or work one out yourself, and never give a session total that is missing it. Mention travel ONLY if you are quoting a price in this email or they asked what it costs; then one clause is enough ("plus a travel fee for ${subject}, which I'll confirm for you"). The destination is known, so do not ask them to confirm the location again; a meeting spot still to be picked does not change it. If this email is not about price, leave travel out entirely.`;
 
-  // Verified by the app from driving distance and tolls. The wording carries
-  // no other dollar figure, because the validator treats every figure in this
-  // fact as quotable.
+  // The wording carries no other dollar figure, because the validator treats
+  // every figure in this fact as quotable.
   const verified = (subject: string, fee: number) =>
-    `Travel fee for ${subject}: ${money(fee)}. This is the verified fee; use it as given and never recalculate it. When you quote the session price, add it and give the all-in total as one figure, the way Chris does ("plus a travel fee of X, so Y total").`;
+    `Travel fee for ${subject}: ${money(fee)}. This is the verified fee; use it as given and never recalculate it, even if an older email in the thread shows a different travel amount. When you quote the session price, add it and give the all-in total as one figure, the way Chris does ("plus a travel fee of X, so Y total").`;
 
-  // ── The location decides, when they gave one: it is where the shoot is ──
-  if (place) {
-    const normalized = place.toLowerCase();
-    // A campus fee applies only when the shoot is AT that campus, matched on
-    // campus names rather than the looser school-field patterns: a couples
-    // session somewhere in "East Bay" is not a CSU East Bay graduation, and
-    // billing it that campus's $30 would be a guess.
-    const fee = namedCampusFee(normalized);
-    if (fee !== null) return verified(place, fee);
-    if (IN_SAN_FRANCISCO.test(normalized)) return `No travel fee for ${place}, it's in San Francisco.`;
-    if (OUTSIDE_SAN_FRANCISCO.test(normalized)) return unknown(place);
-    // The location told us nothing either way, so fall through to the school.
+  switch (travel.kind) {
+    case "verified": return verified(travel.place, travel.fee);
+    case "included": return `No travel fee for ${travel.place}, it's in San Francisco.`;
+    case "unknown": return unknown(travel.place);
+    default: return null;
   }
-
-  // ── Otherwise the school's campus, which the rate card does price ──
-  if (campus) {
-    const normalized = campus.toLowerCase();
-    const fees = PRICING_CATALOG.graduation.travelFees;
-    for (const [pattern, key] of CAMPUS_FEES) {
-      if (!pattern.test(normalized)) continue;
-      const fee = fees[key];
-      if (fee === null) return `No travel fee for ${campus}, it's in San Francisco.`;
-      if (typeof fee === "number") return verified(campus, fee);
-      break;
-    }
-    return unknown(campus);
-  }
-  return unknown(place);
 }
 
 /**
