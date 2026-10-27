@@ -58,6 +58,14 @@ describe("rankLibrary", () => {
     expect(rankLibrary(photos, sessions, palace, { scope: "all", category: "grads" }).map((p) => p.id)).toEqual(["kim-1"]);
   });
 
+  it("treats every photo as a suggestion for the library target and filters by school", () => {
+    const library = { kind: "library" } as const;
+    expect(rankLibrary(photos, sessions, library).map((p) => p.id)).toHaveLength(photos.length);
+    expect(rankLibrary(photos, sessions, library).every((p) => p.tier <= 2)).toBe(true);
+    expect(rankLibrary(photos, sessions, library, { school: "uc-berkeley" }).map((p) => p.id)).toEqual(["kim-1"]);
+    expect(rankLibrary(photos, sessions, palace, { scope: "all", school: "sf-state" }).map((p) => p.id)).toEqual([]);
+  });
+
   it("ranks the matching school first for a grad campus-spot target", () => {
     const tara = photo({ id: "tara-1", sessionId: "tara", qualityScore: 10 });
     const ranked = rankLibrary([...photos, tara], sessions, { kind: "gradSpot", spotSchoolId: "berkeley" }, {}, "uc-berkeley");
