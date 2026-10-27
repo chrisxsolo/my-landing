@@ -16,6 +16,7 @@ const MARQUEE = [
   "Beaches", "Golden Hour", "Gardens", "Clean Light",
 ];
 const marquee = [...MARQUEE, ...MARQUEE];
+const CONTACT_HREF = "/contact";
 
 // Cards beyond this load on "Show more" so a large library stays light on phones.
 const PAGE_SIZE = 24;
@@ -67,7 +68,7 @@ export default function LocationsExplorer({ locations }: { locations: PublicLoca
             Filter by region, setting, light, or the kind of session to narrow it down fast.
           </p>
           <div className="gg-actions gg-afu4">
-            <a href="https://www.soloxsnaps.com/contact/" className="gg-btn gg-btn--primary">Book a shoot →</a>
+            <Link href={CONTACT_HREF} className="gg-btn gg-btn--primary">Book a shoot →</Link>
             <Link href="/availability" className="gg-btn gg-btn--ghost">Check availability</Link>
           </div>
 
@@ -172,7 +173,7 @@ export default function LocationsExplorer({ locations }: { locations: PublicLoca
               Send me the spots you are drawn to and I can help narrow them down based on light, traffic, outfits, and the energy you want the photos to have.
             </p>
             <div className="gg-cta-actions">
-              <a href="https://www.soloxsnaps.com/contact/" className="gg-btn gg-btn--ongreen">Start planning →</a>
+              <Link href={CONTACT_HREF} className="gg-btn gg-btn--ongreen">Start planning →</Link>
               <Link href="/links" className="gg-btn gg-btn--onghost">More links</Link>
             </div>
           </div>

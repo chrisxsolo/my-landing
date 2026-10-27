@@ -4,6 +4,7 @@ import Link from "next/link";
 import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 import { GRAD_GUIDE_CSS, GG_SQUIGGLE_PATH } from "@/lib/gradGuide";
 import type { LocationSpot } from "@/lib/gradGuideData";
+import { GRAD_SCHOOL_LINKS, type GradSchoolLink } from "@/lib/portfolioCategoryContent";
 
 const SCHOOL_ORDER = ["sjsu", "berkeley", "sfsu", "csueb", "usf"];
 
@@ -52,6 +53,32 @@ const DRAFT_SPOTS: LocationSpot[] = [
 const MARQUEE = ["San Jose State", "UC Berkeley", "SF State", "Cal State East Bay", "USF", "Best Spots", "Golden Hour", "Campus Shoots"];
 const marquee = [...MARQUEE, ...MARQUEE];
 
+// Campuses with a live /grads/<slug> page but no spot guide on this hub yet.
+// Listing them here keeps every school reachable from the guide.
+function UpcomingSchools({ schools }: { schools: GradSchoolLink[] }) {
+  if (schools.length === 0) return null;
+  const separator = (index: number) =>
+    index === schools.length - 1 ? null : index === schools.length - 2 ? " and " : ", ";
+  return (
+    <section className="gg-section">
+      <div className="gg-shell">
+        <p className="gg-sec-kicker" data-reveal>More campuses</p>
+        <h2 className="gg-sec-title" data-reveal>Spot guides coming soon</h2>
+        <p className="gg-sec-sub" data-reveal>
+          I also photograph graduates at{" "}
+          {schools.map((school, index) => (
+            <span key={school.href}>
+              <Link href={school.href} className="gg-inline-link">{school.label}</Link>
+              {separator(index)}
+            </span>
+          ))}
+          . Each campus page covers the session, timing, and booking while its spot guide is in the works.
+        </p>
+      </div>
+    </section>
+  );
+}
+
 export default function CampusSpotsContent({ spots: spotsFromDb }: { spots: LocationSpot[] }) {
   // DB rows win; draft spots fill in only for schools the DB doesn't cover yet.
   // USF has no draft: its spots always come from its location guide (guideSpots.ts).
@@ -67,6 +94,8 @@ export default function CampusSpotsContent({ spots: spotsFromDb }: { spots: Loca
     if (!first) return null;
     return { id, name: first.school_name, short: first.school_short, spots: schoolSpots };
   }).filter((s): s is NonNullable<typeof s> => s !== null);
+  const coveredHrefs = new Set(schools.map((school) => `/grads/${SCHOOL_SLUGS[school.id]}`));
+  const upcomingSchools = GRAD_SCHOOL_LINKS.filter((school) => !coveredHrefs.has(school.href));
 
   return (
     <main className="gg-page">
@@ -164,6 +193,8 @@ export default function CampusSpotsContent({ spots: spotsFromDb }: { spots: Loca
           </section>
         );
       })}
+
+      <UpcomingSchools schools={upcomingSchools} />
 
       {/* ── CTA ────────────────────────────────────────────────────────────── */}
       <section className="gg-cta">

@@ -50,6 +50,10 @@ const SCHOOL_FALLBACKS = [
   },
 ] as const;
 
+// First populated key wins for the hero's main photo; the legacy cover key is
+// how older admin saves chose it.
+const HERO_PRIMARY_KEYS = ["home_hero_primary", "home_cover_grads"];
+
 const DEFAULT_ALT = {
   grads: "Bay Area graduation portrait by Chris Solorzano",
   couples: "Bay Area couples portrait by Chris Solorzano",
@@ -141,7 +145,8 @@ export function resolveHomepageImages(
       .filter((entry): entry is HomepageImage => entry !== null);
   };
 
-  const heroPrimary = slot(["home_hero_primary", "home_cover_grads"], grads, DEFAULT_ALT.grads, "grads");
+  const heroPrimary = slot(HERO_PRIMARY_KEYS, grads, DEFAULT_ALT.grads, "grads");
+  const heroPrimaryIsManual = HERO_PRIMARY_KEYS.some((key) => Boolean(settings[key]));
   const heroSecondary = slot(["home_hero_secondary", "pricing_couples_standard_image"], couples, DEFAULT_ALT.couples, "couples");
   const cardGrads = slot(["home_card_grads", "home_cover_grads"], grads, DEFAULT_ALT.grads, "grads");
   const cardCouples = slot(["home_card_couples", "pricing_couples_standard_image"], couples, DEFAULT_ALT.couples, "couples");
@@ -163,7 +168,12 @@ export function resolveHomepageImages(
     image_url: settings.home_about_portrait || aboutPortraitFallback,
     alt: ABOUT_PORTRAIT_ALT,
   };
-  const heroSlides = buildHomepageHeroSlides(images, heroPrimary, cardPortrait);
+  const heroSlides = buildHomepageHeroSlides(images, {
+    primary: heroPrimary,
+    primaryIsManual: heroPrimaryIsManual,
+    secondary: heroSecondary,
+    portrait: cardPortrait,
+  });
 
   return {
     heroSlides,
@@ -215,23 +225,32 @@ function getHeroPosition(image: HomepageImage) {
   return focalPoint ? { ...defaults, objectPosition: focalPoint } : defaults;
 }
 
-function buildHomepageHeroSlides(
-  images: HomepageImage[],
-  primaryImage: HomepageImage,
-  portraitImage: HomepageImage,
-): HomepageHeroSlide[] {
+// The admin's hero slots anchor the slideshow: a manually set main photo opens
+// it (otherwise curated graduation work does) and the secondary photo is the
+// first couples slide. Auto-picked slides fill the remaining positions.
+type HeroAnchors = {
+  primary: HomepageImage;
+  primaryIsManual: boolean;
+  secondary: HomepageImage;
+  portrait: HomepageImage;
+};
+
+function buildHomepageHeroSlides(images: HomepageImage[], anchors: HeroAnchors): HomepageHeroSlide[] {
   const grads = images.filter((image) => image.category_slug === "grads");
   const couples = images.filter((image) => image.category_slug === "couples");
   const curatedGrads = images.filter(
     (image) => image.hero_carousel && image.category_slug === "grads",
   );
-  const gradSlides = dedupeByUrl([...curatedGrads, ...grads, primaryImage]).slice(0, 3);
-  const coupleSlides = pickSpread(dedupeByUrl(couples), 2);
+  const gradCandidates = anchors.primaryIsManual
+    ? [anchors.primary, ...curatedGrads, ...grads]
+    : [...curatedGrads, ...grads, anchors.primary];
+  const gradSlides = dedupeByUrl(gradCandidates).slice(0, 3);
+  const coupleSlides = dedupeByUrl([anchors.secondary, ...pickSpread(dedupeByUrl(couples), 2)]).slice(0, 2);
   const ordered = [
     gradSlides[0],
     coupleSlides[0],
     gradSlides[1],
-    portraitImage,
+    anchors.portrait,
     coupleSlides[1],
     gradSlides[2],
   ].filter((image): image is HomepageImage => Boolean(image));

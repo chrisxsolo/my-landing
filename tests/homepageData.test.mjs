@@ -56,26 +56,48 @@ test("resolveHomepageImages auto-picks by category when no settings are set", ()
   assert.equal(home.aboutPortrait.image_url, FALLBACK_PORTRAIT);
 });
 
+const HERO_IMAGES = [
+  { id: 1, image_url: "grad-1.jpg", alt: "Grad 1", category_slug: "grads", hero_carousel: true },
+  { id: 2, image_url: "grad-2.jpg", alt: "Grad 2", category_slug: "grads", hero_carousel: true },
+  { id: 3, image_url: "grad-3.jpg", alt: "Grad 3", category_slug: "grads", hero_carousel: true },
+  { id: 4, image_url: "couple-1.jpg", alt: "Couple 1", category_slug: "couples", hero_carousel: false },
+  { id: 5, image_url: "couple-2.jpg", alt: "Couple 2", category_slug: "couples", hero_carousel: false },
+  { id: 6, image_url: "family-1.jpg", alt: "Family 1", category_slug: "families", hero_carousel: false },
+];
+
 test("hero slides open with curated graduation work and balance service categories", () => {
-  const images = [
-    { id: 1, image_url: "grad-1.jpg", alt: "Grad 1", category_slug: "grads", hero_carousel: true },
-    { id: 2, image_url: "grad-2.jpg", alt: "Grad 2", category_slug: "grads", hero_carousel: true },
-    { id: 3, image_url: "grad-3.jpg", alt: "Grad 3", category_slug: "grads", hero_carousel: true },
-    { id: 4, image_url: "couple-1.jpg", alt: "Couple 1", category_slug: "couples", hero_carousel: false },
-    { id: 5, image_url: "couple-2.jpg", alt: "Couple 2", category_slug: "couples", hero_carousel: false },
-    { id: 6, image_url: "family-1.jpg", alt: "Family 1", category_slug: "families", hero_carousel: false },
-  ];
-  const home = resolveHomepageImages(
-    { home_hero_primary: "legacy-family-frame.jpg" },
-    images,
-    FALLBACK_PORTRAIT,
-  );
+  const home = resolveHomepageImages({}, HERO_IMAGES, FALLBACK_PORTRAIT);
 
   assert.deepEqual(
     home.heroSlides.map((image) => image.category_slug),
     ["grads", "couples", "grads", "families", "couples", "grads"],
   );
   assert.equal(home.heroSlides[0].image_url, "grad-1.jpg");
+  assert.equal(home.heroSlides[1].image_url, "couple-1.jpg");
+});
+
+test("the admin's hero photos lead the slideshow when set", () => {
+  const home = resolveHomepageImages(
+    { home_hero_primary: "chosen-hero.jpg", home_hero_secondary: "chosen-couple.jpg" },
+    HERO_IMAGES,
+    FALLBACK_PORTRAIT,
+  );
+
+  // Manual choices take precedence over the curated auto picks.
+  assert.equal(home.heroSlides[0].image_url, "chosen-hero.jpg");
+  assert.equal(home.heroSlides[1].image_url, "chosen-couple.jpg");
+  assert.deepEqual(
+    home.heroSlides.map((image) => image.category_slug),
+    ["grads", "couples", "grads", "families", "couples", "grads"],
+  );
+  assert.equal(new Set(home.heroSlides.map((image) => image.image_url)).size, home.heroSlides.length);
+});
+
+test("a manual hero photo that is already in the auto pool is not shown twice", () => {
+  const home = resolveHomepageImages({ home_hero_primary: "grad-2.jpg" }, HERO_IMAGES, FALLBACK_PORTRAIT);
+
+  assert.equal(home.heroSlides[0].image_url, "grad-2.jpg");
+  assert.equal(home.heroSlides.filter((image) => image.image_url === "grad-2.jpg").length, 1);
 });
 
 test("resolveHomepageImages prefers explicit settings, then legacy keys", () => {

@@ -10,6 +10,12 @@ import heroStyles from "@/app/components/ProNavHero.module.css";
 import styles from "@/app/components/ProNav.module.css";
 
 const CLIENT_DASHBOARD_HREF = "/dashboard";
+const MOBILE_MENU_ID = "pro-mobile-menu";
+
+// Dropdown and mobile-menu links are always in the server HTML so crawlers can
+// follow them; a closed menu is hidden with the `hidden` attribute (display:
+// none), which also keeps its links out of the tab order.
+const dropdownId = (groupId: string) => `pro-nav-dropdown-${groupId}`;
 
 function isActive(pathname: string, href: string) {
   const path = href.split("?")[0];
@@ -80,12 +86,14 @@ export default function ProNav({ config = DEFAULT_NAV_CONFIG }: { config?: NavCo
       return (
         <div key={group.id} className={styles.proDropdownWrap}>
           <button className={styles.proNavButton} type="button"
-            aria-expanded={open}
+            aria-expanded={open} aria-controls={dropdownId(group.id)}
             aria-current={active ? "page" : undefined}
             onClick={() => toggleGroup(group.id)}>
             {group.label} <span className={styles.proNavCaret}>{open ? "▲" : "▼"}</span>
           </button>
-          {open && <div className={styles.proNavDropdown}>{group.children.map(renderDropdownLink)}</div>}
+          <div id={dropdownId(group.id)} className={styles.proNavDropdown} hidden={!open}>
+            {group.children.map(renderDropdownLink)}
+          </div>
         </div>
       );
     }
@@ -99,11 +107,13 @@ export default function ProNav({ config = DEFAULT_NAV_CONFIG }: { config?: NavCo
         </Link>
         <button className={styles.proNavButton} type="button"
           style={{ borderRadius: "0 8px 8px 0", paddingLeft: 6, paddingRight: 8, minWidth: 0 }}
-          aria-expanded={open}
+          aria-expanded={open} aria-controls={dropdownId(group.id)}
           onClick={() => toggleGroup(group.id)}>
           <span className={styles.proNavCaret}>{open ? "▲" : "▼"}</span>
         </button>
-        {open && <div className={styles.proNavDropdown}>{group.children.map(renderDropdownLink)}</div>}
+        <div id={dropdownId(group.id)} className={styles.proNavDropdown} hidden={!open}>
+          {group.children.map(renderDropdownLink)}
+        </div>
       </div>
     );
   };
@@ -134,7 +144,7 @@ export default function ProNav({ config = DEFAULT_NAV_CONFIG }: { config?: NavCo
             </button>
           </div>
         )}
-        {open && <div className={styles.proMobileSubmenu}>{group.children.map(renderDropdownLink)}</div>}
+        <div className={styles.proMobileSubmenu} hidden={!open}>{group.children.map(renderDropdownLink)}</div>
       </Fragment>
     );
   };
@@ -178,39 +188,37 @@ export default function ProNav({ config = DEFAULT_NAV_CONFIG }: { config?: NavCo
         </div>
 
         <button className={`${styles.proNavButton} ${styles.proMobileButton}`} type="button"
-          aria-expanded={menuOpen} aria-controls="pro-mobile-menu"
+          aria-expanded={menuOpen} aria-controls={MOBILE_MENU_ID}
           onClick={() => setMenuOpen((o) => !o)}>
           Menu <span className={styles.proNavCaret}>{menuOpen ? "✕" : "▼"}</span>
         </button>
 
-        {menuOpen && (
-          <nav id="pro-mobile-menu" className={styles.proMobilePanel} aria-label="Mobile navigation">
-            {primary.map((item) =>
-              item.type === "link" ? (
-                <Link key={item.id} href={item.href} className={styles.proNavLink}
-                  aria-current={isActive(pathname, item.href) ? "page" : undefined}
-                  onClick={closeMenus}>
-                  {item.label}
-                </Link>
-              ) : (
-                renderMobileGroup(item)
-              )
-            )}
-            {clientLogin.visible && (
-              <Link
-                href={clientLogin.href}
-                className={styles.proNavLink}
-                aria-current={isPortalActive ? "page" : undefined}
-                onClick={closeMenus}
-              >
-                {clientLogin.label}
+        <nav id={MOBILE_MENU_ID} className={styles.proMobilePanel} aria-label="Mobile navigation" hidden={!menuOpen}>
+          {primary.map((item) =>
+            item.type === "link" ? (
+              <Link key={item.id} href={item.href} className={styles.proNavLink}
+                aria-current={isActive(pathname, item.href) ? "page" : undefined}
+                onClick={closeMenus}>
+                {item.label}
               </Link>
-            )}
-            {cta.visible && (
-              <Link href={cta.href} className={styles.proNavCta} onClick={closeMenus}>{cta.label}</Link>
-            )}
-          </nav>
-        )}
+            ) : (
+              renderMobileGroup(item)
+            )
+          )}
+          {clientLogin.visible && (
+            <Link
+              href={clientLogin.href}
+              className={styles.proNavLink}
+              aria-current={isPortalActive ? "page" : undefined}
+              onClick={closeMenus}
+            >
+              {clientLogin.label}
+            </Link>
+          )}
+          {cta.visible && (
+            <Link href={cta.href} className={styles.proNavCta} onClick={closeMenus}>{cta.label}</Link>
+          )}
+        </nav>
       </div>
     </header>
   );
