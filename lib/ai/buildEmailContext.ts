@@ -13,6 +13,8 @@
 import { classifySession } from "./sessionClassifier";
 import { TRAVEL_RATE_LABEL } from "@/lib/travelFee";
 import { buildPricingFacts, buildTravelFact, buildPolicyFacts, buildContactFacts, type PricingFacts } from "./businessFacts";
+import { resolveTravel, type TravelResolution } from "@/lib/travelResolution";
+import { parseQuotedPrices, staleQuotedPrices } from "./quotePricing";
 import { buildGoldenHourWindow, goldenHourCaveat, type GoldenHourWindow } from "./goldenHour";
 import { buildThreadDigest, renderThreadDigest, type ThreadDigest, type ThreadMessage } from "./threadDigest";
 import { selectExamples, type ApprovedExample, type ExampleScenario } from "./approvedExamples";
@@ -52,6 +54,7 @@ export type ContextWarning = {
     | "availability_time_unverified"
     | "pricing_unverified"
     | "travel_unverified"
+    | "stale_quoted_price"
     | "session_type_unknown"
     | "session_type_ambiguous"
     | "requested_date_unavailable"
@@ -88,7 +91,15 @@ export type EmailContext = {
     timeVerified: false;
     requestedDateStatus: "available" | "booked" | "on_hold" | "unknown" | null;
   };
-  pricing: PricingFacts & { travelFact: string | null };
+  pricing: PricingFacts & {
+    travelFact: string | null;
+    /** Where the shoot is and what travel costs there, from the rate card. */
+    travel: TravelResolution;
+    /** Thread prices only an outdated travel figure explains; not quotable. */
+    stalePrices: number[];
+    /** Prices the admin confirmed as agreed for this client. */
+    confirmedPrices: number[];
+  };
   policy: string[];
   /** Phone number and signature behaviour, so no draft dangles a reference. */
   contact: string[];
@@ -178,6 +189,11 @@ export type BuildEmailContextInput = {
   /** The client's newest email, when it is theirs. Used for stage detection. */
   latestClientMessage?: string | null;
   examplePool?: ApprovedExample[];
+  /**
+   * Earlier quotes the admin explicitly confirmed as agreed for this client.
+   * Only these may outrank the current rate card.
+   */
+  confirmedPrices?: number[];
   now?: Date;
 };
 
@@ -277,6 +293,19 @@ export function buildEmailContext(input: BuildEmailContextInput): EmailContext {
 
   // ── Thread, administrative status, conversation stage ───────────────────
   const digest = buildThreadDigest(messages, now);
+  const travel = resolveTravel({ school: inquiry.school, location: inquiry.location, message: inquiry.message });
+  const confirmedPrices = input.confirmedPrices ?? [];
+  const stalePrices = staleQuotedPrices(parseQuotedPrices(digest.quotedPrices), {
+    playbook, people: inquiry.people != null ? String(inquiry.people) : null,
+    basePrices: pricingFacts.basePrices, addOnPrices: pricingFacts.addOnPrices, travel, confirmedPrices,
+  }, messages);
+  if (stalePrices.length > 0 && travel.kind === "verified") {
+    warnings.push({
+      code: "stale_quoted_price",
+      severity: "high",
+      message: `An earlier email quoted ${stalePrices.map((p) => `$${p}`).join(", ")}, which used an outdated travel fee. The current approved fee for ${travel.place} is $${travel.fee}, and the draft uses it. If that earlier quote was agreed for this client, confirm it to keep it.`,
+    });
+  }
 
   // The record decides; the thread only softens. Without an inquiry row the
   // status is a guess off the prose, and the prompt is told so.
@@ -339,14 +368,14 @@ export function buildEmailContext(input: BuildEmailContextInput): EmailContext {
       timeVerified: false,
       requestedDateStatus,
     },
-    pricing: { ...pricingFacts, travelFact },
+    pricing: { ...pricingFacts, travelFact, travel, stalePrices, confirmedPrices },
     policy: buildPolicyFacts(),
     contact: buildContactFacts(),
     goldenHour: {
       window: goldenHourDate ? buildGoldenHourWindow(goldenHourDate) : null,
       caveat: goldenHourCaveat(`${inquiry.location ?? ""} ${inquiry.preferredTime ?? ""} ${inquiry.message}`),
     },
-    thread: { digest, lines: renderThreadDigest(digest) },
+    thread: { digest, lines: renderThreadDigest(digest, stalePrices) },
     conversation: { stage, shape: stageShape(stage) },
     admin: { ...admin, lines: renderAdminStatus(admin) },
     examples: selectExamples(

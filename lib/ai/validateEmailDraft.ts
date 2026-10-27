@@ -13,6 +13,7 @@
 
 import { BANNED_PHRASES } from "./soloxsnapsWritingProfile";
 import type { EmailContext } from "./buildEmailContext";
+import { checkDraftQuote, type QuoteInput } from "./quotePricing";
 
 export type IssueType =
   | "em_dash"
@@ -24,6 +25,7 @@ export type IssueType =
   | "emoji"
   | "missing_greeting"
   | "unsupported_price"
+  | "pricing_mismatch"
   | "unsupported_date"
   | "fabricated_booking_state"
   | "fabricated_payment"
@@ -314,10 +316,15 @@ function auxiliaryPrices(context: EmailContext): number[] {
 function isSupportedPrice(price: number, context: EmailContext): boolean {
   const { basePrices, addOnPrices } = context.pricing;
 
-  const exact = new Set<number>([...basePrices, ...addOnPrices, ...auxiliaryPrices(context)]);
+  const exact = new Set<number>([
+    ...basePrices, ...addOnPrices, ...auxiliaryPrices(context), ...context.pricing.confirmedPrices,
+  ]);
+  // A thread price counts as already quoted unless only a superseded travel
+  // fee explains it; those never outrank the current approved fee.
+  const stale = new Set(context.pricing.stalePrices);
   for (const quoted of context.thread.digest.quotedPrices) {
     const value = Number(quoted.replace(/[$,]/g, ""));
-    if (Number.isFinite(value)) exact.add(value);
+    if (Number.isFinite(value) && !stale.has(value)) exact.add(value);
   }
   if (exact.has(price)) return true;
   if (!basePrices.length) return false;
@@ -333,8 +340,35 @@ function isSupportedPrice(price: number, context: EmailContext): boolean {
   return reachable.has(price);
 }
 
+/** The verified inputs a quote is checked against. */
+export function quoteInputOf(context: EmailContext): QuoteInput {
+  return {
+    playbook: context.client.playbook,
+    people: context.request.people,
+    basePrices: context.pricing.basePrices,
+    addOnPrices: context.pricing.addOnPrices,
+    travel: context.pricing.travel,
+    confirmedPrices: context.pricing.confirmedPrices,
+  };
+}
+
+/** A stated travel fee or total that disagrees with the rate card. */
+function checkQuote(draft: string, context: EmailContext): ValidationIssue[] {
+  return checkDraftQuote(draft, quoteInputOf(context)).mismatches.map((m) => ({
+    type: "pricing_mismatch" as const,
+    category: "factual" as const,
+    severity: "high" as const,
+    description: m.kind === "travel"
+      ? m.expected > 0
+        ? `States a $${m.stated} travel fee; the verified fee is $${m.expected}.`
+        : `States a $${m.stated} travel fee, but no travel amount is verified for this location.`
+      : `States a $${m.stated} total; the rate card gives $${m.expected}.`,
+    excerpt: m.excerpt,
+  }));
+}
+
 function checkFacts(draft: string, context: EmailContext): ValidationIssue[] {
-  const issues: ValidationIssue[] = [];
+  const issues: ValidationIssue[] = [...checkQuote(draft, context)];
 
   // ── Prices ────────────────────────────────────────────────────────────────
   for (const price of extractPrices(draft)) {

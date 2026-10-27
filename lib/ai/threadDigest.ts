@@ -202,7 +202,7 @@ export function buildThreadDigest(
 }
 
 /** Renders the digest as prompt lines. Only known facts appear. */
-export function renderThreadDigest(digest: ThreadDigest): string[] {
+export function renderThreadDigest(digest: ThreadDigest, stalePrices: readonly number[] = []): string[] {
   if (digest.messageCount === 0) return ["No prior email history with this client."];
 
   const documentState = (state: EventState, noun: string): string => {
@@ -220,12 +220,21 @@ export function renderThreadDigest(digest: ThreadDigest): string[] {
       : "There is no evidence in the thread that a deposit was paid. Do not treat this booking as confirmed.",
   ];
 
-  if (digest.quotedPrices.length) {
+  // A price explained only by a superseded travel fee is not "already
+  // quoted": repeating it would put the old fee back in front of the client.
+  const stale = new Set(stalePrices);
+  const isStale = (quoted: string) => stale.has(Number(quoted.replace(/[$,]/g, "")));
+  const current = digest.quotedPrices.filter((q) => !isStale(q));
+  const outdated = digest.quotedPrices.filter(isStale);
+  if (current.length) {
     // The "do not restate" half matters as much as the "do not contradict"
     // half. A client who asked a one-line availability question got the price
     // and the whole booking step read back at them: 93 words where Chris
     // wrote 39.
-    lines.push(`Prices Chris already quoted in this thread, most recent message first: ${digest.quotedPrices.join(", ")}. Do not contradict these, and do not restate them unless they ask about price again. They already have the number.`);
+    lines.push(`Prices Chris already quoted in this thread, most recent message first: ${current.join(", ")}. Do not contradict these, and do not restate them unless they ask about price again. They already have the number.`);
+  }
+  if (outdated.length) {
+    lines.push(`Earlier emails quoted ${outdated.join(", ")} using a travel fee that has since changed. Never repeat those figures. If price comes up, use the current verified travel fee and total from the pricing facts.`);
   }
   if (digest.invoice !== "none" || digest.contract !== "none") {
     lines.push("Chris has already explained how booking works in this thread. Do not explain the invoice and contract step again unless they ask, or unless this email is the one settling the booking.");
