@@ -1,5 +1,7 @@
 // Loads the photo library and audits it. Server-only, uncached (the admin
-// reads it right after writing). ~400 rows today — one read per table.
+// reads it right after writing). Photos are read page by page (ordered by id)
+// so the audit never silently stops at PostgREST's 1000-row cap; a failed
+// page is an audit error, and writes refuse to run on an incomplete audit.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { BUILT_IN_SCHOOL_OPTIONS, CUSTOM_SCHOOLS_TABLE, schoolLabel } from "@/lib/contentEngine/schools";
 import { SCHOOL_SLUGS } from "@/lib/contentEngine/taxonomy";
@@ -8,11 +10,13 @@ import { KNOWN_PLACES, type KnownPlace } from "@/lib/locations/places";
 import type { DbGuideRef } from "@/lib/locations/guideCoverage";
 import { loadKnownPlaces, loadPublishedDbGuides } from "@/lib/locations/registry";
 import { SCHOOL_SPOT_PHOTOS_TABLE, spotsForSchool } from "@/lib/schoolSpots";
+import { fetchAllPages } from "@/lib/supabasePaging";
 import { assembleLibrary, type LibraryEntry, type SpotTagRow } from "@/lib/photoTagging/assemble";
 import { countTags } from "@/lib/photoTagging/filters";
 import { loadReviews, type PhotoReview } from "@/lib/photoTagging/reviews";
 import {
-  canonicalCategory, categoryLabel, type CategoryChoice, type TaggingOptions, type TaggingReport,
+  canonicalCategory, categoryLabel, PORTFOLIO_IMAGES_TABLE, SESSION_PHOTOS_TABLE,
+  type CategoryChoice, type TaggingOptions, type TaggingReport,
 } from "@/lib/photoTagging/types";
 
 type Rows = Record<string, unknown>[];
@@ -20,7 +24,7 @@ type Rows = Record<string, unknown>[];
 export const PORTFOLIO_COLUMNS =
   "id,title,alt,image_url,category_slug,featured,sort_order,width,height,content_hash,school,location,session_label,published";
 const ENGINE_COLUMNS = "id,storage_path,public_derivative_url,content_hash,excluded,title,alt_text,description,tags,"
-  + "quality_score,width,height,gps_latitude,gps_longitude,"
+  + "quality_score,width,height,gps_latitude,gps_longitude,photo_location,photo_location_source,"
   + "photography_sessions!inner(id,public_display_name,service_type,school_slug,primary_location,secondary_locations,marketing_permission,marketing_permission_revoked_at)";
 
 async function rows(query: PromiseLike<{ data: unknown; error: { message: string } | null }>): Promise<Rows> {
@@ -51,10 +55,11 @@ export interface LoadedAudit {
 /** Every library photo with its audit. Optionally narrowed to one Content Engine session. */
 export async function loadAudit(client: SupabaseClient, sessionId?: string): Promise<LoadedAudit> {
   const errors: string[] = [];
-  const engineQuery = client.from("session_photos").select(ENGINE_COLUMNS);
   const [portfolio, engine, spotTags, reviews, places, dbGuides, custom, categories] = await Promise.all([
-    settle("portfolio_images", errors, [] as Rows, () => rows(client.from("portfolio_images").select(PORTFOLIO_COLUMNS))),
-    settle("session_photos", errors, [] as Rows, () => rows(engineQuery)),
+    settle(PORTFOLIO_IMAGES_TABLE, errors, [] as Rows, () => fetchAllPages((from, to) => client.from(PORTFOLIO_IMAGES_TABLE)
+      .select(PORTFOLIO_COLUMNS).order("id").range(from, to), PORTFOLIO_IMAGES_TABLE)),
+    settle(SESSION_PHOTOS_TABLE, errors, [] as Rows, () => fetchAllPages((from, to) => client.from(SESSION_PHOTOS_TABLE)
+      .select(ENGINE_COLUMNS).order("id").range(from, to), SESSION_PHOTOS_TABLE)),
     settle(SCHOOL_SPOT_PHOTOS_TABLE, errors, [] as Rows, () => rows(client.from(SCHOOL_SPOT_PHOTOS_TABLE)
       .select("school_slug,image_url,spot_key"))),
     settle("photo_tag_reviews", errors, new Map<string, PhotoReview>(), () => loadReviews(client)),

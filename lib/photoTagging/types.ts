@@ -8,6 +8,8 @@
 // cached AI vision suggestions are stored, in photo_tag_reviews.
 
 export const PHOTO_TAG_REVIEWS_TABLE = "photo_tag_reviews";
+export const PORTFOLIO_IMAGES_TABLE = "portfolio_images";
+export const SESSION_PHOTOS_TABLE = "session_photos";
 
 export type TagStatus = "full" | "partial" | "needs";
 export type TagField = "category" | "school" | "location" | "spot";
@@ -47,6 +49,12 @@ export interface TagSuggestion {
   reason: string;
   /** "session" = accepting it sets the Content Engine session's fact (all its photos). */
   appliesTo: "photo" | "session";
+  /**
+   * Another record (GPS, the session's other locations, tagged siblings)
+   * points somewhere else. Always medium; the photographer picks one — never
+   * applied in bulk.
+   */
+  competing?: boolean;
 }
 
 export interface AuditedPhoto {

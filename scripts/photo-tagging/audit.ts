@@ -6,7 +6,8 @@
 //      --apply-high   also apply every HIGH-confidence suggestion (fills empty fields only)
 
 import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
-import { executePlan, planHighConfidence } from "@/lib/photoTagging/apply";
+import { executePlan } from "@/lib/photoTagging/apply";
+import { planHighConfidence } from "@/lib/photoTagging/highConfidence";
 import { loadAudit, toReport } from "@/lib/photoTagging/library";
 
 async function main() {
@@ -49,8 +50,12 @@ async function main() {
   }
 
   if (process.argv.includes("--apply-high")) {
+    if (report.errors.length) throw new Error("audit incomplete — refusing to write tags");
     const result = await executePlan(client, planHighConfidence(audit.entries));
-    console.log("\nAPPLIED HIGH-CONFIDENCE:", { updated: result.updated, kept: result.kept, skipped: result.skipped, failures: result.failures });
+    console.log("\nAPPLIED HIGH-CONFIDENCE:", {
+      updated: result.updated, failed: result.failed, kept: result.kept, skipped: result.skipped,
+      conflicts: result.conflicts, failures: result.failures,
+    });
   }
 }
 

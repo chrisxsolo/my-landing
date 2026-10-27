@@ -9,6 +9,9 @@
 //     counted twice). Excluded photos were set aside by the photographer.
 // School and place come from lib/pagePhotos/resolve.ts — the same decision
 // the public pages make — so "tagged" always means "the site can place it".
+// A photo's location is ITS OWN fact: the portfolio tag, or the Content
+// Engine photo's confirmed photo_location (manual or GPS). The session's
+// locations are only context for suggestions (lib/photoTagging/suggest.ts).
 import { BUILT_IN_SCHOOLS } from "@/lib/contentEngine/schools";
 import { isSchoolSlug } from "@/lib/contentEngine/taxonomy";
 import { placeAtCoordinates } from "@/lib/locations/match";
@@ -107,17 +110,27 @@ function spotFact(school: string | null, url: string | null, placeKey: string | 
   return placed ? { value: placed, label: name(placed), source: "location" } : null;
 }
 
+/** The spot tag itself (a spot inferred from the photo's place is not stored anywhere). */
+const storedSpot = (spot: FactValue | null): string | null => (spot?.source === "photo tag" ? spot.value : null);
+
 function placeName(key: string | null, places: readonly KnownPlace[]): string | null {
   return key ? places.find((p) => p.key === key)?.name ?? key : null;
 }
 
-/** Photo's own location tag, else its session's typed location, else the place its session label names. */
+/** The Content Engine photo's own confirmed location (never its session's). */
+function ownLocation(engine: EngineRow | null): FactValue | null {
+  const value = engine?.source.photoLocation;
+  if (!value) return null;
+  return { value, source: engine.source.photoLocationSource === "gps" ? "GPS" : "photo tag" };
+}
+
+/** Photo's own location tag, else its Content Engine photo's location, else the place its (legacy) session label names. */
 function portfolioLocation(
   source: PortfolioSource, engine: EngineRow | null, resolved: ResolvedPhoto, places: readonly KnownPlace[],
 ): FactValue | null {
   if (source.location) return { value: source.location, source: "photo tag" };
-  const typed = engine ? [engine.source.primaryLocation, ...engine.source.secondaryLocations].find((t) => t?.trim()) : null;
-  if (typed) return { value: typed, source: "session" };
+  const own = ownLocation(engine);
+  if (own) return own;
   const labelled = resolved.placeSource === "label" ? placeName(resolved.placeKey, places) : null;
   return labelled ? { value: labelled, source: "session label" } : null;
 }
@@ -136,7 +149,7 @@ interface Draft {
   member: Member;
   engine: EngineRow | null;
   captionText: string;
-  appliesTo: "photo" | "session";
+  schoolScope: "photo" | "session";
   photo: Omit<AuditedPhoto, "status" | "checks" | "suggestions" | "school" | "aiAnalyzedAt">;
   target: PlanTarget;
   vision: VisionInput;
@@ -161,7 +174,7 @@ function portfolioDraft(row: Row, source: PortfolioSource, engine: EngineRow | n
     spotTaggable: published, notApplicable: review(lib, key).notApplicable,
   };
   return {
-    key, facts, engine, captionText: `${source.title} · ${source.alt}`, appliesTo: "photo",
+    key, facts, engine, captionText: `${source.title} · ${source.alt}`, schoolScope: "photo",
     member: { key, group: resolved.engineSessionId ?? (source.sessionLabel ? `label:${source.sessionLabel}` : null),
       school: source.school, location: source.location },
     photo: {
@@ -170,9 +183,10 @@ function portfolioDraft(row: Row, source: PortfolioSource, engine: EngineRow | n
       url: source.url, published, title: source.title, category,
       pages: published ? resolved.pages : [], spotTaggable: published,
     },
-    target: { key, source: "portfolio", portfolioId: source.id, sessionId: resolved.engineSessionId,
+    target: { key, source: "portfolio", portfolioId: source.id, enginePhotoId: null, sessionId: resolved.engineSessionId,
       url: published ? source.url : null, category, school: school?.value ?? null,
-      location: location?.value ?? null, spot: spot?.value ?? null },
+      location: location?.value ?? null, spot: spot?.value ?? null,
+      stored: { school: source.school, location: source.location, spot: storedSpot(spot) } },
     vision: { imageUrl: source.url, storagePath: null },
   };
 }
@@ -184,8 +198,7 @@ function engineDraft(engine: EngineRow, lib: LoadedLibrary): Draft {
   const school = category === "grads" && s.schoolSlug
     ? { value: s.schoolSlug, label: schoolLabel(s.schoolSlug, lib.customSchools), source: "session", builtIn: isSchoolSlug(s.schoolSlug) }
     : null;
-  const typed = [s.primaryLocation, ...s.secondaryLocations].find((t) => t?.trim()) ?? null;
-  const location: FactValue | null = typed ? { value: typed, source: "session" } : null;
+  const location = ownLocation(engine);
   const place = enginePhotoPlace(s, lib.places);
   const spot = spotFact(school?.value ?? null, engine.url, place?.key ?? null, lib);
   const facts: PhotoFacts = {
@@ -195,16 +208,17 @@ function engineDraft(engine: EngineRow, lib: LoadedLibrary): Draft {
   };
   const pages = engine.url && school?.builtIn && s.publishable ? [schoolPageKey(school.value)] : [];
   return {
-    key, facts, engine, captionText: "", appliesTo: "session",
-    member: { key, group: s.sessionId, school: null, location: null },
+    key, facts, engine, captionText: "", schoolScope: "session",
+    member: { key, group: s.sessionId, school: null, location: location?.value ?? null },
     photo: {
       key, source: "engine", portfolioId: null, enginePhotoId: engine.id, sessionId: s.sessionId,
       sessionName: s.sessionName, url: engine.url, published: engine.url !== null,
       title: s.sessionName ? `${s.sessionName} session photo` : "Session photo",
       category, pages, spotTaggable: engine.url !== null,
     },
-    target: { key, source: "engine", portfolioId: null, sessionId: s.sessionId, url: engine.url, category,
-      school: school?.value ?? null, location: typed, spot: spot?.value ?? null },
+    target: { key, source: "engine", portfolioId: null, enginePhotoId: engine.id, sessionId: s.sessionId, url: engine.url,
+      category, school: school?.value ?? null, location: location?.value ?? null, spot: spot?.value ?? null,
+      stored: { school: s.schoolSlug, location: s.photoLocation ?? null, spot: storedSpot(spot) } },
     vision: { imageUrl: engine.url, storagePath: engine.storagePath },
   };
 }
@@ -214,7 +228,7 @@ function finish(draft: Draft, members: readonly Member[], lib: LoadedLibrary): L
   const gps = draft.engine?.gps ? placeAtCoordinates(draft.engine.gps, lib.places)?.place ?? null : null;
   const s = draft.engine?.source;
   const suggestions = suggestTags({
-    facts: draft.facts, appliesTo: draft.appliesTo,
+    facts: draft.facts, schoolScope: draft.schoolScope,
     sessionLocations: s ? [s.primaryLocation, ...s.secondaryLocations].filter((t): t is string => Boolean(t?.trim())) : [],
     gpsPlace: gps, captionText: draft.captionText, analysisText: draft.engine?.analysisText ?? "",
     siblings: siblingsOf(draft.member, members), vision: r.ai, dismissed: r.dismissed, places: lib.places,

@@ -1,13 +1,17 @@
 // /api/admin/photo-tagging — photo tagging audit for Portfolio + Content Engine.
 //   GET  ?session=<uuid>           → audited photos (+ counts, options); one session's photos when given
 //   GET  ?thumbs=1                 → signed thumbnails for private Content Engine photos
+//   POST { action: "preview", keys, changes, replace }  → dry run: per-field outcomes + how many OTHER
+//        { action: "preview", keys?, high: true, photoOnly? }   photos a session-wide write changes
 //   POST { action: "apply", keys, changes, replace }   → tag photos (fill empty fields unless replace)
-//   POST { action: "apply-high", keys? }               → apply every high-confidence suggestion
+//   POST { action: "apply-high", keys?, photoOnly? }   → apply every non-conflicting high-confidence suggestion
 //   POST { action: "mark-na", keys, field, on }        → mark location/spot not applicable
 //   POST { action: "dismiss", key, suggestionId }      → never offer a suggestion again
 //   POST { action: "ai-suggest", keys, force? }        → AI vision for ≤4 photos that need it
 // requireAdmin + service role. Tag writes refresh the public pages and run the
 // existing campus-spot and location-library syncs, exactly like other edits.
+// Writes are refused (409) when the audit read was incomplete: a plan built on
+// a partial library could report fields as empty that are not.
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/requireAdmin";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
@@ -16,9 +20,13 @@ import { syncCampusSpotPhotosInBackground } from "@/lib/campusSpotFill/autoSync"
 import { syncSessionInBackground } from "@/lib/locationLibrary/autoSync";
 import { createAnthropicCaller } from "@/lib/contentEngine/aiClient";
 import { isUuid } from "@/lib/contentEngine/uploadConfig";
-import { executePlan, planForEntries, planHighConfidence, type ApplyResult } from "@/lib/photoTagging/apply";
+import { executePlan, planForEntries, type ApplyResult } from "@/lib/photoTagging/apply";
+import { planHighConfidence } from "@/lib/photoTagging/highConfidence";
+import type { LibraryEntry } from "@/lib/photoTagging/assemble";
+import type { TagPlan } from "@/lib/photoTagging/plan";
+import { previewPlan } from "@/lib/photoTagging/preview";
 import { needsVision, runVision, VISION_BATCH_MAX } from "@/lib/photoTagging/aiSuggest";
-import { loadAudit, signPrivateThumbs, toReport } from "@/lib/photoTagging/library";
+import { loadAudit, signPrivateThumbs, toReport, type LoadedAudit } from "@/lib/photoTagging/library";
 import { dismissSuggestion, loadReviews, setNotApplicable } from "@/lib/photoTagging/reviews";
 import { isPhotoKey, NOT_APPLICABLE_FIELDS, type NotApplicableField, type TagChanges } from "@/lib/photoTagging/types";
 
@@ -80,30 +88,53 @@ export async function GET(req: NextRequest) {
   }
 }
 
-async function apply(body: Body) {
+/** The audit, or a 409 when any read failed — never plan writes on a partial library. */
+async function completeAudit(client: ReturnType<typeof createSupabaseAdminClient>): Promise<LoadedAudit | NextResponse> {
+  const audit = await loadAudit(client);
+  if (audit.errors.length === 0) return audit;
+  return bad(`Tagging is paused: the photo library could not be fully read (${audit.errors.join("; ")}). Nothing was changed — reload and try again.`, 409);
+}
+
+type Planned = { plan: TagPlan; keys: string[] } | NextResponse;
+
+function planExplicit(body: Body, audit: LoadedAudit): Planned {
   const keys = keysOf(body.keys);
   const changes = changesOf(body.changes);
   if (!keys) return bad(`keys must be 1–${MAX_KEYS} photo keys`);
   if (!changes) return bad("changes must set at least one of category, school, location, spot");
-  const client = createSupabaseAdminClient();
-  const audit = await loadAudit(client);
   const chosen = audit.entries.filter((e) => keys.includes(e.photo.key));
   if (chosen.length === 0) return bad("none of those photos exist", 404);
-  const result = await executePlan(client, planForEntries(chosen, changes, body.replace === true));
+  return { plan: planForEntries(chosen, changes, body.replace === true), keys };
+}
+
+function planHigh(body: Body, audit: LoadedAudit): Planned {
+  const keys = body.keys === undefined ? null : keysOf(body.keys);
+  if (body.keys !== undefined && !keys) return bad(`keys must be 1–${MAX_KEYS} photo keys`);
+  const chosen = audit.entries.filter((e: LibraryEntry) => (!keys || keys.includes(e.photo.key))
+    && e.photo.suggestions.some((s) => s.confidence === "high"));
+  return { plan: planHighConfidence(chosen, { photoOnly: body.photoOnly === true }), keys: chosen.map((e) => e.photo.key) };
+}
+
+async function write(body: Body, planner: (body: Body, audit: LoadedAudit) => Planned) {
+  const client = createSupabaseAdminClient();
+  const audit = await completeAudit(client);
+  if (audit instanceof NextResponse) return audit;
+  const planned = planner(body, audit);
+  if (planned instanceof NextResponse) return planned;
+  const result = await executePlan(client, planned.plan);
   afterWrite(result);
   return NextResponse.json(result);
 }
 
-async function applyHigh(body: Body) {
-  const keys = body.keys === undefined ? null : keysOf(body.keys);
-  if (body.keys !== undefined && !keys) return bad(`keys must be 1–${MAX_KEYS} photo keys`);
-  const client = createSupabaseAdminClient();
-  const audit = await loadAudit(client);
-  const chosen = audit.entries.filter((e) => (!keys || keys.includes(e.photo.key))
-    && e.photo.suggestions.some((s) => s.confidence === "high"));
-  const result = await executePlan(client, planHighConfidence(chosen));
-  afterWrite(result);
-  return NextResponse.json(result);
+const apply = (body: Body) => write(body, planExplicit);
+const applyHigh = (body: Body) => write(body, planHigh);
+
+async function preview(body: Body) {
+  const audit = await completeAudit(createSupabaseAdminClient());
+  if (audit instanceof NextResponse) return audit;
+  const planned = body.high === true ? planHigh(body, audit) : planExplicit(body, audit);
+  if (planned instanceof NextResponse) return planned;
+  return NextResponse.json(previewPlan(planned.plan, audit.entries, planned.keys));
 }
 
 async function markNotApplicable(body: Body) {
@@ -145,7 +176,7 @@ async function aiSuggest(body: Body) {
 }
 
 const ACTIONS: Record<string, (body: Body) => Promise<NextResponse>> = {
-  apply, "apply-high": applyHigh, "mark-na": markNotApplicable, dismiss, "ai-suggest": aiSuggest,
+  preview, apply, "apply-high": applyHigh, "mark-na": markNotApplicable, dismiss, "ai-suggest": aiSuggest,
 };
 
 export async function POST(req: NextRequest) {
