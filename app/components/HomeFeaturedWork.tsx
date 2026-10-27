@@ -47,9 +47,9 @@ export default function HomeFeaturedWork({
           </div>
         </div>
 
-        <div className={`${styles.storyGrid} ${responsive.storyGrid}`} aria-label="Featured photography">
+        <div className={`${styles.storyGrid} ${responsive.storyGrid}`} role="list" aria-label="Featured photography">
           {mosaic.map((image, index) => (
-            <div key={image.id} className={`${styles.storyImage} ${responsive.storyImage}`} data-reveal data-delay={String((index % 5) + 1)}>
+            <div key={image.id} role="listitem" className={`${styles.storyImage} ${responsive.storyImage}`} data-reveal data-delay={String((index % 5) + 1)}>
               <OptimizedPhoto
                 src={image.image_url}
                 alt={image.alt}
