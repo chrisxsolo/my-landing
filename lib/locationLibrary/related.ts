@@ -3,13 +3,8 @@
 // published database guides), and published journal posts from the sessions
 // linked to the location. Two queries for the whole library.
 import type { SupabaseClient } from "@supabase/supabase-js";
-import {
-  findGuideForPlace, GUIDE_LABEL, LOCATION_GUIDE_TYPES, type GuideMatch, type LocationGuideType,
-} from "@/lib/locations/guideCoverage";
+import { findGuideForPlace, GUIDE_LABEL, LOCATION_GUIDE_TYPES } from "@/lib/locations/guideCoverage";
 import { loadPublishedDbGuides } from "@/lib/locations/registry";
-import { getCouplesLocation } from "@/lib/couplesGuide/locations";
-import { getFamilyLocation } from "@/lib/familyGuide/locations";
-import { getPortraitLocation } from "@/lib/portraitGuide/locations";
 import type { LibraryLocation } from "@/lib/locationLibrary/load";
 
 const MAX_JOURNAL_LINKS = 3;
@@ -18,23 +13,6 @@ export interface RelatedLink {
   kind: "guide" | "journal";
   label: string;
   href: string;
-}
-
-export interface RelatedContentOptions {
-  /** Admin screens see every guide; public pages hide unpublished (noindex) ones. */
-  includeUnpublished?: boolean;
-}
-
-const STATIC_GUIDE: Record<LocationGuideType, (slug: string) => { published: boolean } | null> = {
-  couples: getCouplesLocation,
-  family: getFamilyLocation,
-  portrait: getPortraitLocation,
-};
-
-/** False for a hand-written guide that still renders noindex (`published: false`). */
-function isPublishedGuide(match: GuideMatch): boolean {
-  if (match.source !== "static") return true;
-  return STATIC_GUIDE[match.guide](match.slug)?.published ?? false;
 }
 
 interface JournalPost {
@@ -71,9 +49,7 @@ async function loadJournalPosts(client: SupabaseClient, sessionIds: string[]): P
   }));
 }
 
-function guideLinks(
-  loc: LibraryLocation, dbGuides: Awaited<ReturnType<typeof loadPublishedDbGuides>>, includeUnpublished: boolean,
-): RelatedLink[] {
+function guideLinks(loc: LibraryLocation, dbGuides: Awaited<ReturnType<typeof loadPublishedDbGuides>>): RelatedLink[] {
   const keys = [loc.row.location_key, ...loc.row.alias_keys].filter((k): k is string => !!k);
   const seen = new Set<string>();
   const out: RelatedLink[] = [];
@@ -81,7 +57,6 @@ function guideLinks(
     for (const key of keys) {
       const match = findGuideForPlace(guide, key, dbGuides);
       if (!match || seen.has(match.url)) continue;
-      if (!includeUnpublished && !isPublishedGuide(match)) continue;
       seen.add(match.url);
       out.push({ kind: "guide", label: `${GUIDE_LABEL[guide]} guide`, href: match.url });
     }
@@ -91,9 +66,8 @@ function guideLinks(
 
 /** Related links per location id (guides for the place key, then newest journal posts). */
 export async function loadRelatedContent(
-  client: SupabaseClient, locations: readonly LibraryLocation[], options: RelatedContentOptions = {},
+  client: SupabaseClient, locations: readonly LibraryLocation[],
 ): Promise<Record<number, RelatedLink[]>> {
-  const includeUnpublished = options.includeUnpublished ?? false;
   const liveSessions = (loc: LibraryLocation) => loc.links.filter((l) => !l.excluded).map((l) => l.sessionId);
   const sessionIds = [...new Set(locations.flatMap(liveSessions))];
   const [dbGuides, posts] = await Promise.all([loadPublishedDbGuides(client), loadJournalPosts(client, sessionIds)]);
@@ -104,7 +78,7 @@ export async function loadRelatedContent(
       .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))
       .slice(0, MAX_JOURNAL_LINKS)
       .map((p): RelatedLink => ({ kind: "journal", label: p.title, href: `/blog/${p.slug}` }));
-    out[loc.row.id] = [...guideLinks(loc, dbGuides, includeUnpublished), ...journals];
+    out[loc.row.id] = [...guideLinks(loc, dbGuides), ...journals];
   }
   return out;
 }

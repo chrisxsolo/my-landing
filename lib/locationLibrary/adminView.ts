@@ -152,7 +152,7 @@ export async function loadAdminDetail(client: SupabaseClient, id: number) {
   const sessions = loc.links
     .filter((l) => lib.sessions.has(l.sessionId))
     .map((l) => sessionDto(lib.sessions.get(l.sessionId)!, l, photos.filter((p) => p.sessionId === l.sessionId).sort(order)));
-  const related: RelatedLink[] = (await loadRelatedContent(client, [loc], { includeUnpublished: true }))[loc.row.id] ?? [];
+  const related: RelatedLink[] = (await loadRelatedContent(client, [loc]))[loc.row.id] ?? [];
   return {
     location: summary(loc),
     row: loc.row,

@@ -13,7 +13,6 @@ import type { FamilyLocationSummary } from "@/lib/familyGuide/types";
 import { SUPPORTING_TOPICS } from "@/lib/familyGuide/supporting";
 import { FAMILY_JOURNAL_PATH } from "@/lib/familyGuide/journal";
 import FamilyJournalStrip from "./FamilyJournalStrip";
-import GuideLocationsEmpty from "@/app/components/GuideLocationsEmpty";
 
 // Concise hub previews — each links to the full dedicated page (no duplicated copy).
 const topicPreviews = [
@@ -193,7 +192,6 @@ export default function FamilyGuideContent({
             <Link href="/family-guide/locations" className="fg-inline-link">full locations guide</Link>{" "}
             covers the fit, light, and access for each.
           </p>
-          {locations.length === 0 && <GuideLocationsEmpty service="Family" />}
           <div className="fg-locs">
             {locations.map((loc) => (
               <Link key={loc.slug} href={loc.canonicalPath} className="fg-loc" data-reveal data-delay="1">

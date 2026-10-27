@@ -12,7 +12,6 @@ import { locationDisplayName } from "@/lib/portraitGuide/types";
 import type { PortraitLocationSummary } from "@/lib/portraitGuide/types";
 import { SUPPORTING_TOPICS } from "@/lib/portraitGuide/supporting";
 import PortraitJournalStrip from "./PortraitJournalStrip";
-import GuideLocationsEmpty from "@/app/components/GuideLocationsEmpty";
 
 // Concise hub previews — each links to the full dedicated page (no duplicated copy).
 const topicPreviews = [
@@ -204,7 +203,6 @@ export default function PortraitGuideContent({
             <Link href="/portrait-guide/locations" className="fg-inline-link">full locations guide</Link>{" "}
             covers the fit, light, and access for each.
           </p>
-          {locations.length === 0 && <GuideLocationsEmpty service="Portrait" />}
           <div className="fg-locs">
             {locations.map((loc) => (
               <Link key={loc.slug} href={loc.canonicalPath} className="fg-loc" data-reveal data-delay="1">

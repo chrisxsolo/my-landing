@@ -9,7 +9,6 @@ import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
 import { PORTRAIT_GUIDE_CSS } from "@/lib/portraitGuide/styles";
 import { locationDisplayName } from "@/lib/portraitGuide/types";
 import { getPortraitLocationListing } from "@/lib/locations/guideListings";
-import GuideLocationsEmpty from "@/app/components/GuideLocationsEmpty";
 
 const SITE_URL = "https://www.soloxsnaps.com";
 const PATH = "/portrait-guide/locations";
@@ -104,7 +103,6 @@ export default async function PortraitLocationsHubPage() {
       {/* ── Location cards ───────────────────────────────────────────────── */}
       <section className="fg-section">
         <div className="fg-shell--wide">
-          {locations.length === 0 && <GuideLocationsEmpty service="Portrait" />}
           <div className="fg-locs">
             {locations.map((loc) => (
               <Link key={loc.slug} href={loc.canonicalPath} className="fg-loc" data-reveal data-delay="1">
