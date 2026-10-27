@@ -30,6 +30,23 @@ export const maxDuration = 300;
 
 const CRON_SECRET = process.env.CRON_SECRET ?? "";
 
+// The sweeps profile new places with the model, so they need real time. When a
+// job already used most of the 300s budget they are skipped rather than cut
+// off mid-run (a killed sweep leaves a run that never finishes); the ticker
+// loops until the queue is empty, and that last cheap call does the sweeps.
+const SWEEP_TIME_BUDGET_MS = 150_000;
+
+async function runSweeps(startedAt: number) {
+  if (Date.now() - startedAt > SWEEP_TIME_BUDGET_MS) {
+    return { sweeps: "skipped: the job used the time budget; the next tick sweeps" };
+  }
+  // Backstop for the location library: heals any background sync that never ran.
+  const locationSweep = await sweepLocationLibrary();
+  // Same for campus-spot photos: fills empty spots and drops picks that went private.
+  const campusSpotSweep = await sweepCampusSpotPhotos();
+  return { locationSweep, campusSpotSweep };
+}
+
 // Fail-secure, exactly like /api/inquiry-digest: with no CRON_SECRET set, no
 // bearer request is ever trusted.
 function hasCronAuth(req: NextRequest): boolean {
@@ -43,6 +60,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "ANTHROPIC_API_KEY not configured" }, { status: 503 });
   }
 
+  const startedAt = Date.now();
   let result: RunWorkerResult;
   try {
     result = await drainOnce(req.nextUrl.origin);
@@ -55,13 +73,10 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "queue table missing", pendingMigration: true }, { status: 503 });
     }
     console.error("content engine worker failed", err);
-    return NextResponse.json({ error }, { status: 500 });
+    // The sweeps do not depend on the queue: a broken run must not stop them.
+    return NextResponse.json({ error, ...(await runSweeps(startedAt)) }, { status: 500 });
   }
-  // Backstop for the location library: heals any background sync that never ran.
-  const locationSweep = await sweepLocationLibrary();
-  // Same for campus-spot photos: fills empty spots and drops picks that went private.
-  const campusSpotSweep = await sweepCampusSpotPhotos();
-  return NextResponse.json({ ...result, locationSweep, campusSpotSweep });
+  return NextResponse.json({ ...result, ...(await runSweeps(startedAt)) });
 }
 
 export async function POST(req: NextRequest) {
