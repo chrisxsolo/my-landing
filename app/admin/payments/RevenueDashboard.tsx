@@ -7,6 +7,7 @@ import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "rea
 import Link from "next/link";
 import { loadAdminInquiries, type AdminInquiry } from "@/lib/adminInquiries";
 import { paymentMatchesPeriod } from "@/lib/paymentAnalytics";
+import { describePaymentSyncOutcome, type PendingReviewSummary } from "@/lib/paymentSyncShared";
 import { normalizePaymentMethod, paymentsToCsv, type PaymentRow } from "@/lib/paymentFilters";
 import { collectionRate, summarizePeriod, topShare, breakdownBy, safeDelta, clientKeyOf } from "@/lib/revenue/calc";
 import { enrichPayments, type LedgerRow } from "@/lib/revenue/enrich";
@@ -91,10 +92,14 @@ export default function RevenueDashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({}),
       });
-      const json = await res.json() as { total?: number; error?: string };
+      const json = await res.json() as {
+        total?: number; pendingReview?: PendingReviewSummary | null; warnings?: string[]; error?: string;
+      };
       if (!res.ok) { setSyncMessage(json.error ?? "Claude payment audit failed."); return; }
       setStagingReloadToken(t => t + 1);
-      setSyncMessage(`Claude found ${json.total ?? 0} payment${json.total === 1 ? "" : "s"} awaiting review in Data Quality.`);
+      setSyncMessage(`${describePaymentSyncOutcome({
+        total: json.total ?? 0, pendingReview: json.pendingReview, warnings: json.warnings,
+      })} Review them in Data Quality.`);
     } catch {
       setSyncMessage("Claude payment audit failed.");
     } finally {

@@ -82,6 +82,7 @@ import TestimonialsTab from "@/app/admin/TestimonialsTab";
 import CouplesPosingGuideTab from "@/app/admin/CouplesPosingGuideTab";
 import { uploadImage } from "@/lib/uploadImage";
 import { parsePositivePaymentCents } from "@/lib/paymentAmount";
+import { describePaymentSyncOutcome } from "@/lib/paymentSyncShared";
 import {
   type GradLocationOption,
   type GradSchoolOption,
@@ -370,7 +371,8 @@ function AdminDashboard() {
       const res=await fetch("/api/sync-payments",{method:"POST"});
       const json=await res.json();
       if(!res.ok){setSyncMsg(json.error??"Payment sync failed");return false;}
-      if(json.message)setSyncMsg(json.message);
+      // Sync only stages rows, so report the approval backlog, not just "synced".
+      setSyncMsg(describePaymentSyncOutcome({total:json.total??0,pendingReview:json.pendingReview,warnings:json.warnings}));
       setSyncResult(json.staged??[]);
       return true;
     }catch{setSyncMsg("Payment sync request failed");return false;}
@@ -3056,8 +3058,6 @@ function AdminDashboard() {
                         </div>
                       ))}
                     </div>
-                  ):syncResult?.length===0&&!syncMsg?(
-                    <p className="text-xs" style={{color:T.inkSoft}}>No new Pixieset payments found in Gmail.</p>
                   ):null}
                 </div>
               )}
@@ -3841,8 +3841,6 @@ function AdminDashboard() {
                         </div>
                       ))}
                     </div>
-                  ):syncResult?.length===0&&!syncMsg?(
-                    <p className="text-xs" style={{color:T.inkSoft}}>No new Pixieset payments found in Gmail.</p>
                   ):null}
                 </div>
               )}
