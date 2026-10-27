@@ -16,10 +16,13 @@ export const label: CSSProperties = {
   fontSize: 10, color: T.inkFaint, display: "block", marginBottom: 3,
   fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.12em", fontFamily: T.mono,
 };
+/** The smallest comfortable touch target (WCAG 2.5.5 / platform guidance). */
+export const TOUCH_TARGET = 44;
 export function btn(primary = false, danger = false): CSSProperties {
   return {
     border: `1px solid ${danger ? T.redBorder : primary ? "transparent" : T.border}`,
-    borderRadius: 10, padding: "6px 12px", cursor: "pointer", fontSize: 13, fontWeight: 700,
+    borderRadius: 10, padding: "8px 14px", minHeight: TOUCH_TARGET, cursor: "pointer", fontSize: 13, fontWeight: 700,
+    display: "inline-flex", alignItems: "center", justifyContent: "center",
     background: danger ? T.redBg : primary ? T.action : T.inset,
     color: danger ? T.red : primary ? T.actionText : T.inkSoft,
     boxShadow: primary ? T.glow : undefined,
