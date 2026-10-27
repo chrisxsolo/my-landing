@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 import { C } from "@/lib/colors";
 import { T, INQ_STATUS, inquiryCardChrome } from "@/app/admin/adminTheme";
 import CommandPalette from "@/app/admin/CommandPalette";
-import AdminWebsiteNavigation, { type WebsiteTab } from "@/app/admin/AdminWebsiteNavigation";
+import AdminWebsiteNavigation from "@/app/admin/AdminWebsiteNavigation";
+import { MOBILE_NAV_ITEMS, TAB_LABELS, isTab, type Tab } from "@/app/admin/adminTabs";
 
 function subscribeReducedMotion(onChange:()=>void){
   const mq=window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -125,7 +126,6 @@ import { buildInquiryReplySubject } from "@/lib/schoolDetection";
 
 export const dynamic = 'force-dynamic'
 
-type Tab = "home"|WebsiteTab|"analytics"|"payments"|"inquiries"|"clients"|"testimonials"|"funnel"|"attribution"|"vault"|"ai"|"chat"|"format"|"accounts";
 type ImageLibraryRow = { id:number; title:string; alt:string|null; image_url:string; source_type:string; source_post_id:number|null; source_post_slug:string|null; source_role:string; in_portfolio:boolean; created_at:string; };
 type Inquiry = AdminInquiry;
 type AdminSessionsResponse = { sessions?: AdminClientSessionDTO[]; session?: AdminClientSessionDTO; error?: string; };
@@ -146,9 +146,6 @@ type PortfolioSeoDraft = { school: GradSchoolOption|null; location: GradLocation
 const EMPTY_CATEGORY = {name:"",slug:"",description:"",sort_order:"1",active:true};
 const EMPTY_PORTFOLIO = {title:"",alt:"",category_slug:"graduation",school:"",featured:false,sort_order:""};
 const EMPTY_PORTFOLIO_SEO_DRAFT: PortfolioSeoDraft = {school:null,location:null,session:null,degree:null,year:null,attire:null,goldenHour:false};
-const CLIENT_TABS:Tab[]=["inquiries","clients","testimonials","analytics","payments","funnel","attribution","ai","chat","format"];
-const VAULT_TABS:Tab[]=["vault"];
-const TAB_LABELS:Record<Tab,string>={home:"🏠 Home",poses:"📸 Grad Poses",couplesGuide:"💞 Couples Posing Guide",couplesLocations:"💑 Couples Locations",portraitLocations:"🙋 Portrait Locations",locations:"📍 Campus Spots",bayGuide:"🗺️ Bay Guide",familyGuide:"👨‍👩‍👧 Family Guide",portfolio:"🖼️ Portfolio",couplesPortfolio:"💑 Couples Portfolio",pagePhotos:"🧩 Page Photos",caseStudies:"📖 Case Studies",categories:"🏷️ Categories",blog:"✍️ Blog",library:"🗄️ Image Library",navigation:"🧭 Navigation",aboutPage:"🙋 About Page",analytics:"📊 Analytics",payments:"💵 Revenue",funnel:"📈 Funnel",attribution:"🎯 Attribution",inquiries:"📬 Inquiries",clients:"👥 Clients",testimonials:"💬 Testimonials",vault:"📓 Vault",ai:"🤖 AI Training",chat:"💬 AI Chat",format:"✨ Quick Format",accounts:"👤 Accounts"};
 // The six home-page "work grid" slots, in display order — used for the batch picker.
 const WORK_GRID_KEYS=["home_story_1","home_story_2","home_story_3","home_story_4","home_story_5","home_story_6"] as const;
 
@@ -195,8 +192,9 @@ function AdminDashboard() {
   useEffect(() => {
     const searchParams=new URLSearchParams(window.location.search);
     const gmailParam=searchParams.get("gmail");
-    const tabParam=searchParams.get("tab") as Tab|null;
-    if(tabParam)setTab(tabParam);
+    // An unknown ?tab= (old link, typo) stays on Home instead of a blank page.
+    const tabParam=searchParams.get("tab");
+    if(isTab(tabParam))setTab(tabParam);
     if(gmailParam==="connected"){
       showToast("Gmail connected ✓ — you can now send emails from here");
       router.replace("/admin?tab=inquiries");
@@ -1793,15 +1791,16 @@ function AdminDashboard() {
         {(()=>{
           const cancelAll=()=>{cancelEditPortfolioImage();cancelEditCategory();setEditingInquiry(null);setInquiryDeleteConfirm(null);};
           const go=(t:Tab)=>{cancelAll();setTab(t);};
-          type MobileNavItem={t:Tab;icon:string;label:string};
-          const all:MobileNavItem[]=[
-            {t:"home",icon:"🏠",label:"Home"},{t:"inquiries",icon:"📬",label:"Inquiries"},{t:"clients",icon:"👥",label:"Clients"},{t:"testimonials",icon:"💬",label:"Testimonials"},{t:"analytics",icon:"📊",label:"Analytics"},{t:"payments",icon:"💵",label:"Revenue"},{t:"funnel",icon:"📈",label:"Funnel"},{t:"attribution",icon:"🎯",label:"Attribution"},
-            {t:"poses",icon:"📸",label:"Poses"},{t:"couplesGuide",icon:"💞",label:"Couples Guide"},{t:"locations",icon:"📍",label:"Spots"},{t:"bayGuide",icon:"🗺️",label:"Bay Guide"},{t:"portfolio",icon:"🖼️",label:"Portfolio"},{t:"categories",icon:"🏷️",label:"Categories"},{t:"blog",icon:"✍️",label:"Blog"},{t:"library",icon:"🗄️",label:"Library"},{t:"navigation",icon:"🧭",label:"Navigation"},
-            {t:"ai",icon:"🤖",label:"AI Training"},{t:"chat",icon:"💬",label:"AI Chat"},{t:"format",icon:"✨",label:"Format"},{t:"vault",icon:"📓",label:"Vault"},{t:"accounts",icon:"👤",label:"Accounts"},
-          ];
+          // Same source as the sidebar (adminTabs ← WEBSITE_NAV_GROUPS), so no tab can be left out here.
           return(
             <div className="md:hidden sticky top-14 z-30 overflow-x-auto flex items-center gap-1.5 px-3 py-2 [&::-webkit-scrollbar]:hidden" style={{background:"rgba(19,17,20,0.88)",backdropFilter:"blur(16px)",borderBottom:`1px solid ${T.border}`}}>
-              {all.map(({t,icon,label})=>(
+              <button onClick={()=>setPaletteOpen(true)} aria-label="Search tabs, actions and clients"
+                className="flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[12px] font-semibold whitespace-nowrap transition-all"
+                style={{color:T.inkSoft,background:T.inset,border:`1px solid ${T.border}`}}>
+                <span className="text-sm leading-none">🔍</span>
+                <span>Search</span>
+              </button>
+              {MOBILE_NAV_ITEMS.map(({t,icon,label})=>(
                 <button key={t} onClick={()=>go(t)}
                   className="flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[12px] font-semibold whitespace-nowrap transition-all"
                   style={tab===t?{background:T.action,color:T.actionText,boxShadow:T.glow}:{color:T.inkSoft,background:T.inset}}>

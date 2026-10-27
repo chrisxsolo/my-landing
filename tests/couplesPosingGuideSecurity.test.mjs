@@ -9,6 +9,7 @@ const migrationPath = new URL(
   import.meta.url,
 );
 const adminPagePath = new URL("../app/admin/page.tsx", import.meta.url);
+const adminTabsPath = new URL("../app/admin/adminTabs.ts", import.meta.url);
 const adminEditorPath = new URL("../app/admin/CouplesInspirationEditor.tsx", import.meta.url);
 const promptRoutePath = new URL("../app/api/admin/couples-posing-prompts/route.ts", import.meta.url);
 const promptManagerPath = new URL("../app/admin/CouplesPromptManager.tsx", import.meta.url);
@@ -43,12 +44,13 @@ test("migration creates a private bucket and keeps table access server-only", as
 });
 
 test("existing admin dashboard exposes the couples guide manager as a real tab", async () => {
-  const [pageSource, editorSource] = await Promise.all([
+  const [pageSource, tabsSource, editorSource] = await Promise.all([
     readFile(adminPagePath, "utf8"),
+    readFile(adminTabsPath, "utf8"),
     readFile(adminEditorPath, "utf8"),
   ]);
   assert.match(pageSource, /couplesGuide/);
-  assert.match(pageSource, /Couples Posing Guide/);
+  assert.match(tabsSource, /couplesGuide: "\S+ Couples Posing Guide"/);
   assert.match(pageSource, /<CouplesPosingGuideTab/);
   assert.match(editorSource, /Only publish images you created, licensed, or have permission to display/);
   assert.match(editorSource, /Add external reference/);

@@ -41,7 +41,7 @@ For multi-file changes, list the files before touching any of them.
 - Supabase client → `supabase` from `@/lib/supabase` (client) or `createSupabaseServerClient()` from `@/lib/supabaseServer` (server/API routes)
 - Admin auth → use `requireAdmin(req)` in API routes, `checkAuth()` on client pages
 - localStorage keys follow the pattern `draft_${id}` and `ai_draft_${id}`
-- Tab values in admin page use the `Tab` type — add new tabs to both the type and `WEBSITE_TABS`/`CLIENT_TABS` arrays
+- Admin tabs live in `app/admin/adminTabs.ts` (`Tab`, `TAB_LABELS`, `BUSINESS_TABS`/`TOOL_TABS`); Website tabs come from `WEBSITE_NAV_GROUPS` in `AdminWebsiteNavigation.tsx` — add a new tab there and to `TAB_LABELS`, and every nav surface picks it up
 
 ---
 
