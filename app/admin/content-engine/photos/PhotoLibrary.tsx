@@ -12,6 +12,7 @@ import type { AuditedPhoto, TagFilter } from "@/lib/photoTagging/types";
 import BulkTagBar from "@/app/admin/photoTagging/BulkTagBar";
 import PhotoTagEditor from "@/app/admin/photoTagging/PhotoTagEditor";
 import PhotoTagToolbar from "@/app/admin/photoTagging/PhotoTagToolbar";
+import ReviewQueue from "@/app/admin/photoTagging/ReviewQueue";
 import TagStatusBadge from "@/app/admin/photoTagging/TagStatusBadge";
 import { taggingApi } from "@/app/admin/photoTagging/taggingApi";
 import { usePhotoTagging } from "@/app/admin/photoTagging/usePhotoTagging";
@@ -94,6 +95,7 @@ export default function PhotoLibrary({ initialFilter }: { initialFilter: TagFilt
         </div>
       </section>
 
+      {report && <ReviewQueue photos={scoped} options={report.options} onChanged={tagging.refresh} onOpen={setOpenKey} />}
       {report && selectedPhotos.length > 0 && (
         <BulkTagBar photos={selectedPhotos} options={report.options} onChanged={tagging.refresh} onClear={tagging.clearSelection} />
       )}

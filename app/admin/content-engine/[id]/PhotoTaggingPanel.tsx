@@ -8,6 +8,7 @@ import type { AuditedPhoto } from "@/lib/photoTagging/types";
 import BulkTagBar from "@/app/admin/photoTagging/BulkTagBar";
 import PhotoTagEditor from "@/app/admin/photoTagging/PhotoTagEditor";
 import PhotoTagToolbar from "@/app/admin/photoTagging/PhotoTagToolbar";
+import ReviewQueue from "@/app/admin/photoTagging/ReviewQueue";
 import { usePhotoTagging, type PhotoTagging } from "@/app/admin/photoTagging/usePhotoTagging";
 
 export interface SessionTagging {
@@ -55,6 +56,7 @@ export default function PhotoTaggingPanel({ state, selectedIds, openId, onClose,
   return (
     <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
       <PhotoTagToolbar photos={photos} options={report.options} filter={tagging.filter} setFilter={tagging.setFilter} compact />
+      <ReviewQueue photos={photos} options={report.options} onChanged={tagging.refresh} />
       {open && <PhotoTagEditor photo={open} options={report.options} onChanged={tagging.refresh} onClose={onClose} />}
       {selected.length > 0 && (
         <BulkTagBar photos={selected} options={report.options} onChanged={tagging.refresh} onClear={onClearSelection} />
