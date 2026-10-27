@@ -2,6 +2,7 @@
 // Workspace (spec §7.4): sticky header (name, type, state, permissions),
 // guided stepper, single-scroll sections gating top-to-bottom, sticky bottom
 // action bar. All durable state is server rows; refresh() refetches everything.
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { T } from "@/app/admin/adminTheme";
@@ -96,6 +97,12 @@ export default function Workspace({ sessionId }: { sessionId: string }) {
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           {analytics !== null && (
             <span style={{ color: T.inkFaint, fontSize: 12, fontFamily: T.mono }}>{analytics.views} views · {analytics.ctaClicks} CTA</span>
+          )}
+          {typeof session.inquiry_id === "number" && (
+            <Link href={`/admin/conversation/${session.inquiry_id}`} title="Open the inquiry conversation this session came from"
+              style={{ ...chip(T.inkSoft, T.inset), textDecoration: "none", minHeight: 32, display: "inline-flex", alignItems: "center" }}>
+              Inquiry ↗
+            </Link>
           )}
           <span style={chip(badge.color, badge.bg)}>{badge.label}</span>
         </div>
