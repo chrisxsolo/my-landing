@@ -208,6 +208,28 @@ function familyFacts(peopleCount: number): PricingFacts {
 }
 
 /**
+ * The maternity session: one package, partner and immediate family included.
+ *
+ * Travel is described without its per-mile rate on purpose: the validator
+ * treats every figure here as quotable, and a mileage rate is not a price.
+ */
+function maternityFacts(): PricingFacts {
+  const maternity = PRICING_CATALOG.maternity;
+  const { extraOutfit, secondLocation, expedited } = maternity.addOns;
+  return {
+    verified: true,
+    lines: [
+      `${maternity.label}: ${money(maternity.price)}, ${maternity.durationMinutes}-minute session, ${maternity.minimumImages}+ edited images, ${maternity.locations} location and ${maternity.outfits} outfit. Partner and immediate family, kids included, are part of this package, so it is never a family session.`,
+      `Add-ons: extra outfit ${money(extraOutfit.price)}, second nearby location ${money(secondLocation.price)}, 72-hour gallery ${money(expedited.price)}.`,
+      "Travel outside San Francisco is calculated separately from round-trip distance. There is no flat travel fee, so state an amount only if one is given to you as a verified fact.",
+    ],
+    basePrices: [maternity.price],
+    addOnPrices: [extraOutfit.price, secondLocation.price, expedited.price],
+    needsManualQuote: null,
+  };
+}
+
+/**
  * Event coverage, priced by length.
  *
  * The catalog has three tiers with different hourly rates and minimums, so an
@@ -370,6 +392,7 @@ export function buildPricingFacts(input: BusinessFactsInput): PricingFacts {
     case "engagement": return couplesFacts("engagement");
     case "couples":    return couplesFacts(detectCouplesPackage(sessionType, message), true);
     case "family":     return familyFacts(people);
+    case "maternity":  return maternityFacts();
     case "event":      return eventFacts();
     case "headshot":   return unpricedSessionFacts("headshot");
     case "portrait":   return unpricedSessionFacts("individual portrait");

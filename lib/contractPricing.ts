@@ -15,6 +15,7 @@
 
 import { classifySession } from "./ai/sessionClassifier";
 import { GRAD_HOURLY_RATE, getGroupRatePerPerson } from "./pricing";
+import { PRICING_CATALOG } from "./pricingCatalog";
 import { resolveTravel, schoolImpliesLocationFor, type TravelResolution } from "./travelResolution";
 
 export interface ExtractedPricing {
@@ -61,6 +62,7 @@ function travelFor(booking: ContractBooking): TravelResolution {
 /** Rate-card session prices this booking could have been quoted at. */
 function catalogSessionPrices(booking: ContractBooking): number[] {
   const service = classifySession(booking.sessionType, booking.message).key;
+  if (service === "maternity") return [PRICING_CATALOG.maternity.price];
   if (service !== "graduation") return [];
   const people = Number(String(booking.people ?? "1").match(/\d+/)?.[0] ?? 1) || 1;
   return people > 1 ? [getGroupRatePerPerson(people) * people] : [GRAD_HOURLY_RATE];

@@ -30,7 +30,7 @@
 /** Every session type the assistant can recognise. */
 export type PlaybookKey =
   | "graduation" | "couples" | "engagement" | "proposal" | "elopement"
-  | "family" | "portrait" | "headshot" | "headshot_event" | "commercial" | "event";
+  | "family" | "maternity" | "portrait" | "headshot" | "headshot_event" | "commercial" | "event";
 
 /** Weight of a phrase that names the coverage the client wants. */
 const REQUEST = 10;
@@ -46,7 +46,9 @@ const MENTION = 4;
  */
 const SPECIFICITY: Record<PlaybookKey, number> = {
   proposal: 5,
-  engagement: 4, elopement: 4, headshot_event: 4, commercial: 4,
+  // Maternity outranks family: partner and kids are included in the maternity
+  // package, so "maternity photos with our family" is a maternity session.
+  engagement: 4, elopement: 4, headshot_event: 4, commercial: 4, maternity: 4,
   graduation: 3, family: 3, event: 3, headshot: 3,
   couples: 2,
   portrait: 1,
@@ -60,7 +62,7 @@ const SPECIFICITY: Record<PlaybookKey, number> = {
 const GROUPS: Record<PlaybookKey, string> = {
   proposal: "romantic", engagement: "romantic", couples: "romantic", elopement: "romantic",
   portrait: "individual", headshot: "individual", commercial: "individual", headshot_event: "individual",
-  graduation: "graduation", family: "family", event: "event",
+  graduation: "graduation", family: "family", maternity: "family", event: "event",
 };
 
 type Patterns = {
@@ -161,6 +163,20 @@ const PATTERNS: Record<PlaybookKey, Patterns> = {
     mention: /\b(?:my|our|the|whole|extended) famil/,
   },
 
+  // One published package (PRICING_CATALOG.maternity). Without its own key a
+  // maternity inquiry fell through to family or couples and was quoted their
+  // rates instead of the $500 maternity session.
+  maternity: {
+    request: [
+      /\bmaternity (?:session|shoot|photos|photoshoot|portraits|pictures|photography)\b/,
+      /\bpregnan(?:t|cy) (?:photos|photoshoot|shoot|session|portraits|pictures)\b/,
+      /\b(?:i'?m|i am|we'?re|we are) (?:\d+ (?:weeks|months) )?pregnant\b/,
+      /\bbaby bump\b/,
+      /\bsession type:\s*maternity\b/,
+    ],
+    mention: /matern|pregnan/,
+  },
+
   portrait: {
     request: [
       /\b(?:individual|solo|personal|lifestyle) (?:portrait|portraits|photos|session)\b/,
@@ -169,6 +185,8 @@ const PATTERNS: Record<PlaybookKey, Patterns> = {
       /\bphotos (?:of|for) (?:just )?(?:me|myself)\b/,
     ],
     mention: /portrait|lifestyle|\bsolo\b/,
+    // "Maternity photos of me" names the maternity package, not a solo portrait.
+    veto: [/\bmaternity\b/],
   },
 
   headshot: {
@@ -234,7 +252,12 @@ const PATTERNS: Record<PlaybookKey, Patterns> = {
     // not relationships. Vetoing them is what kept a solo birthday portrait
     // shoot from being priced as a couples session.
     mention: /\bcouples\b|\bcouple\b|\banniversary\b/,
-    veto: [/\ba couple (?:of )?(?:looks?|outfits?|hours?|minutes?|days?|weeks?|months?|shots?|photos?|things?|more|different)\b/],
+    veto: [
+      /\ba couple (?:of )?(?:looks?|outfits?|hours?|minutes?|days?|weeks?|months?|shots?|photos?|things?|more|different)\b/,
+      // "Maternity photos of me and my husband" is a maternity session; the
+      // partner is included in that package.
+      /\bmaternity\b/,
+    ],
   },
 };
 
@@ -244,6 +267,7 @@ const DROPDOWN: [RegExp, PlaybookKey][] = [
   [/engagement/i, "engagement"],
   [/elope/i, "elopement"],
   [/graduat|\bgrad\b/i, "graduation"],
+  [/matern/i, "maternity"],
   [/famil/i, "family"],
   [/headshot/i, "headshot"],
   [/commercial|brand/i, "commercial"],
