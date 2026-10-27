@@ -125,6 +125,9 @@ export function engineSourceFrom(row: Record<string, unknown>, url: string): Eng
     schoolSlug: text(session.school_slug),
     primaryLocation: text(session.primary_location),
     secondaryLocations: (session.secondary_locations ?? []).filter((t) => typeof t === "string"),
+    photoLocation: text(row.photo_location),
+    photoLocationSource: row.photo_location_source === "manual" || row.photo_location_source === "gps"
+      ? row.photo_location_source : null,
     gpsLatitude: num(row.gps_latitude),
     gpsLongitude: num(row.gps_longitude),
     publishable: session.marketing_permission === true && !session.marketing_permission_revoked_at,
@@ -259,7 +262,7 @@ const SESSION_PHOTOS_TABLE = "session_photos";
 const POOL_PORTFOLIO_COLUMNS =
   "id,title,alt,image_url,category_slug,featured,sort_order,width,height,content_hash,school,location,session_label";
 const POOL_ENGINE_COLUMNS = "id,alt_text,public_derivative_url,content_hash,excluded,quality_score,width,height,"
-  + "gps_latitude,gps_longitude,"
+  + "gps_latitude,gps_longitude,photo_location,photo_location_source,"
   + "photography_sessions!inner(id,public_display_name,service_type,school_slug,primary_location,secondary_locations,"
   + "marketing_permission,marketing_permission_revoked_at)";
 

@@ -10,10 +10,11 @@
 //      with high confidence. Two schools named → ambiguous → no page.
 // The shooting location is NEVER used as the school.
 //
-// Place: the photo's location tag, then its session's location, then (older
-// uploads only) its session label — matched by exact place identity, never
-// by scenery. A session that names several locations places a photo only by
-// that photo's own GPS (no evidence → no place). A place reaches a guide only
+// Place: the photo's location tag, then its Content Engine photo's own
+// confirmed location (session_photos.photo_location), then its session's
+// location, then (older uploads only) its session label — matched by exact
+// place identity, never by scenery. A session that names several locations
+// places a photo only by that photo's own GPS (no evidence → no place). A place reaches a guide only
 // when that guide page exists; a graduation photo reaches the portrait guide.
 import { detectSchoolsInText } from "@/lib/schoolDetection";
 import { getPhotoTitle } from "@/lib/photoMetadata";
@@ -61,6 +62,12 @@ export interface EngineSource {
   primaryLocation: string | null;
   /** The session's other confirmed shooting locations. */
   secondaryLocations: readonly string[];
+  /**
+   * Where THIS photo was taken, confirmed by the photographer or matched from
+   * its GPS (session_photos.photo_location). Beats every session-level fact.
+   */
+  photoLocation?: string | null;
+  photoLocationSource?: "manual" | "gps" | null;
   /** The photo's own GPS, read from the original file. */
   gpsLatitude: number | null;
   gpsLongitude: number | null;
@@ -168,13 +175,16 @@ function labelPlace(label: string | null, places: readonly KnownPlace[]): KnownP
 }
 
 /**
- * Where one Content Engine photo was taken. A session at one location gives
+ * Where one Content Engine photo was taken. The photo's own confirmed
+ * location always wins (one that names no known place leaves it unplaced —
+ * the session never overrides it). Otherwise a session at one location gives
  * it to every photo. A session at several ("SF State" + "Palace of Fine Arts")
  * places a photo only when its own GPS falls inside one of the named places,
  * so campus frames never land on the Palace and photos without GPS stay
  * unplaced (the school page still shows them).
  */
 export function enginePhotoPlace(engine: EngineSource, places: readonly KnownPlace[]): KnownPlace | null {
+  if (engine.photoLocation?.trim()) return singlePlace(engine.photoLocation, places);
   const named = [engine.primaryLocation, ...engine.secondaryLocations].filter((t): t is string => Boolean(t?.trim()));
   const resolved = named.map((text) => singlePlace(text, places));
   const known = resolved.filter((p): p is KnownPlace => p !== null);
@@ -192,8 +202,9 @@ function resolvePlace(
   const tagged = singlePlace(photo.location, places);
   if (tagged) return { place: tagged, source: "tag" };
   if (engine) {
+    const own = Boolean(engine.photoLocation?.trim());
     const session = enginePhotoPlace(engine, places);
-    return session ? { place: session, source: "session" } : { place: null, source: null };
+    return session ? { place: session, source: own ? "tag" : "session" } : { place: null, source: null };
   }
   const labelled = labelPlace(photo.sessionLabel, places);
   return labelled ? { place: labelled, source: "label" } : { place: null, source: null };
