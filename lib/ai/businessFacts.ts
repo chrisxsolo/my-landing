@@ -37,7 +37,7 @@ export type PricingFacts = {
   needsManualQuote: string | null;
 };
 
-/** "$350", or "$43.50" when a bridge toll leaves cents on a travel fee. */
+/** "$350"; travel fees are whole dollars, but a figure with cents is still printed as such. */
 function money(amount: number): string {
   return Number.isInteger(amount) ? `$${amount}` : `$${amount.toFixed(2)}`;
 }

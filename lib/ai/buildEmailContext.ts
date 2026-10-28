@@ -287,7 +287,7 @@ export function buildEmailContext(input: BuildEmailContextInput): EmailContext {
     warnings.push({
       code: "travel_unverified",
       severity: "medium",
-      message: `This location is outside San Francisco and has no verified route yet, so the draft will not state a total. Route it with scripts/travel-route.mjs and add it to lib/travelFee.ts, or add the fee yourself before sending (${TRAVEL_RATE_LABEL}/round-trip mile, rounded up to $5, plus tolls).`,
+      message: `This location is outside San Francisco and has no verified route yet, so the draft will not state a total. Route it with scripts/travel-route.mjs and add it to lib/travelFee.ts, or add the fee yourself before sending (${TRAVEL_RATE_LABEL}/round-trip mile rounded up to $5, plus tolls, then the total rounded to the nearest $5).`,
     });
   }
 

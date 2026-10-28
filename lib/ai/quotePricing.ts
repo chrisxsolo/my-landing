@@ -7,15 +7,16 @@
 //
 //   authoritativeQuote   session + travel = total, from application data only
 //   staleQuotedPrices    thread prices explained by a superseded travel figure
-//                        (the $70 SJSU formula fee, or a travel amount an
-//                        older email stated), which must not outrank today's
-//                        approved fee unless the admin confirms that quote
+//                        (the $70 SJSU formula fee, the $43.50 UC Berkeley
+//                        sum before the final nearest-$5 rounding, or a
+//                        travel amount an older email stated), which must not
+//                        outrank today's fee unless the admin confirms that quote
 //   checkDraftQuote      the draft's stated travel fee and total vs the above
 //   correctDraftPricing  rewrites only the mismatched figures, nothing else
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { getGroupRatePerPerson, graduationSessionPrice, includedMinutesFor } from "@/lib/pricing";
-import { calculatedTravelFee, APPROVED_TRAVEL_FEES, type VerifiedRouteKey } from "@/lib/travelFee";
+import { supersededTravelFees, type VerifiedRouteKey } from "@/lib/travelFee";
 import type { TravelResolution } from "@/lib/travelResolution";
 import type { ThreadMessage } from "./threadDigest";
 
@@ -151,9 +152,8 @@ function reachable(bases: number[], extras: number[]): Set<number> {
 /** Travel amounts that are no longer the fee for this destination. */
 function supersededTravelFigures(travel: TravelResolution, messages: readonly ThreadMessage[]): number[] {
   if (travel.kind !== "verified") return [];
-  const superseded = new Set<number>();
-  const key = travel.campus as VerifiedRouteKey;
-  if (APPROVED_TRAVEL_FEES[key]) superseded.add(calculatedTravelFee(key));
+  // The policy's own outdated figures for this campus (lib/travelFee.ts).
+  const superseded = new Set<number>(supersededTravelFees(travel.campus as VerifiedRouteKey));
   for (const m of messages) {
     if (!m.fromMe) continue;
     for (const f of figures(m.body, TRAVEL_FIGURE)) superseded.add(f.amount);

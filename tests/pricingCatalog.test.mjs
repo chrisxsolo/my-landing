@@ -32,7 +32,7 @@ test("pricing catalog contains every operational pricing category", () => {
   assert.equal(PRICING_CATALOG.graduation.baseHourlyRate, 350);
   assert.equal(PRICING_CATALOG.graduation.groupRates[6], 200);
   assert.equal(PRICING_CATALOG.graduation.addOns.extraOutfit.price, 75);
-  assert.equal(PRICING_CATALOG.graduation.travelFees["uc-berkeley"], 43.5);
+  assert.equal(PRICING_CATALOG.graduation.travelFees["uc-berkeley"], 45);
   assert.equal(PRICING_CATALOG.graduation.standardMinimumImages, 50);
   assert.equal(PRICING_CATALOG.graduation.durationRules.groupMinimumMinutes, 90);
 
@@ -135,9 +135,10 @@ test("graduation travel fees are pinned for every school", () => {
   assert.equal(fees["sf-state"], null);
   assert.equal(fees["usf"], null);
   assert.equal(fees["sf-other"], null);
-  // $0.70 x round-trip miles, rounded up to $5, plus the westbound toll.
-  assert.equal(fees["uc-berkeley"], 43.5);
-  assert.equal(fees["csueb"], 63.5);
+  // $0.70 x round-trip miles, rounded up to $5, plus the westbound toll,
+  // with the total rounded to the nearest $5 ($43.50 -> $45, $63.50 -> $65).
+  assert.equal(fees["uc-berkeley"], 45);
+  assert.equal(fees["csueb"], 65);
   // Approved business fee; the formula alone gives $70 (lib/travelFee.ts).
   assert.equal(fees["sjsu"], 75);
   assert.equal(fees["santa-clara"], 65);

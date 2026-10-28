@@ -14,6 +14,7 @@
 import { BANNED_PHRASES } from "./soloxsnapsWritingProfile";
 import type { EmailContext } from "./buildEmailContext";
 import { checkDraftQuote, type QuoteInput } from "./quotePricing";
+import { formatFee } from "@/lib/pricingCatalog";
 
 export type IssueType =
   | "em_dash"
@@ -360,9 +361,9 @@ function checkQuote(draft: string, context: EmailContext): ValidationIssue[] {
     severity: "high" as const,
     description: m.kind === "travel"
       ? m.expected > 0
-        ? `States a $${m.stated} travel fee; the verified fee is $${m.expected}.`
-        : `States a $${m.stated} travel fee, but no travel amount is verified for this location.`
-      : `States a $${m.stated} total; the rate card gives $${m.expected}.`,
+        ? `States a ${formatFee(m.stated)} travel fee; the verified fee is ${formatFee(m.expected)}.`
+        : `States a ${formatFee(m.stated)} travel fee, but no travel amount is verified for this location.`
+      : `States a ${formatFee(m.stated)} total; the rate card gives ${formatFee(m.expected)}.`,
     excerpt: m.excerpt,
   }));
 }

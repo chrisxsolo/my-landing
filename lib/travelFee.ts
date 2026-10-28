@@ -1,13 +1,17 @@
 // lib/travelFee.ts - the one travel fee policy, for every service.
 //
 // Travel fee = round-trip driving miles x $0.70, rounded UP to the next $5,
-// plus the tolls actually paid on the route. Travel inside San Francisco city
-// limits is included in the session price. A destination with a business-
-// approved fee (APPROVED_TRAVEL_FEES) charges that fee instead.
+// plus the tolls actually paid on the route, with that combined amount then
+// rounded to the NEAREST $5 so no client ever sees a fee like $43.50. Travel
+// inside San Francisco city limits is included in the session price. A
+// destination with a business-approved fee (APPROVED_TRAVEL_FEES) charges that
+// fee instead, untouched by either rounding.
 //
-// The rounding is the business vault's rule (02 Pricing/Travel Fees.md:
-// "round up to nearest $5"). It applies to the mileage charge only; tolls are
-// added to the cent afterwards, because a toll is a pass-through cost.
+// The mileage rounding is the business vault's rule (02 Pricing/Travel
+// Fees.md: "round up to nearest $5"). It applies to the mileage charge only;
+// tolls are added to the cent afterwards, because a toll is a pass-through
+// cost. The final nearest-$5 rounding (2026-10-28) is applied once, to the
+// mileage-plus-toll total, and never to either component on its own.
 //
 // All arithmetic is in integer cents. Distances are stored to the hundredth
 // of a mile and converted to integer hundredths before multiplying, so no
@@ -20,6 +24,8 @@
 export const TRAVEL_POLICY = {
   ratePerMileCents: 70,
   mileageRoundUpCents: 500,
+  /** The step the mileage-plus-toll total is rounded to, nearest. */
+  finalRoundingCents: 500,
   includedArea: "San Francisco city limits",
   originLabel: "San Francisco",
 } as const;
@@ -121,6 +127,9 @@ export interface TravelFeeBreakdown {
   roundTripMiles: number;
   mileageCents: number;
   tollCents: number;
+  /** Mileage charge plus tolls, before the final nearest-$5 rounding. */
+  subtotalCents: number;
+  /** The fee charged: the subtotal rounded to the nearest $5. */
   totalCents: number;
 }
 
@@ -143,11 +152,22 @@ export function tollChargeCents(crossings: readonly BridgeCrossing[]): number {
     .reduce((sum, { bridge }) => sum + TOLL_BRIDGES[bridge].cents, 0);
 }
 
+/**
+ * The final client-facing rounding: the mileage-plus-toll total to the
+ * nearest $5 ($43.50 -> $45, $31 -> $30, $32.50 -> $35). Integer cents in,
+ * integer cents out. Applied once, after mileage and tolls are settled.
+ */
+export function roundTravelFeeToNearestFive(totalCents: number): number {
+  const step = TRAVEL_POLICY.finalRoundingCents;
+  return Math.round(totalCents / step) * step;
+}
+
 export function calculateTravelFee(route: Pick<VerifiedRoute, "outboundMiles" | "returnMiles" | "crossings">): TravelFeeBreakdown {
   const roundTripMiles = (toHundredths(route.outboundMiles) + toHundredths(route.returnMiles)) / 100;
   const mileageCents = mileageChargeCents(roundTripMiles);
   const tollCents = tollChargeCents(route.crossings);
-  return { roundTripMiles, mileageCents, tollCents, totalCents: mileageCents + tollCents };
+  const subtotalCents = mileageCents + tollCents;
+  return { roundTripMiles, mileageCents, tollCents, subtotalCents, totalCents: roundTravelFeeToNearestFive(subtotalCents) };
 }
 
 /**
@@ -174,10 +194,24 @@ export function calculatedTravelFee(key: VerifiedRouteKey): number {
   return calculateTravelFee(VERIFIED_ROUTES[key]).totalCents / 100;
 }
 
-/** The fee charged for a verified destination, in dollars (may carry cents, e.g. 43.5). */
+/** The fee charged for a verified destination, in whole dollars (a multiple of $5). */
 export function verifiedTravelFee(key: VerifiedRouteKey): number {
   const approved = APPROVED_TRAVEL_FEES[key];
   return approved ? approved.cents / 100 : calculatedTravelFee(key);
+}
+
+/**
+ * Figures the policy no longer charges for a destination, in dollars: the
+ * formula fee where an approved fee replaces it (SJSU's $70), and the
+ * unrounded mileage-plus-toll sum where the final rounding moved it (UC
+ * Berkeley's $43.50). Quote validation treats these as outdated, never as
+ * the current fee.
+ */
+export function supersededTravelFees(key: VerifiedRouteKey): number[] {
+  const current = verifiedTravelFee(key);
+  const breakdown = calculateTravelFee(VERIFIED_ROUTES[key]);
+  const candidates = [breakdown.totalCents / 100, breakdown.subtotalCents / 100];
+  return [...new Set(candidates.filter((fee) => fee !== current))];
 }
 
 /** Where a destination's fee comes from, for admin views that show the working. */
@@ -198,4 +232,4 @@ export function travelFeeBasis(key: VerifiedRouteKey): {
 
 /** Client-facing description of the rule, with no origin detail. */
 export const TRAVEL_POLICY_SUMMARY =
-  `Travel within ${TRAVEL_POLICY.includedArea} is included. Elsewhere, travel is ${TRAVEL_RATE_LABEL} per round-trip mile from ${TRAVEL_POLICY.originLabel}, rounded up to the nearest $5, plus any bridge toll on the route.`;
+  `Travel within ${TRAVEL_POLICY.includedArea} is included. Elsewhere, travel is ${TRAVEL_RATE_LABEL} per round-trip mile from ${TRAVEL_POLICY.originLabel} plus any bridge toll on the route, rounded to the nearest $5.`;

@@ -292,7 +292,7 @@ export function getMinimumImageCountForSessionType(sessionType: string): number 
   return PRICING_CATALOG.events.smallEvent.minimumImages;
 }
 
-/** "$70" for whole dollars, "$43.50" when a toll adds cents. */
+/** "$70" for whole dollars; an amount with cents keeps two decimals. */
 export function formatFee(amount: number): string {
   return Number.isInteger(amount)
     ? `$${amount.toLocaleString("en-US")}`

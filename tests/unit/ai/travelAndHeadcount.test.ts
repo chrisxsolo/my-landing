@@ -53,7 +53,8 @@ describe("the location outranks the school", () => {
   it("keeps the campus fee when the shoot is on campus", () => {
     expect(buildTravelFact("San Jose State University", null)).toContain("Travel fee for San Jose State University: $75.");
     expect(buildTravelFact(null, "San Jose State University")).toContain("Travel fee for San Jose State University: $75.");
-    expect(buildTravelFact("University of California, Berkeley", null)).toContain("$43.50");
+    expect(buildTravelFact("University of California, Berkeley", null)).toContain("Travel fee for University of California, Berkeley: $45.");
+    expect(buildTravelFact("University of California, Berkeley", null)).not.toContain("$43.50");
   });
 
   it("charges nothing inside San Francisco", () => {
@@ -62,11 +63,11 @@ describe("the location outranks the school", () => {
   });
 
   it("does not spread a campus fee across the whole region", () => {
-    // CSU East Bay's $63.50 is that campus, not everywhere in the East Bay.
-    expect(buildTravelFact(null, "East Bay")).not.toContain("$63.50");
-    expect(buildTravelFact("California State University, East Bay", null)).toContain("$63.50");
+    // CSU East Bay's $65 is that campus, not everywhere in the East Bay.
+    expect(buildTravelFact(null, "East Bay")).not.toContain("$65");
+    expect(buildTravelFact("California State University, East Bay", null)).toContain("$65.");
     // "Cal State" is not Cal: this school field used to get Berkeley's fee.
-    expect(buildTravelFact("Cal State East Bay", null)).toContain("$63.50");
+    expect(buildTravelFact("Cal State East Bay", null)).toContain("$65.");
   });
 });
 

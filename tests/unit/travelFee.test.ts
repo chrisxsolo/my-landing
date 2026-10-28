@@ -1,5 +1,6 @@
 // The universal travel fee: $0.70 per round-trip mile from San Francisco,
-// rounded up to the next $5, plus tolls actually paid. SF is included.
+// rounded up to the next $5, plus tolls actually paid, with that total then
+// rounded to the nearest $5. SF is included.
 
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
@@ -8,6 +9,8 @@ import {
   VERIFIED_ROUTES,
   calculateTravelFee,
   mileageChargeCents,
+  roundTravelFeeToNearestFive,
+  supersededTravelFees,
   tollChargeCents,
   verifiedTravelFee,
 } from "@/lib/travelFee";
@@ -58,12 +61,50 @@ describe("tolls", () => {
     expect(fee.tollCents).toBe(850);
   });
 
-  it("adds the toll to the cent after rounding the mileage", () => {
+  it("adds the toll to the cent after rounding the mileage, then rounds the total to the nearest $5", () => {
     expect(calculateTravelFee({
       outboundMiles: 25,
       returnMiles: 25,
       crossings: [{ bridge: "bayBridge", heading: "eastbound" }, { bridge: "bayBridge", heading: "westbound" }],
-    })).toEqual({ roundTripMiles: 50, mileageCents: 3500, tollCents: 850, totalCents: 4350 });
+    })).toEqual({ roundTripMiles: 50, mileageCents: 3500, tollCents: 850, subtotalCents: 4350, totalCents: 4500 });
+  });
+});
+
+describe("final nearest-$5 rounding", () => {
+  it.each([
+    [3000, 3000], [3100, 3000], [3250, 3500], [3350, 3500], [3500, 3500], [3600, 3500],
+    [3750, 4000], [4100, 4000], [4350, 4500], [4750, 5000], [5000, 5000], [6350, 6500],
+  ])("rounds %i cents to %i", (subtotal, expected) => {
+    expect(roundTravelFeeToNearestFive(subtotal)).toBe(expected);
+  });
+
+  it("includes the toll before rounding, never rounding the components on their own", () => {
+    // Mileage $35 (already a $5 step) + $8.50 toll = $43.50 -> $45, not $35 + $10.
+    const fee = calculateTravelFee(VERIFIED_ROUTES["uc-berkeley"]);
+    expect([fee.mileageCents, fee.tollCents, fee.subtotalCents, fee.totalCents]).toEqual([3500, 850, 4350, 4500]);
+  });
+
+  it("leaves a toll-free route alone, since its mileage charge is already a $5 step", () => {
+    const fee = calculateTravelFee(VERIFIED_ROUTES.stanford);
+    expect(fee.subtotalCents).toBe(fee.totalCents);
+  });
+
+  it("makes every verified fee a multiple of $5", () => {
+    for (const key of Object.keys(VERIFIED_ROUTES) as (keyof typeof VERIFIED_ROUTES)[]) {
+      expect(verifiedTravelFee(key) % 5).toBe(0);
+      expect(Number.isInteger(verifiedTravelFee(key))).toBe(true);
+    }
+  });
+
+  it("leaves an approved fee untouched", () => {
+    expect(verifiedTravelFee("sjsu")).toBe(75);
+  });
+
+  it("reports the unrounded sum and the replaced formula fee as superseded figures", () => {
+    expect(supersededTravelFees("uc-berkeley")).toEqual([43.5]);
+    expect(supersededTravelFees("csueb")).toEqual([63.5]);
+    expect(supersededTravelFees("sjsu")).toEqual([70]);
+    expect(supersededTravelFees("stanford")).toEqual([]);
   });
 });
 
@@ -78,8 +119,8 @@ describe("verified routes", () => {
   });
 
   it("price every out-of-city campus from the policy", () => {
-    expect(verifiedTravelFee("uc-berkeley")).toBe(43.5);
-    expect(verifiedTravelFee("csueb")).toBe(63.5);
+    expect(verifiedTravelFee("uc-berkeley")).toBe(45); // $35 mileage + $8.50 toll = $43.50, to the nearest $5
+    expect(verifiedTravelFee("csueb")).toBe(65); // $55 + $8.50 = $63.50, to the nearest $5
     expect(verifiedTravelFee("sjsu")).toBe(75); // approved fee; the formula alone gives $70
     expect(verifiedTravelFee("santa-clara")).toBe(65);
     expect(verifiedTravelFee("stanford")).toBe(50);
@@ -116,9 +157,11 @@ describe("one fee everywhere", () => {
 
   it("gives the same session total on the estimator, the confirmation, and the contract", () => {
     const estimate = calculateGraduationEstimate({ school: "uc-berkeley", people: 1, sessionLength: "1hr", extraOutfit: false, secondLocation: false, expedited: false, champagne: false });
-    expect(estimate.subtotal).toBe(393.5);
-    expect(formatCurrency(estimate.subtotal)).toBe("$393.50");
-    expect(catalogSessionTotalCents({ session_type: "Graduation", school: "UC Berkeley", message: "", location: null, people: 1 })).toBe(39350);
+    expect(estimate.subtotal).toBe(395);
+    expect(formatCurrency(estimate.subtotal)).toBe("$395");
+    expect(estimate.deposit).toBe(197.5);
+    expect(estimate.remainingBalance).toBe(197.5);
+    expect(catalogSessionTotalCents({ session_type: "Graduation", school: "UC Berkeley", message: "", location: null, people: 1 })).toBe(39500);
     expect(getGraduationTravelFeeFromText("stanford grad")).toBe(50);
     expect(calculateCouplesEstimate({ packageKey: "1hr", location: "santa-clara", extraLocation: false, extraOutfit: false, extra30Min: false, proofingGallery: false, rushPreview: false, expedited: false }).subtotal).toBe(515);
   });
@@ -127,8 +170,9 @@ describe("one fee everywhere", () => {
 describe("the AI gets the fee as a fact", () => {
   it("recognises universities and states their verified fee", () => {
     expect(buildTravelFact("Stanford University", null)).toContain("Travel fee for Stanford University: $50.");
-    expect(buildTravelFact("Cal State East Bay", null)).toContain("$63.50");
+    expect(buildTravelFact("Cal State East Bay", null)).toContain("$65.");
     expect(buildTravelFact(null, "Santa Clara University")).toContain("$65.");
+    expect(buildTravelFact("UC Berkeley", null)).toContain("Travel fee for UC Berkeley: $45.");
     expect(buildTravelFact("UC Berkeley", null)).toContain("verified fee");
   });
 
