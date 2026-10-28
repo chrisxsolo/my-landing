@@ -81,13 +81,34 @@ describe("campus spot fill: missing photos", () => {
     expect(shown).toEqual({ ...empty, image_url: url(5) });
   });
 
-  it("leaves a spot empty when no photo is proven to show it", () => {
-    const plan = planFill([slot("usf", "lone-mountain-stairs")], [
+  it("leaves a spot empty when no photo is proven to show it (Lyon Street Steps are not the Lone Mountain stairs)", () => {
+    const plan = planFill([slot("usf", "lone-mountain-palm-walkway")], [
       candidate(38, { schoolSlug: "usf", text: "USF Nursing Grad Sunset Portrait on Lyon Street Steps" }),
       candidate(10, { schoolSlug: "usf", text: "Golden Hour USF Graduation Portrait on Campus" }),
     ], []);
     expect(plan.claim).toEqual([]);
     expect(plan.unmatched[0].reason).toMatch(/no public photo/);
+  });
+
+  it("a photo whose text or tag names a child composition fills the consolidated USF card", () => {
+    const lone = slot("usf", "lone-mountain-palm-walkway");
+    const gleeson = slot("usf", "gleeson-library");
+    const plan = planFill([gleeson, lone], [
+      candidate(1, { schoolSlug: "usf", text: "Seated on the Lone Mountain stairs" }),
+      candidate(2, { schoolSlug: "usf", text: "USF grad", tag: { spotKey: "los-lobos-de-loyola", featured: true } }),
+    ], []);
+    expect(plan.claim).toEqual([
+      { schoolSlug: "usf", spotKey: "gleeson-library", imageUrl: url(2), evidence: "tag", detail: "tagged los-lobos-de-loyola" },
+      { schoolSlug: "usf", spotKey: "lone-mountain-palm-walkway", imageUrl: url(1), evidence: "text", detail: "photo text names lone-mountain-stairs" },
+    ]);
+  });
+
+  it("releases an automatic photo left on a section that is no longer public, keeping the photo in the pool", () => {
+    const stale: AutoRow = { schoolSlug: "usf", spotKey: "lone-mountain-stairs", imageUrl: url(1), evidence: "text" };
+    const photo = candidate(1, { schoolSlug: "usf", text: "Seated on the Lone Mountain stairs" });
+    const plan = planFill([slot("usf", "lone-mountain-palm-walkway")], [photo], [stale]);
+    expect(plan.release).toEqual([{ row: stale, reason: "the spot is no longer on the page" }]);
+    expect(plan.claim.map((c) => [c.spotKey, c.imageUrl])).toEqual([["lone-mountain-palm-walkway", url(1)]]);
   });
 
   it("does not guess when a photo's text names two spots", () => {
@@ -193,11 +214,11 @@ describe("campus spot slots", () => {
     const slots = campusSpotSlots([
       spot(3, "sjsu", "The SJSU Sign Wall\n", url(1)),
       spot(11, "csueb", "East Bay Sign", url(2)),
-      spot(1_000_002, "usf", "Los Lobos de Loyola Wolf Sculpture", null, { spot_key: "los-lobos-de-loyola" }),
+      spot(1_000_001, "usf", "Gleeson Library & Los Lobos de Loyola", null, { spot_key: "gleeson-library" }),
     ]);
     expect(slots).toEqual([
       { schoolSlug: "sjsu", spotKey: "sjsu-sign", name: "The SJSU Sign Wall", shownUrl: url(1) },
-      { schoolSlug: "usf", spotKey: "los-lobos-de-loyola", name: "Los Lobos de Loyola Wolf Sculpture", shownUrl: null },
+      { schoolSlug: "usf", spotKey: "gleeson-library", name: "Gleeson Library & Los Lobos de Loyola", shownUrl: null },
     ]);
   });
 });

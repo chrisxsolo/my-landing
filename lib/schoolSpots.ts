@@ -30,8 +30,9 @@ export interface SchoolSpotDef {
   placeKey?: string;
   /**
    * A composition inside another spot's guide section (the church walkway
-   * under St. Ignatius Church). Its photos keep their own tag but show in the
-   * parent's section, after the parent's own photos.
+   * under St. Ignatius Church, the wolf sculpture under Gleeson Library). Its
+   * photos keep their own tag but show in the parent's section, after the
+   * parent's own photos; it never gets a public card of its own.
    */
   parentKey?: string;
 }
@@ -171,12 +172,14 @@ export const SCHOOL_SPOTS: Partial<Record<SchoolSlug, readonly SchoolSpotDef[]>>
     },
     ...SF_OFF_CAMPUS_SPOT_DEFS,
   ],
-  // USF: Chris's six guide areas as eight compositions. The church walkway and
-  // the Lone Mountain main-building background are children of their guide
-  // sections; the stairs stay their own section. "Glass hallway" is Chris's
-  // name for it until the building is confirmed. Bare "Lone Mountain" names
-  // three spots, so it gives no hint; "Lyon Street Steps" is off campus and
-  // must never hint the Lone Mountain stairs.
+  // USF: Chris's four guide locations as eight compositions. The church
+  // walkway, the Los Lobos de Loyola wolf sculpture (outside Gleeson Library),
+  // the Lone Mountain stairs and the Lone Mountain main-building background
+  // are children of their guide sections: their keys stay for precise tagging
+  // and their photos show inside the parent section. "Glass hallway" is
+  // Chris's name for it until the building is confirmed. Bare "Lone Mountain"
+  // names three spots, so it gives no hint; "Lyon Street Steps" is off campus
+  // and must never hint the Lone Mountain stairs.
   usf: [
     {
       key: "st-ignatius-church", name: "St. Ignatius Church", altPlace: "in front of St. Ignatius Church",
@@ -195,7 +198,7 @@ export const SCHOOL_SPOTS: Partial<Record<SchoolSlug, readonly SchoolSpotDef[]>>
     },
     {
       key: "los-lobos-de-loyola", name: "Los Lobos de Loyola Wolf Sculpture", altPlace: "with the Los Lobos de Loyola wolf sculpture",
-      campusSpotNames: [],
+      campusSpotNames: [], parentKey: "gleeson-library",
       hintTerms: ["los lobos", "lobos de loyola", "wolf sculpture", "wolf statue", "wolves sculpture", "wolves and kettle"],
     },
     {
@@ -205,7 +208,7 @@ export const SCHOOL_SPOTS: Partial<Record<SchoolSlug, readonly SchoolSpotDef[]>>
     },
     {
       key: "lone-mountain-stairs", name: "Lone Mountain Stairs", altPlace: "on the Lone Mountain stairs",
-      campusSpotNames: [],
+      campusSpotNames: [], parentKey: "lone-mountain-palm-walkway",
       hintTerms: ["lone mountain stairs", "lone mountain steps", "lone mountain staircase"],
     },
     {

@@ -3,9 +3,11 @@ import { PRICING_CATALOG } from "@/lib/pricingCatalog";
 import { SF_OFF_CAMPUS_SPOTS, sfOffCampusSpot } from "../sfOffCampus";
 
 // The USF photo location guide (/grads/usf/spots). Written from Chris's own
-// USF sessions. Landmark names checked against USF's own pages: St. Ignatius
-// Church, Gleeson Library | Geschke Center, Los Lobos de Loyola by Pancho
-// Cárdenas (installed in front of Gleeson in 2011), and Lone Mountain.
+// USF sessions. Four locations: the wolf sculpture is part of the Gleeson
+// Library stop and the stairs are part of the Lone Mountain stop, never
+// their own route steps. Landmark names checked against USF's own pages: St.
+// Ignatius Church, Gleeson Library | Geschke Center, Los Lobos de Loyola by
+// Pancho Cárdenas (installed in front of Gleeson in 2011), and Lone Mountain.
 //
 // Internal notes (never published):
 // - The glass hallway's building is unconfirmed. The Lo Schiavo Center's
@@ -49,11 +51,8 @@ export const spotsGuide: SchoolSpotsGuide = {
   ],
   mustHaveHeading: "The best USF graduation photo spots at a glance",
   mustHaveIntro:
-    "Start around St. Ignatius Church and Gleeson Library, add the wolf sculpture and the glass hallway when access allows, then head up to Lone Mountain for the stairs and a sunset finish under the palm trees.",
-  mustHaveKeys: [
-    "st-ignatius-church", "gleeson-library", "los-lobos-de-loyola",
-    "usf-glass-hallway", "lone-mountain-stairs", "lone-mountain-palm-walkway",
-  ],
+    "Start around St. Ignatius Church, then Gleeson Library with the wolf sculpture right outside it, add the glass hallway when access allows, and head up to Lone Mountain for a sunset finish under the palm trees.",
+  mustHaveKeys: ["st-ignatius-church", "gleeson-library", "usf-glass-hallway", "lone-mountain-palm-walkway"],
   spotsHeading: "My favorite USF graduation photo spots",
   bestTime: {
     heading: "When Is the Best Time to Take USF Graduation Photos?",
@@ -92,19 +91,17 @@ export const spotsGuide: SchoolSpotsGuide = {
     heading: "How I Like to Photograph a USF Graduation Session",
     intro: [
       "When photographing USF graduates, I like following a route that gives us a variety of photos while making the most of the available light.",
-      "I generally begin around St. Ignatius Church and Gleeson Library, two of the most recognizable places on campus, then photograph the wolf sculpture before moving to the glass hallway if access is authorized. After the lower-campus locations, we head up to Lone Mountain, starting at the stairs before continuing to the palm trees and main building. My favorite way to finish is with the final photos at Lone Mountain around sunset.",
+      "I generally begin around St. Ignatius Church and Gleeson Library, two of the most recognizable places on campus, photographing the Los Lobos de Loyola wolf sculpture as part of the library stop, then move to the glass hallway if access is authorized. After the lower-campus locations, we head up to Lone Mountain, using the stairs on the way up for a few compositions before the palm trees and main building. My favorite way to finish is with the final photos at Lone Mountain around sunset.",
     ],
     steps: [
       { spotKey: "st-ignatius-church", text: "St. Ignatius Church, outside the church and along the walkway in front." },
-      { spotKey: "gleeson-library", text: "The front entrance of Gleeson Library." },
-      { spotKey: "los-lobos-de-loyola", text: "The Los Lobos de Loyola wolf sculpture outside the library." },
+      { spotKey: "gleeson-library", text: "The front entrance of Gleeson Library and the Los Lobos de Loyola wolf sculpture right outside it." },
       { spotKey: "usf-glass-hallway", text: "The glass hallway, only when access is authorized." },
-      { spotKey: "lone-mountain-stairs", text: "The Lone Mountain stairs." },
-      { spotKey: "lone-mountain-palm-walkway", text: "The Lone Mountain palm trees and main building, at sunset." },
+      { spotKey: "lone-mountain-palm-walkway", text: "Lone Mountain: the stairs on the way up, then the palm trees and main building at sunset." },
     ],
     notes: [
       "The session can also begin near Gleeson Library if that suits where we meet or the light. The lower-campus order stays flexible; the one timing priority is finishing at Lone Mountain around sunset when conditions allow.",
-      "Covering all six areas takes more time than a short session, because we also walk up to Lone Mountain. I'll recommend a coverage time for the stops you choose, and if time is limited I prioritize your favorites and my strongest compositions rather than rushing through every stop.",
+      "Covering every location takes more time than a short session, because we also walk up to Lone Mountain. I'll recommend a coverage time for the stops you choose, and if time is limited I prioritize your favorites and my strongest compositions rather than rushing through every stop.",
     ],
   },
   afterRoute: [
@@ -147,7 +144,7 @@ export const spotsGuide: SchoolSpotsGuide = {
     ],
     optionsHeading: "Example session plans",
     options: [
-      { label: "Option A", title: "Classic USF graduation", body: "Campus only: St. Ignatius Church, Gleeson Library, the wolf sculpture, the glass hallway when student access allows, and Lone Mountain at sunset." },
+      { label: "Option A", title: "Classic USF graduation", body: "Campus only: St. Ignatius Church, Gleeson Library and the wolf sculpture, the glass hallway when student access allows, and Lone Mountain at sunset." },
       { label: "Option B", title: `USF + ${palace.name}`, body: `Classic campus portraits first, then architectural portraits with the columns at the ${palace.name}.` },
       { label: "Option C", title: `USF + ${legion.name}`, body: `Campus portraits combined with the grand columns and elegant architecture of the ${legion.name}.` },
     ],
@@ -170,9 +167,9 @@ export const spotsGuide: SchoolSpotsGuide = {
       heading: "Campus and Location Rules",
       paragraphs: [
         "We photograph the outside of St. Ignatius Church and Gleeson Library. Interior photography isn't part of a standard session and isn't something I assume is permitted.",
-        "Los Lobos de Loyola is a work of art. We never climb, stand, or sit on it, and seated portraits use the surrounding surfaces where sitting is allowed.",
+        "Los Lobos de Loyola, the wolf sculpture outside Gleeson Library, is a work of art. We never climb, stand, or sit on it, and seated portraits use the surrounding surfaces where sitting is allowed.",
         "The glass hallway is indoors and access-controlled. We include it only when access and photography are authorized; otherwise the session continues at the outdoor spots.",
-        "On the Lone Mountain stairs we keep the walkway clear and avoid railings and edges. Campus access rules, closures, and events can change, so I check current conditions before your session and adjust the plan if a spot is unavailable.",
+        "On the stairs up to Lone Mountain we keep the walkway clear and avoid railings and edges. Campus access rules, closures, and events can change, so I check current conditions before your session and adjust the plan if a spot is unavailable.",
       ],
       links: [
         { label: "USF campus map", href: "https://www.usfca.edu/campus-map" },
@@ -200,12 +197,12 @@ export const spotsGuide: SchoolSpotsGuide = {
     },
   ],
   faqs: [
-    { q: "Where are the best places for USF graduation pictures?", a: "My favorite spots include St. Ignatius Church, Gleeson Library, the wolf sculpture, the modern glass hallway, and Lone Mountain. I particularly recommend finishing at Lone Mountain around sunset." },
+    { q: "Where are the best places for USF graduation pictures?", a: "My favorite spots are St. Ignatius Church, Gleeson Library with the Los Lobos de Loyola wolf sculpture right outside it, the modern glass hallway, and Lone Mountain. I particularly recommend finishing at Lone Mountain around sunset." },
     { q: "What time is best for USF graduation photos?", a: "Golden hour before sunset is my favorite time on sunny days. Cloudy days are also excellent, because the softer light makes photography possible throughout more of the day." },
     { q: "Where should we start our USF graduation session?", a: "I usually like beginning near St. Ignatius Church or Gleeson Library before working through campus and finishing at Lone Mountain." },
     { q: "Why do you recommend Lone Mountain at sunset?", a: "I love the palm trees, architecture, and warm evening light around Lone Mountain. Saving it for sunset can produce some of my favorite compositions from a USF session." },
     { q: "Can we take photos in the USF glass hallway?", a: "The hallway is an indoor, access-controlled location. In my experience a student ID is required to get in, but professional photography there must also be authorized. We can include it when the necessary access and permission are available." },
-    { q: "Can we take graduation photos with the USF wolf sculpture?", a: "Yes, when the area outside Gleeson Library is accessible. Los Lobos de Loyola is one of my favorite recognizable USF landmarks. We photograph around it without climbing or sitting on the artwork." },
+    { q: "Can we take graduation photos with the USF wolf sculpture?", a: "Yes, when the area outside Gleeson Library is accessible. Los Lobos de Loyola is part of the Gleeson Library stop and one of my favorite recognizable USF landmarks. We photograph around it without climbing or sitting on the artwork." },
     { q: "Is Lone Mountain windy?", a: "It can be very windy! I recommend bringing hair clips, hair ties, and small clothing clips to help secure your hair and graduation outfit." },
     { q: "What if it's cloudy during my graduation photoshoot?", a: "Cloudy skies can actually be ideal for portraits. The clouds soften the light, which lets us create beautiful photos throughout more of the day." },
     { q: "Can I take USF graduation photos at multiple locations?", a: "Yes! We can plan a session that combines USF campus portraits with an additional San Francisco location like the Palace of Fine Arts or the Legion of Honor, depending on coverage time, travel, and the location add-on." },

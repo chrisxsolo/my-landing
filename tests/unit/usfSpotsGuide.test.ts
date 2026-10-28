@@ -25,10 +25,10 @@ import {
 
 const guide = usf.spotsGuide!;
 const allGuideText = JSON.stringify(usf);
-const SECTION_KEYS = [
-  "st-ignatius-church", "gleeson-library", "los-lobos-de-loyola",
-  "usf-glass-hallway", "lone-mountain-stairs", "lone-mountain-palm-walkway",
-];
+// The four public locations, in Chris's order.
+const SECTION_KEYS = ["st-ignatius-church", "gleeson-library", "usf-glass-hallway", "lone-mountain-palm-walkway"];
+// Legacy compositions: still valid tag keys, shown inside their parent section.
+const CHILD_KEYS = ["st-ignatius-walkway", "los-lobos-de-loyola", "lone-mountain-stairs", "lone-mountain-main-building"];
 const LANDMARK_KEYS = [
   "st-ignatius-church", "st-ignatius-walkway", "gleeson-library", "los-lobos-de-loyola",
   "usf-glass-hallway", "lone-mountain-stairs", "lone-mountain-palm-walkway", "lone-mountain-main-building",
@@ -37,23 +37,46 @@ const SF_KEYS = SF_OFF_CAMPUS_SPOT_DEFS.map((s) => s.key);
 const spot = (key: string) => usf.spots.find((s) => s.key === key)!;
 
 describe("USF location guide content", () => {
-  it("covers Chris's six photo areas in his order, each a registered photo key", () => {
+  it("presents exactly four public locations in Chris's order, each a registered photo key", () => {
     expect(usf.spots.map((s) => s.key)).toEqual(SECTION_KEYS);
+    expect(usf.spots.map((s) => s.name)).toEqual([
+      "St. Ignatius Church", "Gleeson Library & Los Lobos de Loyola", "USF Glass Hallway", "Lone Mountain Palm Trees & Main Building",
+    ]);
     expect(spotsForSchool("usf").map((s) => s.key)).toEqual([...LANDMARK_KEYS, ...SF_KEYS]);
     expect(guide.offCampus!.spots.map((s) => s.key)).toEqual(SF_KEYS);
   });
 
-  it("keeps the walkway and main building as compositions inside their sections, stairs on their own", () => {
+  it("never shows the wolf sculpture or the stairs as a standalone card, section, route step or must-have", () => {
+    const publicKeys = [
+      ...usf.spots.map((s) => s.key), ...guide.mustHaveKeys!, ...guide.route.steps.map((s) => s.spotKey),
+    ];
+    for (const key of CHILD_KEYS) expect(publicKeys).not.toContain(key);
+    const names = usf.spots.map((s) => s.name);
+    expect(names).not.toContain("Los Lobos de Loyola Wolf Sculpture");
+    expect(names).not.toContain("Lone Mountain Stairs");
+    expect(guide.mustHaveKeys).toEqual(SECTION_KEYS);
+    expect(guide.route.steps.map((s) => s.spotKey)).toEqual(SECTION_KEYS);
+    expect(guide.route.notes.join(" ")).not.toMatch(/all six|six areas|six stops/i);
+  });
+
+  it("keeps the legacy keys as compositions inside their parent sections", () => {
+    for (const key of CHILD_KEYS) expect(isSchoolSpotKey("usf", key)).toBe(true);
     expect(sectionSpotKeys("usf", "st-ignatius-church")).toEqual(["st-ignatius-church", "st-ignatius-walkway"]);
-    expect(sectionSpotKeys("usf", "lone-mountain-palm-walkway")).toEqual(["lone-mountain-palm-walkway", "lone-mountain-main-building"]);
-    expect(sectionSpotKeys("usf", "lone-mountain-stairs")).toEqual(["lone-mountain-stairs"]);
+    expect(sectionSpotKeys("usf", "gleeson-library")).toEqual(["gleeson-library", "los-lobos-de-loyola"]);
+    expect(sectionSpotKeys("usf", "lone-mountain-palm-walkway")).toEqual([
+      "lone-mountain-palm-walkway", "lone-mountain-stairs", "lone-mountain-main-building",
+    ]);
+    expect(sectionSpotKeys("usf", "usf-glass-hallway")).toEqual(["usf-glass-hallway"]);
+    // A child never aggregates anything itself.
+    for (const key of CHILD_KEYS) expect(sectionSpotKeys("usf", key)).toEqual([key]);
   });
 
   it("routes from the main campus and finishes at Lone Mountain at sunset", () => {
     const keys = guide.route.steps.map((s) => s.spotKey);
     expect(keys).toEqual(SECTION_KEYS);
     expect(keys.every((k) => isSchoolSpotKey("usf", k))).toBe(true);
-    expect(guide.route.steps.at(-1)!.text).toMatch(/sunset/);
+    expect(guide.route.steps.at(-1)!.text).toMatch(/stairs on the way up.*sunset/);
+    expect(guide.route.steps[1].text).toMatch(/Gleeson Library and the Los Lobos de Loyola wolf sculpture/);
     expect(guide.route.notes.join(" ")).toMatch(/begin near Gleeson Library/);
     expect(spot("lone-mountain-palm-walkway")).toMatchObject({ signature: true, role: "Final stop · sunset" });
   });
@@ -67,11 +90,26 @@ describe("USF location guide content", () => {
     expect(allGuideText).not.toMatch(/Lo Schiavo|Harney|Center for Science/);
   });
 
-  it("names the sculpture officially and treats it as artwork", () => {
-    const wolves = spot("los-lobos-de-loyola").details!.join(" ");
-    expect(wolves).toMatch(/Los Lobos de Loyola/);
-    expect(wolves).toMatch(/Pancho Cárdenas/);
-    expect(wolves).toMatch(/no climbing, standing, or sitting on it/);
+  it("folds the wolf sculpture into the Gleeson section: official name, context, artwork rule, portrait ideas", () => {
+    const gleeson = spot("gleeson-library");
+    const text = gleeson.details!.join(" ");
+    expect(text).toMatch(/Immediately outside the library is the wolf sculpture, part of the same stop/);
+    expect(text).toMatch(/Officially called Los Lobos de Loyola/);
+    expect(text).toMatch(/wolves and a kettle.*Jesuit heritage.*Pancho Cárdenas/);
+    expect(text).toMatch(/no climbing, standing, or sitting on it/);
+    expect(gleeson.photoIdeas).toEqual(expect.arrayContaining(["Standing beside the wolf sculpture", "Seated portraits near the sculpture"]));
+    expect(guide.sections!.find((s) => s.id === "rules")!.paragraphs.join(" ")).toMatch(/Los Lobos de Loyola.*never climb, stand, or sit on it/);
+  });
+
+  it("folds the stairs into the Lone Mountain section as a composition, not a destination", () => {
+    const lone = spot("lone-mountain-palm-walkway");
+    const text = lone.details!.join(" ");
+    expect(text).toMatch(/make our way up by the Lone Mountain stairs, and I like using them as part of this stop/);
+    expect(text).toMatch(/natural leading lines/);
+    expect(text).toMatch(/never pose on railings or edges/);
+    expect(text).toMatch(/plan an accessible route/);
+    expect(lone.photoIdeas).toContain("Standing or seated portraits on the stairs, using the leading lines");
+    expect(lone.campusTip).toMatch(/stairs on the way up/);
   });
 
   it("puts the wind warning on Lone Mountain and in a what-to-bring section", () => {
@@ -104,7 +142,7 @@ describe("USF location guide content", () => {
     expect(allGuideText).not.toMatch(/Haight/i);
     const [a, b, c] = guide.plans!.options;
     expect(guide.plans!.options).toHaveLength(3);
-    expect(a.body).toMatch(/St\. Ignatius Church, Gleeson Library, the wolf sculpture, the glass hallway when student access allows, and Lone Mountain at sunset/);
+    expect(a.body).toMatch(/St\. Ignatius Church, Gleeson Library and the wolf sculpture, the glass hallway when student access allows, and Lone Mountain at sunset/);
     expect(b.title).toBe("USF + Palace of Fine Arts");
     expect(c.title).toBe("USF + Legion of Honor");
   });
@@ -173,6 +211,12 @@ describe("USF landmark hints (admin suggestions only)", () => {
     expect(suggestSpotFromText("usf", "Gleeson Library and the glass hallway")).toBeNull();
     expect(suggestSpotFromText("usf", "USF grad at Lone Mountain")).toBeNull();
     expect(suggestSpotFromText("usf", "USF Nursing Grad Sunset Portrait on Lyon Street Steps")).toBeNull();
+  });
+
+  it("the legacy child keys still hint precisely, so tags stay exact after the public merge", () => {
+    expect(suggestSpotFromText("usf", "Wolves and kettle statue portrait")?.key).toBe("los-lobos-de-loyola");
+    expect(suggestSpotFromText("usf", "Seated on the Lone Mountain staircase")?.key).toBe("lone-mountain-stairs");
+    expect(suggestSpotFromText("usf", "Gleeson Library entrance")?.key).toBe("gleeson-library");
   });
 });
 
@@ -267,6 +311,52 @@ describe("USF spot photo layout", () => {
     expect(layout.bySpot["lone-mountain-palm-walkway"].map((p) => p.url)).toEqual(["h1"]);
     expect(layout.bySpot["palace-of-fine-arts"]).toEqual([]);
   });
+
+  // What SchoolSpotsGuidePage shows in a section: the parent's photos, then its children's.
+  const sectionPhotos = (layout: ReturnType<typeof buildSpotPhotoLayout>, key: string) =>
+    sectionSpotKeys("usf", key).flatMap((k) => layout.bySpot[k] ?? []).map((p) => p.url);
+
+  it("a photo tagged with the wolf sculpture shows in the consolidated Gleeson section", () => {
+    const layout = buildSpotPhotoLayout({
+      ...base, tags: [tag("a", "los-lobos-de-loyola", true), tag("b", "gleeson-library")],
+      fallbacks: { "gleeson-library": { url: "x", alt: "" } },
+    });
+    expect(sectionPhotos(layout, "gleeson-library")).toEqual(["b", "a"]);
+    expect(sectionPhotos(layout, "st-ignatius-church")).toEqual([]);
+  });
+
+  it("photos tagged with the stairs or the main building show in the consolidated Lone Mountain section", () => {
+    const layout = buildSpotPhotoLayout({
+      ...base, tags: [tag("a", "lone-mountain-stairs"), tag("b", "lone-mountain-main-building"), tag("x", "lone-mountain-palm-walkway")],
+    });
+    expect(sectionPhotos(layout, "lone-mountain-palm-walkway")).toEqual(["x", "a", "b"]);
+    expect(layout.gallery.map((c) => c.url)).toEqual([]);
+  });
+
+  it("no photo repeats across the hero, the sections and the gallery, even when tagged twice", () => {
+    const layout = buildSpotPhotoLayout({
+      ...base,
+      tags: [tag("hero", "los-lobos-de-loyola", true), tag("a", "gleeson-library"), tag("a", "lone-mountain-stairs"), tag("b", "lone-mountain-stairs")],
+      fallbacks: { "lone-mountain-palm-walkway": { url: "a", alt: "" } },
+    });
+    const shown = ["hero", ...SECTION_KEYS.flatMap((key) => sectionPhotos(layout, key)), ...layout.gallery.map((c) => c.url)];
+    expect(new Set(shown).size).toBe(shown.length);
+    expect(sectionPhotos(layout, "gleeson-library")).toEqual(["a"]);
+    expect(sectionPhotos(layout, "lone-mountain-palm-walkway")).toEqual(["b"]);
+  });
+});
+
+describe("USF structured data lists the four locations", () => {
+  // SchoolSpotsGuidePage builds its ItemList from data.spots then the off-campus spots.
+  const itemList = [...usf.spots, ...guide.offCampus!.spots].map((s) => s.name);
+
+  it("has one entry per public location and no standalone wolf or stairs item", () => {
+    expect(itemList.slice(0, 4)).toEqual(usf.spots.map((s) => s.name));
+    expect(itemList).toHaveLength(4 + SF_KEYS.length);
+    expect(itemList).not.toContain("Los Lobos de Loyola Wolf Sculpture");
+    expect(itemList).not.toContain("Lone Mountain Stairs");
+    expect(new Set(itemList).size).toBe(itemList.length);
+  });
 });
 
 describe("Campus Spots stays in sync with the USF guide", () => {
@@ -278,9 +368,10 @@ describe("Campus Spots stays in sync with the USF guide", () => {
     row(16, "Gleeson Library", "gleeson.jpg"), row(21, "Lone Mountain", "palms.jpg"),
     row(20, "In Front of Church", "church.jpg"), row(22, "Glass Hallway", "hall.jpg"),
   ];
+  const sectionPhoto = (id: string, image_url: string) => ({ id, image_url, alt: "", caption: null, width: 4, height: 5 });
   const photos: SchoolSpotsGuidePhotos = {
     hero: null, gallery: [],
-    bySpot: { "lone-mountain-stairs": [{ id: "s", image_url: "stairs.jpg", alt: "", caption: null, width: 4, height: 5 }] },
+    bySpot: { "lone-mountain-stairs": [sectionPhoto("s", "stairs.jpg")], "los-lobos-de-loyola": [sectionPhoto("w", "wolves.jpg")] },
   };
   const spots = guideCampusSpots("usf", "usf", usf, rows, photos);
 
@@ -296,14 +387,42 @@ describe("Campus Spots stays in sync with the USF guide", () => {
     expect(spots.at(-1)!.tip).toMatch(/windy/);
   });
 
-  it("keeps the existing Campus Spots photos and fills new spots from tagged guide photos", () => {
+  it("generates exactly four USF cards with unique ids, keyed by the parent sections", () => {
+    expect(spots).toHaveLength(4);
+    expect(spots.map((s) => s.spot_key)).toEqual(SECTION_KEYS);
+    expect(spots.map((s) => s.id)).toEqual([20, 16, 22, 21]);
+    expect(new Set(spots.map((s) => s.id)).size).toBe(spots.length);
+    expect(spots.map((s) => s.name)).not.toContain("Lone Mountain Stairs");
+    expect(spots.map((s) => s.name)).not.toContain("Los Lobos de Loyola Wolf Sculpture");
+  });
+
+  it("keeps the existing Campus Spots photos, so no card is left without one", () => {
     const image = (name: string) => spots.find((s) => s.name === name)!.image_url;
     expect(image("St. Ignatius Church")).toBe("church.jpg");
-    expect(image("Gleeson Library")).toBe("gleeson.jpg");
+    expect(image("Gleeson Library & Los Lobos de Loyola")).toBe("gleeson.jpg");
     expect(image("USF Glass Hallway")).toBe("hall.jpg");
     expect(image("Lone Mountain Palm Trees & Main Building")).toBe("palms.jpg");
-    expect(image("Lone Mountain Stairs")).toBe("stairs.jpg");
-    expect(image("Los Lobos de Loyola Wolf Sculpture")).toBeNull();
-    expect(new Set(spots.map((s) => s.id)).size).toBe(spots.length);
+    expect(spots.every((s) => s.image_url)).toBe(true);
+  });
+
+  it("a card with no chosen photo takes a photo tagged with one of its child compositions", () => {
+    const bare = guideCampusSpots("usf", "usf", usf, [row(20, "In Front of Church", "church.jpg")], photos);
+    const image = (key: string) => bare.find((s) => s.spot_key === key)!.image_url;
+    expect(image("gleeson-library")).toBe("wolves.jpg");
+    expect(image("lone-mountain-palm-walkway")).toBe("stairs.jpg");
+    expect(image("usf-glass-hallway")).toBeNull();
+    expect(bare.map((s) => s.id)).toEqual([20, 1_000_001, 1_000_002, 1_000_003]);
+  });
+
+  it("extra raw USF location_spots rows never add a card: the guide decides the cards", () => {
+    const extra = [...rows, row(99, "Lone Mountain Stairs", "extra.jpg"), row(98, "Wolf Sculpture", "wolf.jpg")];
+    const withExtra = guideCampusSpots("usf", "usf", usf, extra, photos);
+    expect(withExtra).toHaveLength(4);
+    expect(withExtra.map((s) => s.image_url)).toEqual(["church.jpg", "gleeson.jpg", "hall.jpg", "palms.jpg"]);
+  });
+
+  it("other schools' rows are untouched by the USF guide", () => {
+    const sjsu = { ...row(1, "The SJSU Sign Wall", "sign.jpg"), school_id: "sjsu" };
+    expect(guideCampusSpots("usf", "usf", usf, [sjsu, ...rows], photos).every((s) => s.school_id === "usf")).toBe(true);
   });
 });

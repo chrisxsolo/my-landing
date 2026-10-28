@@ -13,7 +13,8 @@ vi.mock("@/lib/pagePhotos/publicPages", () => ({
   getSchoolSpotsGuidePhotos: async (slug: string) => ({
     hero: null,
     gallery: [],
-    bySpot: WITH_PHOTOS.has(slug) ? { "main-quad": [{ id: "p1" }] } : { "main-quad": [] },
+    // USF's only tagged photos sit under child compositions (the wolf sculpture), which still count.
+    bySpot: WITH_PHOTOS.has(slug) ? { "main-quad": [], [slug === "usf" ? "los-lobos-de-loyola" : "main-quad"]: [{ id: "p1" }] } : { "main-quad": [] },
   }),
 }));
 

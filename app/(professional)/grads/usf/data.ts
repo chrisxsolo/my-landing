@@ -2,10 +2,12 @@ import type { SchoolLandingData } from "@/app/components/SchoolLandingTemplate";
 import { spotsGuide } from "./spotsGuide";
 
 // Spots, order, timing, and wind advice come from Chris's own USF sessions.
-// Spot keys match lib/schoolSpots.ts, which the photo tags are stored under;
-// the church walkway and the Lone Mountain main-building background are child
-// compositions shown inside their parent sections. Each spot's description and
-// tip also feed the USF entries on /grad-guide/campus-spots.
+// Four public locations. Spot keys match lib/schoolSpots.ts, which the photo
+// tags are stored under; the church walkway, the Los Lobos de Loyola wolf
+// sculpture, the Lone Mountain stairs, and the Lone Mountain main-building
+// background are child compositions shown inside their parent sections, never
+// their own cards. Each spot's description and tip also feed the USF entries
+// on /grad-guide/campus-spots.
 //
 // Not stated on purpose: walking times, parking, interior church or library
 // photography, which building holds the glass hallway, and sun angles.
@@ -16,12 +18,12 @@ export const data: SchoolLandingData = {
   city: "San Francisco, CA",
   metaTitle: "USF Graduation Photographer | University of San Francisco",
   metaDescription:
-    "USF graduation portraits by Chris Solorzano at St. Ignatius Church, Gleeson Library, the wolf sculpture, and Lone Mountain at sunset. Guided sessions in San Francisco.",
+    "USF graduation portraits by Chris Solorzano at St. Ignatius Church, Gleeson Library and its wolf sculpture, and Lone Mountain at sunset in San Francisco.",
   canonicalPath: "/grads/usf",
   heroTagline:
     "Graduation portraits at the University of San Francisco, from St. Ignatius Church and Gleeson Library to a sunset finish under the Lone Mountain palm trees.",
   bodyIntro:
-    "USF gives us a lot of variety in one session: elegant architecture around St. Ignatius Church and Gleeson Library, the Los Lobos de Loyola wolf sculpture, a modern glass hallway, and the stairs and palm trees of Lone Mountain. I like to start on the main campus and finish at Lone Mountain around sunset.",
+    "USF gives us a lot of variety in one session: elegant architecture around St. Ignatius Church, Gleeson Library with the Los Lobos de Loyola wolf sculpture right outside it, a modern glass hallway, and the stairs and palm trees of Lone Mountain. I like to start on the main campus and finish at Lone Mountain around sunset.",
   spots: [
     {
       key: "st-ignatius-church",
@@ -48,46 +50,31 @@ export const data: SchoolLandingData = {
     },
     {
       key: "gleeson-library",
-      name: "Gleeson Library",
+      name: "Gleeson Library & Los Lobos de Loyola",
       priority: "must-have",
-      role: "Gleeson Library | Geschke Center",
+      role: "Gleeson Library | Geschke Center · wolf sculpture outside",
       bestTime: "Golden hour, or any time on overcast days",
       description:
-        "A recognizable university backdrop for traditional standing and close-up graduation portraits outside the library entrance.",
+        "A recognizable university backdrop for standing and close-up portraits outside the library entrance, with the Los Lobos de Loyola wolf sculpture right outside for something distinctly USF.",
       details: [
         "Gleeson Library is another location I highly recommend for USF graduation pictures. The entrance and surrounding architecture provide a recognizable university backdrop that's great for traditional graduation portraits.",
         "I like photographing graduates in front of the library because it offers a different composition from St. Ignatius Church while keeping that classic campus atmosphere. It's a great place for both standing and closer portraits. We photograph the outside of the building.",
+        "Immediately outside the library is the wolf sculpture, part of the same stop. Officially called Los Lobos de Loyola, it features wolves and a kettle, a symbol from the university's Jesuit heritage, and was created by Mexican artist Pancho Cárdenas.",
+        "It's one of my favorite ways to add something distinctly USF to a graduation gallery. I like taking a mix of sitting and standing portraits here, depending on your preferences and the composition, and the sculpture gives a more playful background than the traditional architecture around the library.",
+        "We treat the sculpture as the artwork it is: no climbing, standing, or sitting on it. Seated portraits use the surrounding surfaces where sitting is allowed.",
       ],
       photoIdeas: [
         "Classic standing graduation photos",
         "Full-body portraits",
         "Close-up cap-and-gown portraits",
-        "Relaxed smiling images",
         "Architectural portraits with the entrance",
-      ],
-      tip: "Gleeson Library is one of the main locations I recommend including in a USF graduation session. It's also right by another of my favorite spots, the wolf sculpture outside the library.",
-    },
-    {
-      key: "los-lobos-de-loyola",
-      name: "Los Lobos de Loyola Wolf Sculpture",
-      priority: "highly-recommended",
-      role: "Outside Gleeson Library",
-      bestTime: "Pairs with Gleeson Library",
-      description:
-        "The wolves-and-kettle sculpture outside Gleeson Library, a playful, distinctly USF backdrop for standing and sitting portraits.",
-      details: [
-        "One of the most recognizable photo spots outside Gleeson Library is the wolf sculpture. Officially called Los Lobos de Loyola, it features wolves and a kettle, a symbol from the university's Jesuit heritage, and was created by Mexican artist Pancho Cárdenas.",
-        "It's one of my favorite locations for adding something distinctly USF to a graduation gallery. I like taking a mix of sitting and standing portraits here, depending on your preferences and the composition, and the sculpture gives a more playful background than the traditional architecture around the library.",
-        "We treat the sculpture as the artwork it is: no climbing, standing, or sitting on it. Seated portraits use the surrounding surfaces where sitting is allowed.",
-      ],
-      photoIdeas: [
-        "Standing beside the sculpture",
+        "Standing beside the wolf sculpture",
         "Seated portraits near the sculpture",
-        "Full-body graduation photos",
-        "Relaxed smiling portraits",
         "Candid images that interact visually with the artwork",
+        "Relaxed smiling images",
       ],
-      tip: "I recommend photographing the wolf sculpture right after Gleeson Library because they're close together. It adds variety without needing another major stop.",
+      campusTip: "One stop, two looks: classic portraits at the library entrance, then the Los Lobos de Loyola wolf sculpture right outside. We photograph around the artwork, never on it.",
+      tip: "Gleeson Library is one of the main locations I recommend including in a USF graduation session. The wolf sculpture is right outside, so we cover both in the same stop and add variety without needing another location.",
     },
     {
       key: "usf-glass-hallway",
@@ -117,30 +104,6 @@ export const data: SchoolLandingData = {
       tip: "I particularly recommend this location for photos in your graduation gown. The contrast between the gown and the modern architecture creates a clean, distinctive look.",
     },
     {
-      key: "lone-mountain-stairs",
-      name: "Lone Mountain Stairs",
-      priority: "must-have",
-      role: "Start of the Lone Mountain portion",
-      bestTime: "Late afternoon, on the way to sunset",
-      description:
-        "Natural leading lines for standing and seated portraits, and a great transition before the top of Lone Mountain.",
-      details: [
-        "After photographing around the main USF campus, I like making my way up to Lone Mountain, and one of my favorite places to start this part of the session is along the Lone Mountain stairs.",
-        "The staircase provides natural leading lines and lets us create different compositions from the photos we captured earlier. I like taking a mix of standing and seated portraits around the steps, depending on your outfit and preferences.",
-        "We keep the walkway clear for other people and never pose on railings or edges. If stairs aren't comfortable for you, tell me ahead of time and I'll plan an accessible route and alternative spots.",
-      ],
-      photoIdeas: [
-        "Standing graduation photos on the stairs",
-        "Seated portraits on suitable steps",
-        "Wide staircase compositions",
-        "Full-body cap-and-gown portraits",
-        "Natural walking photos",
-        "Candid images with the staircase as a background",
-      ],
-      campusTip: "I start the Lone Mountain portion here before the palm trees. Lone Mountain can be windy, so come with hair clips and a few clothing clips.",
-      tip: "I usually start with the stairs before moving farther into Lone Mountain. It's a good way to add some different compositions before the final sunset portraits.",
-    },
-    {
       key: "lone-mountain-palm-walkway",
       name: "Lone Mountain Palm Trees & Main Building",
       priority: "must-have",
@@ -148,9 +111,10 @@ export const data: SchoolLandingData = {
       bestTime: "Sunset",
       signature: true,
       description:
-        "Palm trees framing the Lone Mountain building: my favorite place to finish a USF session, ideally around sunset.",
+        "Palm trees framing the Lone Mountain building, with the stairs on the way up for leading lines: my favorite place to finish a USF session, ideally around sunset.",
       details: [
         "Lone Mountain is one of my absolute favorite places to finish a USF graduation session. The palm trees and the architecture around the Lone Mountain building create an iconic San Francisco university backdrop.",
+        "After the main campus, we make our way up by the Lone Mountain stairs, and I like using them as part of this stop. The staircase provides natural leading lines for a mix of standing and seated portraits that look different from everything we captured earlier. We keep the walkway clear for other people and never pose on railings or edges. If stairs aren't comfortable for you, tell me ahead of time and I'll plan an accessible route and alternative compositions.",
         "I especially love photographing here around sunset, when the lower sunlight can bring warmth and flattering light to the end of the session. One of my favorite compositions has the palm trees framing the image with the Lone Mountain building visible behind you.",
         "The surrounding greenery and architecture also give us room for a variety of classic graduation portraits.",
       ],
@@ -159,6 +123,7 @@ export const data: SchoolLandingData = {
         text: "Lone Mountain can get very windy. I strongly recommend bringing hair clips, hair ties, bobby pins, or other accessories to keep your hair in place, plus small clothing clips or safety pins to keep your gown and loose clothing from blowing around. A little preparation means fewer interruptions to fix hair or clothing.",
       },
       photoIdeas: [
+        "Standing or seated portraits on the stairs, using the leading lines",
         "Full-body graduation portraits with the palm trees",
         "Classic cap-and-gown photos",
         "Wide environmental photos of Lone Mountain",
@@ -167,8 +132,8 @@ export const data: SchoolLandingData = {
         "Celebratory graduation portraits",
         "Close-ups in softer sunset light",
       ],
-      campusTip: "Save it for the end of the session, around sunset. It can get very windy, so bring hair ties, clips, bobby pins, and small clothing clips for your gown.",
-      tip: "I recommend saving Lone Mountain for the end of your session, especially around sunset. It's one of my favorite places to use warm, natural light and finish the gallery with some of the strongest photos of the session.",
+      campusTip: "Save it for the end of the session, around sunset. The stairs on the way up give us leading lines first. It can get very windy, so bring hair ties, clips, bobby pins, and small clothing clips for your gown.",
+      tip: "I recommend saving Lone Mountain for the end of your session, especially around sunset. We start with the stairs for a few different compositions, then finish under the palm trees, where the warm, natural light gives us some of the strongest photos of the session.",
     },
   ],
   sessionNote:
@@ -179,7 +144,7 @@ export const data: SchoolLandingData = {
     "Bring the outfit you love; USF's stone architecture and the Lone Mountain greenery suit both classic and richer colors. Lone Mountain can be very windy, so pack hair ties, clips, and bobby pins, a few small clothing clips or safety pins for your gown, and comfortable walking shoes.",
   faqs: [
     { q: "Is there a travel fee for a USF session?", a: "No. USF is in San Francisco, where travel is included. Adding a second location like the Palace of Fine Arts is a separate add-on." },
-    { q: "What are the best photo spots at USF?", a: "St. Ignatius Church, Gleeson Library, the Los Lobos de Loyola wolf sculpture, the modern glass hallway when access is authorized, and the Lone Mountain stairs and palm trees. I like finishing at Lone Mountain around sunset." },
+    { q: "What are the best photo spots at USF?", a: "St. Ignatius Church, Gleeson Library with the Los Lobos de Loyola wolf sculpture right outside it, the modern glass hallway when access is authorized, and Lone Mountain, where the stairs lead up to the palm trees. I like finishing at Lone Mountain around sunset." },
     { q: "What if it's foggy or overcast on our session day?", a: "Overcast skies are often excellent at USF. The clouds soften the light, which gives us more flexibility with the time of day. Very heavy cloud can make it darker, so we'll watch the forecast together." },
     { q: "When does USF hold commencement?", a: "USF commencement is typically in late May, which is peak season, so early inquiries are recommended for spring dates." },
   ],

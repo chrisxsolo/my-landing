@@ -122,3 +122,30 @@ describe("campus spot sync: photos that stop being public", () => {
     expect(tables[AUTO]).toEqual([]);
   });
 });
+
+describe("campus spot sync: USF sections that left the page", () => {
+  // The Lone Mountain stairs became a composition inside the Lone Mountain
+  // card, so an automatic photo left on the old standalone section is released
+  // and the same photo, still in the pool, fills the consolidated card.
+  it("releases the stale stairs pick and re-fills the consolidated Lone Mountain card from it", async () => {
+    const usfSession = { ...SESSION, school_slug: "usf", primary_location: "Lone Mountain stairs" };
+    const tables: Record<string, Record<string, unknown>[]> = {
+      location_spots: [],
+      portfolio_images: [{ id: 7, title: "USF grad on the Lone Mountain stairs", alt: "USF grad on the Lone Mountain stairs",
+        image_url: url("pf-7"), category_slug: "grads", featured: false, sort_order: 1, width: 1000, height: 1500,
+        content_hash: "h-7", school: "usf", location: null, session_label: null, published: true }],
+      session_photos: [enginePhoto(7, { photography_sessions: usfSession })],
+      [AUTO]: [{ school_slug: "usf", spot_key: "lone-mountain-stairs", image_url: url("pf-7"), evidence: "text" }],
+    };
+    const report = await syncCampusSpotPhotos(fakeSupabase(tables, { rpc: claimRpc(tables) }).client, { apply: true });
+    expect(report.released).toEqual([{
+      row: { schoolSlug: "usf", spotKey: "lone-mountain-stairs", imageUrl: url("pf-7"), evidence: "text" },
+      reason: "the spot is no longer on the page",
+    }]);
+    expect(report.claimed.map((c) => [c.schoolSlug, c.spotKey, c.imageUrl])).toEqual([["usf", "lone-mountain-palm-walkway", url("pf-7")]]);
+    expect(tables[AUTO]).toEqual([{ school_slug: "usf", spot_key: "lone-mountain-palm-walkway", image_url: url("pf-7"), evidence: "session" }]);
+    expect(tables.portfolio_images).toHaveLength(1);
+    expect(tables.session_photos).toHaveLength(1);
+    expect(report.unmatched.map((u) => u.spot)).not.toContain("usf → Lone Mountain Stairs");
+  });
+});
