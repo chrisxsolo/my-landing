@@ -4,7 +4,10 @@
 // plain-English reason and the recommended action, then the buttons.
 // Photo items act through the tagging API (preview → apply → undo); finding
 // items call the existing admin endpoint their action names. Buttons are at
-// least 44px tall for touch.
+// least 44px tall for touch. A card that stands for an editable photo carries
+// a checkbox for batch editing; clicking the card away from its controls
+// toggles it too, and a selected card glows like a selected grid tile.
+import type { MouseEvent } from "react";
 import { T } from "@/app/admin/adminTheme";
 import { btn, chip } from "@/app/admin/content-engine/[id]/ui";
 import supabaseImageLoader from "@/lib/supabaseImageLoader";
@@ -16,6 +19,13 @@ import { valueLabel } from "./TagApplyPanel";
 export const TOUCH = { minHeight: 44, minWidth: 44, padding: "8px 14px", fontSize: 13 } as const;
 const THUMB = 72;
 const PUBLIC_STORAGE = "/storage/v1/object/public/";
+/** A click on any of these is the control's own, never a selection toggle. */
+const CONTROLS = "button, a, input, select, textarea, label, [role=\"dialog\"]";
+
+export interface RowSelection {
+  selected: boolean;
+  onToggle: (item: QueueItem) => void;
+}
 
 export interface RowHandlers {
   busy: boolean;
@@ -100,12 +110,32 @@ function FindingButtons({ item, h }: { item: QueueItem; h: RowHandlers }) {
   );
 }
 
-export default function ReviewQueueRow({ item, options, thumbs, h }: {
+function SelectBox({ item, selection }: { item: QueueItem; selection: RowSelection }) {
+  return (
+    <label style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 44, minHeight: 44, cursor: "pointer", flex: "0 0 auto" }}>
+      <input type="checkbox" checked={selection.selected} onChange={() => selection.onToggle(item)}
+        aria-label={`Select ${item.title} for batch editing`} style={{ width: 18, height: 18, accentColor: T.action, cursor: "pointer" }} />
+    </label>
+  );
+}
+
+export default function ReviewQueueRow({ item, options, thumbs, h, selection }: {
   item: QueueItem; options: TaggingOptions; thumbs: Record<string, string>; h: RowHandlers;
+  /** Present only for cards that can be batch-edited. */
+  selection?: RowSelection;
 }) {
   const photoItem = isPhotoItem(item);
+  const selected = selection?.selected === true;
+  const toggleFromCard = (e: MouseEvent<HTMLLIElement>) => {
+    if (!selection || (e.target as HTMLElement).closest(CONTROLS) || window.getSelection()?.toString()) return;
+    selection.onToggle(item);
+  };
   return (
-    <li style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: 10, borderRadius: 12, background: T.inset, border: `1px solid ${T.border}` }}>
+    <li data-selected={selected || undefined} onClick={toggleFromCard} style={{
+      display: "flex", gap: 10, alignItems: "flex-start", padding: 10, borderRadius: 12, cursor: selection ? "pointer" : undefined,
+      background: selected ? T.amberBg : T.inset, border: `1px solid ${selected ? T.action : T.border}`, boxShadow: selected ? T.glow : undefined,
+    }}>
+      {selection && <SelectBox item={item} selection={selection} />}
       <Thumb item={item} thumbs={thumbs} />
       <div style={{ flex: 1, minWidth: 0, display: "grid", gap: 6 }}>
         <div style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>

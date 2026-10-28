@@ -6,6 +6,9 @@
 // confirmation; Undo restores the previous values. Also applies
 // high-confidence suggestions and runs AI vision over the selection (a few
 // photos per request, resumable — already-analyzed photos are skipped).
+// The review queue mounts it for the cards selected there, sharing the
+// queue's apply state so the preview, result and Undo stay on screen after
+// the approved cards leave the queue.
 import { useState } from "react";
 import { T } from "@/app/admin/adminTheme";
 import { btn, card } from "@/app/admin/content-engine/[id]/ui";
@@ -13,13 +16,17 @@ import type { AuditedPhoto, TaggingOptions } from "@/lib/photoTagging/types";
 import TagApplyPanel from "./TagApplyPanel";
 import TagFields, { draftToChanges, EMPTY_DRAFT, type TagDraft } from "./TagFields";
 import { taggingApi } from "./taggingApi";
-import { useTagApply } from "./useTagApply";
+import { useTagApply, type TagApply } from "./useTagApply";
 
 interface Props {
   photos: readonly AuditedPhoto[];
   options: TaggingOptions;
   onChanged: () => Promise<void> | void;
   onClear: () => void;
+  /** Shared preview / toast / Undo state; its owner renders the TagApplyPanel. */
+  apply?: TagApply;
+  /** Offer "Review high-confidence suggestions" and "Ask AI" (default). Off when suggestions are approved card by card. */
+  suggestionTools?: boolean;
 }
 
 const MAX_AI_ROUNDS = 100;
@@ -29,10 +36,11 @@ function commonSchool(photos: readonly AuditedPhoto[]): string | null {
   return schools.size === 1 ? [...schools][0] : null;
 }
 
-export default function BulkTagBar({ photos, options, onChanged, onClear }: Props) {
+export default function BulkTagBar({ photos, options, onChanged, onClear, apply, suggestionTools = true }: Props) {
   const [draft, setDraft] = useState<TagDraft>(EMPTY_DRAFT);
   const [replace, setReplace] = useState(false);
-  const tagApply = useTagApply(onChanged);
+  const ownApply = useTagApply(onChanged);
+  const tagApply = apply ?? ownApply;
   const { busy, showToast } = tagApply;
   const keys = photos.map((p) => p.key);
   const anyPortfolio = photos.some((p) => p.source === "portfolio");
@@ -87,19 +95,19 @@ export default function BulkTagBar({ photos, options, onChanged, onClear }: Prop
         <button type="button" style={btn(true)} disabled={busy} onClick={review}>
           {busy ? "Checking…" : `Review changes for ${photos.length}`}
         </button>
-        {highCount > 0 && (
+        {suggestionTools && highCount > 0 && (
           <button type="button" style={btn(false)} disabled={busy} onClick={reviewHigh}>
             Review high-confidence suggestions ({highCount})
           </button>
         )}
-        {needAi > 0 && (
+        {suggestionTools && needAi > 0 && (
           <button type="button" style={btn(false)} disabled={busy} onClick={() => void askAi()}
             title="Only photos still missing a field that no record answers. Each photo is analyzed once.">
             {`Ask AI about ${needAi}`}
           </button>
         )}
       </div>
-      <TagApplyPanel apply={tagApply} options={options} titleOf={titleOf} />
+      {!apply && <TagApplyPanel apply={tagApply} options={options} titleOf={titleOf} />}
     </div>
   );
 }
