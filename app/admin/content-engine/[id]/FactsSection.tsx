@@ -37,6 +37,15 @@ const time = (v: unknown) => (typeof v === "string" ? v.slice(0, 5) : "");
 const list = (v: unknown) => (Array.isArray(v) ? (v as string[]).join(", ") : "");
 const pretty = (v: string) => v.replace(/_/g, " ");
 
+/** "Saved." plus what the session location did to the photos — a failed sync is never reported as a clean save. */
+function savedNotice(sync: { updated: number; failed: number; error: string | null } | undefined): { text: string; ok: boolean } {
+  if (sync && sync.failed > 0) {
+    return { text: `Saved, but ${sync.failed} photo location(s) could not be synced (${sync.error ?? "sync failed"}) — save again to retry.`, ok: false };
+  }
+  if (sync && sync.updated > 0) return { text: `Saved · ${sync.updated} photo location(s) now follow the session location.`, ok: true };
+  return { text: "Saved.", ok: true };
+}
+
 export default function FactsSection({ session, sessionId, onSaved, onRegisterFlush }: Props) {
   const [form, setForm] = useState({
     public_display_name: text(session.public_display_name),
@@ -74,7 +83,7 @@ export default function FactsSection({ session, sessionId, onSaved, onRegisterFl
     setSaving(true);
     setNotice(null);
     try {
-      await engineApi.patchFacts(sessionId, {
+      const saved = await engineApi.patchFacts(sessionId, {
         ...values,
         // a non-grad session never keeps a school (grad-only fact)
         school_slug: values.service_type === "grads" ? values.school_slug || null : null,
@@ -86,7 +95,7 @@ export default function FactsSection({ session, sessionId, onSaved, onRegisterFl
         secondary_locations: values.secondary_locations
           .split(",").map((s) => s.trim()).filter(Boolean),
       });
-      setNotice({ text: "Saved.", ok: true });
+      setNotice(savedNotice(saved.locationSync));
     } catch (err) {
       setNotice({ text: err instanceof Error ? err.message : "save failed", ok: false });
       throw err;

@@ -15,7 +15,9 @@ import { AUTO_CURATE_THRESHOLD, TOP_PICK_COUNT } from "@/lib/contentEngine/curat
 import { formatDuration } from "@/lib/contentEngine/jobProgress";
 import { btn, card, chip, sectionTitle } from "./ui";
 import AnalysisProgress from "./AnalysisProgress";
+import { filesFromEntry } from "./dropEntries";
 import { ALLOWED_MIME, uploadPhotos, type UploadProgress } from "./photoUpload";
+import SelectionBar from "./SelectionBar";
 import TagStatusBadge from "@/app/admin/photoTagging/TagStatusBadge";
 import { enginePhotoKey } from "@/lib/photoTagging/types";
 import PhotoTaggingPanel, { useSessionTagging } from "./PhotoTaggingPanel";
@@ -54,33 +56,6 @@ function uploadLabel(p: UploadProgress): string {
   return parts.join(" · ");
 }
 
-// readEntries() returns at most ~100 entries per call; drain until empty.
-function readAllEntries(reader: FileSystemDirectoryReader): Promise<FileSystemEntry[]> {
-  return new Promise((resolve, reject) => {
-    const all: FileSystemEntry[] = [];
-    const step = () =>
-      reader.readEntries((batch) => {
-        if (batch.length === 0) return resolve(all);
-        all.push(...batch);
-        step();
-      }, reject);
-    step();
-  });
-}
-
-async function filesFromEntry(entry: FileSystemEntry): Promise<File[]> {
-  if (entry.isFile) {
-    return new Promise((resolve, reject) =>
-      (entry as FileSystemFileEntry).file((file) => resolve([file]), reject),
-    );
-  }
-  if (entry.isDirectory) {
-    const children = await readAllEntries((entry as FileSystemDirectoryEntry).createReader());
-    return (await Promise.all(children.map(filesFromEntry))).flat();
-  }
-  return [];
-}
-
 export default function PhotosSection({ sessionId, photos, aiAllowed, onChanged, onPhotosMutated, factsKey }: Props) {
   const fileInput = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState<UploadProgress | null>(null);
@@ -96,6 +71,9 @@ export default function PhotosSection({ sessionId, photos, aiAllowed, onChanged,
   const [deleting, setDeleting] = useState(false);
   const tags = useSessionTagging(sessionId, factsKey);
   const [tagOpenId, setTagOpenId] = useState<string | null>(null);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const gridOrder = useMemo(() => photos.map((p) => p.id), [photos]);
+  const taggableSelected = useMemo(() => [...selected].filter((id) => tags.byPhotoId.has(id)).length, [selected, tags.byPhotoId]);
   // The grid's signed thumbnails, by audit key, so the tag editor can show a private photo.
   const tagThumbs = useMemo(() => Object.fromEntries(photos.flatMap((p) =>
     (p.thumbnailUrl ? [[enginePhotoKey(p.id), p.thumbnailUrl]] : []))), [photos]);
@@ -247,6 +225,7 @@ export default function PhotosSection({ sessionId, photos, aiAllowed, onChanged,
       const gone = new Set(result.deleted);
       onPhotosMutated((prev) => prev.filter((p) => !gone.has(p.id)));
       setSelected(new Set());
+      setBulkOpen(false);
       if (result.skippedPublished.length > 0) {
         setNotice(`${result.skippedPublished.length} photo(s) not deleted — already published (take down first)`);
       }
@@ -306,17 +285,11 @@ export default function PhotosSection({ sessionId, photos, aiAllowed, onChanged,
         onChange={(e) => void uploadFiles(Array.from(e.target.files ?? []))} />
 
       {photos.length > 0 && (selected.size > 0 ? (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 13, fontWeight: 700, color: T.ink }}>{selected.size} selected</span>
-          <button style={{ ...btn(false), padding: "3px 10px", fontSize: 12 }}
-            onClick={() => setSelected(new Set(photos.map((p) => p.id)))}>Select all</button>
-          <button style={{ ...btn(false), padding: "3px 10px", fontSize: 12 }}
-            onClick={() => setSelected(new Set())}>Clear</button>
-          <button style={{ ...btn(false, true), padding: "3px 10px", fontSize: 12 }} disabled={deleting}
-            onClick={() => void deleteSelected()}>
-            {deleting ? "Deleting…" : `Delete ${selected.size} photo(s)`}
-          </button>
-        </div>
+        <SelectionBar count={selected.size} taggable={taggableSelected} deleting={deleting}
+          onTag={() => setBulkOpen(true)}
+          onSelectAll={() => setSelected(new Set(photos.map((p) => p.id)))}
+          onClear={() => { setSelected(new Set()); setBulkOpen(false); }}
+          onDelete={() => void deleteSelected()} />
       ) : (
         <p style={{ fontSize: 12, color: T.inkFaint, margin: "10px 0 0" }}>
           Click a photo to select it (to tag or delete). Click its colored dot for its tags.
@@ -324,8 +297,9 @@ export default function PhotosSection({ sessionId, photos, aiAllowed, onChanged,
       ))}
 
       {photos.length > 0 && (
-        <PhotoTaggingPanel state={tags} selectedIds={selected} openId={tagOpenId} thumbs={tagThumbs}
-          onClose={() => setTagOpenId(null)} onClearSelection={() => setSelected(new Set())} />
+        <PhotoTaggingPanel state={tags} selectedIds={selected} gridOrder={gridOrder} openId={tagOpenId} thumbs={tagThumbs}
+          onClose={() => setTagOpenId(null)} onClearSelection={() => setSelected(new Set())}
+          bulkOpen={bulkOpen && selected.size > 0} onBulkClose={() => setBulkOpen(false)} />
       )}
 
       {photos.length === 0 ? (

@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/requireAdmin";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
 import { assembleSessionStates } from "@/lib/contentEngine/sessionState";
 import { updateSessionFacts } from "@/lib/contentEngine/createSession";
+import { NO_INHERITANCE_CHANGES, syncSessionLocationInheritanceSummary } from "@/lib/photoTagging/inheritLocationSync";
 import { syncSessionInBackground } from "@/lib/locationLibrary/autoSync";
 import { syncCampusSpotPhotosInBackground } from "@/lib/campusSpotFill/autoSync";
 import { isUuid } from "@/lib/contentEngine/uploadConfig";
@@ -69,16 +70,23 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: "invalid JSON body" }, { status: 400 });
   }
 
+  const admin = createSupabaseAdminClient();
+  const sessionId = id.toLowerCase();
   try {
-    const result = await updateSessionFacts({
-      client: createSupabaseAdminClient(), sessionId: id.toLowerCase(), facts: body,
-    });
+    const result = await updateSessionFacts({ client: admin, sessionId, facts: body });
+    // A session with exactly one location gives it to its photos; when the
+    // location facts change, only session-inherited photo locations follow.
+    // Awaited so the saved facts and the photo locations arrive together, and
+    // a sync failure is reported with the save instead of lost.
+    const locationSync = "primary_location" in body || "secondary_locations" in body
+      ? await syncSessionLocationInheritanceSummary(admin, sessionId, { reason: "session facts saved" })
+      : NO_INHERITANCE_CHANGES;
     // School / location / service decide which public pages show the photos.
     revalidatePublicContent();
     // The location fields decide which library places the session belongs to.
-    syncSessionInBackground(id.toLowerCase());
+    syncSessionInBackground(sessionId);
     syncCampusSpotPhotosInBackground();
-    return NextResponse.json(result);
+    return NextResponse.json({ ...result, locationSync });
   } catch (err) {
     const message = err instanceof Error ? err.message : "facts update failed";
     return NextResponse.json({ error: message }, { status: /invalid|must be/i.test(message) ? 422 : 500 });

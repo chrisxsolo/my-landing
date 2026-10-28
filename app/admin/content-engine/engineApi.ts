@@ -8,6 +8,7 @@ import type {
 import type { SchoolOption } from "@/lib/contentEngine/schools";
 import type { LiveJournalPhoto } from "@/lib/contentEngine/journalPhotoMembership";
 import type { PostImageInventory, ReplaceCoverResult } from "@/lib/blog/publishedImages";
+import type { InheritanceSyncSummary as LocationSyncSummary } from "@/lib/photoTagging/inheritLocationSync";
 
 export class EngineApiError extends Error {
   readonly status: number;
@@ -48,7 +49,7 @@ export const engineApi = {
       method: "POST", body: JSON.stringify(input),
     }),
   patchFacts: (sessionId: string, facts: Record<string, unknown>) =>
-    request<{ updated: boolean }>(`/api/admin/session-content/sessions/${sessionId}`, {
+    request<{ updated: boolean; locationSync: LocationSyncSummary }>(`/api/admin/session-content/sessions/${sessionId}`, {
       method: "PATCH", body: JSON.stringify(facts),
     }),
   // Reads the client's Gmail conversation live every time — the point of the
@@ -90,7 +91,7 @@ export const engineApi = {
     filename: string; mime: string; sizeBytes: number; contentHash?: string;
     gps?: { latitude: number; longitude: number } | null;
   }) =>
-    request<{ photo: { id: string } }>("/api/admin/session-content/photos/finalize", {
+    request<{ photo: { id: string }; locationSync: LocationSyncSummary }>("/api/admin/session-content/photos/finalize", {
       method: "POST",
       body: JSON.stringify({ sessionId, storagePath, ...declared }),
     }),

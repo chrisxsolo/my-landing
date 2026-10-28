@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { KNOWN_PLACES } from "@/lib/locations/places";
 import { assembleLibrary, type LoadedLibrary } from "@/lib/photoTagging/assemble";
-import { buildReviewQueue, EMPTY_QUEUE_FILTER, filterQueue, safeKeys, sortByNewest } from "@/lib/photoTagging/reviewQueue";
+import { buildReviewQueue, EMPTY_QUEUE_FILTER, filterQueue, QUEUE_LABELS, safeKeys, sortByNewest } from "@/lib/photoTagging/reviewQueue";
 import type { PhotoReview } from "@/lib/photoTagging/reviews";
 import type { TagSuggestion } from "@/lib/photoTagging/types";
 
@@ -46,7 +46,7 @@ describe("review queue", () => {
       ],
       engine: [engineRow(4, { primary_location: "Palace of Fine Arts", secondary_locations: ["Legion of Honor"] })],
     }));
-    expect(queue.map((i) => i.kind)).toEqual(["school", "location-conflict", "categorization", "categorization", "spot"]);
+    expect(queue.map((i) => i.kind)).toEqual(["school", "location-conflict", "location", "location", "spot"]);
     expect(queue[0]).toMatchObject({ key: "portfolio:3", field: "school" });
     const contested = queue.find((i) => i.kind === "location-conflict")!;
     expect(contested.options.map((o) => o.value).sort()).toEqual(["Legion of Honor", "Palace of Fine Arts"]);
@@ -74,11 +74,26 @@ describe("review queue", () => {
   it("describes each item: what is about, saved vs suggested, evidence, why and what to do", () => {
     const [item] = queueOf(library({ engine: [engineRow(8, { primary_location: "Crissy Field" })] }));
     expect(item).toMatchObject({
-      kind: "categorization", field: "location", sessionId: `11111111-1111-4111-8111-${String(8).padStart(12, "0")}`,
+      kind: "location", field: "location", sessionId: `11111111-1111-4111-8111-${String(8).padStart(12, "0")}`,
       sessionName: "Session 8", before: null, evidence: "session facts · high", url: null,
     });
     expect(item.explanation).toMatch(/No location is saved/);
     expect(item.recommended).toBe("Accept Crissy Field.");
+  });
+
+  it("labels a missing location as such, and a missing category as missing categorization", () => {
+    expect(QUEUE_LABELS.location).toBe("Missing location");
+    expect(QUEUE_LABELS.categorization).toBe("Missing categorization");
+    expect(QUEUE_LABELS["location-conflict"]).toBe("Location records disagree — pick one");
+    expect(QUEUE_LABELS.vision).toBe("AI-suggested location (low confidence)");
+    expect(QUEUE_LABELS.school).toBe("Graduation photo missing a university");
+    expect(QUEUE_LABELS.spot).toBe("Campus spot to confirm");
+    const queue = queueOf(library({
+      portfolio: [portfolioRow(20, { category_slug: "portfolio" }), portfolioRow(21, { category_slug: "couples" })],
+    }));
+    expect(queue.find((i) => i.key === "portfolio:20" && i.field === "category")).toMatchObject({ kind: "categorization" });
+    expect(queue.find((i) => i.key === "portfolio:21" && i.field === "location")).toMatchObject({ kind: "location" });
+    expect(filterQueue(queue, { ...EMPTY_QUEUE_FILTER, kind: "location" }).map((i) => i.key)).toEqual(["portfolio:20", "portfolio:21"]);
   });
 
   it("files a vision-only location as a low-confidence AI suggestion that is never safe", () => {

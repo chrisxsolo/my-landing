@@ -191,7 +191,8 @@ function portfolioDraft(row: Row, source: PortfolioSource, engine: EngineRow | n
       url: published ? source.url : null, category, school: school?.value ?? null,
       location: location?.value ?? null, spot: spot?.value ?? null,
       stored: { school: source.school, location: source.location, spot: storedSpot(spot) },
-      storedLocationSource: source.location ? "manual" : null },
+      storedLocationSource: source.location ? "manual" : null,
+      storedLocationEvidence: source.location ? "manual" : null },
     vision: { imageUrl: source.url, storagePath: null },
   };
 }
@@ -224,7 +225,8 @@ function engineDraft(engine: EngineRow, lib: LoadedLibrary): Draft {
     target: { key, source: "engine", portfolioId: null, enginePhotoId: engine.id, sessionId: s.sessionId, url: engine.url,
       category, school: school?.value ?? null, location: location?.value ?? null, spot: spot?.value ?? null,
       stored: { school: s.schoolSlug, location: s.photoLocation ?? null, spot: storedSpot(spot) },
-      storedLocationSource: s.photoLocation ? s.photoLocationSource ?? null : null },
+      storedLocationSource: s.photoLocation ? s.photoLocationSource ?? null : null,
+      storedLocationEvidence: s.photoLocation ? engine.locationEvidence ?? s.photoLocationSource ?? null : null },
     vision: { imageUrl: engine.url, storagePath: engine.storagePath },
   };
 }

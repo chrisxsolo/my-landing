@@ -17,11 +17,11 @@ import {
 
 export type QueueKind =
   | "excluded-live" | "school" | "grad-no-school" | "location-conflict" | "session-location"
-  | "proposed-place" | "categorization" | "vision" | "spot";
+  | "proposed-place" | "categorization" | "location" | "vision" | "spot";
 
 export const QUEUE_PRIORITY: Record<QueueKind, number> = {
   "excluded-live": 1, school: 2, "grad-no-school": 3, "location-conflict": 4, "session-location": 5,
-  "proposed-place": 6, categorization: 7, vision: 8, spot: 9,
+  "proposed-place": 6, categorization: 7, location: 8, vision: 9, spot: 10,
 };
 
 export const QUEUE_LABELS: Record<QueueKind, string> = {
@@ -32,6 +32,7 @@ export const QUEUE_LABELS: Record<QueueKind, string> = {
   "session-location": "Session location needs review",
   "proposed-place": "Proposed new place",
   categorization: "Missing categorization",
+  location: "Missing location",
   vision: "AI-suggested location (low confidence)",
   spot: "Campus spot to confirm",
 };
@@ -92,6 +93,7 @@ function kindOf(photo: AuditedPhoto, check: TagCheck, options: readonly TagSugge
   if (check.field === "spot") return options.length > 0 ? "spot" : null;
   if (check.field === "location" && isContested(options)) return "location-conflict";
   if (check.field === "location" && isVisionOnly(options)) return "vision";
+  if (check.field === "location") return "location";
   return "categorization";
 }
 

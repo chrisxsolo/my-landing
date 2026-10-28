@@ -24,9 +24,13 @@
 // session asking for different session-level values are a conflict: nothing
 // is written for them.
 //
-// A location the photographer set (stored source "manual") is never
-// overwritten by an automated plan (apply-high, a sync), Replace or not. Only
-// a person, through an explicit edit with Replace on, can change it.
+// A stored location a person stands behind — set by the photographer, matched
+// from the photo's own GPS, or accepted from any evidence but the session's
+// facts — is never overwritten by an automated plan (apply-high, a sync),
+// Replace or not. Only a person, through an explicit edit with Replace on, can
+// change it. A location inherited from the session's facts (evidence
+// "session") is the one value an automated step may update or clear, so the
+// session-location sync can follow the facts (lib/photoTagging/inheritLocation).
 import { isSchoolSlug } from "@/lib/contentEngine/taxonomy";
 import { isSchoolSpotKey } from "@/lib/schoolSpots";
 import type { LocationEvidence, PhotoSource, TagChanges, TagField } from "@/lib/photoTagging/types";
@@ -48,8 +52,10 @@ export interface PlanTarget {
   spot: string | null;
   /** What the column a write would change holds now, when it differs from the effective value. */
   stored?: Partial<Record<TagField, string | null>>;
-  /** Who set the stored location: "manual" blocks every automated overwrite. */
+  /** Who set the stored location (session_photos.photo_location_source). */
   storedLocationSource?: LocationSource | null;
+  /** What the stored location rests on; only "session" may be changed by an automated step. */
+  storedLocationEvidence?: LocationEvidence | null;
 }
 
 export interface PortfolioPatch { category?: string; school?: string | null; location?: string | null }
@@ -109,6 +115,7 @@ interface Ctx {
 
 const KEPT = "already set — turn on Replace to overwrite";
 const MANUAL_WINS = "set by the photographer — an automated step never overwrites it";
+const GPS_WINS = "matched from the photo's own GPS — an automated step never overwrites it";
 const blank = (v: string | null | undefined) => v === null || v === undefined || v.trim() === "";
 const clean = (v: string | null) => (v === null ? null : v.trim().slice(0, 200) || null);
 
@@ -175,8 +182,8 @@ function planLocation(ctx: Ctx, raw: string | null): void {
   const next = clean(raw);
   const d = decide(t.location, next, ctx.replace);
   if (d !== "write") return notWritten(ctx, "location", d);
-  if (ctx.automated && !blank(t.location) && t.storedLocationSource === "manual") {
-    return note(ctx, "location", "kept", { reason: MANUAL_WINS });
+  if (ctx.automated && !blank(t.location) && t.storedLocationEvidence !== "session") {
+    return note(ctx, "location", "kept", { reason: t.storedLocationSource === "gps" ? GPS_WINS : MANUAL_WINS });
   }
   if (t.source === "portfolio" && t.portfolioId !== null) {
     ctx.plan.portfolio.location = next;

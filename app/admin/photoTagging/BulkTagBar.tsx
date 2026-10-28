@@ -27,6 +27,8 @@ interface Props {
   apply?: TagApply;
   /** Offer "Review high-confidence suggestions" and "Ask AI" (default). Off when suggestions are approved card by card. */
   suggestionTools?: boolean;
+  /** When mounted in a dialog: close it, keeping the selection. */
+  onClose?: () => void;
 }
 
 const MAX_AI_ROUNDS = 100;
@@ -36,7 +38,7 @@ function commonSchool(photos: readonly AuditedPhoto[]): string | null {
   return schools.size === 1 ? [...schools][0] : null;
 }
 
-export default function BulkTagBar({ photos, options, onChanged, onClear, apply, suggestionTools = true }: Props) {
+export default function BulkTagBar({ photos, options, onChanged, onClear, apply, suggestionTools = true, onClose }: Props) {
   const [draft, setDraft] = useState<TagDraft>(EMPTY_DRAFT);
   const [replace, setReplace] = useState(false);
   const ownApply = useTagApply(onChanged);
@@ -77,7 +79,10 @@ export default function BulkTagBar({ photos, options, onChanged, onClear, apply,
     <div style={{ ...card, marginBottom: 0, display: "grid", gap: 10, border: `1px solid ${T.amberBorder}` }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
         <strong style={{ color: T.ink, fontSize: 14 }}>Tag {photos.length} selected photo(s)</strong>
-        <button type="button" style={btn(false)} onClick={onClear}>Clear selection</button>
+        <span style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button type="button" style={btn(false)} onClick={onClear}>Clear selection</button>
+          {onClose && <button type="button" style={btn(false)} onClick={onClose} title="Keep the selection and go back to the grid">Close</button>}
+        </span>
       </div>
       <TagFields draft={draft} setDraft={(d) => { setDraft(d); tagApply.cancel(); }} options={options} allowCategory={anyPortfolio}
         currentSchool={commonSchool(photos)} showSchool={grads} />

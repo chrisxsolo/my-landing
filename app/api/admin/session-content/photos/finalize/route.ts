@@ -7,6 +7,7 @@ import {
 } from "@/lib/contentEngine/finalizeUpload";
 import { isUuid } from "@/lib/contentEngine/uploadConfig";
 import { sanitizeGps } from "@/lib/contentEngine/exifGps";
+import { syncSessionLocationInheritanceSummary } from "@/lib/photoTagging/inheritLocationSync";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -69,7 +70,14 @@ export async function POST(req: NextRequest) {
         gps: sanitizeGps(body.gps),
       },
     });
-    return NextResponse.json({ photo: row });
+    // A session with exactly one location gives it to the new photo here, on
+    // the server, so a refresh or a closed tab never loses it. The row exists
+    // either way; a failed sync is reported with the upload (the browser
+    // shows it) and is repaired by the next Session facts save or Resync.
+    const locationSync = await syncSessionLocationInheritanceSummary(admin, normalizedSessionId, {
+      photoIds: [row.id], reason: "photo uploaded",
+    });
+    return NextResponse.json({ photo: row, locationSync });
   } catch (err) {
     if (err instanceof UploadFinalizationError) {
       const status = err.kind === "duplicate" ? 409 : 422;
