@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { service, resetDb, createTestSession, createPackage, createItem } from "./helpers";
+import { service, resetDb, createTestSession, createTestPhoto, createPackage, createItem } from "./helpers";
 import { applyAutosave, applyStatusAction } from "@/lib/contentEngine/itemTransitions";
 
 beforeAll(() => resetDb());
@@ -74,6 +74,64 @@ describe("applyAutosave (payload_revision optimistic concurrency, spec §7.4)", 
       .eq("id", item);
     const result = await applyAutosave({ client: service, itemId: item, payload: LINKS2, expectedRevision: 1 });
     expect(result.outcome).toBe("not_editable");
+  });
+});
+
+describe("journal cover autosave (chosen on a photo tile)", () => {
+  const journal = (ids: string[], cover: string) => ({
+    title: "UC Law", slug: "uc-law-cover", body: "Body.", meta_description: "", meta_keywords: "",
+    photo_ids: ids, cover_photo_id: cover, internal_links: [], testimonial_id: null,
+  });
+
+  it("the chosen cover is what the row holds after a reload, and the editor's one-step add+cover is accepted", async () => {
+    const sessionId = await createTestSession();
+    const a = await createTestPhoto(sessionId);
+    const b = await createTestPhoto(sessionId);
+    const c = await createTestPhoto(sessionId);
+    const pkg = await createPackage(sessionId);
+    const item = await createItem(pkg, "journal_post", journal([a.id, b.id], a.id), "draft");
+
+    // cover control on an included photo: only cover_photo_id changes
+    const first = await applyAutosave({ client: service, itemId: item, payload: journal([a.id, b.id], b.id), expectedRevision: 1 });
+    expect(first.outcome).toBe("saved");
+    // cover control on a photo that was not included: added and made cover in one save
+    const second = await applyAutosave({ client: service, itemId: item, payload: journal([a.id, b.id, c.id], c.id), expectedRevision: 2 });
+    expect(second.outcome).toBe("saved");
+
+    const { data: row } = await service.from("session_content_items")
+      .select("payload,payload_revision").eq("id", item).single();
+    expect(row!.payload_revision).toBe(3);
+    expect(row!.payload.cover_photo_id).toBe(c.id);
+    expect(row!.payload.photo_ids).toEqual([a.id, b.id, c.id]);
+  });
+
+  it("a cover outside photo_ids is refused, so the tiles can never save a split state", async () => {
+    const sessionId = await createTestSession();
+    const a = await createTestPhoto(sessionId);
+    const b = await createTestPhoto(sessionId);
+    const pkg = await createPackage(sessionId);
+    const item = await createItem(pkg, "journal_post", journal([a.id], a.id), "draft");
+    const result = await applyAutosave({ client: service, itemId: item, payload: journal([a.id], b.id), expectedRevision: 1 });
+    expect(result.outcome).toBe("invalid");
+    const { data: row } = await service.from("session_content_items").select("payload").eq("id", item).single();
+    expect(row!.payload.cover_photo_id).toBe(a.id);
+  });
+
+  it("choosing a new cover on an approved journal sends it back to draft", async () => {
+    const sessionId = await createTestSession();
+    const a = await createTestPhoto(sessionId);
+    const b = await createTestPhoto(sessionId);
+    const pkg = await createPackage(sessionId);
+    const item = await createItem(pkg, "journal_post", journal([a.id, b.id], a.id), "approved");
+    const result = await applyAutosave({ client: service, itemId: item, payload: journal([a.id, b.id], b.id), expectedRevision: 1 });
+    expect(result.outcome).toBe("saved");
+    if (result.outcome !== "saved") throw new Error("unreachable");
+    expect(result.statusReset).toBe(true);
+    const { data: row } = await service.from("session_content_items")
+      .select("status,approved_at,payload").eq("id", item).single();
+    expect(row!.status).toBe("draft");
+    expect(row!.approved_at).toBeNull();
+    expect(row!.payload.cover_photo_id).toBe(b.id);
   });
 });
 

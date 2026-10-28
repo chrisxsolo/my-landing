@@ -1,13 +1,19 @@
 "use client";
-// Journal editor (spec §7.4): title/slug/body/meta, photo picker (cover +
-// extras from analyzed photos), and the structured internal-links list
+// Journal editor (spec §7.4): title/slug/body/meta, photo picker (include /
+// remove and choose the cover directly on each photo; the membership rules
+// live in lib/contentEngine/journalCoverSelection), and the structured internal-links list
 // (payload.internal_links — the pages the body may link; links are written
 // inside the body's paragraphs, nothing is appended at publish).
+import { useState } from "react";
 import { T } from "@/app/admin/adminTheme";
 import { internalLinksForService, isServiceType } from "@/lib/contentEngine/taxonomy";
 import { serviceConfigFor } from "@/lib/contentEngine/serviceConfig";
+import {
+  chooseCover, refusalMessage, toggleInclusion, type SelectionResult,
+} from "@/lib/contentEngine/journalCoverSelection";
 import { PhotoThumb, type EditorProps } from "./editorsSimple";
 import { PendingGuideLinksNote } from "./editorsLocationGuide";
+import { JournalPhotoTile, MissingPhotoTile, photoDisplayName } from "./journalPhotoTile";
 import { input, label } from "./ui";
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
@@ -28,15 +34,25 @@ export function JournalEditor(props: EditorProps) {
   const linkCandidates = internalLinksForService(service);
   const keywordsPlaceholder = serviceConfigFor(service).keywordsPlaceholder;
 
-  const togglePhoto = (id: string) => {
-    const next = photoIds.includes(id) ? photoIds.filter((p) => p !== id) : [...photoIds, id];
-    const cover = str(payload.cover_photo_id);
-    onEdit({
-      ...payload,
-      photo_ids: next,
-      cover_photo_id: next.includes(cover) ? cover : (next[0] ?? ""),
-    });
+  const coverId = str(payload.cover_photo_id);
+  const existing = new Set(photos.map((p) => p.id));
+  const selection = { photo_ids: photoIds, cover_photo_id: coverId };
+  // Only a notice lives here; the photo list and cover are read from the
+  // payload so the tiles, the preview and the dropdown can never disagree.
+  const [notice, setNotice] = useState<string | null>(null);
+  const nameOf = (id: string) => {
+    const p = photos.find((x) => x.id === id);
+    return p ? photoDisplayName(p) : id.slice(0, 8);
   };
+  // One onEdit per click: photo_ids and cover_photo_id change together, so
+  // the autosaved payload always satisfies "photo_ids contains cover_photo_id".
+  const applySelection = (result: SelectionResult, id: string) => {
+    if (!result.ok) { setNotice(refusalMessage(result.reason, nameOf(id))); return; }
+    setNotice(null);
+    onEdit({ ...payload, ...result.selection });
+  };
+  const togglePhoto = (id: string) => applySelection(toggleInclusion(selection, id, existing), id);
+  const makeCover = (id: string) => applySelection(chooseCover(selection, id, existing), id);
 
   return (
     <div style={{ display: "grid", gap: 8 }}>
@@ -74,64 +90,33 @@ export function JournalEditor(props: EditorProps) {
       </div>
 
       <div>
-        <span style={label}>Photos (click to toggle; ◉ = cover, set below)</span>
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          {candidates.map((p) => {
-            const selected = photoIds.includes(p.id);
-            const isCover = str(payload.cover_photo_id) === p.id;
-            return (
-              <button key={p.id} disabled={disabled} onClick={() => togglePhoto(p.id)}
-                title={p.original_filename ?? p.id.slice(0, 8)}
-                style={{
-                  position: "relative", padding: 0, width: 84, height: 84,
-                  border: `2px solid ${selected ? T.green : T.border}`, borderRadius: 8,
-                  overflow: "hidden", cursor: disabled ? "default" : "pointer",
-                  background: T.inset, opacity: selected ? 1 : 0.45,
-                }}>
-                {p.thumbnailUrl && (
-                  // eslint-disable-next-line @next/next/no-img-element -- short-lived signed URL, next/image can't optimize it
-                  <img src={p.thumbnailUrl} alt={p.alt_text ?? p.original_filename ?? "session photo"}
-                    style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                )}
-                {selected && p.excluded && (
-                  <span style={{
-                    position: "absolute", bottom: 3, left: 3, right: 3, padding: "0 4px",
-                    borderRadius: 6, fontSize: 10, lineHeight: "15px", textAlign: "center",
-                    background: T.scrim, color: T.amber,
-                  }}>excluded in library</span>
-                )}
-                {(selected || isCover) && (
-                  <span style={{
-                    position: "absolute", top: 3, left: 3, padding: "0 5px",
-                    borderRadius: 6, fontSize: 11, lineHeight: "16px",
-                    background: "rgba(0,0,0,0.65)", color: "#fff",
-                  }}>
-                    {isCover ? "◉ cover" : "✓"}
-                  </span>
-                )}
-              </button>
-            );
-          })}
+        <span style={label}>Journal photos</span>
+        <p style={{ margin: "0 0 6px", fontSize: 12, color: T.inkSoft }}>
+          Click a photo to include it in the journal or take it out. Use <strong>Make cover</strong> under
+          any photo to choose the cover directly; it is included automatically.
+        </p>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {candidates.map((p) => (
+            <JournalPhotoTile key={p.id} photo={p} disabled={disabled}
+              selected={photoIds.includes(p.id)} isCover={coverId === p.id}
+              onToggle={() => togglePhoto(p.id)} onMakeCover={() => makeCover(p.id)} />
+          ))}
           {missingIds.map((id) => (
-            <button key={id} disabled={disabled} onClick={() => togglePhoto(id)}
-              title={`Selected photo ${id.slice(0, 8)} no longer exists — click to remove`}
-              style={{
-                width: 84, height: 84, borderRadius: 8, border: `2px dashed ${T.amberBorder}`,
-                background: T.amberBg, color: T.amber, fontSize: 11, cursor: disabled ? "default" : "pointer",
-              }}>
-              missing ✕
-            </button>
+            <MissingPhotoTile key={id} id={id} disabled={disabled} onRemove={() => togglePhoto(id)} />
           ))}
         </div>
-        <span style={label}>Cover photo</span>
-        <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-          <PhotoThumb photo={photos.find((x) => x.id === str(payload.cover_photo_id))} size={56} />
-          <select style={input} disabled={disabled} value={str(payload.cover_photo_id)}
-            onChange={(e) => onEdit({ ...payload, cover_photo_id: e.target.value })}>
-            {photoIds.map((id) => {
-              const p = photos.find((x) => x.id === id);
-              return <option key={id} value={id}>{p?.original_filename ?? id.slice(0, 8)}</option>;
-            })}
+        <p role="status" aria-live="polite" style={{ margin: notice ? "6px 0 0" : 0, fontSize: 12, color: T.amber }}>
+          {notice}
+        </p>
+        <span style={{ ...label, marginTop: 8 }}>Cover photo</span>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <PhotoThumb photo={photos.find((x) => x.id === coverId)} size={56} />
+          <select style={input} disabled={disabled} value={coverId} aria-label="Journal cover (choose by filename)"
+            onChange={(e) => makeCover(e.target.value)}>
+            {!existing.has(coverId) && <option value={coverId}>{coverId ? "missing photo" : "no cover yet"}</option>}
+            {photoIds.filter((id) => existing.has(id)).map((id) => (
+              <option key={id} value={id}>{nameOf(id)}</option>
+            ))}
           </select>
         </div>
       </div>

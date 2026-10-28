@@ -63,4 +63,31 @@ describe("journal publisher mapping (spec §9.3)", () => {
     expect(published!.published_target_id).toBe(String(post.id));
     void result;
   });
+
+  it("a cover chosen from the middle of the gallery is the hero and is not repeated in the gallery", async () => {
+    const sessionId = await createTestSession();
+    const first = await createTestPhoto(sessionId, { alt: "first" });
+    const chosen = await createTestPhoto(sessionId, { alt: "chosen on its tile" });
+    const third = await createTestPhoto(sessionId, { alt: "third" });
+    const pkg = await createPackage(sessionId);
+    const slug = `sjsu-chosen-cover-${Date.now()}`;
+    // The editor keeps the gallery order and only moves cover_photo_id.
+    const item = await createItem(pkg, "journal_post", {
+      title: "Chosen cover", slug, body: "Body.", meta_description: "", meta_keywords: "",
+      photo_ids: [first.id, chosen.id, third.id], cover_photo_id: chosen.id,
+      internal_links: [], testimonial_id: null,
+    });
+
+    const { error } = await publish(item);
+    expect(error).toBeNull();
+
+    const { data: post } = await service.from("blog_posts")
+      .select("cover_image_url,cover_image_alt,og_image_url,extra_image_urls,extra_image_alts").eq("slug", slug).single();
+    expect(post!.cover_image_url).toBe(chosen.public_derivative_url);
+    expect(post!.cover_image_alt).toBe("chosen on its tile");
+    expect(post!.og_image_url).toBe(chosen.public_derivative_url);
+    expect(post!.extra_image_urls).toEqual([first.public_derivative_url, third.public_derivative_url]);
+    expect(post!.extra_image_alts).toEqual(["first", "third"]);
+    expect(post!.extra_image_urls).not.toContain(chosen.public_derivative_url);
+  });
 });
