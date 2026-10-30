@@ -53,14 +53,22 @@ function extractBestText(part: MimePart): string {
   return plain || stripHtml(html);
 }
 
-/** The client's thread, oldest first, as one labelled transcript. Empty when Gmail is unavailable. */
-export async function fetchEmailContext(email: string): Promise<string> {
+export type EmailContext =
+  | { status: "read"; context: string }
+  | { status: "none"; context: "" }
+  | { status: "unavailable"; context: "" };
+
+/** The client's thread, oldest first, as one labelled transcript, or why there is none. */
+export async function fetchEmailContext(email: string): Promise<EmailContext> {
   const tokens = await getValidTokens();
-  if (!tokens) return "";
+  if (!tokens) return { status: "unavailable", context: "" };
   const headers = { Authorization: `Bearer ${tokens.access_token}` };
   const query = encodeURIComponent(`from:${email} OR to:${email}`);
   const searchRes = await fetch(`${GMAIL_API}/messages?q=${query}&maxResults=20`, { headers });
-  if (!searchRes.ok) return "";
+  if (!searchRes.ok) {
+    console.error("Extension session facts: Gmail search failed", searchRes.status);
+    return { status: "unavailable", context: "" };
+  }
   const searchData = await searchRes.json() as { messages?: { id: string }[] };
   const ids = (searchData.messages ?? []).map(m => m.id).slice(0, MAX_THREAD_MESSAGES);
   const bodies = await Promise.all(ids.map(async id => {
@@ -73,10 +81,12 @@ export async function fetchEmailContext(email: string): Promise<string> {
     } catch { return null; }
   }));
   const sorted = bodies.filter((b): b is { ts: number; text: string } => b != null).sort((a, b) => a.ts - b.ts);
-  return sorted.map((b, i) => {
+  if (!sorted.length) return { status: "none", context: "" };
+  const context = sorted.map((b, i) => {
     const sent = b.ts ? new Date(b.ts).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" }) : "unknown date";
     return `--- Email ${i + 1} of ${sorted.length} (sent ${sent}) ---\n${b.text}`;
   }).join("\n\n");
+  return { status: "read", context };
 }
 
 export interface FactsInquiry {
@@ -141,6 +151,7 @@ export function normalizeExtractedFacts(raw: unknown): SessionFacts {
     includes_travel: typeof r.includes_travel === "boolean" ? r.includes_travel : null,
     confidence,
     source: "email",
+    email_status: "read",
   };
 }
 
@@ -150,7 +161,7 @@ export function hasUsefulFacts(facts: SessionFacts): boolean {
 }
 
 /** What the inquiry form alone says, when the thread settles nothing. */
-export function factsFromInquiry(inq: FactsInquiry): SessionFacts {
+export function factsFromInquiry(inq: FactsInquiry, emailStatus: SessionFacts["email_status"] = "none"): SessionFacts {
   const iso = parseLooseDate(inq.date_in_mind);
   return {
     ...NO_FACTS,
@@ -158,6 +169,7 @@ export function factsFromInquiry(inq: FactsInquiry): SessionFacts {
     readable: iso ? formatReadable(iso) : inq.date_in_mind,
     session_type: inq.session_type ?? null,
     source: inq.date_in_mind ? "inquiry" : "none",
+    email_status: emailStatus,
   };
 }
 
@@ -182,10 +194,10 @@ async function askModel(inq: FactsInquiry, emailContext: string): Promise<Sessio
 
 /** The thread's facts when Gmail and the model produce any, else the inquiry form's. */
 export async function sessionFactsForInquiry(inq: FactsInquiry): Promise<SessionFacts> {
-  const emailContext = await fetchEmailContext(inq.email);
-  if (emailContext) {
-    const facts = await askModel(inq, emailContext);
+  const thread = await fetchEmailContext(inq.email);
+  if (thread.status === "read") {
+    const facts = await askModel(inq, thread.context);
     if (facts) return facts;
   }
-  return factsFromInquiry(inq);
+  return factsFromInquiry(inq, thread.status);
 }

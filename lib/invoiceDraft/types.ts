@@ -105,11 +105,14 @@ export interface SessionFacts {
   includes_travel: boolean | null;
   confidence: "high" | "medium" | "low";
   source: "email" | "inquiry" | "none";
+  /** Whether the Gmail thread was read: "unavailable" means Gmail is not connected. */
+  email_status: "read" | "none" | "unavailable";
 }
 
 export const NO_FACTS: SessionFacts = {
   date: null, readable: null, time: null, location: null, session_type: null,
   total_fee: null, total_kind: null, includes_travel: null, confidence: "low", source: "none",
+  email_status: "none",
 };
 
 export const invoiceDraftRequestSchema = z.object({

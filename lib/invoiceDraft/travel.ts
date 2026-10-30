@@ -47,13 +47,34 @@ function fromEmail(place: string): InvoiceLocation {
   return { location: place, locationSource: "email", travel: toInvoiceTravel(resolution) };
 }
 
+/** Longest a stored location can be and still be a place name rather than a note. */
+const MAX_PLACE_NAME_CHARS = 60;
+const MAX_PLACE_NAME_WORDS = 8;
+
+/**
+ * Whether the inquiry's location field holds a place name. One inquiry held
+ * "Still thinking of a spot but don't want it to be basic SJSU campus…", which
+ * names SJSU only to rule it out; a note like that is shown for review, never
+ * priced.
+ */
+export function isPlaceName(text: string): boolean {
+  const trimmed = text.trim();
+  return trimmed.length > 0
+    && trimmed.length <= MAX_PLACE_NAME_CHARS
+    && trimmed.split(/\s+/).length <= MAX_PLACE_NAME_WORDS
+    && namesAPlace(trimmed);
+}
+
 export function resolveInvoiceLocation(input: LocationInput): InvoiceLocation {
   const emailPlace = (input.emailLocation ?? "").trim();
   if (emailPlace) return fromEmail(emailPlace);
 
   const graduation = schoolImpliesLocationFor(input.serviceKey);
   const school = (input.school ?? "").trim() || null;
-  const stored = (input.location ?? "").trim();
+  const storedText = (input.location ?? "").trim();
+  // The stored field counts as a location only when it is a place name; a
+  // free-text note is left to the reviewer (see isPlaceName).
+  const stored = isPlaceName(storedText) ? storedText : "";
   const resolution = resolveTravel({
     school,
     location: stored,
@@ -62,9 +83,7 @@ export function resolveInvoiceLocation(input: LocationInput): InvoiceLocation {
   });
   const travel = toInvoiceTravel(resolution);
 
-  // The stored field counts as a location only when it names a place; the
-  // resolver ignores it otherwise (one inquiry carried a date in it).
-  if (stored && namesAPlace(stored)) return { location: stored, locationSource: "inquiry", travel };
+  if (stored) return { location: stored, locationSource: "inquiry", travel };
   if (graduation && school) return { location: school, locationSource: "school", travel };
   if (travel.kind === "unknown") return { location: travel.place, locationSource: "unknown", travel };
   return { location: null, locationSource: "unknown", travel };

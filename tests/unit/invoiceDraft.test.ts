@@ -94,6 +94,23 @@ describe("travel precedence", () => {
     expect(draft.status).toBe("review");
   });
 
+  it("treats a free-text location note as a review item, not a place (live inquiry 126)", () => {
+    const note = "Still thinking of a spot but don’t want it to be basic SJSU campus and more federal building / justice studies related / federal law enforcement";
+    const draft = buildInvoiceDraft({ ...anthony, location: note }, NO_FACTS);
+    expect(draft.status).toBe("review");
+    expect(draft.reviewReasons.join(" ")).toMatch(/location field is a note, not a place/);
+    expect(draft.session.locationSource).toBe("school");
+    expect(draft.pricing.travel.place).not.toBe(note);
+  });
+
+  it("still lets a confirmed email location win over a free-text note", () => {
+    const note = "Still thinking of a spot but don’t want it to be basic SJSU campus";
+    const draft = buildInvoiceDraft({ ...anthony, location: note }, email({ location: "City Hall, San Francisco" }));
+    expect(draft.status).toBe("ready");
+    expect(draft.pricing.totalCents).toBe(60000);
+    expect(draft.pricing.travel.kind).toBe("included");
+  });
+
   it("charges no campus fee on a couples session that lists a school", () => {
     const draft = buildInvoiceDraft({ ...anthony, session_type: "Couples Session", message: "", people: "2" }, NO_FACTS);
     expect(draft.session.itemName).toBe("Couples Session");
@@ -136,10 +153,42 @@ describe("agreed totals from the thread", () => {
     expect(draft.pricing).toMatchObject({ baseCents: 57500, travel: { kind: "verified", amountCents: 7500 }, totalCents: 65000 });
   });
 
+  it("resolves Anthony's earlier $675 campus quote to $600 once City Hall is confirmed, with a note", () => {
+    for (const total_kind of ["agreed_total", "quote", "unclear"] as const) {
+      const draft = buildInvoiceDraft(anthony, email({ location: "City Hall, San Francisco", total_fee: 675, total_kind, includes_travel: true }));
+      expect(draft.status, total_kind).toBe("ready");
+      expect(draft.pricing.totalCents, total_kind).toBe(60000);
+      expect(draft.pricing.agreedTotalCents, total_kind).toBeNull();
+      expect(draft.pricing.travel.kind, total_kind).toBe("included");
+      expect(draft.warnings.join(" "), total_kind).toMatch(/\$675 quote included a \$75 campus travel fee/);
+    }
+  });
+
+  it("never takes a travel-inclusive total as-is for a shoot with no travel fee", () => {
+    const draft = buildInvoiceDraft(anthony, email({ location: "San Francisco City Hall", total_fee: 700, total_kind: "agreed_total", includes_travel: true }));
+    expect(draft.status).toBe("review");
+    expect(draft.pricing.totalCents).toBeNull();
+  });
+
   it("does not accept a negotiated total at an unpriced location", () => {
     const draft = buildInvoiceDraft(anthony, email({ location: "Point Reyes", total_fee: 700, total_kind: "agreed_total", includes_travel: true }));
     expect(draft.status).toBe("review");
     expect(draft.pricing.totalCents).toBeNull();
+  });
+});
+
+describe("when the thread cannot be read", () => {
+  it("asks for review instead of pricing from the school when Gmail is not connected", () => {
+    const draft = buildInvoiceDraft(anthony, { ...NO_FACTS, email_status: "unavailable" });
+    expect(draft.status).toBe("review");
+    expect(draft.reviewReasons.join(" ")).toMatch(/Gmail is not connected/);
+    expect(draft.pricing.travel.kind).toBe("verified");
+    expect(draft.pricing.totalCents).toBe(67500);
+  });
+
+  it("stays ready when Gmail is connected but the client has no thread yet", () => {
+    const draft = buildInvoiceDraft(anthony, { ...NO_FACTS, email_status: "none" });
+    expect(draft.status).toBe("ready");
   });
 });
 
@@ -210,6 +259,10 @@ describe("email extraction", () => {
 
   it("drops an empty result", () => {
     expect(hasUsefulFacts(normalizeExtractedFacts({ date: null, confidence: "low" }))).toBe(false);
+  });
+
+  it("marks model facts as read from email", () => {
+    expect(normalizeExtractedFacts({ location: "SJSU" }).email_status).toBe("read");
   });
 
   it("coerces and bounds every field", () => {
