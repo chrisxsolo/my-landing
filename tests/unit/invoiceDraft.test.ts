@@ -5,7 +5,7 @@
 import { describe, expect, it } from "vitest";
 import { buildInvoiceDraft, validateInvoiceDraft } from "@/lib/invoiceDraft/build";
 import { NO_FACTS, type InvoiceInquiry, type SessionFacts } from "@/lib/invoiceDraft/types";
-import { hasUsefulFacts, normalizeExtractedFacts } from "@/lib/extension/sessionFacts";
+import { extractJson, hasUsefulFacts, normalizeExtractedFacts } from "@/lib/extension/sessionFacts";
 
 const anthony: InvoiceInquiry = {
   id: 412, name: "Anthony Trujillo", email: "anthony@example.com",
@@ -259,6 +259,13 @@ describe("email extraction", () => {
 
   it("drops an empty result", () => {
     expect(hasUsefulFacts(normalizeExtractedFacts({ date: null, confidence: "low" }))).toBe(false);
+  });
+
+  it("reads the JSON object even when the model adds prose or a code fence around it (live failure)", () => {
+    const reply = '{"date":"2026-12-05","location":"San Francisco City Hall","note":"a \\"quoted\\" }brace"}\n\nThe client confirmed City Hall in the latest email.';
+    expect(JSON.parse(extractJson(reply))).toMatchObject({ location: "San Francisco City Hall" });
+    expect(JSON.parse(extractJson("```json\n{\"time\":\"6:00 PM\"}\n```\nDone."))).toEqual({ time: "6:00 PM" });
+    expect(JSON.parse(extractJson('Sure! {"location":null,"confidence":"low"}'))).toEqual({ location: null, confidence: "low" });
   });
 
   it("marks model facts as read from email", () => {

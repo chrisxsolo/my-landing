@@ -122,8 +122,29 @@ Respond ONLY with valid JSON:
 Use null for any field not found.`;
 }
 
-function extractJson(raw: string): string {
-  return raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+/**
+ * The first complete JSON object in the model's reply. Haiku sometimes adds
+ * a sentence after the object (or wraps it in a code fence); either used to
+ * make JSON.parse throw and the thread's facts were silently dropped.
+ */
+export function extractJson(raw: string): string {
+  const text = raw.replace(/```(?:json)?/gi, "").trim();
+  const start = text.indexOf("{");
+  if (start < 0) return text;
+  let depth = 0;
+  let inString = false;
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+    if (inString) {
+      if (ch === "\\") i++;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') inString = true;
+    else if (ch === "{") depth++;
+    else if (ch === "}" && --depth === 0) return text.slice(start, i + 1);
+  }
+  return text.slice(start);
 }
 
 const shortText = (v: unknown, max: number): string | null => {
