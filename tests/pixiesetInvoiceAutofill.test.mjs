@@ -299,6 +299,21 @@ test("the list shows no browser-calculated travel total before the server has pr
   assert.equal(describe({ status: "review", totalCents: null }), "Pricing needs review");
 });
 
+test("the inquiry GET omits Content-Type so its CORS preflight remains valid", async () => {
+  const fixture = loadExtension(buildInvoicePage());
+  let request = null;
+  fixture.context.fetch = async (url, options) => {
+    request = { url, options };
+    return { ok: true, json: async () => [] };
+  };
+
+  await vm.runInContext('apiFetch("/api/extension/inquiries")', fixture.context);
+
+  assert.equal(request.url, "https://www.soloxsnaps.com/api/extension/inquiries");
+  assert.equal(request.options.headers["content-type"], undefined);
+  assert.equal(typeof request.options.headers["x-extension-secret"], "string");
+});
+
 test("the manifest loads every invoice module and was bumped", () => {
   const scripts = manifest.content_scripts[0].js;
   for (const file of ["invoiceSelection.js", "invoicePreview.js", "invoiceFill.js", "domHelpers.js", "content.js"]) {

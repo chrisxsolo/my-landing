@@ -68,7 +68,11 @@ async function openPanelFlow() {
 async function apiFetch(path, options = {}) {
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
-    headers: { "x-extension-secret": API_SECRET, "content-type": "application/json", ...(options.headers || {}) },
+    headers: {
+      "x-extension-secret": API_SECRET,
+      ...(options.body != null ? { "content-type": "application/json" } : {}),
+      ...(options.headers || {}),
+    },
   });
   const body = await res.json().catch(() => null);
   if (!res.ok) throw new Error(body?.error ? `${body.error} (HTTP ${res.status})` : `HTTP ${res.status}`);
