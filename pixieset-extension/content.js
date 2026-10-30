@@ -1,168 +1,13 @@
 // SoloXSnaps → PixiSet Autofill content script
 // Injects a floating panel on studio.pixieset.com pages.
-// Fetches recent inquiries from Supabase and fills in invoice/contract fields.
+// Fetches recent inquiries from SoloXSnaps and fills in invoice/contract fields.
+//
+// Invoices are priced by /api/extension/invoice-draft (the site's own pricing
+// catalog and travel resolver); the browser only shows that draft for review
+// and writes it into Pixieset. Contract previews still use extensionPricing.js.
 
 const API_BASE   = "https://www.soloxsnaps.com";
 const API_SECRET = "898b46208d6a8e27b1f65f052f7a4d82a47dc9294eed1a7d037b0d8c3abc7032";
-
-// ── SCHOOL NAME EXPANSION ─────────────────────────────────────────────────────
-const SCHOOL_FULL_NAMES = {
-  "uc-berkeley":  "UC Berkeley",
-  "sjsu":         "San Jose State University",
-  "sf-state":     "San Francisco State University",
-  "usf":          "University of San Francisco",
-  "csueb":        "California State University, East Bay",
-  "santa-clara":  "Santa Clara University",
-  "stanford":     "Stanford University",
-};
-
-function detectSchoolKey(schoolText = "") {
-  const s = schoolText.toLowerCase();
-  if (s.includes("berkeley"))                          return "uc-berkeley";
-  if (s.includes("san jose") || s.includes("sjsu"))   return "sjsu";
-  if (s.includes("sf state") || s.includes("san francisco state")) return "sf-state";
-  if (s.includes("usf") || s.includes("university of san francisco")) return "usf";
-  if (s.includes("east bay") || s.includes("csueb"))  return "csueb";
-  if (s.includes("santa clara"))                       return "santa-clara";
-  if (s.includes("stanford") || s.includes("palo alto")) return "stanford";
-  return null;
-}
-
-function expandSchoolName(schoolText = "") {
-  const key = detectSchoolKey(schoolText);
-  return key ? SCHOOL_FULL_NAMES[key] ?? schoolText : schoolText;
-}
-
-// ── DATE FORMATTING ──────────────────────────────────────────────────────────
-const MONTH_NAMES = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
-];
-
-function ordinal(n) {
-  const s = ["th", "st", "nd", "rd"];
-  const v = n % 100;
-  return `${n}${s[(v - 20) % 10] || s[v] || s[0]}`;
-}
-
-// "July 24th" / "7/24" / "2026-07-24" → "July 24th, 2026".
-// Missing year resolves to the next occurrence of that month+day.
-// Returns null when the text isn't a parseable date (e.g. "sometime this week").
-function formatSessionDate(raw) {
-  if (!raw) return null;
-  const text = String(raw).trim();
-  let year = null, month = null, day = null;
-
-  const iso   = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(text);
-  const slash = /^(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/.exec(text);
-  const named = /([A-Za-z]{3,9})\.?\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s*(\d{4}))?/.exec(text);
-
-  if (iso) {
-    year = +iso[1]; month = +iso[2]; day = +iso[3];
-  } else if (slash) {
-    month = +slash[1]; day = +slash[2];
-    year = slash[3] ? (+slash[3] < 100 ? 2000 + +slash[3] : +slash[3]) : null;
-  } else if (named) {
-    const idx = MONTH_NAMES.findIndex(m => m.toLowerCase().startsWith(named[1].toLowerCase()));
-    if (idx >= 0) {
-      month = idx + 1; day = +named[2];
-      year = named[3] ? +named[3] : null;
-    }
-  }
-
-  if (!month || !day || month < 1 || month > 12 || day < 1 || day > 31) return null;
-
-  if (year == null) {
-    const now = new Date();
-    year = now.getFullYear();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    if (new Date(year, month - 1, day) < today) year += 1;
-  }
-  return `${MONTH_NAMES[month - 1]} ${ordinal(day)}, ${year}`;
-}
-
-// ── PRICING (mirrors lib/pricingCatalog.ts) ──────────────────────────────────
-const GRAD_HOURLY_RATE = 350;
-const GROUP_RATES = { 2: 300, 3: 275, 4: 250, 5: 225 };
-const GROUP_RATE_6_PLUS = 200;
-// Travel = round-trip miles x $0.70 rounded up to $5, plus tolls, with that
-// total rounded to the nearest $5, or the business-approved fee where one
-// exists (lib/travelFee.ts, SJSU = $75).
-// tests/unit/travelFee.test.ts fails if these drift from the site.
-const TRAVEL_FEES = {
-  "sf-state": 0, "usf": 0, "sf-other": 0,
-  "uc-berkeley": 45, "csueb": 65, "sjsu": 75, "santa-clara": 65, "stanford": 50,
-};
-
-// Flat per-session rates for non-graduation services
-const SERVICE_FLAT_RATES = {
-  "family":          350, // Family Session (30 min)
-  "extended-family": 500, // Extended Family Session (60 min)
-  "couples":         450, // 1-Hour Couples Session
-  "engagement":      650,
-  "proposal":        750,
-  "elopement":       950, // Elopement & Courthouse Ceremony, 2-hour base. A
-                          // floor Chris edits when the coverage runs longer.
-  "maternity":       500, // Maternity Session (60 min, partner + kids included)
-};
-
-const SERVICE_LABELS = {
-  "family":          "Family Session",
-  "extended-family": "Extended Family Session",
-  "couples":         "Couples Session",
-  "engagement":      "Engagement Session",
-  "proposal":        "Proposal Session",
-  "elopement":       "Elopement & Courthouse Ceremony",
-  "maternity":       "Maternity Session",
-  "graduation":      "Graduation Session",
-};
-
-function detectServiceType(inq) {
-  // Email-detected type wins if it's one we price
-  const fromEmail = String(inq._serviceType || "").toLowerCase();
-  if (SERVICE_FLAT_RATES[fromEmail] != null || fromEmail === "graduation") return fromEmail;
-
-  const t = `${inq.session_type || ""} ${inq.message || ""}`.toLowerCase().replace(/-/g, " ");
-  if (t.includes("elope") || t.includes("courthouse")) return "elopement";
-  // Before couples and family: partner and kids are part of the maternity package.
-  if (t.includes("matern"))          return "maternity";
-  if (t.includes("proposal"))        return "proposal";
-  if (t.includes("engagement"))      return "engagement";
-  if (t.includes("couple") || t.includes("anniversary")) return "couples";
-  if (t.includes("extended family")) return "extended-family";
-  if (t.includes("family"))          return "family";
-  return "graduation";
-}
-
-function calcPrice(inquiry) {
-  const service = detectServiceType(inquiry);
-  const people = parseInt(inquiry.people || "1") || 1;
-  let sessionBase, travelFee = null, schoolKey = null;
-
-  if (SERVICE_FLAT_RATES[service] != null) {
-    sessionBase = SERVICE_FLAT_RATES[service];
-  } else {
-    sessionBase = people <= 1
-      ? GRAD_HOURLY_RATE
-      : (GROUP_RATES[people] ?? GROUP_RATE_6_PLUS) * people;
-    schoolKey = detectSchoolKey(inquiry._school || inquiry.school || inquiry.message || "");
-    if (schoolKey != null && TRAVEL_FEES[schoolKey] != null) travelFee = TRAVEL_FEES[schoolKey];
-  }
-
-  // A price quoted/agreed in the email thread overrides the calculator
-  const agreed = Number.isFinite(inquiry._agreedTotal) ? inquiry._agreedTotal : null;
-  if (agreed != null) { sessionBase = agreed; travelFee = null; }
-  const subtotal = sessionBase + (travelFee ?? 0);
-  const deposit  = subtotal / 2;
-
-  return {
-    sessionBase, travelFee,
-    subtotal, deposit, remaining: subtotal - deposit,
-    people, schoolKey, service, priceFromEmail: agreed != null,
-  };
-}
-
-function fmt(n) { return `$${Number(n).toFixed(2)}`; }
 
 // ── PANEL UI ─────────────────────────────────────────────────────────────────
 let panel = null;
@@ -202,31 +47,45 @@ function createPanel() {
     panel.style.display = "none";
   });
 
-  loadInquiries();
+  openPanelFlow();
 }
 
 function showPanel() {
   if (!panel) { createPanel(); return; }
   panel.style.display = "flex";
+  openPanelFlow();
+}
+
+/** On the invoice editor, a client chosen on the previous page is restored; everywhere else, the list. */
+async function openPanelFlow() {
+  if (getPageType() === "invoice") {
+    const selection = await loadInvoiceSelection();
+    if (selection) { loadInvoiceDraft(selection.inquiryId, { restored: true }); return; }
+  }
   loadInquiries();
+}
+
+async function apiFetch(path, options = {}) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...options,
+    headers: { "x-extension-secret": API_SECRET, "content-type": "application/json", ...(options.headers || {}) },
+  });
+  const body = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(body?.error ? `${body.error} (HTTP ${res.status})` : `HTTP ${res.status}`);
+  return body;
 }
 
 async function loadInquiries() {
   setView("loading");
   try {
-    const res = await fetch(
-      `${API_BASE}/api/extension/inquiries`,
-      { headers: { "x-extension-secret": API_SECRET } }
-    );
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const rows = await res.json();
-    renderList(rows);
+    const [rows, totals] = await Promise.all([apiFetch("/api/extension/inquiries"), loadDraftTotals()]);
+    renderList(rows, totals);
   } catch (err) {
     showError(`Failed to load: ${err.message}`);
   }
 }
 
-function renderList(inquiries) {
+function renderList(inquiries, draftTotals = {}) {
   if (!inquiries.length) {
     document.getElementById("sxs-rows").innerHTML = "<p style='color:#888;font-size:12px'>No inquiries found.</p>";
     setView("list");
@@ -241,19 +100,18 @@ function renderList(inquiries) {
     }
     rows.innerHTML = filtered.map(inq => {
       const date = new Date(inq.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-      const price = calcPrice(inq);
       return `
         <div class="sxs-inq-row" data-id="${inq.id}">
           <div class="sxs-inq-name">${esc(inq.name)}</div>
           <div class="sxs-inq-meta">${esc(inq.email)} · ${date}</div>
-          <div class="sxs-inq-price">${fmt(price.subtotal)}${price.travelFee ? ` (+${fmt(price.travelFee)} travel)` : ""}</div>
+          <div class="sxs-inq-price">${esc(describeListPrice(draftTotals[String(inq.id)]))}</div>
         </div>
       `;
     }).join("");
     rows.querySelectorAll(".sxs-inq-row").forEach(row => {
       row.addEventListener("click", () => {
         const inq = inquiries.find(i => String(i.id) === row.dataset.id);
-        if (inq) renderDetail(inq);
+        if (inq) onInquiryChosen(inq);
       });
     });
   }
@@ -272,287 +130,181 @@ function renderList(inquiries) {
   setView("list");
 }
 
+function onInquiryChosen(inq) {
+  const pageType = getPageType();
+  if (pageType === "invoice-create") { renderClientSelect(inq); return; }
+  if (pageType === "invoice") { loadInvoiceDraft(inq.id); return; }
+  renderDetail(inq);
+}
+
+function renderDetailShell(title, status, btnLabel, btnDisabled) {
+  const detail = document.getElementById("sxs-detail");
+  detail.innerHTML = `
+    <button id="sxs-back" style="margin-bottom:10px">← Back</button>
+    <div class="sxs-section-title">${title}</div>
+    <div id="sxs-date-status" style="font-size:11px;color:#888;margin-bottom:8px">${status}</div>
+    <div id="sxs-preview-rows"></div>
+    <button id="sxs-fill" class="sxs-fill-btn" ${btnDisabled ? "disabled" : ""}>${btnLabel}</button>
+    <div id="sxs-fill-status"></div>
+  `;
+  detail.querySelector("#sxs-back").addEventListener("click", () => loadInquiries());
+  setView("detail");
+  return detail;
+}
+
+// ── INVOICES ─────────────────────────────────────────────────────────────────
+
+/** Invoice create page: type the client's email and let the user confirm Pixieset's match. */
+function renderClientSelect(inq) {
+  const detail = renderDetailShell(`${esc(inq.name)} · invoice client`, "", "Select this client in Pixieset", false);
+  document.getElementById("sxs-preview-rows").innerHTML =
+    `<div class="sxs-field-row"><span class="sxs-field-label">Client</span><span class="sxs-field-val">${esc(inq.name)}</span></div>` +
+    `<div class="sxs-field-row"><span class="sxs-field-label">Email</span><span class="sxs-field-val">${esc(inq.email)}</span></div>`;
+  detail.querySelector("#sxs-fill").addEventListener("click", () => selectPixiesetClient(inq));
+}
+
+async function selectPixiesetClient(inq) {
+  const statusEl = document.getElementById("sxs-fill-status");
+  const input = document.querySelector('input[placeholder*="name or email"], input[placeholder*="name"]')
+    || document.querySelector('input[type="text"]');
+  if (!input) { showFillStatus(0); return; }
+
+  await saveInvoiceSelection(inq.id, inq.email);
+  await typeIntoInput(input, inq.email);
+  await new Promise(r => setTimeout(r, 700));
+
+  const candidates = [...document.querySelectorAll('[role="option"], li, [class*="option" i], [class*="suggestion" i], [class*="result" i]')]
+    .map(el => ({ el, text: el.textContent || "" }));
+  const match = chooseClientMatch(candidates, inq.email);
+  if (!match) {
+    statusEl.textContent = `⚠ Pixieset shows no single match for ${inq.email}. Pick the client by hand, then click Next — the invoice page will remember ${inq.name}.`;
+    statusEl.style.color = "#e67e22";
+    return;
+  }
+  match.el.click();
+  statusEl.textContent = `✓ Selected ${inq.email}. Click Next; the invoice page will load ${inq.name}'s draft.`;
+  statusEl.style.color = "#26a69a";
+}
+
+async function loadInvoiceDraft(inquiryId, { restored = false } = {}) {
+  setView("loading");
+  document.getElementById("sxs-loading").textContent = "🔍 Pricing the invoice from the inquiry and Gmail…";
+  try {
+    const { draft } = await apiFetch("/api/extension/invoice-draft", { method: "POST", body: JSON.stringify({ inquiry_id: inquiryId }) });
+    await rememberDraftTotal(inquiryId, draft);
+    renderInvoiceDraft(draft, restored);
+  } catch (err) {
+    showError(`Could not build the invoice draft: ${err.message}`);
+  } finally {
+    document.getElementById("sxs-loading").textContent = "Loading inquiries…";
+  }
+}
+
+function renderInvoiceDraft(draft, restored) {
+  const status = restored ? "Restored the client you picked on the previous page." : "";
+  const detail = renderDetailShell(`${esc(draft.client.name)} · invoice`, status, "Fill invoice", false);
+  document.getElementById("sxs-preview-rows").innerHTML = buildInvoicePreview(draft);
+  const fillBtn = detail.querySelector("#sxs-fill");
+  const syncButton = () => { fillBtn.disabled = !invoiceFillAllowed(draft); };
+  syncButton();
+  detail.querySelector("#sxs-review-confirm")?.addEventListener("change", syncButton);
+  fillBtn.addEventListener("click", () => runInvoiceFill(draft));
+}
+
+async function runInvoiceFill(draft) {
+  if (!invoiceFillAllowed(draft)) return;
+  const reviewed = readInvoicePreview(draft);
+  const total = document.getElementById("sxs-invoice-total");
+  if (total) total.textContent = reviewed.pricing.totalCents === null ? "—" : fmtCents(reviewed.pricing.totalCents);
+  const { filled, skipped } = await fillInvoiceFromDraft(reviewed);
+  showFillStatus(filled);
+  const statusEl = document.getElementById("sxs-fill-status");
+  if (statusEl && skipped.length) statusEl.textContent += ` Not found on this page: ${skipped.join(", ")}.`;
+  if (filled > 0) await clearInvoiceSelection();
+}
+
+// ── CONTRACTS ────────────────────────────────────────────────────────────────
+
 async function renderDetail(inq) {
   const pageType = getPageType();
   const price = calcPrice(inq);
-  const detail = document.getElementById("sxs-detail");
-
-  // Show skeleton while detecting date from Gmail
-  const isCreatePage = pageType === "contract-create" || pageType === "invoice-create";
+  const isCreatePage = pageType === "contract-create";
   const btnLabel = isCreatePage ? `Fill client name → Next` : `Fill ${pageType} fields`;
-
-  detail.innerHTML = `
-    <button id="sxs-back" style="margin-bottom:10px">← Back</button>
-    <div class="sxs-section-title">${esc(inq.name)} · ${pageType.replace("-create", "")}</div>
-    <div id="sxs-date-status" style="font-size:11px;color:#888;margin-bottom:8px">${isCreatePage ? "" : "🔍 Checking Gmail for confirmed details…"}</div>
-    <div id="sxs-preview-rows"></div>
-    <button id="sxs-fill" class="sxs-fill-btn" ${isCreatePage ? "" : "disabled"}>${btnLabel}</button>
-    <div id="sxs-fill-status"></div>
-  `;
-  detail.querySelector("#sxs-back").addEventListener("click", () => setView("list"));
-  setView("detail");
-
-  // Skip Gmail scan on create pages — we only need the client name there
-  let sessionDate   = formatSessionDate(inq.date_in_mind) || inq.date_in_mind || "TBD";
-  let sessionTime   = "TBD";
-  // Location falls back to school only — never the raw inquiry message
-  // (calcPrice still scans the message for school detection separately).
-  let sessionSchool = inq.school || "";
-  let serviceType   = null;
-  let agreedTotal   = null;
+  const detail = renderDetailShell(
+    `${esc(inq.name)} · ${pageType.replace("-create", "")}`,
+    isCreatePage ? "" : "🔍 Checking Gmail for confirmed details…",
+    btnLabel, !isCreatePage,
+  );
 
   if (isCreatePage) {
-    const previewRows = document.getElementById("sxs-preview-rows");
-    if (previewRows) previewRows.innerHTML = `<div class="sxs-field-row"><span class="sxs-field-label">Client</span><span class="sxs-field-val">${esc(inq.name)}</span></div><div class="sxs-field-row"><span class="sxs-field-label">Email</span><span class="sxs-field-val">${esc(inq.email)}</span></div>`;
-    const fillBtn = detail.querySelector("#sxs-fill");
-    if (fillBtn) { fillBtn.disabled = false; fillBtn.addEventListener("click", () => fillClientInput(inq)); }
+    document.getElementById("sxs-preview-rows").innerHTML =
+      `<div class="sxs-field-row"><span class="sxs-field-label">Client</span><span class="sxs-field-val">${esc(inq.name)}</span></div>` +
+      `<div class="sxs-field-row"><span class="sxs-field-label">Email</span><span class="sxs-field-val">${esc(inq.email)}</span></div>`;
+    detail.querySelector("#sxs-fill").addEventListener("click", () => fillClientInput(inq));
     return;
   }
+
+  // Skip Gmail scan on create pages — we only need the client name there
+  let sessionDate     = formatSessionDate(inq.date_in_mind) || inq.date_in_mind || "TBD";
+  let sessionTime     = "TBD";
+  // The shoot location from the thread stays separate from the school.
+  let sessionLocation = "";
+  let serviceType     = null;
+  let agreedTotal     = null;
+
   try {
-    const res = await fetch(`${API_BASE}/api/extension/detect-date`, {
-      method: "POST",
-      headers: { "x-extension-secret": API_SECRET, "content-type": "application/json" },
-      body: JSON.stringify({ inquiry_id: inq.id }),
-    });
-    if (res.ok) {
-      const d = await res.json();
-      if (d.readable)     sessionDate   = formatSessionDate(d.readable) || d.readable;
-      if (d.time)         sessionTime   = d.time;
-      if (d.location)     sessionSchool = d.location;
-      if (d.session_type) serviceType   = d.session_type;
-      if (d.total_fee != null && Number.isFinite(Number(d.total_fee))) agreedTotal = Number(d.total_fee);
-      const confidence = d.confidence === "high" ? "✓ Confirmed in email" : d.confidence === "medium" ? "~ Likely from email" : "~ From inquiry form";
-      const bits = [confidence];
-      if (serviceType)         bits.push(SERVICE_LABELS[serviceType] || serviceType);
-      if (agreedTotal != null) bits.push(`$${agreedTotal} agreed in email`);
-      const src = document.getElementById("sxs-date-status");
-      if (src) src.textContent = bits.join(" · ");
-    }
-  } catch {
-    const src = document.getElementById("sxs-date-status");
-    if (src) src.textContent = "Could not reach Gmail — using inquiry date";
+    const d = await apiFetch("/api/extension/detect-date", { method: "POST", body: JSON.stringify({ inquiry_id: inq.id }) });
+    if (d.readable)     sessionDate     = formatSessionDate(d.readable) || d.readable;
+    if (d.time)         sessionTime     = d.time;
+    if (d.location)     sessionLocation = d.location;
+    if (d.session_type) serviceType     = d.session_type;
+    if (d.total_fee != null && Number.isFinite(Number(d.total_fee))) agreedTotal = Number(d.total_fee);
+    const confidence = d.confidence === "high" ? "✓ Confirmed in email" : d.confidence === "medium" ? "~ Likely from email" : "~ From inquiry form";
+    const bits = [confidence];
+    if (serviceType)         bits.push(SERVICE_LABELS[serviceType] || serviceType);
+    if (agreedTotal != null) bits.push(`$${agreedTotal} agreed in email`);
+    document.getElementById("sxs-date-status").textContent = bits.join(" · ");
+  } catch (err) {
+    console.error("SoloXSnaps detect-date failed", err);
+    document.getElementById("sxs-date-status").textContent = `Could not reach Gmail (${err.message}) — using inquiry date`;
   }
 
-  const enriched     = { ...inq, _sessionDate: sessionDate, _sessionTime: sessionTime, _school: sessionSchool, _serviceType: serviceType, _agreedTotal: agreedTotal };
-  const enrichedPrice = calcPrice(enriched); // recalc with detected school for travel fee
-  const previewRows  = document.getElementById("sxs-preview-rows");
-  if (previewRows) {
-    previewRows.innerHTML = pageType === "invoice"
-      ? buildInvoicePreview(enriched, enrichedPrice)
-      : buildContractPreview(enriched, enrichedPrice);
-    if (pageType !== "invoice") wireContractPreview();
-  }
+  const enriched      = { ...inq, _sessionDate: sessionDate, _sessionTime: sessionTime, _location: sessionLocation, _serviceType: serviceType, _agreedTotal: agreedTotal };
+  const enrichedPrice = calcPrice(enriched); // recalc with the detected location for the travel fee
+  document.getElementById("sxs-preview-rows").innerHTML = buildContractPreview(enriched, enrichedPrice);
+  wireContractPreview();
 
   const fillBtn = detail.querySelector("#sxs-fill");
-  if (fillBtn) {
-    fillBtn.disabled = false;
-    fillBtn.addEventListener("click", () => {
-      if (pageType === "invoice" || pageType === "invoice-create") fillInvoice(enriched, enrichedPrice);
-      else if (pageType === "contract-create") fillClientInput(enriched);
-      else fillContract(enriched, enrichedPrice);
-    });
+  fillBtn.disabled = false;
+  fillBtn.addEventListener("click", () => fillContract(enriched, enrichedPrice));
+}
+
+// Type each character one at a time — this is what React's synthetic event system responds to
+async function typeIntoInput(input, text) {
+  input.focus();
+  input.select();
+  document.execCommand("selectAll");
+  document.execCommand("delete");
+  for (const char of text) {
+    const opts = { key: char, char, keyCode: char.charCodeAt(0), which: char.charCodeAt(0), bubbles: true, cancelable: true };
+    input.dispatchEvent(new KeyboardEvent("keydown",  opts));
+    input.dispatchEvent(new KeyboardEvent("keypress", opts));
+    document.execCommand("insertText", false, char);
+    input.dispatchEvent(new KeyboardEvent("keyup", opts));
+    await new Promise(r => setTimeout(r, 20));
   }
 }
 
-function buildInvoicePreview(inq, price) {
-  const serviceLabel = SERVICE_LABELS[price.service] || "Photo Session";
-  const rows = [
-    ["Session item", `${serviceLabel} (${inq.school || "Bay Area"})`],
-    ["Price", fmt(price.sessionBase)],
-    ...(price.travelFee ? [["Travel Fee", fmt(price.travelFee)]] : []),
-    ["Total", fmt(price.subtotal)],
-    ["Deposit (50%)", fmt(price.deposit)],
-    ["Due date", inq.date_in_mind || "—"],
-  ];
-  return rows.map(([k, v]) => `
-    <div class="sxs-field-row">
-      <span class="sxs-field-label">${k}</span>
-      <span class="sxs-field-val">${esc(v)}</span>
-    </div>
-  `).join("");
-}
-
-function buildContractPreview(inq, price) {
-  const rows = [
-    ["SESSION_TYPE",     (SERVICE_LABELS[price.service] || "Photo Session").replace(/ Session$/, "")],
-    ["SESSION_DATE",     inq._sessionDate || inq.date_in_mind || "TBD"],
-    ["SESSION_TIME",     inq._sessionTime || "TBD"],
-    ["SESSION_LOCATION", expandSchoolName(inq._school || inq.school || "") || "Bay Area, CA"],
-    ["TOTAL_FEE",        fmt(price.subtotal)],
-    ["RETAINER",         fmt(price.deposit)],
-    ["REMAINING",        fmt(price.remaining)],
-    ["FINAL_DATE",       inq._sessionDate || inq.date_in_mind || "TBD"],
-  ];
-  return rows.map(([k, v]) => `
-    <div class="sxs-field-row">
-      <span class="sxs-field-label">[${k}]</span>
-      <input class="sxs-field-input" data-key="${k}" value="${esc(v)}" spellcheck="false" />
-    </div>
-  `).join("");
-}
-
-function parseMoney(v) {
-  const n = parseFloat(String(v).replace(/[^0-9.\-]/g, ""));
-  return Number.isFinite(n) ? n : null;
-}
-
-// When the total is edited, re-split retainer/remaining 50/50.
-// When the retainer is edited, remaining = total − retainer.
-function wireContractPreview() {
-  const get = key => document.querySelector(`#sxs-preview-rows input[data-key="${key}"]`);
-  const total = get("TOTAL_FEE"), retainer = get("RETAINER"), remaining = get("REMAINING");
-  if (!total || !retainer || !remaining) return;
-
-  total.addEventListener("input", () => {
-    const t = parseMoney(total.value);
-    if (t == null) return;
-    retainer.value  = fmt(t / 2);
-    remaining.value = fmt(t / 2);
-  });
-  retainer.addEventListener("input", () => {
-    const t = parseMoney(total.value);
-    const r = parseMoney(retainer.value);
-    if (t == null || r == null) return;
-    remaining.value = fmt(t - r);
-  });
-}
-
-function readContractPreview() {
-  const vals = {};
-  document.querySelectorAll('#sxs-preview-rows input[data-key]').forEach(el => {
-    vals[el.dataset.key] = el.value.trim();
-  });
-  return vals;
-}
-
-// ── FILL LOGIC ────────────────────────────────────────────────────────────────
-
-function fillInvoice(inq, price) {
-  let filled = 0;
-
-  // Item name field (first line-item input)
-  filled += setInputByPlaceholder("Item name", SERVICE_LABELS[price.service] || "Photo Session");
-  filled += setInputByPlaceholder("Item description", `${inq.school || "Bay Area"} · ${inq.date_in_mind || ""}`);
-
-  // Price field — find inputs near a "$" label
-  const priceInputs = [...document.querySelectorAll('input[type="text"], input[type="number"]')]
-    .filter(el => {
-      const label = el.closest("td,div")?.previousElementSibling?.textContent || "";
-      const placeholder = el.placeholder || "";
-      return label.includes("$") || placeholder.includes("0.00") || el.closest("[class*='price']");
-    });
-
-  if (priceInputs[0]) { setNativeValue(priceInputs[0], String(price.sessionBase)); filled++; }
-
-  // Notes
-  filled += setTextareaByPlaceholder("Thank you", `Thank you for booking, ${inq.name}! Looking forward to your session.`);
-
-  // Travel fee row — if a second item row exists
-  if (price.travelFee) {
-    const allItemNames = document.querySelectorAll('input[placeholder="Item name"]');
-    if (allItemNames[1]) { setNativeValue(allItemNames[1], "Travel Fee"); filled++; }
-    if (priceInputs[1])  { setNativeValue(priceInputs[1], String(price.travelFee)); filled++; }
-  }
-
-  showFillStatus(filled);
-}
-
-function fillContract(inq, price) {
-  // Prefer values from the (possibly user-edited) preview inputs
-  const edited = readContractPreview();
-  const money = (raw, fallback) => {
-    const n = parseMoney(raw);
-    return n != null ? fmt(n) : fmt(fallback);
-  };
-
-  const sessionDate     = edited.SESSION_DATE || inq._sessionDate || inq.date_in_mind || "TBD";
-  const sessionTime     = edited.SESSION_TIME || inq._sessionTime || "TBD";
-  const sessionLocation = edited.SESSION_LOCATION || expandSchoolName(inq._school || inq.school || "") || "Bay Area, CA";
-  const sessionType = edited.SESSION_TYPE || (SERVICE_LABELS[price.service] || "Photo Session").replace(/ Session$/, "");
-
-  const replacements = [
-    { pattern: /\[SESSION_TYPE\]/g,     value: sessionType },
-    { pattern: /\[SESSION_DATE\]/g,     value: sessionDate },
-    { pattern: /\[SESSION_TIME\]/g,     value: sessionTime },
-    { pattern: /\[SESSION_LOCATION\]/g, value: sessionLocation },
-    { pattern: /\[TOTAL_FEE\]/g,        value: money(edited.TOTAL_FEE, price.subtotal) },
-    { pattern: /\[RETAINER\]/g,         value: money(edited.RETAINER, price.deposit) },
-    { pattern: /\[REMAINING\]/g,        value: money(edited.REMAINING, price.remaining) },
-    { pattern: /\[FINAL_DATE\]/g,       value: edited.FINAL_DATE || sessionDate },
-  ];
-
-  const smartFieldMap = {};
-
-  const editableArea = document.querySelector('[contenteditable="true"]');
-  if (!editableArea) { showFillStatus(0); return; }
-
-  let filled = 0;
-
-  // 1. Replace [$XXXX]-style plain text nodes
-  const walker = document.createTreeWalker(editableArea, NodeFilter.SHOW_TEXT);
-  const textNodes = [];
-  while (walker.nextNode()) textNodes.push(walker.currentNode);
-
-  for (const node of textNodes) {
-    let text = node.nodeValue;
-    let changed = false;
-    for (const { pattern, value } of replacements) {
-      const next = text.replace(pattern, () => value);
-      if (next !== text) { text = next; changed = true; filled++; }
-    }
-    if (changed) {
-      node.nodeValue = text;
-      node.parentElement?.dispatchEvent(new Event("input", { bubbles: true }));
-    }
-  }
-
-  filled += replaceContractSessionType(textNodes, sessionType);
-
-  // 2. Replace PixiSet smart field spans (teal underlined clickable elements)
-  // These are rendered as <span> or <a> with the label as their text content
-  const allSpans = editableArea.querySelectorAll("span, a");
-  for (const el of allSpans) {
-    const label = el.textContent.trim();
-    if (smartFieldMap[label]) {
-      el.textContent = smartFieldMap[label];
-      el.removeAttribute("data-smart-field");
-      el.style.textDecoration = "none";
-      el.style.color = "inherit";
-      el.dispatchEvent(new Event("input", { bubbles: true }));
-      filled++;
-    }
-  }
-
-  showFillStatus(filled);
-}
-
+/** Contract create page: type the client's email and move on to the contract. */
 async function fillClientInput(inq) {
   const input = document.querySelector('input[placeholder*="name or email"], input[placeholder*="name"]')
     || document.querySelector('input[type="text"]');
   if (!input) { showFillStatus(0); return; }
 
   const statusEl = document.getElementById("sxs-fill-status");
-
-  // Clear existing value first
-  input.focus();
-  input.select();
-  document.execCommand("selectAll");
-  document.execCommand("delete");
-
-  // Type each character one at a time — this is what React's synthetic event system responds to
-  for (const char of inq.email) {
-    const opts = { key: char, char, keyCode: char.charCodeAt(0), which: char.charCodeAt(0), bubbles: true, cancelable: true };
-    input.dispatchEvent(new KeyboardEvent("keydown",  opts));
-    input.dispatchEvent(new KeyboardEvent("keypress", opts));
-    // Use execCommand to actually insert the character into the DOM
-    document.execCommand("insertText", false, char);
-    input.dispatchEvent(new KeyboardEvent("keyup", opts));
-    await new Promise(r => setTimeout(r, 20));
-  }
-
+  await typeIntoInput(input, inq.email);
   if (statusEl) statusEl.textContent = `✓ Typed — now click Next in PixiSet`;
 
-  // Attempt to click Next
   setTimeout(() => {
     const nextBtn = [...document.querySelectorAll("button")].find(b => /^next$/i.test(b.textContent.trim()));
     if (nextBtn && !nextBtn.disabled) {
@@ -562,40 +314,7 @@ async function fillClientInput(inq) {
   }, 500);
 }
 
-// ── DOM HELPERS ───────────────────────────────────────────────────────────────
-
-function setNativeValue(el, value) {
-  const nativeSetter = Object.getOwnPropertyDescriptor(
-    el.tagName === "INPUT" ? window.HTMLInputElement.prototype : window.HTMLTextAreaElement.prototype,
-    "value"
-  )?.set;
-  if (nativeSetter) nativeSetter.call(el, value);
-  el.dispatchEvent(new Event("input", { bubbles: true }));
-  el.dispatchEvent(new Event("change", { bubbles: true }));
-}
-
-function setInputByPlaceholder(placeholder, value) {
-  const el = document.querySelector(`input[placeholder*="${placeholder}"]`);
-  if (!el) return 0;
-  setNativeValue(el, value);
-  return 1;
-}
-
-function setTextareaByPlaceholder(placeholder, value) {
-  const el = document.querySelector(`textarea[placeholder*="${placeholder}"]`);
-  if (!el) return 0;
-  setNativeValue(el, value);
-  return 1;
-}
-
-function showFillStatus(count) {
-  const el = document.getElementById("sxs-fill-status");
-  if (!el) return;
-  el.textContent = count > 0
-    ? `✓ Filled ${count} field${count !== 1 ? "s" : ""}. Review and adjust as needed.`
-    : "⚠ No fillable fields found on this page yet. Scroll to the fields and try again.";
-  el.style.color = count > 0 ? "#26a69a" : "#e67e22";
-}
+// ── VIEWS ─────────────────────────────────────────────────────────────────────
 
 function setView(view) {
   document.getElementById("sxs-loading").style.display = view === "loading" ? "block" : "none";
@@ -608,10 +327,6 @@ function showError(msg) {
   const el = document.getElementById("sxs-error");
   el.textContent = msg;
   setView("error");
-}
-
-function esc(str = "") {
-  return String(str).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 }
 
 // ── TRIGGER BUTTON ────────────────────────────────────────────────────────────

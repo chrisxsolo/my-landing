@@ -147,7 +147,7 @@ describe("one fee everywhere", () => {
   });
 
   it("matches the Pixieset extension's copy", () => {
-    const source = readFileSync("pixieset-extension/content.js", "utf8");
+    const source = readFileSync("pixieset-extension/extensionPricing.js", "utf8");
     const block = source.match(/const TRAVEL_FEES = \{([\s\S]*?)\};/)?.[1] ?? "";
     const extension = Object.fromEntries([...block.matchAll(/"([\w-]+)":\s*([\d.]+)/g)].map(([, k, v]) => [k, Number(v)]));
     for (const key of Object.keys(VERIFIED_ROUTES) as (keyof typeof VERIFIED_ROUTES)[]) {

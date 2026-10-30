@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
   const supabase = createSupabaseServerClient();
   const { data, error } = await supabase
     .from("inquiries")
-    .select("id, name, email, phone, school, people, date_in_mind, session_type, message, created_at")
+    .select("id, name, email, phone, school, location, people, date_in_mind, session_type, message, created_at")
     .order("created_at", { ascending: false })
     .limit(25);
 

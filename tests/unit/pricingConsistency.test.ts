@@ -46,10 +46,10 @@ const BASE_ESTIMATE: EstimateInput = {
 
 /** The extension's hand-mirrored constants, read as the values the file declares. */
 function pixiesetConstants() {
-  const source = readFileSync("pixieset-extension/content.js", "utf8");
+  const source = readFileSync("pixieset-extension/extensionPricing.js", "utf8");
   const literal = (name: string) => {
     const match = source.match(new RegExp(`const ${name} = ([^;]+);`));
-    if (!match) throw new Error(`${name} is not declared in content.js`);
+    if (!match) throw new Error(`${name} is not declared in extensionPricing.js`);
     return new Function(`return ${match[1]}`)() as Record<string, number> & number;
   };
   return {

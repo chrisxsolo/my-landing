@@ -67,7 +67,7 @@ describe("one SJSU price on every surface", () => {
   });
 
   it("matches the Pixieset extension", () => {
-    const source = readFileSync("pixieset-extension/content.js", "utf8");
+    const source = readFileSync("pixieset-extension/extensionPricing.js", "utf8");
     expect(source).toMatch(/"sjsu":\s*75\b/);
   });
 

@@ -163,3 +163,41 @@
   color: #555;
 }
 #sxs-back:hover { background: #f5f5f5; }
+
+/* Invoice review */
+.sxs-status {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 8px;
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
+.sxs-status-ready  { background: #e6f6f4; color: #1f8a7e; }
+.sxs-status-review { background: #fdf1e3; color: #c9711a; }
+
+.sxs-messages {
+  margin: 0 0 8px;
+  padding-left: 16px;
+  font-size: 11px;
+  line-height: 1.45;
+}
+.sxs-review-reason { color: #c0392b; }
+.sxs-warning       { color: #a36a12; }
+
+.sxs-note-input {
+  resize: vertical;
+  text-align: left;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.sxs-confirm-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  font-size: 12px;
+  color: #333;
+}
+
+.sxs-fill-btn:disabled { background: #b9ddd9; cursor: not-allowed; }
