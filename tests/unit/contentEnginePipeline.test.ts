@@ -8,14 +8,21 @@ const curatePhotos = vi.fn();
 const createPackage = vi.fn();
 const generateType = vi.fn();
 
-vi.mock("@/app/admin/content-engine/engineApi", () => ({
-  engineApi: {
-    analyzePhotos: (...a: unknown[]) => analyzePhotos(...a),
-    curatePhotos: (...a: unknown[]) => curatePhotos(...a),
-    createPackage: (...a: unknown[]) => createPackage(...a),
-    generateType: (...a: unknown[]) => generateType(...a),
-  },
-}));
+vi.mock("@/app/admin/content-engine/engineApi", async () => {
+  const actual = await vi.importActual<typeof import("@/app/admin/content-engine/engineApi")>(
+    "@/app/admin/content-engine/engineApi",
+  );
+  return {
+    EngineApiError: actual.EngineApiError,
+    engineApi: {
+      analyzePhotos: (...a: unknown[]) => analyzePhotos(...a),
+      curatePhotos: (...a: unknown[]) => curatePhotos(...a),
+      createPackage: (...a: unknown[]) => createPackage(...a),
+      generateType: (...a: unknown[]) => generateType(...a),
+    },
+  };
+});
+const { EngineApiError } = await import("@/app/admin/content-engine/engineApi");
 
 const {
   analyzeAllPhotos, generateAllTypes, pendingGenerationTypes,
@@ -183,26 +190,55 @@ describe("generateAllTypes", () => {
       return { outcome: "completed", itemIds: [], packageStatus: "ready" };
     });
 
-    const errors = await generateAllTypes("pkg", [
+    const outcomes = await generateAllTypes("pkg", [
       "internal_link_suggestion", "portfolio_pick", "journal_post",
     ]);
-    expect(errors).toEqual([]);
+    expect(outcomes).toEqual([]);
     expect(started.slice(0, 2).sort()).toEqual(["internal_link_suggestion", "portfolio_pick"]);
     expect(started[2]).toBe("journal_post");
   });
 
-  it("collects a readable error per failed type and keeps going", async () => {
+  it("classifies each failure and keeps going: recorded failure, live-claim conflict, unreachable server", async () => {
     generateType.mockImplementation(async (_id: string, type: string) => {
-      if (type === "portfolio_pick") return { outcome: "failed", itemIds: [], packageStatus: "needs_attention", error: "model said no" };
-      if (type === "guide_photo") throw new Error("network down");
+      if (type === "portfolio_pick") throw new EngineApiError(422, { outcome: "failed", error: "model said no" });
+      if (type === "guide_photo") throw new EngineApiError(504, {});
+      if (type === "school_page_photo") throw new EngineApiError(409, { error: "content type school_page_photo is already in progress" });
+      if (type === "journal_post") throw new TypeError("Failed to fetch");
       return { outcome: "completed", itemIds: [], packageStatus: "ready" };
     });
-    const errors = await generateAllTypes("pkg", [
-      "internal_link_suggestion", "portfolio_pick", "guide_photo",
+    const outcomes = await generateAllTypes("pkg", [
+      "internal_link_suggestion", "portfolio_pick", "guide_photo", "school_page_photo", "journal_post",
     ]);
-    expect(errors).toEqual([
-      "Portfolio pick: model said no",
-      "Guide photo: network down",
+    expect(outcomes).toEqual([
+      { type: "portfolio_pick", kind: "failed", message: "model said no" },
+      { type: "guide_photo", kind: "unreachable", message: "request failed (504)" },
+      { type: "school_page_photo", kind: "conflict", message: "content type school_page_photo is already in progress" },
+      { type: "journal_post", kind: "unreachable", message: "Failed to fetch" },
     ]);
+  });
+
+  it("settles and refreshes each type on its own, including the ones that errored", async () => {
+    generateType.mockImplementation(async (_id: string, type: string) => {
+      if (type === "guide_photo") throw new EngineApiError(504, {});
+      return { outcome: "completed", itemIds: [], packageStatus: "ready" };
+    });
+    const settled: string[] = [];
+    await generateAllTypes("pkg", ["internal_link_suggestion", "guide_photo"], {
+      onTypeSettled: (type) => settled.push(type),
+    });
+    expect(settled.sort()).toEqual(["guide_photo", "internal_link_suggestion"]);
+  });
+});
+
+describe("retryableGenerationTypes", () => {
+  it("leaves out a type whose server claim is still live, so Generate-all never hits a 409 on it", async () => {
+    const { retryableGenerationTypes } = await import("@/app/admin/content-engine/pipeline");
+    const now = Date.parse("2026-11-04T02:20:00.000Z");
+    const future = new Date(now + 100_000).toISOString();
+    const past = new Date(now - 100_000).toISOString();
+    const active = pkg({ journal_post: "pending", guide_photo: "processing", portfolio_pick: "processing" });
+    active.generation_settings.progress!.guide_photo.lease_expires_at = future;
+    active.generation_settings.progress!.portfolio_pick.lease_expires_at = past;
+    expect(retryableGenerationTypes(active, now)).toEqual(["portfolio_pick", "journal_post"]);
   });
 });

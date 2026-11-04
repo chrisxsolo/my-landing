@@ -60,6 +60,9 @@ async function loadCandidates(client: SupabaseClient, sessionId: string): Promis
   }));
 }
 
+// A 2,000-token pick list answers well inside this; one SDK retry stays inside the worker budget.
+const CURATE_CALL_TIMEOUT_MS = 60_000;
+
 export async function curateTopPicks(args: CuratePhotosArgs): Promise<CuratePhotosResult> {
   const { client, callModel, sessionId } = args;
   const count = args.count ?? TOP_PICK_COUNT;
@@ -85,6 +88,9 @@ export async function curateTopPicks(args: CuratePhotosArgs): Promise<CuratePhot
     system: prompt.system,
     maxTokens: 2000,
     messages: [{ role: "user", content: prompt.userText }],
+    // Never the SDK's 10-minute default inside a bounded worker invocation.
+    timeoutMs: CURATE_CALL_TIMEOUT_MS,
+    maxRetries: 1,
   });
 
   const candidateIds = summaries.map((s) => s.session_photo_id);

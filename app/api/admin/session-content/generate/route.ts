@@ -5,10 +5,17 @@ import { createAnthropicCaller } from "@/lib/contentEngine/aiClient";
 import { generateContentType, GenerationConflictError } from "@/lib/contentEngine/generateContent";
 import { isUuid } from "@/lib/contentEngine/uploadConfig";
 import { GENERATABLE_CONTENT_TYPES } from "@/lib/contentEngine/taxonomy";
+import { GENERATION_DEADLINE_MS } from "@/lib/contentEngine/generationBudget";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+// Long AI work, like the worker and analysis routes (Fluid compute allows it on
+// this plan). Next.js reads segment config statically, so this is the literal;
+// generationBudget.GENERATE_ROUTE_MAX_DURATION_SECONDS pins the same number
+// and tests/unit/generateRoute.test.ts keeps them equal. Model work must end
+// by GENERATION_DEADLINE_MS, leaving time to record the result before the
+// function is killed — a 60s cap here once left a guide step `processing`.
+export const maxDuration = 300;
 
 export async function POST(req: NextRequest) {
   const deny = requireAdmin(req);
@@ -32,12 +39,20 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const startedAt = Date.now();
   try {
     const result = await generateContentType({
       client: createSupabaseAdminClient(),
       callModel: createAnthropicCaller(apiKey),
       packageId, contentType,
+      deadlineAt: startedAt + GENERATION_DEADLINE_MS,
     });
+    if (result.outcome === "failed") {
+      console.warn(
+        `generate ${contentType} for package ${packageId}: ${result.failure?.kind ?? "failed"} ` +
+        `in ${Date.now() - startedAt}ms`,
+      );
+    }
     return NextResponse.json(result, { status: result.outcome === "failed" ? 422 : 200 });
   } catch (err) {
     if (err instanceof GenerationConflictError) {

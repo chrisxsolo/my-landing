@@ -6,12 +6,12 @@
 // Every step is an existing engine route and every route claims atomically
 // (claim_photos_for_analysis uses FOR UPDATE SKIP LOCKED; claim_generation_type
 // is per-type), so a re-run always picks up whatever is left.
-import { engineApi } from "./engineApi";
-import { pendingGenerationTypesFrom } from "@/lib/contentEngine/generationProgress";
-import type { PhotoStatusRow } from "@/lib/contentEngine/jobProgress";
+import { engineApi, EngineApiError } from "./engineApi";
 import {
-  CONTENT_TYPE_LABELS, type EnginePackage, type EnginePhoto,
-} from "./engineTypes";
+  pendingGenerationTypesFrom, retryableGenerationTypesFrom,
+} from "@/lib/contentEngine/generationProgress";
+import type { PhotoStatusRow } from "@/lib/contentEngine/jobProgress";
+import type { EnginePackage, EnginePhoto } from "./engineTypes";
 
 export type PipelineStage = "analyzing" | "generating";
 
@@ -23,7 +23,6 @@ export interface PipelineProgress {
 export type ProgressReporter = (progress: PipelineProgress) => void;
 
 const message = (err: unknown) => (err instanceof Error ? err.message : "failed");
-const labelFor = (type: string) => CONTENT_TYPE_LABELS[type] ?? type;
 
 /** Photos still awaiting (or retrying) analysis. */
 export function pendingAnalysisCount(photos: EnginePhoto[]): number {
@@ -126,43 +125,85 @@ export function mergePhotoStatuses(
   return changed ? next : photos;
 }
 
+/** Pending types a Retry may claim now — a type another request still holds is left out. */
+export function retryableGenerationTypes(pkg: EnginePackage | null, nowMs: number): string[] {
+  if (!pkg) return [];
+  return retryableGenerationTypesFrom(
+    pkg.generation_settings.selected_types ?? [],
+    pkg.generation_settings.progress ?? {},
+    nowMs,
+  );
+}
+
 export interface GenerateOptions {
   onProgress?: ProgressReporter;
   onTypeStart?: (types: string[]) => void;
   onTypeSettled?: (type: string) => void;
 }
 
+// How one type's request ended, when it did not complete:
+//   failed      — the server ran it and recorded `failed` (Retry/Skip apply)
+//   conflict    — 409: another invocation holds the claim; nothing went wrong
+//   unreachable — no answer from the server (504, network): the server may
+//                 still be working, or may have recorded a result we never saw
+//   error       — anything else (a 4xx/5xx with a message)
+// The workspace refreshes after every settled type, so what to show is decided
+// from the refreshed progress entry (generationView.ts), never from this alone.
+export type GenerationOutcomeKind = "failed" | "conflict" | "unreachable" | "error";
+
+export interface GenerationOutcome {
+  type: string;
+  kind: GenerationOutcomeKind;
+  message: string;
+}
+
+const UNREACHABLE_STATUSES = new Set([502, 503, 504]);
+
+function classifyRequestError(type: string, err: unknown): GenerationOutcome {
+  if (err instanceof EngineApiError) {
+    if (err.status === 409) return { type, kind: "conflict", message: err.message };
+    if (err.status === 422) return { type, kind: "failed", message: err.message };
+    if (UNREACHABLE_STATUSES.has(err.status)) return { type, kind: "unreachable", message: err.message };
+    return { type, kind: "error", message: err.message };
+  }
+  // fetch() rejects with a TypeError when the request never got an answer.
+  if (err instanceof TypeError) return { type, kind: "unreachable", message: message(err) };
+  return { type, kind: "error", message: message(err) };
+}
+
 async function generateWave(
   packageId: string, types: string[], options: GenerateOptions,
-): Promise<string[]> {
+): Promise<GenerationOutcome[]> {
   if (types.length === 0) return [];
   options.onTypeStart?.(types);
-  const results = await Promise.all(types.map(async (type) => {
+  const results = await Promise.all(types.map(async (type): Promise<GenerationOutcome | null> => {
     try {
       const result = await engineApi.generateType(packageId, type);
-      return result.outcome === "failed" ? `${labelFor(type)}: ${result.error ?? "failed"}` : null;
+      return result.outcome === "failed"
+        ? { type, kind: "failed", message: result.error ?? "failed" }
+        : null;
     } catch (err) {
-      return `${labelFor(type)}: ${message(err)}`;
+      return classifyRequestError(type, err);
     } finally {
       options.onTypeSettled?.(type);
     }
   }));
-  return results.filter((r): r is string => r !== null);
+  return results.filter((r): r is GenerationOutcome => r !== null);
 }
 
 /**
  * Generates the given types, independent ones concurrently. journal_post runs
  * last because it consumes the link + testimonial drafts of the same package.
- * Returns one human-readable string per failed type.
+ * Returns one classified outcome per type that did not complete.
  */
 export async function generateAllTypes(
   packageId: string, types: string[], options: GenerateOptions = {},
-): Promise<string[]> {
+): Promise<GenerationOutcome[]> {
   const independent = types.filter((t) => t !== "journal_post");
-  const errors = await generateWave(packageId, independent, options);
+  const outcomes = await generateWave(packageId, independent, options);
   if (types.includes("journal_post")) {
     options.onProgress?.({ stage: "generating", detail: "Writing the journal post…" });
-    errors.push(...await generateWave(packageId, ["journal_post"], options));
+    outcomes.push(...await generateWave(packageId, ["journal_post"], options));
   }
-  return errors;
+  return outcomes;
 }

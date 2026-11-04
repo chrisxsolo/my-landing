@@ -127,3 +127,70 @@ describe("settledGenerationCount", () => {
     expect(settledGenerationCount(ALL, map)).toBe(2);
   });
 });
+
+// ── Lease-aware state (2026-11-03: the stuck-processing fix) ────────────────
+import {
+  effectiveGenerationState, leaseExpiresAtMs, retryableGenerationTypesFrom,
+  type GenerationProgressEntry,
+} from "@/lib/contentEngine/generationProgress";
+
+const NOW = Date.parse("2026-11-04T02:20:00.000Z");
+const at = (offsetMs: number) => new Date(NOW + offsetMs).toISOString();
+
+describe("effectiveGenerationState", () => {
+  it("a processing entry with a live lease is running — not retryable", () => {
+    const entry: GenerationProgressEntry = {
+      status: "processing", attempt: 1, lease_started_at: at(-60_000), lease_expires_at: at(240_000),
+    };
+    expect(effectiveGenerationState(entry, NOW)).toBe("running");
+  });
+
+  it("a processing entry whose lease expired is stalled — recoverable", () => {
+    const entry: GenerationProgressEntry = {
+      status: "processing", attempt: 1, lease_started_at: at(-400_000), lease_expires_at: at(-1_000),
+    };
+    expect(effectiveGenerationState(entry, NOW)).toBe("stalled");
+  });
+
+  it("a lease that expires exactly now counts as expired (matches the RPC's <= now())", () => {
+    expect(effectiveGenerationState({ status: "processing", lease_expires_at: at(0) }, NOW)).toBe("stalled");
+  });
+
+  it("a processing entry with a missing or malformed lease is stalled, never silently running", () => {
+    expect(effectiveGenerationState({ status: "processing" }, NOW)).toBe("stalled");
+    expect(effectiveGenerationState({ status: "processing", lease_expires_at: null }, NOW)).toBe("stalled");
+    expect(effectiveGenerationState({ status: "processing", lease_expires_at: "not a date" }, NOW)).toBe("stalled");
+    expect(leaseExpiresAtMs({ status: "processing", lease_expires_at: "not a date" })).toBeNull();
+    expect(leaseExpiresAtMs({ status: "processing" })).toBeNull();
+  });
+
+  it("terminal and pending statuses pass through unchanged", () => {
+    expect(effectiveGenerationState({ status: "pending" }, NOW)).toBe("pending");
+    expect(effectiveGenerationState({ status: "failed", error: "x" }, NOW)).toBe("failed");
+    expect(effectiveGenerationState({ status: "completed" }, NOW)).toBe("completed");
+    expect(effectiveGenerationState({ status: "skipped" }, NOW)).toBe("skipped");
+    expect(effectiveGenerationState(undefined, NOW)).toBe("pending");
+  });
+
+  it("is judged on the caller's (server-corrected) clock, so a fast browser clock cannot fake an expiry", () => {
+    const entry: GenerationProgressEntry = { status: "processing", lease_expires_at: at(30_000) };
+    const browserNow = NOW + 90_000; // browser runs 90s ahead of the server
+    const serverOffsetMs = -90_000;
+    expect(effectiveGenerationState(entry, browserNow)).toBe("stalled"); // wrong clock → false expiry
+    expect(effectiveGenerationState(entry, browserNow + serverOffsetMs)).toBe("running");
+  });
+});
+
+describe("retryableGenerationTypesFrom", () => {
+  it("drops types another invocation is still running, keeps stalled and failed ones", () => {
+    const map: GenerationProgressMap = {
+      internal_link_suggestion: { status: "processing", lease_expires_at: at(100_000) },
+      guide_photo: { status: "processing", lease_expires_at: at(-5_000) },
+      portfolio_pick: { status: "failed", attempt: 1 },
+      journal_post: { status: "pending" },
+      testimonial_feature: { status: "completed" },
+    };
+    expect(retryableGenerationTypesFrom(ALL, map, NOW))
+      .toEqual(["portfolio_pick", "guide_photo", "journal_post"]);
+  });
+});

@@ -54,6 +54,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     items: items ?? [],
     published: published ?? [],
     ...states.get(sessionId),
+    // Generation leases are judged against this, not the browser clock.
+    serverNow: Date.now(),
   });
 }
 

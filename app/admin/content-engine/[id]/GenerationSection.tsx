@@ -4,17 +4,22 @@
 // LAST (it consumes the link + testimonial drafts — Plan 3 contract), Skip
 // failed type, and Regenerate (archive + new package, optional
 // preserve-approvals copy-forward per §8.4).
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { T } from "@/app/admin/adminTheme";
 import { engineApi } from "@/app/admin/content-engine/engineApi";
 import { guideTypeForService, isSchoolSlug, SPOT_SCHOOL_IDS } from "@/lib/contentEngine/taxonomy";
 import { estimateCostUsd } from "@/lib/contentEngine/aiPricing";
-import { generateAllTypes, pendingGenerationTypes } from "@/app/admin/content-engine/pipeline";
+import {
+  generateAllTypes, retryableGenerationTypes, type GenerationOutcome,
+} from "@/app/admin/content-engine/pipeline";
+import { generationNotice } from "@/app/admin/content-engine/generationView";
+import { effectiveGenerationState } from "@/lib/contentEngine/generationProgress";
 import {
   GENERATION_ORDER, CONTENT_TYPE_LABELS,
   type EngineItem, type EnginePackage, type EnginePhoto,
 } from "@/app/admin/content-engine/engineTypes";
-import { btn, card, chip, sectionTitle } from "./ui";
+import GenerationRow from "./GenerationRow";
+import { btn, card, sectionTitle } from "./ui";
 
 interface Props {
   sessionId: string;
@@ -23,8 +28,16 @@ interface Props {
   items: EngineItem[];
   photos: EnginePhoto[];
   aiAllowed: boolean;
+  /** serverNow − Date.now() at the last workspace load: leases are judged on the server clock. */
+  clockOffsetMs: number;
   onChanged: () => void;
+  /** Light refresh (no photo re-signing) while a server claim is live. */
+  onPoll: () => Promise<void>;
 }
+
+// While another invocation holds a type, the section watches it: the lease
+// lapses or the type settles without anyone clicking.
+const POLL_MS = 5_000;
 
 // The grad guide is the campus-spots page: placements key off the school (not
 // primary_location), and only campuses in SPOT_SCHOOL_IDS have spots. Mirrors
@@ -96,11 +109,15 @@ function statusNote(
 }
 
 export default function GenerationSection({
-  sessionId, session, activePackage, items, photos, aiAllowed, onChanged,
+  sessionId, session, activePackage, items, photos, aiAllowed, clockOffsetMs, onChanged, onPoll,
 }: Props) {
   const [busyTypes, setBusyTypes] = useState<ReadonlySet<string>>(new Set());
   const [notice, setNotice] = useState<string | null>(null);
+  // The last request outcome per type; what it means is re-read against the
+  // refreshed progress entry on every render (generationNotice).
+  const [outcomes, setOutcomes] = useState<Record<string, GenerationOutcome>>({});
   const [preserveApprovals, setPreserveApprovals] = useState(true);
+  const [nowMs, setNowMs] = useState(() => Date.now() + clockOffsetMs);
 
   const serviceType = typeof session.service_type === "string" ? session.service_type : "";
   const schoolSlug = typeof session.school_slug === "string" ? session.school_slug : null;
@@ -109,14 +126,31 @@ export default function GenerationSection({
     () => activePackage?.generation_settings.progress ?? {},
     [activePackage],
   );
-  const selected = activePackage?.generation_settings.selected_types ?? [];
+  const selected = useMemo(
+    () => activePackage?.generation_settings.selected_types ?? [],
+    [activePackage],
+  );
+  const anyRunning = selected.some((t) => effectiveGenerationState(progress[t], nowMs) === "running");
+
+  // Keep the clock honest after every workspace load, and tick + poll while a
+  // claim is live so a lapsed lease turns into Retry on its own.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- re-sync the server-corrected clock on every load
+    setNowMs(Date.now() + clockOffsetMs);
+    if (!anyRunning) return;
+    const timer = setInterval(() => {
+      setNowMs(Date.now() + clockOffsetMs);
+      void onPoll();
+    }, POLL_MS);
+    return () => clearInterval(timer);
+  }, [clockOffsetMs, anyRunning, onPoll]);
 
   // Cost from the tokens the model actually reported for this package's
   // generation calls — never an invented count. Photo analysis is billed
   // separately and isn't part of this figure.
   const cost = useMemo(() => {
     const usages = Object.values(progress)
-      .map((entry) => entry.usage)
+      .map((entry) => entry?.usage)
       .filter((u): u is NonNullable<typeof u> => u !== null && u !== undefined);
     if (usages.length === 0) return null;
     const { totalUsd, unknownModels } = estimateCostUsd(usages);
@@ -140,10 +174,13 @@ export default function GenerationSection({
   // Independent types run concurrently and the journal post waits for them —
   // that ordering lives in pipeline.generateAllTypes, shared with the one-click
   // run bar. Each type clears its own busy flag and refreshes as it finishes,
-  // so results stream in as they complete.
-  const generateBatch = useCallback(async (types: string[]): Promise<string[]> => {
-    if (!activePackage || types.length === 0) return [];
-    return generateAllTypes(activePackage.id, types, {
+  // so results stream in as they complete; a request that did not complete
+  // is kept as an outcome and explained against the refreshed entry.
+  const generateBatch = useCallback(async (types: string[]) => {
+    if (!activePackage || types.length === 0) return;
+    setNotice(null);
+    setOutcomes((prev) => Object.fromEntries(Object.entries(prev).filter(([t]) => !types.includes(t))));
+    const results = await generateAllTypes(activePackage.id, types, {
       onTypeStart: (started) => setBusyTypes((prev) => new Set([...prev, ...started])),
       onTypeSettled: (type) => {
         setBusyTypes((prev) => {
@@ -154,21 +191,16 @@ export default function GenerationSection({
         onChanged();
       },
     });
-  }, [activePackage, onChanged]);
-
-  const generateOne = useCallback(async (contentType: string) => {
-    setNotice(null);
-    const errors = await generateBatch([contentType]);
-    if (errors.length > 0) setNotice(errors.join(" · "));
-  }, [generateBatch]);
+    setOutcomes((prev) => ({ ...prev, ...Object.fromEntries(results.map((o) => [o.type, o])) }));
+    setNowMs(Date.now() + clockOffsetMs);
+  }, [activePackage, clockOffsetMs, onChanged]);
 
   const generateAll = useCallback(async () => {
     if (!activePackage) return;
-    setNotice(null);
-    const remaining = pendingGenerationTypes(activePackage).filter((t) => !busyTypes.has(t));
-    const errors = await generateBatch(remaining);
-    if (errors.length > 0) setNotice(`${errors.join(" · ")} — retry or skip below`);
-  }, [activePackage, busyTypes, generateBatch]);
+    const remaining = retryableGenerationTypes(activePackage, Date.now() + clockOffsetMs)
+      .filter((t) => !busyTypes.has(t));
+    await generateBatch(remaining);
+  }, [activePackage, busyTypes, clockOffsetMs, generateBatch]);
 
   const skip = useCallback(async (contentType: string) => {
     if (!activePackage) return;
@@ -190,6 +222,11 @@ export default function GenerationSection({
       </section>
     );
   }
+
+  const outcomeNotices = Object.values(outcomes)
+    .map((o) => generationNotice(o, progress[o.type], nowMs))
+    .filter((n): n is string => n !== null);
+  const remaining = activePackage ? retryableGenerationTypes(activePackage, nowMs).filter((t) => !busyTypes.has(t)) : [];
 
   return (
     <section style={card}>
@@ -227,50 +264,32 @@ export default function GenerationSection({
         )}
       </p>
       {notice && <p style={{ fontSize: 13, color: T.red }}>{notice}</p>}
+      {outcomeNotices.map((n) => <p key={n} style={{ fontSize: 13, color: T.amber, margin: "0 0 6px" }}>{n}</p>)}
 
       {activePackage && (
         <>
           <div style={{ display: "grid", gap: 6 }}>
             {GENERATION_ORDER.filter((t) => selected.includes(t)).map((type) => {
               const entry = progress[type];
-              const status = entry?.status ?? "pending";
-              const color = status === "failed" ? T.red : status === "completed" ? T.ink : T.inkSoft;
-              const reason = status === "skipped" || status === "pending"
-                ? statusNote(type, status, serviceType, schoolSlug, activePackage.session_facts_snapshot)
+              const state = effectiveGenerationState(entry, nowMs);
+              const reason = state === "skipped" || state === "pending"
+                ? statusNote(type, state, serviceType, schoolSlug, activePackage.session_facts_snapshot)
                 : null;
               return (
-                <div key={type} style={{ display: "grid", gap: 2 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13 }}>
-                    <span>{CONTENT_TYPE_LABELS[type]}</span>
-                    <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                      {entry?.usage && (
-                        <span style={{ color: T.inkSoft, fontSize: 11 }}>
-                          {entry.usage.input_tokens + entry.usage.output_tokens} tok
-                        </span>
-                      )}
-                      <span style={chip(color, T.inset)} title={entry?.error ?? undefined}>{status}</span>
-                      {(status === "pending" || status === "failed") && (
-                        <button style={btn(false)} disabled={busyTypes.has(type)}
-                          onClick={() => void generateOne(type)}>
-                          {busyTypes.has(type) ? "Generating…" : status === "failed" ? "Retry" : "Generate"}
-                        </button>
-                      )}
-                      {status === "failed" && (
-                        <button style={btn(false)} onClick={() => void skip(type)}>Skip</button>
-                      )}
-                    </span>
-                  </div>
-                  {reason && <span style={{ fontSize: 11, color: T.inkSoft, lineHeight: 1.4 }}>{reason}</span>}
-                </div>
+                <GenerationRow key={type} type={type} entry={entry} nowMs={nowMs}
+                  busy={busyTypes.has(type)} reason={reason}
+                  onGenerate={() => void generateBatch([type])} onSkip={() => void skip(type)} />
               );
             })}
           </div>
           {activePackage.status === "generating" && (
-            <button style={{ ...btn(true), marginTop: 10 }} disabled={busyTypes.size > 0}
+            <button style={{ ...btn(true), marginTop: 10 }} disabled={busyTypes.size > 0 || remaining.length === 0}
               onClick={() => void generateAll()}>
               {busyTypes.size > 0
                 ? `Generating ${[...busyTypes].map((t) => CONTENT_TYPE_LABELS[t] ?? t).join(", ")}…`
-                : "Generate all remaining"}
+                : remaining.length === 0 && anyRunning
+                  ? "Waiting for the running step…"
+                  : "Generate all remaining"}
             </button>
           )}
         </>

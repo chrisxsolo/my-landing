@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { service, resetDb, createTestSession, createPackage } from "./helpers";
+import { GENERATION_DEADLINE_MS, GENERATION_LEASE_SECONDS } from "@/lib/contentEngine/generationBudget";
 
 beforeAll(() => resetDb());
 
@@ -65,6 +66,36 @@ describe("claim_generation_type (spec §8.2)", () => {
       .update({ status: "archived", archived_at: new Date().toISOString() }).eq("id", pkg);
     const archived = await claimType(pkg, "journal_post");
     expect(archived.error?.message).toMatch(/archived/i);
+  });
+
+  it("the service's lease covers the whole generation deadline; a live claim cannot be stolen inside it", async () => {
+    // 2026-11-03: a 180s lease under a 60s-killed route left a type `processing`
+    // with nothing to record it. The lease now outlives any invocation.
+    const sessionId = await createTestSession();
+    const pkg = await createPackage(sessionId, ["guide_photo"]);
+    const before = Date.now();
+    expect((await claimType(pkg, "guide_photo", GENERATION_LEASE_SECONDS)).data).toBe(true);
+    const { progress } = await progressOf(pkg);
+    const started = Date.parse(progress.guide_photo.lease_started_at);
+    const expires = Date.parse(progress.guide_photo.lease_expires_at);
+    expect(expires - started).toBe(GENERATION_LEASE_SECONDS * 1000);
+    expect(expires).toBeGreaterThan(before + GENERATION_DEADLINE_MS);
+    expect((await claimType(pkg, "guide_photo")).data).toBe(false); // still held
+    const { progress: after } = await progressOf(pkg);
+    expect(after.guide_photo.attempt).toBe(1);
+  });
+
+  it("concurrent retry clicks on an expired claim: exactly one reclaims it", async () => {
+    const sessionId = await createTestSession();
+    const pkg = await createPackage(sessionId, ["guide_photo"]);
+    expect((await claimType(pkg, "guide_photo", 0)).data).toBe(true); // the dead invocation's claim
+    const results = await Promise.all([
+      claimType(pkg, "guide_photo"), claimType(pkg, "guide_photo"), claimType(pkg, "guide_photo"),
+    ]);
+    expect(results.filter((r) => r.data === true)).toHaveLength(1);
+    const { progress } = await progressOf(pkg);
+    expect(progress.guide_photo.attempt).toBe(2);
+    expect(Date.parse(progress.guide_photo.lease_expires_at)).toBeGreaterThan(Date.now());
   });
 
   it("concurrent claims: exactly one winner", async () => {

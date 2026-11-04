@@ -1,18 +1,31 @@
 // Shared plumbing for the per-type generation targets: context/result types,
 // the JSON model call, photo summaries, and identity/validation guards.
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { ModelCaller, ModelUsage } from "@/lib/contentEngine/aiClient";
+import type { ModelCaller, ModelCallRequest, ModelCallResult, ModelUsage } from "@/lib/contentEngine/aiClient";
 import { extractJsonObject } from "@/lib/contentEngine/analysisResponse";
 import type { BuiltPrompt, PhotoSummary } from "@/lib/contentEngine/prompts";
 import { validatePayload, type SessionFactsSnapshot } from "@/lib/contentEngine/payloads";
 import { generateMetaKeywords } from "@/lib/contentEngine/serviceKeywords";
 import type { toImageBlock } from "@/lib/contentEngine/modelImages";
 import type { KnownPlace } from "@/lib/locations/places";
+import { withRetries } from "@/lib/contentEngine/retry";
+import { isModelTimeoutError, isTransientModelError, modelRetryDelayMs } from "@/lib/contentEngine/modelRetry";
+import {
+  GENERATION_DEADLINE_MS, GENERATION_RETRY, MIN_MODEL_CALL_MS, remainingModelCallMs,
+} from "@/lib/contentEngine/generationBudget";
 
 export class GenerationError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "GenerationError";
+  }
+}
+
+/** The model could not answer inside the generation deadline. Retryable by a fresh invocation. */
+export class GenerationTimeoutError extends GenerationError {
+  constructor(message: string) {
+    super(message);
+    this.name = "GenerationTimeoutError";
   }
 }
 
@@ -41,6 +54,11 @@ export interface TargetContext {
   sessionId: string;
   packageId: string;
   facts: SessionFactsSnapshot;
+  /** Epoch ms by which every model call of this target must have returned (generationBudget). */
+  deadlineAt?: number;
+  /** Injectable clock, so tests never wait out a real budget. */
+  now?: () => number;
+  sleep?: (ms: number) => Promise<void>;
 }
 
 // Deterministic meta keywords from the approved taxonomy/facts — never
@@ -76,12 +94,41 @@ export async function loadPhotoSummaries(client: SupabaseClient, sessionId: stri
   }));
 }
 
+const seconds = (ms: number) => Math.round(ms / 1000);
+
+type ModelCallBody = Pick<ModelCallRequest, "model" | "system" | "maxTokens" | "messages">;
+
+// One attempt, given exactly the time left: the SDK's own timeout is set to
+// the remainder (never its 10-minute default) and its retries are off — the
+// loop around this retries against the same deadline. A timeout comes back as
+// GenerationTimeoutError, which is final: there is no time left to try again.
+async function boundedModelCall(
+  ctx: TargetContext, body: ModelCallBody, deadlineAt: number, now: () => number,
+): Promise<ModelCallResult> {
+  const remaining = remainingModelCallMs(deadlineAt, now());
+  if (remaining < MIN_MODEL_CALL_MS) {
+    throw new GenerationTimeoutError(
+      `only ${seconds(remaining)}s left before the generation deadline — not enough for a model call`,
+    );
+  }
+  try {
+    return await ctx.callModel({ ...body, timeoutMs: remaining, maxRetries: 0 });
+  } catch (err) {
+    if (isModelTimeoutError(err)) {
+      throw new GenerationTimeoutError(`model call timed out after ${seconds(remaining)}s`);
+    }
+    throw err;
+  }
+}
+
 export async function callForJson(
   ctx: TargetContext, prompt: BuiltPrompt,
   imageBlocks: ReturnType<typeof toImageBlock>[] = [],
   maxTokens = 4000,
 ): Promise<{ json: unknown; usage: TargetUsage }> {
-  const response = await ctx.callModel({
+  const now = ctx.now ?? Date.now;
+  const deadlineAt = ctx.deadlineAt ?? now() + GENERATION_DEADLINE_MS;
+  const body: ModelCallBody = {
     model: ctx.model,
     system: prompt.system,
     maxTokens,
@@ -91,6 +138,11 @@ export async function callForJson(
         ? [...imageBlocks, { type: "text", text: prompt.userText }]
         : prompt.userText,
     }],
+  };
+  const response = await withRetries(() => boundedModelCall(ctx, body, deadlineAt, now), {
+    policy: GENERATION_RETRY, deadlineAt, now, sleep: ctx.sleep,
+    isRetryable: isTransientModelError,
+    delayFor: (err, attempt) => modelRetryDelayMs(err, attempt, GENERATION_RETRY),
   });
   return {
     json: extractJsonObject(response.text),

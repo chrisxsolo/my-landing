@@ -18,6 +18,11 @@ export function isTransientModelError(err: unknown): boolean {
   return false;
 }
 
+/** The SDK gave up waiting (our per-request timeout): retrying would only run out of time again. */
+export function isModelTimeoutError(err: unknown): boolean {
+  return err instanceof Anthropic.APIConnectionTimeoutError;
+}
+
 function retryAfterMs(err: unknown): number | null {
   if (!(err instanceof Anthropic.APIError)) return null;
   const header = err.headers?.get("retry-after");

@@ -11,6 +11,7 @@ import { generateContentType } from "@/lib/contentEngine/generateContent";
 import { buildLocationSummary } from "@/lib/contentEngine/locationSummary";
 import { confirmNewPlace } from "@/lib/locations/confirmLocation";
 import type { ModelCallRequest } from "@/lib/contentEngine/aiClient";
+import Anthropic from "@anthropic-ai/sdk";
 
 beforeAll(() => resetDb());
 
@@ -183,5 +184,64 @@ describe("Test E — uncertain location", () => {
     const after = await buildLocationSummary(service, sessionId);
     expect(after).toMatchObject({ status: "verified", place: { city: "Pescadero", county: "San Mateo County" } });
     expect(after!.proposedGuide!.url).toBe("/couples-guide/locations/hidden-cove-test-beach-pescadero");
+  });
+});
+
+describe("Test H — a cut-off proposal attempt, then retry (2026-11-03 guide-photo timeout)", () => {
+  async function progressOf(packageId: string) {
+    const { data } = await service.from("session_content_packages")
+      .select("status,generation_settings").eq("id", packageId).single();
+    return data!.generation_settings.progress.guide_photo;
+  }
+
+  it("the first attempt records failed (not processing); the retry proposes exactly one guide; a further retry never duplicates it", async () => {
+    const { sessionId, photoIds } = await couplesSession("Shark Fin Cove");
+    const pkg = await createPackage(sessionId, ["guide_photo"], couplesFacts("Shark Fin Cove"));
+
+    const first = await generateContentType({
+      client: service, packageId: pkg, contentType: "guide_photo",
+      callModel: async () => { throw new Anthropic.APIConnectionTimeoutError({ message: "Request timed out." }); },
+    });
+    expect(first.outcome).toBe("failed");
+    expect(first.failure).toEqual({ kind: "timeout", retryable: true });
+    const afterTimeout = await progressOf(pkg);
+    expect(afterTimeout.status).toBe("failed");
+    expect(afterTimeout.lease_expires_at).toBeNull();
+    expect(afterTimeout.attempt).toBe(1);
+    expect(await itemsOf(pkg, "location_guide")).toHaveLength(0);
+
+    const calls: ModelCallRequest[] = [];
+    const retry = await generateContentType({
+      client: service, packageId: pkg, contentType: "guide_photo",
+      callModel: scriptedModel(() => proposalResponse(photoIds), calls),
+    });
+    expect(retry.outcome).toBe("completed");
+    expect(calls).toHaveLength(1);
+    expect(calls[0].timeoutMs).toBeGreaterThan(0);
+    const afterRetry = await progressOf(pkg);
+    expect(afterRetry).toMatchObject({ status: "completed", attempt: 2, lease_expires_at: null });
+    expect(afterRetry.usage.input_tokens).toBe(900);
+    const proposals = await itemsOf(pkg, "location_guide");
+    expect(proposals).toHaveLength(1);
+    expect(proposals[0].payload.location_key).toBe("shark-fin-cove");
+    expect(await itemsOf(pkg, "guide_photo")).toHaveLength(0); // no placement until the page exists
+
+    // A third attempt (the type forced back to failed, as a second tab's Retry
+    // after a later failure would see it) finds the proposal and skips — no
+    // model call, no second draft.
+    const { data: row } = await service.from("session_content_packages")
+      .select("generation_settings").eq("id", pkg).single();
+    const settings = row!.generation_settings;
+    settings.progress.guide_photo = { ...settings.progress.guide_photo, status: "failed" };
+    await service.from("session_content_packages").update({ generation_settings: settings }).eq("id", pkg);
+    const again = await generateContentType({
+      client: service, packageId: pkg, contentType: "guide_photo",
+      callModel: scriptedModel(() => proposalResponse(photoIds), calls),
+    });
+    expect(again.outcome).toBe("skipped");
+    expect(calls).toHaveLength(1);
+    expect(await itemsOf(pkg, "location_guide")).toHaveLength(1);
+
+    await service.from("session_content_items").update({ status: "rejected" }).eq("id", proposals[0].id);
   });
 });

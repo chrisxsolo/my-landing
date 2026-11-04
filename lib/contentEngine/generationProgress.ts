@@ -20,10 +20,47 @@ export type GenerationType = (typeof GENERATION_ORDER)[number];
 export type GenerationStatus =
   | "pending" | "processing" | "completed" | "failed" | "skipped";
 
+// One type's entry in generation_settings.progress, as the claim/record RPCs
+// write it. The lease timestamps are part of the contract: a `processing`
+// entry is only "running" while its lease is live — once it lapses, the
+// invocation that held it is gone (Vercel killed it) and the type is
+// reclaimable, which is exactly what claim_generation_type checks.
 export interface GenerationProgressEntry {
   status: GenerationStatus;
   attempt?: number;
   error?: string | null;
+  usage?: { model: string; input_tokens: number; output_tokens: number } | null;
+  lease_started_at?: string | null;
+  lease_expires_at?: string | null;
+  completed_at?: string | null;
+}
+
+/** A stored status read against the clock: `processing` splits into running and stalled. */
+export type EffectiveGenerationState =
+  | "pending" | "running" | "stalled" | "failed" | "completed" | "skipped";
+
+/** The lease expiry as epoch ms, or null when it is missing or unreadable. */
+export function leaseExpiresAtMs(entry: GenerationProgressEntry): number | null {
+  const raw = entry.lease_expires_at;
+  if (typeof raw !== "string") return null;
+  const ms = Date.parse(raw);
+  return Number.isFinite(ms) ? ms : null;
+}
+
+/**
+ * What a progress entry means right now. `nowMs` must be the server's clock
+ * (or the browser's corrected by a server offset) — the lease was written by
+ * the database, and a browser running ahead would otherwise call a live claim
+ * stalled. A missing or unreadable lease on a processing entry is stalled: the
+ * RPC treats it as expired, and hiding it would strand the type.
+ */
+export function effectiveGenerationState(
+  entry: GenerationProgressEntry | undefined, nowMs: number,
+): EffectiveGenerationState {
+  if (!entry) return "pending";
+  if (entry.status !== "processing") return entry.status;
+  const expiresAt = leaseExpiresAtMs(entry);
+  return expiresAt !== null && expiresAt > nowMs ? "running" : "stalled";
 }
 
 export type GenerationProgressMap = Record<string, GenerationProgressEntry | undefined>;
@@ -45,6 +82,18 @@ export function pendingGenerationTypesFrom(
       const entry = progress[type];
       return !!entry && !TERMINAL.includes(entry.status);
     });
+}
+
+/**
+ * Pending types a retry may claim now: everything not terminal except a type
+ * another invocation is still running. Those are left to their owner (a claim
+ * would only answer 409) and picked up once the lease lapses.
+ */
+export function retryableGenerationTypesFrom(
+  selectedTypes: readonly string[], progress: GenerationProgressMap, nowMs: number,
+): string[] {
+  return pendingGenerationTypesFrom(selectedTypes, progress)
+    .filter((type) => effectiveGenerationState(progress[type], nowMs) !== "running");
 }
 
 export interface NextTypeOptions {

@@ -30,6 +30,8 @@ export default function Workspace({ sessionId }: { sessionId: string }) {
   const [data, setData] = useState<WorkspaceData | null>(null);
   const [photos, setPhotos] = useState<EnginePhoto[]>([]);
   const [error, setError] = useState<string | null>(null);
+  // serverNow − Date.now(): generation leases are judged on the server clock.
+  const [clockOffsetMs, setClockOffsetMs] = useState(0);
   const [analytics, setAnalytics] = useState<{ views: number; ctaClicks: number; perItem: Record<string, number> } | null>(null);
   // FactsSection registers its committer here so the one-click run saves the
   // facts form before a package snapshot freezes them.
@@ -49,12 +51,24 @@ export default function Workspace({ sessionId }: { sessionId: string }) {
         engineApi.listPhotos(sessionId),
       ]);
       setData(workspace);
+      setClockOffsetMs(workspace.serverNow - Date.now());
       setPhotos(photoList.photos);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "could not load session");
     }
     engineApi.analytics(sessionId).then(setAnalytics).catch(() => setAnalytics(null));
+  }, [sessionId]);
+
+  // Package/items only — no photo list, so polling never re-signs thumbnails.
+  const refreshWorkspace = useCallback(async () => {
+    try {
+      const workspace = await engineApi.getWorkspace(sessionId);
+      setData(workspace);
+      setClockOffsetMs(workspace.serverNow - Date.now());
+    } catch {
+      // transient; the next poll or a full refresh tries again
+    }
   }, [sessionId]);
 
   useEffect(() => {
@@ -128,7 +142,7 @@ export default function Workspace({ sessionId }: { sessionId: string }) {
         ])} />
       <GenerationSection sessionId={sessionId} session={session} activePackage={data.activePackage}
         items={data.items} aiAllowed={session.ai_processing_allowed as boolean}
-        photos={photos} onChanged={refresh} />
+        photos={photos} clockOffsetMs={clockOffsetMs} onChanged={refresh} onPoll={refreshWorkspace} />
       <ItemsSection items={data.items} photos={photos} onChanged={refresh}
         serviceType={typeof session.service_type === "string" ? session.service_type : undefined} />
       <PublicationHistory published={data.published} onChanged={refresh} viewCounts={analytics?.perItem ?? {}} />

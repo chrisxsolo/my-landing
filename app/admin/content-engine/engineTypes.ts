@@ -2,6 +2,7 @@
 import type { SessionEngineState } from "@/lib/contentEngine/state";
 import type { ExtractionOutcome, FreshnessOutcome } from "@/lib/contentEngine/emailFacts/run";
 import type { PhotoStatusRow } from "@/lib/contentEngine/jobProgress";
+import type { GenerationProgressEntry } from "@/lib/contentEngine/generationProgress";
 
 export type { SessionEngineState, PhotoStatusRow };
 export type { LocationSummaryDto, PlaceDto } from "@/lib/contentEngine/locationSummary";
@@ -88,12 +89,9 @@ export interface EnginePackage {
   } & Record<string, unknown>;
   generation_settings: {
     selected_types?: string[];
-    progress?: Record<string, {
-      status: "pending" | "processing" | "completed" | "failed" | "skipped";
-      attempt: number;
-      error: string | null;
-      usage: { model: string; input_tokens: number; output_tokens: number } | null;
-    }>;
+    // The lease timestamps are part of the entry (generationProgress.ts): a
+    // `processing` type is only live while its lease is.
+    progress?: Record<string, GenerationProgressEntry>;
   };
   created_at: string;
 }
@@ -114,6 +112,8 @@ export interface WorkspaceData {
   photoCount: number;
   itemCounts: Record<string, number>;
   activePackageId: string | null;
+  /** Server clock (epoch ms) when the response was built, to correct for skew. */
+  serverNow: number;
 }
 
 // A background content run (content_engine_jobs). The phase is the worker's

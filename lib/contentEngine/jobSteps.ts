@@ -16,6 +16,7 @@ import {
   type GenerationProgressMap,
 } from "@/lib/contentEngine/generationProgress";
 import type { ContentEngineJob, JobPhase, WorkerContext } from "@/lib/contentEngine/jobRunner";
+import { GENERATION_MIN_WINDOW_MS } from "@/lib/contentEngine/generationBudget";
 
 // When every remaining photo is leased by someone else (the admin's Analyze
 // button), wait this long before looking again instead of spinning steps.
@@ -28,6 +29,7 @@ export interface StepEnv {
   /** True once the job was cancelled or its lease lost; also renews the lease. */
   shouldStop: () => Promise<boolean>;
   sleep: (ms: number) => Promise<void>;
+  now: () => number;
 }
 
 /** The outcome of one step: where the job goes next and what to record. */
@@ -39,6 +41,8 @@ export interface StepResult {
   fatal?: string;
   /** Pass over these content types for the rest of the invocation. */
   skipTypes?: string[];
+  /** Too little of the invocation is left for this step: hand the job back untouched. */
+  deferred?: boolean;
 }
 
 const message = (err: unknown) => (err instanceof Error ? err.message : String(err));
@@ -192,10 +196,16 @@ async function loadPackageProgress(ctx: WorkerContext, packageId: string): Promi
 
 type TypeOutcome = { softError?: string; skipType?: string; fatal?: string };
 
-async function generateOneType(ctx: WorkerContext, packageId: string, contentType: string): Promise<TypeOutcome> {
+async function generateOneType(
+  ctx: WorkerContext, packageId: string, contentType: string, env: StepEnv,
+): Promise<TypeOutcome> {
   try {
+    // Every model call ends by the invocation's hard deadline, so a type is
+    // recorded failed (and retried next invocation) instead of being killed
+    // mid-call and left `processing` until its lease lapses.
     const result = await generateContentType({
       client: ctx.client, callModel: ctx.callModel, packageId, contentType,
+      deadlineAt: env.hardDeadlineAt, now: env.now, sleep: env.sleep,
     });
     // A failed type is recorded on the package with its own error; the run
     // carries on and the admin can retry or skip that one type by hand.
@@ -216,12 +226,12 @@ async function generateOneType(ctx: WorkerContext, packageId: string, contentTyp
  * testimonial draft that failed (and is due a retry) holds the journal back.
  */
 async function journalAfter(
-  ctx: WorkerContext, packageId: string, inputs: Promise<TypeOutcome[]>, skip: ReadonlySet<string>,
+  ctx: WorkerContext, packageId: string, inputs: Promise<TypeOutcome[]>, skip: ReadonlySet<string>, env: StepEnv,
 ): Promise<TypeOutcome[]> {
   await inputs;
   const now = await loadPackageProgress(ctx, packageId);
   if (typeof now === "string" || !journalReady(now.selected, now.progress, { skip })) return [];
-  return [await generateOneType(ctx, packageId, "journal_post")];
+  return [await generateOneType(ctx, packageId, "journal_post", env)];
 }
 
 /**
@@ -232,7 +242,7 @@ async function journalAfter(
  * and a replayed type is a no-op.
  */
 async function generateStep(
-  ctx: WorkerContext, job: ContentEngineJob, skip: ReadonlySet<string>,
+  ctx: WorkerContext, job: ContentEngineJob, skip: ReadonlySet<string>, env: StepEnv,
 ): Promise<StepResult> {
   if (!job.package_id) return { phase: "package" };
   const packageId = job.package_id;
@@ -246,12 +256,18 @@ async function generateStep(
       patch: { types_total: before.selected.length, types_done: settledGenerationCount(before.selected, before.progress) },
     };
   }
+  // A wave started with only a sliver of the invocation left would just time
+  // out and burn one of the type's attempts. Hand the job back instead; the
+  // next invocation starts it with the full window.
+  if (env.hardDeadlineAt - env.now() < GENERATION_MIN_WINDOW_MS) {
+    return { phase: "generate", deferred: true };
+  }
 
   const isInput = (t: string) => JOURNAL_DEPENDENCIES.includes(t);
-  const inputs = Promise.all(wave.filter(isInput).map((t) => generateOneType(ctx, packageId, t)));
-  const others = Promise.all(wave.filter((t) => !isInput(t)).map((t) => generateOneType(ctx, packageId, t)));
+  const inputs = Promise.all(wave.filter(isInput).map((t) => generateOneType(ctx, packageId, t, env)));
+  const others = Promise.all(wave.filter((t) => !isInput(t)).map((t) => generateOneType(ctx, packageId, t, env)));
   const journalPending = before.selected.includes("journal_post") && !wave.includes("journal_post");
-  const journal = journalPending ? journalAfter(ctx, packageId, inputs, skip) : Promise.resolve([]);
+  const journal = journalPending ? journalAfter(ctx, packageId, inputs, skip, env) : Promise.resolve([]);
   const outcomes = (await Promise.all([inputs, others, journal])).flat();
 
   const after = await loadPackageProgress(ctx, packageId);
@@ -272,7 +288,7 @@ export async function executeStep(
     case "analyze": return analyzeStep(ctx, job, env);
     case "curate": return curateStep(ctx, job);
     case "package": return packageStep(ctx, job);
-    case "generate": return generateStep(ctx, job, skip);
+    case "generate": return generateStep(ctx, job, skip, env);
     case "done": return { phase: "done" };
   }
 }

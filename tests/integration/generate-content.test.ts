@@ -6,8 +6,13 @@ import { generateContentType, GenerationConflictError } from "@/lib/contentEngin
 import { PROMPT_VERSION } from "@/lib/contentEngine/prompts";
 import { ORIGINALS_BUCKET } from "@/lib/contentEngine/uploadConfig";
 import type { ModelCaller } from "@/lib/contentEngine/aiClient";
+import Anthropic from "@anthropic-ai/sdk";
 
 beforeAll(() => resetDb());
+
+const timingOutModel: ModelCaller = async () => {
+  throw new Anthropic.APIConnectionTimeoutError({ message: "Request timed out." });
+};
 
 function fakeModel(text: string): ModelCaller {
   return async (req) => ({
@@ -95,6 +100,32 @@ describe("generateContentType (spec §8.2)", () => {
     expect(result.outcome).toBe("completed");
     const items = await itemsOf(pkg, "internal_link_suggestion");
     expect(items[0].payload.links.map((l: { url: string }) => l.url)).toEqual(["/grads/sjsu"]);
+  });
+
+  it("a model timeout is recorded failed with the lease cleared — never left processing — and a retry succeeds", async () => {
+    const sessionId = await createTestSession();
+    const pkg = await createPackage(sessionId, ["internal_link_suggestion"]);
+    const first = await generateContentType({
+      client: service, packageId: pkg, contentType: "internal_link_suggestion",
+      callModel: timingOutModel,
+    });
+    expect(first.outcome).toBe("failed");
+    expect(first.failure).toEqual({ kind: "timeout", retryable: true });
+    const { status, progress } = await packageState(pkg);
+    expect(status).toBe("needs_attention");
+    expect(progress.internal_link_suggestion.status).toBe("failed");
+    expect(progress.internal_link_suggestion.lease_expires_at).toBeNull();
+    expect(progress.internal_link_suggestion.error).toMatch(/timed out/i);
+    expect(progress.internal_link_suggestion.attempt).toBe(1);
+
+    const retry = await generateContentType({
+      client: service, packageId: pkg, contentType: "internal_link_suggestion",
+      callModel: fakeModel(JSON.stringify({ links: [] })),
+    });
+    expect(retry.outcome).toBe("completed");
+    const { progress: after } = await packageState(pkg);
+    expect(after.internal_link_suggestion.attempt).toBe(2);
+    expect(after.internal_link_suggestion.usage.input_tokens).toBe(800);
   });
 
   it("a second call for the same type conflicts (no double generation)", async () => {

@@ -155,6 +155,7 @@ export async function runWorkerOnce(args: RunWorkerArgs): Promise<RunWorkerResul
     hardDeadlineAt: startedAt + Math.max(budgetMs, HARD_DEADLINE_MS),
     shouldStop: createHeartbeat(client, job.id, leaseSeconds, clock),
     sleep: args.sleep ?? realSleep,
+    now: clock,
   };
 
   // Writes progress and renews the lease in one statement. The status guard is
@@ -245,6 +246,12 @@ export async function runWorkerOnce(args: RunWorkerArgs): Promise<RunWorkerResul
       console.error(`[content-engine] job ${job.id} step threw (attempt ${job.attempts + 1}): ${reason}`);
       await releaseForRetry(reason);
       return result({ status: "running", handedOff: false });
+    }
+
+    if (step.deferred) {
+      // Not enough invocation left for this step: nothing ran, nothing to record.
+      await handOff();
+      return result({ status: "queued", handedOff: true });
     }
 
     for (const type of step.skipTypes ?? []) skip.add(type);
