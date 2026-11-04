@@ -225,3 +225,210 @@ describe("approval-time conflict detection", () => {
     expect(unresolved).toHaveLength(0);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Regression: "Learn from reply" on a visibly different email.
+//
+// Synthetic stand-in for the reported case: a multi-paragraph proposal email
+// where the sent version rewords sentences, adds and removes a question, and
+// changes the price. The differ must find edits and keep the price change
+// separate from the style changes. All names and figures here are invented.
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { runLearnReview, type LearnDeps } from "@/lib/ai/learnService";
+
+const PROPOSAL_AI_DRAFT = `Hi Jordan,
+
+Thank you so much for reaching out! I'd love to photograph your proposal at Baker Beach!
+
+My proposal sessions are $450 for one hour and include around 40 edited photos. If you'd like, I can also stay for a few portraits of the two of you afterward.
+
+Would sunset on November 15th work for you? Do you know roughly where on the beach you're planning to ask?
+
+Once we settle on the details I'll send over the invoice and contract to lock it in!`;
+
+const PROPOSAL_SENT = `Hi Jordan,
+
+Thanks for reaching out! I'd love to photograph your proposal at Baker Beach.
+
+Proposal sessions are $475 for an hour with around 40 edited photos, and I usually stay for a few portraits of you two afterward.
+
+Does sunset on November 15th work? Is there a spot on the beach you have in mind, and will anyone else be there with you?
+
+Once the details are set I'll send the invoice and contract and we're locked in!`;
+
+describe("a visibly different sent email is never 'exactly as drafted'", () => {
+  it("finds edits and separates the price change from the wording changes", () => {
+    const edits = detectEdits(PROPOSAL_AI_DRAFT, PROPOSAL_SENT);
+    expect(edits.length).toBeGreaterThan(0);
+
+    const price = edits.find((e) => e.kind === "price_changed");
+    expect(price).toMatchObject({ category: "factual", ruleCandidate: false, before: "$450", after: "$475" });
+
+    expect(edits.some((e) => e.category === "style" && e.ruleCandidate)).toBe(true);
+    expect(isFactualOnly(edits)).toBe(false);
+
+    const result = analyzeEditsDeterministically({ aiDraft: PROPOSAL_AI_DRAFT, sentDraft: PROPOSAL_SENT, existingRules: [] });
+    expect(result.outcome).toBe("style_candidates");
+    expect(result.message).not.toMatch(/exactly as drafted/i);
+  });
+
+  it("treats line endings and extra blank lines as no edit at all", () => {
+    const crlf = PROPOSAL_AI_DRAFT.replace(/\n/g, "\r\n").replace(/\r\n\r\n/g, "\r\n\r\n\r\n") + "  \r\n";
+    expect(detectEdits(PROPOSAL_AI_DRAFT, crlf)).toEqual([]);
+    expect(analyzeEditsDeterministically({ aiDraft: PROPOSAL_AI_DRAFT, sentDraft: crlf, existingRules: [] }).outcome).toBe("unchanged");
+  });
+
+  it("still sees a real wording change under CRLF line endings", () => {
+    const crlfEdited = PROPOSAL_AI_DRAFT.replace(/\n/g, "\r\n").replace("Thank you so much for reaching out!", "Thanks for reaching out!");
+    const edits = detectEdits(PROPOSAL_AI_DRAFT, crlfEdited);
+    expect(edits.length).toBeGreaterThan(0);
+    expect(edits.some((e) => e.ruleCandidate)).toBe(true);
+  });
+
+  it("reports a factual-only outcome with a distinct code", () => {
+    const result = analyzeEditsDeterministically({
+      aiDraft: "Hi Sarah,\n\nThat's $350 for the hour",
+      sentDraft: "Hi Sarah,\n\nThat's $375 for the hour",
+      existingRules: [],
+    });
+    expect(result.outcome).toBe("factual_only");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The deterministic result survives whatever happens afterwards.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function failingCaller(error: Error) {
+  const calls: unknown[] = [];
+  const caller = async (req: unknown) => { calls.push(req); throw error; };
+  return Object.assign(caller, { calls });
+}
+
+function deps(overrides: Partial<LearnDeps> = {}): LearnDeps & { inserted: string[] } {
+  const inserted: string[] = [];
+  return {
+    inserted,
+    fetchRules: async () => [],
+    insertRule: async (input) => {
+      inserted.push(input.rule);
+      return rule(input.rule, { id: `id-${inserted.length}`, status: "pending", source: "learn-from-edit" });
+    },
+    call: fakeCaller("- Keep the opening to a short thanks"),
+    ...overrides,
+  };
+}
+
+describe("model failure after deterministic success", () => {
+  it("keeps the detected edits and reports a retryable learning failure", async () => {
+    const call = failingCaller(new Error("529 overloaded_error"));
+    const result = await learnFromEdit({ aiDraft: PROPOSAL_AI_DRAFT, sentDraft: PROPOSAL_SENT, existingRules: [] }, call);
+
+    expect(call.calls).toHaveLength(1);
+    expect(result.outcome).toBe("phrasing_failed");
+    expect(result.edits.length).toBeGreaterThan(0);
+    expect(result.edits.some((e) => e.kind === "price_changed")).toBe(true);
+    expect(result.failure?.code).toBe("overloaded");
+    expect(result.message).toMatch(new RegExp(`found ${result.edits.length} change`, "i"));
+    expect(result.message).not.toMatch(/draft request failed|exactly as drafted/i);
+  });
+
+  it("does not call the model when there is nothing stylistic, even if the model is down", async () => {
+    const call = failingCaller(new Error("should not be called"));
+    const result = await learnFromEdit({
+      aiDraft: "Hi Sarah,\n\nThat's $350", sentDraft: "Hi Sarah,\n\nThat's $375", existingRules: [],
+    }, call);
+    expect(call.calls).toHaveLength(0);
+    expect(result.outcome).toBe("factual_only");
+  });
+
+  it("treats an empty model reply as a phrasing failure, not as no edits", async () => {
+    const result = await learnFromEdit({ aiDraft: PROPOSAL_AI_DRAFT, sentDraft: PROPOSAL_SENT, existingRules: [] }, fakeCaller(""));
+    expect(result.outcome).toBe("phrasing_failed");
+    expect(result.failure?.code).toBe("empty_output");
+    expect(result.edits.length).toBeGreaterThan(0);
+  });
+
+  it("treats prose with no rule lines as malformed output", async () => {
+    const result = await learnFromEdit(
+      { aiDraft: PROPOSAL_AI_DRAFT, sentDraft: PROPOSAL_SENT, existingRules: [] },
+      fakeCaller("Sure! Here are some thoughts about the edits without any rules."),
+    );
+    expect(result.outcome).toBe("phrasing_failed");
+    expect(result.failure?.code).toBe("empty_output");
+  });
+
+  it("reports NONE truthfully as no general rule, with the edits intact", async () => {
+    const result = await learnFromEdit({ aiDraft: PROPOSAL_AI_DRAFT, sentDraft: PROPOSAL_SENT, existingRules: [] }, fakeCaller("NONE"));
+    expect(result.outcome).toBe("no_general_rule");
+    expect(result.candidates).toEqual([]);
+    expect(result.edits.length).toBeGreaterThan(0);
+  });
+});
+
+describe("runLearnReview: persistence is reported, never assumed", () => {
+  const input = { aiDraft: PROPOSAL_AI_DRAFT, sentDraft: PROPOSAL_SENT };
+
+  it("stores new candidates as pending exactly once and says so", async () => {
+    const d = deps();
+    const result = await runLearnReview(input, d);
+    expect(result.outcome).toBe("rules_pending");
+    expect(d.inserted).toEqual(["Keep the opening to a short thanks"]);
+    expect(result.pending.map((p) => p.rule)).toEqual(["Keep the opening to a short thanks"]);
+    expect(result.apiCalls).toBe(1);
+  });
+
+  it("does not claim rules are waiting when the insert failed", async () => {
+    const d = deps({ insertRule: async () => null });
+    const result = await runLearnReview(input, d);
+    expect(result.outcome).toBe("persist_failed");
+    expect(result.pending).toEqual([]);
+    expect(result.failure?.code).toBe("rules_write");
+    expect(result.edits.length).toBeGreaterThan(0);
+    expect(result.message).not.toMatch(/waiting for (your )?approval/i);
+  });
+
+  it("does not store a duplicate pending rule on retry", async () => {
+    const stored: WritingRule[] = [];
+    const d = deps({
+      fetchRules: async () => stored,
+      insertRule: async (i) => { const r = rule(i.rule, { id: `id-${stored.length + 1}`, status: "pending" }); stored.push(r); return r; },
+    });
+    const first = await runLearnReview(input, d);
+    expect(first.outcome).toBe("rules_pending");
+    expect(stored).toHaveLength(1);
+
+    const second = await runLearnReview(input, d);
+    expect(stored).toHaveLength(1);
+    expect(second.pending).toEqual([]);
+    expect(second.outcome).toBe("no_general_rule");
+    expect(second.candidates[0].intake.verdict).toBe("duplicate");
+  });
+
+  it("returns the edits with a configuration failure when no model is available", async () => {
+    const result = await runLearnReview(input, deps({ call: null }));
+    expect(result.outcome).toBe("phrasing_failed");
+    expect(result.failure?.code).toBe("not_configured");
+    expect(result.edits.length).toBeGreaterThan(0);
+    expect(result.apiCalls).toBe(0);
+  });
+
+  it("returns a deterministic outcome without a model when nothing stylistic changed", async () => {
+    const result = await runLearnReview(
+      { aiDraft: "Hi Sarah,\n\nThat's $350", sentDraft: "Hi Sarah,\n\nThat's $375" },
+      deps({ call: null }),
+    );
+    expect(result.outcome).toBe("factual_only");
+    expect(result.apiCalls).toBe(0);
+  });
+
+  it("reports a rules-store read failure instead of guessing at duplicates", async () => {
+    const d = deps({ fetchRules: async () => { throw new Error("connection refused"); } });
+    const result = await runLearnReview(input, d);
+    expect(result.outcome).toBe("phrasing_failed");
+    expect(result.failure?.code).toBe("rules_read");
+    expect(d.inserted).toEqual([]);
+    expect(result.edits.length).toBeGreaterThan(0);
+  });
+});

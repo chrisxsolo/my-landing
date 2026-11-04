@@ -1,13 +1,14 @@
 "use client";
-// Learn from Reply — compares the AI draft with what was actually sent.
-// Factual changes are reported as corrections; style changes become rule
-// candidates that need approval. Analysis lives in the page.
+// Learn from Reply — compares the AI draft Chris edited with what was actually
+// sent. Factual changes are reported as corrections; style changes become rule
+// candidates that need approval. Analysis lives in the page; which draft is
+// compared is decided in learnBaseline.ts.
 
 import { T, Icon, Spinner, Panel, PanelHead, MonoLabel } from "../ui";
+import { BASELINE_LABELS, type LearnBaseline } from "./learnBaseline";
 
 type Props = {
-  originalAiDraft: string;
-  lastAiDraft: string;
+  baseline: LearnBaseline;
   manualAiDraft: string;
   onManualAiDraft: (v: string) => void;
   actualSent: string;
@@ -17,13 +18,16 @@ type Props = {
   learnedRules: string[] | null;
   /** Edits classified as corrections to this one email, not preferences. */
   factualEdits: string[];
+  /** A result that needs Chris's attention but is not a rule list: a retry prompt. */
+  learnNotice: string | null;
   learnLoading: boolean;
   onAnalyze: () => void;
   onReset: () => void;
 };
 
 export default function LearnPanel(p: Props) {
-  const hasAiDraft = Boolean(p.originalAiDraft || p.lastAiDraft);
+  const hasAiBaseline = p.baseline.source === "latest_ai" || p.baseline.source === "sent_cycle";
+  const canAnalyze = Boolean(p.baseline.text) && Boolean(p.actualSent.trim()) && !p.learnLoading;
 
   return (
     <Panel>
@@ -75,11 +79,18 @@ export default function LearnPanel(p: Props) {
               Paste what you actually sent. The differences are classified first: changed dates, prices, times, and names are treated as corrections to this email, and only genuine style changes become rules for you to approve.
             </p>
 
-            {hasAiDraft ? (
+            {p.learnNotice && (
+              <div className="rounded-xl p-3" role="status"
+                style={{ background: T.amberBg, border: `1px solid ${T.amberBorder}` }}>
+                <p className="text-xs leading-snug" style={{ color: T.ink }}>{p.learnNotice}</p>
+              </div>
+            )}
+
+            {hasAiBaseline ? (
               <div className="rounded-xl p-3 space-y-1"
                 style={{ background: T.inset, border: `1px solid ${T.rowBorder}` }}>
                 <div className="flex items-center justify-between">
-                  <MonoLabel>Original AI draft</MonoLabel>
+                  <MonoLabel>{BASELINE_LABELS[p.baseline.source as "latest_ai" | "sent_cycle"]}</MonoLabel>
                   <button
                     onClick={() => p.onAiDraftExpanded(!p.aiDraftExpanded)}
                     className="text-[10px] underline underline-offset-2 transition-colors hover:opacity-70"
@@ -88,18 +99,18 @@ export default function LearnPanel(p: Props) {
                   </button>
                 </div>
                 <p className={`text-xs leading-relaxed whitespace-pre-wrap${p.aiDraftExpanded ? "" : " line-clamp-3"}`}
-                  style={{ color: T.inkFaint }}>{p.originalAiDraft || p.lastAiDraft}</p>
+                  style={{ color: T.inkFaint }}>{p.baseline.text}</p>
               </div>
             ) : (
               <div>
                 <MonoLabel className="block mb-1">
-                  AI draft <span className="normal-case font-normal tracking-normal" style={{ opacity: 0.7, fontFamily: "inherit" }}>(paste here if you didn&apos;t use Draft with AI)</span>
+                  AI draft you edited <span className="normal-case font-normal tracking-normal" style={{ opacity: 0.7, fontFamily: "inherit" }}>(no AI draft from this reply is on hand, so paste it here)</span>
                 </MonoLabel>
                 <textarea
                   value={p.manualAiDraft}
                   onChange={e => p.onManualAiDraft(e.target.value)}
                   rows={4}
-                  placeholder="Paste the AI-generated draft here…"
+                  placeholder="Paste the AI draft you started from…"
                   className="conv-input w-full leading-relaxed rounded-xl p-3 resize-none sm:resize-y"
                   style={{ border: `1px solid ${T.border}`, background: T.inset, color: T.inkSoft, fontFamily: "inherit", fontSize: "16px" }} />
               </div>
@@ -118,12 +129,12 @@ export default function LearnPanel(p: Props) {
 
             <button
               onClick={p.onAnalyze}
-              disabled={(!hasAiDraft && !p.manualAiDraft.trim()) || !p.actualSent.trim() || p.learnLoading}
+              disabled={!canAnalyze}
               className="w-full text-sm font-black py-2.5 rounded-xl transition-all hover:-translate-y-px disabled:opacity-40 flex items-center justify-center gap-2"
               style={{ background: T.action, color: T.actionText, boxShadow: T.glow }}>
               {p.learnLoading
                 ? <><Spinner size={13} /> Analyzing…</>
-                : <><Icon name="pen" size={13} /> Learn from edit</>}
+                : <><Icon name="pen" size={13} /> {p.learnNotice ? "Try again" : "Learn from edit"}</>}
             </button>
           </>
         )}

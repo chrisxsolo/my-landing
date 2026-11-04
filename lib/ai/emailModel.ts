@@ -106,6 +106,23 @@ export type EmailCallResult = {
 export type EmailModelCaller = (req: EmailCallRequest) => Promise<EmailCallResult>;
 
 /**
+ * The system prompt as API content blocks.
+ *
+ * The API rejects an empty text block ("system: text content blocks must be
+ * non-empty"), and an operation with nothing per-draft to say, such as rule
+ * phrasing, has an empty volatile half. Sending it anyway failed every
+ * "Learn from reply" call with a 400 that surfaced as a drafting error.
+ */
+export function systemBlocks(system: SystemPrompt): Anthropic.TextBlockParam[] {
+  const blocks: Anthropic.TextBlockParam[] = [];
+  if (system.stable.trim()) {
+    blocks.push({ type: "text", text: system.stable, cache_control: { type: "ephemeral" } });
+  }
+  if (system.volatile.trim()) blocks.push({ type: "text", text: system.volatile });
+  return blocks;
+}
+
+/**
  * Builds the real caller.
  *
  * The system prompt goes out as two blocks with a cache_control breakpoint
@@ -126,14 +143,7 @@ export function createEmailModelCaller(
       model: config.model,
       max_tokens: req.maxTokens ?? EMAIL_MAX_TOKENS,
       output_config: { effort: req.effort ?? config.effort },
-      system: [
-        {
-          type: "text",
-          text: req.system.stable,
-          cache_control: { type: "ephemeral" },
-        },
-        { type: "text", text: req.system.volatile },
-      ],
+      system: systemBlocks(req.system),
       messages: [{ role: "user", content: req.userPrompt }],
     });
 
@@ -157,13 +167,54 @@ export function createEmailModelCaller(
   };
 }
 
-/** Maps SDK/API failures onto something a photographer can act on. */
-export function friendlyModelError(err: unknown): string {
+export type ModelErrorKind = "overloaded" | "rate_limit" | "timeout" | "auth" | "credit" | "invalid_request" | "unknown";
+
+/**
+ * Sorts an SDK/API failure into a short kind that is safe to log and store.
+ * Never includes the message itself, which could echo prompt content.
+ */
+export function classifyModelError(err: unknown): ModelErrorKind {
   const message = err instanceof Error ? err.message : String(err);
-  if (/overloaded/i.test(message)) return "Claude is overloaded right now. Try again in a moment.";
-  if (/rate.?limit|429/i.test(message)) return "Rate limit hit. Wait a few seconds and try again.";
-  if (/timeout|aborted|ETIMEDOUT/i.test(message)) return "Claude took too long to respond. Your draft is unchanged.";
-  if (/401|authentication|invalid.*api.?key/i.test(message)) return "The Claude API key is missing or invalid.";
-  if (/credit|billing|quota/i.test(message)) return "The Claude account is out of credit.";
-  return "The draft request failed. Your existing draft is unchanged.";
+  if (/overloaded|529/i.test(message)) return "overloaded";
+  if (/rate.?limit|429/i.test(message)) return "rate_limit";
+  if (/timeout|timed out|aborted|ETIMEDOUT/i.test(message)) return "timeout";
+  if (/401|authentication|invalid.*api.?key/i.test(message)) return "auth";
+  if (/credit|billing|quota/i.test(message)) return "credit";
+  if (/invalid_request_error|\b400\b/i.test(message)) return "invalid_request";
+  return "unknown";
+}
+
+/** What the failing operation was, so the fallback wording fits it. */
+export type ModelOperationContext = "draft" | "learn";
+
+const SHARED_ERRORS: Record<Exclude<ModelErrorKind, "unknown" | "timeout">, string> = {
+  invalid_request: "Claude rejected the request as malformed. This is a bug in the app, not something to retry.",
+  overloaded: "Claude is overloaded right now. Try again in a moment.",
+  rate_limit: "Rate limit hit. Wait a few seconds and try again.",
+  auth: "The Claude API key is missing or invalid.",
+  credit: "The Claude account is out of credit.",
+};
+
+const OPERATION_ERRORS: Record<ModelOperationContext, { timeout: string; unknown: string }> = {
+  draft: {
+    timeout: "Claude took too long to respond. Your draft is unchanged.",
+    unknown: "The draft request failed. Your existing draft is unchanged.",
+  },
+  learn: {
+    timeout: "Claude took too long to phrase the rules. Your edits are still here; try again.",
+    unknown: "Claude couldn't phrase the rules this time. Your edits are still here; try again.",
+  },
+};
+
+/**
+ * Maps SDK/API failures onto something a photographer can act on.
+ *
+ * The operation matters: "your draft is unchanged" was the only wording, and
+ * it reached the Learn panel, where there is no draft in play and the
+ * deterministic comparison had already succeeded.
+ */
+export function friendlyModelError(err: unknown, operation: ModelOperationContext = "draft"): string {
+  const kind = classifyModelError(err);
+  if (kind === "timeout" || kind === "unknown") return OPERATION_ERRORS[operation][kind];
+  return SHARED_ERRORS[kind];
 }

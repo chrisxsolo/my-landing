@@ -19,7 +19,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/requireAdmin";
-import { resolveEmailModelConfig, createEmailModelCaller, friendlyModelError } from "@/lib/ai/emailModel";
+import { resolveEmailModelConfig, createEmailModelCaller, friendlyModelError, classifyModelError } from "@/lib/ai/emailModel";
 import { fetchAvailabilitySnapshot } from "@/lib/ai/availabilitySnapshot";
 import { fetchWritingRules, fetchExamplePool, recordUsage, fetchMonthToDateSpendUsd } from "@/lib/ai/aiEmailStore";
 import { resolveBudgetConfig, evaluateBudget, type EmailOperation } from "@/lib/ai/aiUsage";
@@ -235,6 +235,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       draft: result.draft,
       mode,
+      // True when an edit operation returned the draft it was given. The panel
+      // says so instead of implying the instruction was applied.
+      unchanged: result.unchanged ?? false,
       validation: result.validation,
       warnings: result.context.warnings,
       // The rate card's inputs for this inquiry, so the panel can re-check
@@ -257,19 +260,12 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     console.error(`[draft-reply] ${mode} failed:`, err);
 
-    const message = err instanceof Error ? err.message : String(err);
-    const errorKind = /timeout|aborted/i.test(message) ? "timeout"
-      : /rate.?limit|429/i.test(message) ? "rate_limit"
-      : /overloaded/i.test(message) ? "overloaded"
-      : /401|authentication/i.test(message) ? "auth"
-      : "unknown";
-
     await recordUsage({
       operation: mode as EmailOperation,
       model: modelConfig.model,
       input_tokens: 0, output_tokens: 0,
       cache_creation_input_tokens: 0, cache_read_input_tokens: 0,
-      duration_ms: 0, success: false, error_kind: errorKind,
+      duration_ms: 0, success: false, error_kind: classifyModelError(err),
     });
 
     // No draft field in the response: the client keeps whatever it already has.

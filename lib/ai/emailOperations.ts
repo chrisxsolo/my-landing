@@ -94,6 +94,12 @@ function finishDraft(
 
 export type OperationResult = {
   draft: string;
+  /**
+   * Set by edit operations: true when the model handed back the draft it was
+   * given. Reported rather than retried, so a no-op never bills a second call
+   * and never passes as a successful refinement.
+   */
+  unchanged?: boolean;
   validation: ValidationResult;
   /** Rate-card figures put back into the draft before it was returned, if any. */
   pricing: PricingEnforcement;
@@ -224,12 +230,41 @@ export type EditInput = BuildEmailContextInput & {
 
 export type RefineInput = EditInput & { feedback: string };
 
-/** Applies one instruction from Chris and changes nothing else. */
+/**
+ * Whether the feedback hands over words to use as written.
+ *
+ * Quoted text, "exactly", "verbatim", "word for word", or "these (exact)
+ * words" all mean Chris has written the sentence himself. Anything else is a
+ * description of the result he wants, for the model to achieve in his voice.
+ */
+export function feedbackRequestsExactWording(feedback: string): boolean {
+  const text = feedback.trim();
+  if (/["“”].{3,}["“”]/.test(text)) return true;
+  return /\b(?:exactly|verbatim|word for word|these (?:exact )?words|this (?:exact )?wording|exact wording|as written)\b/i.test(text);
+}
+
+const normalizeForComparison = (text: string): string => text.replace(/\s+/g, " ").trim();
+
+/**
+ * Applies one piece of feedback from Chris and changes nothing else.
+ *
+ * The feedback is read as intent. The old instruction, "apply that instruction
+ * and change nothing else", was fine for "change the date to the 28th" and
+ * wrong for "this sounds like they're already booked": the model took the
+ * sentence literally, and either echoed it or tinkered with one word. The
+ * prompt now says what feedback is, how to resolve what it points at, where
+ * the edit stops, and when wording is to be used as given.
+ */
 export async function refineDraft(
   input: RefineInput,
   call: EmailModelCaller,
 ): Promise<OperationResult> {
   const context = buildEmailContext(input);
+  const feedback = input.feedback.trim();
+
+  const wordingNote = feedbackRequestsExactWording(feedback)
+    ? `Chris has given exact wording here (quoted, or marked "exactly"). Use it verbatim where he says it goes, and do not rephrase it.`
+    : `He has not given exact wording, so write the change in his voice. Never copy his feedback, or a paraphrase of it, into the email: "this sounds like they're already booked" means remove the premature commitment, not tell the client that.`;
 
   const userPrompt = `Here is the current draft:
 
@@ -237,19 +272,30 @@ export async function refineDraft(
 ${input.currentDraft}
 </draft>
 
-<chris_instruction>
-${input.feedback.trim()}
-</chris_instruction>
+Chris read it and said:
 
-Apply that instruction and change nothing else. Treat every other sentence as correct and leave it exactly as it is. Do not improve the wording, do not reorder anything, do not add or remove information the instruction did not ask about.
+<chris_feedback>
+${feedback}
+</chris_feedback>
 
-Any date, time, or price you keep or introduce must still come from the verified facts above.
+This is feedback about the draft, not text for the email. Work out the result he wants, then rewrite only the part of the draft his feedback is about so that it reads that way.
+
+${wordingNote}
+
+Resolve what he points at ("that part", "the ending", "the price sentence") against the draft above and the thread in the verified facts. A tone request ("less salesy", "warmer") can take a whole sentence or two; a factual one takes a word. Edit the smallest coherent region that satisfies the feedback, and leave every other sentence exactly as it is: do not improve wording, reorder, or add or remove information the feedback did not ask about.
+
+Every date, time, price, location, person, question, next step, and booking or payment claim stays as it is, unless the feedback asks to change it AND the new value is in the verified facts above. If he asks to add something that is not in the verified facts (a turnaround time, a price, an availability, a policy), leave it out rather than guess; do not guess at a number or a promise.
+
+If the feedback asks for nothing that would change this draft, return the draft unchanged.
 
 Output the revised email body only.`;
 
   const result = await call({ system: buildEditSystem(context, input.rules), userPrompt });
+  const finished = finishDraft(result.text, context, result.stopReason);
+  const before = normalizeForComparison(stripParagraphPeriods(input.currentDraft.trim()));
   return {
-    ...finishDraft(result.text, context, result.stopReason),
+    ...finished,
+    unchanged: normalizeForComparison(finished.draft) === before,
     context,
     usage: toUsageRecord("refine", result),
     estimatedCostUsd: 0,

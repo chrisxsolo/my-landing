@@ -14,6 +14,7 @@
 import { BANNED_PHRASES } from "./soloxsnapsWritingProfile";
 import type { EmailContext } from "./buildEmailContext";
 import { checkDraftQuote, type QuoteInput } from "./quotePricing";
+import { PRICING_CATALOG } from "@/lib/pricingCatalog";
 import { formatFee } from "@/lib/pricingCatalog";
 
 export type IssueType =
@@ -28,6 +29,7 @@ export type IssueType =
   | "unsupported_price"
   | "pricing_mismatch"
   | "unsupported_date"
+  | "unsupported_turnaround"
   | "fabricated_booking_state"
   | "fabricated_payment"
   | "unanswered_question"
@@ -368,8 +370,42 @@ function checkQuote(draft: string, context: EmailContext): ValidationIssue[] {
   }));
 }
 
+/** Words that make a number-plus-unit a delivery promise rather than a session length. */
+const DELIVERY_CONTEXT = /\b(?:gallery|galleries|deliver(?:ed|y)?|turnaround|edited|edits|photos? (?:back|ready)|get (?:your|the) photos|have (?:your|the) photos|final images|back to you)\b/i;
+const DELIVERY_WINDOW = /\b(\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)\s*(?:-|–|to)?\s*(\d{1,2})?\s*(business\s+)?(hours?|days?|weeks?)\b/gi;
+const SMALL_NUMBERS: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
+
+/**
+ * A delivery window the verified facts do not support.
+ *
+ * "Mention turnaround time" as a refinement must not end in an invented
+ * number. The catalog carries exactly one turnaround, so a promised window
+ * either matches it (in days or whole weeks) or it was made up.
+ */
+function checkTurnaround(draft: string): ValidationIssue[] {
+  const verifiedDays = PRICING_CATALOG.standardTurnaroundDays;
+  const issues: ValidationIssue[] = [];
+  // Clause by clause, so "gallery in 14 days, and the session is 1 hour" does
+  // not read the session length as a delivery promise.
+  for (const clause of draft.split(/(?<=[.!?,;])\s+|\n+/)) {
+    if (!DELIVERY_CONTEXT.test(clause)) continue;
+    for (const match of clause.matchAll(DELIVERY_WINDOW)) {
+      const [excerpt, first, second, , unit] = match;
+      const upper = second ? Number(second) : (SMALL_NUMBERS[first.toLowerCase()] ?? Number(first));
+      const inDays = /hour/i.test(unit) ? upper / 24 : /week/i.test(unit) ? upper * 7 : upper;
+      if (inDays === verifiedDays) continue;
+      issues.push({
+        type: "unsupported_turnaround", category: "factual", severity: "high",
+        description: `Promises delivery in ${excerpt.trim()}; the verified turnaround is ${verifiedDays} days.`,
+        excerpt: excerpt.trim(),
+      });
+    }
+  }
+  return issues;
+}
+
 function checkFacts(draft: string, context: EmailContext): ValidationIssue[] {
-  const issues: ValidationIssue[] = [...checkQuote(draft, context)];
+  const issues: ValidationIssue[] = [...checkQuote(draft, context), ...checkTurnaround(draft)];
 
   // ── Prices ────────────────────────────────────────────────────────────────
   for (const price of extractPrices(draft)) {

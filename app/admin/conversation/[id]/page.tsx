@@ -27,6 +27,7 @@ import TrainAiPanel from "./TrainAiPanel";
 import BookingPanel, { SunsetCard } from "./BookingPanel";
 import RemindersPanel from "./RemindersPanel";
 import LearnPanel from "./LearnPanel";
+import { selectLearnBaseline, interpretLearnResponse, SEND_CLEARED_DRAFT_KINDS } from "./learnBaseline";
 import { ConfirmationModal, ContractModal } from "./Modals";
 
 type Inquiry = AdminInquiry;
@@ -34,6 +35,8 @@ type Inquiry = AdminInquiry;
 /** Shape returned by POST /api/draft-reply for every mode. */
 type AiDraftResponse = {
   draft?: string;
+  /** An edit operation returned the draft it was given. */
+  unchanged?: boolean;
   error?: string;
   validation?: DraftValidation | null;
   warnings?: ContextWarning[];
@@ -93,7 +96,10 @@ export default function ConversationPage() {
 
   const [draft,         setDraft]         = useState("");
   const [lastAiDraft,     setLastAiDraft]     = useState("");   // latest AI draft (updated on every generate/refine)
-  const [originalAiDraft, setOriginalAiDraft] = useState("");   // first AI draft this session — never overwritten
+  const [originalAiDraft, setOriginalAiDraft] = useState("");   // first AI draft of this compose cycle, for the regeneration metric only
+  // The latest AI draft of the cycle just sent, kept in memory only so Learn
+  // from reply can still compare after a send. Cleared by the next generation.
+  const [sentCycleAiDraft, setSentCycleAiDraft] = useState("");
   const [draftLoading,  setDraftLoading]  = useState(false);
   const [polishLoading, setPolishLoading] = useState(false);
   const [draftSaving,   setDraftSaving]   = useState(false);
@@ -175,6 +181,7 @@ export default function ConversationPage() {
   const [manualAiDraft, setManualAiDraft] = useState(""); // used when no AI draft was generated
   const [learnLoading,  setLearnLoading]  = useState(false);
   const [learnedRules,  setLearnedRules]  = useState<string[] | null>(null);
+  const [learnNotice,   setLearnNotice]   = useState<string | null>(null);
 
   function showToast(msg: string, ok = true) {
     setToast({ msg, ok });
@@ -280,10 +287,11 @@ export default function ConversationPage() {
     else localStorage.removeItem(`ai_draft_${inquiryId}`);
   }, [lastAiDraft, inquiryId]);
 
-  // Persist original AI draft — written once, never cleared until session reset
+  // Persist the cycle's first AI draft; cleared with the rest when a send ends the cycle
   useEffect(() => {
-    if (!inquiryId || !originalAiDraft) return;
-    localStorage.setItem(`original_ai_draft_${inquiryId}`, originalAiDraft);
+    if (!inquiryId) return;
+    if (originalAiDraft) localStorage.setItem(`original_ai_draft_${inquiryId}`, originalAiDraft);
+    else localStorage.removeItem(`original_ai_draft_${inquiryId}`);
   }, [originalAiDraft, inquiryId]);
 
   // Auto-scroll to bottom when thread loads
@@ -430,6 +438,8 @@ export default function ConversationPage() {
   function applyAiResult(json: AiDraftResponse & { draft: string }): void {
     setDraft(json.draft);
     setLastAiDraft(json.draft);
+    setSentCycleAiDraft("");
+    setLearnNotice(null);
     setValidation(json.validation ?? null);
     setContextWarnings(json.warnings ?? []);
     setDraftQuote(json.quote ?? null);
@@ -471,6 +481,9 @@ export default function ConversationPage() {
         applyAiResult({ ...json, draft: json.draft });
         setLearnedRules(null);
         setFeedback("");
+        if (isRefine && json.unchanged) {
+          showToast("Refine left the draft as it was. Try saying what you want the result to be.", false);
+        }
         const draftPayload: { inquiryId: number | string; draft: string; ai_draft: string; original_ai_draft?: string } = {
           inquiryId,
           draft: json.draft,
@@ -793,15 +806,19 @@ export default function ConversationPage() {
           }).catch(() => {});
         }
 
+        // The send ends the compose cycle. The AI draft Chris edited stays in
+        // memory for Learn from reply; everything persisted is cleared so the
+        // next reply to this inquiry cannot inherit a stale baseline.
+        setSentCycleAiDraft(lastAiDraft);
         setDraft("");
-        // Clear cloud drafts now that it's sent (server-side, service role)
+        setLastAiDraft("");
+        setOriginalAiDraft("");
         await fetch("/api/admin/drafts", {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ inquiryId, kinds: ["draft", "ai_draft"] }),
+          body: JSON.stringify({ inquiryId, kinds: SEND_CLEARED_DRAFT_KINDS }),
         }).catch(() => {});
-        localStorage.removeItem(`draft_${inquiryId}`);
-        localStorage.removeItem(`ai_draft_${inquiryId}`);
+        for (const kind of SEND_CLEARED_DRAFT_KINDS) localStorage.removeItem(`${kind}_${inquiryId}`);
         // Refresh thread to show the sent message
         setTimeout(() => fetchThread(inquiry.email), 1500);
       } else {
@@ -1210,48 +1227,27 @@ export default function ConversationPage() {
   // such, never generalised. Only genuine style changes become rule
   // candidates, and they sit as pending until approved on the AI tab.
   async function learnFromReply() {
-    const aiDraftToUse = originalAiDraft || lastAiDraft || manualAiDraft.trim();
-    if (!inquiry || !aiDraftToUse || !actualSent.trim()) return;
+    const baseline = selectLearnBaseline({ lastAiDraft, originalAiDraft, sentCycleAiDraft, manualAiDraft });
+    if (!inquiry || !baseline.text || !actualSent.trim()) return;
     setLearnLoading(true);
     try {
       const res = await fetch("/api/ai/learn", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ai_draft:    aiDraftToUse,
+          ai_draft:    baseline.text,
           actual_sent: actualSent.trim(),
           mode:        "review",
         }),
       });
-      const json = await res.json() as {
-        edits?: { kind: string; category: string; description: string }[];
-        candidates?: { rule: string; intake: { verdict: string } }[];
-        message?: string;
-        error?: string;
-      };
-
-      if (json.error) { showToast(json.error, false); return; }
-
-      const newRules = (json.candidates ?? [])
-        .filter(c => c.intake.verdict === "new")
-        .map(c => c.rule);
-
-      if (!newRules.length) {
-        // The common case worth being explicit about: a factual fix is not a
-        // writing preference, and the old system turned it into one anyway.
-        showToast(json.message ?? "Nothing to learn from these edits", false);
-        setFactualEdits((json.edits ?? []).filter(e => e.category === "factual").map(e => e.description));
-        return;
-      }
-
-      setLearnedRules(newRules);
-      setFactualEdits((json.edits ?? []).filter(e => e.category === "factual").map(e => e.description));
-      setActualSent("");
-      showToast(
-        `${newRules.length} rule${newRules.length === 1 ? "" : "s"} waiting for approval on the AI tab`,
-      );
+      const view = interpretLearnResponse(res.ok, await readJsonSafe(res));
+      setFactualEdits(view.factualEdits);
+      setLearnNotice(view.kind === "retry" ? view.toast : null);
+      if (view.kind === "rules_pending") setLearnedRules(view.rules);
+      if (view.clearSentText) setActualSent("");
+      showToast(view.toast, view.toastOk);
     } catch {
-      showToast("Could not analyze the edit", false);
+      showToast("Could not reach the server. Your text is still here; try again.", false);
     } finally {
       setLearnLoading(false);
     }
@@ -1462,8 +1458,7 @@ export default function ConversationPage() {
           )}
 
           <LearnPanel
-            originalAiDraft={originalAiDraft}
-            lastAiDraft={lastAiDraft}
+            baseline={selectLearnBaseline({ lastAiDraft, originalAiDraft, sentCycleAiDraft, manualAiDraft })}
             manualAiDraft={manualAiDraft}
             onManualAiDraft={setManualAiDraft}
             actualSent={actualSent}
@@ -1472,9 +1467,10 @@ export default function ConversationPage() {
             onAiDraftExpanded={setAiDraftExpanded}
             learnedRules={learnedRules}
             factualEdits={factualEdits}
+            learnNotice={learnNotice}
             learnLoading={learnLoading}
             onAnalyze={learnFromReply}
-            onReset={() => { setLearnedRules(null); setActualSent(""); setManualAiDraft(""); }}
+            onReset={() => { setLearnedRules(null); setLearnNotice(null); setActualSent(""); setManualAiDraft(""); }}
           />
 
         </div>
