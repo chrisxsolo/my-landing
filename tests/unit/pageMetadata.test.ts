@@ -89,7 +89,8 @@ describe("root layout fallback", () => {
 
   it("opens the Supabase image connection early for the LCP photo", () => {
     const source = readFileSync(path.join(process.cwd(), "app/layout.tsx"), "utf8");
-    expect(source).toContain('preconnect("https://dmtslzwglpezympptqls.supabase.co")');
+    expect(source).toContain('const SUPABASE_ORIGIN = "https://dmtslzwglpezympptqls.supabase.co"');
+    expect(source).toContain("preconnect(SUPABASE_ORIGIN)");
   });
 });
 
