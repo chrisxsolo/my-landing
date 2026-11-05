@@ -23,10 +23,11 @@ const SCHOOLS = GRAD_SCHOOL_LINKS;
 
 const { couples, families, graduation, maternity } = PRICING_CATALOG;
 
-// Every price line reads from the catalog. The couples mini is named as a
-// 30-minute mini so it is never mistaken for the full-hour session.
+// Every price line reads from the catalog. Each mini is named with its
+// length so it is never mistaken for the full-hour session.
 const GRAD_PRICE_LINES = [
-  `Starting at ${formatFee(graduation.baseHourlyRate)}`,
+  `${graduation.packages.mini.durationMinutes}-minute mini from ${formatFee(graduation.packages.mini.price)}`,
+  `1-hour session ${formatFee(graduation.packages.standard.price)}`,
   `${graduation.standardMinimumImages}+ edited images`,
 ];
 const COUPLES_PRICE_LINES = [

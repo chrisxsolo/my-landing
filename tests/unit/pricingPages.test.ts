@@ -78,19 +78,30 @@ describe("pricing pages render values from the catalog, not hardcoded literals",
     const html = await renderPage(() => import("@/app/(professional)/pricing/grads/page"));
 
     expectAll(html, [
-      fc(g.baseHourlyRate), // $350
+      fc(g.packages.mini.price), // $325
+      fc(g.packages.standard.price), // $425
+      `${g.packages.mini.durationMinutes}-min mini`, // the entry price names its length
+      g.packages.mini.label,
+      g.packages.standard.label,
       fc(g.addOns.extraOutfit.price), // $75
       fc(g.addOns.secondLocation.price), // $125
       fc(g.addOns.expedited.price), // $150
       fc(g.addOns.champagne.price), // $15
-      fc(g.groupRates[2]), // $300
-      fc(g.groupRates[6]), // $200
+      `${fc(g.groupRatesPerPerson[2])} per person`, // $350 per person
+      `${fc(g.groupRatesPerPerson[5])} per person`, // $275 per person
+      "6-8 people",
+      `${fc(g.groupRatesPerPerson[8])} per person`, // $250 per person
+      `${g.headcountRules.groupMaxPeople + 1} or more`,
+      "Custom quote",
       `${g.standardMinimumImages}+`, // 50+
       `${g.groupMinimumImagesPerPerson}+`, // 25+
       TWO_WEEK,
       ...POLICY,
     ]);
-    expect(visibleText(html).toLowerCase()).not.toContain("deposit");
+    const text = visibleText(html);
+    expect(text.toLowerCase()).not.toContain("deposit");
+    // Graduation is two packages, never an hourly rate.
+    expect(text).not.toMatch(/per hour|\/\s?hr\b|hourly/i);
   });
 
   it("couples page matches the catalog", async () => {
@@ -195,13 +206,16 @@ describe("pricing pages render values from the catalog, not hardcoded literals",
     const html = await renderPage(() => import("@/app/(professional)/pricing/page"));
 
     expectAll(html, [
-      fc(PRICING_CATALOG.graduation.baseHourlyRate), // $350 / hr
+      `${fc(PRICING_CATALOG.graduation.packages.mini.price)} / ${PRICING_CATALOG.graduation.packages.mini.durationMinutes}-min mini`, // $325 / 30-min mini
+      fc(PRICING_CATALOG.graduation.packages.standard.price), // $425
       fc(PRICING_CATALOG.families.packages.standard.price), // $350
       fc(PRICING_CATALOG.couples.packages.mini.price), // $350
       fc(PRICING_CATALOG.elopement.startingPrice), // $950
       `${PRICING_CATALOG.graduation.standardMinimumImages}+`, // 50+
       `${PRICING_CATALOG.couples.packages.mini.minimumImages}+`, // 25+
     ]);
-    expect(visibleText(html).toLowerCase()).not.toContain("deposit");
+    const text = visibleText(html);
+    expect(text.toLowerCase()).not.toContain("deposit");
+    expect(text).not.toMatch(/\/\s?hr\b|per hour/i);
   });
 });

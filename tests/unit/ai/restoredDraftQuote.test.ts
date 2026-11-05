@@ -17,7 +17,7 @@ const SJSU_ROW = {
   session_type: "Graduation", message: "Hi! I'd love to book graduation photos.",
   school: "San Jose State University", location: null, people: 1,
 };
-const OLD_DRAFT = "Hi Sarah,\n\nMy sessions start at $350, plus a $70 travel fee for SJSU, so $420 total";
+const OLD_DRAFT = "Hi Sarah,\n\nMy 1-hour sessions are $425, plus a $70 travel fee for SJSU, so $495 total";
 
 const mocks = vi.hoisted(() => ({
   inquiry: null as Record<string, unknown> | null,
@@ -54,7 +54,7 @@ describe("buildQuoteInputForInquiry", () => {
 
   it("flags a stored $70 SJSU draft against the approved $75 fee", () => {
     const check = checkDraftQuote(OLD_DRAFT, buildQuoteInputForInquiry(SJSU_ROW).input);
-    expect(check.mismatches.map((m) => [m.stated, m.expected])).toEqual([[70, 75], [420, 425]]);
+    expect(check.mismatches.map((m) => [m.stated, m.expected])).toEqual([[70, 75], [495, 500]]);
   });
 
   it("prices nothing for a session the rate card does not cover", () => {

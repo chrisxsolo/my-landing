@@ -4,7 +4,7 @@
 // total, or a session with no catalog price all come back as "review".
 
 import { BOOKING_POLICY, PRICING_CATALOG, formatFee } from "../pricingCatalog";
-import { resolveSession } from "./session";
+import { resolveSession, type BaseOption } from "./session";
 import { isPlaceName, resolveInvoiceLocation } from "./travel";
 import {
   invoiceDraftSchema, NO_FACTS, type InvoiceDraft, type InvoiceInquiry, type InvoiceTravel, type SessionFacts,
@@ -83,6 +83,29 @@ function applyAgreedTotal(baseCents: number, travel: InvoiceTravel, facts: Sessi
   };
 }
 
+/**
+ * One graduate, two possible packages, and only the thread can say which.
+ * An agreed figure that lands exactly on one package (plus travel where it
+ * is due) picks that package; a clearly negotiated total is taken as-is the
+ * way applyAgreedTotal takes any; anything else is a review item naming both.
+ */
+function chooseAmongPackages(options: BaseOption[], travel: InvoiceTravel, facts: SessionFacts): Totals {
+  const agreedCents = facts.total_fee === null ? null : Math.round(facts.total_fee * 100);
+  const named = options.map((option) => `${option.label} ${money(option.baseCents / 100)}`).join(" or ");
+  const unresolved = (extra: string[] = []): Totals => ({
+    baseCents: 0, agreedTotalCents: agreedCents, totalCents: null,
+    problems: [`The thread does not say which package was booked: ${named}. Confirm the session length before filling.`, ...extra],
+    notes: [],
+  });
+  if (agreedCents === null) return unresolved();
+  const travelCents = travel.amountCents ?? 0;
+  const matches = options.filter((option) => travel.kind !== "unknown" && agreedCents === option.baseCents + travelCents);
+  if (matches.length === 1) return applyAgreedTotal(matches[0].baseCents, travel, facts);
+  // A negotiated total that is neither package stands on its own merits.
+  const negotiated = applyAgreedTotal(options[options.length - 1].baseCents, travel, facts);
+  return negotiated.totalCents !== null && negotiated.problems.length === 0 ? negotiated : unresolved();
+}
+
 function dateFacts(inquiry: InvoiceInquiry, facts: SessionFacts): { date: string | null; dateConfidence: InvoiceDraft["session"]["dateConfidence"]; warning: string | null } {
   if (facts.date && facts.source === "email" && facts.confidence === "high") {
     return { date: facts.date, dateConfidence: "confirmed", warning: null };
@@ -123,9 +146,11 @@ export function buildInvoiceDraft(inquiry: InvoiceInquiry, facts: SessionFacts =
   if (where.travel.kind === "unknown") {
     reviewReasons.push(`${where.travel.place} is outside San Francisco and has no approved travel fee. Confirm the travel fee before filling.`);
   }
-  const totals = session.baseCents === null
-    ? { baseCents: 0, agreedTotalCents: null, totalCents: null, problems: [], notes: [] }
-    : applyAgreedTotal(session.baseCents, where.travel, facts);
+  const totals = session.baseCents !== null
+    ? applyAgreedTotal(session.baseCents, where.travel, facts)
+    : session.baseOptions.length > 1
+      ? chooseAmongPackages(session.baseOptions, where.travel, facts)
+      : { baseCents: 0, agreedTotalCents: null, totalCents: null, problems: [], notes: [] };
   reviewReasons.push(...totals.problems);
 
   const when = dateFacts(inquiry, facts);

@@ -15,7 +15,7 @@
 //   correctDraftPricing  rewrites only the mismatched figures, nothing else
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { getGroupRatePerPerson, graduationSessionPrice, includedMinutesFor } from "@/lib/pricing";
+import { GRAD_PACKAGES, graduationSessionLabel, graduationSessionPrice, includedMinutesFor } from "@/lib/pricing";
 import { supersededTravelFees, type VerifiedRouteKey } from "@/lib/travelFee";
 import type { TravelResolution } from "@/lib/travelResolution";
 import type { ThreadMessage } from "./threadDigest";
@@ -103,28 +103,43 @@ function travelLabel(travel: TravelResolution): string {
   return travel.campus === "sjsu" ? "SJSU travel fee" : `Travel fee (${travel.place})`;
 }
 
-/** "Graduation session", with the headcount and any non-standard length spelled out. */
-function graduationLabel(people: number, durationMinutes: number | undefined): string {
-  const headcount = people > 1 ? ` (${people} × ${money(getGroupRatePerPerson(people))})` : "";
-  const length = durationMinutes && durationMinutes !== includedMinutesFor(people) ? `, ${durationMinutes} min` : "";
-  return `Graduation session${headcount}${length}`;
-}
-
-/** The session line the rate card can name without guessing, or null. */
-function sessionLine(input: QuoteInput, draftPrices: number[]): QuoteLine | null {
+/**
+ * Every session line the rate card could stand behind for this inquiry.
+ *
+ * Graduation: one line once the headcount and length are known. For one
+ * graduate who has not said how long a session they want, BOTH packages are
+ * candidates (the mini and the hour), so neither is treated as a mismatch.
+ * Nine or more graduates have no rate-card line at all.
+ */
+function sessionCandidates(input: QuoteInput, draftPrices: number[]): QuoteLine[] {
   if (input.playbook === "graduation") {
     const people = peopleCount(input.people);
+    const lengths = input.durationMinutes !== undefined
+      ? [input.durationMinutes]
+      : people <= 1 ? [GRAD_PACKAGES.mini.durationMinutes, GRAD_PACKAGES.standard.durationMinutes] : [includedMinutesFor(people)];
     // One duration rule for every surface (lib/pricing.ts).
-    return {
-      kind: "session",
-      label: graduationLabel(people, input.durationMinutes),
-      amount: graduationSessionPrice(people, input.durationMinutes),
-    };
+    return lengths.flatMap((minutes) => {
+      const amount = graduationSessionPrice(people, minutes);
+      return amount === null ? [] : [{ kind: "session" as const, label: graduationSessionLabel(people, minutes), amount }];
+    });
   }
   // Other services offer several packages: use the one the draft names, if exactly one.
   const named = input.basePrices.filter((p) => draftPrices.includes(p));
-  if (named.length === 1) return { kind: "session", label: "Session", amount: named[0] };
-  return input.basePrices.length === 1 ? { kind: "session", label: "Session", amount: input.basePrices[0] } : null;
+  if (named.length === 1) return [{ kind: "session", label: "Session", amount: named[0] }];
+  return input.basePrices.length === 1 ? [{ kind: "session", label: "Session", amount: input.basePrices[0] }] : [];
+}
+
+/**
+ * The session line the rate card can name without guessing, or null. With
+ * two candidate packages, the one the draft prices wins; otherwise the
+ * standard (longer) package is shown, with the mini still accepted as valid.
+ */
+function sessionLine(input: QuoteInput, draftPrices: number[]): QuoteLine | null {
+  const candidates = sessionCandidates(input, draftPrices);
+  if (candidates.length === 0) return null;
+  const named = candidates.filter((c) => draftPrices.includes(c.amount));
+  if (named.length === 1) return named[0];
+  return candidates.at(-1) ?? null;
 }
 
 /** Session plus the verified travel fee. Add-ons are left to the draft's own wording. */
@@ -203,7 +218,8 @@ export function checkDraftQuote(draft: string, input: QuoteInput): DraftQuoteChe
 
   if (breakdown) {
     const extras = expectedTravel === null ? input.addOnPrices : [...input.addOnPrices, expectedTravel];
-    const valid = reachable(breakdown.lines.filter((l) => l.kind === "session").map((l) => l.amount), extras);
+    // Any candidate package is a valid base, not only the one shown.
+    const valid = reachable(sessionCandidates(input, prices).map((l) => l.amount), extras);
     const travelWrong = mismatches.find((m) => m.kind === "travel");
     for (const f of figures(draft, TOTAL_FIGURE)) {
       if (confirmed.has(f.amount) || valid.has(f.amount)) continue;

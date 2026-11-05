@@ -43,7 +43,8 @@ describe("1. graduation inquiry with university specified", () => {
     const context = contextFor({ school: "UC Berkeley", sessionType: "Graduation" });
     const prompt = promptFor(context);
     expect(context.client.playbook).toBe("graduation");
-    expect(prompt).toContain("$350 per hour");
+    expect(prompt).toContain('Do NOT say "$425 per hour"');
+    expect(prompt).toContain("$325 for 30 minutes");
     expect(prompt).toContain("Travel fee for UC Berkeley: $45.");
     expect(prompt).not.toContain("$43.50");
   });
@@ -146,8 +147,8 @@ describe("9. client asking about two graduates", () => {
       message: "It'd be me and my roommate, both graduating.",
     });
     const prompt = promptFor(context);
-    expect(prompt).toContain("$300 per person");
-    expect(prompt).toContain("$600 total");
+    expect(prompt).toContain("$350 per graduate");
+    expect(prompt).toContain("$700 total");
   });
 
   it("applies the minimum duration for a group of three or more", () => {

@@ -30,6 +30,14 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { ConversationStage } from "./conversationStage";
+import { PRICING_CATALOG } from "@/lib/pricingCatalog";
+
+// Seed examples quote the CURRENT rate card, read from it rather than typed,
+// so an approved example never teaches the model a superseded price.
+const GRAD_HOUR_NUMBER = PRICING_CATALOG.graduation.packages.standard.price;
+const GRAD_HOUR = `$${GRAD_HOUR_NUMBER}`;
+const GROUP_OF_TWO_RATE = PRICING_CATALOG.graduation.groupRatesPerPerson[2];
+const SJSU_FEE = PRICING_CATALOG.graduation.travelFees.sjsu;
 
 /**
  * What an example demonstrates. Conversation stages are the primary axis; the
@@ -69,7 +77,7 @@ export const SEED_EXAMPLES: ApprovedExample[] = [
 
 Thank you so much for reaching out, and congratulations on your graduation! I'd love to take your graduation pictures!
 
-My graduation sessions at San Jose State start at $350 for a 1-hour session, plus a $75 travel fee for SJSU, so $425 total
+My graduation sessions at San Jose State are ${GRAD_HOUR} for a 1-hour session, plus a $${SJSU_FEE} travel fee for SJSU, so $${GRAD_HOUR_NUMBER + SJSU_FEE} total
 
 Let me know which date works best for you, and I'll send over the invoice and contract to secure the session once we confirm the details
 
@@ -167,7 +175,7 @@ June 9th at 7pm works perfectly, see you then!`,
     scenarios: ["pricing_discussion"],
     tags: ["pricing", "travel", "group", "short"],
     source: "seed",
-    body: `Yes, the $300 per person listed on my graduation pricing page is correct. For two graduates, that would be $600 total, plus the travel fee to San Jose State, which brings the session total to $675
+    body: `Yes, the $${GROUP_OF_TWO_RATE} per person listed on my graduation pricing page is correct. For two graduates, that would be $${GROUP_OF_TWO_RATE * 2} total, plus the travel fee to San Jose State, which brings the session total to $${GROUP_OF_TWO_RATE * 2 + SJSU_FEE}
 
 If you'd like, I can send over the invoice and contract once you confirm the location`,
   },

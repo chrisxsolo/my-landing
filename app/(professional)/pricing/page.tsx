@@ -34,9 +34,9 @@ const RATES = [
     href:    "/pricing/grads",
     kicker:  "Graduation photography",
     heading: "Grad rates",
-    copy:    `Senior portraits and graduation day coverage. Packages starting from ${formatCurrency(graduationPricing.baseHourlyRate)}/hr with add-ons for groups, extra locations, and rush delivery.`,
+    copy:    `Senior portraits and graduation day coverage. A ${graduationPricing.packages.mini.durationMinutes}-minute mini from ${formatCurrency(graduationPricing.packages.mini.price)} or a 1-hour session at ${formatCurrency(graduationPricing.packages.standard.price)}, with per-person group rates, extra locations, and rush delivery.`,
     cta:     "See grad pricing",
-    chips:   [`From ${formatCurrency(graduationPricing.baseHourlyRate)} / hr`, `${graduationPricing.standardMinimumImages}+ edited images`, "Bay Area locations"],
+    chips:   [`From ${formatCurrency(graduationPricing.packages.mini.price)} / ${graduationPricing.packages.mini.durationMinutes}-min mini`, `${graduationPricing.standardMinimumImages}+ edited images`, "Bay Area locations"],
   },
   {
     slug:    "couples",

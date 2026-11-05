@@ -53,9 +53,9 @@ function pixiesetConstants() {
     return new Function(`return ${match[1]}`)() as Record<string, number> & number;
   };
   return {
-    gradHourly: Number(literal("GRAD_HOURLY_RATE")),
-    groupRates: literal("GROUP_RATES") as Record<string, number>,
-    groupRate6Plus: Number(literal("GROUP_RATE_6_PLUS")),
+    gradPackages: literal("GRAD_PACKAGE_PRICES") as unknown as Record<"mini" | "standard", number>,
+    groupRates: literal("GROUP_RATES_PER_PERSON") as Record<string, number>,
+    groupMaxPeople: Number(literal("GROUP_MAX_PEOPLE")),
     travelFees: literal("TRAVEL_FEES") as Record<string, number>,
     flatRates: literal("SERVICE_FLAT_RATES") as Record<string, number>,
   };
@@ -63,8 +63,8 @@ function pixiesetConstants() {
 const pixieset = pixiesetConstants();
 
 describe("graduation sessions", () => {
-  it.each([1, 2, 3, 4, 5, 6])("price %i graduate(s) the same everywhere", (people) => {
-    const session = graduationSessionPrice(people);
+  it.each([1, 2, 3, 4, 5, 6, 7, 8])("price %i graduate(s) the same everywhere", (people) => {
+    const session = graduationSessionPrice(people)!;
     const estimate = calculateGraduationEstimate({ ...BASE_ESTIMATE, people, sessionLength: people >= 3 ? "1.5hr" : "1hr" });
     expect(estimate.sessionBase).toBe(session);
 
@@ -75,10 +75,33 @@ describe("graduation sessions", () => {
 
     expect(resolveContractPricing({ ...sjsuBooking, people }, { ...NO_PRICE, sessionPrice: session }))
       .toMatchObject({ status: "ok", total: session + SJSU_FEE });
-    expect(catalogSessionTotalCents({ session_type: "Graduation", school: SJSU, message: "", people })).toBe((session + SJSU_FEE) * 100);
+    // Payment totals need the length for one graduate (two packages are possible).
+    const message = people <= 1 ? "a 1 hour session" : "";
+    expect(catalogSessionTotalCents({ session_type: "Graduation", school: SJSU, message, people })).toBe((session + SJSU_FEE) * 100);
 
-    const pixiesetSession = people <= 1 ? pixieset.gradHourly : (pixieset.groupRates[people] ?? pixieset.groupRate6Plus) * people;
+    const pixiesetSession = people <= 1 ? pixieset.gradPackages.standard : pixieset.groupRates[people] * people;
     expect(pixiesetSession).toBe(session);
+  });
+
+  it("prices the 30-minute mini the same everywhere, for one graduate only", () => {
+    const mini = grad.packages.mini;
+    expect(graduationSessionPrice(1, mini.durationMinutes)).toBe(mini.price);
+    expect(calculateGraduationEstimate({ ...BASE_ESTIMATE, sessionLength: "30min" }).sessionBase).toBe(mini.price);
+    expect(buildPricingFacts({ sessionType: "Graduation", message: "", people: 1 }).basePrices).toContain(mini.price);
+    expect(authoritativeQuote(buildQuoteInputForInquiry({ sessionType: "Graduation", school: SJSU, message: "a 30 minute mini", people: 1 }).input)?.total).toBe(mini.price + SJSU_FEE);
+    expect(catalogSessionTotalCents({ session_type: "Graduation", school: SJSU, message: "the 30 min mini please", people: 1 })).toBe((mini.price + SJSU_FEE) * 100);
+    expect(pixieset.gradPackages.mini).toBe(mini.price);
+    expect(calculateGraduationEstimate({ ...BASE_ESTIMATE, people: 2, sessionLength: "30min" }).sessionBase).toBe(graduationSessionPrice(2));
+  });
+
+  it("stops at eight graduates on every surface", () => {
+    expect(pixieset.groupMaxPeople).toBe(grad.headcountRules.groupMaxPeople);
+    expect(Object.keys(pixieset.groupRates).map(Number).sort((a, b) => a - b)).toEqual(Object.keys(grad.groupRatesPerPerson).map(Number).sort((a, b) => a - b));
+    expect(graduationSessionPrice(9)).toBeNull();
+    expect(buildPricingFacts({ sessionType: "Graduation", message: "", people: 9 }).needsManualQuote).toMatch(/quoted by hand/);
+    expect(authoritativeQuote(buildQuoteInputForInquiry({ sessionType: "Graduation", school: SJSU, people: 9 }).input)).toBeNull();
+    expect(catalogSessionTotalCents({ session_type: "Graduation", school: SJSU, message: "", people: 9 })).toBe(0);
+    expect(resolveContractPricing({ ...sjsuBooking, people: 9 }, NO_PRICE)).toMatchObject({ status: "review" });
   });
 
   const toggles = {
@@ -93,7 +116,7 @@ describe("graduation sessions", () => {
     expect(buildPricingFacts({ sessionType: "Graduation", message: "", people: 1 }).addOnPrices).toContain(addOn.price);
     expect(faqText(GRAD_FAQ)).toContain(`$${addOn.price}`);
     const contract = resolveContractPricing(sjsuBooking, {
-      ...NO_PRICE, sessionPrice: grad.baseHourlyRate, addOns: [{ label: addOn.label, amount: addOn.price }],
+      ...NO_PRICE, sessionPrice: grad.packages.standard.price, addOns: [{ label: addOn.label, amount: addOn.price }],
     });
     expect(contract).toMatchObject({ status: "ok", total: estimate.subtotal });
   });
@@ -102,7 +125,7 @@ describe("graduation sessions", () => {
     expect(buildPricingFacts({ sessionType: "Graduation", message: "", people: 1 }).lines.join(" "))
       .toContain(`$${grad.addOns.extra30Minutes.price} for each extra 30 minutes`);
     expect(calculateGraduationEstimate({ ...BASE_ESTIMATE, people: 2, sessionLength: "1.5hr" }).sessionBase)
-      .toBe(graduationSessionPrice(2) + grad.addOns.extra30Minutes.price);
+      .toBe(graduationSessionPrice(2)! + grad.addOns.extra30Minutes.price);
   });
 });
 
@@ -112,9 +135,9 @@ describe("SJSU travel", () => {
     expect(calculateGraduationEstimate(BASE_ESTIMATE).travelFee).toBe(SJSU_FEE);
     expect(buildTravelFact(SJSU, null)).toContain(`$${SJSU_FEE}.`);
     expect(faqText(GRAD_FAQ)).toContain(`SJSU ($${SJSU_FEE})`);
-    const contract = resolveContractPricing(sjsuBooking, { ...NO_PRICE, sessionPrice: grad.baseHourlyRate });
+    const contract = resolveContractPricing(sjsuBooking, { ...NO_PRICE, sessionPrice: grad.packages.standard.price });
     expect(contract.lines.at(-1)).toEqual({ label: `Travel fee (${SJSU})`, amount: SJSU_FEE });
-    expect(calculatePaymentSchedule(grad.baseHourlyRate + SJSU_FEE).retainer * 2).toBe(grad.baseHourlyRate + SJSU_FEE);
+    expect(calculatePaymentSchedule(grad.packages.standard.price + SJSU_FEE).retainer * 2).toBe(grad.packages.standard.price + SJSU_FEE);
     expect(pixieset.travelFees.sjsu).toBe(SJSU_FEE);
   });
 
@@ -209,11 +232,11 @@ describe("Draft AI against the rate card", () => {
 
   it("corrects a draft quoting $70 SJSU travel to the approved $75 server-side", async () => {
     const result = await generate(
-      "Hi Sarah,\n\nMy sessions start at $350, plus a $70 travel fee for SJSU, so $420 total",
+      "Hi Sarah,\n\nMy 1-hour sessions are $425, plus a $70 travel fee for SJSU, so $495 total",
       { school: SJSU, people: 1 },
     );
-    expect(result.draft).toContain(`$${SJSU_FEE} travel fee for SJSU, so $${grad.baseHourlyRate + SJSU_FEE} total`);
-    expect(result.pricing.corrections.map((c) => c.expected)).toEqual([SJSU_FEE, grad.baseHourlyRate + SJSU_FEE]);
+    expect(result.draft).toContain(`$${SJSU_FEE} travel fee for SJSU, so $${grad.packages.standard.price + SJSU_FEE} total`);
+    expect(result.pricing.corrections.map((c) => c.expected)).toEqual([SJSU_FEE, grad.packages.standard.price + SJSU_FEE]);
     expect(result.validation.factsVerified).toBe(true);
   });
 

@@ -2,7 +2,10 @@
 // Every amount comes from PRICING_CATALOG through lib/pricing.ts.
 
 import { classifySession, type PlaybookKey } from "../ai/sessionClassifier";
-import { COUPLES_PACKAGES, graduationSessionPrice } from "../pricing";
+import {
+  COUPLES_PACKAGES, GRAD_PACKAGES, GROUP_MAX_PEOPLE, MINI_MAX_PEOPLE,
+  detectGraduationDurationMinutes, graduationSessionLabel, graduationSessionPrice, includedMinutesFor, isHeadcountPriced,
+} from "../pricing";
 import { PRICING_CATALOG } from "../pricingCatalog";
 
 export type InvoiceServiceKey =
@@ -21,8 +24,6 @@ const ITEM_NAMES: Record<InvoiceServiceKey, string> = {
 
 const PRICED_KEYS = new Set<string>(Object.keys(ITEM_NAMES));
 
-/** The most people a graduation invoice will price without a second look. */
-export const MAX_PLAUSIBLE_HEADCOUNT = 20;
 
 const NUMBER_WORDS = ["Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten"];
 
@@ -31,9 +32,19 @@ export interface ResolvedSession {
   itemName: string;
   description: string;
   people: number;
-  /** Rate-card price in cents, or null when the rate card has none. */
+  /**
+   * Rate-card price in cents, or null when the rate card has none, or cannot
+   * choose between packages without the thread (see baseOptions).
+   */
   baseCents: number | null;
+  /** Every package the session could be on; two for one graduate who named no length. */
+  baseOptions: BaseOption[];
   problems: string[];
+}
+
+export interface BaseOption {
+  label: string;
+  baseCents: number;
 }
 
 /** "Two people", "One person", "12 people". */
@@ -101,19 +112,42 @@ export function resolveSession(
   const problems: string[] = [];
   if (!serviceKey) {
     problems.push("The session type has no rate-card price. Enter the item and price by hand.");
-    return { serviceKey: null, itemName: "Photo Session", description: "", people: 1, baseCents: null, problems };
+    return { serviceKey: null, itemName: "Photo Session", description: "", people: 1, baseCents: null, baseOptions: [], problems };
   }
   const itemName = ITEM_NAMES[serviceKey];
-  if (serviceKey === "graduation") {
-    const people = parseHeadcount(inquiry.people) ?? 1;
-    if (people > MAX_PLAUSIBLE_HEADCOUNT) {
-      problems.push(`A group of ${people} is larger than the invoice can price on its own. Confirm the headcount.`);
-      return { serviceKey, itemName, description: headcountDescription(people), people, baseCents: null, problems };
-    }
-    return { serviceKey, itemName, description: headcountDescription(people), people, baseCents: graduationSessionPrice(people) * 100, problems };
-  }
   const text = `${inquiry.session_type ?? ""} ${inquiry.message ?? ""}`.toLowerCase();
+  if (serviceKey === "graduation") return resolveGraduation(itemName, parseHeadcount(inquiry.people) ?? 1, text, problems);
   const flat = flatPrice(serviceKey, text);
   if (flat.problem) problems.push(flat.problem);
-  return { serviceKey, itemName, description: flat.description, people: parseHeadcount(inquiry.people) ?? 1, baseCents: flat.cents, problems };
+  const single = flat.cents === null ? [] : [{ label: flat.description, baseCents: flat.cents }];
+  return { serviceKey, itemName, description: flat.description, people: parseHeadcount(inquiry.people) ?? 1, baseCents: flat.cents, baseOptions: single, problems };
+}
+
+/**
+ * A graduation session: the per-graduate group rate for 2-8, or for one
+ * graduate the package the inquiry names. One graduate who named no length
+ * gets both packages as options and no price of its own, so the invoice is
+ * never filled with a package nobody chose. Nine or more is a hand quote.
+ */
+function resolveGraduation(itemName: string, people: number, text: string, problems: string[]): ResolvedSession {
+  const serviceKey = "graduation" as const;
+  const description = headcountDescription(people);
+  if (!isHeadcountPriced(people)) {
+    problems.push(`A group of ${people} is larger than the rate card prices (up to ${GROUP_MAX_PEOPLE} graduates). Confirm the headcount and quote it by hand.`);
+    return { serviceKey, itemName, description, people, baseCents: null, baseOptions: [], problems };
+  }
+  const named = detectGraduationDurationMinutes(text);
+  const lengths = named !== null
+    ? [named]
+    : people <= MINI_MAX_PEOPLE ? [GRAD_PACKAGES.mini.durationMinutes, GRAD_PACKAGES.standard.durationMinutes] : [includedMinutesFor(people)];
+  const baseOptions = lengths.flatMap((minutes) => {
+    const price = graduationSessionPrice(people, minutes);
+    return price === null ? [] : [{ label: graduationSessionLabel(people, minutes), baseCents: price * 100 }];
+  });
+  const only = baseOptions.length === 1 ? baseOptions[0] : null;
+  return {
+    serviceKey, itemName,
+    description: only && people <= MINI_MAX_PEOPLE ? `${description}, ${only.label}` : description,
+    people, baseCents: only?.baseCents ?? null, baseOptions, problems,
+  };
 }

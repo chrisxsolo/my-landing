@@ -127,8 +127,8 @@ describe("2. Danel, inquiry #129: graduation inquiry", () => {
 
   it("quotes graduation as a package, never an hourly rate", () => {
     const text = prompt(ctx(base));
-    expect(text).toMatch(/START AT \$350/);
-    expect(text).toMatch(/Do NOT say "\$350 per hour"/);
+    expect(text).toMatch(/start at \$325 for a 30-minute mini/);
+    expect(text).toMatch(/Do NOT say "\$425 per hour"/);
   });
 
   it("flags the hourly phrasing the real draft used", () => {
@@ -137,7 +137,7 @@ describe("2. Danel, inquiry #129: graduation inquiry", () => {
   });
 
   it("accepts the package phrasing", () => {
-    const draft = "Hi Danel,\n\nMy graduation sessions start at $350, and the champagne add-on is $15";
+    const draft = "Hi Danel,\n\nMy graduation sessions start at $325 for a 30-minute mini, and the champagne add-on is $15";
     const found = types(ctx(base), draft);
     expect(found).not.toContain("hourly_pricing");
     expect(found).not.toContain("unsupported_price");
@@ -162,7 +162,7 @@ describe("2. Danel, inquiry #129: graduation inquiry", () => {
 
   it("still refuses to invent an Oakland travel fee", () => {
     expect(prompt(ctx(base))).toMatch(/Never state a travel-fee amount/);
-    const draft = "Hi Danel,\n\nMy graduation sessions start at $350, plus a $40 travel fee for Oakland";
+    const draft = "Hi Danel,\n\nMy graduation sessions start at $325, plus a $40 travel fee for Oakland";
     expect(types(ctx(base), draft)).toContain("unsupported_price");
   });
 
@@ -406,7 +406,7 @@ describe("14. awkward sentence construction", () => {
     const text = prompt(ctx({ inquiry: { sessionType: "Graduation Portrait" } }));
     expect(text).toMatch(/Not "I'd love to shoot your graduation, and congratulations!"/);
     expect(text).toMatch(/Not "So glad 5:45 pm works!"/);
-    expect(text).toMatch(/Not "My graduation session is \$350 per hour"/);
+    expect(text).toMatch(/Not "My graduation session is \$425 per hour"/);
   });
 
   it("flags the padded add-on phrasing", () => {

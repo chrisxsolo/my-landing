@@ -13,6 +13,7 @@ import {
   enforceSessionLength,
   graduationSessionPrice,
   isSessionLengthAllowed,
+  requiresManualGroupQuote,
   type EstimateInput,
 } from "@/lib/pricing";
 import { buildPricingFacts } from "@/lib/ai/businessFacts";
@@ -71,6 +72,15 @@ describe("graduation group duration minimum", () => {
     expect(groupMinimumMinutes).toBe(90);
   });
 
+  it("offers the 30-minute mini to one graduate only", () => {
+    expect(isSessionLengthAllowed(1, "30min")).toBe(true);
+    expect(isSessionLengthAllowed(2, "30min")).toBe(false);
+    expect(isSessionLengthAllowed(3, "30min")).toBe(false);
+    expect(enforceSessionLength(2, "30min")).toBe("1hr");
+    expect(enforceSessionLength(3, "30min")).toBe("1.5hr");
+    expect(calculateGraduationEstimate({ ...BASE, people: 2, sessionLength: "30min" }).sessionBase).toBe(700);
+  });
+
   it("disallows 60 minutes for 3+ but allows it for 1–2", () => {
     expect(isSessionLengthAllowed(1, "1hr")).toBe(true);
     expect(isSessionLengthAllowed(2, "1hr")).toBe(true);
@@ -94,75 +104,90 @@ describe("graduation group duration minimum", () => {
 
 describe("one graduation duration rule", () => {
   it("is what the estimator, Draft AI facts and quote check all price from", () => {
-    for (const people of [1, 2, 3, 6]) {
-      for (const [length, minutes] of [["1hr", 60], ["1.5hr", 90], ["2hr", 120]] as const) {
+    for (const people of [1, 2, 3, 6, 8]) {
+      for (const [length, minutes] of [["30min", 30], ["1hr", 60], ["1.5hr", 90], ["2hr", 120]] as const) {
         if (!isSessionLengthAllowed(people, length)) continue;
         expect(calculateGraduationEstimate({ ...BASE, people, sessionLength: length }).sessionBase)
           .toBe(graduationSessionPrice(people, minutes));
       }
     }
     expect(buildPricingFacts({ sessionType: "Graduation", message: "", people: 1 }).basePrices)
-      .toEqual([60, 90, 120].map((minutes) => graduationSessionPrice(1, minutes)));
+      .toEqual([30, 60, 90, 120].map((minutes) => graduationSessionPrice(1, minutes)));
     expect(buildPricingFacts({ sessionType: "Graduation", message: "", people: 2 }).lines.join(" "))
       .toContain(`$${graduationSessionPrice(2, 90)} total`);
     const input = { playbook: "graduation", people: "2", basePrices: [], addOnPrices: [], travel: { kind: "none" as const } };
     expect(authoritativeQuote({ ...input, durationMinutes: 90 })?.lines[0]).toEqual({
-      kind: "session", label: "Graduation session (2 × $300), 90 min", amount: graduationSessionPrice(2, 90),
+      kind: "session", label: "Group rate (2 × $350), 90 min", amount: graduationSessionPrice(2, 90),
     });
     expect(authoritativeQuote(input)?.lines[0].amount).toBe(graduationSessionPrice(2));
   });
 });
 
 describe("graduation pricing", () => {
-  const rates = PRICING_CATALOG.graduation.groupRates;
+  const rates = PRICING_CATALOG.graduation.groupRatesPerPerson;
   const extra30 = PRICING_CATALOG.graduation.addOns.extra30Minutes.price;
 
-  it("prices an individual session by the hour", () => {
-    expect(calculateGraduationEstimate(BASE).sessionBase).toBe(350);
+  it("prices one graduate as two packages, with $100 per extra 30 minutes past the hour", () => {
+    expect(calculateGraduationEstimate({ ...BASE, sessionLength: "30min" }).sessionBase).toBe(325);
+    expect(calculateGraduationEstimate(BASE).sessionBase).toBe(425);
     expect(calculateGraduationEstimate({ ...BASE, sessionLength: "1.5hr" }).sessionBase).toBe(525);
-    expect(calculateGraduationEstimate({ ...BASE, sessionLength: "2hr" }).sessionBase).toBe(700);
+    expect(calculateGraduationEstimate({ ...BASE, sessionLength: "2hr" }).sessionBase).toBe(625);
+    expect(calculateGraduationEstimate({ ...BASE, sessionLength: "30min" }).sessionLabel).toBe("Graduation Mini (30 min)");
+    expect(calculateGraduationEstimate(BASE).sessionLabel).toBe("Graduation Session (60 min)");
   });
 
   it.each([
-    [2, rates[2] * 2],
-    [3, rates[3] * 3],
-    [4, rates[4] * 4],
-    [5, rates[5] * 5],
-    [6, rates[6] * 6],
-    [8, rates[6] * 8],
-  ])("prices %i graduates at the per-person rate for their included time", (people, expected) => {
+    [2, rates[2] * 2, 700],
+    [3, rates[3] * 3, 975],
+    [4, rates[4] * 4, 1200],
+    [5, rates[5] * 5, 1375],
+    [6, rates[6] * 6, 1500],
+    [7, rates[7] * 7, 1750],
+    [8, rates[8] * 8, 2000],
+  ])("prices %i graduates at the per-person rate for their included time", (people, expected, pinned) => {
     const length = people >= 3 ? "1.5hr" : "1hr";
+    expect(expected).toBe(pinned);
     expect(calculateGraduationEstimate({ ...BASE, people, sessionLength: length }).sessionBase).toBe(expected);
   });
 
   it("includes the 90-minute group minimum in the group rate (matches the contract tool)", () => {
-    expect(calculateGraduationEstimate({ ...BASE, people: 3, sessionLength: "1.5hr" }).sessionBase).toBe(825);
+    expect(calculateGraduationEstimate({ ...BASE, people: 3, sessionLength: "1.5hr" }).sessionBase).toBe(975);
   });
 
   it("adds extra time past the included length as 30-minute add-ons", () => {
-    expect(calculateGraduationEstimate({ ...BASE, people: 2, sessionLength: "1.5hr" }).sessionBase).toBe(600 + extra30);
-    expect(calculateGraduationEstimate({ ...BASE, people: 3, sessionLength: "2hr" }).sessionBase).toBe(825 + extra30);
+    expect(calculateGraduationEstimate({ ...BASE, people: 2, sessionLength: "1.5hr" }).sessionBase).toBe(700 + extra30);
+    expect(calculateGraduationEstimate({ ...BASE, people: 2, sessionLength: "2hr" }).sessionBase).toBe(700 + 2 * extra30);
+    expect(calculateGraduationEstimate({ ...BASE, people: 3, sessionLength: "2hr" }).sessionBase).toBe(975 + extra30);
+    expect(calculateGraduationEstimate({ ...BASE, people: 8, sessionLength: "2hr" }).sessionBase).toBe(2000 + extra30);
+  });
+
+  it("has no automatic price for nine or more graduates", () => {
+    expect(graduationSessionPrice(9)).toBeNull();
+    expect(graduationSessionPrice(12, 120)).toBeNull();
+    expect(requiresManualGroupQuote(9)).toBe(true);
+    expect(requiresManualGroupQuote(8)).toBe(false);
+    expect(() => calculateGraduationEstimate({ ...BASE, people: 9, sessionLength: "2hr" })).toThrow(/quoted by hand/);
   });
 
   it("adds outfits, locations, expedited delivery, and champagne", () => {
     const a = PRICING_CATALOG.graduation.addOns;
     const estimate = calculateGraduationEstimate({ ...BASE, extraOutfit: true, secondLocation: true, expedited: true, champagne: true });
     expect(estimate.addons).toBe(a.extraOutfit.price + a.secondLocation.price + a.expedited.price + a.champagne.price);
-    expect(estimate.subtotal).toBe(350 + estimate.addons);
+    expect(estimate.subtotal).toBe(425 + estimate.addons);
   });
 
   it("adds a verified campus travel fee and keeps the split cent-exact", () => {
     const estimate = calculateGraduationEstimate({ ...BASE, school: "uc-berkeley" });
     const fee = PRICING_CATALOG.graduation.travelFees["uc-berkeley"];
     expect(estimate.travelMethod).toBe("mileage");
-    expect(estimate.subtotal).toBe(350 + fee);
+    expect(estimate.subtotal).toBe(425 + fee);
     expect(Math.round((estimate.deposit + estimate.remainingBalance) * 100)).toBe(Math.round(estimate.subtotal * 100));
   });
 
   it("marks travel as pending for an unverified location", () => {
     const estimate = calculateGraduationEstimate({ ...BASE, school: "other" });
     expect(estimate.travelMethod).toBe("tbd");
-    expect(estimate.subtotal).toBe(350);
+    expect(estimate.subtotal).toBe(425);
   });
 });
 

@@ -134,6 +134,7 @@ export default function ConversationPage() {
   const [markPaidLoading,   setMarkPaidLoading]   = useState(false);
   const [sessionDateInput,  setSessionDateInput]  = useState("");
   const [previewHtml,       setPreviewHtml]       = useState<string | null>(null);
+  const [previewWarnings,   setPreviewWarnings]   = useState<string[]>([]);
   const [confirmLoading,    setConfirmLoading]    = useState(false);
   const [previewLoading,    setPreviewLoading]    = useState(false);
   const [customComment,     setCustomComment]     = useState("");
@@ -948,6 +949,7 @@ export default function ConversationPage() {
       });
       const json = await res.json();
       if (!res.ok || !json.html) { showToast(json.error ?? "Preview failed", false); return; }
+      setPreviewWarnings(Array.isArray(json.warnings) ? json.warnings : []);
       setPreviewHtml(json.html);
     } catch {
       showToast("Preview failed", false);
@@ -1490,6 +1492,7 @@ export default function ConversationPage() {
         <ConfirmationModal
           inquiry={inquiry}
           previewHtml={previewHtml}
+          warnings={previewWarnings}
           customComment={customComment}
           onCustomComment={setCustomComment}
           confirmLoading={confirmLoading}

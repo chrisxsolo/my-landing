@@ -14,6 +14,7 @@ import { buildPricingFacts, type PricingFacts } from "./businessFacts";
 import { buildThreadDigest, type ThreadMessage } from "./threadDigest";
 import { parseQuotedPrices, staleQuotedPrices, type QuoteInput } from "./quotePricing";
 import { resolveTravel, schoolImpliesLocationFor, type TravelResolution } from "@/lib/travelResolution";
+import { detectGraduationDurationMinutes } from "@/lib/pricing";
 
 /** The inquiry fields a quote depends on: the row's columns, or the form's. */
 export type QuoteSubject = {
@@ -70,6 +71,9 @@ export function buildQuoteInputForInquiry(subject: QuoteSubject, options: Inquir
     addOnPrices: facts.addOnPrices,
     travel,
     confirmedPrices,
+    // The length they asked for, if they named one, so the quote is one
+    // package rather than both. Shared with validateEmailDraft.quoteInputOf.
+    durationMinutes: playbook === "graduation" ? detectGraduationDurationMinutes(message) ?? undefined : undefined,
   };
   const quoted = parseQuotedPrices(buildThreadDigest([...messages]).quotedPrices);
   return { playbook, facts, travel, input, stalePrices: staleQuotedPrices(quoted, input, messages) };

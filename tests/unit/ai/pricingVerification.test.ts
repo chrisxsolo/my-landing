@@ -23,24 +23,27 @@ function sjsu(opts: { people?: number; thread?: ReturnType<typeof message>[]; co
 const types = (draft: string, context: ReturnType<typeof sjsu>) =>
   validateEmailDraft(draft, context).issues.map((i) => i.type);
 
-const OLD_DRAFT = "Hi Sarah,\n\nMy graduation sessions at San Jose State start at $350 for a 1-hour session, plus a $70 travel fee for SJSU, so $420 total";
-const GOOD_DRAFT = "Hi Sarah,\n\nMy graduation sessions at San Jose State start at $350 for a 1-hour session, plus a $75 travel fee for SJSU, so $425 total";
+const OLD_DRAFT = "Hi Sarah,\n\nMy graduation sessions at San Jose State are $425 for a 1-hour session, plus a $70 travel fee for SJSU, so $495 total";
+const GOOD_DRAFT = "Hi Sarah,\n\nMy graduation sessions at San Jose State are $425 for a 1-hour session, plus a $75 travel fee for SJSU, so $500 total";
 
 describe("the authoritative breakdown", () => {
-  it("is $350 + $75 = $425 for one SJSU graduate", () => {
+  it("is $425 + $75 = $500 for one SJSU graduate on the hour, $325 + $75 = $400 on the mini", () => {
     expect(authoritativeQuote(quoteInputOf(sjsu()))).toEqual({
       lines: [
-        { kind: "session", label: "Graduation session", amount: 350 },
+        { kind: "session", label: "Graduation Session (60 min)", amount: 425 },
         { kind: "travel", label: "SJSU travel fee", amount: 75 },
       ],
-      total: 425,
+      total: 500,
     });
+    // A draft that quotes the mini is checked against the mini.
+    expect(authoritativeQuote(quoteInputOf(sjsu()), [325])?.total).toBe(400);
+    expect(types("Hi Sarah,\n\nThe 30-minute mini is $325, plus a $75 travel fee for SJSU, so $400 total", sjsu())).toEqual([]);
   });
 
-  it("is $600 + $75 = $675 for two", () => {
+  it("is $700 + $75 = $775 for two", () => {
     const quote = authoritativeQuote(quoteInputOf(sjsu({ people: 2 })));
-    expect(quote?.lines.map((l) => l.amount)).toEqual([600, 75]);
-    expect(quote?.total).toBe(675);
+    expect(quote?.lines.map((l) => l.amount)).toEqual([700, 75]);
+    expect(quote?.total).toBe(775);
   });
 
   it("is reported only when the draft quotes a price", () => {
@@ -54,7 +57,7 @@ describe("validation against the approved fee", () => {
     const mismatches = result.issues.filter((i) => i.type === "pricing_mismatch");
     expect(mismatches.map((i) => i.description)).toEqual([
       "States a $70 travel fee; the verified fee is $75.",
-      "States a $420 total; the rate card gives $425.",
+      "States a $495 total; the rate card gives $500.",
     ]);
     expect(result.factsVerified).toBe(false);
     expect(result.valid).toBe(false);
@@ -63,12 +66,12 @@ describe("validation against the approved fee", () => {
   it("passes the correct quote, single and group", () => {
     expect(types(GOOD_DRAFT, sjsu())).not.toContain("pricing_mismatch");
     expect(types(GOOD_DRAFT, sjsu())).not.toContain("unsupported_price");
-    const group = "Hi Sarah,\n\nFor two graduates that's $600, plus a $75 travel fee for SJSU, so $675 total";
+    const group = "Hi Sarah,\n\nFor two graduates that's $700, plus a $75 travel fee for SJSU, so $775 total";
     expect(types(group, sjsu({ people: 2 }))).toEqual([]);
   });
 
   it("keeps add-ons valid on top of the travel fee", () => {
-    const draft = "Hi Sarah,\n\nThat's $350 plus $75 for the extra outfit and a $75 travel fee, so $500 total";
+    const draft = "Hi Sarah,\n\nThat's $425 plus $75 for the extra outfit and a $75 travel fee, so $575 total";
     expect(types(draft, sjsu())).not.toContain("pricing_mismatch");
   });
 
@@ -82,7 +85,7 @@ describe("validation against the approved fee", () => {
       inquiry: inquiry({ school: "San Jose State University", location: "Palace of Fine Arts" }),
       messages: [], availability: AVAILABILITY, threadLoaded: true, now: NOW,
     });
-    expect(types("Hi Sarah,\n\nIt's $350 plus a $75 travel fee", sf)).toContain("pricing_mismatch");
+    expect(types("Hi Sarah,\n\nIt's $425 plus a $75 travel fee", sf)).toContain("pricing_mismatch");
   });
 });
 
@@ -96,7 +99,7 @@ describe("server-side correction", () => {
     const result = await generate(OLD_DRAFT);
     expect(result.draft).toBe(GOOD_DRAFT);
     expect(result.pricing.originalDraft).toBe(OLD_DRAFT);
-    expect(result.pricing.corrections.map((c) => [c.kind, c.stated, c.expected])).toEqual([["travel", 70, 75], ["total", 420, 425]]);
+    expect(result.pricing.corrections.map((c) => [c.kind, c.stated, c.expected])).toEqual([["travel", 70, 75], ["total", 495, 500]]);
     expect(result.validation.issues.map((i) => i.type)).not.toContain("pricing_mismatch");
   });
 
@@ -116,29 +119,35 @@ describe("server-side correction", () => {
   });
 
   it("does not rewrite a total the rate card can only guess at", () => {
-    const check = checkDraftQuote("Hi Sarah,\n\nIt's $350 plus a $75 travel fee for SJSU, so $480 total", quoteInputOf(sjsu()));
+    const check = checkDraftQuote("Hi Sarah,\n\nIt's $425 plus a $75 travel fee for SJSU, so $480 total", quoteInputOf(sjsu()));
     expect(check.mismatches).toEqual([expect.objectContaining({ kind: "total", stated: 480, certain: false })]);
     expect(enforceDraftPricing("so $480 total for SJSU with a $75 travel fee", quoteInputOf(sjsu())).corrections).toEqual([]);
   });
 });
 
 describe("an older email's figure", () => {
-  const oldQuote = message("My sessions start at $350, plus a $70 travel fee for SJSU, so $420 total", true, 5);
+  const oldQuote = message("My 1-hour sessions are $425, plus a $70 travel fee for SJSU, so $495 total", true, 5);
 
   it("does not override the approved fee", () => {
     const context = sjsu({ thread: [oldQuote] });
-    expect(context.pricing.stalePrices.sort()).toEqual([420, 70]);
+    expect(context.pricing.stalePrices.sort()).toEqual([495, 70]);
     expect(context.warnings.map((w) => w.code)).toContain("stale_quoted_price");
-    expect(context.thread.lines.join("\n")).not.toMatch(/Do not contradict these[^\n]*\$420/);
-    expect(types("Hi Sarah,\n\nYes, it's still $420", context)).toContain("unsupported_price");
+    expect(context.thread.lines.join("\n")).not.toMatch(/Do not contradict these[^\n]*\$495/);
+    expect(types("Hi Sarah,\n\nYes, it's still $495", context)).toContain("unsupported_price");
     expect(validateEmailDraft(GOOD_DRAFT, context).factsVerified).toBe(true);
   });
 
   it("stands when the admin confirms it was agreed for this client", () => {
-    const context = sjsu({ thread: [oldQuote], confirmed: [70, 420] });
+    const context = sjsu({ thread: [oldQuote], confirmed: [70, 495] });
     expect(context.pricing.stalePrices).toEqual([]);
     expect(context.warnings.map((w) => w.code)).not.toContain("stale_quoted_price");
-    expect(types("Hi Sarah,\n\nYes, it's still $420 with the $70 travel fee", context)).not.toContain("pricing_mismatch");
+    expect(types("Hi Sarah,\n\nYes, it's still $495 with the $70 travel fee", context)).not.toContain("pricing_mismatch");
+  });
+
+  it("keeps a legacy client's $350 quote (the pre-2027 session price) as quoted, not stale", () => {
+    const legacy = sjsu({ thread: [message("My graduation sessions start at $350 for a 1-hour session, plus a $75 travel fee for SJSU, so $425 total", true, 5)] });
+    expect(legacy.pricing.stalePrices).toEqual([]);
+    expect(types("Hi Sarah,\n\nStill $425 total as quoted, with the $75 travel fee", legacy)).not.toContain("unsupported_price");
   });
 
   it("leaves a deliberate custom price alone", () => {

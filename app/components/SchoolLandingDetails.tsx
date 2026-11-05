@@ -30,9 +30,8 @@ export default function SchoolLandingDetails({
   spots,
 }: Props) {
   const graduationPricing = PRICING_CATALOG.graduation;
-  const durationLabel = graduationPricing.durationRules.allowedMinutes
-    .map((minutes) => minutes === 90 ? "1.5" : String(minutes / 60))
-    .join(", ");
+  const { mini, standard } = graduationPricing.packages;
+  const longestMinutes = graduationPricing.durationRules.allowedMinutes.at(-1)!;
   const included = [
     "Professionally guided posing and direction throughout",
     "Multiple on-campus location selections",
@@ -42,8 +41,9 @@ export default function SchoolLandingDetails({
     "Clear communication from inquiry to delivery",
   ];
   const quickReference = [
-    { label: "Starting rate", value: `${formatCurrency(graduationPricing.baseHourlyRate)} / hour` },
-    { label: "Session length", value: `${durationLabel} hours` },
+    { label: mini.label, value: `${formatCurrency(mini.price)} / ${mini.durationMinutes} min` },
+    { label: standard.label, value: `${formatCurrency(standard.price)} / ${standard.durationMinutes} min` },
+    { label: "Session length", value: `${mini.durationMinutes} min to ${longestMinutes / 60} hours` },
     { label: "Retainer", value: `${BOOKING_POLICY.retainerPercent}% ${BOOKING_POLICY.retainerRefundability}` },
     { label: "Balance", value: `Due ${BOOKING_POLICY.remainingBalanceDeadline}` },
     { label: "Turnaround", value: `Up to ${PRICING_CATALOG.standardTurnaroundDays / 7} weeks` },

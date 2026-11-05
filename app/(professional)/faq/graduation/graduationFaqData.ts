@@ -5,9 +5,13 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { FAQGroup } from "../faqShared";
-import { BOOKING_POLICY, PRICING_CATALOG, formatFee } from "@/lib/pricingCatalog";
+import { BOOKING_POLICY, PRICING_CATALOG, formatFee, graduationGroupTiers } from "@/lib/pricingCatalog";
 
 const graduationPricing = PRICING_CATALOG.graduation;
+const { mini, standard } = graduationPricing.packages;
+const groupTierText = graduationGroupTiers()
+  .map((tier) => `${formatFee(tier.ratePerPerson)} each for ${tier.label}`)
+  .join(", ");
 
 export const FAQS: FAQGroup[] = [
   {
@@ -21,6 +25,10 @@ export const FAQS: FAQGroup[] = [
       {
         q: "How far in advance should I book?",
         a: "As early as possible — especially for May graduation season. Spring dates at UC Berkeley, SJSU, SF State, USF, and CSUEB fill up fast. If you have a specific date near your ceremony, reach out at least 3–4 weeks ahead.",
+      },
+      {
+        q: "How much does a graduation session cost?",
+        a: `One graduate can book the ${mini.label} (${formatFee(mini.price)} for ${mini.durationMinutes} minutes) or the ${standard.label} (${formatFee(standard.price)} for ${standard.durationMinutes} minutes); both include ${graduationPricing.standardMinimumImages}+ edited images, and extra time past the hour is ${formatFee(graduationPricing.addOns.extra30Minutes.price)} per 30 minutes. Groups are priced per graduate: ${groupTierText}, with ${graduationPricing.groupMinimumImagesPerPerson}+ edited images per person. Groups of ${graduationPricing.headcountRules.groupMaxPeople + 1} or more are quoted individually. Add-ons and campus travel fees are listed on the pricing page.`,
       },
       {
         q: "What's the retainer and when is it due?",
@@ -46,7 +54,7 @@ export const FAQS: FAQGroup[] = [
       },
       {
         q: "How long is the session?",
-        a: `Standard sessions are ${graduationPricing.durationRules.standardMinutes} minutes. Groups of ${graduationPricing.durationRules.groupMinimumSize} or more need at least ${graduationPricing.durationRules.groupMinimumMinutes} minutes to cover individual portraits plus group combinations. ${graduationPricing.durationRules.allowedMinutes.at(-1)! / 60}-hour sessions are available if you want more locations or more time.`,
+        a: `One graduate can book a ${mini.durationMinutes}-minute mini or a ${standard.durationMinutes}-minute session. Groups of ${graduationPricing.durationRules.groupMinimumSize} or more need at least ${graduationPricing.durationRules.groupMinimumMinutes} minutes to cover individual portraits plus group combinations. ${graduationPricing.durationRules.allowedMinutes.at(-1)! / 60}-hour sessions are available if you want more locations or more time.`,
       },
       {
         q: "How many photos will I receive?",

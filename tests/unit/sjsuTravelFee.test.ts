@@ -40,15 +40,17 @@ describe("the approved SJSU fee", () => {
 });
 
 describe("one SJSU price on every surface", () => {
-  it("prices one graduate at $350 + $75 = $425", () => {
+  it("prices one graduate at $425 + $75 = $500 for the hour, $325 + $75 = $400 for the mini", () => {
     const estimate = grad(1);
-    expect([estimate.sessionBase, estimate.travelFee, estimate.subtotal]).toEqual([350, 75, 425]);
-    expect(estimate.deposit + estimate.remainingBalance).toBe(425);
+    expect([estimate.sessionBase, estimate.travelFee, estimate.subtotal]).toEqual([425, 75, 500]);
+    expect(estimate.deposit + estimate.remainingBalance).toBe(500);
+    const mini = calculateGraduationEstimate({ school: "sjsu", people: 1, sessionLength: "30min", extraOutfit: false, secondLocation: false, expedited: false, champagne: false });
+    expect([mini.sessionBase, mini.travelFee, mini.subtotal]).toEqual([325, 75, 400]);
   });
 
-  it("prices two graduates at $600 + $75 = $675", () => {
+  it("prices two graduates at $700 + $75 = $775", () => {
     const estimate = grad(2);
-    expect([estimate.sessionBase, estimate.travelFee, estimate.subtotal]).toEqual([600, 75, 675]);
+    expect([estimate.sessionBase, estimate.travelFee, estimate.subtotal]).toEqual([700, 75, 775]);
   });
 
   it("uses $75 in the catalog, landing copy and FAQ", () => {
@@ -59,11 +61,11 @@ describe("one SJSU price on every surface", () => {
     expect(faq).not.toContain("SJSU ($70)");
   });
 
-  it("totals payments at $425 / $675", () => {
+  it("totals payments at $500 / $775", () => {
     const base = { session_type: "Graduation", school: "San Jose State University", message: "", location: null };
-    expect(catalogSessionTotalCents({ ...base, people: 1 })).toBe(42500);
-    expect(catalogSessionTotalCents({ ...base, people: 2 })).toBe(67500);
-    expect(calculatePaymentSchedule(425)).toEqual({ retainer: 212.5, remainingBalance: 212.5 });
+    expect(catalogSessionTotalCents({ ...base, people: 1, message: "1 hour session" })).toBe(50000);
+    expect(catalogSessionTotalCents({ ...base, people: 2 })).toBe(77500);
+    expect(calculatePaymentSchedule(500)).toEqual({ retainer: 250, remainingBalance: 250 });
   });
 
   it("matches the Pixieset extension", () => {
@@ -78,7 +80,7 @@ describe("one SJSU price on every surface", () => {
   it("teaches Draft AI no outdated SJSU figure in its seed examples", () => {
     const sjsu = SEED_EXAMPLES.filter((e) => /san jose state|sjsu/i.test(e.body));
     expect(sjsu.length).toBeGreaterThan(0);
-    for (const e of sjsu) expect(e.body).not.toMatch(/\$(?:70|420|670)\b/);
-    expect(sjsu.map((e) => e.body).join("\n")).toMatch(/\$75 travel fee for SJSU, so \$425 total/);
+    for (const e of sjsu) expect(e.body).not.toMatch(/\$(?:70|420|495|670|770)\b/);
+    expect(sjsu.map((e) => e.body).join("\n")).toMatch(/\$75 travel fee for SJSU, so \$500 total/);
   });
 });

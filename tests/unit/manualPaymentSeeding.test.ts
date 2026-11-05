@@ -74,11 +74,11 @@ describe("seedAmounts — mirror of the database", () => {
     expect(parseFloat(seed.d1) + parseFloat(seed.d2)).toBeCloseTo(350, 2);
   });
 
-  it("nothing saved → suggestion from session pricing, split per schedule, nothing paid", () => {
-    const seed = seedAmounts(inquiry({ message: "grad photos at SJSU please" }), []);
+  it("nothing saved → suggestion labelled as today's rate card, split per schedule, nothing paid", () => {
+    const seed = seedAmounts(inquiry({ message: "grad photos at SJSU please, 1 hour session" }), []);
     expect(seed.d1Paid).toBe(false);
     expect(seed.d2Paid).toBe(false);
-    expect(seed.totalSource).toBe("session pricing");
+    expect(seed.totalSource).toBe("current rate card");
     expect(parseFloat(seed.d1) + parseFloat(seed.d2)).toBeCloseTo(parseFloat(seed.full), 2);
     expect(seed.nextType).toBe("deposit_1");
   });

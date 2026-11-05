@@ -28,7 +28,7 @@ import GraduationRateEstimator from "@/app/components/GraduationRateEstimator";
 import ContextualTestimonials from "@/app/components/ContextualTestimonials";
 import { getContextualTestimonials } from "@/lib/testimonialsData";
 import { formatCurrency } from "@/lib/pricing";
-import { BOOKING_POLICY, PRICING_CATALOG, getBookingPolicyItems } from "@/lib/pricingCatalog";
+import { BOOKING_POLICY, PRICING_CATALOG, getBookingPolicyItems, graduationGroupTiers } from "@/lib/pricingCatalog";
 
 // Cached/ISR: refreshed at most hourly, or immediately on admin content saves
 // (POST /api/admin/revalidate).
@@ -37,7 +37,7 @@ export const revalidate = 3600;
 // ── SEO metadata (tab title + Google description) ────────────────────────────
 export const metadata: Metadata = {
   title: "Graduation Photography Pricing",
-  description: `Bay Area graduation photography pricing: sessions from $${PRICING_CATALOG.graduation.baseHourlyRate} with ${PRICING_CATALOG.graduation.standardMinimumImages}+ edited images, group rates from $${PRICING_CATALOG.graduation.groupRates[6]} per person, and campus travel fees listed up front.`,
+  description: `Bay Area graduation photography pricing: a ${PRICING_CATALOG.graduation.packages.mini.durationMinutes}-minute mini from $${PRICING_CATALOG.graduation.packages.mini.price}, a 1-hour session at $${PRICING_CATALOG.graduation.packages.standard.price} with ${PRICING_CATALOG.graduation.standardMinimumImages}+ edited images, per-person group rates from $${PRICING_CATALOG.graduation.groupRatesPerPerson[2]} down to $${PRICING_CATALOG.graduation.groupRatesPerPerson[8]} per graduate for groups of 6-8, and campus travel fees listed up front.`,
   alternates: { canonical: "/pricing/grads" },
 };
 
@@ -52,6 +52,16 @@ const mediaVars = {
   "--pricing-media-pos": "center top",
 } as CSSProperties;
 const graduationPricing = PRICING_CATALOG.graduation;
+const { mini, standard } = graduationPricing.packages;
+const { groupMaxPeople } = graduationPricing.headcountRules;
+
+// ── INDIVIDUAL PACKAGES ───────────────────────────────────────────────────────
+// Two real packages at their own prices: the mini is not half the hour, and
+// the hour is not an hourly rate. Both come from the catalog.
+const individualPackages = [
+  { kicker: "Mini", label: mini.label, price: mini.price, meta: `${mini.durationMinutes} minutes · one graduate` },
+  { kicker: "Standard", label: standard.label, price: standard.price, meta: `${standard.durationMinutes} minutes` },
+];
 
 // ── ADD-ONS LIST ──────────────────────────────────────────────────────────────
 // Shown below the Graduation Package bullet list.
@@ -65,15 +75,10 @@ const addOns = [
 ];
 
 // ── GROUP PRICING TABLE ───────────────────────────────────────────────────────
-// Shown in the Group Grad Package section.
-// To change prices: edit price values below.
-const groupPricing = [
-  { people: "2 people", price: graduationPricing.groupRates[2] },
-  { people: "3 people", price: graduationPricing.groupRates[3] },
-  { people: "4 people", price: graduationPricing.groupRates[4] },
-  { people: "5 people", price: graduationPricing.groupRates[5] },
-  { people: "6-8 people", price: graduationPricing.groupRates[6] },
-];
+// Shown in the Group Grad Package section. PER GRADUATE, derived from the
+// catalog: equal consecutive rates collapse into one row ("6-8 people").
+// To change prices: edit groupRatesPerPerson in lib/pricingCatalog.ts.
+const groupPricing = graduationGroupTiers().map((tier) => ({ people: tier.label, price: tier.ratePerPerson }));
 
 // ── INFO CARDS (Booking / Session flow / Travel) ─────────────────────────────
 // These are the three cards shown between the hero and the packages.
@@ -87,7 +92,7 @@ const infoCards = [
   },
   {
     heading: "Session flow",
-    items: ["Hourly rates.", "Campus route planned around light.", "Session length scales with group size."],
+    items: [`${mini.durationMinutes}-minute mini or 1-hour session for one graduate.`, "Campus route planned around light.", "Groups book per person, with time to match."],
     delay: 0.40,
   },
   {
@@ -121,7 +126,7 @@ export default async function GradPricingPage() {
              → Background photo: set pricing_grad_standard_image in Supabase site_settings
              → Overlay darkness: adjust rgba values in .pricingHeroDark::before (Pricing.module.css)
              → Hero height:      change clamp() in .pricingHeroDark (Pricing.module.css)
-             → Price shown:      find "$350" in the footer row below
+             → Price shown:      the mini's price from the catalog, in the footer row below
              → Chips:            edit the chip spans in the footer row
              → Heading text:     edit the h1 below */}
       <section
@@ -156,11 +161,11 @@ export default async function GradPricingPage() {
                Sits at the very bottom of the dark hero.
                pricingHeroDivider = thin vertical line separator. */}
           <div className={styles.pricingHeroDarkFooter}>
-            {/* Price block — change "$350" and "/ hr" here */}
+            {/* Price block — the 30-minute mini is the entry price; the unit names its length */}
             <div className={styles.pricingHeroPriceBlock}>
               <span className={styles.pricingHeroPriceLabel}>from</span>
-              <span className={styles.pricingHeroPriceBig}>{formatCurrency(graduationPricing.baseHourlyRate)}</span>
-              <span className={styles.pricingHeroPriceUnit}>/ hr</span>
+              <span className={styles.pricingHeroPriceBig}>{formatCurrency(mini.price)}</span>
+              <span className={styles.pricingHeroPriceUnit}>/ {mini.durationMinutes}-min mini</span>
             </div>
 
             <span className={styles.pricingHeroDivider} aria-hidden="true" />
@@ -193,20 +198,20 @@ export default async function GradPricingPage() {
       {/* ── GRADUATION PACKAGE ────────────────────────────────────────────────
            Text on the left, photo on the right.
            To change included items: edit the array in the ul below.
-           To change the price: find "$350" below and update both instances.
+           To change the prices: edit graduation.packages in lib/pricingCatalog.ts.
            packageImage comes from Supabase (see image logic above). */}
       <section className={`${styles.pricingShell} ${styles.pricingPackage}`}>
         <div className={styles.pricingPackageContent}>
-          <p className={styles.pricingKicker}>Standard</p>
-          <h2>Graduation Package</h2>
+          <p className={styles.pricingKicker}>Individual sessions</p>
+          <h2>Graduation Packages</h2>
           <p className={styles.pricingCopy}>
-            Ideal for graduates who want a cohesive, elevated gallery without feeling rushed or over-posed.
+            Two lengths for one graduate: a {mini.durationMinutes}-minute mini for the cap-and-gown essentials, or a full hour for a cohesive, elevated gallery without feeling rushed or over-posed.
           </p>
 
           {/* What's included list — add/remove items here */}
           <ul>
             {[
-              `Approximately ${graduationPricing.durationRules.standardMinutes / 60} hour on campus`,
+              `${mini.durationMinutes} or ${standard.durationMinutes} minutes on campus, your choice`,
               "Professionally guided posing and direction throughout",
               "One curated outfit look",
               "Multiple on-campus location selections",
@@ -226,12 +231,16 @@ export default async function GradPricingPage() {
             ))}
           </div>
 
-          {/* Investment block — change "$350" and "per hour" text here */}
+          {/* Investment block — one column per package, prices from the catalog */}
           <div className={styles.pricingInvestment}>
-            <div>
-              <p className={styles.pricingKicker}>Investment</p>
-              <p className={styles.pricingPrice}>{formatCurrency(graduationPricing.baseHourlyRate)}</p>
-              <p className={styles.pricingMeta}>per hour</p>
+            <div className={styles.pricingInvestmentOptions}>
+              {individualPackages.map(({ kicker, label, price, meta }) => (
+                <div key={label} className={styles.pricingInvestmentOption}>
+                  <p className={styles.pricingKicker}>{kicker}</p>
+                  <p className={styles.pricingPrice}>{formatCurrency(price)}</p>
+                  <p className={styles.pricingMeta}>{label} · {meta}</p>
+                </div>
+              ))}
             </div>
             <Link href="/contact" className={styles.pricingLink}>Book This Session</Link>
           </div>
@@ -288,19 +297,23 @@ export default async function GradPricingPage() {
             ].map((item) => <li key={item}>{item}</li>)}
           </ul>
 
-          {/* Group pricing table — defined in groupPricing array above */}
-          <div className={styles.pricingGroupTable}>
+          {/* Group pricing table — per graduate, from graduationGroupTiers() */}
+          <p className={styles.pricingKicker} style={{ marginTop: 28 }}>Rates per graduate</p>
+          <div className={styles.pricingGroupTable} style={{ marginTop: 10 }}>
             {groupPricing.map(({ people, price }) => (
               <div key={people} className={styles.pricingRow}>
                 <span>{people}</span><span>{formatCurrency(price)} per person</span>
               </div>
             ))}
+            <div className={styles.pricingRow}>
+              <span>{groupMaxPeople + 1} or more</span><span>Custom quote</span>
+            </div>
           </div>
 
           {/* Small note below the group table — edit text here */}
           <p className={styles.pricingNote}>
             Sessions with {graduationPricing.durationRules.groupMinimumSize} or more graduates require at least{" "}
-            {graduationPricing.durationRules.groupMinimumMinutes} minutes to maintain quality and flow.
+            {graduationPricing.durationRules.groupMinimumMinutes} minutes to maintain quality and flow; that time is included in the per-person rate, and each extra 30 minutes adds {formatCurrency(graduationPricing.addOns.extra30Minutes.price)} to the group total. The {mini.durationMinutes}-minute mini is for one graduate only.
           </p>
 
           <div className={styles.pricingInvestment}>

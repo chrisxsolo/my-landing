@@ -18,16 +18,16 @@ const email = (facts: Partial<SessionFacts>): SessionFacts => ({ ...NO_FACTS, so
 describe("Anthony: SJSU graduate shooting at San Francisco City Hall", () => {
   const draft = buildInvoiceDraft(anthony, email({ location: "San Francisco City Hall", date: "2027-05-16" }));
 
-  it("is ready at $600 with travel included and no travel line", () => {
+  it("is ready at $700 with travel included and no travel line", () => {
     expect(draft.status).toBe("ready");
     expect(draft.reviewReasons).toEqual([]);
     expect(draft.session).toMatchObject({ itemName: "Graduation Session", description: "Two people", quantity: 1, people: 2 });
     expect(draft.session.location).toBe("San Francisco City Hall");
     expect(draft.session.locationSource).toBe("email");
     expect(draft.session.school).toBe("SJSU");
-    expect(draft.pricing.baseCents).toBe(60000);
+    expect(draft.pricing.baseCents).toBe(70000);
     expect(draft.pricing.travel).toEqual({ kind: "included", amountCents: 0, place: "San Francisco City Hall" });
-    expect(draft.pricing.totalCents).toBe(60000);
+    expect(draft.pricing.totalCents).toBe(70000);
   });
 
   it("uses the confirmed session date as the due date", () => {
@@ -40,9 +40,9 @@ describe("Anthony: SJSU graduate shooting at San Francisco City Hall", () => {
     expect(validateInvoiceDraft(draft)).toMatchObject({ ok: true });
   });
 
-  it("never shows $675 once City Hall is known, even if the thread mentions SJSU", () => {
+  it("never shows $775 once City Hall is known, even if the thread mentions SJSU", () => {
     const withMention = buildInvoiceDraft({ ...anthony, message: "SJSU grads! Meeting at City Hall." }, email({ location: "San Francisco City Hall" }));
-    expect(withMention.pricing.totalCents).toBe(60000);
+    expect(withMention.pricing.totalCents).toBe(70000);
     expect(withMention.pricing.travel.kind).toBe("included");
   });
 });
@@ -52,21 +52,21 @@ describe("travel precedence", () => {
     const draft = buildInvoiceDraft(anthony, email({ location: "SJSU campus" }));
     expect(draft.status).toBe("ready");
     expect(draft.pricing.travel).toEqual({ kind: "verified", amountCents: 7500, place: "SJSU campus" });
-    expect(draft.pricing.totalCents).toBe(67500);
+    expect(draft.pricing.totalCents).toBe(77500);
   });
 
   it("falls back to the school's campus only when no shoot location is known", () => {
     const draft = buildInvoiceDraft(anthony, NO_FACTS);
     expect(draft.session.locationSource).toBe("school");
     expect(draft.pricing.travel).toMatchObject({ kind: "verified", amountCents: 7500 });
-    expect(draft.pricing.totalCents).toBe(67500);
+    expect(draft.pricing.totalCents).toBe(77500);
   });
 
   it("lets an explicit San Francisco location override any non-SF school", () => {
     for (const school of ["UC Berkeley", "Stanford", "CSU East Bay", "Santa Clara University"]) {
       const draft = buildInvoiceDraft({ ...anthony, school }, email({ location: "Palace of Fine Arts, San Francisco" }));
       expect(draft.pricing.travel.kind, school).toBe("included");
-      expect(draft.pricing.totalCents, school).toBe(60000);
+      expect(draft.pricing.totalCents, school).toBe(70000);
     }
   });
 
@@ -74,7 +74,7 @@ describe("travel precedence", () => {
     const draft = buildInvoiceDraft({ ...anthony, location: "Baker Beach" }, NO_FACTS);
     expect(draft.session.locationSource).toBe("inquiry");
     expect(draft.pricing.travel.kind).toBe("included");
-    expect(draft.pricing.totalCents).toBe(60000);
+    expect(draft.pricing.totalCents).toBe(70000);
   });
 
   it("asks for review on an unknown outside-SF location, guessing nothing and keeping the location", () => {
@@ -107,7 +107,7 @@ describe("travel precedence", () => {
     const note = "Still thinking of a spot but don’t want it to be basic SJSU campus";
     const draft = buildInvoiceDraft({ ...anthony, location: note }, email({ location: "City Hall, San Francisco" }));
     expect(draft.status).toBe("ready");
-    expect(draft.pricing.totalCents).toBe(60000);
+    expect(draft.pricing.totalCents).toBe(70000);
     expect(draft.pricing.travel.kind).toBe("included");
   });
 
@@ -122,23 +122,23 @@ describe("travel precedence", () => {
 
 describe("agreed totals from the thread", () => {
   it("accepts a quoted amount that matches the rate card", () => {
-    const draft = buildInvoiceDraft(anthony, email({ location: "San Francisco City Hall", total_fee: 600, total_kind: "quote" }));
+    const draft = buildInvoiceDraft(anthony, email({ location: "San Francisco City Hall", total_fee: 700, total_kind: "quote" }));
     expect(draft.status).toBe("ready");
-    expect(draft.pricing.agreedTotalCents).toBe(60000);
-    expect(draft.pricing.totalCents).toBe(60000);
+    expect(draft.pricing.agreedTotalCents).toBe(70000);
+    expect(draft.pricing.totalCents).toBe(70000);
   });
 
   it("asks for review when an amount could be the session price without travel", () => {
-    const draft = buildInvoiceDraft(anthony, email({ location: "SJSU campus", total_fee: 600, total_kind: "agreed_total" }));
+    const draft = buildInvoiceDraft(anthony, email({ location: "SJSU campus", total_fee: 700, total_kind: "agreed_total" }));
     expect(draft.status).toBe("review");
     expect(draft.pricing.totalCents).toBeNull();
-    expect(draft.reviewReasons.join(" ")).toMatch(/\$600.*session price alone.*\$75 travel fee/);
+    expect(draft.reviewReasons.join(" ")).toMatch(/\$700.*session price alone.*\$75 travel fee/);
   });
 
   it("asks for review when an unclear amount disagrees with the rate card", () => {
     const draft = buildInvoiceDraft(anthony, email({ location: "San Francisco City Hall", total_fee: 500, total_kind: "unclear" }));
     expect(draft.status).toBe("review");
-    expect(draft.reviewReasons.join(" ")).toMatch(/\$500.*differs from the rate card \(\$600\)/);
+    expect(draft.reviewReasons.join(" ")).toMatch(/\$500.*differs from the rate card \(\$700\)/);
   });
 
   it("accepts a clearly negotiated all-in total that is consistent with the shoot location", () => {
@@ -153,19 +153,19 @@ describe("agreed totals from the thread", () => {
     expect(draft.pricing).toMatchObject({ baseCents: 57500, travel: { kind: "verified", amountCents: 7500 }, totalCents: 65000 });
   });
 
-  it("resolves Anthony's earlier $675 campus quote to $600 once City Hall is confirmed, with a note", () => {
+  it("resolves Anthony's earlier $775 campus quote to $700 once City Hall is confirmed, with a note", () => {
     for (const total_kind of ["agreed_total", "quote", "unclear"] as const) {
-      const draft = buildInvoiceDraft(anthony, email({ location: "City Hall, San Francisco", total_fee: 675, total_kind, includes_travel: true }));
+      const draft = buildInvoiceDraft(anthony, email({ location: "City Hall, San Francisco", total_fee: 775, total_kind, includes_travel: true }));
       expect(draft.status, total_kind).toBe("ready");
-      expect(draft.pricing.totalCents, total_kind).toBe(60000);
+      expect(draft.pricing.totalCents, total_kind).toBe(70000);
       expect(draft.pricing.agreedTotalCents, total_kind).toBeNull();
       expect(draft.pricing.travel.kind, total_kind).toBe("included");
-      expect(draft.warnings.join(" "), total_kind).toMatch(/\$675 quote included a \$75 campus travel fee/);
+      expect(draft.warnings.join(" "), total_kind).toMatch(/\$775 quote included a \$75 campus travel fee/);
     }
   });
 
   it("never takes a travel-inclusive total as-is for a shoot with no travel fee", () => {
-    const draft = buildInvoiceDraft(anthony, email({ location: "San Francisco City Hall", total_fee: 700, total_kind: "agreed_total", includes_travel: true }));
+    const draft = buildInvoiceDraft(anthony, email({ location: "San Francisco City Hall", total_fee: 800, total_kind: "agreed_total", includes_travel: true }));
     expect(draft.status).toBe("review");
     expect(draft.pricing.totalCents).toBeNull();
   });
@@ -177,13 +177,53 @@ describe("agreed totals from the thread", () => {
   });
 });
 
+describe("one graduate: the package comes from the thread or the inquiry, never a guess", () => {
+  const solo: InvoiceInquiry = { ...anthony, people: "1", message: "Grad photos for me, graduating from SJSU." };
+
+  it("asks which package when no length was named and nothing was agreed", () => {
+    const draft = buildInvoiceDraft(solo, email({ location: "SJSU campus" }));
+    expect(draft.status).toBe("review");
+    expect(draft.pricing.totalCents).toBeNull();
+    expect(draft.reviewReasons.join(" ")).toMatch(/does not say which package.*Graduation Mini \(30 min\) \$325 or Graduation Session \(60 min\) \$425/);
+  });
+
+  it("prices the mini when the inquiry asks for it", () => {
+    const draft = buildInvoiceDraft({ ...solo, message: "A 30 minute mini at SJSU please" }, email({ location: "SJSU campus" }));
+    expect(draft.status).toBe("ready");
+    expect(draft.session.description).toBe("One person, Graduation Mini (30 min)");
+    expect(draft.pricing).toMatchObject({ baseCents: 32500, travel: { kind: "verified", amountCents: 7500 }, totalCents: 40000 });
+  });
+
+  it("picks the package an agreed total lands on", () => {
+    const mini = buildInvoiceDraft(solo, email({ location: "San Francisco City Hall", total_fee: 325, total_kind: "quote" }));
+    expect(mini.status).toBe("ready");
+    expect(mini.pricing.totalCents).toBe(32500);
+    const hour = buildInvoiceDraft(solo, email({ location: "SJSU campus", total_fee: 500, total_kind: "quote" }));
+    expect(hour.status).toBe("ready");
+    expect(hour.pricing).toMatchObject({ baseCents: 42500, totalCents: 50000 });
+  });
+
+  it("keeps a legacy client's clearly agreed $350 rather than repricing them", () => {
+    const draft = buildInvoiceDraft(solo, email({ location: "San Francisco City Hall", total_fee: 350, total_kind: "agreed_total" }));
+    expect(draft.status).toBe("ready");
+    expect(draft.pricing).toMatchObject({ baseCents: 35000, agreedTotalCents: 35000, totalCents: 35000 });
+  });
+
+  it("never fills the 6-8 rate for nine graduates", () => {
+    const draft = buildInvoiceDraft({ ...anthony, people: "9" }, email({ location: "San Francisco City Hall" }));
+    expect(draft.status).toBe("review");
+    expect(draft.pricing.totalCents).toBeNull();
+    expect(draft.reviewReasons.join(" ")).toMatch(/group of 9.*up to 8 graduates/);
+  });
+});
+
 describe("when the thread cannot be read", () => {
   it("asks for review instead of pricing from the school when Gmail is not connected", () => {
     const draft = buildInvoiceDraft(anthony, { ...NO_FACTS, email_status: "unavailable" });
     expect(draft.status).toBe("review");
     expect(draft.reviewReasons.join(" ")).toMatch(/Gmail is not connected/);
     expect(draft.pricing.travel.kind).toBe("verified");
-    expect(draft.pricing.totalCents).toBe(67500);
+    expect(draft.pricing.totalCents).toBe(77500);
   });
 
   it("stays ready when Gmail is connected but the client has no thread yet", () => {

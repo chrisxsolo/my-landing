@@ -10,44 +10,54 @@ const none: ExtractedPricing = { agreedTotal: null, sessionPrice: null, addOns: 
 const sjsuGrad = { sessionType: "Graduation", school: "San Jose State University", location: null, message: "" };
 
 describe("contract pricing", () => {
-  it("keeps an agreed all-inclusive $425 at $425 (was $500)", () => {
-    const pricing = resolveContractPricing(sjsuGrad, { ...none, agreedTotal: 425, includesTravel: true });
-    expect(pricing).toMatchObject({ status: "ok", total: 425 });
+  it("keeps an agreed all-inclusive $500 at $500 (was $575)", () => {
+    const pricing = resolveContractPricing(sjsuGrad, { ...none, agreedTotal: 500, includesTravel: true });
+    expect(pricing).toMatchObject({ status: "ok", total: 500 });
   });
 
   it("never adds travel to an agreed total that matches session + travel", () => {
-    const pricing = resolveContractPricing(sjsuGrad, { ...none, agreedTotal: 425 });
-    expect(pricing).toMatchObject({ status: "ok", total: 425 });
+    const pricing = resolveContractPricing(sjsuGrad, { ...none, agreedTotal: 500 });
+    expect(pricing).toMatchObject({ status: "ok", total: 500 });
+  });
+
+  it("keeps a legacy client's agreed all-in total ($350 session + $75 travel) as-is", () => {
+    const legacy = resolveContractPricing(sjsuGrad, { ...none, agreedTotal: 425, includesTravel: true });
+    expect(legacy).toMatchObject({ status: "ok", total: 425 });
+    // The same figure is now also today's bare session price, so without the
+    // thread saying travel is included it goes to review rather than a guess.
+    expect(resolveContractPricing(sjsuGrad, { ...none, agreedTotal: 425 })).toMatchObject({ status: "review", total: null });
   });
 
   it("builds session + add-ons + approved travel when only the session price is known", () => {
     const pricing = resolveContractPricing(sjsuGrad, {
-      ...none, sessionPrice: 350, addOns: [{ label: "Extra outfit", amount: 75 }],
+      ...none, sessionPrice: 425, addOns: [{ label: "Extra outfit", amount: 75 }],
     });
     expect(pricing.status).toBe("ok");
-    expect(pricing.total).toBe(500);
+    expect(pricing.total).toBe(575);
     expect(pricing.lines).toEqual([
-      { label: "Session", amount: 350 },
+      { label: "Session", amount: 425 },
       { label: "Extra outfit", amount: 75 },
       { label: "Travel fee (San Jose State University)", amount: 75 },
     ]);
   });
 
-  it("asks for review when an agreed total could exclude travel", () => {
-    const pricing = resolveContractPricing(sjsuGrad, { ...none, agreedTotal: 350 });
-    expect(pricing.status).toBe("review");
-    expect(pricing.total).toBeNull();
-    expect(pricing.status === "review" && pricing.reason).toMatch(/\$350.*travel/i);
+  it("asks for review when an agreed total could exclude travel, for either package", () => {
+    for (const agreedTotal of [325, 425]) {
+      const pricing = resolveContractPricing(sjsuGrad, { ...none, agreedTotal });
+      expect(pricing.status, String(agreedTotal)).toBe("review");
+      expect(pricing.total).toBeNull();
+      expect(pricing.status === "review" && pricing.reason).toMatch(new RegExp(`\\$${agreedTotal}.*travel`, "i"));
+    }
   });
 
   it("uses the approved fee over a stale thread travel figure, and flags it", () => {
-    const pricing = resolveContractPricing(sjsuGrad, { ...none, sessionPrice: 350, travelFee: 70 });
-    expect(pricing).toMatchObject({ status: "review", total: 425 });
+    const pricing = resolveContractPricing(sjsuGrad, { ...none, sessionPrice: 425, travelFee: 70 });
+    expect(pricing).toMatchObject({ status: "review", total: 500 });
   });
 
   it("charges no campus fee for an SJSU graduate shooting in San Francisco", () => {
-    const pricing = resolveContractPricing({ ...sjsuGrad, location: "Palace of Fine Arts" }, { ...none, sessionPrice: 350 });
-    expect(pricing).toMatchObject({ status: "ok", total: 350 });
+    const pricing = resolveContractPricing({ ...sjsuGrad, location: "Palace of Fine Arts" }, { ...none, sessionPrice: 425 });
+    expect(pricing).toMatchObject({ status: "ok", total: 425 });
   });
 
   it("charges no campus fee on an elopement that only mentions a university", () => {
@@ -81,25 +91,25 @@ describe("contract pricing", () => {
 
 describe("an agreed total built on a superseded travel fee", () => {
   const oldQuote = {
-    body: "My sessions start at $350, plus a $70 travel fee for SJSU, so $420 total",
+    body: "My 1-hour sessions are $425, plus a $70 travel fee for SJSU, so $495 total",
     fromMe: true,
     timestamp: "2026-10-01T12:00:00Z",
   };
 
   it("goes to review instead of into the contract", () => {
-    const pricing = resolveContractPricing({ ...sjsuGrad, messages: [oldQuote] }, { ...none, agreedTotal: 420 });
+    const pricing = resolveContractPricing({ ...sjsuGrad, messages: [oldQuote] }, { ...none, agreedTotal: 495 });
     expect(pricing.status).toBe("review");
     expect(pricing.total).toBeNull();
-    expect(pricing.status === "review" && pricing.reason).toMatch(/\$420.*outdated travel fee.*\$75/);
+    expect(pricing.status === "review" && pricing.reason).toMatch(/\$495.*outdated travel fee.*\$75/);
   });
 
   it("is caught from the formula fee alone when the thread is not loaded", () => {
-    expect(resolveContractPricing(sjsuGrad, { ...none, agreedTotal: 420 })).toMatchObject({ status: "review", total: null });
+    expect(resolveContractPricing(sjsuGrad, { ...none, agreedTotal: 495 })).toMatchObject({ status: "review", total: null });
   });
 
   it("leaves the current all-in total and a deliberate custom price alone", () => {
-    expect(resolveContractPricing({ ...sjsuGrad, messages: [oldQuote] }, { ...none, agreedTotal: 425 }))
-      .toMatchObject({ status: "ok", total: 425 });
+    expect(resolveContractPricing({ ...sjsuGrad, messages: [oldQuote] }, { ...none, agreedTotal: 500 }))
+      .toMatchObject({ status: "ok", total: 500 });
     const custom = { body: "I can do $275 given the short notice", fromMe: true, timestamp: "2026-10-02T12:00:00Z" };
     expect(resolveContractPricing({ ...sjsuGrad, messages: [custom] }, { ...none, agreedTotal: 275 }))
       .toMatchObject({ status: "ok", total: 275 });
@@ -118,13 +128,27 @@ describe("payment total inference", () => {
   });
 
   it("charges no campus fee when an SJSU graduate shoots in San Francisco", () => {
-    const grad = { session_type: "Graduation", school: "San Jose State University", location: "Legion of Honor", message: "" };
-    expect(catalogSessionTotalCents(grad)).toBe(35000);
+    const grad = { session_type: "Graduation", school: "San Jose State University", location: "Legion of Honor", message: "1 hour session" };
+    expect(catalogSessionTotalCents(grad)).toBe(42500);
   });
 
   it("still charges the campus fee for an on-campus graduation named only in the message", () => {
-    const grad = { session_type: "Graduation", school: null, location: null, message: "I'm graduating from SJSU in May" };
-    expect(catalogSessionTotalCents(grad)).toBe(42500);
+    const grad = { session_type: "Graduation", school: null, location: null, message: "I'm graduating from SJSU in May, a 1-hour session" };
+    expect(catalogSessionTotalCents(grad)).toBe(50000);
+  });
+
+  it("prices one graduate only once the package is named, and the mini at its own price", () => {
+    const base = { session_type: "Graduation", school: "San Jose State University", location: null };
+    expect(catalogSessionTotalCents({ ...base, message: "" })).toBe(0);
+    expect(catalogSessionTotalCents({ ...base, message: "the 30 minute mini" })).toBe(40000);
+    expect(catalogSessionTotalCents({ ...base, message: "an hour and a half" })).toBe(60000);
+  });
+
+  it("prices a group per graduate and nothing above eight", () => {
+    const base = { session_type: "Graduation", school: "San Jose State University", location: null, message: "" };
+    expect(catalogSessionTotalCents({ ...base, people: 2 })).toBe(77500);
+    expect(catalogSessionTotalCents({ ...base, people: 8 })).toBe(207500);
+    expect(catalogSessionTotalCents({ ...base, people: 9 })).toBe(0);
   });
 
   it("prices maternity and both family packages from the rate card", () => {

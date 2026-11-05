@@ -100,8 +100,8 @@ describe("a longer group graduation session is priced, not guessed", () => {
       people: "2",
     });
     const text = facts.lines.join(" ");
-    expect(text).toContain("$600");
     expect(text).toContain("$700");
+    expect(text).toContain("$800");
   });
 
   it("says the 90-minute minimum is included for a group of three or more", () => {
@@ -119,6 +119,6 @@ describe("a longer group graduation session is priced, not guessed", () => {
       message: "grad photos, maybe two hours?",
       people: "1",
     });
-    expect(facts.lines.join(" ")).toMatch(/60, 90, 120 minutes/);
+    expect(facts.lines.join(" ")).toMatch(/90 minutes is \$525, 120 minutes is \$625/);
   });
 });

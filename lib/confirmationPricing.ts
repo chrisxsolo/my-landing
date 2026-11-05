@@ -16,6 +16,14 @@ import { catalogSessionTotalCents, type PaymentTotalInquiry } from "@/lib/paymen
 /** Where the amount shown as "Payment Received" came from. */
 export type AmountSource = "recorded" | "thread" | "retainer" | "none";
 
+/**
+ * Where the session total came from. "catalog" means the LIVE rate card
+ * priced it, not anything this client agreed to: a client quoted before a
+ * price change must not have their balance recomputed from today's rates, so
+ * the admin preview flags it for review instead of sending it silently.
+ */
+export type TotalSource = "thread" | "catalog" | "none";
+
 export type ConfirmationPricing = {
   /** Money received, e.g. "$225". Empty when nothing could be determined. */
   amount: string;
@@ -25,10 +33,11 @@ export type ConfirmationPricing = {
   /** Still owed, e.g. "$225". Empty when unknown; "paid" when settled. */
   balanceDue: string;
   balanceNote: string;
+  totalSource: TotalSource;
 };
 
 const EMPTY: ConfirmationPricing = {
-  amount: "", amountSource: "none", sessionTotal: "", balanceDue: "", balanceNote: "",
+  amount: "", amountSource: "none", sessionTotal: "", balanceDue: "", balanceNote: "", totalSource: "none",
 };
 
 /** Parse any money-ish text ("150", "$1,500.50", "150 dollars") into cents. */
@@ -65,7 +74,9 @@ export function resolveConfirmationPricing(input: {
 
   // A price quoted in the thread beats the rate card — it accounts for add-ons
   // and any discount the catalog can't know about.
-  const totalCents = parseMoneyCents(threadTotal) || catalogSessionTotalCents(inquiry);
+  const threadTotalCents = parseMoneyCents(threadTotal);
+  const totalCents = threadTotalCents || catalogSessionTotalCents(inquiry);
+  const totalSource: TotalSource = threadTotalCents ? "thread" : totalCents ? "catalog" : "none";
 
   if (!totalCents) {
     return paidCents
@@ -93,5 +104,6 @@ export function resolveConfirmationPricing(input: {
     sessionTotal: formatCents(totalCents),
     balanceDue: balanceCents > 0 ? formatCents(balanceCents) : "",
     balanceNote: balanceCents > 0 ? `due ${BOOKING_POLICY.remainingBalanceDeadline}` : "Paid in full ✓",
+    totalSource,
   };
 }

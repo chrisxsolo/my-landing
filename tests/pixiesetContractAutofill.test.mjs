@@ -53,6 +53,24 @@ test("fills Family into the existing graduation template and preserves other fie
   assert.ok(fixture.events.includes("input"));
 });
 
+test("prices a graduation contract from the 1-hour package and the per-graduate group rate", () => {
+  const fixture = loadAutofill(["Total: [TOTAL_FEE]; Retainer: [RETAINER]; Remaining: [REMAINING]."]);
+  fill(fixture, { session_type: "graduation", school: "SF State", people: "1" });
+  assert.equal(fixture.text(), "Total: $425.00; Retainer: $212.50; Remaining: $212.50.");
+  const group = loadAutofill(["Total: [TOTAL_FEE]; Retainer: [RETAINER]; Remaining: [REMAINING]."]);
+  fill(group, { session_type: "graduation", school: "SF State", people: "3" });
+  assert.equal(group.text(), "Total: $975.00; Retainer: $487.50; Remaining: $487.50.");
+});
+
+test("leaves the price placeholders alone for nine or more graduates, and keeps an agreed total", () => {
+  const nine = loadAutofill(["Total: [TOTAL_FEE]; Retainer: [RETAINER]; Remaining: [REMAINING]."]);
+  fill(nine, { session_type: "graduation", school: "SF State", people: "9" });
+  assert.equal(nine.text(), "Total: [TOTAL_FEE]; Retainer: [RETAINER]; Remaining: [REMAINING].");
+  const legacy = loadAutofill(["Total: [TOTAL_FEE]; Retainer: [RETAINER]; Remaining: [REMAINING]."]);
+  fill(legacy, { session_type: "graduation", school: "SJSU", people: "1", _agreedTotal: 425 });
+  assert.equal(legacy.text(), "Total: $425.00; Retainer: $212.50; Remaining: $212.50.");
+});
+
 test("fills the session type when inline formatting splits it across text nodes", () => {
   const fixture = loadAutofill([
     "in connection with the portrait ", "session of ", "Grad", "uation", ' (the "Portrait Session").',

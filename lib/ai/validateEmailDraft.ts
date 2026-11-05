@@ -14,6 +14,7 @@
 import { BANNED_PHRASES } from "./soloxsnapsWritingProfile";
 import type { EmailContext } from "./buildEmailContext";
 import { checkDraftQuote, type QuoteInput } from "./quotePricing";
+import { detectGraduationDurationMinutes } from "@/lib/pricing";
 import { PRICING_CATALOG } from "@/lib/pricingCatalog";
 import { formatFee } from "@/lib/pricingCatalog";
 
@@ -352,6 +353,9 @@ export function quoteInputOf(context: EmailContext): QuoteInput {
     addOnPrices: context.pricing.addOnPrices,
     travel: context.pricing.travel,
     confirmedPrices: context.pricing.confirmedPrices,
+    durationMinutes: context.client.playbook === "graduation"
+      ? detectGraduationDurationMinutes(context.request.rawMessage) ?? undefined
+      : undefined,
   };
 }
 
@@ -641,7 +645,7 @@ function checkWritingQuality(draft: string, context: EmailContext): ValidationIs
   if (context.client.playbook === "graduation" && /\$\s?\d+\s*(?:per hour|\/\s?hour|\/\s?hr|an hour|a hour)/i.test(draft)) {
     issues.push({
       type: "hourly_pricing", category: "style", severity: "medium",
-      description: 'Quotes graduation as an hourly rate. Chris writes "my graduation sessions start at $350".',
+      description: `Quotes graduation as an hourly rate. Chris writes "my graduation sessions start at $${PRICING_CATALOG.graduation.packages.mini.price} for a ${PRICING_CATALOG.graduation.packages.mini.durationMinutes}-minute mini" or "$${PRICING_CATALOG.graduation.packages.standard.price} for a 1-hour session".`,
       excerpt: (draft.match(/\$\s?\d+\s*(?:per hour|\/\s?hour|\/\s?hr|an hour)/i) ?? [""])[0],
     });
   }

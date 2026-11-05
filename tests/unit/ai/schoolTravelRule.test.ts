@@ -46,9 +46,9 @@ describe("school implies location only for graduation", () => {
 
     const contract = resolveContractPricing(
       { sessionType: grad.sessionType, school: grad.school, location: null, message: grad.message },
-      { ...none, sessionPrice: 350 },
+      { ...none, sessionPrice: 425 },
     );
-    expect(contract.total).toBe(425);
+    expect(contract.total).toBe(500);
   });
 
   it("still reads a couples shoot location when one is named", () => {

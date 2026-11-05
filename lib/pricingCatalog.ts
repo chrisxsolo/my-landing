@@ -51,15 +51,43 @@ export function addOnPriceValues(addOns: Readonly<Record<string, object>>): numb
 export const PRICING_CATALOG = {
   standardTurnaroundDays: STANDARD_TURNAROUND_DAYS,
   graduation: {
-    baseHourlyRate: 350,
+    // Two individual packages (Spring 2027 rate card). The mini is a real
+    // package at its own price: it is not half the hour, and the hour is not
+    // an hourly rate. Time past the hour is the extra-30-minutes add-on.
+    packages: {
+      mini: {
+        label: "Graduation Mini",
+        price: 325,
+        durationMinutes: 30,
+        durationLabel: "30 minute session",
+      },
+      standard: {
+        label: "Graduation Session",
+        price: 425,
+        durationMinutes: 60,
+        durationLabel: "1 hour session",
+      },
+    },
     standardMinimumImages: 50,
     groupMinimumImagesPerPerson: 25,
-    groupRates: {
-      2: 300,
-      3: 275,
-      4: 250,
-      5: 225,
-      6: 200,
+    // PER GRADUATE, never a group total. The rate covers the group's included
+    // time (60 minutes for two, the 90-minute minimum for three or more).
+    // Six, seven and eight share one rate; nine or more is a hand quote.
+    groupRatesPerPerson: {
+      2: 350,
+      3: 325,
+      4: 300,
+      5: 275,
+      6: 250,
+      7: 250,
+      8: 250,
+    },
+    headcountRules: {
+      // The 30-minute mini is for one graduate only.
+      miniMaxPeople: 1,
+      groupMinPeople: 2,
+      // Above this the rate card has no figure: manual quote or review.
+      groupMaxPeople: 8,
     },
     addOns: {
       extraOutfit: {
@@ -100,7 +128,8 @@ export const PRICING_CATALOG = {
       "other": undefined,
     },
     durationRules: {
-      allowedMinutes: [60, 90, 120],
+      // 30 is the mini (one graduate only); 60 is the standard package.
+      allowedMinutes: [30, 60, 90, 120],
       standardMinutes: 60,
       groupMinimumSize: 3,
       groupMinimumMinutes: 90,
@@ -237,6 +266,35 @@ export function getBookingPolicyItems(): string[] {
     `Contract completed ${BOOKING_POLICY.contractDeadline}.`,
     `Remaining balance due ${BOOKING_POLICY.remainingBalanceDeadline}.`,
   ];
+}
+
+export interface GraduationGroupTier {
+  /** Smallest and largest headcount the row covers. */
+  minPeople: number;
+  maxPeople: number;
+  /** "2 people" / "6-8 people". */
+  label: string;
+  ratePerPerson: number;
+}
+
+/**
+ * The per-person group table as the public pages print it: one row per
+ * headcount, with consecutive headcounts at the same rate collapsed into a
+ * range ("6-8 people"). Derived from the catalog, never typed by hand, and
+ * totals still multiply the exact headcount by the row's rate.
+ */
+export function graduationGroupTiers(): GraduationGroupTier[] {
+  const rates = PRICING_CATALOG.graduation.groupRatesPerPerson;
+  const headcounts = Object.keys(rates).map(Number).sort((a, b) => a - b);
+  return headcounts.reduce<GraduationGroupTier[]>((tiers, people) => {
+    const rate = rates[people as keyof typeof rates];
+    const last = tiers.at(-1);
+    if (last && last.ratePerPerson === rate && last.maxPeople === people - 1) {
+      const merged = { ...last, maxPeople: people, label: `${last.minPeople}-${people} people` };
+      return [...tiers.slice(0, -1), merged];
+    }
+    return [...tiers, { minPeople: people, maxPeople: people, label: `${people} people`, ratePerPerson: rate }];
+  }, []);
 }
 
 /**

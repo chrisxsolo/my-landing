@@ -567,6 +567,16 @@
   margin-top: 30px;
 }
 
+/* Two individual packages side by side (grads page: mini + full hour) */
+.pricingInvestmentOptions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 40px;
+}
+.pricingInvestmentOption .pricingPrice {
+  font-size: 52px;
+}
+
 /* ── BUTTON / LINK ─────────────────────────────────────────────────────────── */
 .pricingLink {
   min-height: 46px;

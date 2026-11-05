@@ -105,6 +105,8 @@ export async function POST(req: NextRequest) {
   }
 
   let html: string;
+  // Things the admin must check before sending; shown with the preview.
+  const warnings: string[] = [];
   if (mode === "send" && edited_html) {
     // WYSIWYG: the admin edited the preview inline, so send exactly that
     // content re-wrapped in the document shell the preview stripped.
@@ -159,6 +161,10 @@ export async function POST(req: NextRequest) {
       threadTotal: details.quotedTotal,
     });
 
+    if (pricing.totalSource === "catalog") {
+      warnings.push(`The session total (${pricing.sessionTotal}) and balance come from the current rate card, not from a price quoted to this client. If they were quoted a different amount, edit the figures before sending.`);
+    }
+
     html = buildPaymentConfirmationHtml({
       name:               inq.name,
       sessionType:        inq.session_type,
@@ -175,7 +181,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (mode === "preview") {
-    return NextResponse.json({ html });
+    return NextResponse.json({ html, warnings });
   }
 
   // ── Send via Gmail ─────────────────────────────────────────────────────────

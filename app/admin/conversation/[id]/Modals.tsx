@@ -7,9 +7,11 @@ import { useRef } from "react";
 import type { AdminInquiry } from "@/lib/adminInquiries";
 import { T, Icon, Spinner, PanelHead, MonoLabel } from "../ui";
 
-export function ConfirmationModal({ inquiry, previewHtml, customComment, onCustomComment, confirmLoading, onClose, onSend }: {
+export function ConfirmationModal({ inquiry, previewHtml, warnings = [], customComment, onCustomComment, confirmLoading, onClose, onSend }: {
   inquiry: AdminInquiry;
   previewHtml: string;
+  /** Figures the admin must check before sending (a total the rate card guessed). */
+  warnings?: string[];
   customComment: string;
   onCustomComment: (v: string) => void;
   confirmLoading: boolean;
@@ -55,6 +57,13 @@ export function ConfirmationModal({ inquiry, previewHtml, customComment, onCusto
             <p className="text-[10px] mt-1 font-medium" style={{ color: T.green }}>↓ Preview will update when you resend</p>
           )}
         </div>
+
+        {warnings.length > 0 && (
+          <div className="px-5 py-3 flex-shrink-0 text-[12px] leading-relaxed"
+            style={{ background: T.amberBg, color: T.amber, borderBottom: `1px solid ${T.rowBorder}` }}>
+            {warnings.map((warning) => <p key={warning}>⚠ {warning}</p>)}
+          </div>
+        )}
 
         {/* Email preview — white, as the client sees it. Directly editable. */}
         <div className="flex-1 overflow-y-auto p-4">

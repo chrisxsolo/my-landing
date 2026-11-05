@@ -34,6 +34,13 @@ import {
 import type { EmailContext } from "./buildEmailContext";
 import type { SystemPrompt } from "./emailModel";
 import type { WritingRule } from "./writingRules";
+import { PRICING_CATALOG } from "@/lib/pricingCatalog";
+
+// The graduation figures the style examples quote, read from the rate card so
+// the model is never shown a price the website has moved on from.
+const GRAD_MINI = `$${PRICING_CATALOG.graduation.packages.mini.price}`;
+const GRAD_MINI_MINUTES = PRICING_CATALOG.graduation.packages.mini.durationMinutes;
+const GRAD_HOUR = `$${PRICING_CATALOG.graduation.packages.standard.price}`;
 
 /**
  * Style guidance, deduplicated.
@@ -46,7 +53,7 @@ import type { WritingRule } from "./writingRules";
  */
 export const STYLE_CONSOLIDATED: readonly string[] = [
   "Answer what they asked, say what happens next, stop. Length follows from that and from nothing else: a one-line question gets a short reply, a first inquiry with four questions in it gets a longer one.",
-  'Say prices plainly, then stop: "My graduation sessions start at $350". No framing, no justifying, no explaining the value.',
+  `Say prices plainly, then stop: "My graduation sessions start at ${GRAD_MINI} for a ${GRAD_MINI_MINUTES}-minute mini, or ${GRAD_HOUR} for a 1-hour session". No framing, no justifying, no explaining the value.`,
   "Warmth is one genuine sentence, never three. That covers congratulations, sympathy, and apologies for a late reply alike.",
   "Never predict how the photos, the light, or a place will look. No sentence about light on a building, a staircase, a backdrop, or a landscape. Timing advice is useful, scenery commentary is not.",
   "Describe a location only when you are the one suggesting it, and then in one clause about why it suits them. If the client named the place, do not describe it back to them.",
@@ -67,7 +74,7 @@ export const STYLE_CONSOLIDATED: readonly string[] = [
 export const PHRASING_CONSOLIDATED: readonly string[] = [
   'Not "I\'d love to shoot your graduation, and congratulations!" → "Thank you so much for reaching out, and congratulations on graduating! I\'d love to take your graduation pictures!"',
   'Not "So glad 5:45 pm works!" → "Perfect! October 16th at 5:45 pm works for me!"',
-  'Not "My graduation session is $350 per hour" → "My graduation sessions start at $350"',
+  `Not "My graduation session is ${GRAD_HOUR} per hour" → "My graduation sessions start at ${GRAD_MINI} for a ${GRAD_MINI_MINUTES}-minute mini, or ${GRAD_HOUR} for a 1-hour session"`,
   'Not "The champagne setup is a fun add-on, and it\'s $15" → "The champagne add-on is $15"',
 ];
 

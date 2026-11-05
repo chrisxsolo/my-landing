@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/requireAdmin";
 import {
   PAYMENT_SOURCE_MANUAL,
   inferPaymentTotalCents,
+  recordedPaymentTotalCents,
   parseLoosePaymentCents,
 } from "@/lib/paymentTotalInference";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
@@ -253,9 +254,12 @@ async function markPaymentState(input: PaymentPlanInput) {
   }
 
   const sameEmailInquiry = inquiry ?? await findBestInquiryByEmail(supabase, email);
-  const totalCents = parseCents(input.total_amount ?? "") || inferPaymentTotalCents(existingPayments ?? [], sameEmailInquiry);
+  // The ledger or the client's own record may supply the total; the live rate
+  // card may not, because a booking made at an earlier price would be
+  // repriced on save. The panel shows the rate-card figure as a hint only.
+  const totalCents = parseCents(input.total_amount ?? "") || recordedPaymentTotalCents(existingPayments ?? [], sameEmailInquiry);
   if (totalCents <= 0) {
-    return NextResponse.json({ error: "Enter a total amount first." }, { status: 400 });
+    return NextResponse.json({ error: "Enter the agreed total first. The rate card figure is not this client's quote." }, { status: 400 });
   }
 
   const existingTypes = new Set((existingPayments ?? []).map(payment => payment.payment_type).filter(Boolean) as string[]);

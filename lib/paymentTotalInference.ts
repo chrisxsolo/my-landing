@@ -1,4 +1,4 @@
-import { COUPLES_PACKAGES, GRAD_HOURLY_RATE, getGroupRatePerPerson } from "./pricing";
+import { COUPLES_PACKAGES, detectGraduationDurationMinutes, graduationSessionPrice } from "./pricing";
 import { PRICING_CATALOG, inferTotalFromRetainer } from "./pricingCatalog";
 import { classifySession, type PlaybookKey } from "./ai/sessionClassifier";
 import { detectSchoolsInText } from "./schoolDetection";
@@ -68,10 +68,19 @@ function serviceOf(inquiry: PaymentTotalInquiry, text: string): PlaybookKey | nu
   return null;
 }
 
-/** Graduation rate plus travel to where the shoot is (the campus, unless a location says otherwise). */
+/**
+ * Graduation package or group rate plus travel to where the shoot is (the
+ * campus, unless a location says otherwise). Returns 0, sending the caller
+ * to a recorded or hand-entered figure, when the rate card cannot name ONE
+ * price: a single graduate who never said whether they want the 30-minute
+ * mini or the hour, or a group larger than the rate card prices.
+ */
 function graduationTotalCents(inquiry: PaymentTotalInquiry, text: string): number {
   const people = parsePeopleCount(inquiry.people, text);
-  const base = people > 1 ? getGroupRatePerPerson(people) * people : GRAD_HOURLY_RATE;
+  const length = detectGraduationDurationMinutes(`${inquiry.session_type ?? ""} ${inquiry.message ?? ""}`);
+  if (people <= 1 && length === null) return 0;
+  const base = graduationSessionPrice(people, length ?? undefined);
+  if (base === null) return 0;
   const school = inquiry.school || detectSchoolsInText(text)[0]?.canonicalName || null;
   const travel = resolveTravel({ school, location: inquiry.location, message: inquiry.message });
   return Math.round((base + travelFeeAmount(travel)) * 100);
@@ -124,19 +133,36 @@ export function catalogSessionTotalCents(inquiry: PaymentTotalInquiry | null | u
   return 0;
 }
 
+/** A total the client's own record states: the payment note or the inquiry message. Never the rate card. */
+export function recordedSessionTotalCents(inquiry: PaymentTotalInquiry | null | undefined): number {
+  if (!inquiry) return 0;
+  return parseKnownMoneyCents(inquiry.payment_note) || parseKnownMoneyCents(inquiry.message);
+}
+
 export function inferSessionTotalCents(inquiry: PaymentTotalInquiry | null | undefined): number {
   if (!inquiry) return 0;
 
-  const explicit = parseKnownMoneyCents(inquiry.payment_note) || parseKnownMoneyCents(inquiry.message);
+  const explicit = recordedSessionTotalCents(inquiry);
   if (explicit > 0) return explicit;
 
   return catalogSessionTotalCents(inquiry);
 }
 
-export function inferPaymentTotalCents(
+/**
+ * The total the ledger or the client's record states, or 0. Unlike
+ * inferPaymentTotalCents it never falls back to the live rate card, so a
+ * write path can refuse to persist a figure nobody agreed with this client.
+ */
+export function recordedPaymentTotalCents(
   payments: PaymentTotalRow[],
   inquiry: PaymentTotalInquiry | null | undefined,
 ): number {
+  const fromLedger = ledgerTotalCents(payments);
+  return fromLedger > 0 ? fromLedger : recordedSessionTotalCents(inquiry);
+}
+
+/** What the ledger rows themselves say the total is, or 0 when they don't. */
+function ledgerTotalCents(payments: PaymentTotalRow[]): number {
   const active = payments.filter(payment => (
     payment.status !== "voided"
     && (payment.amount_cents ?? parseLoosePaymentCents(payment.amount)) > 0
@@ -153,6 +179,14 @@ export function inferPaymentTotalCents(
       deposits[0].amount_cents ?? parseLoosePaymentCents(deposits[0].amount),
     );
   }
+  return 0;
+}
 
+export function inferPaymentTotalCents(
+  payments: PaymentTotalRow[],
+  inquiry: PaymentTotalInquiry | null | undefined,
+): number {
+  const fromLedger = ledgerTotalCents(payments);
+  if (fromLedger > 0) return fromLedger;
   return inferSessionTotalCents(inquiry);
 }

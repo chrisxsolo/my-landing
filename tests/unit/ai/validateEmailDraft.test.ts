@@ -58,14 +58,14 @@ describe("format rules", () => {
 
 describe("price support", () => {
   it("accepts an exact rate-card price", () => {
-    const draft = "Hi Sarah,\n\nMy graduation session is $350 per hour";
+    const draft = "Hi Sarah,\n\nMy graduation session is $425 for the hour, or $325 for a 30-minute mini";
     expect(validateEmailDraft(draft, ctx()).issues.map((i) => i.type))
       .not.toContain("unsupported_price");
   });
 
   it("accepts a base plus add-ons, which is a real total", () => {
-    // 350 base + 75 extra outfit
-    const draft = "Hi Sarah,\n\nWith the second outfit that comes to $425";
+    // 425 base + 75 extra outfit
+    const draft = "Hi Sarah,\n\nWith the second outfit that comes to $500";
     expect(validateEmailDraft(draft, ctx()).issues.map((i) => i.type))
       .not.toContain("unsupported_price");
   });

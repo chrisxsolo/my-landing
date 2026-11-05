@@ -143,7 +143,7 @@ describe("one fee everywhere", () => {
   it("includes San Francisco", () => {
     const grad = PRICING_CATALOG.graduation.travelFees;
     expect([grad["sf-state"], grad.usf, grad["sf-other"], PRICING_CATALOG.couples.travelFees.sf]).toEqual([null, null, null, null]);
-    expect(calculateGraduationEstimate({ school: "usf", people: 1, sessionLength: "1hr", extraOutfit: false, secondLocation: false, expedited: false, champagne: false }).subtotal).toBe(350);
+    expect(calculateGraduationEstimate({ school: "usf", people: 1, sessionLength: "1hr", extraOutfit: false, secondLocation: false, expedited: false, champagne: false }).subtotal).toBe(425);
   });
 
   it("matches the Pixieset extension's copy", () => {
@@ -157,11 +157,11 @@ describe("one fee everywhere", () => {
 
   it("gives the same session total on the estimator, the confirmation, and the contract", () => {
     const estimate = calculateGraduationEstimate({ school: "uc-berkeley", people: 1, sessionLength: "1hr", extraOutfit: false, secondLocation: false, expedited: false, champagne: false });
-    expect(estimate.subtotal).toBe(395);
-    expect(formatCurrency(estimate.subtotal)).toBe("$395");
-    expect(estimate.deposit).toBe(197.5);
-    expect(estimate.remainingBalance).toBe(197.5);
-    expect(catalogSessionTotalCents({ session_type: "Graduation", school: "UC Berkeley", message: "", location: null, people: 1 })).toBe(39500);
+    expect(estimate.subtotal).toBe(470);
+    expect(formatCurrency(estimate.subtotal)).toBe("$470");
+    expect(estimate.deposit).toBe(235);
+    expect(estimate.remainingBalance).toBe(235);
+    expect(catalogSessionTotalCents({ session_type: "Graduation", school: "UC Berkeley", message: "a 1 hour session", location: null, people: 1 })).toBe(47000);
     expect(getGraduationTravelFeeFromText("stanford grad")).toBe(50);
     expect(calculateCouplesEstimate({ packageKey: "1hr", location: "santa-clara", extraLocation: false, extraOutfit: false, extra30Min: false, proofingGallery: false, rushPreview: false, expedited: false }).subtotal).toBe(515);
   });

@@ -111,8 +111,10 @@ export function seedFromRelated(
       totalCents = noteCents;
       totalSource = "payment note";
     } else if (inquiry) {
+      // Today's rate card, not what this client agreed: labelled so the
+      // spreadsheet shows it as a suggestion to check, never a recorded figure.
       totalCents = inferSessionTotalCents(inquiry);
-      totalSource = totalCents > 0 ? "session pricing" : "manual";
+      totalSource = totalCents > 0 ? "current rate card" : "manual";
     }
   }
 

@@ -3,7 +3,8 @@ import { formatCents, parseMoneyCents, resolveConfirmationPricing } from "@/lib/
 import { BOOKING_POLICY, PRICING_CATALOG } from "@/lib/pricingCatalog";
 
 const COUPLES = { session_type: "Couples Session", message: null, school: null, location: null };
-const GRAD_SJSU = { session_type: "Graduation", message: null, school: "San Jose State University", location: null };
+const GRAD_SJSU = { session_type: "Graduation", message: "a 1 hour session please", school: "San Jose State University", location: null };
+const GRAD_SJSU_NO_LENGTH = { ...GRAD_SJSU, message: null };
 
 describe("parseMoneyCents / formatCents", () => {
   it("parses the shapes clients and the AI write", () => {
@@ -34,10 +35,26 @@ describe("resolveConfirmationPricing", () => {
     expect(p.balanceNote).toContain(BOOKING_POLICY.remainingBalanceDeadline);
   });
 
-  it("adds the campus travel fee for a graduation shoot", () => {
+  it("adds the campus travel fee for a graduation shoot and says the rate card priced it", () => {
     const p = resolveConfirmationPricing({ inquiry: GRAD_SJSU });
-    const total = PRICING_CATALOG.graduation.baseHourlyRate + PRICING_CATALOG.graduation.travelFees.sjsu;
+    const total = PRICING_CATALOG.graduation.packages.standard.price + PRICING_CATALOG.graduation.travelFees.sjsu;
     expect(p.sessionTotal).toBe(`$${total}`);
+    expect(p.totalSource).toBe("catalog");
+  });
+
+  it("shows no total for one graduate who never chose a package, rather than guessing one", () => {
+    const p = resolveConfirmationPricing({ inquiry: GRAD_SJSU_NO_LENGTH, recordedAmount: "$175" });
+    expect(p.sessionTotal).toBe("");
+    expect(p.totalSource).toBe("none");
+    expect(p.amount).toBe("$175");
+  });
+
+  it("keeps a legacy total quoted in the thread over today's rate card", () => {
+    // Quoted at the old $350 session + $75 travel: the thread, not the catalog, is the record.
+    const p = resolveConfirmationPricing({ inquiry: GRAD_SJSU, threadTotal: "425", recordedAmount: "212.50" });
+    expect(p.sessionTotal).toBe("$425");
+    expect(p.totalSource).toBe("thread");
+    expect(p.balanceDue).toBe("$212.50");
   });
 
   it("prefers a recorded payment over the estimated retainer", () => {
@@ -70,7 +87,7 @@ describe("resolveConfirmationPricing", () => {
 
   it("returns nothing to show when the shoot cannot be priced", () => {
     const p = resolveConfirmationPricing({ inquiry: { session_type: "Something else" } });
-    expect(p).toEqual({ amount: "", amountSource: "none", sessionTotal: "", balanceDue: "", balanceNote: "" });
+    expect(p).toEqual({ amount: "", amountSource: "none", sessionTotal: "", balanceDue: "", balanceNote: "", totalSource: "none" });
   });
 
   it("still shows a recorded payment when the shoot cannot be priced", () => {

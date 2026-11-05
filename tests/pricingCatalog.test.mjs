@@ -8,6 +8,7 @@ import {
   calculatePaymentSchedule,
   getBookingPolicyItems,
   getMinimumImageCountForSessionType,
+  graduationGroupTiers,
 } from "../lib/pricingCatalog.ts";
 
 test("booking policy uses one 50% non-refundable retainer and balance deadline", () => {
@@ -29,8 +30,9 @@ test("booking policy uses one 50% non-refundable retainer and balance deadline",
 });
 
 test("pricing catalog contains every operational pricing category", () => {
-  assert.equal(PRICING_CATALOG.graduation.baseHourlyRate, 350);
-  assert.equal(PRICING_CATALOG.graduation.groupRates[6], 200);
+  assert.equal(PRICING_CATALOG.graduation.packages.mini.price, 325);
+  assert.equal(PRICING_CATALOG.graduation.packages.standard.price, 425);
+  assert.equal(PRICING_CATALOG.graduation.groupRatesPerPerson[6], 250);
   assert.equal(PRICING_CATALOG.graduation.addOns.extraOutfit.price, 75);
   assert.equal(PRICING_CATALOG.graduation.travelFees["uc-berkeley"], 45);
   assert.equal(PRICING_CATALOG.graduation.standardMinimumImages, 50);
@@ -95,14 +97,28 @@ test("every add-on price across categories is pinned", () => {
 });
 
 test("package prices and minimum image counts are pinned per category", () => {
-  // Graduation.
-  assert.equal(PRICING_CATALOG.graduation.baseHourlyRate, 350);
+  // Graduation (Spring 2027): two individual packages, per-graduate group tiers.
+  const gradPackages = PRICING_CATALOG.graduation.packages;
+  assert.deepEqual([gradPackages.mini.price, gradPackages.mini.durationMinutes], [325, 30]);
+  assert.deepEqual([gradPackages.standard.price, gradPackages.standard.durationMinutes], [425, 60]);
   assert.equal(PRICING_CATALOG.graduation.standardMinimumImages, 50);
   assert.equal(PRICING_CATALOG.graduation.groupMinimumImagesPerPerson, 25);
   assert.deepEqual(
-    { ...PRICING_CATALOG.graduation.groupRates },
-    { 2: 300, 3: 275, 4: 250, 5: 225, 6: 200 },
+    { ...PRICING_CATALOG.graduation.groupRatesPerPerson },
+    { 2: 350, 3: 325, 4: 300, 5: 275, 6: 250, 7: 250, 8: 250 },
   );
+  assert.deepEqual(
+    { ...PRICING_CATALOG.graduation.headcountRules },
+    { miniMaxPeople: 1, groupMinPeople: 2, groupMaxPeople: 8 },
+  );
+  assert.deepEqual(PRICING_CATALOG.graduation.durationRules.allowedMinutes, [30, 60, 90, 120]);
+  assert.deepEqual(graduationGroupTiers(), [
+    { minPeople: 2, maxPeople: 2, label: "2 people", ratePerPerson: 350 },
+    { minPeople: 3, maxPeople: 3, label: "3 people", ratePerPerson: 325 },
+    { minPeople: 4, maxPeople: 4, label: "4 people", ratePerPerson: 300 },
+    { minPeople: 5, maxPeople: 5, label: "5 people", ratePerPerson: 275 },
+    { minPeople: 6, maxPeople: 8, label: "6-8 people", ratePerPerson: 250 },
+  ]);
 
   // Couples packages: price + minimum images.
   const cp = PRICING_CATALOG.couples.packages;

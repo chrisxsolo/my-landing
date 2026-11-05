@@ -2,7 +2,7 @@
 //
 // The generator used to take one "agreed price" off the email thread and add
 // the campus travel fee to it. When that price was already the all-in total
-// ($425 = $350 session + $75 SJSU travel) the contract said $500.
+// ($500 = $425 session + $75 SJSU travel) the contract said $575.
 //
 // So the thread is read as separate parts and combined here, by code:
 //   agreed total    the all-in figure both sides settled on → used as-is,
@@ -12,14 +12,14 @@
 //                   where the rate card has none)
 // Anything that cannot be settled without guessing returns "review", and the
 // contract carries a placeholder instead of a number. That includes an agreed
-// total only a superseded travel fee explains ($420 = $350 + the old $70 SJSU
+// total only a superseded travel fee explains ($495 = $425 + the old $70 SJSU
 // formula fee): the same staleQuotedPrices check Draft AI runs.
 
 import { classifySession } from "./ai/sessionClassifier";
 import { buildQuoteInputForInquiry } from "./ai/inquiryQuote";
 import { staleQuotedPrices } from "./ai/quotePricing";
 import type { ThreadMessage } from "./ai/threadDigest";
-import { graduationSessionPrice } from "./pricing";
+import { GRAD_PACKAGES, detectGraduationDurationMinutes, graduationSessionPrice } from "./pricing";
 import { PRICING_CATALOG } from "./pricingCatalog";
 import { resolveTravel, schoolImpliesLocationFor, type TravelResolution } from "./travelResolution";
 
@@ -66,13 +66,24 @@ function travelFor(booking: ContractBooking): TravelResolution {
   });
 }
 
-/** Rate-card session prices this booking could have been quoted at. */
+/**
+ * Rate-card session prices this booking could have been quoted at. One
+ * graduate who named no length could be on either package; nine or more
+ * graduates have no rate-card price at all.
+ */
 function catalogSessionPrices(booking: ContractBooking): number[] {
   const service = classifySession(booking.sessionType, booking.message).key;
   if (service === "maternity") return [PRICING_CATALOG.maternity.price];
   if (service !== "graduation") return [];
   const people = Number(String(booking.people ?? "1").match(/\d+/)?.[0] ?? 1) || 1;
-  return [graduationSessionPrice(people)];
+  const named = detectGraduationDurationMinutes(booking.message);
+  const lengths = named !== null
+    ? [named]
+    : people <= 1 ? [GRAD_PACKAGES.mini.durationMinutes, GRAD_PACKAGES.standard.durationMinutes] : [undefined];
+  return lengths.flatMap((minutes) => {
+    const price = graduationSessionPrice(people, minutes);
+    return price === null ? [] : [price];
+  });
 }
 
 /** Whether only an outdated travel figure explains this agreed total. */

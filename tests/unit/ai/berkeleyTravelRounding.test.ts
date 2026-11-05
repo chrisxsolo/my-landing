@@ -24,8 +24,8 @@ function berkeley(thread: ReturnType<typeof message>[] = []) {
   });
 }
 
-const OLD_DRAFT = "Hi Jaqueline,\n\nMy graduation sessions start at $350 for a 1-hour session, plus a travel fee of $43.50 for UC Berkeley, so $393.50 total";
-const GOOD_DRAFT = "Hi Jaqueline,\n\nMy graduation sessions start at $350 for a 1-hour session, plus a travel fee of $45 for UC Berkeley, so $395 total";
+const OLD_DRAFT = "Hi Jaqueline,\n\nMy graduation sessions are $425 for a 1-hour session, plus a travel fee of $43.50 for UC Berkeley, so $468.50 total";
+const GOOD_DRAFT = "Hi Jaqueline,\n\nMy graduation sessions are $425 for a 1-hour session, plus a travel fee of $45 for UC Berkeley, so $470 total";
 
 describe("UC Berkeley after the nearest-$5 rounding", () => {
   it("gives the AI $45 as the verified fact, never $43.50", () => {
@@ -34,13 +34,13 @@ describe("UC Berkeley after the nearest-$5 rounding", () => {
     expect(fact).not.toContain("43.5");
   });
 
-  it("prices the session at $350 + $45 = $395", () => {
+  it("prices the session at $425 + $45 = $470", () => {
     expect(authoritativeQuote(quoteInputOf(berkeley()))).toEqual({
       lines: [
-        { kind: "session", label: "Graduation session", amount: 350 },
+        { kind: "session", label: "Graduation Session (60 min)", amount: 425 },
         { kind: "travel", label: "Travel fee (UC Berkeley)", amount: 45 },
       ],
-      total: 395,
+      total: 470,
     });
   });
 
@@ -48,7 +48,7 @@ describe("UC Berkeley after the nearest-$5 rounding", () => {
     const result = validateEmailDraft(OLD_DRAFT, berkeley());
     expect(result.issues.filter((i) => i.type === "pricing_mismatch").map((i) => i.description)).toEqual([
       "States a $43.50 travel fee; the verified fee is $45.",
-      "States a $393.50 total; the rate card gives $395.",
+      "States a $468.50 total; the rate card gives $470.",
     ]);
     expect(result.factsVerified).toBe(false);
   });
@@ -65,22 +65,22 @@ describe("UC Berkeley after the nearest-$5 rounding", () => {
       messages: [], availability: AVAILABILITY, threadLoaded: true, now: NOW, rules: [], threadText: null,
     }, fakeCaller(OLD_DRAFT));
     expect(result.draft).toBe(GOOD_DRAFT);
-    expect(result.pricing.corrections.map((c) => [c.kind, c.stated, c.expected])).toEqual([["travel", 43.5, 45], ["total", 393.5, 395]]);
+    expect(result.pricing.corrections.map((c) => [c.kind, c.stated, c.expected])).toEqual([["travel", 43.5, 45], ["total", 468.5, 470]]);
   });
 
   it("treats an earlier email's $393.50 as an outdated quote, not the current price", () => {
-    const thread = [message("My sessions start at $350, plus a $43.50 travel fee for UC Berkeley, so $393.50 total", true, 5)];
+    const thread = [message("My 1-hour sessions are $425, plus a $43.50 travel fee for UC Berkeley, so $468.50 total", true, 5)];
     const input = quoteInputOf(berkeley(thread));
     const quoted = parseQuotedPrices(buildThreadDigest(thread).quotedPrices);
-    expect(staleQuotedPrices(quoted, input, thread)).toEqual(expect.arrayContaining([43.5, 393.5]));
-    expect(berkeley(thread).pricing.stalePrices).toEqual(expect.arrayContaining([393.5]));
+    expect(staleQuotedPrices(quoted, input, thread)).toEqual(expect.arrayContaining([43.5, 468.5]));
+    expect(berkeley(thread).pricing.stalePrices).toEqual(expect.arrayContaining([468.5]));
   });
 
-  it("calls a $393.50 agreed total stale on the contract until confirmed", () => {
+  it("calls a $468.50 agreed total stale on the contract until confirmed", () => {
     const pricing = resolveContractPricing(
       { sessionType: "Graduation", school: SCHOOL, location: "UC Berkeley", message: "", people: 1,
-        messages: [message("plus a $43.50 travel fee for UC Berkeley, so $393.50 total", true, 5)] },
-      { agreedTotal: 393.5, sessionPrice: null, addOns: [], travelFee: null, includesTravel: true },
+        messages: [message("plus a $43.50 travel fee for UC Berkeley, so $468.50 total", true, 5)] },
+      { agreedTotal: 468.5, sessionPrice: null, addOns: [], travelFee: null, includesTravel: true },
     );
     expect(pricing.status).toBe("review");
     expect(pricing.status === "review" && pricing.reason).toMatch(/outdated travel fee.*\$45/);
@@ -88,14 +88,14 @@ describe("UC Berkeley after the nearest-$5 rounding", () => {
 
   it("agrees across the estimator, payment totals and the contract", () => {
     const estimate = calculateGraduationEstimate({ school: "uc-berkeley", people: 1, sessionLength: "1hr", extraOutfit: false, secondLocation: false, expedited: false, champagne: false });
-    expect([estimate.travelFee, estimate.subtotal, estimate.deposit, estimate.remainingBalance]).toEqual([45, 395, 197.5, 197.5]);
-    expect(calculatePaymentSchedule(395)).toEqual({ retainer: 197.5, remainingBalance: 197.5 });
-    expect(catalogSessionTotalCents({ session_type: "Graduation", school: SCHOOL, message: "", location: "UC Berkeley", people: 1 })).toBe(39500);
+    expect([estimate.travelFee, estimate.subtotal, estimate.deposit, estimate.remainingBalance]).toEqual([45, 470, 235, 235]);
+    expect(calculatePaymentSchedule(470)).toEqual({ retainer: 235, remainingBalance: 235 });
+    expect(catalogSessionTotalCents({ session_type: "Graduation", school: SCHOOL, message: "a 1 hour session", location: "UC Berkeley", people: 1 })).toBe(47000);
     const contract = resolveContractPricing(
       { sessionType: "Graduation", school: SCHOOL, location: "UC Berkeley", message: "", people: 1 },
-      { agreedTotal: null, sessionPrice: 350, addOns: [], travelFee: null, includesTravel: null },
+      { agreedTotal: null, sessionPrice: 425, addOns: [], travelFee: null, includesTravel: null },
     );
     expect(contract.status).toBe("ok");
-    expect(contract.total).toBe(395);
+    expect(contract.total).toBe(470);
   });
 });

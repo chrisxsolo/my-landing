@@ -79,9 +79,15 @@ function formatSessionDate(raw) {
 }
 
 // ── PRICING (mirrors lib/pricingCatalog.ts) ──────────────────────────────────
-const GRAD_HOURLY_RATE = 350;
-const GROUP_RATES = { 2: 300, 3: 275, 4: 250, 5: 225 };
-const GROUP_RATE_6_PLUS = 200;
+// Graduation is two individual packages, not an hourly rate: the 30-minute
+// mini and the 60-minute session. The contract preview defaults to the
+// 60-minute package; a price agreed in the email thread always wins.
+// tests/unit/pricingConsistency.test.ts fails if these drift from the site.
+const GRAD_PACKAGE_PRICES = { mini: 325, standard: 425 };
+// Per graduate. The rate covers the group's included time (60 min for two,
+// 90 min for three or more). Nine or more graduates: no automatic price.
+const GROUP_RATES_PER_PERSON = { 2: 350, 3: 325, 4: 300, 5: 275, 6: 250, 7: 250, 8: 250 };
+const GROUP_MAX_PEOPLE = 8;
 // Travel = round-trip miles x $0.70 rounded up to $5, plus tolls, with that
 // total rounded to the nearest $5, or the business-approved fee where one
 // exists (lib/travelFee.ts, SJSU = $75).
@@ -140,8 +146,10 @@ function calcPrice(inquiry) {
     sessionBase = SERVICE_FLAT_RATES[service];
   } else {
     sessionBase = people <= 1
-      ? GRAD_HOURLY_RATE
-      : (GROUP_RATES[people] ?? GROUP_RATE_6_PLUS) * people;
+      ? GRAD_PACKAGE_PRICES.standard
+      : people <= GROUP_MAX_PEOPLE
+        ? GROUP_RATES_PER_PERSON[people] * people
+        : null; // quoted by hand; the preview is left for Chris to fill
     // The thread's shoot location (kept apart from the school) decides first.
     schoolKey = detectSchoolKey(inquiry._location || inquiry.school || inquiry.message || "");
     if (schoolKey != null && TRAVEL_FEES[schoolKey] != null) travelFee = TRAVEL_FEES[schoolKey];
@@ -150,14 +158,15 @@ function calcPrice(inquiry) {
   // A price quoted/agreed in the email thread overrides the calculator
   const agreed = Number.isFinite(inquiry._agreedTotal) ? inquiry._agreedTotal : null;
   if (agreed != null) { sessionBase = agreed; travelFee = null; }
-  const subtotal = sessionBase + (travelFee ?? 0);
-  const deposit  = subtotal / 2;
+  const subtotal = sessionBase == null ? null : sessionBase + (travelFee ?? 0);
+  const deposit  = subtotal == null ? null : subtotal / 2;
 
   return {
     sessionBase, travelFee,
-    subtotal, deposit, remaining: subtotal - deposit,
+    subtotal, deposit, remaining: subtotal == null ? null : subtotal - deposit,
     people, schoolKey, service, priceFromEmail: agreed != null,
   };
 }
 
-function fmt(n) { return `$${Number(n).toFixed(2)}`; }
+// "$425.00"; an unpriced figure (a group quoted by hand) renders empty.
+function fmt(n) { return n == null ? "" : `$${Number(n).toFixed(2)}`; }

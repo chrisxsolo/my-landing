@@ -18,7 +18,7 @@ import {
   addOnPriceValues,
   calculatePaymentSchedule,
 } from "@/lib/pricingCatalog";
-import { graduationSessionPrice } from "@/lib/pricing";
+import { getGroupRatePerPerson, graduationSessionPrice } from "@/lib/pricing";
 import { resolvePlaybookKey } from "./sessionClassifier";
 import { resolveTravel, type TravelResolution } from "@/lib/travelResolution";
 
@@ -37,65 +37,97 @@ export type PricingFacts = {
   needsManualQuote: string | null;
 };
 
-/** "$350"; travel fees are whole dollars, but a figure with cents is still printed as such. */
+/** "$425"; travel fees are whole dollars, but a figure with cents is still printed as such. */
 function money(amount: number): string {
   return Number.isInteger(amount) ? `$${amount}` : `$${amount.toFixed(2)}`;
 }
 
-function graduationFacts(peopleCount: number): PricingFacts {
+const GRAD_ADD_ON_PRICES = [
+  PRICING_CATALOG.graduation.addOns.extraOutfit.price, PRICING_CATALOG.graduation.addOns.secondLocation.price,
+  PRICING_CATALOG.graduation.addOns.extra30Minutes.price, PRICING_CATALOG.graduation.addOns.expedited.price,
+  PRICING_CATALOG.graduation.addOns.champagne.price,
+];
+
+function graduationAddOnLine(): string {
   const grad = PRICING_CATALOG.graduation;
-  const lines: string[] = [];
+  return `Add-ons: extra outfit ${money(grad.addOns.extraOutfit.price)}, second nearby location ${money(grad.addOns.secondLocation.price)}, extra 30 minutes ${money(grad.addOns.extra30Minutes.price)}, 72-hour gallery ${money(grad.addOns.expedited.price)}, champagne setup ${money(grad.addOns.champagne.price)}.`;
+}
 
-  if (peopleCount <= 1) {
-    // Phrased the way Chris phrases it: "My graduation sessions at San Jose
-    // State start at $350 for a 1-hour session". The catalog field is named
-    // baseHourlyRate, and rendering that literally as "$350 per hour" made
-    // the draft sound like it was selling time rather than a session.
-    lines.push(`Graduation sessions START AT ${money(grad.baseHourlyRate)} for a ${grad.durationRules.standardMinutes}-minute session, ${grad.standardMinimumImages}+ edited images. Say "start at ${money(grad.baseHourlyRate)}" or "${money(grad.baseHourlyRate)} for a 1-hour session". Do NOT say "${money(grad.baseHourlyRate)} per hour" or "${money(grad.baseHourlyRate)}/hour".`);
-    lines.push(`Longer sessions are available at ${grad.durationRules.allowedMinutes.join(", ")} minutes; ${money(grad.addOns.extra30Minutes.price)} for each extra 30 minutes.`);
-  } else {
-    const perPerson = peopleCount >= 6
-      ? grad.groupRates[6]
-      : grad.groupRates[peopleCount as 2 | 3 | 4 | 5] ?? grad.groupRates[6];
-    const total = perPerson * peopleCount;
-    lines.push(`Group graduation rate for ${peopleCount} graduates: ${money(perPerson)} per person, ${money(total)} total, ${grad.groupMinimumImagesPerPerson}+ edited images per person.`);
-    if (peopleCount >= grad.durationRules.groupMinimumSize) {
-      lines.push(`Groups of ${grad.durationRules.groupMinimumSize} or more need at least ${grad.durationRules.groupMinimumMinutes} minutes, and that length is included in the per-person rate.`);
-    } else {
-      // Spelled out because the gap was expensive. A real inquiry asked for
-      // "2 people for 1.5hours", the facts said nothing about what a longer
-      // group session costs, and the model spent its whole output budget
-      // reasoning about it and returned a truncated draft.
-      lines.push(`The group rate covers the standard ${grad.durationRules.standardMinutes}-minute session. A longer booking adds the extra 30 minutes add-on at ${money(grad.addOns.extra30Minutes.price)} per 30 minutes, so ${peopleCount} graduates for 90 minutes is ${money(total)} plus ${money(grad.addOns.extra30Minutes.price)}, ${money(graduationSessionPrice(peopleCount, 90))} total.`);
-    }
-  }
-
-  lines.push(
-    `Add-ons: extra outfit ${money(grad.addOns.extraOutfit.price)}, second nearby location ${money(grad.addOns.secondLocation.price)}, extra 30 minutes ${money(grad.addOns.extra30Minutes.price)}, 72-hour gallery ${money(grad.addOns.expedited.price)}, champagne setup ${money(grad.addOns.champagne.price)}.`,
-  );
-
-  const perPerson = peopleCount <= 1
-    ? grad.baseHourlyRate
-    : peopleCount >= 6
-      ? grad.groupRates[6]
-      : grad.groupRates[peopleCount as 2 | 3 | 4 | 5] ?? grad.groupRates[6];
-
+/**
+ * One graduate: two packages, neither an hourly rate.
+ *
+ * Phrased the way Chris phrases it ("start at $325 for a 30-minute mini",
+ * "$425 for a 1-hour session"). Rendering the hour as "$425 per hour" made
+ * an earlier draft sound like it was selling time rather than a session, and
+ * halving it for the mini would be wrong: the mini is its own price.
+ */
+function singleGraduateFacts(): PricingFacts {
+  const grad = PRICING_CATALOG.graduation;
+  const { mini, standard } = grad.packages;
+  const longer = grad.durationRules.allowedMinutes.filter((minutes) => minutes > standard.durationMinutes);
+  const lines = [
+    `Graduation sessions for one graduate come in two packages: the ${mini.label} is ${money(mini.price)} for ${mini.durationMinutes} minutes, and the ${standard.label} is ${money(standard.price)} for ${standard.durationMinutes} minutes; both include ${grad.standardMinimumImages}+ edited images. Say "start at ${money(mini.price)} for a ${mini.durationMinutes}-minute mini" or "${money(standard.price)} for a 1-hour session". Do NOT say "${money(standard.price)} per hour" or "${money(standard.price)}/hour", and never describe the mini as half of the hour.`,
+    `Longer sessions: ${longer.map((minutes) => `${minutes} minutes is ${money(graduationSessionPrice(1, minutes)!)}`).join(", ")} (${money(grad.addOns.extra30Minutes.price)} for each extra 30 minutes past the hour). The ${mini.durationMinutes}-minute mini is for one graduate only. If they have not said how long a session they want, give both packages rather than one total.`,
+    graduationAddOnLine(),
+  ];
   return {
     verified: true,
     lines,
-    // Both the per-person rate and the group total are quotable figures. A
-    // single graduate's longer bookings are priced by the one duration rule in
-    // lib/pricing.ts, the same one the public estimator shows.
-    basePrices: peopleCount <= 1
-      ? grad.durationRules.allowedMinutes.map((minutes) => graduationSessionPrice(1, minutes))
-      : [perPerson, graduationSessionPrice(peopleCount)],
-    addOnPrices: [
-      grad.addOns.extraOutfit.price, grad.addOns.secondLocation.price,
-      grad.addOns.extra30Minutes.price, grad.addOns.expedited.price,
-      grad.addOns.champagne.price,
-    ],
+    // Every length the rate card prices for one graduate, priced by the one
+    // package rule in lib/pricing.ts, the same one the public estimator shows.
+    basePrices: grad.durationRules.allowedMinutes.map((minutes) => graduationSessionPrice(1, minutes)!),
+    addOnPrices: GRAD_ADD_ON_PRICES,
     needsManualQuote: null,
   };
+}
+
+/** Two to eight graduates: a per-graduate rate that covers the group's included time. */
+function groupGraduateFacts(peopleCount: number, perPerson: number): PricingFacts {
+  const grad = PRICING_CATALOG.graduation;
+  const total = graduationSessionPrice(peopleCount)!;
+  const lines = [
+    `Group graduation rate for ${peopleCount} graduates: ${money(perPerson)} per graduate, ${money(total)} total, ${grad.groupMinimumImagesPerPerson}+ edited images per person. The ${grad.packages.mini.durationMinutes}-minute mini is not offered to groups.`,
+  ];
+  if (peopleCount >= grad.durationRules.groupMinimumSize) {
+    lines.push(`Groups of ${grad.durationRules.groupMinimumSize} or more need at least ${grad.durationRules.groupMinimumMinutes} minutes, and that length is included in the per-person rate. Each extra 30 minutes past that adds ${money(grad.addOns.extra30Minutes.price)} to the group total, so ${peopleCount} graduates for ${grad.durationRules.groupMinimumMinutes + 30} minutes is ${money(graduationSessionPrice(peopleCount, grad.durationRules.groupMinimumMinutes + 30)!)} total.`);
+  } else {
+    // Spelled out because the gap was expensive. A real inquiry asked for
+    // "2 people for 1.5hours", the facts said nothing about what a longer
+    // group session costs, and the model spent its whole output budget
+    // reasoning about it and returned a truncated draft.
+    lines.push(`The group rate covers the standard ${grad.durationRules.standardMinutes}-minute session. A longer booking adds the extra 30 minutes add-on at ${money(grad.addOns.extra30Minutes.price)} per 30 minutes to the group total, so ${peopleCount} graduates for 90 minutes is ${money(total)} plus ${money(grad.addOns.extra30Minutes.price)}, ${money(graduationSessionPrice(peopleCount, 90)!)} total.`);
+  }
+  lines.push(graduationAddOnLine());
+  return {
+    verified: true,
+    lines,
+    // Both the per-person rate and the group total are quotable figures.
+    basePrices: [perPerson, total],
+    addOnPrices: GRAD_ADD_ON_PRICES,
+    needsManualQuote: null,
+  };
+}
+
+/**
+ * Nine or more graduates. The rate card stops at eight on purpose: the
+ * 6-8 rate is not silently applied to a bigger group, Chris prices it.
+ */
+function largeGroupFacts(peopleCount: number): PricingFacts {
+  const max = PRICING_CATALOG.graduation.headcountRules.groupMaxPeople;
+  return {
+    verified: false,
+    lines: [`There is no published rate for a group of ${peopleCount} graduates: the group rate card stops at ${max}.`],
+    basePrices: [],
+    addOnPrices: [],
+    needsManualQuote: `A group of ${peopleCount} graduates is quoted by hand. Do not state a per-person rate or a total; find out the headcount, the campus and the date, and say the quote is coming.`,
+  };
+}
+
+function graduationFacts(peopleCount: number): PricingFacts {
+  if (peopleCount <= PRICING_CATALOG.graduation.headcountRules.miniMaxPeople) return singleGraduateFacts();
+  const perPerson = getGroupRatePerPerson(peopleCount);
+  if (perPerson === null) return largeGroupFacts(peopleCount);
+  return groupGraduateFacts(peopleCount, perPerson);
 }
 
 function describePackage(key: keyof typeof PRICING_CATALOG.couples.packages): string {

@@ -218,7 +218,7 @@ describe("a courthouse is also a graduation photo spot", () => {
   it("leaves grad photos at a courthouse on the graduation rate", () => {
     const message = "I'm graduating in May and would love grad photos on the courthouse steps downtown";
     expect(resolvePlaybookKey("Graduation Portrait", message)).toBe("graduation");
-    expect(buildPricingFacts({ sessionType: "Graduation Portrait", message }).basePrices).toContain(350);
+    expect(buildPricingFacts({ sessionType: "Graduation Portrait", message }).basePrices).toContain(425);
   });
 
   it("still reads a courthouse wedding as an elopement", () => {

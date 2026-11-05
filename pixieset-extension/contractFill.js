@@ -58,9 +58,12 @@ function readContractPreview() {
 function fillContract(inq, price) {
   // Prefer values from the (possibly user-edited) preview inputs
   const edited = readContractPreview();
-  const money = (raw, fallback) => {
+  // An edited figure, else the calculated one, else the placeholder stays
+  // put (a group the rate card does not price has no calculated figure).
+  const money = (raw, fallback, placeholder) => {
     const n = parseMoney(raw);
-    return n != null ? fmt(n) : fmt(fallback);
+    if (n != null) return fmt(n);
+    return fallback == null ? placeholder : fmt(fallback);
   };
 
   const sessionDate     = edited.SESSION_DATE || inq._sessionDate || inq.date_in_mind || "TBD";
@@ -73,9 +76,9 @@ function fillContract(inq, price) {
     { pattern: /\[SESSION_DATE\]/g,     value: sessionDate },
     { pattern: /\[SESSION_TIME\]/g,     value: sessionTime },
     { pattern: /\[SESSION_LOCATION\]/g, value: sessionLocation },
-    { pattern: /\[TOTAL_FEE\]/g,        value: money(edited.TOTAL_FEE, price.subtotal) },
-    { pattern: /\[RETAINER\]/g,         value: money(edited.RETAINER, price.deposit) },
-    { pattern: /\[REMAINING\]/g,        value: money(edited.REMAINING, price.remaining) },
+    { pattern: /\[TOTAL_FEE\]/g,        value: money(edited.TOTAL_FEE, price.subtotal, "[TOTAL_FEE]") },
+    { pattern: /\[RETAINER\]/g,         value: money(edited.RETAINER, price.deposit, "[RETAINER]") },
+    { pattern: /\[REMAINING\]/g,        value: money(edited.REMAINING, price.remaining, "[REMAINING]") },
     { pattern: /\[FINAL_DATE\]/g,       value: edited.FINAL_DATE || sessionDate },
   ];
 

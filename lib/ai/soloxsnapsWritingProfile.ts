@@ -15,6 +15,14 @@
 // so editing it invalidates the prompt cache for the next 5 minutes.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { PRICING_CATALOG } from "@/lib/pricingCatalog";
+
+// The graduation figures the style examples quote, read from the rate card so
+// the model is never shown a price the website has moved on from.
+const GRAD_MINI = `$${PRICING_CATALOG.graduation.packages.mini.price}`;
+const GRAD_MINI_MINUTES = PRICING_CATALOG.graduation.packages.mini.durationMinutes;
+const GRAD_HOUR = `$${PRICING_CATALOG.graduation.packages.standard.price}`;
+
 export const PHOTOGRAPHER = {
   firstName: "Chris",
   fullName: "Chris Solorzano",
@@ -96,7 +104,7 @@ export const BANNED_PHRASES: readonly string[] = [
  * concise" is advice the model already thinks it is following.
  */
 export const STYLE_NOTES: readonly string[] = [
-  'Say prices plainly, then stop: "My graduation sessions start at $350". No framing, no justifying, no explaining the value.',
+  `Say prices plainly, then stop: "My graduation sessions start at ${GRAD_MINI} for a ${GRAD_MINI_MINUTES}-minute mini, or ${GRAD_HOUR} for a 1-hour session". No framing, no justifying, no explaining the value.`,
   "When several dates are open, write them in a sentence and offer three or four. Consecutive days become a range.",
   "Warmth means one genuine sentence, not three. Skip compliments the client did not earn from you.",
   "No apology stacking. One sincere line for a late reply is plenty.",
@@ -122,7 +130,7 @@ export const STYLE_NOTES: readonly string[] = [
 export const PHRASING_CORRECTIONS: readonly string[] = [
   'Not "I\'d love to shoot your graduation, and congratulations!" → "Thank you so much for reaching out, and congratulations on graduating! I\'d love to take your graduation pictures!"',
   'Not "So glad 5:45 pm works!" → "Perfect! October 16th at 5:45 pm works for me!"',
-  'Not "My graduation session is $350 per hour" → "My graduation sessions start at $350"',
+  `Not "My graduation session is ${GRAD_HOUR} per hour" → "My graduation sessions start at ${GRAD_MINI} for a ${GRAD_MINI_MINUTES}-minute mini, or ${GRAD_HOUR} for a 1-hour session"`,
   'Not "The champagne setup is a fun add-on, and it\'s $15" → "The champagne add-on is $15"',
   'Not "It\'ll look great on the building and the stair steps" → cut the sentence entirely.',
   'Not "should be a beautiful evening for it, and the light is going to be lovely" → cut it. Say the time and move on.',

@@ -7,37 +7,45 @@ import {
   formatFee,
 } from "./pricingCatalog";
 
-// ── BASE RATES ────────────────────────────────────────────────────────────────
-export const GRAD_HOURLY_RATE = PRICING_CATALOG.graduation.baseHourlyRate;
+// ── GRADUATION PACKAGES ───────────────────────────────────────────────────────
+// Two individual packages at their own prices. There is no hourly rate: the
+// mini is not half the hour, and time past the hour is the extra-30-minutes
+// add-on. Groups pay a PER-GRADUATE rate that covers their included time.
+const GRADUATION = PRICING_CATALOG.graduation;
+export const GRAD_PACKAGES = GRADUATION.packages;
+export const GRAD_MINI_PRICE = GRAD_PACKAGES.mini.price;
+export const GRAD_SESSION_PRICE = GRAD_PACKAGES.standard.price;
+export type GraduationPackageKey = keyof typeof GRAD_PACKAGES;
 
-export const GROUP_RATES: Record<number, number> = {
-  2: PRICING_CATALOG.graduation.groupRates[2],
-  3: PRICING_CATALOG.graduation.groupRates[3],
-  4: PRICING_CATALOG.graduation.groupRates[4],
-  5: PRICING_CATALOG.graduation.groupRates[5],
-};
-export const GROUP_RATE_6_PLUS = PRICING_CATALOG.graduation.groupRates[6];
+export const GROUP_RATES_PER_PERSON: Readonly<Record<number, number>> = GRADUATION.groupRatesPerPerson;
+export const MINI_MAX_PEOPLE: number = GRADUATION.headcountRules.miniMaxPeople;
+export const GROUP_MIN_PEOPLE: number = GRADUATION.headcountRules.groupMinPeople;
+/** The largest group the rate card prices; above it the quote is done by hand. */
+export const GROUP_MAX_PEOPLE: number = GRADUATION.headcountRules.groupMaxPeople;
 
 // ── ADD-ON RATES ──────────────────────────────────────────────────────────────
-export const ADDON_EXTRA_OUTFIT = PRICING_CATALOG.graduation.addOns.extraOutfit.price;
-export const ADDON_SECOND_LOCATION = PRICING_CATALOG.graduation.addOns.secondLocation.price;
-export const ADDON_EXPEDITED = PRICING_CATALOG.graduation.addOns.expedited.price;
-export const ADDON_CHAMPAGNE = PRICING_CATALOG.graduation.addOns.champagne.price;
-export const ADDON_EXTRA_30_MIN = PRICING_CATALOG.graduation.addOns.extra30Minutes.price;
+export const ADDON_EXTRA_OUTFIT = GRADUATION.addOns.extraOutfit.price;
+export const ADDON_SECOND_LOCATION = GRADUATION.addOns.secondLocation.price;
+export const ADDON_EXPEDITED = GRADUATION.addOns.expedited.price;
+export const ADDON_CHAMPAGNE = GRADUATION.addOns.champagne.price;
+export const ADDON_EXTRA_30_MIN = GRADUATION.addOns.extra30Minutes.price;
 
-// ── SESSION LENGTH (in hours) ─────────────────────────────────────────────────
-export const SESSION_LENGTHS = {
-  "1hr": PRICING_CATALOG.graduation.durationRules.allowedMinutes[0] / 60,
-  "1.5hr": PRICING_CATALOG.graduation.durationRules.allowedMinutes[1] / 60,
-  "2hr": PRICING_CATALOG.graduation.durationRules.allowedMinutes[2] / 60,
+// ── SESSION LENGTHS (in minutes) ──────────────────────────────────────────────
+// Keys travel in estimator state and booking-intent links; minutes are what
+// the rate card prices. Every entry is one of the catalog's allowed lengths.
+export const SESSION_LENGTH_MINUTES = {
+  "30min": GRAD_PACKAGES.mini.durationMinutes,
+  "1hr": GRAD_PACKAGES.standard.durationMinutes,
+  "1.5hr": 90,
+  "2hr": 120,
 } as const;
-export type SessionLengthKey = keyof typeof SESSION_LENGTHS;
+export type SessionLengthKey = keyof typeof SESSION_LENGTH_MINUTES;
 
 // ── TRAVEL FEES ───────────────────────────────────────────────────────────────
 // Per school, from lib/travelFee.ts ($0.70/round-trip mile + tolls).
 // null = included (inside SF). undefined = no verified route, confirmed per spot.
 export const TRAVEL_FEES: Record<string, number | null | undefined> = {
-  ...PRICING_CATALOG.graduation.travelFees,
+  ...GRADUATION.travelFees,
 };
 
 // ── SCHOOL LABELS ─────────────────────────────────────────────────────────────
@@ -60,30 +68,48 @@ export function getTravelFeeForSchool(school: SchoolValue): number | null | unde
   return TRAVEL_FEES[school]
 }
 
-export function getGroupRatePerPerson(people: number): number {
-  if (people <= 1) return GRAD_HOURLY_RATE
-  if (people <= 5) return GROUP_RATES[people] ?? GROUP_RATE_6_PLUS
-  return GROUP_RATE_6_PLUS
+/** Whether the rate card prices this headcount at all (one graduate, or a group up to the maximum). */
+export function isHeadcountPriced(people: number): boolean {
+  return Number.isInteger(people) && people >= 1 && people <= GROUP_MAX_PEOPLE
 }
 
-// ── GROUP DURATION RULES ─────────────────────────────────────────────────────
-const DURATION_RULES = PRICING_CATALOG.graduation.durationRules
-const SESSION_LENGTH_KEYS = Object.keys(SESSION_LENGTHS) as SessionLengthKey[]
+/** Nine or more graduates: no automatic price, Chris quotes it by hand. */
+export function requiresManualGroupQuote(people: number): boolean {
+  return people > GROUP_MAX_PEOPLE
+}
+
+/** The per-graduate group rate, or null for one graduate and for groups the rate card does not price. */
+export function getGroupRatePerPerson(people: number): number | null {
+  if (people < GROUP_MIN_PEOPLE || !isHeadcountPriced(people)) return null
+  return GROUP_RATES_PER_PERSON[people] ?? null
+}
+
+// ── DURATION RULES ───────────────────────────────────────────────────────────
+const DURATION_RULES = GRADUATION.durationRules
+const SESSION_LENGTH_KEYS = Object.keys(SESSION_LENGTH_MINUTES) as SessionLengthKey[]
 
 function minutesOf(length: SessionLengthKey): number {
-  return SESSION_LENGTHS[length] * 60
+  return SESSION_LENGTH_MINUTES[length]
 }
 
-/** Minutes the session price already covers: 60 for 1–2 people, 90 for groups of 3+. */
+/**
+ * Minutes the standard price already covers: the 60-minute package for one
+ * graduate, 60 for two, the 90-minute minimum for groups of 3+.
+ */
 export function includedMinutesFor(people: number): number {
   return people >= DURATION_RULES.groupMinimumSize
     ? DURATION_RULES.groupMinimumMinutes
     : DURATION_RULES.standardMinutes
 }
 
-/** Groups of 3+ can't book under the group minimum (90 minutes). */
+/** The shortest bookable length: the 30-minute mini for one graduate, else the included time. */
+export function shortestMinutesFor(people: number): number {
+  return people <= MINI_MAX_PEOPLE ? GRAD_PACKAGES.mini.durationMinutes : includedMinutesFor(people)
+}
+
+/** The mini is for one graduate only; groups of 3+ can't book under their 90-minute minimum. */
 export function isSessionLengthAllowed(people: number, length: SessionLengthKey): boolean {
-  return minutesOf(length) >= includedMinutesFor(people)
+  return minutesOf(length) >= shortestMinutesFor(people)
 }
 
 /** The requested length, raised to the shortest allowed length when it is too short. */
@@ -92,24 +118,64 @@ export function enforceSessionLength(people: number, requested: SessionLengthKey
   return SESSION_LENGTH_KEYS.find((key) => isSessionLengthAllowed(people, key)) ?? requested
 }
 
+/** Which individual package a one-graduate booking of this length is. */
+export function graduationPackageFor(durationMinutes: number): GraduationPackageKey {
+  return durationMinutes <= GRAD_PACKAGES.mini.durationMinutes ? "mini" : "standard"
+}
+
+function extraTimeCharge(durationMinutes: number, includedMinutes: number): number {
+  const extraHalfHours = Math.max(0, Math.ceil((durationMinutes - includedMinutes) / 30))
+  return extraHalfHours * ADDON_EXTRA_30_MIN
+}
+
 /**
- * The graduation session price for a headcount and length. The estimator,
- * Draft AI's facts, the quote check and the contract all read it from here,
- * so the duration rule lives in one place.
+ * The graduation session price for a headcount and length, or null when the
+ * rate card has no figure (nine or more graduates). The estimator, Draft AI's
+ * facts, the quote check, the contract, payment totals and the invoice draft
+ * all read it from here, so the package and group rules live in one place.
  *
- * One graduate books by the hour. A group pays the per-person rate, which
- * covers the included time (60 minutes, or the 90-minute minimum for 3+), and
- * time past that is the extra-30-minutes add-on.
- *
- * The public pricing page presents both an hourly rate and a "$100 / 30 min"
- * extended-time add-on for the single session, which disagree at 90 minutes
- * ($525 by the hour, $450 with the add-on). Which one is the rule is the
- * owner's call; until it is made, this keeps what the estimator has shown.
+ * One graduate: the 30-minute mini, or the 60-minute package plus the
+ * extra-30-minutes add-on for each half hour past it ($525 / $625). A group
+ * pays the per-graduate rate, which covers the included time (60 minutes for
+ * two, the 90-minute minimum for 3+), plus the same add-on past that.
  */
-export function graduationSessionPrice(people: number, durationMinutes: number = includedMinutesFor(people)): number {
-  if (people <= 1) return GRAD_HOURLY_RATE * (durationMinutes / 60)
-  const extraHalfHours = Math.max(0, durationMinutes - includedMinutesFor(people)) / 30
-  return getGroupRatePerPerson(people) * people + extraHalfHours * ADDON_EXTRA_30_MIN
+export function graduationSessionPrice(people: number, durationMinutes: number = includedMinutesFor(people)): number | null {
+  if (!isHeadcountPriced(people)) return null
+  if (people <= MINI_MAX_PEOPLE) {
+    const pkg = GRAD_PACKAGES[graduationPackageFor(durationMinutes)]
+    return pkg.price + extraTimeCharge(durationMinutes, pkg.durationMinutes)
+  }
+  const ratePerPerson = getGroupRatePerPerson(people)
+  if (ratePerPerson === null) return null
+  return ratePerPerson * people + extraTimeCharge(durationMinutes, includedMinutesFor(people))
+}
+
+/** "Graduation Mini (30 min)", "Graduation Session (60 min)", "Group rate (3 × $325), 120 min". */
+export function graduationSessionLabel(people: number, durationMinutes: number = includedMinutesFor(people)): string {
+  if (people <= MINI_MAX_PEOPLE) {
+    const pkg = GRAD_PACKAGES[graduationPackageFor(durationMinutes)]
+    const extra = durationMinutes > pkg.durationMinutes ? `, ${durationMinutes} min` : ""
+    return `${pkg.label} (${pkg.durationMinutes} min)${extra}`
+  }
+  const rate = getGroupRatePerPerson(people)
+  const headcount = rate === null ? `${people} graduates` : `${people} × ${formatFee(rate)}`
+  const extra = durationMinutes > includedMinutesFor(people) ? `, ${durationMinutes} min` : ""
+  return `Group rate (${headcount})${extra}`
+}
+
+/**
+ * The length a client asked for, read off free text ("30 min", "mini",
+ * "1.5 hours", "two hours"), or null when they named none. Shared by the
+ * quote check, payment totals and the invoice draft so none of them guesses
+ * a package the text does not name.
+ */
+export function detectGraduationDurationMinutes(text: string | null | undefined): number | null {
+  const t = (text ?? "").toLowerCase()
+  if (/\b(?:2|two)[ -]?(?:hours?|hrs?)\b|\b120[ -]?min/.test(t)) return 120
+  if (/\b(?:90|ninety)[ -]?min|\b1\.5[ -]?(?:hours?|hrs?)\b|hour and a half|\b(?:an|one|1)[ -]?and[ -]?a[ -]?half[ -]?hours?\b/.test(t)) return 90
+  if (/\b(?:30|thirty)[ -]?min|\bmini\b|half[ -]?(?:an[ -]?)?hour\b/.test(t)) return GRAD_PACKAGES.mini.durationMinutes
+  if (/\b(?:60|sixty)[ -]?min|\b(?:1|one|an?)[ -]?(?:hour|hr)\b|\bfull hour\b/.test(t)) return GRAD_PACKAGES.standard.durationMinutes
+  return null
 }
 
 export interface EstimateInput {
@@ -133,12 +199,20 @@ export interface EstimateResult {
   groupNote: string | null
 }
 
-export type GraduationEstimate = EstimateResult & { sessionLength: SessionLengthKey }
+export type GraduationEstimate = EstimateResult & { sessionLength: SessionLengthKey; sessionLabel: string }
 
+/**
+ * The public estimate. Throws for a headcount the rate card does not price;
+ * the estimator shows a custom-quote path for those instead of calling this.
+ */
 export function calculateGraduationEstimate(input: EstimateInput): GraduationEstimate {
   const { school, people, extraOutfit, secondLocation, expedited, champagne } = input
   const sessionLength = enforceSessionLength(people, input.sessionLength)
-  const sessionBase = graduationSessionPrice(people, minutesOf(sessionLength))
+  const minutes = minutesOf(sessionLength)
+  const sessionBase = graduationSessionPrice(people, minutes)
+  if (sessionBase === null) {
+    throw new RangeError(`Groups of more than ${GROUP_MAX_PEOPLE} graduates are quoted by hand, not by the estimator.`)
+  }
 
   let addons = 0
   if (extraOutfit)    addons += ADDON_EXTRA_OUTFIT
@@ -152,14 +226,18 @@ export function calculateGraduationEstimate(input: EstimateInput): GraduationEst
     travelFee === undefined ? "tbd"  :
     "mileage"
 
+  // Whole dollars in, so the sum is exact; the retainer split runs in cents.
   const subtotal = sessionBase + addons + (travelFee ?? 0)
   const { retainer: deposit, remainingBalance } = calculatePaymentSchedule(subtotal)
 
   const groupNote = people >= DURATION_RULES.groupMinimumSize
-    ? `Groups of ${DURATION_RULES.groupMinimumSize} or more book at least ${DURATION_RULES.groupMinimumMinutes} minutes for individual and group photos. That time is included in the group rate.`
+    ? `Groups of ${DURATION_RULES.groupMinimumSize} or more book at least ${DURATION_RULES.groupMinimumMinutes} minutes for individual and group photos. That time is included in the per-person group rate.`
     : null
 
-  return { sessionBase, travelFee, addons, subtotal, deposit, remainingBalance, travelMethod, groupNote, sessionLength }
+  return {
+    sessionBase, travelFee, addons, subtotal, deposit, remainingBalance, travelMethod, groupNote,
+    sessionLength, sessionLabel: graduationSessionLabel(people, minutes),
+  }
 }
 
 export function formatCurrency(amount: number): string {

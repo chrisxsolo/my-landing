@@ -66,6 +66,9 @@ function inferTotal(payments: SavedPayment[], note: string | null) {
   return { cents: noteCents, source: noteCents > 0 ? "client note" : "manual" };
 }
 
+/** The total came from the live rate card, not from this client's record. */
+const RATE_CARD_SOURCE = "current rate card (confirm)";
+
 const FIELD = "mt-1 h-9 w-full rounded-lg px-2 text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-500/50";
 const LABEL = "text-[9px] font-black uppercase tracking-[0.14em]";
 
@@ -93,7 +96,7 @@ export default function PaymentStatusPanel({ inquiries, payments, onSaved, onErr
       totalCents: sessionTotalCents,
       paid1: active.some(payment => payment.payment_type === "deposit_1" || payment.payment_type === "full"),
       paid2: active.some(payment => payment.payment_type === "deposit_2" || payment.payment_type === "full"),
-      source: inferred.cents ? inferred.source : sessionTotalCents > 0 ? "session pricing" : "manual",
+      source: inferred.cents ? inferred.source : sessionTotalCents > 0 ? RATE_CARD_SOURCE : "manual",
     };
   }), [inquiries, payments]);
 
@@ -105,8 +108,14 @@ export default function PaymentStatusPanel({ inquiries, payments, onSaved, onErr
       .slice(0, 36);
   }, [plans, query]);
 
+  // A rate-card figure is a hint, never a prefilled value: it is today's
+  // price, not what this client agreed, so the admin types the real total.
   function totalFor(plan: ClientPlan) {
-    return totals[plan.id] ?? (plan.totalCents > 0 ? formatCents(plan.totalCents) : "");
+    return totals[plan.id] ?? (plan.totalCents > 0 && plan.source !== RATE_CARD_SOURCE ? formatCents(plan.totalCents) : "");
+  }
+
+  function totalHint(plan: ClientPlan) {
+    return plan.source === RATE_CARD_SOURCE ? `Rate card now ${displayCents(plan.totalCents)} — enter the agreed total` : undefined;
   }
 
   async function markPaid(plan: ClientPlan, paid: "deposit_1" | "deposit_2" | "full") {
@@ -192,6 +201,7 @@ export default function PaymentStatusPanel({ inquiries, payments, onSaved, onErr
                 <label className={LABEL} style={{ color: REV.textFaint }}>
                   Total
                   <input value={totalFor(plan)} onChange={event => setTotals(prev => ({ ...prev, [plan.id]: event.target.value }))}
+                    placeholder={totalHint(plan)} title={totalHint(plan)}
                     inputMode="decimal" className={`${FIELD} tabular-nums`} style={fieldStyle} />
                 </label>
                 <label className={LABEL} style={{ color: REV.textFaint }}>

@@ -98,7 +98,16 @@ describe("an elopement contract", () => {
 describe("an SJSU graduation contract", () => {
   const SJSU = { ...ELOPEMENT_INQUIRY, session_type: "Graduation", school: "San Jose State University", location: null, message: "SJSU grad photos" };
 
-  it("keeps an agreed $425 all-in total at $425, not $500", async () => {
+  it("keeps an agreed $500 all-in total at $500, not $575", async () => {
+    mocks.inquiry = SJSU;
+    mocks.extracted = JSON.stringify({ agreedTotal: 500, sessionPrice: 425, travelFee: 75, includesTravel: true });
+    const contract = await generate();
+    expect(contract).toContain("$500");
+    expect(contract).toContain("$250");
+    expect(contract).not.toContain("$575");
+  });
+
+  it("keeps a legacy client's agreed $425 all-in total ($350 session + travel) at $425", async () => {
     mocks.inquiry = SJSU;
     mocks.extracted = JSON.stringify({ agreedTotal: 425, sessionPrice: 350, travelFee: 75, includesTravel: true });
     const contract = await generate();
@@ -107,15 +116,15 @@ describe("an SJSU graduation contract", () => {
     expect(contract).not.toContain("$500");
   });
 
-  it("adds the approved $75 travel fee to a bare $350 session price", async () => {
+  it("adds the approved $75 travel fee to a bare $425 session price", async () => {
     mocks.inquiry = SJSU;
-    mocks.extracted = JSON.stringify({ sessionPrice: 350 });
-    expect(await generate()).toContain("$425");
+    mocks.extracted = JSON.stringify({ sessionPrice: 425 });
+    expect(await generate()).toContain("$500");
   });
 
-  it("asks for review instead of guessing whether $350 includes travel", async () => {
+  it("asks for review instead of guessing whether $425 includes travel", async () => {
     mocks.inquiry = SJSU;
-    mocks.extracted = JSON.stringify({ agreedTotal: 350 });
+    mocks.extracted = JSON.stringify({ agreedTotal: 425 });
     const { contract, pricing } = await generateWithPricing();
     expect(pricing?.status).toBe("review");
     expect(contract).toContain("[TOTAL FEE — review the price]");

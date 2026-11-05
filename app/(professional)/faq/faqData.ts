@@ -48,7 +48,7 @@ export const FAQS: FAQGroup[] = [
       },
       {
         q: "How long is a session?",
-        a: `It depends on the package. Graduation sessions start at ${grad.durationRules.standardMinutes} minutes (groups of ${grad.durationRules.groupMinimumSize} or more book at least ${grad.durationRules.groupMinimumMinutes}). Couples sessions run from ${couples.mini.durationMinutes} minutes for a mini to ${couples.engagement.durationMinutes} minutes for an engagement session, and maternity sessions are ${PRICING_CATALOG.maternity.durationMinutes} minutes. The Family Session is ${families.standard.durationMinutes} minutes and the Extended Family Session is ${families.extended.durationMinutes} minutes. Larger groups, or families who want more combinations and a slower pace with kids, usually do best with the extended session or added time.`,
+        a: `It depends on the package. Graduation sessions run ${grad.packages.mini.durationMinutes} or ${grad.packages.standard.durationMinutes} minutes for one graduate (groups of ${grad.durationRules.groupMinimumSize} or more book at least ${grad.durationRules.groupMinimumMinutes}). Couples sessions run from ${couples.mini.durationMinutes} minutes for a mini to ${couples.engagement.durationMinutes} minutes for an engagement session, and maternity sessions are ${PRICING_CATALOG.maternity.durationMinutes} minutes. The Family Session is ${families.standard.durationMinutes} minutes and the Extended Family Session is ${families.extended.durationMinutes} minutes. Larger groups, or families who want more combinations and a slower pace with kids, usually do best with the extended session or added time.`,
       },
       {
         q: "How many photos will I receive?",
@@ -152,7 +152,7 @@ export const FAQS: FAQGroup[] = [
       },
       {
         q: "How much does a session cost?",
-        a: `Pricing depends on the session type, length, and group size. Graduation sessions start at ${formatCurrency(grad.baseHourlyRate)}, couples sessions at ${formatCurrency(couples.mini.price)} for a ${couples.mini.durationMinutes}-minute mini (${formatCurrency(couples["1hr"].price)} for a full hour), family sessions at ${formatCurrency(families.standard.price)}, and maternity sessions are ${formatCurrency(PRICING_CATALOG.maternity.price)}. The pricing pages list every package and add-on, or send an inquiry describing what you have in mind and I'll put together a quote.`,
+        a: `Pricing depends on the session type, length, and group size. Graduation sessions start at ${formatCurrency(grad.packages.mini.price)} for a ${grad.packages.mini.durationMinutes}-minute mini (${formatCurrency(grad.packages.standard.price)} for a full hour), couples sessions at ${formatCurrency(couples.mini.price)} for a ${couples.mini.durationMinutes}-minute mini (${formatCurrency(couples["1hr"].price)} for a full hour), family sessions at ${formatCurrency(families.standard.price)}, and maternity sessions are ${formatCurrency(PRICING_CATALOG.maternity.price)}. The pricing pages list every package and add-on, or send an inquiry describing what you have in mind and I'll put together a quote.`,
       },
     ],
   },
