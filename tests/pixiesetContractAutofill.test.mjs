@@ -92,19 +92,80 @@ test("adds the campus travel fee to a chosen package", () => {
   assert.equal(fixture.text(), "Total: $400.00; Retainer: $200.00; Remaining: $200.00.");
 });
 
-test("prices a group from the per-graduate rate regardless of length wording", () => {
-  const group = loadAutofill(PRICE_LINE);
-  fill(group, { session_type: "graduation", school: "SF State", people: "3" });
-  assert.equal(group.text(), "Total: $975.00; Retainer: $487.50; Remaining: $487.50.");
+// Groups follow lib/pricing.ts graduationSessionPrice: the per-graduate rate
+// covers 60 minutes for two graduates and the 90-minute minimum for three or
+// more, and each started half hour the inquiry names past that adds $100.
+// SF State carries no travel fee, so these totals are the session base alone.
+const GROUP_PRICES = [
+  [2, "a 1 hour session", 700], [2, "90 minutes", 800], [2, "2 hours", 900],
+  [3, "90 minutes", 975], [3, "2 hours", 1075],
+  [8, "2 hours", 2100],
+];
+for (const [people, message, total] of GROUP_PRICES) {
+  test(`prices ${people} graduates for "${message}" at $${total} before travel`, () => {
+    const fixture = loadAutofill(PRICE_LINE);
+    fill(fixture, { session_type: "graduation", school: "SF State", people: String(people), message });
+    const half = (total / 2).toFixed(2);
+    assert.equal(fixture.text(), `Total: $${total}.00; Retainer: $${half}; Remaining: $${half}.`);
+  });
+}
+
+test("charges a group's compound length whole: 1 hour 30 minutes is 90 minutes, not 30", () => {
+  const fixture = loadAutofill(PRICE_LINE);
+  fill(fixture, { session_type: "graduation", school: "SF State", people: "2", message: "1 hour 30 minutes on campus" });
+  assert.equal(fixture.text(), "Total: $800.00; Retainer: $400.00; Remaining: $400.00.");
+});
+
+test("ignores delivery and arrival spans when a group names its session length", () => {
+  const fixture = loadAutofill(PRICE_LINE);
+  fill(fixture, {
+    session_type: "graduation", school: "SF State", people: "3",
+    message: "we would arrive 30 minutes early for a 2 hour session, with photos back within 30 days",
+  });
+  assert.equal(fixture.text(), "Total: $1075.00; Retainer: $537.50; Remaining: $537.50.");
+});
+
+test("prices a group that names no length at its included time", () => {
+  const pair = loadAutofill(PRICE_LINE);
+  fill(pair, { session_type: "graduation", school: "SF State", people: "2", message: "grad photos for the two of us" });
+  assert.equal(pair.text(), "Total: $700.00; Retainer: $350.00; Remaining: $350.00.");
+  const three = loadAutofill(PRICE_LINE);
+  fill(three, { session_type: "graduation", school: "SF State", people: "3" });
+  assert.equal(three.text(), "Total: $975.00; Retainer: $487.50; Remaining: $487.50.");
   const eight = loadAutofill(PRICE_LINE);
-  fill(eight, { session_type: "graduation", school: "SF State", people: "8", message: "2 hours" });
+  fill(eight, { session_type: "graduation", school: "SF State", people: "8" });
   assert.equal(eight.text(), "Total: $2000.00; Retainer: $1000.00; Remaining: $1000.00.");
+});
+
+test("never discounts a group below its included time for a shorter named length", () => {
+  const three = loadAutofill(PRICE_LINE);
+  fill(three, { session_type: "graduation", school: "SF State", people: "3", message: "a 1 hour session" });
+  assert.equal(three.text(), "Total: $975.00; Retainer: $487.50; Remaining: $487.50.");
+  const pair = loadAutofill(PRICE_LINE);
+  fill(pair, { session_type: "graduation", school: "SF State", people: "2", message: "the 30 minute mini" });
+  assert.equal(pair.text(), "Total: $700.00; Retainer: $350.00; Remaining: $350.00.");
+});
+
+test("an agreed total overrides a group's calculated duration price", () => {
+  const fixture = loadAutofill(PRICE_LINE);
+  fill(fixture, { session_type: "graduation", school: "SJSU", people: "8", message: "2 hours", _agreedTotal: 1800 });
+  assert.equal(fixture.text(), "Total: $1800.00; Retainer: $900.00; Remaining: $900.00.");
+});
+
+test("adds travel once, after the group's extended-time base", () => {
+  const fixture = loadAutofill(PRICE_LINE);
+  fill(fixture, { session_type: "graduation", school: "SJSU", people: "3", message: "2 hours" });
+  assert.equal(fixture.text(), "Total: $1150.00; Retainer: $575.00; Remaining: $575.00.");
 });
 
 test("leaves the price placeholders alone for nine or more graduates, and keeps an agreed total", () => {
   const nine = loadAutofill(PRICE_LINE);
-  fill(nine, { session_type: "graduation", school: "SF State", people: "9" });
+  const nineInquiry = { session_type: "graduation", school: "SF State", people: "9", message: "2 hours" };
+  fill(nine, nineInquiry);
   assert.equal(nine.text(), "Total: [TOTAL_FEE]; Retainer: [RETAINER]; Remaining: [REMAINING].");
+  const ninePreview = vm.runInContext("buildContractPreview(inquiry, calcPrice(inquiry))", nine.context);
+  assert.match(ninePreview, /data-key="TOTAL_FEE" value=""/);
+  assert.match(ninePreview, /quoted by hand/);
   const legacy = loadAutofill(PRICE_LINE);
   fill(legacy, { session_type: "graduation", school: "SJSU", people: "1", _agreedTotal: 425 });
   assert.equal(legacy.text(), "Total: $425.00; Retainer: $212.50; Remaining: $212.50.");
@@ -114,7 +175,7 @@ test("leaves the price placeholders alone for nine or more graduates, and keeps 
 });
 
 test("this release of the extension is the one that prices packages", () => {
-  assert.equal(manifest.version, "1.1.1");
+  assert.equal(manifest.version, "1.1.2");
 });
 
 test("fills the session type when inline formatting splits it across text nodes", () => {

@@ -87,12 +87,15 @@ function formatSessionDate(raw) {
 // tests/unit/pricingConsistency.test.ts fails if these drift from the site.
 const GRAD_PACKAGE_PRICES = { mini: 325, standard: 425 };
 const GRAD_PACKAGE_MINUTES = { mini: 30, standard: 60 };
-// Each 30 minutes past the hour for one graduate (lib/pricing.ts extraTimeCharge).
+// Each started 30 minutes past the included time, for one graduate and for
+// a group alike (lib/pricing.ts extraTimeCharge).
 const ADDON_EXTRA_30_MIN = 100;
 // Per graduate. The rate covers the group's included time (60 min for two,
-// 90 min for three or more). Nine or more graduates: no automatic price.
+// the 90-minute minimum for three or more). Nine or more: no automatic price.
 const GROUP_RATES_PER_PERSON = { 2: 350, 3: 325, 4: 300, 5: 275, 6: 250, 7: 250, 8: 250 };
 const GROUP_MAX_PEOPLE = 8;
+const GROUP_MINIMUM_SIZE = 3;
+const GROUP_MINIMUM_MINUTES = 90;
 // Travel = round-trip miles x $0.70 rounded up to $5, plus tolls, with that
 // total rounded to the nearest $5, or the business-approved fee where one
 // exists (lib/travelFee.ts, SJSU = $75).
@@ -214,15 +217,40 @@ function detectGradDurationMinutes(text) {
   return distinct.length === 1 ? distinct[0] : null;
 }
 
+// Minutes a group's per-graduate rate already covers (lib/pricing.ts includedMinutesFor).
+function includedMinutesFor(people) {
+  return people >= GROUP_MINIMUM_SIZE ? GROUP_MINIMUM_MINUTES : GRAD_PACKAGE_MINUTES.standard;
+}
+
+// The extension for each started half hour past the included time; a shorter
+// length never discounts (lib/pricing.ts extraTimeCharge).
+function extraTimeCharge(minutes, includedMinutes) {
+  const extraHalfHours = Math.max(0, Math.ceil((minutes - includedMinutes) / 30));
+  return extraHalfHours * ADDON_EXTRA_30_MIN;
+}
+
+function namedGradMinutes(inquiry) {
+  return detectGradDurationMinutes(`${inquiry.session_type || ""} ${inquiry.message || ""}`);
+}
+
 // One graduate's session price from the length the inquiry names (mirrors
 // lib/pricing.ts graduationSessionPrice for one person), or null when no
 // package was chosen: the preview then asks instead of picking the hour.
 function individualGradPrice(inquiry) {
-  const minutes = detectGradDurationMinutes(`${inquiry.session_type || ""} ${inquiry.message || ""}`);
+  const minutes = namedGradMinutes(inquiry);
   if (minutes === null) return null;
   if (minutes <= GRAD_PACKAGE_MINUTES.mini) return GRAD_PACKAGE_PRICES.mini;
-  const extraHalfHours = Math.max(0, Math.ceil((minutes - GRAD_PACKAGE_MINUTES.standard) / 30));
-  return GRAD_PACKAGE_PRICES.standard + extraHalfHours * ADDON_EXTRA_30_MIN;
+  return GRAD_PACKAGE_PRICES.standard + extraTimeCharge(minutes, GRAD_PACKAGE_MINUTES.standard);
+}
+
+// A group of two to eight: the per-graduate rate covers the included time,
+// plus the extension for each started half hour the inquiry names past it
+// (mirrors lib/pricing.ts graduationSessionPrice for a group). No named
+// length, or a shorter one, is the included-time base.
+function groupGradPrice(inquiry, people) {
+  const included = includedMinutesFor(people);
+  const minutes = namedGradMinutes(inquiry) ?? included;
+  return GROUP_RATES_PER_PERSON[people] * people + extraTimeCharge(minutes, included);
 }
 
 const PACKAGE_REVIEW_HINT = "No package chosen: the inquiry does not say whether this is the 30-minute mini ($325) or the 1-hour session ($425). Enter the total once it is agreed.";
@@ -240,7 +268,7 @@ function calcPrice(inquiry) {
       sessionBase = individualGradPrice(inquiry);
       if (sessionBase == null) reviewHint = PACKAGE_REVIEW_HINT;
     } else if (people <= GROUP_MAX_PEOPLE) {
-      sessionBase = GROUP_RATES_PER_PERSON[people] * people;
+      sessionBase = groupGradPrice(inquiry, people);
     } else {
       sessionBase = null; // quoted by hand; the preview is left for Chris to fill
       reviewHint = MANUAL_QUOTE_HINT;

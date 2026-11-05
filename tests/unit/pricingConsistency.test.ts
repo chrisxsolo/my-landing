@@ -10,6 +10,7 @@
 // sessions only; maternity and family return 0 there and are not asserted.
 
 import { readFileSync } from "node:fs";
+import vm from "node:vm";
 import { describe, expect, it } from "vitest";
 import { PRICING_CATALOG, addOnPriceValues, calculatePaymentSchedule } from "@/lib/pricingCatalog";
 import {
@@ -61,6 +62,13 @@ function pixiesetConstants() {
   };
 }
 const pixieset = pixiesetConstants();
+
+/** The extension's calculator itself, run as the content script runs it. */
+function pixiesetCalcPrice(inquiry: Record<string, unknown>): { sessionBase: number | null; travelFee: number | null } {
+  const context = vm.createContext({ inquiry });
+  vm.runInContext(readFileSync("pixieset-extension/extensionPricing.js", "utf8"), context);
+  return vm.runInContext("calcPrice(inquiry)", context);
+}
 
 describe("graduation sessions", () => {
   it.each([1, 2, 3, 4, 5, 6, 7, 8])("price %i graduate(s) the same everywhere", (people) => {
@@ -119,6 +127,27 @@ describe("graduation sessions", () => {
       ...NO_PRICE, sessionPrice: grad.packages.standard.price, addOns: [{ label: addOn.label, amount: addOn.price }],
     });
     expect(contract).toMatchObject({ status: "ok", total: estimate.subtotal });
+  });
+
+  // Named lengths in the words a client uses, for one graduate and for groups.
+  const EXTENSION_LENGTHS: [number, string, number][] = [
+    [1, "a 30 minute mini", 30], [1, "a 1 hour session", 60], [1, "1 hour 30 minutes", 90], [1, "2 hours", 120],
+    [2, "a 1 hour session", 60], [2, "90 minutes", 90], [2, "2 hours", 120],
+    [3, "90 minutes", 90], [3, "2 hours", 120], [4, "1.5 hours", 90], [5, "two hours", 120],
+    [8, "2 hours", 120], [8, "2 hours and 30 minutes", 150],
+  ];
+  it.each(EXTENSION_LENGTHS)("the extension prices %i graduate(s) for %j as the site does", (people, message, minutes) => {
+    const calc = pixiesetCalcPrice({ session_type: "graduation", school: "SJSU", people: String(people), message });
+    expect(calc.sessionBase).toBe(graduationSessionPrice(people, minutes));
+    expect(calc.travelFee).toBe(SJSU_FEE);
+  });
+
+  it("the extension prices a group that names no length, or a shorter one, at its included time", () => {
+    for (const people of [2, 3, 8]) {
+      expect(pixiesetCalcPrice({ session_type: "graduation", people: String(people), message: "" }).sessionBase).toBe(graduationSessionPrice(people));
+      expect(pixiesetCalcPrice({ session_type: "graduation", people: String(people), message: "the 30 minute mini" }).sessionBase).toBe(graduationSessionPrice(people));
+    }
+    expect(pixiesetCalcPrice({ session_type: "graduation", people: "9", message: "2 hours" }).sessionBase).toBeNull();
   });
 
   it("quotes the extra 30 minutes at the catalog price", () => {
