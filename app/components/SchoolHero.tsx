@@ -3,7 +3,7 @@
 // priority — it is the largest above-the-fold element. Without a photo the
 // hero renders exactly as it did before (text only).
 import Link from "next/link";
-import OptimizedPhoto from "@/app/components/OptimizedPhoto";
+import LcpPhoto from "@/app/components/LcpPhoto";
 import { C } from "@/lib/colors";
 import type { PagePhoto } from "@/lib/pagePhotos/publicPages";
 
@@ -56,11 +56,11 @@ export default function SchoolHero({ school, aliases, tagline, contactHref, phot
         {photo && (
           <figure className="school-hero-photo">
             <div className="school-hero-frame" style={{ aspectRatio: `${photo.width} / ${photo.height}` }}>
-              <OptimizedPhoto
+              <LcpPhoto
                 src={photo.image_url}
                 alt={photo.alt}
                 sizes="(max-width: 900px) 92vw, 470px"
-                priority
+                phoneSizes="92vw"
                 quality={85}
                 objectPosition="50% 35%"
               />

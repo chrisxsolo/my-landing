@@ -25,6 +25,7 @@ describe("journal post photo loading", () => {
     expect(eager).toHaveLength(1);
     expect(eager[0]).toContain("cover.jpg");
     expect(eager[0]).toContain('fetchPriority="high"');
-    expect((html.match(/rel="preload"/g) ?? []).length).toBe(1);
+    expect((html.match(/rel="preload"/g) ?? []).length).toBe(2);
+    expect(html).toContain('<source media="(max-width: 760px)"');
   });
 });

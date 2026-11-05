@@ -16,6 +16,7 @@ import { buildBookingIntentParams } from "@/lib/bookingIntent";
 import { inquirySessionTypeFor } from "@/lib/serviceRegistry";
 import type { ServiceType } from "@/lib/contentEngine/taxonomy";
 import ContentEventBeacon from "@/app/components/ContentEventBeacon";
+import LcpPhoto from "@/app/components/LcpPhoto";
 import { WEBSITE_ID, businessRef, personRef } from "@/lib/seo/schema";
 import { absoluteUrl } from "@/lib/seo/siteMetadata";
 
@@ -172,16 +173,12 @@ export default async function ProfessionalBlogPostPage({ params }: Props) {
       {post.cover_image_url && (
         <div style={{ padding: "0 20px 80px", maxWidth: 1400, margin: "0 auto" }}>
           <div style={{ position: "relative", overflow: "hidden", maxHeight: 780, aspectRatio: "4/3" }}>
-            <Image
+            {/* The cover is the page's largest paint: preloaded, high priority,
+                and a lighter encode on phones (see LcpPhoto). */}
+            <LcpPhoto
               src={post.cover_image_url}
               alt={post.cover_image_alt || post.title}
-              fill
               sizes="(max-width: 1400px) 100vw, 1400px"
-              style={{ objectFit: "cover" }}
-              preload
-              // The cover is the page's largest paint; fetch it ahead of the
-              // story gallery and scripts.
-              fetchPriority="high"
               quality={90}
             />
           </div>

@@ -28,7 +28,10 @@ describe("homepage photos are ready before visitors select a slide", () => {
     expect(photos[0]).toContain("hero-1");
     expect(photos[0]).toContain('fetchPriority="high"');
     expect(photos.some((photo) => photo.includes('loading="lazy"'))).toBe(false);
-    expect((html.match(/rel="preload"/g) ?? []).length).toBe(1);
+    // One preload per viewport class (phone / larger), each behind its media query.
+    expect((html.match(/rel="preload"/g) ?? []).length).toBe(2);
+    expect(html).toContain('media="(max-width: 760px)"');
+    expect(html).toContain('media="(min-width: 761px)"');
     // Every slide still has its frame, so layout never shifts when photos arrive.
     expect((html.match(/<div[^>]*data-active=/g) ?? []).length).toBe(3);
   });

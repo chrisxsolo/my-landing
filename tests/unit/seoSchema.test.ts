@@ -41,6 +41,7 @@ vi.mock("@/lib/supabaseServer", () => ({ createSupabaseServerClient: () => fakeS
 vi.mock("@/app/components/ContentEventBeacon", () => ({ default: () => null }));
 vi.mock("@/app/components/OptimizedPhoto", () => ({ default: () => null }));
 vi.mock("next/image", () => ({ default: () => null }));
+vi.mock("@/app/components/LcpPhoto", () => ({ default: () => null }));
 
 function jsonLdBlocks(html: string): JsonLdNode[] {
   return [...html.matchAll(/<script type="application\/ld\+json">(.*?)<\/script>/g)].map((m) => JSON.parse(m[1]));

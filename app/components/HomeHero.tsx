@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties, MouseEvent } from "react";
 import { SERVICES_SECTION_ID, type HomepageHeroSlide } from "@/lib/homepageData";
 import { addMountedSlides, slidesToMount, wrapSlideIndex } from "@/lib/heroSlides";
+import LcpPhoto from "@/app/components/LcpPhoto";
 import styles from "@/app/components/HomeHero.module.css";
 
 const AUTOPLAY_INTERVAL_MS = 7000;
@@ -141,16 +142,19 @@ export default function HomeHero({ slides }: { slides: HomepageHeroSlide[] }) {
               data-active={index === current}
               aria-hidden={index !== current}
             >
-              {mounted.includes(index) ? (
+              {/* The first slide is the page's largest paint: preloaded, high
+                  priority, and a lighter encode on phones (see LcpPhoto). */}
+              {index === 0 ? (
+                <LcpPhoto src={slide.image_url} alt="" sizes="100vw" quality={90} className={styles.image} style={imageStyle} />
+              ) : mounted.includes(index) ? (
                 <Image
                   src={slide.image_url}
                   alt=""
                   fill
                   sizes="100vw"
-                  preload={index === 0}
-                  loading={index === 0 ? undefined : "eager"}
-                  fetchPriority={index === 0 ? "high" : "low"}
-                  quality={index === 0 ? 90 : 85}
+                  loading="eager"
+                  fetchPriority="low"
+                  quality={85}
                   className={styles.image}
                   style={imageStyle}
                 />
