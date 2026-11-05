@@ -17,10 +17,11 @@ const SUPABASE_ORIGIN = "https://dmtslzwglpezympptqls.supabase.co";
 //   analytics beacons, and the sunrise API the admin conversation page calls.
 // - forms/navigation: inquiry forms post to this origin; Google sign-in goes
 //   through Supabase auth and accounts.google.com.
-// Report-Only first; CSP_MODE flips to "enforce" once production shows no
-// violations on the public pages, sign-in, and the admin.
+// Shipped report-only first (2026-11-05); the production console showed no
+// violations on the public pages or sign-in, so it now enforces. Set back to
+// "report-only" to investigate a regression without blocking anything.
 type CspMode = "report-only" | "enforce";
-const CSP_MODE = "report-only" as CspMode;
+const CSP_MODE = "enforce" as CspMode;
 
 export function buildContentSecurityPolicy({ dev = false, enforce = CSP_MODE === "enforce" }: { dev?: boolean; enforce?: boolean } = {}): string {
   return [
