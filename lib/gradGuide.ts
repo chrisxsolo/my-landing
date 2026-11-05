@@ -106,7 +106,7 @@ export const GRAD_GUIDE_CSS = `
   .gg-marquee-track { display:flex; gap:42px; width:max-content; white-space:nowrap; animation:ggMarquee 24s linear infinite; }
   .gg-marquee-item {
     display:inline-flex; align-items:center; gap:14px;
-    color:var(--ink-dim, #667f79); font-size:11px; font-weight:800;
+    color:var(--ink-dim, #64716d); font-size:11px; font-weight:800;
     letter-spacing:0.14em; text-transform:uppercase;
   }
   .gg-marquee-sep { width:4px; height:4px; border-radius:999px; background:var(--accent, #3d6b5e); flex-shrink:0; }
@@ -114,7 +114,7 @@ export const GRAD_GUIDE_CSS = `
   /* ── SECTION HEADINGS ────────────────────────────────────────────────────── */
   .gg-section { padding:62px 0; }
   .gg-section--alt { background:#fff; border-top:1px solid rgba(18,24,22,0.06); border-bottom:1px solid rgba(18,24,22,0.06); }
-  .gg-sec-kicker { margin:0 0 8px; color:var(--ink-dim, #667f79); font-size:12px; font-weight:820; letter-spacing:0.07em; text-transform:uppercase; }
+  .gg-sec-kicker { margin:0 0 8px; color:var(--ink-dim, #64716d); font-size:12px; font-weight:820; letter-spacing:0.07em; text-transform:uppercase; }
   .gg-sec-title { margin:0; color:var(--ink, #101412); font-size:clamp(1.7rem, 3.2vw, 2.4rem); font-weight:880; letter-spacing:-0.02em; line-height:1.04; text-wrap:balance; }
   .gg-sec-sub { margin:10px 0 0; color:var(--ink-muted, #4b5a55); font-size:15px; line-height:1.6; }
 
@@ -130,7 +130,7 @@ export const GRAD_GUIDE_CSS = `
   .gg-card:hover { transform:translateY(-5px); box-shadow:0 18px 40px rgba(18,24,22,0.10); border-color:rgba(112,139,133,0.32); }
   .gg-card-bar { position:absolute; top:0; left:0; right:0; height:3px; background:linear-gradient(90deg, #5b8a7a, #82b9af); }
   .gg-card-emoji { display:block; font-size:30px; margin:6px 0 14px; }
-  .gg-card-num { margin:0 0 4px; color:var(--ink-dim, #667f79); font-size:11px; font-weight:820; letter-spacing:0.14em; }
+  .gg-card-num { margin:0 0 4px; color:var(--ink-dim, #64716d); font-size:11px; font-weight:820; letter-spacing:0.14em; }
   .gg-card-title { margin:0 0 7px; color:var(--ink, #101412); font-size:18px; font-weight:860; letter-spacing:-0.01em; line-height:1.15; }
   .gg-card-desc { margin:0; color:var(--ink-muted, #4b5a55); font-size:14px; line-height:1.6; }
   .gg-card-arrow { position:absolute; top:20px; right:20px; color:rgba(112,139,133,0.5); font-size:16px; transition:color .2s ease, transform .2s ease; }
@@ -191,7 +191,7 @@ export const GRAD_GUIDE_CSS = `
   /* ── TIP CATEGORIES ──────────────────────────────────────────────────────── */
   .gg-cats { display:flex; flex-direction:column; gap:40px; margin-top:30px; }
   .gg-cat-head { display:flex; align-items:center; gap:12px; margin-bottom:16px; }
-  .gg-cat-label { padding:5px 12px; border-radius:999px; background:rgba(112,139,133,0.12); color:var(--accent, #3d6b5e); font-size:11px; font-weight:840; letter-spacing:0.13em; text-transform:uppercase; }
+  .gg-cat-label { margin:0; padding:5px 12px; line-height:1.4; border-radius:999px; background:rgba(112,139,133,0.12); color:var(--accent, #3d6b5e); font-size:11px; font-weight:840; letter-spacing:0.13em; text-transform:uppercase; }
   .gg-cat-line { flex:1; height:1px; background:linear-gradient(90deg, rgba(112,139,133,0.28), transparent); }
   .gg-tips { display:flex; flex-direction:column; gap:12px; }
   .gg-tip {

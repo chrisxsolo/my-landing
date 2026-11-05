@@ -58,7 +58,7 @@ export const SPOTS_BASE_CSS = `
     background: rgba(112,139,133,0.12); color: #3d6b5e;
     font-size: 12px; font-weight: 800; letter-spacing: 0.03em;
   }
-  .sp-chip-label { color: #667f79; font-weight: 820; }
+  .sp-chip-label { color: #64716d; font-weight: 820; }
   .sp-desc { margin: 0; color: #4b5a55; font-size: 16px; line-height: 1.72; text-wrap: pretty; }
 
   .sp-foot {

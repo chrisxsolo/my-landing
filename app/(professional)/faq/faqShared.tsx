@@ -129,7 +129,7 @@ export const FAQ_CSS = `
 
   .faq-kicker {
     margin: 0 0 14px;
-    color: #667f79;
+    color: #64716d;
     font-size: 13px;
     font-weight: 820;
     letter-spacing: 0.06em;
@@ -191,7 +191,7 @@ export const FAQ_CSS = `
   .faq-grad-banner-sub {
     margin: 4px 0 0;
     font-size: 13.5px;
-    color: #667f79;
+    color: #64716d;
     line-height: 1.5;
   }
   .faq-grad-banner-btn {
@@ -260,7 +260,7 @@ export const FAQ_CSS = `
     background: rgba(18,24,22,0.05);
     font-size: 13px;
     font-weight: 700;
-    color: #667f79;
+    color: #64716d;
     animation: faq-fade-up 0.6s 0.28s cubic-bezier(0.22,1,0.36,1) both;
   }
   .faq-count-dot {
@@ -289,7 +289,7 @@ export const FAQ_CSS = `
   .faq-group-label {
     font-size: 12px;
     font-weight: 820;
-    color: #667f79;
+    color: #64716d;
     letter-spacing: 0.06em;
     text-transform: uppercase;
     flex: 1;
@@ -352,7 +352,7 @@ export const FAQ_CSS = `
     border-radius: 50%;
     border: 1px solid rgba(18,24,22,0.1);
     background: rgba(247,250,248,0.9);
-    color: #667f79;
+    color: #64716d;
     transition: background 0.22s ease, color 0.22s ease, border-color 0.22s ease, transform 0.32s cubic-bezier(0.4,0,0.2,1);
   }
   .faq-item-btn:hover .faq-item-icon {
@@ -494,7 +494,7 @@ export const FAQ_CSS = `
     align-items: center;
     gap: 6px;
     margin: 0 0 18px;
-    color: #667f79;
+    color: #64716d;
     font-size: 13px;
     font-weight: 720;
     text-decoration: none;

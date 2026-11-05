@@ -264,9 +264,34 @@ export function validateInspirationUpload(file: { type: string; size: number }) 
   return { ok: true as const };
 }
 
+// Alt text that describes nothing: a filename, a stock placeholder, or the
+// word "image". The public guide shipped dozens of tiles whose alt was "inspo".
+const PLACEHOLDER_ALT = /^(?:inspo|inspiration|image|img|photo|picture|pic|untitled|reference|test|dsc[_ -]?\d*|img[_ -]?\d+)$|\.(?:jpe?g|png|webp|avif|heic)$/i;
+const MAX_ALT_LENGTH = 300;
+
+export function isPlaceholderAltText(value: string | null | undefined): boolean {
+  const text = (value ?? "").trim();
+  return text.length > 0 && (text.length < 4 || PLACEHOLDER_ALT.test(text));
+}
+
+/** The alt a visitor gets: the written alt, else a description built from the title and categories. */
+export function inspirationAltText(image: { alt_text: string | null; title: string; categories: string[] }): string {
+  const alt = (image.alt_text ?? "").trim();
+  if (alt && !isPlaceholderAltText(alt)) return alt;
+  const subject = isPlaceholderAltText(image.title) || !image.title.trim() ? "Couple" : image.title.trim();
+  const context = image.categories.length ? ` (${image.categories.join(", ").toLowerCase()})` : "";
+  return `${subject}: couples posing reference${context}`;
+}
+
 export function validateInspirationImageInput(input: Record<string, unknown>) {
   const title = optionalText(input.title, 160);
   if (!title) return { ok: false as const, error: "Image title is required." };
+  if (isPlaceholderAltText(input.alt_text as string | null | undefined)) {
+    return { ok: false as const, error: "Alt text should describe the photo (who, where, what they are doing), not a placeholder or filename. Leave it blank to use the title." };
+  }
+  if (typeof input.alt_text === "string" && input.alt_text.trim().length > MAX_ALT_LENGTH) {
+    return { ok: false as const, error: `Alt text is longer than ${MAX_ALT_LENGTH} characters; keep it to one or two descriptive sentences.` };
+  }
 
   const visibility = COUPLES_IMAGE_VISIBILITIES.includes(
     input.visibility as CouplesImageVisibility,
@@ -320,7 +345,7 @@ export function validateInspirationImageInput(input: Record<string, unknown>) {
       height: Number.isInteger(Number(input.height)) && Number(input.height) > 0
         ? Number(input.height)
         : null,
-      alt_text: optionalText(input.alt_text, 300),
+      alt_text: optionalText(input.alt_text, MAX_ALT_LENGTH),
       visibility,
       is_published: input.is_published === true,
       display_order: Number.isFinite(Number(input.display_order))

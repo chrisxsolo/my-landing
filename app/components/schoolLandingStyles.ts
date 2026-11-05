@@ -24,7 +24,7 @@ export const SCHOOL_LANDING_CSS = `
   }
   .school-kicker {
     margin: 0 0 14px;
-    color: #667f79;
+    color: #64716d;
     font-size: 13px;
     font-weight: 820;
     letter-spacing: 0.04em;
@@ -175,7 +175,7 @@ export const SCHOOL_LANDING_CSS = `
   }
   .school-info-label {
     margin: 0 0 6px;
-    color: #667f79;
+    color: #64716d;
     font-size: 12px;
     font-weight: 820;
     letter-spacing: 0.06em;

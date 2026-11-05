@@ -170,3 +170,30 @@ test("storage cleanup includes owned uploads but excludes external references", 
     ["2026/a/photo.jpg"],
   );
 });
+
+test("placeholder alt text is detected, rejected on save, and replaced for visitors", async () => {
+  const { inspirationAltText, isPlaceholderAltText } = await import("../lib/couplesPosingGuide.ts");
+  for (const value of ["inspo", "IMG_2041.jpg", "image", "photo", "ab"]) {
+    assert.equal(isPlaceholderAltText(value), true, `${value} should be a placeholder`);
+  }
+  assert.equal(isPlaceholderAltText("Couple laughing mid-spin on Baker Beach at sunset"), false);
+  assert.equal(isPlaceholderAltText(""), false);
+
+  const described = { alt_text: "Couple walking arm in arm through the Presidio", title: "inspo", categories: ["Walking and Movement"] };
+  assert.equal(inspirationAltText(described), "Couple walking arm in arm through the Presidio");
+  assert.equal(
+    inspirationAltText({ alt_text: "inspo", title: "Piggyback Sway", categories: ["Lifts and Spins"] }),
+    "Piggyback Sway: couples posing reference (lifts and spins)",
+  );
+  assert.equal(inspirationAltText({ alt_text: null, title: "inspo", categories: [] }), "Couple: couples posing reference");
+
+  const rejected = validateInspirationImageInput({ title: "Reference", alt_text: "inspo", visibility: "private" });
+  assert.equal(rejected.ok, false);
+  assert.match(rejected.error, /describe the photo/);
+  const tooLong = validateInspirationImageInput({ title: "Reference", alt_text: "x".repeat(301), visibility: "private" });
+  assert.equal(tooLong.ok, false);
+  assert.match(tooLong.error, /300 characters/);
+  const blank = validateInspirationImageInput({ title: "Reference", alt_text: "", visibility: "private" });
+  assert.equal(blank.ok, true);
+  assert.equal(blank.data.alt_text, null);
+});

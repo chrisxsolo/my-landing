@@ -21,7 +21,7 @@ const CSS = `
   }
   .ssg-shell { width: min(1180px, calc(100% - 48px)); margin: 0 auto; }
   .ssg-kicker {
-    margin: 0 0 10px; color: #667f79;
+    margin: 0 0 10px; color: #64716d;
     font-size: 12px; font-weight: 820; letter-spacing: 0.06em; text-transform: uppercase;
   }
   .ssg-title {

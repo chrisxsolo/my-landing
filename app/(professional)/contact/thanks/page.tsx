@@ -52,7 +52,7 @@ const CSS = `
   }
   .thanks-kicker {
     margin: 0 0 14px;
-    color: #667f79;
+    color: #64716d;
     font-size: 13px;
     font-weight: 820;
   }
@@ -204,7 +204,7 @@ const CSS = `
     border-bottom: 1px solid rgba(18, 24, 22, 0.09);
   }
   .detail-label {
-    color: #667f79;
+    color: #64716d;
     font-size: 12px;
     font-weight: 820;
   }

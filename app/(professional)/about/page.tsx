@@ -104,7 +104,7 @@ const CSS = `
   }
   .about-kicker {
     margin: 0 0 16px;
-    color: #667f79;
+    color: #64716d;
     font-size: 13px;
     font-weight: 820;
     animation: fadeUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
@@ -172,7 +172,7 @@ const CSS = `
   .about-bio-text { padding-top: 8px; }
   .about-section-kicker {
     margin: 0 0 16px;
-    color: #667f79;
+    color: #64716d;
     font-size: 13px;
     font-weight: 820;
   }

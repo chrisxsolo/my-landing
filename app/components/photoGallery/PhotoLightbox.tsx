@@ -9,6 +9,7 @@
 import Image from "next/image";
 import { useCallback, useEffect, useRef, type CSSProperties } from "react";
 import { C } from "@/lib/colors";
+import useDialogFocus from "./useDialogFocus";
 import styles from "./PhotoGallery.module.css";
 
 export type LightboxPhoto = { id: string | number; image_url: string; alt: string };
@@ -21,24 +22,6 @@ type Props = {
 };
 
 const SWIPE_THRESHOLD_PX = 40;
-
-// Tab / Shift+Tab wrap around the dialog's own buttons instead of reaching
-// the page behind it.
-function keepFocusInside(event: KeyboardEvent, dialog: HTMLElement | null) {
-  if (event.key !== "Tab" || !dialog) return;
-  const focusable = [...dialog.querySelectorAll<HTMLElement>("button:not([disabled]), a[href]")];
-  if (focusable.length === 0) return;
-  const first = focusable[0];
-  const last = focusable[focusable.length - 1];
-  const active = document.activeElement;
-  if (event.shiftKey && (active === first || !dialog.contains(active))) {
-    event.preventDefault();
-    last.focus();
-  } else if (!event.shiftKey && (active === last || !dialog.contains(active))) {
-    event.preventDefault();
-    first.focus();
-  }
-}
 
 // Colors come from the shared palette, set as variables on the dialog itself so
 // the viewer looks the same on any page that mounts it.
@@ -62,23 +45,13 @@ export default function PhotoLightbox({ photos, index, onChange, onClose }: Prop
     [index, onChange, photos.length],
   );
 
-  useEffect(() => {
-    const previousFocus = document.activeElement as HTMLElement | null;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    closeRef.current?.focus();
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      previousFocus?.focus();
-    };
-  }, []);
+  useDialogFocus(dialogRef, closeRef);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
       if (event.key === "ArrowRight") move(1);
       if (event.key === "ArrowLeft") move(-1);
-      keepFocusInside(event, dialogRef.current);
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);

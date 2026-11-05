@@ -73,7 +73,7 @@ export default function WhatToWearContent({ outfits: outfitsFromDb }: { outfits:
               return (
                 <div key={cat.label} data-reveal>
                   <div className="gg-cat-head">
-                    <span className="gg-cat-label">{cat.label}</span>
+                    <h2 className="gg-cat-label">{cat.label}</h2>
                     <span className="gg-cat-line" />
                   </div>
                   <div className="gg-tips">

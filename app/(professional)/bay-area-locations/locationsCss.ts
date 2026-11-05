@@ -10,7 +10,7 @@ export const LOC_CSS = `
     padding:22px; border-radius:14px; background:var(--glass, rgba(255,255,255,0.86));
     border:1px solid rgba(18,24,22,0.08); box-shadow:0 6px 20px rgba(18,24,22,0.05);
   }
-  .loc-stat-label { margin:0 0 8px; color:var(--ink-dim, #667f79); font-size:11px; font-weight:820; letter-spacing:0.16em; text-transform:uppercase; }
+  .loc-stat-label { margin:0 0 8px; color:var(--ink-dim, #64716d); font-size:11px; font-weight:820; letter-spacing:0.16em; text-transform:uppercase; }
   .loc-stat-num { margin:0; color:var(--ink, #101412); font-size:34px; font-weight:880; letter-spacing:-0.02em; line-height:1; }
   .loc-stat-note { margin:8px 0 0; color:var(--ink-muted, #4b5a55); font-size:13px; line-height:1.5; }
 
@@ -21,12 +21,12 @@ export const LOC_CSS = `
   }
   .loc-toolbar-grid { display:grid; gap:16px; grid-template-columns:minmax(0,1fr) auto; align-items:end; }
   @media (max-width:680px) { .loc-toolbar-grid { grid-template-columns:1fr; } }
-  .loc-label { display:block; margin:0 0 8px; color:var(--ink-dim, #667f79); font-size:11px; font-weight:820; letter-spacing:0.15em; text-transform:uppercase; }
+  .loc-label { display:block; margin:0 0 8px; color:var(--ink-dim, #64716d); font-size:11px; font-weight:820; letter-spacing:0.15em; text-transform:uppercase; }
   .loc-search { display:flex; align-items:center; gap:10px; border-radius:10px; padding:11px 14px; background:#fff; border:1px solid rgba(18,24,22,0.12); }
   .loc-search input { width:100%; border:none; outline:none; background:transparent; font-size:14px; font-weight:500; color:var(--ink, #101412); }
   .loc-search input::placeholder { color:#9aa7a2; }
   .loc-count { border-radius:10px; padding:11px 16px; background:rgba(112,139,133,0.10); }
-  .loc-count-label { margin:0; color:var(--ink-dim, #667f79); font-size:11px; font-weight:820; letter-spacing:0.14em; text-transform:uppercase; }
+  .loc-count-label { margin:0; color:var(--ink-dim, #64716d); font-size:11px; font-weight:820; letter-spacing:0.14em; text-transform:uppercase; }
   .loc-count-num { margin:2px 0 0; color:var(--ink, #101412); font-size:22px; font-weight:880; line-height:1; }
   .loc-count-note { margin:2px 0 0; color:var(--ink-muted, #4b5a55); font-size:13px; }
   .loc-chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:16px; }
@@ -64,7 +64,7 @@ export const LOC_CSS = `
   .loc-card-body { padding:24px; }
   .loc-card-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:14px; }
   .loc-card-head-main { min-width:0; }
-  .loc-card-place { margin:0 0 4px; color:var(--ink-dim, #667f79); font-size:11px; font-weight:820; letter-spacing:0.12em; text-transform:uppercase; }
+  .loc-card-place { margin:0 0 4px; color:var(--ink-dim, #64716d); font-size:11px; font-weight:820; letter-spacing:0.12em; text-transform:uppercase; }
   .loc-card-title { margin:0; color:var(--ink, #101412); font-size:21px; font-weight:870; letter-spacing:-0.01em; line-height:1.15; }
   .loc-light { flex-shrink:0; max-width:46%; text-align:right; border-radius:11px; padding:9px 13px; background:rgba(112,139,133,0.10); border:1px solid rgba(112,139,133,0.2); }
   .loc-light-label { margin:0; color:var(--accent, #3d6b5e); font-size:10px; font-weight:820; letter-spacing:0.12em; text-transform:uppercase; }
@@ -95,7 +95,7 @@ export const LOC_CSS = `
   .loc-select {
     width:100%; appearance:none; border-radius:10px; padding:10px 34px 10px 13px; font-size:14px; font-weight:650;
     color:var(--ink, #101412); background:#fff; border:1px solid rgba(18,24,22,0.12); cursor:pointer;
-    background-image:linear-gradient(45deg, transparent 50%, #667f79 50%), linear-gradient(135deg, #667f79 50%, transparent 50%);
+    background-image:linear-gradient(45deg, transparent 50%, #64716d 50%), linear-gradient(135deg, #64716d 50%, transparent 50%);
     background-position:calc(100% - 17px) 52%, calc(100% - 12px) 52%; background-size:5px 5px; background-repeat:no-repeat;
   }
   .loc-select:focus-visible, .loc-search:focus-within { outline:2px solid var(--accent, #3d6b5e); outline-offset:2px; }

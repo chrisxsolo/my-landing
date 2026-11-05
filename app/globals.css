@@ -6,7 +6,7 @@
 :root {
   --ink:           #101412;      /* primary text */
   --ink-muted:     #4b5a55;      /* secondary text */
-  --ink-dim:       #667f79;      /* captions, kickers */
+  --ink-dim:       #64716d;      /* captions, kickers */
   --bg:            #f5f6f4;      /* page background */
   --bg-white:      #ffffff;      /* card/section white */
   --accent:        #3d6b5e;      /* green CTA / link accent */

@@ -203,18 +203,26 @@
 .indicators {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 0;
 }
 
+/* The visible dot stays 8px, but padding with background-clip gives each
+   button a 24px touch target (the dot paints only inside the content box). */
 .indicators button {
+  box-sizing: content-box;
   width: 8px;
   height: 8px;
-  padding: 0;
+  padding: 8px;
   border: 0;
   border-radius: 999px;
   background: color-mix(in srgb, var(--home-paper) 44%, transparent);
+  background-clip: content-box;
   cursor: pointer;
   transition: width 220ms ease, background 220ms ease;
+}
+.indicators button:focus-visible {
+  outline: 2px solid var(--home-paper);
+  outline-offset: -4px;
 }
 
 .indicators button[data-active="true"] {

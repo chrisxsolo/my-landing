@@ -45,7 +45,7 @@ const CSS = `
   .afc-fact { animation: afcFade 0.45s cubic-bezier(0.22, 1, 0.36, 1) both; }
   .afc-counter {
     margin: 0 0 14px;
-    color: #667f79;
+    color: #64716d;
     font-size: 13px;
     font-weight: 820;
     font-variant-numeric: tabular-nums;

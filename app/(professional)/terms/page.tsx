@@ -1,6 +1,7 @@
 import { BOOKING_POLICY, PRICING_CATALOG } from "@/lib/pricingCatalog";
 import type { Metadata } from "next";
 import { buildPageMetadata } from "@/lib/seo/siteMetadata";
+import { C } from "@/lib/colors";
 
 export const metadata: Metadata = buildPageMetadata({
   title: "Terms of Service",
@@ -14,7 +15,7 @@ export default function TermsPage() {
       <h1 style={{ fontSize: 36, fontWeight: 860, color: "#101412", marginBottom: 8 }}>
         Terms of Service
       </h1>
-      <p style={{ color: "#667f79", fontSize: 14, marginBottom: 48 }}>
+      <p style={{ color: C.proMuted, fontSize: 14, marginBottom: 48 }}>
         Last updated: May 15, 2025
       </p>
 

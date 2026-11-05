@@ -35,7 +35,7 @@
 
 .ratesKicker {
   margin: 0 0 14px;
-  color: #667f79;
+  color: #64716d;
   font-size: 13px;
   font-weight: 820;
   letter-spacing: 0;
@@ -334,7 +334,7 @@
 /* ── KICKER (small label above headings) ──────────────────────────────────── */
 .pricingKicker {
   margin: 0 0 14px;
-  color: #667f79;
+  color: #64716d;
   font-size: 13px;
   font-weight: 820;
 }
@@ -867,7 +867,7 @@
   box-shadow: 0 6px 16px rgba(18,24,22,0.18);
   font-family: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
 }
-.couplesCardPricePrefix { display: block; margin: 0 0 2px; color: #667f79; font-size: 12px; font-weight: 760; letter-spacing: 0.04em; text-transform: uppercase; font-family: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif; }
+.couplesCardPricePrefix { display: block; margin: 0 0 2px; color: #64716d; font-size: 12px; font-weight: 760; letter-spacing: 0.04em; text-transform: uppercase; font-family: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif; }
 
 /* Which session should I book? (P8) */
 .couplesChooser { padding: 8px 0 56px; }

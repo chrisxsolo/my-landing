@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { buildPageMetadata } from "@/lib/seo/siteMetadata";
+import { C } from "@/lib/colors";
 
 export const metadata: Metadata = buildPageMetadata({
   title: "Privacy Policy",
@@ -13,7 +14,7 @@ export default function PrivacyPage() {
       <h1 style={{ fontSize: 36, fontWeight: 860, color: "#101412", marginBottom: 8 }}>
         Privacy Policy
       </h1>
-      <p style={{ color: "#667f79", fontSize: 14, marginBottom: 48 }}>
+      <p style={{ color: C.proMuted, fontSize: 14, marginBottom: 48 }}>
         Last updated: May 15, 2025
       </p>
 

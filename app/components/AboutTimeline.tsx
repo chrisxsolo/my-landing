@@ -40,7 +40,7 @@ const CSS = `
   }
   .atl-year {
     margin: 0 0 6px;
-    color: #667f79;
+    color: #64716d;
     font-size: 13px;
     font-weight: 820;
     font-variant-numeric: tabular-nums;

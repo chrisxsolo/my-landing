@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { formatCurrency } from "@/lib/pricing";
 import { BOOKING_POLICY, PRICING_CATALOG } from "@/lib/pricingCatalog";
+import { C } from "@/lib/colors";
 
 type SchoolSpot = {
   name: string;
@@ -60,7 +61,7 @@ export default function SchoolLandingDetails({
             <h2 className="school-section-title">Grad sessions at {schoolShort}</h2>
             <p className="school-body-copy">{bodyIntro}</p>
             {sessionNote && (
-              <p className="school-body-copy" style={{ color: "#667f79", fontSize: 15 }}>{sessionNote}</p>
+              <p className="school-body-copy" style={{ color: C.proMuted, fontSize: 15 }}>{sessionNote}</p>
             )}
           </div>
           <div>
@@ -96,7 +97,7 @@ export default function SchoolLandingDetails({
                 See all {schoolShort}{" "}graduation photo spots &amp; the best time for each →
               </Link>
             </p>
-            <p className="school-body-copy" style={{ marginTop: 10, color: "#667f79", fontSize: 15 }}>
+            <p className="school-body-copy" style={{ marginTop: 10, color: C.proMuted, fontSize: 15 }}>
               New to grad photos? The{" "}
               <Link href="/grad-guide" style={{ color: "#3d6b5e", fontWeight: 700 }}>
                 Bay Area graduation photo guide

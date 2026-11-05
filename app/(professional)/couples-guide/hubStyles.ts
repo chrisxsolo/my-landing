@@ -44,7 +44,7 @@ export const COUPLES_HUB_CSS = `
   .cg-price-table th { color:var(--ink, #101412); font-weight:820; }
   .cg-price-table td { color:var(--ink-muted, #4b5a55); }
   .cg-price-table .cg-price { color:var(--ink, #101412); font-weight:860; white-space:nowrap; text-align:right; }
-  .cg-price-detail { display:block; margin-top:2px; color:var(--ink-dim, #667f79); font-size:13px; font-weight:600; }
+  .cg-price-detail { display:block; margin-top:2px; color:var(--ink-dim, #64716d); font-size:13px; font-weight:600; }
   .cg-highlight td, .cg-highlight th { background:rgba(162,210,196,0.16); }
 
   .cg-faq { margin-top:22px; display:grid; gap:10px; }

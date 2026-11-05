@@ -6,6 +6,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import styles from "./couplesPosingGuide.module.css";
 import galleryStyles from "./couplesGallery.module.css";
 import useInspirationPhotoWarmup, { warmInspirationPhoto } from "./useInspirationPhotoWarmup";
+import InspirationLightbox from "./InspirationLightbox";
+import { inspirationAltText } from "@/lib/couplesPosingGuide";
 
 type Prompt = {
   number: number;
@@ -329,7 +331,7 @@ export default function CouplesPosingGuideClient({
                     visitor scrolls near them (next/image's default). */}
                 <Image
                   src={image.image_url}
-                  alt={image.alt_text || image.title}
+                  alt={inspirationAltText(image)}
                   width={image.width || 1200}
                   height={image.height || 1500}
                   sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
@@ -354,47 +356,17 @@ export default function CouplesPosingGuideClient({
         </section>
       )}
 
-      {selectedImage && selectedImage.image_url && (
-        <div
-          className={galleryStyles.lightbox}
-          role="dialog"
-          aria-modal="true"
-          aria-label={selectedImage.title}
-          onClick={() => setActiveImage(null)}
-          onTouchStart={(event) => { touchStart.current = event.touches[0].clientX; }}
+      {selectedImage && selectedImage.image_url && activeImage !== null && (
+        <InspirationLightbox
+          image={selectedImage}
+          mode={mode}
+          position={activeImage + 1}
+          total={filteredImages.length}
+          onClose={() => setActiveImage(null)}
+          onMove={moveLightbox}
+          onTouchStart={(clientX) => { touchStart.current = clientX; }}
           onTouchEnd={onTouchEnd}
-        >
-          <div className={galleryStyles.lightboxPanel} onClick={(event) => event.stopPropagation()}>
-            <button className={galleryStyles.closeButton} type="button" onClick={() => setActiveImage(null)} aria-label="Close lightbox">×</button>
-            <div className={galleryStyles.lightboxMedia}>
-              <Image
-                src={selectedImage.image_url}
-                alt={selectedImage.alt_text || selectedImage.title}
-                width={selectedImage.width || 1600}
-                height={selectedImage.height || 2000}
-                sizes="95vw"
-                loading="eager"
-              />
-            </div>
-            <div className={galleryStyles.lightboxCopy}>
-              <p className={styles.eyebrow}>{selectedImage.categories.join(" · ") || "Inspiration"}</p>
-              <h2>{selectedImage.title}</h2>
-              <p>{mode === "photographer" ? selectedImage.internal_notes || selectedImage.client_notes : selectedImage.client_notes}</p>
-              {selectedImage.related_prompt_number && <p>Related prompt: {selectedImage.related_prompt_number}</p>}
-              {(selectedImage.creator_name || selectedImage.attribution_text) && (
-                <p>Source: {[selectedImage.creator_name, selectedImage.attribution_text].filter(Boolean).join(" · ")}</p>
-              )}
-              {mode === "photographer" && <p>Visibility: {selectedImage.visibility.replace("_", " ")}</p>}
-            </div>
-            {filteredImages.length > 1 && (
-              <div className={galleryStyles.lightboxNav}>
-                <button type="button" onClick={() => moveLightbox(-1)}>Previous</button>
-                <span>{activeImage! + 1} / {filteredImages.length}</span>
-                <button type="button" onClick={() => moveLightbox(1)}>Next</button>
-              </div>
-            )}
-          </div>
-        </div>
+        />
       )}
     </>
   );
