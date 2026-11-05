@@ -86,6 +86,11 @@ describe("root layout fallback", () => {
     expect(source).toMatch(/twitter: \{ card: "summary_large_image"/);
     expect(source).toContain('metadataBase: new URL("https://www.soloxsnaps.com")');
   });
+
+  it("opens the Supabase image connection early for the LCP photo", () => {
+    const source = readFileSync(path.join(process.cwd(), "app/layout.tsx"), "utf8");
+    expect(source).toContain('preconnect("https://dmtslzwglpezympptqls.supabase.co")');
+  });
 });
 
 describe("campus pages", () => {

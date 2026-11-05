@@ -179,6 +179,9 @@ export default async function ProfessionalBlogPostPage({ params }: Props) {
               sizes="(max-width: 1400px) 100vw, 1400px"
               style={{ objectFit: "cover" }}
               preload
+              // The cover is the page's largest paint; fetch it ahead of the
+              // story gallery and scripts.
+              fetchPriority="high"
               quality={90}
             />
           </div>

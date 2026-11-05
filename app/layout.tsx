@@ -2,7 +2,15 @@ import type { Metadata } from "next";
 import { DEFAULT_SOCIAL_IMAGE, SITE_NAME } from "@/lib/seo/siteMetadata";
 import { DM_Sans } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
+import { preconnect, prefetchDNS } from "react-dom";
 import "./globals.css";
+
+// Every photo on the site comes from Supabase's image endpoint. Opening that
+// connection while the HTML is still parsing takes DNS + TCP + TLS off the
+// hero image's critical path (Lighthouse showed ~0.6-0.9 s of LCP "load
+// delay" that was mostly connection setup). Images are no-cors requests, so
+// no crossOrigin attribute.
+const SUPABASE_ORIGIN = "https://dmtslzwglpezympptqls.supabase.co";
 
 // DM Sans — clean geometric sans, modern and readable
 // This replaces the default Geist font from the boilerplate
@@ -38,6 +46,8 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  preconnect(SUPABASE_ORIGIN);
+  prefetchDNS(SUPABASE_ORIGIN);
   return (
     <html lang="en" className="scroll-smooth" data-scroll-behavior="smooth">
       <body className={`${dmSans.variable} font-sans antialiased`}>

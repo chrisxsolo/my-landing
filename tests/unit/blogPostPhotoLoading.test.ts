@@ -24,6 +24,7 @@ describe("journal post photo loading", () => {
     const eager = images.filter((tag) => !tag.includes('loading="lazy"'));
     expect(eager).toHaveLength(1);
     expect(eager[0]).toContain("cover.jpg");
+    expect(eager[0]).toContain('fetchPriority="high"');
     expect((html.match(/rel="preload"/g) ?? []).length).toBe(1);
   });
 });
