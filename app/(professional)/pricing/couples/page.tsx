@@ -12,6 +12,8 @@ import { getContextualTestimonials } from "@/lib/testimonialsData";
 import { formatCurrency } from "@/lib/pricing";
 import { PRICING_CATALOG, getBookingPolicyItems } from "@/lib/pricingCatalog";
 import { getCouplesPricingPhoto, PRICING_PHOTO_SIZES } from "@/lib/pricingPhotos";
+import JsonLd from "@/app/components/JsonLd";
+import { serviceEntity } from "@/lib/seo/schema";
 
 // Cached/ISR: refreshed at most hourly, or immediately on admin content saves
 // (POST /api/admin/revalidate).
@@ -99,6 +101,15 @@ export default async function CouplesPricingPage() {
 
   return (
     <main className={styles.pricingModern} style={mediaVars}>
+      <JsonLd data={serviceEntity({
+        name: "Couples Photography",
+        description: String(metadata.description),
+        path: "/pricing/couples",
+        serviceType: "Couples photography",
+        offers: Object.values(couplesPricing.packages).map((pkg) => ({
+          name: pkg.label, price: pkg.price, description: pkg.durationLabel,
+        })),
+      })} />
 
       <section className={styles.pricingHeroDark}>
         {heroImage && (

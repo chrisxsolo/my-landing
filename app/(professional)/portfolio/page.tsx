@@ -44,6 +44,8 @@ import PortfolioCtaPair from "@/app/(professional)/portfolio/_components/Portfol
 import styles from "@/app/(professional)/portfolio/Portfolio.module.css";
 import ContentEventBeacon from "@/app/components/ContentEventBeacon";
 import { COUPLES_CATEGORY_SLUG, COUPLES_PORTFOLIO_PATH } from "@/lib/couplesRoutes";
+import JsonLd from "@/app/components/JsonLd";
+import { personRef, webPageEntity } from "@/lib/seo/schema";
 
 // Reading searchParams already renders this page per-request; the data it
 // reads is served from the tagged public-content cache (lib/publicContentCache)
@@ -130,6 +132,17 @@ export default async function PortfolioPage({
   return (
     <main className={styles.portfolioPage}>
       <ContentEventBeacon contentType="portfolio" contentId="portfolio" />
+      <JsonLd data={webPageEntity({
+        type: "CollectionPage", name: String(metadata.title), path: "/portfolio",
+        description: String(metadata.description),
+        mainEntity: {
+          "@type": "ImageGallery",
+          name: "Selected Bay Area photography",
+          associatedMedia: displayImages.slice(0, 24).map((image) => ({
+            "@type": "ImageObject", contentUrl: image.image_url, caption: image.alt, creator: personRef(),
+          })),
+        },
+      })} />
 
       {/* ── HERO ──────────────────────────────────────────────────────────────
            Full-bleed photo background with dark gradient overlay.

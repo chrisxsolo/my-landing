@@ -10,6 +10,7 @@ import Link from "next/link";
 import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
 import { COUPLES_GUIDE_CSS } from "@/lib/couplesGuide/styles";
 import { SUPPORTING_TOPICS, type SupportingTopic } from "@/lib/couplesGuide/supporting";
+import { businessRef, personRef } from "@/lib/seo/schema";
 
 const SITE_URL = "https://www.soloxsnaps.com";
 const COUPLES_CONTACT = "/contact?sessionType=Couples+Session";
@@ -52,9 +53,8 @@ export default function CouplesSupportingArticle({ topic }: { topic: SupportingT
     description: topic.metaDescription,
     mainEntityOfPage: `${SITE_URL}${path}`,
     image: `${SITE_URL}/couples-guide/opengraph-image`,
-    author: { "@type": "Person", name: "Chris Solorzano" },
-    publisher: { "@type": "Organization", name: "SoloXSnaps Photography", url: SITE_URL },
-    dateModified: new Date().toISOString().slice(0, 10),
+    author: personRef(),
+    publisher: businessRef(),
   };
 
   return (

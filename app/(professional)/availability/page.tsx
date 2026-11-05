@@ -31,6 +31,8 @@ import { buildPageMetadata } from "@/lib/seo/siteMetadata";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { todayInClientSessionTimeZone } from "@/lib/clientSessions";
 import AvailabilityCalendar, { type AvailDate } from "./AvailabilityCalendar";
+import JsonLd from "@/app/components/JsonLd";
+import { webPageEntity } from "@/lib/seo/schema";
 
 export const revalidate = 300;
 
@@ -70,6 +72,7 @@ export default async function AvailabilityPage() {
 
   return (
     <main className="avail-page">
+      <JsonLd data={webPageEntity({ type: "WebPage", name: PAGE_TITLE, description: DESCRIPTION, path: "/availability" })} />
       <AvailabilityCalendar initialDates={dates} />
     </main>
   );

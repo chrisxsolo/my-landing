@@ -6,6 +6,8 @@ import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 import ContactClient from "./ContactClient";
 import ContactStyles from "./ContactStyles";
 import { BOOKING_POLICY } from "@/lib/pricingCatalog";
+import JsonLd from "@/app/components/JsonLd";
+import { webPageEntity } from "@/lib/seo/schema";
 
 const PAGE_TITLE = "Book a Bay Area Photography Session";
 const SOCIAL_TITLE = `${PAGE_TITLE} | SoloXSnaps`;
@@ -88,6 +90,7 @@ export default function ContactPage() {
   return (
     <main className="contact-page">
       <ContactStyles />
+      <JsonLd data={webPageEntity({ type: "ContactPage", name: PAGE_TITLE, description: DESCRIPTION, path: "/contact" })} />
       <section className="contact-shell contact-hero">
         <div>
           <p className="contact-kicker">Start the booking note</p>

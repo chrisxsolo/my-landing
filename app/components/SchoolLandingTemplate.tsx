@@ -18,6 +18,8 @@ import { getContextualTestimonials, testimonialMatchesSchool } from "@/lib/testi
 import { getBlogPostSummaries } from "@/lib/professionalData";
 import { detectSchoolLink } from "@/lib/portfolioCategoryContent";
 import type { SchoolSpotsGuide } from "./schoolSpotsGuideTypes";
+import JsonLd from "@/app/components/JsonLd";
+import { serviceEntity } from "@/lib/seo/schema";
 
 // ── TYPES ─────────────────────────────────────────────────────────────────────
 
@@ -134,36 +136,20 @@ export default async function SchoolLandingTemplate({ data }: { data: SchoolLand
       <ContentEventBeacon contentType="school_page" contentId={data.slug} />
       <style>{SCHOOL_LANDING_CSS}</style>
 
-      {/* JSON-LD for local SEO */}
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
-            "@context": "https://schema.org",
-            "@type": "ProfessionalService",
-            name: "soloxsnaps",
-            url: "https://www.soloxsnaps.com",
-            founder: { "@type": "Person", name: "Chris Solorzano" },
-            areaServed: [data.city, "Bay Area", "San Francisco"],
-            serviceType: [`${data.school} graduation photography`],
-            description: data.metaDescription,
-            ...(heroPhoto ? { image: heroPhoto.image_url } : {}),
-          }).replace(/</g, "\\u003c"),
-        }}
-      />
-
-      {/* Breadcrumb JSON-LD */}
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify(
-            buildBreadcrumbJsonLd([
-              { name: "Home", path: "/" },
-              { name: `${data.school} Graduation Photographer`, path: data.canonicalPath },
-            ])
-          ).replace(/</g, "\\u003c"),
-        }}
-      />
+      {/* This campus's service, provided by the one business entity the
+          homepage defines (no second ProfessionalService per campus). */}
+      <JsonLd data={serviceEntity({
+        name: `${data.school} Graduation Photography`,
+        description: data.metaDescription,
+        path: data.canonicalPath,
+        serviceType: "Graduation photography",
+        areaServed: [data.city, "San Francisco Bay Area"],
+        image: heroPhoto?.image_url,
+      })} />
+      <JsonLd data={buildBreadcrumbJsonLd([
+        { name: "Home", path: "/" },
+        { name: `${data.school} Graduation Photographer`, path: data.canonicalPath },
+      ])} />
 
       {/* ── HERO + GALLERY ── real photos from this campus come first, so
            visitors see the work before the planning details. */}

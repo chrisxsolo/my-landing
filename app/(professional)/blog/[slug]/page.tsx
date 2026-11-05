@@ -16,6 +16,8 @@ import { buildBookingIntentParams } from "@/lib/bookingIntent";
 import { inquirySessionTypeFor } from "@/lib/serviceRegistry";
 import type { ServiceType } from "@/lib/contentEngine/taxonomy";
 import ContentEventBeacon from "@/app/components/ContentEventBeacon";
+import { WEBSITE_ID, businessRef, personRef } from "@/lib/seo/schema";
+import { absoluteUrl } from "@/lib/seo/siteMetadata";
 
 // Cached/ISR: rebuilt at most hourly, or immediately on admin post saves
 // (POST /api/admin/revalidate).
@@ -93,14 +95,20 @@ export default async function ProfessionalBlogPostPage({ params }: Props) {
   );
   const inquiryHref = inquiryHrefFor(service);
 
+  const postUrl = absoluteUrl(`/blog/${post.slug}`);
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "BlogPosting",
+    "@id": postUrl,
+    url: postUrl,
+    mainEntityOfPage: postUrl,
     headline: post.title,
+    description: post.meta_description || undefined,
     datePublished: post.published_at,
     image: [post.cover_image_url, ...extraImages].filter(Boolean),
-    author: { "@type": "Person", name: "Chris Solorzano" },
-    publisher: { "@type": "Organization", name: "soloxsnaps" },
+    author: personRef(),
+    publisher: businessRef(),
+    isPartOf: { "@id": WEBSITE_ID },
   };
 
   const breadcrumbLd = buildBreadcrumbJsonLd([
@@ -204,7 +212,8 @@ export default async function ProfessionalBlogPostPage({ params }: Props) {
             lineHeight: 1.7,
             color: "#555",
           }}>
-            Bay Area photography by Chris Solorzano.
+            Photographs and words by{" "}
+            <Link href="/about" rel="author" style={{ color: "#4f6d67" }}>Chris Solorzano</Link>, Bay Area photographer.
           </p>
         </aside>
         <div>

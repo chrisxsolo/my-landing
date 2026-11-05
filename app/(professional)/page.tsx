@@ -23,6 +23,8 @@ import {
 import { getFeaturedTestimonials, pickBalancedTestimonials } from "@/lib/testimonialsData";
 import styles from "@/app/(professional)/home.module.css";
 import pageStyles from "@/app/(professional)/HomePage.module.css";
+import JsonLd from "@/app/components/JsonLd";
+import { siteGraph } from "@/lib/seo/schema";
 
 export const revalidate = 3600;
 
@@ -96,30 +98,11 @@ export default async function ProfessionalHomePage() {
     },
   });
 
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "ProfessionalService",
-    name: "SoloXSnaps Photography",
-    url: "https://www.soloxsnaps.com",
-    image: home.heroPrimary.image_url,
-    founder: { "@type": "Person", name: "Chris Solorzano" },
-    areaServed: ["San Francisco", "Bay Area", "San Jose", "Oakland", "Berkeley"],
-    serviceType: [
-      "Graduation photography",
-      "Couples photography",
-      "Family photography",
-      "Maternity photography",
-      "Portrait photography",
-    ],
-    sameAs: ["https://www.instagram.com/soloxsnaps"],
-  };
-
   return (
     <main className={`${styles.page} ${pageStyles.fullBleed}`} style={COLOR_VARS}>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
-      />
+      {/* The site's entity graph lives here: the business, the photographer,
+          and the website, each with the stable @id every other page cites. */}
+      <JsonLd data={siteGraph(home.heroPrimary.image_url)} />
       <HomeHero slides={home.heroSlides} />
       <HomeServices
         cardGrads={home.cardGrads}

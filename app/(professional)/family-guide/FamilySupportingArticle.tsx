@@ -10,6 +10,7 @@ import Link from "next/link";
 import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
 import { FAMILY_GUIDE_CSS } from "@/lib/familyGuide/styles";
 import { SUPPORTING_TOPICS, type SupportingTopic } from "@/lib/familyGuide/supporting";
+import { businessRef, personRef } from "@/lib/seo/schema";
 
 const SITE_URL = "https://www.soloxsnaps.com";
 const FAMILY_CONTACT = "/contact?sessionType=Family+Session";
@@ -52,9 +53,8 @@ export default function FamilySupportingArticle({ topic }: { topic: SupportingTo
     description: topic.metaDescription,
     mainEntityOfPage: `${SITE_URL}${path}`,
     image: `${SITE_URL}/family-guide/opengraph-image`,
-    author: { "@type": "Person", name: "Chris Solorzano" },
-    publisher: { "@type": "Organization", name: "SoloXSnaps Photography", url: SITE_URL },
-    dateModified: new Date().toISOString().slice(0, 10),
+    author: personRef(),
+    publisher: businessRef(),
   };
 
   return (

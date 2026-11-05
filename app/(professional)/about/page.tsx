@@ -35,6 +35,8 @@ import {
 } from "@/lib/aboutFacts";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { resolveAboutPhotoUrl } from "@/lib/aboutPhotoUrl";
+import JsonLd from "@/app/components/JsonLd";
+import { profileGraph } from "@/lib/seo/schema";
 
 // ISR: photos uploaded in the Darkroom appear within the hour, or immediately
 // via the admin revalidate ping (see /api/admin/revalidate).
@@ -116,6 +118,13 @@ const CSS = `
     line-height: 0.88;
     text-wrap: balance;
     animation: fadeUp 0.65s 0.08s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .about-byline {
+    margin: 18px 0 0;
+    color: #4b5a55;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
   }
   .about-hero-sub {
     margin: 22px 0 0;
@@ -419,6 +428,8 @@ export default async function ProfessionalAboutPage() {
   return (
     <main className="about-page">
       <style>{CSS}</style>
+      {/* ProfilePage whose subject is the photographer entity cited by every post. */}
+      <JsonLd data={profileGraph(portrait)} />
 
       {/* ── HERO ──────────────────────────────────────────────────────────────────
            Light gradient header — airy and clean.
@@ -427,6 +438,7 @@ export default async function ProfessionalAboutPage() {
         <div className="about-shell">
           <p className="about-kicker">About</p>
           <h1 className="about-hero-title">I&rsquo;m Chris.</h1>
+          <p className="about-byline">Chris Solorzano, photographer behind SoloXSnaps</p>
           <p className="about-hero-sub">
             Bay Area graduation and couples photographer. I guide every session so the photos feel natural — even if you hate being in front of the camera.
           </p>

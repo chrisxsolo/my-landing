@@ -10,6 +10,7 @@ import Link from "next/link";
 import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
 import { PORTRAIT_GUIDE_CSS } from "@/lib/portraitGuide/styles";
 import { SUPPORTING_TOPICS, type SupportingTopic } from "@/lib/portraitGuide/supporting";
+import { businessRef, personRef } from "@/lib/seo/schema";
 
 const SITE_URL = "https://www.soloxsnaps.com";
 const PORTRAIT_CONTACT = "/contact?sessionType=Individual+Portrait";
@@ -52,9 +53,8 @@ export default function PortraitSupportingArticle({ topic }: { topic: Supporting
     description: topic.metaDescription,
     mainEntityOfPage: `${SITE_URL}${path}`,
     image: `${SITE_URL}/portrait-guide/opengraph-image`,
-    author: { "@type": "Person", name: "Chris Solorzano" },
-    publisher: { "@type": "Organization", name: "SoloXSnaps Photography", url: SITE_URL },
-    dateModified: new Date().toISOString().slice(0, 10),
+    author: personRef(),
+    publisher: businessRef(),
   };
 
   return (

@@ -28,6 +28,8 @@ import { anim } from "@/lib/proStyles";
 import styles from "@/app/(professional)/pricing/Pricing.module.css";
 import { formatCurrency } from "@/lib/pricing";
 import { PRICING_CATALOG, getBookingPolicyItems } from "@/lib/pricingCatalog";
+import JsonLd from "@/app/components/JsonLd";
+import { serviceEntity } from "@/lib/seo/schema";
 
 // Cached/ISR: refreshed at most hourly, or immediately on admin content saves
 // (POST /api/admin/revalidate).
@@ -103,6 +105,13 @@ export default async function MaternityPricingPage() {
 
   return (
     <main className={styles.pricingModern} style={mediaVars}>
+      <JsonLd data={serviceEntity({
+        name: "Maternity Photography",
+        description: String(metadata.description),
+        path: "/pricing/maternity",
+        serviceType: "Maternity photography",
+        offers: [{ name: maternity.label, price: maternity.price, description: DURATION_LABEL }],
+      })} />
       <section className={styles.pricingHeroDark}>
         {heroImage && (
           <div className={styles.pricingHeroPhoto} aria-hidden="true">

@@ -57,7 +57,8 @@ const visibleText = (html: string) => html.replace(/<[^>]*>/g, " ").replace(/\s+
 const hrefs = (html: string) => [...html.matchAll(/<a [^>]*href="([^"]+)"/g)].map((m) => m[1]);
 // The article column, and everything the page renders below it.
 const afterArticleStart = (html: string) => html.split('class="slug-body-grid"')[1];
-const articleOf = (html: string) => afterArticleStart(html).split("<section")[0];
+// The aside before the article carries the author byline, which is not post content.
+const articleOf = (html: string) => afterArticleStart(html).split("</aside>")[1].split("<section")[0];
 const belowArticle = (html: string) => afterArticleStart(html).slice(afterArticleStart(html).indexOf("<section"));
 
 beforeEach(() => { post.current = null; });

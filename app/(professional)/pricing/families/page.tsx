@@ -28,6 +28,8 @@ import { formatCurrency } from "@/lib/pricing";
 import { PRICING_CATALOG, getBookingPolicyItems } from "@/lib/pricingCatalog";
 import ContextualTestimonials from "@/app/components/ContextualTestimonials";
 import { getContextualTestimonials } from "@/lib/testimonialsData";
+import JsonLd from "@/app/components/JsonLd";
+import { serviceEntity } from "@/lib/seo/schema";
 
 // Cached/ISR: refreshed at most hourly, or immediately on admin content saves
 // (POST /api/admin/revalidate).
@@ -94,6 +96,15 @@ export default async function FamilyPricingPage() {
 
   return (
     <main className={styles.pricingModern} style={mediaVars}>
+      <JsonLd data={serviceEntity({
+        name: "Family Photography",
+        description: String(metadata.description),
+        path: "/pricing/families",
+        serviceType: "Family photography",
+        offers: Object.values(familyPricing.packages).map((pkg) => ({
+          name: pkg.label, price: pkg.price, description: `${pkg.durationMinutes} minute session`,
+        })),
+      })} />
 
       {/* ── DARK PHOTO HERO ───────────────────────────────────────────────────
            Full-bleed photo background with dark gradient overlay + grain texture.

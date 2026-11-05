@@ -10,6 +10,7 @@ import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
 import { getPortfolioData } from "@/lib/professionalData";
 import { getFamilyLocationListing } from "@/lib/locations/guideListings";
 import { familyJournalHasPosts } from "@/lib/familyGuide/journalPosts";
+import { businessRef, personRef } from "@/lib/seo/schema";
 
 // Cached/ISR: refreshed hourly, or immediately on admin content saves
 // (POST /api/admin/revalidate revalidates the root layout).
@@ -59,9 +60,8 @@ export default async function FamilyGuidePage() {
     description: DESCRIPTION,
     mainEntityOfPage: `${SITE_URL}${PATH}`,
     image: `${SITE_URL}${PATH}/opengraph-image`,
-    author: { "@type": "Person", name: "Chris Solorzano" },
-    publisher: { "@type": "Organization", name: "SoloXSnaps Photography", url: SITE_URL },
-    dateModified: new Date().toISOString().slice(0, 10),
+    author: personRef(),
+    publisher: businessRef(),
   };
   const breadcrumbLd = buildBreadcrumbJsonLd([
     { name: "Home", path: "/" },

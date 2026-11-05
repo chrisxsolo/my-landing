@@ -31,6 +31,7 @@ import {
 import CouplesGallery from "./CouplesGallery";
 import CouplesLocationCards from "./CouplesLocationCards";
 import styles from "./CouplesPortfolio.module.css";
+import { WEBSITE_ID, personRef } from "@/lib/seo/schema";
 
 // ISR: refreshed hourly, or immediately when admin saves call /api/admin/revalidate.
 export const revalidate = 3600;
@@ -127,14 +128,15 @@ export default async function CouplesPortfolioPage() {
     name: "Bay Area Couples Photography Portfolio",
     description: DESCRIPTION,
     url: `${SITE_URL}${COUPLES_PORTFOLIO_PATH}`,
-    author: { "@type": "Person", name: "Chris Solorzano" },
+    author: personRef(),
+    isPartOf: { "@id": WEBSITE_ID },
     mainEntity: {
       "@type": "ImageGallery",
       associatedMedia: photos.slice(0, 24).map((photo) => ({
         "@type": "ImageObject",
         contentUrl: photo.image_url,
         caption: photo.alt,
-        creator: { "@type": "Person", name: "Chris Solorzano" },
+        creator: personRef(),
       })),
     },
   };

@@ -8,6 +8,7 @@ import type { Metadata } from "next";
 import { buildPageMetadata } from "@/lib/seo/siteMetadata";
 import GradGuideContent from "./GradGuideContent";
 import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
+import { businessRef, personRef } from "@/lib/seo/schema";
 
 // ISR: the gallery now server-fetches (cached); refresh hourly, sooner on
 // admin revalidate. Previously this page was frozen static + client-fetched.
@@ -36,13 +37,8 @@ export default function GradGuidePage() {
     description: DESCRIPTION,
     mainEntityOfPage: `${SITE_URL}${PATH}`,
     image: `${SITE_URL}${PATH}/opengraph-image`,
-    author: { "@type": "Person", name: "Chris Solorzano" },
-    publisher: {
-      "@type": "Organization",
-      name: "SoloXSnaps Photography",
-      url: SITE_URL,
-    },
-    dateModified: new Date().toISOString().slice(0, 10),
+    author: personRef(),
+    publisher: businessRef(),
   };
   const breadcrumbLd = buildBreadcrumbJsonLd([
     { name: "Home", path: "/" },

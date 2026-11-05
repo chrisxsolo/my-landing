@@ -30,6 +30,8 @@ import ContextualTestimonials from "@/app/components/ContextualTestimonials";
 import { getContextualTestimonials } from "@/lib/testimonialsData";
 import { formatCurrency } from "@/lib/pricing";
 import { BOOKING_POLICY, PRICING_CATALOG, getBookingPolicyItems, graduationGroupTiers } from "@/lib/pricingCatalog";
+import JsonLd from "@/app/components/JsonLd";
+import { serviceEntity } from "@/lib/seo/schema";
 
 // Cached/ISR: refreshed at most hourly, or immediately on admin content saves
 // (POST /api/admin/revalidate).
@@ -117,6 +119,16 @@ export default async function GradPricingPage() {
 
   return (
     <main className={styles.pricingModern} style={mediaVars}>
+      <JsonLd data={serviceEntity({
+        name: "Graduation Photography",
+        description: String(metadata.description),
+        path: "/pricing/grads",
+        serviceType: "Graduation photography",
+        offers: [
+          { name: mini.label, price: mini.price, description: mini.durationLabel },
+          { name: standard.label, price: standard.price, description: standard.durationLabel },
+        ],
+      })} />
       {/* ── DARK PHOTO HERO ───────────────────────────────────────────────────
            Full-bleed photo background with dark gradient overlay + grain texture.
            Same vibe as the portfolio page hero.

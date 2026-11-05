@@ -7,6 +7,7 @@ import { buildPageMetadata } from "@/lib/seo/siteMetadata";
 import HowToPrepareContent from "./HowToPrepareContent";
 import { getGradPrepTips } from "@/lib/gradGuideData";
 import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
+import { businessRef, personRef } from "@/lib/seo/schema";
 
 // ISR: content now server-fetches (cached); refresh hourly, sooner on admin
 // revalidate. Previously this page was frozen static + client-fetched.
@@ -33,8 +34,8 @@ export default async function HowToPreparePage() {
     headline: TITLE,
     description: DESCRIPTION,
     mainEntityOfPage: `${SITE_URL}${PATH}`,
-    author: { "@type": "Person", name: "Chris Solorzano" },
-    publisher: { "@type": "Organization", name: "soloxsnaps" },
+    author: personRef(),
+    publisher: businessRef(),
   };
   const breadcrumbLd = buildBreadcrumbJsonLd([
     { name: "Home", path: "/" },

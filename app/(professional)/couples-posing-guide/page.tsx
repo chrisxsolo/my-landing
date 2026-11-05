@@ -18,6 +18,8 @@ import CouplesPosingGuideClient from "./CouplesPosingGuideClient";
 import ContextualTestimonials from "@/app/components/ContextualTestimonials";
 import { getContextualTestimonials } from "@/lib/testimonialsData";
 import styles from "./couplesPosingGuide.module.css";
+import JsonLd from "@/app/components/JsonLd";
+import { webPageEntity } from "@/lib/seo/schema";
 
 export const dynamic = "force-dynamic";
 
@@ -112,6 +114,10 @@ export default async function CouplesPosingGuidePage({ searchParams }: PageProps
 
   return (
     <main className={styles.page} style={guideStyle()}>
+      <JsonLd data={webPageEntity({
+        type: "WebPage", name: "Couples Posing Guide", path: "/couples-posing-guide",
+        description: String(metadata.description),
+      })} />
       <CouplesPosingGuideClient
         mode={displayMode}
         isAdmin={isAdmin}

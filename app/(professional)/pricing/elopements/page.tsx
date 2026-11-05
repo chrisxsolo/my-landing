@@ -24,6 +24,8 @@ import { anim } from "@/lib/proStyles";
 import styles from "@/app/(professional)/pricing/Pricing.module.css";
 import { formatCurrency } from "@/lib/pricing";
 import { PRICING_CATALOG, getBookingPolicyItems } from "@/lib/pricingCatalog";
+import JsonLd from "@/app/components/JsonLd";
+import { serviceEntity } from "@/lib/seo/schema";
 
 // Cached/ISR: refreshed at most hourly, or immediately on admin content saves
 // (POST /api/admin/revalidate).
@@ -96,6 +98,14 @@ export default async function ElopementPricingPage() {
 
   return (
     <main className={styles.pricingModern} style={mediaVars}>
+      <JsonLd data={serviceEntity({
+        name: "Elopement & Courthouse Wedding Photography",
+        description: String(metadata.description),
+        path: "/pricing/elopements",
+        serviceType: "Elopement photography",
+        // The catalog prices elopements from a floor, so the offer is the starting price.
+        offers: [{ name: `Elopement coverage, starting at`, price: elopementPricing.startingPrice, description: elopementPricing.durationLabel }],
+      })} />
 
       <section className={styles.pricingHeroDark}>
         {heroImage && (

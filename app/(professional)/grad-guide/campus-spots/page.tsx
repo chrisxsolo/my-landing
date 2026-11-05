@@ -9,6 +9,7 @@ import { getLocationSpots } from "@/lib/gradGuideData";
 import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
 import { withGuideCampusSpots } from "./guideSpots";
 import { withAutoFilledCampusSpots } from "@/lib/campusSpotFill/publicSpots";
+import { businessRef, personRef } from "@/lib/seo/schema";
 
 // ISR: content now server-fetches (cached); refresh hourly, sooner on admin
 // revalidate. Previously this page was frozen static + client-fetched.
@@ -37,8 +38,8 @@ export default async function CampusSpotsPage() {
     headline: TITLE,
     description: DESCRIPTION,
     mainEntityOfPage: `${SITE_URL}${PATH}`,
-    author: { "@type": "Person", name: "Chris Solorzano" },
-    publisher: { "@type": "Organization", name: "soloxsnaps" },
+    author: personRef(),
+    publisher: businessRef(),
   };
   const breadcrumbLd = buildBreadcrumbJsonLd([
     { name: "Home", path: "/" },

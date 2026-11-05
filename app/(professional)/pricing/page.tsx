@@ -13,6 +13,8 @@ import { PRICING_CATALOG } from "@/lib/pricingCatalog";
 import { getPricingCardPhotos, PRICING_PHOTO_SIZES } from "@/lib/pricingPhotos";
 import { PUBLIC_SERVICES } from "@/lib/serviceRegistry";
 import styles from "@/app/(professional)/pricing/Pricing.module.css";
+import JsonLd from "@/app/components/JsonLd";
+import { webPageEntity } from "@/lib/seo/schema";
 
 const graduationPricing = PRICING_CATALOG.graduation;
 const familyPricing = PRICING_CATALOG.families;
@@ -89,6 +91,10 @@ export default async function RatesPage() {
 
   return (
     <main className={styles.ratesRoot}>
+      <JsonLd data={webPageEntity({
+        type: "CollectionPage", name: String(metadata.title), path: "/pricing",
+        description: String(metadata.description),
+      })} />
       {/* ── PAGE HEADER ───────────────────────────────────────────────────────── */}
       <section className={styles.ratesShell}>
         <div className={styles.ratesHeader}>

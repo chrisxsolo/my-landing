@@ -10,6 +10,7 @@ import CouplesGuideContent from "./CouplesGuideContent";
 import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
 import { getCouplesPortfolio, type CouplesPortfolioPhoto } from "@/lib/couplesPortfolio";
 import { getFeaturedCouplesLocations } from "@/lib/couplesGuide/featuredLocations";
+import { businessRef, personRef } from "@/lib/seo/schema";
 
 // Cached/ISR: refreshed hourly, or immediately on admin content saves
 // (POST /api/admin/revalidate revalidates the root layout).
@@ -68,10 +69,9 @@ export default async function CouplesGuidePage() {
     description: DESCRIPTION,
     mainEntityOfPage: `${SITE_URL}${PATH}`,
     image: hero ? [hero.image_url] : `${SITE_URL}${PATH}/opengraph-image`,
-    author: { "@type": "Person", name: "Chris Solorzano" },
-    publisher: { "@type": "Organization", name: "SoloXSnaps Photography", url: SITE_URL },
+    author: personRef(),
+    publisher: businessRef(),
     about: { "@type": "Service", name: "Couples photography", areaServed: "San Francisco Bay Area" },
-    dateModified: new Date().toISOString().slice(0, 10),
   };
   const breadcrumbLd = buildBreadcrumbJsonLd([
     { name: "Home", path: "/" },

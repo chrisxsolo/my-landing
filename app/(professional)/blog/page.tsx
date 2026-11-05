@@ -11,6 +11,8 @@ import BlogIndex from "./BlogIndex";
 import type { BlogIndexPost } from "./BlogPostCards";
 import { BLOG_INDEX_CSS } from "./blogIndexStyles";
 import { BLOG_FILTER_CSS } from "./blogFilterStyles";
+import JsonLd from "@/app/components/JsonLd";
+import { webPageEntity } from "@/lib/seo/schema";
 
 // Cached/ISR: rebuilt at most hourly, or immediately when the admin saves a
 // post (POST /api/admin/revalidate). Category/sort filters run client-side and
@@ -59,6 +61,10 @@ export default async function ProfessionalBlogPage() {
   return (
     <main className="blog-page">
       <style>{BLOG_INDEX_CSS + BLOG_FILTER_CSS}</style>
+      <JsonLd data={webPageEntity({
+        type: "Blog", name: "SoloXSnaps Journal", path: "/blog",
+        description: String(metadata.description),
+      })} />
 
       {/* ── HERO ─────────────────────────────────────────────────────────── */}
       <section className="blog-hero">

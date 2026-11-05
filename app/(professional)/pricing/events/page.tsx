@@ -22,6 +22,8 @@ import { anim } from "@/lib/proStyles";
 import styles from "@/app/(professional)/pricing/Pricing.module.css";
 import { formatCurrency } from "@/lib/pricing";
 import { PRICING_CATALOG, getBookingPolicyItems } from "@/lib/pricingCatalog";
+import JsonLd from "@/app/components/JsonLd";
+import { serviceEntity } from "@/lib/seo/schema";
 
 // Cached/ISR: refreshed at most hourly, or immediately on admin content saves
 // (POST /api/admin/revalidate).
@@ -93,6 +95,16 @@ export default async function EventPricingPage() {
 
   return (
     <main className={styles.pricingModern} style={mediaVars}>
+      <JsonLd data={serviceEntity({
+        name: "Event Photography",
+        description: String(metadata.description),
+        path: "/pricing/events",
+        serviceType: "Event photography",
+        offers: [
+          { name: "Small event coverage", price: eventPricing.smallEvent.hourlyRate, unitText: "hour", description: `${eventPricing.smallEvent.minimumHours}-hour minimum` },
+          { name: "Half-day coverage", price: eventPricing.largeEvent.halfDayPrice, description: `Up to ${eventPricing.largeEvent.halfDayHours} hours` },
+        ],
+      })} />
 
       {/* ── DARK PHOTO HERO ─────────────────────────────────────────────────── */}
       <section
