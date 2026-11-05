@@ -1,16 +1,59 @@
 import type { NextConfig } from "next";
 
+const SUPABASE_ORIGIN = "https://dmtslzwglpezympptqls.supabase.co";
+
+// Content-Security-Policy, built from an inventory of what the browser loads:
+// - scripts: Next's own bundles plus its inline hydration scripts, which need
+//   'unsafe-inline' because the public pages are statically rendered (a
+//   per-request nonce would force dynamic rendering and lose ISR); Vercel
+//   Analytics loads from /_vercel/insights on Vercel and from
+//   va.vercel-scripts.com in development; 'unsafe-eval' only in development,
+//   where React uses eval to rebuild server error stacks.
+// - styles: inline <style> blocks on most pages, and Google Fonts stylesheets
+//   in the admin and client portal (next/font self-hosts the public site's).
+// - images: Supabase transforms, blob previews in the admin, data: SVG
+//   backgrounds, and admin email previews that embed any https image.
+// - connections: the browser Supabase client (REST, auth, storage, realtime),
+//   analytics beacons, and the sunrise API the admin conversation page calls.
+// - forms/navigation: inquiry forms post to this origin; Google sign-in goes
+//   through Supabase auth and accounts.google.com.
+// Report-Only first; CSP_MODE flips to "enforce" once production shows no
+// violations on the public pages, sign-in, and the admin.
+type CspMode = "report-only" | "enforce";
+const CSP_MODE = "report-only" as CspMode;
+
+export function buildContentSecurityPolicy({ dev = false, enforce = CSP_MODE === "enforce" }: { dev?: boolean; enforce?: boolean } = {}): string {
+  return [
+    "default-src 'self'",
+    `script-src 'self' 'unsafe-inline'${dev ? " 'unsafe-eval'" : ""} https://va.vercel-scripts.com`,
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "font-src 'self' data: https://fonts.gstatic.com",
+    "img-src 'self' data: blob: https:",
+    `connect-src 'self' ${SUPABASE_ORIGIN} ${SUPABASE_ORIGIN.replace("https://", "wss://")} https://va.vercel-scripts.com https://api.sunrise-sunset.org`,
+    "frame-src 'self'",
+    "frame-ancestors 'self'",
+    "object-src 'none'",
+    "base-uri 'self'",
+    `form-action 'self' ${SUPABASE_ORIGIN} https://accounts.google.com`,
+    "worker-src 'self' blob:",
+    "media-src 'self' https:",
+    "manifest-src 'self'",
+    // Browsers ignore (and log) this directive in a report-only policy.
+    ...(enforce ? ["upgrade-insecure-requests"] : []),
+  ].join("; ");
+}
+
+export const CSP_HEADER_NAME = CSP_MODE === "enforce" ? "Content-Security-Policy" : "Content-Security-Policy-Report-Only";
+
 // Response headers for every route. Hardening rather than ranking: browsers
 // stop sniffing content types, the site cannot be framed by other origins,
 // referrers shrink to the origin off-site, and unused device APIs are off.
-// No Content-Security-Policy yet: inline styles, Supabase images, Vercel
-// Analytics, Google Fonts, and Google OAuth each need an audited allowlist
-// before one can ship without breaking image delivery or sign-in.
 export const SECURITY_HEADERS = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "X-Frame-Options", value: "SAMEORIGIN" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+  { key: CSP_HEADER_NAME, value: buildContentSecurityPolicy({ dev: process.env.NODE_ENV === "development" }) },
 ];
 
 const nextConfig: NextConfig = {
