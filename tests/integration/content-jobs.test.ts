@@ -3,7 +3,7 @@ import sharp from "sharp";
 import { service, resetDb, createTestSession, createPackage } from "./helpers";
 import { finalizeUpload } from "@/lib/contentEngine/finalizeUpload";
 import { ORIGINALS_BUCKET, issueUploadPath } from "@/lib/contentEngine/uploadConfig";
-import { runWorkerOnce, JOB_COLUMNS, type ContentEngineJob } from "@/lib/contentEngine/jobRunner";
+import { runWorkerOnce, JOB_COLUMNS, JOB_LEASE_SECONDS, type ContentEngineJob } from "@/lib/contentEngine/jobRunner";
 import type { ModelCaller } from "@/lib/contentEngine/aiClient";
 
 beforeAll(() => resetDb());
@@ -435,6 +435,66 @@ describe("runWorkerOnce", () => {
     const result = await runWorkerOnce({ client: service, callModel: tracking });
     expect(result.status).toBe("succeeded");
     expect(peak).toBe(2);
+  });
+
+  it("waits for a type another owner holds instead of marking the run succeeded, then finishes once it is recorded", async () => {
+    const { sessionId, packageId } = await seedSession(["internal_link_suggestion", "portfolio_pick"]);
+    const { job_id } = await enqueue(sessionId);
+    // The job is already at generation; a manual Generate click holds one type.
+    await service.from("content_engine_jobs")
+      .update({ phase: "generate", package_id: packageId, types_total: 2 }).eq("id", job_id);
+    const { data: claimed } = await service.rpc("claim_generation_type", {
+      p_package_id: packageId, p_content_type: "portfolio_pick", p_lease_seconds: 300,
+    });
+    expect(claimed).toBe(true);
+
+    // Injected clock: every wait advances it, so the budget runs out without real sleeping.
+    let now = Date.now();
+    const sleeps: number[] = [];
+    const first = await runWorkerOnce({
+      client: service, callModel: fakeModel().caller,
+      budgetMs: 12_000, now: () => now, sleep: async (ms) => { sleeps.push(ms); now += ms; },
+    });
+    expect(first.status).toBe("queued");
+    expect(first.handedOff).toBe(true);
+    expect(sleeps).toContain(5_000);
+
+    const waiting = await jobRow(job_id);
+    expect(waiting.status).toBe("queued");
+    expect(waiting.phase).toBe("generate");
+    expect(waiting.steps_run).toBeLessThanOrEqual(1); // the waits did not count as steps
+    const { data: pkg } = await service.from("session_content_packages")
+      .select("generation_settings").eq("id", packageId).single();
+    expect(pkg!.generation_settings.progress.internal_link_suggestion.status).toBe("completed");
+    expect(pkg!.generation_settings.progress.portfolio_pick.status).toBe("processing");
+
+    // The other owner records its result; the next invocation finishes normally.
+    const { error } = await service.rpc("record_generation_result", {
+      p_package_id: packageId, p_content_type: "portfolio_pick",
+      p_outcome: "completed", p_error: null, p_usage: { model: "fake", input_tokens: 1, output_tokens: 1 },
+    });
+    expect(error).toBeNull();
+    const second = await runWorkerOnce({ client: service, callModel: fakeModel().caller });
+    expect(second.status).toBe("succeeded");
+    const done = await jobRow(job_id);
+    expect(done.status).toBe("succeeded");
+    expect(done.types_done).toBe(2);
+    expect(done.attempts).toBe(0);
+  });
+
+  it("claims the job with a lease that outlives a full-length generation, so a slow wave cannot be stolen", async () => {
+    const { sessionId } = await seedSession();
+    const { job_id } = await enqueue(sessionId);
+    const result = await runWorkerOnce({ client: service, callModel: fakeModel().caller });
+    expect(result.status).toBe("succeeded");
+    // Replay the claim on a fresh queued row to read the lease the runner asks for.
+    await service.from("content_engine_jobs")
+      .update({ status: "queued", finished_at: null }).eq("id", job_id);
+    const before = Date.now();
+    const { data } = await service.rpc("claim_content_engine_job", { p_lease_seconds: JOB_LEASE_SECONDS, p_max_attempts: 5 });
+    const row = (data as ContentEngineJob[])[0];
+    expect(row.id).toBe(job_id);
+    expect(new Date(row.lease_expires_at!).getTime() - before).toBeGreaterThan(270_000);
   });
 
   it("retries a run whose step threw instead of failing it outright", async () => {

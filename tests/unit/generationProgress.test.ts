@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  GENERATION_ORDER, journalReady, nextGenerationWave, pendingGenerationTypesFrom,
+  GENERATION_ORDER, allGenerationSettled, journalReady, nextGenerationWave, pendingGenerationTypesFrom,
   settledGenerationCount, MAX_TYPE_ATTEMPTS_PER_RUN,
   type GenerationProgressMap,
 } from "@/lib/contentEngine/generationProgress";
@@ -109,12 +109,35 @@ describe("nextGenerationWave", () => {
     expect(nextGenerationWave(ALL, map)).toEqual([]);
   });
 
-  it("passes over types the caller is already handling", () => {
+  it("holds the journal post while an input is processing under someone else's live claim", () => {
     const map = progress({
-      internal_link_suggestion: ["pending"], portfolio_pick: ["pending"],
+      internal_link_suggestion: ["processing"], testimonial_feature: ["completed"], journal_post: ["pending"],
     });
-    expect(nextGenerationWave(ALL, map, { skip: new Set(["internal_link_suggestion"]) }))
-      .toEqual(["portfolio_pick"]);
+    expect(journalReady(ALL, map)).toBe(false);
+    expect(nextGenerationWave(ALL, map)).toEqual(["internal_link_suggestion"]);
+  });
+});
+
+describe("allGenerationSettled", () => {
+  it("is true only when every selected type is completed, skipped, or failed past its attempts", () => {
+    expect(allGenerationSettled(ALL, progress({ journal_post: ["completed"], portfolio_pick: ["skipped"] }))).toBe(true);
+    expect(allGenerationSettled(ALL, progress({ journal_post: ["completed"], portfolio_pick: ["failed", MAX_TYPE_ATTEMPTS_PER_RUN] }))).toBe(true);
+    expect(allGenerationSettled(ALL, progress({ journal_post: ["completed"], portfolio_pick: ["failed", 1] }))).toBe(false);
+    expect(allGenerationSettled(ALL, progress({ journal_post: ["completed"], portfolio_pick: ["pending"] }))).toBe(false);
+  });
+
+  it("never calls a processing type settled, live or stalled", () => {
+    expect(allGenerationSettled(ALL, progress({ portfolio_pick: ["processing"] }))).toBe(false);
+  });
+
+  it("is the complement of an empty wave, so an empty wave never hides unfinished work", () => {
+    for (const map of [
+      progress({ journal_post: ["processing"], portfolio_pick: ["completed"] }),
+      progress({ journal_post: ["pending"], internal_link_suggestion: ["processing"] }),
+      progress({ guide_photo: ["failed", 9], journal_post: ["failed", 9] }),
+    ]) {
+      expect(nextGenerationWave(ALL, map).length === 0).toBe(allGenerationSettled(ALL, map));
+    }
   });
 });
 

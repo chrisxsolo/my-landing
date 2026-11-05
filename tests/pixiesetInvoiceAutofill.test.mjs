@@ -319,5 +319,5 @@ test("the manifest loads every invoice module and was bumped", () => {
   for (const file of ["invoiceSelection.js", "invoicePreview.js", "invoiceFill.js", "domHelpers.js", "content.js"]) {
     assert.ok(scripts.includes(file), `${file} is loaded`);
   }
-  assert.notEqual(manifest.version, "1.0.3");
+  assert.equal(manifest.version, "1.1.1");
 });

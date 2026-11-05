@@ -29,6 +29,18 @@ export const GENERATION_DEADLINE_MS = 240_000;
  */
 export const GENERATION_LEASE_SECONDS = 300;
 
+/**
+ * How long a worker's claim on the OUTER job lasts between renewals. Never
+ * shorter than the longest invocation that could still write job progress
+ * (the worker route's maxDuration, which is also the generate route's), so a
+ * second worker can never steal a job whose first worker is still generating
+ * and mark it finished over that worker's head.
+ */
+export const JOB_LEASE_SECONDS = GENERATE_ROUTE_MAX_DURATION_SECONDS;
+
+/** How often a long step renews the job lease (and notices a cancel). */
+export const HEARTBEAT_MS = 10_000;
+
 /** Below this much time left, a model call is not started: fail fast, retryable. */
 export const MIN_MODEL_CALL_MS = 10_000;
 

@@ -97,23 +97,36 @@ export function retryableGenerationTypesFrom(
 }
 
 export interface NextTypeOptions {
-  /** Types to pass over for now — e.g. a type another worker or tab holds. */
-  skip?: ReadonlySet<string>;
   maxAttempts?: number;
 }
 
-/** Pending types a worker may attempt now, in generation order. */
+/**
+ * Non-terminal types the run still owes, in generation order. A type that
+ * burned its attempts is passed over so one failing type can never stall the
+ * rest of the run (the run finishes with a soft error naming it). A type held
+ * by someone else's live claim is NOT passed over: its claim answers 409 and
+ * the worker waits for the owner, because only a terminal record settles it.
+ */
 function attemptableTypes(
   selectedTypes: readonly string[], progress: GenerationProgressMap, options: NextTypeOptions,
 ): string[] {
-  const { skip, maxAttempts = MAX_TYPE_ATTEMPTS_PER_RUN } = options;
+  const { maxAttempts = MAX_TYPE_ATTEMPTS_PER_RUN } = options;
   return pendingGenerationTypesFrom(selectedTypes, progress).filter((type) => {
-    if (skip?.has(type)) return false;
     const entry = progress[type];
-    // Types that already burned their attempts are passed over so one failing
-    // type can never stall the rest of the run.
     return !(entry?.status === "failed" && (entry.attempt ?? 0) >= maxAttempts);
   });
+}
+
+/**
+ * Whether generation is over for this package: every selected type is
+ * completed or skipped, or failed past its attempts. False while any type is
+ * pending or processing — live or stalled — however it got there, so a run
+ * can never be marked succeeded over work someone else is still doing.
+ */
+export function allGenerationSettled(
+  selectedTypes: readonly string[], progress: GenerationProgressMap, options: NextTypeOptions = {},
+): boolean {
+  return attemptableTypes(selectedTypes, progress, options).length === 0;
 }
 
 // The journal post weaves in the link and testimonial drafts of its package

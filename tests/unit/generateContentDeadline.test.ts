@@ -32,7 +32,7 @@ const { generateContentType } = await import("@/lib/contentEngine/generateConten
 
 interface RpcCall { name: string; params: Record<string, unknown> }
 
-function fakeClient(rpcCalls: RpcCall[]) {
+function fakeClient(rpcCalls: RpcCall[], lookup: "ok" | "error" | "reject" = "ok") {
   return {
     rpc: async (name: string, params: Record<string, unknown>) => {
       rpcCalls.push({ name, params });
@@ -43,14 +43,18 @@ function fakeClient(rpcCalls: RpcCall[]) {
     from: () => ({
       select: () => ({
         eq: () => ({
-          single: async () => ({
+          single: async () => {
+            if (lookup === "reject") throw new Error("socket hang up");
+            if (lookup === "error") return { data: null, error: { message: "connection reset" } };
+            return {
             data: {
               photography_session_id: SESSION, model_name: "claude-sonnet-4-6",
               session_facts_snapshot: { service_type: "grads", school_slug: null, primary_location: null },
               generation_settings: {},
             },
             error: null,
-          }),
+          };
+          },
         }),
       }),
     }),
@@ -145,5 +149,38 @@ describe("generateContentType under a deadline", () => {
     expect(result.outcome).toBe("failed");
     expect(result.failure).toEqual({ kind: "timeout", retryable: true });
     expect(modelCalls).toHaveLength(0);
+  });
+
+  it.each(["error", "reject"] as const)("a package lookup %s after the claim records the type failed instead of leaving it processing", async (lookup) => {
+    const callModel: ModelCaller = async (req) => {
+      modelCalls.push(req);
+      return { text: "{}", usage: { input_tokens: 1, output_tokens: 1 }, model: req.model };
+    };
+    const result = await generateContentType({
+      client: fakeClient(rpcCalls, lookup), callModel, packageId: PACKAGE, contentType: "internal_link_suggestion",
+      deadlineAt: 1_000_000 + GENERATION_DEADLINE_MS, now: () => 1_000_000,
+    });
+    expect(result.outcome).toBe("failed");
+    expect(result.error).toMatch(/package lookup failed|socket hang up/);
+    expect(modelCalls).toHaveLength(0);
+    expect(rpcCalls.map((c) => c.name)).toEqual(["claim_generation_type", "record_generation_result"]);
+    expect(rpcCalls[1].params).toMatchObject({ p_outcome: "failed" });
+  });
+
+  it("says so when the failure itself could not be recorded, rather than calling the type terminal", async () => {
+    const client = {
+      ...fakeClient(rpcCalls, "reject"),
+      rpc: async (name: string, params: Record<string, unknown>) => {
+        rpcCalls.push({ name, params });
+        if (name === "claim_generation_type") return { data: true, error: null };
+        return { data: null, error: { message: "db down" } };
+      },
+    } as unknown as Parameters<typeof generateContentType>[0]["client"];
+    const result = await generateContentType({
+      client, callModel: async () => { throw new Error("never"); }, packageId: PACKAGE, contentType: "internal_link_suggestion",
+      deadlineAt: 1_000_000 + GENERATION_DEADLINE_MS, now: () => 1_000_000,
+    });
+    expect(result.outcome).toBe("failed");
+    expect(result.unrecorded).toBe(true);
   });
 });

@@ -406,6 +406,44 @@ describe("runLearnReview: persistence is reported, never assumed", () => {
     expect(second.candidates[0].intake.verdict).toBe("duplicate");
   });
 
+  it("reports persist_failed when the rule store rejects before any write, with no pending rows claimed", async () => {
+    const d = deps({ insertRule: async () => { throw new Error("connection reset"); } });
+    const result = await runLearnReview(input, d);
+    expect(result.outcome).toBe("persist_failed");
+    expect(result.failure?.code).toBe("rules_write");
+    expect(result.pending).toEqual([]);
+    expect(result.edits.length).toBeGreaterThan(0);
+    expect(result.candidates.map((c) => c.rule)).toEqual(["Keep the opening to a short thanks"]);
+    expect(result.message).toMatch(/could not be saved/i);
+  });
+
+  it("returns only the row really written when one insert succeeds and another rejects, and a retry does not duplicate it", async () => {
+    const stored: WritingRule[] = [];
+    let rejectSecond = true;
+    const d = deps({
+      call: fakeCaller("- Keep the opening to a short thanks\n- Close with one clear next step"),
+      fetchRules: async () => stored,
+      insertRule: async (i) => {
+        if (rejectSecond && /next step/.test(i.rule)) throw new Error("timeout");
+        const r = rule(i.rule, { id: `id-${stored.length + 1}`, status: "pending" });
+        stored.push(r);
+        return r;
+      },
+    });
+    const first = await runLearnReview(input, d);
+    expect(first.outcome).toBe("persist_failed");
+    expect(first.pending.map((p) => p.rule)).toEqual(["Keep the opening to a short thanks"]);
+    expect(first.message).toMatch(/Saved 1 of 2/);
+    expect(stored).toHaveLength(1);
+
+    rejectSecond = false;
+    const second = await runLearnReview(input, d);
+    expect(second.outcome).toBe("rules_pending");
+    expect(second.pending.map((p) => p.rule)).toEqual(["Close with one clear next step"]);
+    expect(stored.map((r) => r.rule)).toEqual(["Keep the opening to a short thanks", "Close with one clear next step"]);
+    expect(second.candidates.map((c) => c.intake.verdict)).toEqual(["duplicate", "new"]);
+  });
+
   it("returns the edits with a configuration failure when no model is available", async () => {
     const result = await runLearnReview(input, deps({ call: null }));
     expect(result.outcome).toBe("phrasing_failed");

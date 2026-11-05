@@ -13,7 +13,10 @@ function buildContractPreview(inq, price) {
     ["REMAINING",        fmt(price.remaining)],
     ["FINAL_DATE",       inq._sessionDate || inq.date_in_mind || "TBD"],
   ];
-  return rows.map(([k, v]) => `
+  const hint = price.reviewHint
+    ? `<div class="sxs-field-row sxs-warning sxs-price-hint">${esc(price.reviewHint)}</div>`
+    : "";
+  return hint + rows.map(([k, v]) => `
     <div class="sxs-field-row">
       <span class="sxs-field-label">[${k}]</span>
       <input class="sxs-field-input" data-key="${k}" value="${esc(v)}" spellcheck="false" />

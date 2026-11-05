@@ -80,10 +80,15 @@ function formatSessionDate(raw) {
 
 // ── PRICING (mirrors lib/pricingCatalog.ts) ──────────────────────────────────
 // Graduation is two individual packages, not an hourly rate: the 30-minute
-// mini and the 60-minute session. The contract preview defaults to the
-// 60-minute package; a price agreed in the email thread always wins.
+// mini and the 60-minute session. The contract preview fills the package the
+// inquiry names (detectGradDurationMinutes) and leaves the price unresolved
+// when one graduate named none, exactly as the server does; a price agreed in
+// the email thread always wins.
 // tests/unit/pricingConsistency.test.ts fails if these drift from the site.
 const GRAD_PACKAGE_PRICES = { mini: 325, standard: 425 };
+const GRAD_PACKAGE_MINUTES = { mini: 30, standard: 60 };
+// Each 30 minutes past the hour for one graduate (lib/pricing.ts extraTimeCharge).
+const ADDON_EXTRA_30_MIN = 100;
 // Per graduate. The rate covers the group's included time (60 min for two,
 // 90 min for three or more). Nine or more graduates: no automatic price.
 const GROUP_RATES_PER_PERSON = { 2: 350, 3: 325, 4: 300, 5: 275, 6: 250, 7: 250, 8: 250 };
@@ -137,19 +142,109 @@ function detectServiceType(inq) {
   return "graduation";
 }
 
+// ── DURATION PARSER (mirrors lib/pricing.ts detectGraduationDurationMinutes) ──
+// Content scripts cannot import TypeScript, so this is the same parser in plain
+// JS; tests/unit/graduationDurationParser.test.ts runs both on the same cases.
+const HOURS_WORD = { a: 1, an: 1, one: 1, full: 1, two: 2, three: 3 };
+const MINUTES_WORD = { thirty: 30, forty: 40, sixty: 60, ninety: 90 };
+const HOUR_RE = String.raw`(?:hours?|hrs?)`;
+const MINUTE_RE = String.raw`(?:minutes?|mins?)`;
+const HOUR_COUNT_RE = String.raw`(\d+(?:\.\d+)?|one|two|three|full|an?)`;
+const MINUTE_COUNT_RE = String.raw`(\d+|thirty|forty|sixty|ninety)`;
+const hoursOf = raw => HOURS_WORD[raw] ?? Number(raw);
+const minutesOfWord = raw => MINUTES_WORD[raw] ?? Number(raw);
+
+// Compound forms first, so "1 hour 30 minutes" is one 90-minute phrase.
+const DURATION_PATTERNS = [
+  { re: new RegExp(String.raw`\b${HOUR_COUNT_RE}\s*-?\s*${HOUR_RE}\s*(?:and|plus|&|\+)?\s*${MINUTE_COUNT_RE}\s*-?\s*${MINUTE_RE}\b`, "y"),
+    minutes: m => hoursOf(m[1]) * 60 + minutesOfWord(m[2]) },
+  { re: new RegExp(String.raw`\b(?:(?:an?|one|1)\s+)?${HOUR_RE}\s+and\s+a\s+half\b`, "y"), minutes: () => 90 },
+  { re: new RegExp(String.raw`\b(?:one|1)\s*(?:and\s+a\s+half|1/2|½)\s*${HOUR_RE}\b`, "y"), minutes: () => 90 },
+  { re: new RegExp(String.raw`\bhalf\s*(?:an?\s*)?(?:hour|hr)\b`, "y"), minutes: () => 30 },
+  { re: new RegExp(String.raw`\b${HOUR_COUNT_RE}\s*-?\s*${HOUR_RE}\b`, "y"), minutes: m => Math.round(hoursOf(m[1]) * 60) },
+  { re: new RegExp(String.raw`\b${MINUTE_COUNT_RE}\s*-?\s*${MINUTE_RE}\b`, "y"), minutes: m => minutesOfWord(m[1]) },
+  { re: /\bmini\b/y, minutes: () => GRAD_PACKAGE_MINUTES.mini },
+];
+const SESSION_WORDS = /\b(?:sessions?|length|coverage|package|shoot|photoshoot|book(?:ing)?|mini|photos?|portraits?|slot)\b/g;
+const UNRELATED_WORDS = /\b(?:deliver(?:y|ed|ing|s)?|turnaround|gallery|edits?|editing|reply|respond|within|early|late|before|after|ahead|prior|arrive|arrival|drive|driving|away|commute|notice|days?|weeks?)\b/g;
+
+function durationMentions(clause) {
+  const found = [];
+  let at = 0;
+  while (at < clause.length) {
+    const hit = DURATION_PATTERNS.map(p => { p.re.lastIndex = at; return { p, m: p.re.exec(clause) }; }).find(x => x.m);
+    if (hit) {
+      found.push({ minutes: hit.p.minutes(hit.m), start: at, end: at + hit.m[0].length });
+      at += Math.max(1, hit.m[0].length);
+    } else {
+      at += 1;
+    }
+  }
+  return found;
+}
+
+function nearestDistance(clause, mention, words) {
+  let best = Infinity;
+  for (const m of clause.matchAll(words)) {
+    const wordStart = m.index, wordEnd = wordStart + m[0].length;
+    if (wordEnd <= mention.start) best = Math.min(best, mention.start - wordEnd);
+    else if (wordStart >= mention.end) best = Math.min(best, wordStart - mention.end);
+    else best = 0;
+  }
+  return best;
+}
+
+function classifyMention(clause, mention) {
+  const tied = nearestDistance(clause, mention, SESSION_WORDS);
+  const unrelated = nearestDistance(clause, mention, UNRELATED_WORDS);
+  if (tied === Infinity && unrelated === Infinity) return "neutral";
+  return tied <= unrelated ? "tied" : "unrelated";
+}
+
+// The length the inquiry names in minutes, or null when it names none or two
+// that disagree. Session wording outranks delivery/availability spans.
+function detectGradDurationMinutes(text) {
+  const found = [];
+  for (const clause of String(text ?? "").toLowerCase().split(/[!?;\n]+|\.(?!\d)/)) {
+    for (const mention of durationMentions(clause)) found.push({ minutes: mention.minutes, kind: classifyMention(clause, mention) });
+  }
+  const tied = found.filter(f => f.kind === "tied");
+  const counted = tied.length ? tied : found.filter(f => f.kind === "neutral");
+  const distinct = [...new Set(counted.map(f => f.minutes))];
+  return distinct.length === 1 ? distinct[0] : null;
+}
+
+// One graduate's session price from the length the inquiry names (mirrors
+// lib/pricing.ts graduationSessionPrice for one person), or null when no
+// package was chosen: the preview then asks instead of picking the hour.
+function individualGradPrice(inquiry) {
+  const minutes = detectGradDurationMinutes(`${inquiry.session_type || ""} ${inquiry.message || ""}`);
+  if (minutes === null) return null;
+  if (minutes <= GRAD_PACKAGE_MINUTES.mini) return GRAD_PACKAGE_PRICES.mini;
+  const extraHalfHours = Math.max(0, Math.ceil((minutes - GRAD_PACKAGE_MINUTES.standard) / 30));
+  return GRAD_PACKAGE_PRICES.standard + extraHalfHours * ADDON_EXTRA_30_MIN;
+}
+
+const PACKAGE_REVIEW_HINT = "No package chosen: the inquiry does not say whether this is the 30-minute mini ($325) or the 1-hour session ($425). Enter the total once it is agreed.";
+const MANUAL_QUOTE_HINT = `Nine or more graduates are quoted by hand; the rate card stops at ${GROUP_MAX_PEOPLE}. Enter the agreed total.`;
+
 function calcPrice(inquiry) {
   const service = detectServiceType(inquiry);
   const people = parseInt(inquiry.people || "1") || 1;
-  let sessionBase, travelFee = null, schoolKey = null;
+  let sessionBase, travelFee = null, schoolKey = null, reviewHint = null;
 
   if (SERVICE_FLAT_RATES[service] != null) {
     sessionBase = SERVICE_FLAT_RATES[service];
   } else {
-    sessionBase = people <= 1
-      ? GRAD_PACKAGE_PRICES.standard
-      : people <= GROUP_MAX_PEOPLE
-        ? GROUP_RATES_PER_PERSON[people] * people
-        : null; // quoted by hand; the preview is left for Chris to fill
+    if (people <= 1) {
+      sessionBase = individualGradPrice(inquiry);
+      if (sessionBase == null) reviewHint = PACKAGE_REVIEW_HINT;
+    } else if (people <= GROUP_MAX_PEOPLE) {
+      sessionBase = GROUP_RATES_PER_PERSON[people] * people;
+    } else {
+      sessionBase = null; // quoted by hand; the preview is left for Chris to fill
+      reviewHint = MANUAL_QUOTE_HINT;
+    }
     // The thread's shoot location (kept apart from the school) decides first.
     schoolKey = detectSchoolKey(inquiry._location || inquiry.school || inquiry.message || "");
     if (schoolKey != null && TRAVEL_FEES[schoolKey] != null) travelFee = TRAVEL_FEES[schoolKey];
@@ -157,14 +252,14 @@ function calcPrice(inquiry) {
 
   // A price quoted/agreed in the email thread overrides the calculator
   const agreed = Number.isFinite(inquiry._agreedTotal) ? inquiry._agreedTotal : null;
-  if (agreed != null) { sessionBase = agreed; travelFee = null; }
+  if (agreed != null) { sessionBase = agreed; travelFee = null; reviewHint = null; }
   const subtotal = sessionBase == null ? null : sessionBase + (travelFee ?? 0);
   const deposit  = subtotal == null ? null : subtotal / 2;
 
   return {
     sessionBase, travelFee,
     subtotal, deposit, remaining: subtotal == null ? null : subtotal - deposit,
-    people, schoolKey, service, priceFromEmail: agreed != null,
+    people, schoolKey, service, priceFromEmail: agreed != null, reviewHint,
   };
 }
 

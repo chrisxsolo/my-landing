@@ -35,10 +35,12 @@ Once the details are set I'll send the invoice and contract and we're locked in!
 const mocks = vi.hoisted(() => ({
   rules: [] as WritingRule[],
   rulesError: null as Error | null,
-  insertResult: "ok" as "ok" | "fail",
+  insertResult: "ok" as "ok" | "fail" | "reject",
   inserted: [] as string[],
   usage: [] as Record<string, unknown>[],
+  usageError: null as Error | null,
   outcomes: [] as Record<string, unknown>[],
+  outcomeError: null as Error | null,
   caller: null as unknown,
 }));
 
@@ -47,11 +49,12 @@ vi.mock("@/lib/ai/aiEmailStore", () => ({
   fetchWritingRules: async () => { if (mocks.rulesError) throw mocks.rulesError; return mocks.rules; },
   insertWritingRule: async (input: { rule: string }) => {
     if (mocks.insertResult === "fail") return null;
+    if (mocks.insertResult === "reject") throw new Error("connection reset");
     mocks.inserted.push(input.rule);
     return { id: `id-${mocks.inserted.length}`, rule: input.rule, category: "style", status: "pending", source: "learn-from-edit", createdAt: "2026-11-03T00:00:00Z" };
   },
-  recordUsage: async (record: Record<string, unknown>) => { mocks.usage.push(record); },
-  recordDraftOutcome: async (outcome: Record<string, unknown>) => { mocks.outcomes.push(outcome); },
+  recordUsage: async (record: Record<string, unknown>) => { if (mocks.usageError) throw mocks.usageError; mocks.usage.push(record); },
+  recordDraftOutcome: async (outcome: Record<string, unknown>) => { if (mocks.outcomeError) throw mocks.outcomeError; mocks.outcomes.push(outcome); },
 }));
 vi.mock("@/lib/ai/emailModel", async (importOriginal) => {
   const original = await importOriginal<typeof import("@/lib/ai/emailModel")>();
@@ -76,7 +79,7 @@ async function post(body: unknown): Promise<{ status: number; json: LearnJson }>
 
 beforeEach(() => {
   mocks.rules = []; mocks.rulesError = null; mocks.insertResult = "ok";
-  mocks.inserted = []; mocks.usage = []; mocks.outcomes = [];
+  mocks.inserted = []; mocks.usage = []; mocks.outcomes = []; mocks.usageError = null; mocks.outcomeError = null;
   mocks.caller = fakeCaller("- Keep the opening to a short thanks");
   process.env.ANTHROPIC_API_KEY = "test-key";
 });
@@ -92,6 +95,32 @@ describe("POST /api/ai/learn validation", () => {
     const { status, json } = await post({ ai_draft: AI, actual_sent: "", mode: "review" });
     expect(status).toBe(400);
     expect(json.code).toBe("invalid_request");
+  });
+
+  it.each([
+    ["a numeric ai_draft", { ai_draft: 123, actual_sent: SENT }],
+    ["an object actual_sent", { ai_draft: AI, actual_sent: { text: SENT } }],
+    ["a numeric mode", { ai_draft: AI, actual_sent: SENT, mode: 1 }],
+    ["an unknown mode", { ai_draft: AI, actual_sent: SENT, mode: "learn" }],
+    ["an object inquiry_id", { ai_draft: AI, actual_sent: SENT, inquiry_id: { id: 4 } }],
+    ["a string was_regenerated", { ai_draft: AI, actual_sent: SENT, was_regenerated: "yes" }],
+    ["an array body", [AI, SENT]],
+  ])("rejects %s with 400, never 500", async (_label, body) => {
+    const { status, json } = await post(body);
+    expect(status).toBe(400);
+    expect(json.code).toBe("invalid_request");
+    expect(mocks.outcomes).toEqual([]);
+    expect(mocks.inserted).toEqual([]);
+  });
+
+  it("accepts the optional fields in the shapes the panel and the send path use", async () => {
+    for (const body of [
+      { ai_draft: AI, actual_sent: SENT, mode: "AUTO", inquiry_id: "42", was_regenerated: false },
+      { ai_draft: AI, actual_sent: SENT, inquiry_id: null },
+    ]) {
+      const { status } = await post(body);
+      expect(status).toBe(200);
+    }
   });
 });
 
@@ -149,6 +178,35 @@ describe("POST /api/ai/learn review mode", () => {
     expect(json.message).not.toMatch(/waiting for/i);
   });
 
+  it("returns persist_failed with no pending rows when the rule store rejects", async () => {
+    mocks.insertResult = "reject";
+    const { status, json } = await post({ ai_draft: AI, actual_sent: SENT, mode: "review" });
+    expect(status).toBe(200);
+    expect(json.outcome).toBe("persist_failed");
+    expect(json.error_code).toBe("rules_write");
+    expect(json.retryable).toBe(true);
+    expect(json.pending).toEqual([]);
+    expect((json.edits ?? []).length).toBeGreaterThan(0);
+  });
+
+  it("still returns the stored rules when the usage store rejects afterwards", async () => {
+    mocks.usageError = new Error("usage table locked");
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const { status, json } = await post({ ai_draft: AI, actual_sent: SENT, mode: "review" });
+      expect(status).toBe(200);
+      expect(json.outcome).toBe("rules_pending");
+      expect(json.pending?.map((p) => p.rule)).toEqual(["Keep the opening to a short thanks"]);
+      expect(mocks.inserted).toHaveLength(1);
+      const logged = JSON.stringify(errors.mock.calls);
+      expect(logged).toMatch(/usage/i);
+      expect(logged).not.toContain("Baker Beach");
+      expect(logged).not.toContain("Jordan");
+    } finally {
+      errors.mockRestore();
+    }
+  });
+
   it("returns a configuration failure code when no API key is set", async () => {
     delete process.env.ANTHROPIC_API_KEY;
     const { status, json } = await post({ ai_draft: AI, actual_sent: SENT, mode: "review" });
@@ -178,5 +236,21 @@ describe("POST /api/ai/learn auto mode", () => {
     expect(mocks.inserted).toEqual([]);
     expect(mocks.outcomes).toHaveLength(1);
     expect(mocks.outcomes[0]).toMatchObject({ inquiryId: 42, sentUnchanged: false });
+  });
+
+  it("still returns the deterministic outcome when the measurement store rejects", async () => {
+    mocks.outcomeError = new Error("outcomes table locked");
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const { status, json } = await post({ ai_draft: AI, actual_sent: SENT, mode: "auto", inquiry_id: 42 });
+      expect(status).toBe(200);
+      expect(json.outcome).toBe("style_candidates");
+      expect((json.edits ?? []).length).toBeGreaterThan(0);
+      const logged = JSON.stringify(errors.mock.calls);
+      expect(logged).toMatch(/outcome/i);
+      expect(logged).not.toContain("Baker Beach");
+    } finally {
+      errors.mockRestore();
+    }
   });
 });

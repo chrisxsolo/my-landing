@@ -48,15 +48,20 @@ function withoutModel(result: LearnResult): LearnReviewResult {
   return { ...result, pending: [], apiCalls: 0 };
 }
 
+/**
+ * Writes the new candidates as pending, one insert each, and reports exactly
+ * which rows exist afterwards. An insert that returns null or rejects counts
+ * as not written; the others are kept, never rolled back, and a retry finds
+ * them through fetchRules as duplicates, so it cannot store them twice.
+ */
 async function persistNewRules(result: LearnResult, insertRule: LearnDeps["insertRule"]): Promise<LearnReviewResult> {
   const fresh = result.candidates.filter((candidate) => candidate.intake.verdict === "new");
-  const written = await Promise.all(
-    fresh.map(async (candidate) => {
-      const row = await insertRule({ rule: candidate.rule, category: "style", status: "pending", source: LEARN_RULE_SOURCE });
-      return row ? { id: row.id, rule: row.rule } : null;
-    }),
+  const written = await Promise.allSettled(
+    fresh.map((candidate) => insertRule({ rule: candidate.rule, category: "style", status: "pending", source: LEARN_RULE_SOURCE })),
   );
-  const pending = written.filter((row): row is PendingRule => row !== null);
+  const pending = written.flatMap((outcome): PendingRule[] => (
+    outcome.status === "fulfilled" && outcome.value ? [{ id: outcome.value.id, rule: outcome.value.rule }] : []
+  ));
 
   if (pending.length < fresh.length) {
     const detail = pending.length

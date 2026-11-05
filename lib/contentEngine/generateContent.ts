@@ -1,7 +1,9 @@
 // Generation orchestrator (spec §8.2): atomic per-type claim → target → insert
 // validated drafts (idempotency-keyed, retry-safe) → record result + usage
-// atomically with that type's progress (spec §11). A failed target records
-// 'failed' with a safe error; the drafts of other types are untouched.
+// atomically with that type's progress (spec §11). Everything after the claim
+// — the package lookup included — is inside the boundary that records
+// 'failed' with a safe error, so a claimed type is never left `processing`
+// for its lease to expire; the drafts of other types are untouched.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { DEFAULT_ENGINE_MODEL, type ModelCaller } from "@/lib/contentEngine/aiClient";
 import { PROMPT_VERSION } from "@/lib/contentEngine/prompts";
@@ -51,6 +53,11 @@ export interface GenerateTypeResult {
   packageStatus: string;
   error?: string;
   failure?: GenerationFailure;
+  /**
+   * True when the failure could not be written to the package: the type is
+   * still `processing` on its lease, and the lease-aware UI recovers it.
+   */
+  unrecorded?: true;
 }
 
 function classifyFailure(err: unknown): GenerationFailure {
@@ -102,18 +109,17 @@ export async function generateContentType(args: GenerateTypeArgs): Promise<Gener
     );
   }
 
-  const { data: pkg, error: pkgErr } = await client
-    .from("session_content_packages")
-    .select("photography_session_id,model_name,session_facts_snapshot,generation_settings")
-    .eq("id", packageId).single();
-  if (pkgErr || !pkg) throw new Error(`package lookup failed: ${pkgErr?.message ?? "missing"}`);
-
-  const model = args.model
-    ?? (pkg.generation_settings?.overrides?.model_name as string | undefined)
-    ?? (pkg.model_name as string | undefined)
-    ?? DEFAULT_ENGINE_MODEL;
-
   try {
+    const { data: pkg, error: pkgErr } = await client
+      .from("session_content_packages")
+      .select("photography_session_id,model_name,session_facts_snapshot,generation_settings")
+      .eq("id", packageId).single();
+    if (pkgErr || !pkg) throw new Error(`package lookup failed: ${pkgErr?.message ?? "missing"}`);
+
+    const model = args.model
+      ?? (pkg.generation_settings?.overrides?.model_name as string | undefined)
+      ?? (pkg.model_name as string | undefined)
+      ?? DEFAULT_ENGINE_MODEL;
     const facts = sessionFactsSnapshotSchema.parse(pkg.session_facts_snapshot);
     const target = GENERATION_TARGETS[contentType];
     if (!target) throw new GenerationError(`content type ${contentType} is not generatable`);
@@ -146,7 +152,12 @@ export async function generateContentType(args: GenerateTypeArgs): Promise<Gener
       p_package_id: packageId, p_content_type: contentType,
       p_outcome: "failed", p_error: message, p_usage: null,
     });
-    if (recErr) console.error("could not record generation failure", recErr);
+    if (recErr) {
+      // Distinct from a recorded failure: the type is still `processing` on its
+      // lease. Say so rather than report it terminal.
+      console.error(`[content-engine] could not record the failure of ${contentType} for package ${packageId}:`, recErr.message);
+      return { outcome: "failed", itemIds: [], packageStatus: "generating", error: message, failure, unrecorded: true };
+    }
     return {
       outcome: "failed", itemIds: [],
       packageStatus: (status as string | null) ?? "generating", error: message, failure,

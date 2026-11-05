@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   GENERATE_ROUTE_MAX_DURATION_SECONDS, GENERATION_DEADLINE_MS, GENERATION_LEASE_SECONDS,
-  GENERATION_MIN_WINDOW_MS, MIN_MODEL_CALL_MS, remainingModelCallMs,
+  GENERATION_MIN_WINDOW_MS, HEARTBEAT_MS, JOB_LEASE_SECONDS, MIN_MODEL_CALL_MS, remainingModelCallMs,
 } from "@/lib/contentEngine/generationBudget";
 import { HARD_DEADLINE_MS } from "@/lib/contentEngine/jobRunner";
 
@@ -16,6 +16,15 @@ describe("generation duration budget", () => {
   it("the claim lease is at least as long as the longest-lived invocation (route and worker)", () => {
     expect(GENERATION_LEASE_SECONDS * 1000).toBeGreaterThanOrEqual(GENERATE_ROUTE_MAX_DURATION_SECONDS * 1000);
     expect(GENERATION_LEASE_SECONDS * 1000).toBeGreaterThan(HARD_DEADLINE_MS);
+  });
+
+  it("the job lease outlives the longest invocation that could still write job progress", () => {
+    // A worker still generating at 270s must not have its job stolen and marked
+    // succeeded by a second worker; the route itself is killed at maxDuration.
+    expect(JOB_LEASE_SECONDS * 1000).toBeGreaterThan(HARD_DEADLINE_MS);
+    expect(JOB_LEASE_SECONDS).toBeGreaterThanOrEqual(GENERATE_ROUTE_MAX_DURATION_SECONDS);
+    expect(JOB_LEASE_SECONDS).toBeGreaterThanOrEqual(GENERATION_LEASE_SECONDS);
+    expect(HEARTBEAT_MS).toBeLessThan(JOB_LEASE_SECONDS * 1000 / 2);
   });
 
   it("the worker needs a real window before it starts a generate wave", () => {

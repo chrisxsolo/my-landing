@@ -163,19 +163,102 @@ export function graduationSessionLabel(people: number, durationMinutes: number =
   return `Group rate (${headcount})${extra}`
 }
 
+// ── DURATION PARSER ──────────────────────────────────────────────────────────
+// Mirrored in pixieset-extension/extensionPricing.js (detectGradDurationMinutes);
+// tests/unit/graduationDurationParser.test.ts runs both on the same cases.
+const HOURS_WORD: Record<string, number> = { a: 1, an: 1, one: 1, full: 1, two: 2, three: 3 }
+const MINUTES_WORD: Record<string, number> = { thirty: 30, forty: 40, sixty: 60, ninety: 90 }
+const HOUR = String.raw`(?:hours?|hrs?)`
+const MINUTE = String.raw`(?:minutes?|mins?)`
+const HOUR_COUNT = String.raw`(\d+(?:\.\d+)?|one|two|three|full|an?)`
+const MINUTE_COUNT = String.raw`(\d+|thirty|forty|sixty|ninety)`
+
+const hoursOf = (raw: string) => HOURS_WORD[raw] ?? Number(raw)
+const minutesOfWord = (raw: string) => MINUTES_WORD[raw] ?? Number(raw)
+
+/**
+ * Every way a client writes a length, compound forms first so "1 hour 30
+ * minutes" is one 90-minute phrase and never the 30 of its second half. Each
+ * pattern is anchored at a word start and tried at every position in order.
+ */
+const DURATION_PATTERNS: { re: RegExp; minutes: (m: RegExpExecArray) => number }[] = [
+  { re: new RegExp(String.raw`\b${HOUR_COUNT}\s*-?\s*${HOUR}\s*(?:and|plus|&|\+)?\s*${MINUTE_COUNT}\s*-?\s*${MINUTE}\b`, "y"),
+    minutes: (m) => hoursOf(m[1]) * 60 + minutesOfWord(m[2]) },
+  { re: new RegExp(String.raw`\b(?:(?:an?|one|1)\s+)?${HOUR}\s+and\s+a\s+half\b`, "y"), minutes: () => 90 },
+  { re: new RegExp(String.raw`\b(?:one|1)\s*(?:and\s+a\s+half|1/2|½)\s*${HOUR}\b`, "y"), minutes: () => 90 },
+  { re: new RegExp(String.raw`\bhalf\s*(?:an?\s*)?(?:hour|hr)\b`, "y"), minutes: () => 30 },
+  { re: new RegExp(String.raw`\b${HOUR_COUNT}\s*-?\s*${HOUR}\b`, "y"), minutes: (m) => Math.round(hoursOf(m[1]) * 60) },
+  { re: new RegExp(String.raw`\b${MINUTE_COUNT}\s*-?\s*${MINUTE}\b`, "y"), minutes: (m) => minutesOfWord(m[1]) },
+  { re: /\bmini\b/y, minutes: () => GRAD_PACKAGES.mini.durationMinutes },
+]
+
+// Words that tie a length to the booking, and words that make it some other
+// span (delivery, turnaround, arrival, travel). The nearer kind decides.
+const SESSION_WORDS = /\b(?:sessions?|length|coverage|package|shoot|photoshoot|book(?:ing)?|mini|photos?|portraits?|slot)\b/g
+const UNRELATED_WORDS = /\b(?:deliver(?:y|ed|ing|s)?|turnaround|gallery|edits?|editing|reply|respond|within|early|late|before|after|ahead|prior|arrive|arrival|drive|driving|away|commute|notice|days?|weeks?)\b/g
+
+type DurationMention = { minutes: number; start: number; end: number }
+
+function durationMentions(clause: string): DurationMention[] {
+  const found: DurationMention[] = []
+  let at = 0
+  while (at < clause.length) {
+    const hit = DURATION_PATTERNS.map((p) => { p.re.lastIndex = at; return { p, m: p.re.exec(clause) } }).find((x) => x.m)
+    if (hit?.m) {
+      found.push({ minutes: hit.p.minutes(hit.m), start: at, end: at + hit.m[0].length })
+      at += Math.max(1, hit.m[0].length)
+    } else {
+      at += 1
+    }
+  }
+  return found
+}
+
+/** Distance from a mention to the nearest word of a kind in the same clause, or Infinity. */
+function nearestDistance(clause: string, mention: DurationMention, words: RegExp): number {
+  let best = Infinity
+  for (const m of clause.matchAll(words)) {
+    const wordStart = m.index ?? 0
+    const wordEnd = wordStart + m[0].length
+    if (wordEnd <= mention.start) best = Math.min(best, mention.start - wordEnd)
+    else if (wordStart >= mention.end) best = Math.min(best, wordStart - mention.end)
+    else best = 0
+  }
+  return best
+}
+
+type MentionKind = "tied" | "neutral" | "unrelated"
+
+function classifyMention(clause: string, mention: DurationMention): MentionKind {
+  const tied = nearestDistance(clause, mention, SESSION_WORDS)
+  const unrelated = nearestDistance(clause, mention, UNRELATED_WORDS)
+  if (tied === Infinity && unrelated === Infinity) return "neutral"
+  return tied <= unrelated ? "tied" : "unrelated"
+}
+
 /**
  * The length a client asked for, read off free text ("30 min", "mini",
- * "1.5 hours", "two hours"), or null when they named none. Shared by the
- * quote check, payment totals and the invoice draft so none of them guesses
- * a package the text does not name.
+ * "1.5 hours", "1 hour 30 minutes", "two hours"), or null when they named
+ * none — or named two that disagree. Shared by the quote check, payment
+ * totals, the contract and the invoice draft so none of them guesses a
+ * package the text does not name.
+ *
+ * Lengths tied to session wording outrank unrelated spans ("delivered within
+ * 2 hours"); among the lengths that count, one distinct value is the answer
+ * and more than one is a conflict for a person to settle.
  */
 export function detectGraduationDurationMinutes(text: string | null | undefined): number | null {
-  const t = (text ?? "").toLowerCase()
-  if (/\b(?:2|two)[ -]?(?:hours?|hrs?)\b|\b120[ -]?min/.test(t)) return 120
-  if (/\b(?:90|ninety)[ -]?min|\b1\.5[ -]?(?:hours?|hrs?)\b|hour and a half|\b(?:an|one|1)[ -]?and[ -]?a[ -]?half[ -]?hours?\b/.test(t)) return 90
-  if (/\b(?:30|thirty)[ -]?min|\bmini\b|half[ -]?(?:an[ -]?)?hour\b/.test(t)) return GRAD_PACKAGES.mini.durationMinutes
-  if (/\b(?:60|sixty)[ -]?min|\b(?:1|one|an?)[ -]?(?:hour|hr)\b|\bfull hour\b/.test(t)) return GRAD_PACKAGES.standard.durationMinutes
-  return null
+  const found: { minutes: number; kind: MentionKind }[] = []
+  // Sentence breaks scope the context words; a period inside "1.5" is not one.
+  for (const clause of (text ?? "").toLowerCase().split(/[!?;\n]+|\.(?!\d)/)) {
+    for (const mention of durationMentions(clause)) {
+      found.push({ minutes: mention.minutes, kind: classifyMention(clause, mention) })
+    }
+  }
+  const tied = found.filter((f) => f.kind === "tied")
+  const counted = tied.length ? tied : found.filter((f) => f.kind === "neutral")
+  const distinct = [...new Set(counted.map((f) => f.minutes))]
+  return distinct.length === 1 ? distinct[0] : null
 }
 
 export interface EstimateInput {

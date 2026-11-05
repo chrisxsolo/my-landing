@@ -53,22 +53,68 @@ test("fills Family into the existing graduation template and preserves other fie
   assert.ok(fixture.events.includes("input"));
 });
 
-test("prices a graduation contract from the 1-hour package and the per-graduate group rate", () => {
-  const fixture = loadAutofill(["Total: [TOTAL_FEE]; Retainer: [RETAINER]; Remaining: [REMAINING]."]);
-  fill(fixture, { session_type: "graduation", school: "SF State", people: "1" });
-  assert.equal(fixture.text(), "Total: $425.00; Retainer: $212.50; Remaining: $212.50.");
-  const group = loadAutofill(["Total: [TOTAL_FEE]; Retainer: [RETAINER]; Remaining: [REMAINING]."]);
+const PRICE_LINE = ["Total: [TOTAL_FEE]; Retainer: [RETAINER]; Remaining: [REMAINING]."];
+
+test("prices one graduate from the package the inquiry names: mini $325, hour $425", () => {
+  const mini = loadAutofill(PRICE_LINE);
+  fill(mini, { session_type: "graduation", school: "SF State", people: "1", message: "a 30 minute mini please" });
+  assert.equal(mini.text(), "Total: $325.00; Retainer: $162.50; Remaining: $162.50.");
+  const hour = loadAutofill(PRICE_LINE);
+  fill(hour, { session_type: "graduation", school: "SF State", people: "1", message: "a 1 hour session" });
+  assert.equal(hour.text(), "Total: $425.00; Retainer: $212.50; Remaining: $212.50.");
+});
+
+test("leaves one graduate with no chosen length unresolved instead of defaulting to the hour", () => {
+  const fixture = loadAutofill(PRICE_LINE);
+  const inquiry = { session_type: "graduation", school: "SF State", people: "1", message: "grad photos for me in May" };
+  fill(fixture, inquiry);
+  assert.equal(fixture.text(), "Total: [TOTAL_FEE]; Retainer: [RETAINER]; Remaining: [REMAINING].");
+  const preview = vm.runInContext("buildContractPreview(inquiry, calcPrice(inquiry))", fixture.context);
+  assert.match(preview, /data-key="TOTAL_FEE" value=""/);
+  assert.match(preview, /30-minute mini.*1-hour/);
+});
+
+test("treats conflicting mini-or-hour wording as unresolved too", () => {
+  const fixture = loadAutofill(PRICE_LINE);
+  fill(fixture, { session_type: "graduation", school: "SF State", people: "1", message: "the 1 hour session, or the 30 minute mini if cheaper" });
+  assert.equal(fixture.text(), "Total: [TOTAL_FEE]; Retainer: [RETAINER]; Remaining: [REMAINING].");
+});
+
+test("prices 90 minutes for one graduate as the hour plus the extension, never the mini", () => {
+  const fixture = loadAutofill(PRICE_LINE);
+  fill(fixture, { session_type: "graduation", school: "SF State", people: "1", message: "1 hour 30 minutes on campus" });
+  assert.equal(fixture.text(), "Total: $525.00; Retainer: $262.50; Remaining: $262.50.");
+});
+
+test("adds the campus travel fee to a chosen package", () => {
+  const fixture = loadAutofill(PRICE_LINE);
+  fill(fixture, { session_type: "graduation", school: "SJSU", people: "1", message: "the 30 minute mini" });
+  assert.equal(fixture.text(), "Total: $400.00; Retainer: $200.00; Remaining: $200.00.");
+});
+
+test("prices a group from the per-graduate rate regardless of length wording", () => {
+  const group = loadAutofill(PRICE_LINE);
   fill(group, { session_type: "graduation", school: "SF State", people: "3" });
   assert.equal(group.text(), "Total: $975.00; Retainer: $487.50; Remaining: $487.50.");
+  const eight = loadAutofill(PRICE_LINE);
+  fill(eight, { session_type: "graduation", school: "SF State", people: "8", message: "2 hours" });
+  assert.equal(eight.text(), "Total: $2000.00; Retainer: $1000.00; Remaining: $1000.00.");
 });
 
 test("leaves the price placeholders alone for nine or more graduates, and keeps an agreed total", () => {
-  const nine = loadAutofill(["Total: [TOTAL_FEE]; Retainer: [RETAINER]; Remaining: [REMAINING]."]);
+  const nine = loadAutofill(PRICE_LINE);
   fill(nine, { session_type: "graduation", school: "SF State", people: "9" });
   assert.equal(nine.text(), "Total: [TOTAL_FEE]; Retainer: [RETAINER]; Remaining: [REMAINING].");
-  const legacy = loadAutofill(["Total: [TOTAL_FEE]; Retainer: [RETAINER]; Remaining: [REMAINING]."]);
+  const legacy = loadAutofill(PRICE_LINE);
   fill(legacy, { session_type: "graduation", school: "SJSU", people: "1", _agreedTotal: 425 });
   assert.equal(legacy.text(), "Total: $425.00; Retainer: $212.50; Remaining: $212.50.");
+  const legacyMini = loadAutofill(PRICE_LINE);
+  fill(legacyMini, { session_type: "graduation", school: "SJSU", people: "1", message: "the 30 minute mini", _agreedTotal: 350 });
+  assert.equal(legacyMini.text(), "Total: $350.00; Retainer: $175.00; Remaining: $175.00.");
+});
+
+test("this release of the extension is the one that prices packages", () => {
+  assert.equal(manifest.version, "1.1.1");
 });
 
 test("fills the session type when inline formatting splits it across text nodes", () => {

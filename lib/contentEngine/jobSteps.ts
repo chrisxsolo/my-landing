@@ -12,14 +12,15 @@ import { buildSessionFactsSnapshot } from "@/lib/contentEngine/payloads";
 import { findSchool } from "@/lib/contentEngine/schoolStore";
 import { AUTO_CURATE_THRESHOLD, TOP_PICK_COUNT } from "@/lib/contentEngine/curationConfig";
 import {
-  GENERATION_ORDER, JOURNAL_DEPENDENCIES, journalReady, nextGenerationWave, settledGenerationCount,
-  type GenerationProgressMap,
+  GENERATION_ORDER, JOURNAL_DEPENDENCIES, allGenerationSettled, journalReady, nextGenerationWave,
+  settledGenerationCount, type GenerationProgressMap,
 } from "@/lib/contentEngine/generationProgress";
 import type { ContentEngineJob, JobPhase, WorkerContext } from "@/lib/contentEngine/jobRunner";
 import { GENERATION_MIN_WINDOW_MS } from "@/lib/contentEngine/generationBudget";
 
-// When every remaining photo is leased by someone else (the admin's Analyze
-// button), wait this long before looking again instead of spinning steps.
+// When every remaining photo or content type is leased by someone else (the
+// admin's Analyze or Generate button, an earlier invocation whose claim is
+// still live), wait this long before looking again instead of spinning steps.
 const IN_FLIGHT_WAIT_MS = 5_000;
 
 /** Per-invocation knobs a step needs beyond the shared context. */
@@ -28,6 +29,12 @@ export interface StepEnv {
   hardDeadlineAt: number;
   /** True once the job was cancelled or its lease lost; also renews the lease. */
   shouldStop: () => Promise<boolean>;
+  /**
+   * Renews the job lease on a real timer for as long as the given work is in
+   * flight, so a wave of generations longer than one heartbeat never lets a
+   * second worker see the job as abandoned. Resolves with the work's result.
+   */
+  keepAlive: <T>(work: Promise<T>) => Promise<T>;
   sleep: (ms: number) => Promise<void>;
   now: () => number;
 }
@@ -39,8 +46,11 @@ export interface StepResult {
   softErrors?: string[];
   /** Stops the run and marks it failed — the admin has something to fix. */
   fatal?: string;
-  /** Pass over these content types for the rest of the invocation. */
-  skipTypes?: string[];
+  /**
+   * Nothing could be claimed: another owner holds every remaining type. The
+   * step slept and the job stays in this phase; the runner does not count it.
+   */
+  waiting?: boolean;
   /** Too little of the invocation is left for this step: hand the job back untouched. */
   deferred?: boolean;
 }
@@ -194,7 +204,7 @@ async function loadPackageProgress(ctx: WorkerContext, packageId: string): Promi
   };
 }
 
-type TypeOutcome = { softError?: string; skipType?: string; fatal?: string };
+type TypeOutcome = { softError?: string; held?: string; fatal?: string };
 
 async function generateOneType(
   ctx: WorkerContext, packageId: string, contentType: string, env: StepEnv,
@@ -213,9 +223,9 @@ async function generateOneType(
       ? { softError: `${contentType}: ${result.error ?? "generation failed"}` }
       : {};
   } catch (err) {
-    // Someone (or a previous invocation whose lease is still live) holds this
-    // type. Leave it to them and move on.
-    if (err instanceof GenerationConflictError) return { skipType: contentType };
+    // Someone (a manual Generate, or an invocation whose claim is still live)
+    // holds this type. Only their terminal record settles it: come back later.
+    if (err instanceof GenerationConflictError) return { held: contentType };
     return { fatal: message(err) };
   }
 }
@@ -223,15 +233,20 @@ async function generateOneType(
 /**
  * Writes the journal post once its inputs are, without waiting for the
  * unrelated types still running beside it. Re-reads progress so a link or
- * testimonial draft that failed (and is due a retry) holds the journal back.
+ * testimonial draft that failed (and is due a retry), or that another owner
+ * is still writing, holds the journal back.
  */
 async function journalAfter(
-  ctx: WorkerContext, packageId: string, inputs: Promise<TypeOutcome[]>, skip: ReadonlySet<string>, env: StepEnv,
+  ctx: WorkerContext, packageId: string, inputs: Promise<TypeOutcome[]>, env: StepEnv,
 ): Promise<TypeOutcome[]> {
   await inputs;
   const now = await loadPackageProgress(ctx, packageId);
-  if (typeof now === "string" || !journalReady(now.selected, now.progress, { skip })) return [];
+  if (typeof now === "string" || !journalReady(now.selected, now.progress)) return [];
   return [await generateOneType(ctx, packageId, "journal_post", env)];
+}
+
+function typesPatch(state: PackageProgress) {
+  return { types_total: state.selected.length, types_done: settledGenerationCount(state.selected, state.progress) };
 }
 
 /**
@@ -240,21 +255,26 @@ async function journalAfter(
  * are written, overlapping the slower portfolio/school/guide picks.
  * claim_generation_type is atomic per type, so concurrent types never collide
  * and a replayed type is a no-op.
+ *
+ * The run is done with generation only when the re-read progress map says
+ * every selected type is settled. A type someone else holds is waited for,
+ * never written off: the job stays `generate` until that owner records it.
  */
 async function generateStep(
-  ctx: WorkerContext, job: ContentEngineJob, skip: ReadonlySet<string>, env: StepEnv,
+  ctx: WorkerContext, job: ContentEngineJob, env: StepEnv,
 ): Promise<StepResult> {
   if (!job.package_id) return { phase: "package" };
   const packageId = job.package_id;
   const before = await loadPackageProgress(ctx, packageId);
   if (typeof before === "string") return { phase: "generate", fatal: before };
 
-  const wave = nextGenerationWave(before.selected, before.progress, { skip });
+  const wave = nextGenerationWave(before.selected, before.progress);
   if (wave.length === 0) {
-    return {
-      phase: "done",
-      patch: { types_total: before.selected.length, types_done: settledGenerationCount(before.selected, before.progress) },
-    };
+    if (allGenerationSettled(before.selected, before.progress)) return { phase: "done", patch: typesPatch(before) };
+    // Unreachable by construction (an empty wave means nothing attemptable),
+    // kept so a future change to the wave can never turn open work into success.
+    await env.sleep(IN_FLIGHT_WAIT_MS);
+    return { phase: "generate", waiting: true, patch: typesPatch(before) };
   }
   // A wave started with only a sliver of the invocation left would just time
   // out and burn one of the type's attempts. Hand the job back instead; the
@@ -267,28 +287,30 @@ async function generateStep(
   const inputs = Promise.all(wave.filter(isInput).map((t) => generateOneType(ctx, packageId, t, env)));
   const others = Promise.all(wave.filter((t) => !isInput(t)).map((t) => generateOneType(ctx, packageId, t, env)));
   const journalPending = before.selected.includes("journal_post") && !wave.includes("journal_post");
-  const journal = journalPending ? journalAfter(ctx, packageId, inputs, skip, env) : Promise.resolve([]);
-  const outcomes = (await Promise.all([inputs, others, journal])).flat();
+  const journal = journalPending ? journalAfter(ctx, packageId, inputs, env) : Promise.resolve([]);
+  const outcomes = (await env.keepAlive(Promise.all([inputs, others, journal]))).flat();
 
   const after = await loadPackageProgress(ctx, packageId);
-  return {
-    phase: "generate",
-    patch: typeof after === "string" ? undefined
-      : { types_total: after.selected.length, types_done: settledGenerationCount(after.selected, after.progress) },
-    softErrors: outcomes.flatMap((o) => (o.softError ? [o.softError] : [])),
-    skipTypes: outcomes.flatMap((o) => (o.skipType ? [o.skipType] : [])),
-    fatal: outcomes.find((o) => o.fatal)?.fatal,
-  };
+  const patch = typeof after === "string" ? undefined : typesPatch(after);
+  const fatal = outcomes.find((o) => o.fatal)?.fatal;
+  const softErrors = outcomes.flatMap((o) => (o.softError ? [o.softError] : []));
+  // Every type we reached for is held by someone else: nothing moved, so wait
+  // before the next look instead of spinning claims.
+  if (!fatal && outcomes.length > 0 && outcomes.every((o) => o.held)) {
+    await env.sleep(IN_FLIGHT_WAIT_MS);
+    return { phase: "generate", patch, waiting: true };
+  }
+  return { phase: "generate", patch, softErrors, fatal };
 }
 
 export async function executeStep(
-  ctx: WorkerContext, job: ContentEngineJob, skip: ReadonlySet<string>, env: StepEnv,
+  ctx: WorkerContext, job: ContentEngineJob, env: StepEnv,
 ): Promise<StepResult> {
   switch (job.phase) {
     case "analyze": return analyzeStep(ctx, job, env);
     case "curate": return curateStep(ctx, job);
     case "package": return packageStep(ctx, job);
-    case "generate": return generateStep(ctx, job, skip, env);
+    case "generate": return generateStep(ctx, job, env);
     case "done": return { phase: "done" };
   }
 }

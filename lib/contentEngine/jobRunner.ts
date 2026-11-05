@@ -14,12 +14,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ModelCaller } from "@/lib/contentEngine/aiClient";
 import { executeStep, type StepEnv, type StepResult } from "@/lib/contentEngine/jobSteps";
+import { HEARTBEAT_MS, JOB_LEASE_SECONDS } from "@/lib/contentEngine/generationBudget";
 
-export const JOB_LEASE_SECONDS = 120;
+// The job lease lives in generationBudget beside the per-type lease and the
+// route maxDuration it must outlast; re-exported so callers keep one import.
+export { JOB_LEASE_SECONDS };
 /** How long a run whose step threw waits before a worker may retry it. */
 export const RETRY_BACKOFF_SECONDS = 120;
-// How often a long analysis step renews the job lease (and notices a cancel).
-const HEARTBEAT_MS = 10_000;
 export const MAX_JOB_ATTEMPTS = 5;
 // Steps are inherently bounded (analysis steps end when the photos do, one
 // call per content type), so this only exists to make a pathological loop
@@ -73,6 +74,12 @@ export interface RunWorkerArgs extends WorkerContext {
   /** Injectable clock so tests don't wait out a real budget. */
   now?: () => number;
   sleep?: (ms: number) => Promise<void>;
+  /**
+   * The timer between lease renewals while a wave is in flight. Separate from
+   * `sleep` on purpose: a test that makes `sleep` return at once must not turn
+   * the heartbeat into a busy loop against the database.
+   */
+  heartbeatTimer?: (ms: number) => Promise<void>;
 }
 
 export interface RunWorkerResult {
@@ -121,6 +128,29 @@ function createHeartbeat(
   };
 }
 
+/**
+ * Wraps in-flight work so the job lease is renewed every HEARTBEAT_MS until it
+ * settles. The timer is raced against settlement, so short work never waits
+ * out an interval, and the loop ends with the work, never on its own clock.
+ */
+export function createKeepAlive(
+  heartbeat: () => Promise<boolean>, timer: (ms: number) => Promise<void>,
+): <T>(work: Promise<T>) => Promise<T> {
+  return async <T>(work: Promise<T>): Promise<T> => {
+    let settled = false;
+    const guarded = work.finally(() => { settled = true; });
+    const settledSignal = guarded.then(() => undefined, () => undefined);
+    const beat = async () => {
+      while (!settled) {
+        await Promise.race([timer(HEARTBEAT_MS), settledSignal]);
+        if (!settled) await heartbeat();
+      }
+    };
+    const [result] = await Promise.all([guarded, beat()]);
+    return result;
+  };
+}
+
 const IDLE: RunWorkerResult = {
   picked: false, jobId: null, status: null, phase: null, stepsRun: 0, handedOff: false,
 };
@@ -147,13 +177,14 @@ export async function runWorkerOnce(args: RunWorkerArgs): Promise<RunWorkerResul
 
   let job = claimed[0];
   const ctx: WorkerContext = { client, callModel };
-  const skip = new Set<string>();
   const startedAt = clock();
   let stepsThisRun = 0;
+  const heartbeat = createHeartbeat(client, job.id, leaseSeconds, clock);
   const env: StepEnv = {
     stopClaimingAt: startedAt + budgetMs,
     hardDeadlineAt: startedAt + Math.max(budgetMs, HARD_DEADLINE_MS),
-    shouldStop: createHeartbeat(client, job.id, leaseSeconds, clock),
+    shouldStop: heartbeat,
+    keepAlive: createKeepAlive(heartbeat, args.heartbeatTimer ?? realSleep),
     sleep: args.sleep ?? realSleep,
     now: clock,
   };
@@ -172,7 +203,9 @@ export async function runWorkerOnce(args: RunWorkerArgs): Promise<RunWorkerResul
       .update({
         ...result.patch,
         phase: result.phase,
-        steps_run: next.steps_run + 1,
+        // A step that only waited for another owner is not progress; counting
+        // it would let a long manual generation exhaust MAX_JOB_STEPS.
+        steps_run: next.steps_run + (result.waiting ? 0 : 1),
         soft_errors: softErrors,
         lease_expires_at: new Date(clock() + leaseSeconds * 1000).toISOString(),
         updated_at: new Date(clock()).toISOString(),
@@ -239,7 +272,7 @@ export async function runWorkerOnce(args: RunWorkerArgs): Promise<RunWorkerResul
 
     let step: StepResult;
     try {
-      step = await executeStep(ctx, job, skip, env);
+      step = await executeStep(ctx, job, env);
     } catch (err) {
       // Recorded where the admin sees it, then retried a bounded number of times.
       const reason = message(err);
@@ -253,8 +286,6 @@ export async function runWorkerOnce(args: RunWorkerArgs): Promise<RunWorkerResul
       await handOff();
       return result({ status: "queued", handedOff: true });
     }
-
-    for (const type of step.skipTypes ?? []) skip.add(type);
 
     const updated = await writeProgress(job, step);
     if (!updated) {
