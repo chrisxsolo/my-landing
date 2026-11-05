@@ -6,6 +6,7 @@
 // noindex (excluded from the sitemap too); it becomes indexable once posts exist.
 
 import type { Metadata } from "next";
+import { buildPageMetadata } from "@/lib/seo/siteMetadata";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import OptimizedPhoto from "@/app/components/OptimizedPhoto";
@@ -31,15 +32,13 @@ export async function generateMetadata({
   if (!cat) return {};
   const path = `/blog/category/${cat.slug}`;
   const posts = await getJournalPostsForCategory(cat.slug);
-  return {
+  return buildPageMetadata({
     title: cat.title,
     description: cat.description,
-    alternates: { canonical: path },
+    path,
     // Thin while empty: keep out of the index until there's at least one post.
     ...(posts.length === 0 ? { robots: { index: false, follow: true } } : {}),
-    openGraph: { title: `${cat.title} | SoloXSnaps`, description: cat.description, url: path, type: "website", siteName: "soloxsnaps" },
-    twitter: { card: "summary_large_image", title: `${cat.title} | SoloXSnaps`, description: cat.description },
-  };
+  });
 }
 
 function formatDate(iso: string) {

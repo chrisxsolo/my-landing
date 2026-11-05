@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { buildPageMetadata } from "@/lib/seo/siteMetadata";
 import Link from "next/link";
 import { Suspense } from "react";
 import OptimizedPhoto from "@/app/components/OptimizedPhoto";
@@ -20,18 +21,10 @@ const EXPECTATIONS = [
   `${BOOKING_POLICY.retainerPercent}% ${BOOKING_POLICY.retainerRefundability} retainer to reserve your session`,
 ];
 
-export const metadata: Metadata = {
-  title: PAGE_TITLE,
-  description: DESCRIPTION,
-  alternates: { canonical: "/contact" },
-  openGraph: {
-    title: SOCIAL_TITLE,
-    description: DESCRIPTION,
-    type: "website",
-    siteName: "SoloXSnaps",
-  },
-  twitter: { card: "summary_large_image", title: SOCIAL_TITLE, description: DESCRIPTION },
-};
+// This route has its own opengraph-image.tsx, which Next injects as the share image.
+export const metadata: Metadata = buildPageMetadata({
+  title: PAGE_TITLE, socialTitle: SOCIAL_TITLE, description: DESCRIPTION, path: "/contact", image: null,
+});
 
 function ContactFormFallback() {
   return (

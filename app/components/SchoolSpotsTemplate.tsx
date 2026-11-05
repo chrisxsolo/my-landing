@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { buildPageMetadata, type SocialImage } from "@/lib/seo/siteMetadata";
 import Link from "next/link";
 import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
 import { buildBookingIntentParams } from "@/lib/bookingIntent";
@@ -13,26 +14,27 @@ import { SPOTS_BASE_CSS } from "./schoolSpotsBaseStyles";
 // colocated data.ts — and links back to the landing page (the cluster hub).
 // When data.ts also provides a spotsGuide, the long-form guide renders instead.
 
-export function buildSpotsMetadata(data: SchoolLandingData): Metadata {
+export function buildSpotsMetadata(data: SchoolLandingData, image?: SocialImage): Metadata {
+  const path = `${data.canonicalPath}/spots`;
   const guide = data.spotsGuide;
   if (guide) {
-    return {
+    return buildPageMetadata({
       title: guide.metaTitle,
       description: guide.metaDescription,
-      alternates: { canonical: `${data.canonicalPath}/spots` },
+      path,
       keywords: [...guide.keywords, "soloxsnaps"],
-      openGraph: { title: guide.metaTitle, description: guide.metaDescription, type: "website", siteName: "soloxsnaps" },
-    };
+      image,
+    });
   }
   const title = `Best ${data.school} Graduation Photo Spots`;
   const topSpots = data.spots.slice(0, 3).map((s) => s.name).join(", ");
   const description = `The best places for graduation photos at ${data.school}${
     topSpots ? ` — ${topSpots} and more` : ""
   }, with the best time of day for each. Guided grad sessions by Chris Solorzano.`;
-  return {
+  return buildPageMetadata({
     title,
     description,
-    alternates: { canonical: `${data.canonicalPath}/spots` },
+    path,
     keywords: [
       `best ${data.school} graduation photo spots`,
       `${data.schoolShort} graduation photo locations`,
@@ -40,8 +42,8 @@ export function buildSpotsMetadata(data: SchoolLandingData): Metadata {
       `${data.school} graduation photographer`,
       "soloxsnaps",
     ],
-    openGraph: { title, description, type: "website", siteName: "soloxsnaps" },
-  };
+    image,
+  });
 }
 
 

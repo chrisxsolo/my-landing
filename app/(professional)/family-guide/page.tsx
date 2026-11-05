@@ -4,6 +4,7 @@
 // Family portfolio photos are fetched here on the server (ISR) and passed down.
 
 import type { Metadata } from "next";
+import { buildPageMetadata } from "@/lib/seo/siteMetadata";
 import FamilyGuideContent from "./FamilyGuideContent";
 import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
 import { getPortfolioData } from "@/lib/professionalData";
@@ -22,10 +23,14 @@ const OG_TITLE = "San Francisco Family Photography Guide | SoloXSnaps";
 const DESCRIPTION =
   "Plan your San Francisco family photo session with location ideas, outfit guidance, preparation tips, lighting advice, and family photography resources from SoloXSnaps.";
 
-export const metadata: Metadata = {
+// This route has its own opengraph-image.tsx, which Next injects as the share image.
+export const metadata: Metadata = buildPageMetadata({
   title: TITLE,
+  socialTitle: OG_TITLE,
   description: DESCRIPTION,
-  alternates: { canonical: PATH },
+  path: PATH,
+  type: "website",
+  image: null,
   keywords: [
     "San Francisco family photographer",
     "Bay Area family photographer",
@@ -36,19 +41,7 @@ export const metadata: Metadata = {
     "outdoor family photographer San Francisco",
     "soloxsnaps",
   ],
-  openGraph: {
-    title: OG_TITLE,
-    description: DESCRIPTION,
-    url: PATH,
-    type: "website",
-    siteName: "soloxsnaps",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: OG_TITLE,
-    description: DESCRIPTION,
-  },
-};
+});
 
 export default async function FamilyGuidePage() {
   const { images } = await getPortfolioData();

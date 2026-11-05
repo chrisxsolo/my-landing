@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { buildPageMetadata } from "@/lib/seo/siteMetadata";
 import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
@@ -41,18 +42,17 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!post) return { title: "Not Found" };
   const plain = toPlainText(post.body);
   const description = post.meta_description || (plain.length > 155 ? `${plain.slice(0, 155).trim()}…` : plain);
-  return {
+  const image = post.og_image_url || post.cover_image_url;
+  return buildPageMetadata({
     title: post.title,
     description,
-    alternates: { canonical: `/blog/${post.slug}` },
-    keywords: post.meta_keywords ?? undefined,
-    openGraph: {
-      title: post.title, description, type: "article",
-      publishedTime: post.published_at,
-      images: post.og_image_url || post.cover_image_url
-        ? [post.og_image_url || post.cover_image_url || ""] : undefined,
-    },
-  };
+    path: `/blog/${post.slug}`,
+    type: "article",
+    publishedTime: post.published_at,
+    ...(post.meta_keywords ? { keywords: post.meta_keywords } : {}),
+    // The post's own cover; the brand image only when a post has none.
+    ...(image ? { image: { url: image, alt: post.cover_image_alt || post.title } } : {}),
+  });
 }
 
 const CSS = `

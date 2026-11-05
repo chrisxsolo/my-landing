@@ -4,6 +4,7 @@
 // the individual pages, not here. Mirrors the couples locations hub.
 
 import type { Metadata } from "next";
+import { buildPageMetadata } from "@/lib/seo/siteMetadata";
 import Link from "next/link";
 import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
 import { PORTRAIT_GUIDE_CSS } from "@/lib/portraitGuide/styles";
@@ -18,10 +19,10 @@ const TITLE = "Best Portrait Photo Locations in San Francisco";
 const DESCRIPTION =
   "Explore natural, urban, and iconic portrait photo locations in San Francisco, including Golden Gate Park, the Palace of Fine Arts, the Embarcadero, Baker Beach, and the Mission District murals.";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildPageMetadata({
   title: TITLE,
   description: DESCRIPTION,
-  alternates: { canonical: PATH },
+  path: PATH,
   keywords: [
     "best portrait photo locations San Francisco",
     "portrait photography locations Bay Area",
@@ -29,9 +30,7 @@ export const metadata: Metadata = {
     "San Francisco portrait photographer",
     "lifestyle photoshoot locations San Francisco",
   ],
-  openGraph: { title: TITLE, description: DESCRIPTION, url: PATH, type: "website", siteName: "soloxsnaps" },
-  twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION },
-};
+});
 
 // ISR: database guides (approved Content Engine proposals) join the hand-written
 // ones; publishing a guide revalidates this page.

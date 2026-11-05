@@ -3,6 +3,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { Metadata } from "next";
+import { buildPageMetadata } from "@/lib/seo/siteMetadata";
 import { getBlogPostSummaries, type BlogPostSummary } from "@/lib/professionalData";
 import { getJournalServicesByPostId } from "@/lib/blog/journalServices";
 import { buildCategoryFilters, resolvePostCategories, type PostCategory } from "@/lib/blog/postCategories";
@@ -17,16 +18,11 @@ import { BLOG_FILTER_CSS } from "./blogFilterStyles";
 // and its canonical.
 export const revalidate = 3600;
 
-export const metadata: Metadata = {
-  title: "Journal",
-  description: "Session notes and case studies from soloxsnaps in San Francisco and the Bay Area.",
-  alternates: { canonical: "/blog" },
-  openGraph: {
-    title: "Journal | soloxsnaps",
-    description: "Professional photography case studies and session notes from soloxsnaps.",
-    type: "website",
-  },
-};
+export const metadata: Metadata = buildPageMetadata({
+  title: "Photography Journal: Bay Area Session Stories",
+  description: "Session notes and case studies from SoloXSnaps: graduation, couples, and family photography across San Francisco and the Bay Area.",
+  path: "/blog",
+});
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", {

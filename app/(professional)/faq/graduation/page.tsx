@@ -2,6 +2,7 @@
 // Server component — exports metadata. Client interactivity lives in GraduationFAQClient.tsx.
 
 import type { Metadata } from "next";
+import { buildPageMetadata } from "@/lib/seo/siteMetadata";
 import GraduationFAQClient from "./GraduationFAQClient";
 import { FAQS } from "./graduationFaqData";
 import { buildFaqJsonLd } from "../faqSchema";
@@ -10,17 +11,11 @@ import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
 const FAQ_DESCRIPTION =
   "Everything about graduation photography sessions — booking, caps & gowns, campus locations, props, delivery, and more.";
 
-export const metadata: Metadata = {
-  title: "Graduation FAQ",
+export const metadata: Metadata = buildPageMetadata({
+  title: "Graduation Photography FAQ",
   description: FAQ_DESCRIPTION,
-  alternates: { canonical: "/faq/graduation" },
-  openGraph: {
-    title: "Graduation FAQ | soloxsnaps",
-    description: FAQ_DESCRIPTION,
-    type: "website",
-    siteName: "soloxsnaps",
-  },
-};
+  path: "/faq/graduation",
+});
 
 export default function GraduationFAQPage() {
   const jsonLd = buildFaqJsonLd(FAQS);

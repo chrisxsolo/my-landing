@@ -23,6 +23,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { Metadata } from "next";
+import { buildPageMetadata } from "@/lib/seo/siteMetadata";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import OptimizedPhoto from "@/app/components/OptimizedPhoto";
@@ -55,16 +56,11 @@ const CURATED_LIMIT = 30;
 // loads eagerly; everything below waits until scrolled near.
 const FIRST_ROW_PHOTOS = 4;
 
-export const metadata: Metadata = {
-  title: "Portfolio",
+export const metadata: Metadata = buildPageMetadata({
+  title: "Bay Area Graduation & Couples Photography Portfolio",
   description: "Portfolio of Bay Area graduation and couples photography by Chris Solorzano, with family and portrait sessions also featured.",
-  alternates: { canonical: "/portfolio" },
-  openGraph: {
-    title: "Portfolio | soloxsnaps",
-    description: "Bay Area graduation and couples photography by Chris Solorzano.",
-    type: "website",
-  },
-};
+  path: "/portfolio",
+});
 
 export default async function PortfolioPage({
   searchParams,

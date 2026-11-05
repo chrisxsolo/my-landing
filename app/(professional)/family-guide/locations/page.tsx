@@ -4,6 +4,7 @@
 // lives on the individual pages, not here.
 
 import type { Metadata } from "next";
+import { buildPageMetadata } from "@/lib/seo/siteMetadata";
 import Link from "next/link";
 import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
 import { FAMILY_GUIDE_CSS } from "@/lib/familyGuide/styles";
@@ -18,10 +19,10 @@ const TITLE = "Best Family Photo Locations in San Francisco and the Bay Area";
 const DESCRIPTION =
   "Explore beautiful family photo locations in San Francisco and the Bay Area, including the Palace of Fine Arts, Crissy Field, Lovers' Lane, and Redwood Grove.";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildPageMetadata({
   title: TITLE,
   description: DESCRIPTION,
-  alternates: { canonical: PATH },
+  path: PATH,
   keywords: [
     "best family photo locations in San Francisco",
     "family photography locations Bay Area",
@@ -29,9 +30,7 @@ export const metadata: Metadata = {
     "San Francisco family photographer",
     "Bay Area family photographer",
   ],
-  openGraph: { title: TITLE, description: DESCRIPTION, url: PATH, type: "website", siteName: "soloxsnaps" },
-  twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION },
-};
+});
 
 // ISR: database guides (approved Content Engine proposals) join the hand-written
 // ones; publishing a guide revalidates this page.

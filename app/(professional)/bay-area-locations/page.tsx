@@ -4,6 +4,7 @@
 // professional graduation guide (sage/green, frosted glass).
 
 import type { Metadata } from "next";
+import { buildPageMetadata } from "@/lib/seo/siteMetadata";
 import { getPublicLocations, type PublicLocationCard } from "@/lib/locationLibrary/publicData";
 import { environmentLabel, regionLabel, sessionKindLabel } from "@/lib/locationLibrary/taxonomy";
 import { buildBreadcrumbJsonLd, SITE_URL } from "@/lib/breadcrumbs";
@@ -18,12 +19,10 @@ const PAGE_TITLE = "Bay Area Photo Location Guide";
 const PAGE_DESCRIPTION =
   "Explore Chris Solorzano's favorite Bay Area photo locations for portraits, couples, creative shoots, beaches, South Bay, San Francisco, East Bay, and Peninsula sessions.";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildPageMetadata({
   title: PAGE_TITLE,
   description: PAGE_DESCRIPTION,
-  alternates: {
-    canonical: PATH,
-  },
+  path: PATH,
   keywords: [
     "Bay Area photo locations",
     "Bay Area portrait photographer",
@@ -35,18 +34,7 @@ export const metadata: Metadata = {
     "Bay Area beaches photoshoot",
     "portrait session locations",
   ],
-  openGraph: {
-    title: PAGE_TITLE,
-    description: PAGE_DESCRIPTION,
-    type: "website",
-    siteName: "soloxsnaps",
-  },
-  twitter: {
-    card: "summary",
-    title: PAGE_TITLE,
-    description: PAGE_DESCRIPTION,
-  },
-};
+});
 
 function getLocationsJsonLd(locations: PublicLocationCard[]) {
   return {

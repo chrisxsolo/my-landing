@@ -1,7 +1,11 @@
-export const metadata = {
+import type { Metadata } from "next";
+import { buildPageMetadata } from "@/lib/seo/siteMetadata";
+
+export const metadata: Metadata = buildPageMetadata({
   title: "Privacy Policy",
-  description: "How soloxsnaps collects, uses, and protects your personal information.",
-};
+  description: "How SoloXSnaps collects, uses, and protects the personal information you share when you inquire or book a session.",
+  path: "/privacy",
+});
 
 export default function PrivacyPage() {
   return (

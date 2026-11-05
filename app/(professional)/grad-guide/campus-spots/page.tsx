@@ -3,6 +3,7 @@
 // Content is server-rendered in CampusSpotsContent.tsx.
 
 import type { Metadata } from "next";
+import { buildPageMetadata } from "@/lib/seo/siteMetadata";
 import CampusSpotsContent from "./CampusSpotsContent";
 import { getLocationSpots } from "@/lib/gradGuideData";
 import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
@@ -19,17 +20,12 @@ const TITLE = "Best Campus Spots for Graduation Photos — Bay Area Guide";
 const DESCRIPTION =
   "Where to shoot your graduation photos at SJSU, UC Berkeley, SF State, Cal State East Bay, and USF — the best spots on each Bay Area campus and when to show up.";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildPageMetadata({
   title: TITLE,
   description: DESCRIPTION,
-  alternates: { canonical: PATH },
-  openGraph: {
-    title: TITLE,
-    description: DESCRIPTION,
-    type: "article",
-    siteName: "soloxsnaps",
-  },
-};
+  path: PATH,
+  type: "article",
+});
 
 export default async function CampusSpotsPage() {
   // Schools with a location guide (USF) take their spot text from it. Spots

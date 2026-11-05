@@ -3,6 +3,7 @@
 // Content is server-rendered in PosingContent.tsx.
 
 import type { Metadata } from "next";
+import { buildPageMetadata } from "@/lib/seo/siteMetadata";
 import PosingContent from "./PosingContent";
 import ContextualTestimonials from "@/app/components/ContextualTestimonials";
 import { getContextualTestimonials } from "@/lib/testimonialsData";
@@ -19,17 +20,12 @@ const TITLE = "How to Pose for Graduation Photos — Bay Area Guide";
 const DESCRIPTION =
   "Natural, flattering graduation photo poses that actually look good on camera — posing tips for caps, gowns, and campus portraits across the Bay Area.";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildPageMetadata({
   title: TITLE,
   description: DESCRIPTION,
-  alternates: { canonical: PATH },
-  openGraph: {
-    title: TITLE,
-    description: DESCRIPTION,
-    type: "article",
-    siteName: "soloxsnaps",
-  },
-};
+  path: PATH,
+  type: "article",
+});
 
 export default async function PosingPage() {
   const [testimonials, poses] = await Promise.all([

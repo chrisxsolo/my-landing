@@ -5,6 +5,7 @@
 // Lives on the professional site and renders inside ProfessionalLayout.
 
 import type { Metadata } from "next";
+import { buildPageMetadata } from "@/lib/seo/siteMetadata";
 import GradGuideContent from "./GradGuideContent";
 import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
 
@@ -18,23 +19,14 @@ const TITLE = "Bay Area Graduation Photo Guide — Posing, Outfits & Prep";
 const DESCRIPTION =
   "Your complete guide to graduation photos in the Bay Area — posing tips, what to wear, how to prepare, and the best campus spots at SJSU, UC Berkeley, SF State, USF, and CSU East Bay.";
 
-export const metadata: Metadata = {
+// This route has its own opengraph-image.tsx, which Next injects as the share image.
+export const metadata: Metadata = buildPageMetadata({
   title: TITLE,
+  socialTitle: "Bay Area Graduation Photo Guide | SoloXSnaps",
   description: DESCRIPTION,
-  alternates: { canonical: PATH },
-  openGraph: {
-    title: "Bay Area Graduation Photo Guide | soloxsnaps",
-    description: DESCRIPTION,
-    url: PATH,
-    type: "website",
-    siteName: "soloxsnaps",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Bay Area Graduation Photo Guide | soloxsnaps",
-    description: DESCRIPTION,
-  },
-};
+  path: PATH,
+  image: null,
+});
 
 export default function GradGuidePage() {
   const articleLd = {

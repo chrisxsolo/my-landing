@@ -5,6 +5,7 @@
 // config entry + a thin page.tsx; no template changes.
 
 import type { Metadata } from "next";
+import { buildPageMetadata } from "@/lib/seo/siteMetadata";
 import Link from "next/link";
 import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
 import { FAMILY_GUIDE_CSS } from "@/lib/familyGuide/styles";
@@ -14,14 +15,12 @@ const SITE_URL = "https://www.soloxsnaps.com";
 const FAMILY_CONTACT = "/contact?sessionType=Family+Session";
 
 export function buildSupportingMetadata(topic: SupportingTopic): Metadata {
-  const path = `/family-guide/${topic.slug}`;
-  return {
+  return buildPageMetadata({
     title: topic.metaTitle,
     description: topic.metaDescription,
-    alternates: { canonical: path },
-    openGraph: { title: `${topic.metaTitle} | SoloXSnaps`, description: topic.metaDescription, url: path, type: "article", siteName: "soloxsnaps" },
-    twitter: { card: "summary_large_image", title: `${topic.metaTitle} | SoloXSnaps`, description: topic.metaDescription },
-  };
+    path: `/family-guide/${topic.slug}`,
+    type: "article",
+  });
 }
 
 // Cross-links shown on every supporting page: the other supporting topics plus

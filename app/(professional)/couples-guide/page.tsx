@@ -5,6 +5,7 @@
 // for variety) and the published couples location guides.
 
 import type { Metadata } from "next";
+import { buildPageMetadata } from "@/lib/seo/siteMetadata";
 import CouplesGuideContent from "./CouplesGuideContent";
 import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
 import { getCouplesPortfolio, type CouplesPortfolioPhoto } from "@/lib/couplesPortfolio";
@@ -23,10 +24,14 @@ const OG_TITLE = `${HEADLINE} | SoloXSnaps`;
 const DESCRIPTION =
   "Plan your Bay Area couples photos: the best couples photoshoot locations, what to wear, golden hour timing, how posing works, pricing, and answers to common questions.";
 
-export const metadata: Metadata = {
+// This route has its own opengraph-image.tsx, which Next injects as the share image.
+export const metadata: Metadata = buildPageMetadata({
   title: TITLE,
+  socialTitle: OG_TITLE,
   description: DESCRIPTION,
-  alternates: { canonical: PATH },
+  path: PATH,
+  type: "article",
+  image: null,
   keywords: [
     "Bay Area couples photography guide",
     "best couples photoshoot locations Bay Area",
@@ -35,19 +40,7 @@ export const metadata: Metadata = {
     "couples photoshoot tips",
     "golden hour couples photography",
   ],
-  openGraph: {
-    title: OG_TITLE,
-    description: DESCRIPTION,
-    url: PATH,
-    type: "article",
-    siteName: "soloxsnaps",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: OG_TITLE,
-    description: DESCRIPTION,
-  },
-};
+});
 
 // First photo of each session, so the photo band shows three different shoots.
 function onePerSession(photos: CouplesPortfolioPhoto[], hero: CouplesPortfolioPhoto | null) {

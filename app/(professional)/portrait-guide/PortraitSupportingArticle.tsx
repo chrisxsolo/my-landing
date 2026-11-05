@@ -5,6 +5,7 @@
 // config entry + a thin page.tsx; no template changes. Mirrors the couples guide.
 
 import type { Metadata } from "next";
+import { buildPageMetadata } from "@/lib/seo/siteMetadata";
 import Link from "next/link";
 import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
 import { PORTRAIT_GUIDE_CSS } from "@/lib/portraitGuide/styles";
@@ -14,14 +15,12 @@ const SITE_URL = "https://www.soloxsnaps.com";
 const PORTRAIT_CONTACT = "/contact?sessionType=Individual+Portrait";
 
 export function buildSupportingMetadata(topic: SupportingTopic): Metadata {
-  const path = `/portrait-guide/${topic.slug}`;
-  return {
+  return buildPageMetadata({
     title: topic.metaTitle,
     description: topic.metaDescription,
-    alternates: { canonical: path },
-    openGraph: { title: `${topic.metaTitle} | SoloXSnaps`, description: topic.metaDescription, url: path, type: "article", siteName: "soloxsnaps" },
-    twitter: { card: "summary_large_image", title: `${topic.metaTitle} | SoloXSnaps`, description: topic.metaDescription },
-  };
+    path: `/portrait-guide/${topic.slug}`,
+    type: "article",
+  });
 }
 
 // Cross-links shown on every supporting page: the other supporting topics plus

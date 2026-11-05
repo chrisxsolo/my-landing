@@ -19,6 +19,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { Metadata } from "next";
+import { buildPageMetadata } from "@/lib/seo/siteMetadata";
 import Link from "next/link";
 import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 import { BOOKING_POLICY, PRICING_CATALOG } from "@/lib/pricingCatalog";
@@ -39,16 +40,12 @@ import { resolveAboutPhotoUrl } from "@/lib/aboutPhotoUrl";
 // via the admin revalidate ping (see /api/admin/revalidate).
 export const revalidate = 3600;
 
-export const metadata: Metadata = {
-  title: "About",
-  description: "Meet Chris Solorzano, the San Francisco based photographer behind soloxsnaps.",
-  alternates: { canonical: "/about" },
-  openGraph: {
-    title: "About | soloxsnaps",
-    description: "Meet Chris Solorzano, the San Francisco based photographer behind soloxsnaps.",
-    type: "profile",
-  },
-};
+export const metadata: Metadata = buildPageMetadata({
+  title: "About Chris Solorzano, Bay Area Photographer",
+  description: "Meet Chris Solorzano, the San Francisco photographer behind SoloXSnaps: guided graduation, couples, and family sessions across the Bay Area.",
+  path: "/about",
+  type: "profile",
+});
 
 // ── PORTRAIT PHOTO ────────────────────────────────────────────────────────────
 // To change: drop a new file in public/images/about/ (or paste a Supabase URL).

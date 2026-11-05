@@ -27,6 +27,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { Metadata } from "next";
+import { buildPageMetadata } from "@/lib/seo/siteMetadata";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { todayInClientSessionTimeZone } from "@/lib/clientSessions";
 import AvailabilityCalendar, { type AvailDate } from "./AvailabilityCalendar";
@@ -38,18 +39,10 @@ const SOCIAL_TITLE = `${PAGE_TITLE} | SoloXSnaps`;
 const DESCRIPTION =
   "See open dates for Bay Area graduation, couples, family, and portrait photography sessions with Chris Solorzano. Check availability before you book.";
 
-export const metadata: Metadata = {
-  title: PAGE_TITLE,
-  description: DESCRIPTION,
-  alternates: { canonical: "/availability" },
-  openGraph: {
-    title: SOCIAL_TITLE,
-    description: DESCRIPTION,
-    type: "website",
-    siteName: "SoloXSnaps",
-  },
-  twitter: { card: "summary_large_image", title: SOCIAL_TITLE, description: DESCRIPTION },
-};
+// This route has its own opengraph-image.tsx, which Next injects as the share image.
+export const metadata: Metadata = buildPageMetadata({
+  title: PAGE_TITLE, socialTitle: SOCIAL_TITLE, description: DESCRIPTION, path: "/availability", image: null,
+});
 
 export default async function AvailabilityPage() {
   const supabase = createSupabaseServerClient();

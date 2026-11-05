@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import type { Metadata } from "next";
+import { buildPageMetadata } from "@/lib/seo/siteMetadata";
 import HomeAboutExperience from "@/app/components/HomeAboutExperience";
 import HomeFeaturedWork from "@/app/components/HomeFeaturedWork";
 import HomeFinalCTA from "@/app/components/HomeFinalCTA";
@@ -35,10 +36,11 @@ const description =
 const SOCIAL_IMAGE = "/images/about/chris-solorzano-sunset-beach-og.jpg";
 const HOME_ABOUT_PORTRAIT = "/images/about/chris-solorzano-sunset-beach.webp";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildPageMetadata({
   title: PAGE_TITLE,
+  socialTitle: SOCIAL_TITLE,
   description,
-  alternates: { canonical: "/" },
+  path: "/",
   keywords: [
     "Bay Area graduation photographer",
     "Bay Area couples photographer",
@@ -48,20 +50,8 @@ export const metadata: Metadata = {
     "graduation photography Bay Area",
     "Chris Solorzano photographer",
   ],
-  openGraph: {
-    title: SOCIAL_TITLE,
-    description,
-    type: "website",
-    siteName: "SoloXSnaps",
-    images: [{ url: SOCIAL_IMAGE, width: 1200, height: 630, alt: "San Francisco photographer Chris Solorzano" }],
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: SOCIAL_TITLE,
-    description,
-    images: [SOCIAL_IMAGE],
-  },
-};
+  image: { url: SOCIAL_IMAGE, width: 1200, height: 630, alt: "San Francisco photographer Chris Solorzano" },
+});
 
 const COLOR_VARS = {
   "--home-ink": C.ink,

@@ -15,6 +15,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { Metadata } from "next";
+import { buildPageMetadata } from "@/lib/seo/siteMetadata";
 import type { CSSProperties } from "react";
 import Link from "next/link";
 import OptimizedPhoto from "@/app/components/OptimizedPhoto";
@@ -36,11 +37,11 @@ const maternity = PRICING_CATALOG.maternity;
 const TURNAROUND_WEEKS = PRICING_CATALOG.standardTurnaroundDays / 7;
 const DURATION_LABEL = `${maternity.durationMinutes / 60}-hour session`;
 
-export const metadata: Metadata = {
-  title: "Maternity Photography Pricing",
+export const metadata: Metadata = buildPageMetadata({
+  title: "Bay Area Maternity Photography Pricing",
   description: `Bay Area maternity photography: ${formatCurrency(maternity.price)} for a ${DURATION_LABEL} with your partner and immediate family, guided posing, and ${maternity.minimumImages}+ edited images.`,
-  alternates: { canonical: "/pricing/maternity" },
-};
+  path: "/pricing/maternity",
+});
 
 const mediaVars = {
   "--pricing-media-h": "580px",

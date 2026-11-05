@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { DEFAULT_SOCIAL_IMAGE, SITE_NAME } from "@/lib/seo/siteMetadata";
 import { DM_Sans } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
@@ -20,12 +21,16 @@ export const metadata: Metadata = {
   description:
     "Bay Area graduation and couples photographer Chris Solorzano, with guided family and portrait sessions also available.",
   applicationName: "SoloXSnaps",
-  // Open Graph — controls how the link looks when shared on Instagram/iMessage
+  // Share defaults for any route that sets no openGraph of its own. Pages that
+  // do set one replace this whole block (Next merges shallowly), so they build
+  // theirs with buildPageMetadata, which fills in the same image and card.
   openGraph: {
-    siteName: "SoloXSnaps",
+    siteName: SITE_NAME,
     type: "website",
     locale: "en_US",
+    images: [DEFAULT_SOCIAL_IMAGE],
   },
+  twitter: { card: "summary_large_image", images: [DEFAULT_SOCIAL_IMAGE.url] },
 };
 
 export default function RootLayout({

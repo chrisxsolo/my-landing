@@ -12,6 +12,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { Metadata } from "next";
+import { buildPageMetadata } from "@/lib/seo/siteMetadata";
 import Link from "next/link";
 import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 import { getEventPricingPhotos, PRICING_PHOTO_SIZES } from "@/lib/pricingPhotos";
@@ -26,11 +27,11 @@ import { PRICING_CATALOG, getBookingPolicyItems } from "@/lib/pricingCatalog";
 // (POST /api/admin/revalidate).
 export const revalidate = 3600;
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildPageMetadata({
   title: "Bay Area Event Photography Pricing",
   description: `Event photography in San Francisco and the Bay Area from ${formatCurrency(PRICING_CATALOG.events.smallEvent.hourlyRate)}/hour with a ${PRICING_CATALOG.events.smallEvent.minimumHours}-hour minimum: candid coverage for reunions, mixers, corporate events, and private celebrations, plus half-day and full-day rates.`,
-  alternates: { canonical: "/pricing/events" },
-};
+  path: "/pricing/events",
+});
 
 // Package photo sizing → read by Pricing.module.css via CSS custom properties.
 const mediaVars = {

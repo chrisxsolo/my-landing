@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { buildPageMetadata, type SocialImage } from "@/lib/seo/siteMetadata";
 import Link from "next/link";
 import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
 import { PRICING_CATALOG } from "@/lib/pricingCatalog";
@@ -66,11 +67,26 @@ export async function getSchoolRelatedPosts(slug: string, limit = 3) {
     .map((post) => ({ slug: post.slug, title: post.title }));
 }
 
-export function buildSchoolMetadata(data: SchoolLandingData): Metadata {
-  return {
+/**
+ * Share image for a campus page: the curated hero photo for that school, else
+ * the static hero in data.ts, else the brand default. Pages call this from
+ * generateMetadata and pass the result to the sync builders below.
+ */
+export async function schoolSocialImage(data: SchoolLandingData): Promise<SocialImage | undefined> {
+  try {
+    const hero = (await getSchoolPagePhotos(data.slug)).hero;
+    if (hero) return { url: hero.image_url, alt: hero.alt, width: hero.width, height: hero.height };
+  } catch (error) {
+    console.error(`[school-metadata] could not read the hero photo for ${data.slug}`, error);
+  }
+  return data.heroImage ? { url: data.heroImage, alt: `${data.school} graduation portrait by SoloXSnaps` } : undefined;
+}
+
+export function buildSchoolMetadata(data: SchoolLandingData, image?: SocialImage): Metadata {
+  return buildPageMetadata({
     title: data.metaTitle,
     description: data.metaDescription,
-    alternates: { canonical: data.canonicalPath },
+    path: data.canonicalPath,
     keywords: [
       `${data.school} graduation photographer`,
       `${data.schoolShort} grad photos`,
@@ -78,13 +94,8 @@ export function buildSchoolMetadata(data: SchoolLandingData): Metadata {
       `graduation photography ${data.city}`,
       "soloxsnaps",
     ],
-    openGraph: {
-      title: data.metaTitle,
-      description: data.metaDescription,
-      type: "website",
-      siteName: "soloxsnaps",
-    },
-  };
+    image,
+  });
 }
 
 // ── TEMPLATE COMPONENT ────────────────────────────────────────────────────────

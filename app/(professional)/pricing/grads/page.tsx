@@ -17,6 +17,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { Metadata } from "next";
+import { buildPageMetadata } from "@/lib/seo/siteMetadata";
 import type { CSSProperties } from "react";
 import Link from "next/link";
 import OptimizedPhoto from "@/app/components/OptimizedPhoto";
@@ -35,11 +36,11 @@ import { BOOKING_POLICY, PRICING_CATALOG, getBookingPolicyItems, graduationGroup
 export const revalidate = 3600;
 
 // ── SEO metadata (tab title + Google description) ────────────────────────────
-export const metadata: Metadata = {
-  title: "Graduation Photography Pricing",
-  description: `Bay Area graduation photography pricing: a ${PRICING_CATALOG.graduation.packages.mini.durationMinutes}-minute mini from $${PRICING_CATALOG.graduation.packages.mini.price}, a 1-hour session at $${PRICING_CATALOG.graduation.packages.standard.price} with ${PRICING_CATALOG.graduation.standardMinimumImages}+ edited images, per-person group rates from $${PRICING_CATALOG.graduation.groupRatesPerPerson[2]} down to $${PRICING_CATALOG.graduation.groupRatesPerPerson[8]} per graduate for groups of 6-8, and campus travel fees listed up front.`,
-  alternates: { canonical: "/pricing/grads" },
-};
+export const metadata: Metadata = buildPageMetadata({
+  title: "Bay Area Graduation Photography Pricing",
+  description: `Graduation photo pricing: a ${PRICING_CATALOG.graduation.packages.mini.durationMinutes}-minute mini from $${PRICING_CATALOG.graduation.packages.mini.price}, a 1-hour session at $${PRICING_CATALOG.graduation.packages.standard.price} with ${PRICING_CATALOG.graduation.standardMinimumImages}+ edited images, group rates from $${PRICING_CATALOG.graduation.groupRatesPerPerson[2]} to $${PRICING_CATALOG.graduation.groupRatesPerPerson[8]} per graduate for groups of 6-8, travel fees listed up front.`,
+  path: "/pricing/grads",
+});
 
 // ── PACKAGE PHOTO SIZING ─────────────────────────────────────────────────────
 // Read by Pricing.module.css (.pricingPackageMedia) via CSS custom properties.

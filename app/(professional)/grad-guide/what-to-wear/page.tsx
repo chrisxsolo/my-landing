@@ -3,6 +3,7 @@
 // Content is server-rendered in WhatToWearContent.tsx.
 
 import type { Metadata } from "next";
+import { buildPageMetadata } from "@/lib/seo/siteMetadata";
 import WhatToWearContent from "./WhatToWearContent";
 import { getGradOutfitTips } from "@/lib/gradGuideData";
 import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
@@ -17,17 +18,12 @@ const TITLE = "What to Wear for Graduation Photos — Bay Area Guide";
 const DESCRIPTION =
   "What to wear for your graduation photos: the colors, fits, and styling that photograph beautifully under your cap and gown at Bay Area campuses.";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildPageMetadata({
   title: TITLE,
   description: DESCRIPTION,
-  alternates: { canonical: PATH },
-  openGraph: {
-    title: TITLE,
-    description: DESCRIPTION,
-    type: "article",
-    siteName: "soloxsnaps",
-  },
-};
+  path: PATH,
+  type: "article",
+});
 
 export default async function WhatToWearPage() {
   const outfits = await getGradOutfitTips();

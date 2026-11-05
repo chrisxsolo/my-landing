@@ -3,6 +3,7 @@
 // Content is server-rendered in HowToPrepareContent.tsx.
 
 import type { Metadata } from "next";
+import { buildPageMetadata } from "@/lib/seo/siteMetadata";
 import HowToPrepareContent from "./HowToPrepareContent";
 import { getGradPrepTips } from "@/lib/gradGuideData";
 import { buildBreadcrumbJsonLd } from "@/lib/breadcrumbs";
@@ -17,17 +18,12 @@ const TITLE = "How to Prepare for Graduation Photos — Bay Area Guide";
 const DESCRIPTION =
   "How to prepare for your graduation photo session — steaming your gown, hair and makeup, props, timing, and everything to do before shoot day.";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildPageMetadata({
   title: TITLE,
   description: DESCRIPTION,
-  alternates: { canonical: PATH },
-  openGraph: {
-    title: TITLE,
-    description: DESCRIPTION,
-    type: "article",
-    siteName: "soloxsnaps",
-  },
-};
+  path: PATH,
+  type: "article",
+});
 
 export default async function HowToPreparePage() {
   const tips = await getGradPrepTips();

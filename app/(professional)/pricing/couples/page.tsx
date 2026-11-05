@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { buildPageMetadata } from "@/lib/seo/siteMetadata";
 import type { CSSProperties } from "react";
 import Link from "next/link";
 import OptimizedPhoto from "@/app/components/OptimizedPhoto";
@@ -16,12 +17,12 @@ import { getCouplesPricingPhoto, PRICING_PHOTO_SIZES } from "@/lib/pricingPhotos
 // (POST /api/admin/revalidate).
 export const revalidate = 3600;
 
-export const metadata: Metadata = {
-  title: "Couples Photography Pricing",
+export const metadata: Metadata = buildPageMetadata({
+  title: "Bay Area Couples Photography Pricing",
   description:
     "Bay Area couples photography pricing by Chris Solorzano — engagement sessions, proposal coverage, anniversary photos, and lifestyle portraits in San Francisco and beyond.",
-  alternates: { canonical: "/pricing/couples" },
-};
+  path: "/pricing/couples",
+});
 
 // Package photo sizing → read by Pricing.module.css via CSS custom properties.
 const mediaVars = {

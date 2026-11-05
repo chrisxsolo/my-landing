@@ -4,6 +4,7 @@
 // visible questions and answers exactly.
 
 import type { Metadata } from "next";
+import { buildPageMetadata } from "@/lib/seo/siteMetadata";
 import FamilyFaqClient from "./FamilyFaqClient";
 import { FAQS } from "./familyFaqData";
 import { buildFaqJsonLd } from "../../faq/faqSchema";
@@ -14,13 +15,7 @@ const TITLE = "Family Photography FAQ";
 const DESCRIPTION =
   "Answers to common San Francisco and Bay Area family photography questions — booking, session length, what to wear, kids, grandparents, delivery, and fall timing.";
 
-export const metadata: Metadata = {
-  title: TITLE,
-  description: DESCRIPTION,
-  alternates: { canonical: PATH },
-  openGraph: { title: `${TITLE} | SoloXSnaps`, description: DESCRIPTION, url: PATH, type: "website", siteName: "soloxsnaps" },
-  twitter: { card: "summary_large_image", title: `${TITLE} | SoloXSnaps`, description: DESCRIPTION },
-};
+export const metadata: Metadata = buildPageMetadata({ title: TITLE, description: DESCRIPTION, path: PATH });
 
 export default function FamilyFaqPage() {
   const jsonLd = buildFaqJsonLd(FAQS);

@@ -4,6 +4,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { Metadata } from "next";
+import { buildPageMetadata } from "@/lib/seo/siteMetadata";
 import Link from "next/link";
 import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 import { getPortfolioData, getSiteSettings } from "@/lib/professionalData";
@@ -23,11 +24,11 @@ const maternityPricing = PRICING_CATALOG.maternity;
 // (POST /api/admin/revalidate).
 export const revalidate = 3600;
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildPageMetadata({
   title: "Bay Area Photography Pricing & Session Rates",
   description: `Photography pricing for San Francisco and the Bay Area: graduation sessions from ${formatCurrency(graduationPricing.packages.mini.price)}, couples from ${formatCurrency(couplesPricing.packages.mini.price)}, plus family, maternity, and elopement rates by Chris Solorzano.`,
-  alternates: { canonical: "/pricing" },
-};
+  path: "/pricing",
+});
 
 // Services sold but not given a card above (event coverage) still get a
 // crawlable link here, so no indexable rates page is orphaned.

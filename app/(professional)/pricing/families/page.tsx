@@ -16,6 +16,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { Metadata } from "next";
+import { buildPageMetadata } from "@/lib/seo/siteMetadata";
 import Link from "next/link";
 import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 import { getPortfolioData, getSiteSettings } from "@/lib/professionalData";
@@ -33,11 +34,11 @@ import { getContextualTestimonials } from "@/lib/testimonialsData";
 export const revalidate = 3600;
 
 // ── SEO metadata (tab title + Google description) ────────────────────────────
-export const metadata: Metadata = {
-  title: "Family Pricing",
+export const metadata: Metadata = buildPageMetadata({
+  title: "Bay Area Family Photography Pricing",
   description: `Bay Area family photography pricing: a ${PRICING_CATALOG.families.packages.standard.durationMinutes}-minute Family Session from $${PRICING_CATALOG.families.packages.standard.price} or a ${PRICING_CATALOG.families.packages.extended.durationMinutes}-minute Extended Family Session at $${PRICING_CATALOG.families.packages.extended.price}, with guided posing.`,
-  alternates: { canonical: "/pricing/families" },
-};
+  path: "/pricing/families",
+});
 
 // ── PACKAGE PHOTO SIZING ─────────────────────────────────────────────────────
 // Read by Pricing.module.css (.pricingPackageMedia) via CSS custom properties.

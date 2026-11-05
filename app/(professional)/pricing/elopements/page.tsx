@@ -14,6 +14,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { Metadata } from "next";
+import { buildPageMetadata } from "@/lib/seo/siteMetadata";
 import type { CSSProperties } from "react";
 import Link from "next/link";
 import OptimizedPhoto from "@/app/components/OptimizedPhoto";
@@ -28,12 +29,12 @@ import { PRICING_CATALOG, getBookingPolicyItems } from "@/lib/pricingCatalog";
 // (POST /api/admin/revalidate).
 export const revalidate = 3600;
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildPageMetadata({
   title: "Elopement & Courthouse Wedding Photographer",
   description:
     "San Francisco Bay Area elopement and courthouse wedding photography starting at $950. Capture your ceremony, intimate moments, and beautiful portraits with SoloXSnaps.",
-  alternates: { canonical: "/pricing/elopements" },
-};
+  path: "/pricing/elopements",
+});
 
 // Package photo sizing → read by Pricing.module.css via CSS custom properties.
 const mediaVars = {

@@ -1,9 +1,12 @@
 import { BOOKING_POLICY, PRICING_CATALOG } from "@/lib/pricingCatalog";
+import type { Metadata } from "next";
+import { buildPageMetadata } from "@/lib/seo/siteMetadata";
 
-export const metadata = {
+export const metadata: Metadata = buildPageMetadata({
   title: "Terms of Service",
-  description: "Terms and conditions for booking and working with soloxsnaps.",
-};
+  description: "Terms and conditions for booking and working with SoloXSnaps: retainers, rescheduling, delivery, and photo usage.",
+  path: "/terms",
+});
 
 export default function TermsPage() {
   return (

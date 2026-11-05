@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import type { Metadata } from "next";
+import { buildPageMetadata } from "@/lib/seo/siteMetadata";
 import { cookies } from "next/headers";
 import { isValidAdminSession } from "@/lib/adminAuthShared";
 import { listCouplesInspirationImages } from "@/lib/couplesInspiration";
@@ -34,18 +35,13 @@ const listPosingPromptsCached = cachePublicContent(
   ["couples-posing-prompts"],
 );
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildPageMetadata({
   title: "Couples Posing Guide",
   description:
-    "Explore the natural, playful, and documentary-inspired posing approach used during SoloXSnaps couples photography sessions in the San Francisco Bay Area",
-  alternates: { canonical: "/couples-posing-guide" },
-  openGraph: {
-    title: "Couples Posing Guide | SoloXSnaps Photography",
-    description:
-      "Natural movement, connection, and storytelling for Bay Area couples sessions.",
-    type: "article",
-  },
-};
+    "Explore the natural, playful, and documentary-inspired posing approach used during SoloXSnaps couples photography sessions in the San Francisco Bay Area.",
+  path: "/couples-posing-guide",
+  type: "article",
+});
 
 type PageProps = {
   searchParams: Promise<{ preview?: string }>;
