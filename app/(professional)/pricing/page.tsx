@@ -10,6 +10,7 @@ import { getPortfolioData, getSiteSettings } from "@/lib/professionalData";
 import { formatCurrency } from "@/lib/pricing";
 import { PRICING_CATALOG } from "@/lib/pricingCatalog";
 import { getPricingCardPhotos, PRICING_PHOTO_SIZES } from "@/lib/pricingPhotos";
+import { PUBLIC_SERVICES } from "@/lib/serviceRegistry";
 import styles from "@/app/(professional)/pricing/Pricing.module.css";
 
 const graduationPricing = PRICING_CATALOG.graduation;
@@ -23,10 +24,14 @@ const maternityPricing = PRICING_CATALOG.maternity;
 export const revalidate = 3600;
 
 export const metadata: Metadata = {
-  title: "Rates",
-  description: "Photography pricing by Chris Solorzano — graduation and couples sessions in the Bay Area, with family and portrait sessions also available.",
+  title: "Bay Area Photography Pricing & Session Rates",
+  description: `Photography pricing for San Francisco and the Bay Area: graduation sessions from ${formatCurrency(graduationPricing.packages.mini.price)}, couples from ${formatCurrency(couplesPricing.packages.mini.price)}, plus family, maternity, and elopement rates by Chris Solorzano.`,
   alternates: { canonical: "/pricing" },
 };
+
+// Services sold but not given a card above (event coverage) still get a
+// crawlable link here, so no indexable rates page is orphaned.
+const ALSO_AVAILABLE = PUBLIC_SERVICES.filter((service) => !service.onPricingHub);
 
 const RATES = [
   {
@@ -156,6 +161,19 @@ export default async function RatesPage() {
 
       {/* ── BOTTOM NOTE ───────────────────────────────────────────────────────── */}
       <section className={`${styles.ratesShell} ${styles.ratesFooterNote}`} style={{ animationDelay: "0.56s" }}>
+        {ALSO_AVAILABLE.length > 0 ? (
+          <p>
+            Also available:{" "}
+            {ALSO_AVAILABLE.map((service, i) => (
+              <span key={service.id}>
+                {i > 0 ? ", " : ""}
+                <Link href={service.pricingPath} className={styles.ratesInlineLink}>
+                  {service.label.toLowerCase()} coverage pricing →
+                </Link>
+              </span>
+            ))}
+          </p>
+        ) : null}
         <p>
           Questions before booking?{" "}
           <Link href="/contact" className={styles.ratesInlineLink}>Send an inquiry →</Link>

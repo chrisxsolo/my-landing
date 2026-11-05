@@ -42,6 +42,10 @@ export const C = {
   dangerBg,
   success,
   proPage: "#f7faf8",
+  // Muted copy on the light professional surfaces. #64716d holds 4.8:1 on
+  // proPage and 4.4:1 on the palest hero gradient; the old #667f79 fell to
+  // 3.7-4.3:1 and failed the audit's contrast check.
+  proMuted: "#64716d",
   proAccent: "#3d6b5e",
   proAccentDark: "#2f554b",
   proAccentSoft: "rgba(61,107,94,0.10)",

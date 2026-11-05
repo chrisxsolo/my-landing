@@ -27,8 +27,8 @@ import { PRICING_CATALOG, getBookingPolicyItems } from "@/lib/pricingCatalog";
 export const revalidate = 3600;
 
 export const metadata: Metadata = {
-  title: "Event Pricing",
-  description: "Event photography pricing by Chris Solorzano — Bay Area event coverage.",
+  title: "Bay Area Event Photography Pricing",
+  description: `Event photography in San Francisco and the Bay Area from ${formatCurrency(PRICING_CATALOG.events.smallEvent.hourlyRate)}/hour with a ${PRICING_CATALOG.events.smallEvent.minimumHours}-hour minimum: candid coverage for reunions, mixers, corporate events, and private celebrations, plus half-day and full-day rates.`,
   alternates: { canonical: "/pricing/events" },
 };
 

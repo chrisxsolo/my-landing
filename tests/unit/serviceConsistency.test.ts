@@ -73,6 +73,12 @@ describe("homepage and hub ↔ pricing", () => {
     }
   });
 
+  it("the /pricing hub still links the services it gives no card (events), so none is orphaned", () => {
+    expect(PUBLIC_SERVICES.some((s) => !s.onPricingHub)).toBe(true);
+    expect(hub).toContain("PUBLIC_SERVICES.filter((service) => !service.onPricingHub)");
+    expect(hub).toContain("href={service.pricingPath}");
+  });
+
   it("homepage prices come from the catalog, not number literals", () => {
     expect(home).not.toMatch(/\$\d{3}/);
   });
