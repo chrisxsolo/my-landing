@@ -1,5 +1,18 @@
 import type { NextConfig } from "next";
 
+// Response headers for every route. Hardening rather than ranking: browsers
+// stop sniffing content types, the site cannot be framed by other origins,
+// referrers shrink to the origin off-site, and unused device APIs are off.
+// No Content-Security-Policy yet: inline styles, Supabase images, Vercel
+// Analytics, Google Fonts, and Google OAuth each need an audited allowlist
+// before one can ship without breaking image delivery or sign-in.
+export const SECURITY_HEADERS = [
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "X-Frame-Options", value: "SAMEORIGIN" },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+];
+
 const nextConfig: NextConfig = {
   // Keep local development output away from the default `.next` folder,
   // which has been getting into a corrupted state on this machine.
@@ -22,6 +35,9 @@ const nextConfig: NextConfig = {
         pathname: "/storage/v1/object/**",
       },
     ],
+  },
+  async headers() {
+    return [{ source: "/(.*)", headers: SECURITY_HEADERS }];
   },
   async redirects() {
     return [
