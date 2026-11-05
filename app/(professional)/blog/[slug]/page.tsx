@@ -212,7 +212,8 @@ export default async function ProfessionalBlogPostPage({ params }: Props) {
         </div>
       </div>
 
-      {/* ── EXTRA IMAGES ── */}
+      {/* ── EXTRA IMAGES ── below the article, so each photo loads as the
+          reader scrolls near it (next/image's default) rather than all at once. */}
       {extraImages.length > 0 && (
         <section style={{
           borderTop: "1px solid rgba(0,0,0,0.07)",
@@ -256,7 +257,6 @@ export default async function ProfessionalBlogPostPage({ params }: Props) {
                     sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                     style={{ objectFit: "cover" }}
                     quality={85}
-                    loading="eager"
                   />
                 </div>
               ))}

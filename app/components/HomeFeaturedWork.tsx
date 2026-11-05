@@ -11,6 +11,19 @@ type HomeImage = Pick<PortfolioImage, "id" | "image_url" | "alt" | "category_slu
 const MAX_IMAGES = 5;
 const MAX_SESSIONS = 2;
 
+// Rendered widths of each mosaic tile (home.module.css / homeResponsive.module.css):
+// a 12-column grid inside the 1180px shell on desktop, two columns on phones
+// where the first and fourth tiles span both. Matching `sizes` to these keeps
+// the browser from requesting a full-viewport photo for a quarter-width tile.
+const MOSAIC_SIZES = [
+  "(max-width: 760px) 100vw, (max-width: 1230px) 42vw, 500px",
+  "(max-width: 760px) 50vw, (max-width: 1230px) 25vw, 300px",
+  "(max-width: 760px) 50vw, (max-width: 1230px) 34vw, 400px",
+  "(max-width: 760px) 100vw, (max-width: 1230px) 25vw, 300px",
+  "(max-width: 760px) 50vw, (max-width: 1230px) 34vw, 400px",
+] as const;
+const SESSION_SIZES = "(max-width: 760px) 100vw, (max-width: 1230px) 50vw, 590px";
+
 export default function HomeFeaturedWork({
   images,
   featuredSessions,
@@ -53,7 +66,7 @@ export default function HomeFeaturedWork({
               <OptimizedPhoto
                 src={image.image_url}
                 alt={image.alt}
-                sizes="(max-width: 760px) 100vw, 40vw"
+                sizes={MOSAIC_SIZES[index] ?? MOSAIC_SIZES[MOSAIC_SIZES.length - 1]}
                 quality={index === 0 ? 90 : 85}
               />
             </div>
@@ -66,7 +79,7 @@ export default function HomeFeaturedWork({
               {sessions.map((session) => (
                 <Link key={session.href} href={session.href} className={`${styles.sessionCard} ${responsive.sessionCard}`}>
                   <div className={styles.sessionImage}>
-                    <OptimizedPhoto src={session.imageUrl} alt={session.imageAlt} sizes="(max-width: 760px) 100vw, 50vw" />
+                    <OptimizedPhoto src={session.imageUrl} alt={session.imageAlt} sizes={SESSION_SIZES} />
                   </div>
                   <div className={styles.sessionBody}>
                     <span className={styles.sessionMeta}>{session.location}</span>

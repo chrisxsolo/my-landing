@@ -6,6 +6,7 @@ import { track } from "@vercel/analytics";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties, MouseEvent } from "react";
 import { SERVICES_SECTION_ID, type HomepageHeroSlide } from "@/lib/homepageData";
+import { addMountedSlides, slidesToMount, wrapSlideIndex } from "@/lib/heroSlides";
 import styles from "@/app/components/HomeHero.module.css";
 
 const AUTOPLAY_INTERVAL_MS = 7000;
@@ -60,23 +61,23 @@ export default function HomeHero({ slides }: { slides: HomepageHeroSlide[] }) {
   const [paused, setPaused] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
   // Slides whose image is in the DOM. The server HTML carries only the first
-  // (preloaded, high priority), so it gets the page's early bandwidth. Once the
-  // page has loaded, every other slide mounts and downloads in the background,
-  // so they are ready long before anyone picks one; a slide picked even
-  // earlier mounts on the spot.
-  const [mountedThrough, setMountedThrough] = useState(0);
+  // (preloaded, high priority), so it gets the page's early bandwidth. After
+  // the page has loaded, only the slide that comes next is fetched; each later
+  // slide is fetched when its predecessor shows (see lib/heroSlides), and a
+  // slide picked out of order mounts on the spot.
+  const [mounted, setMounted] = useState<readonly number[]>([0]);
   const currentRef = useRef(0);
 
   const showSlide = useCallback((index: number, action?: string) => {
-    const next = (index + slides.length) % slides.length;
+    const next = wrapSlideIndex(index, slides.length);
     currentRef.current = next;
     setCurrent(next);
-    setMountedThrough((value) => Math.max(value, next));
+    setMounted((value) => addMountedSlides(value, slidesToMount(next, slides.length)));
     if (action) trackHero(action);
   }, [slides.length]);
 
   useEffect(() => {
-    const warmNext = () => setMountedThrough(slides.length - 1);
+    const warmNext = () => setMounted((value) => addMountedSlides(value, slidesToMount(0, slides.length)));
     if (document.readyState === "complete") {
       const id = window.setTimeout(warmNext, 0);
       return () => window.clearTimeout(id);
@@ -140,7 +141,7 @@ export default function HomeHero({ slides }: { slides: HomepageHeroSlide[] }) {
               data-active={index === current}
               aria-hidden={index !== current}
             >
-              {index <= mountedThrough ? (
+              {mounted.includes(index) ? (
                 <Image
                   src={slide.image_url}
                   alt=""

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import styles from "./couplesPosingGuide.module.css";
 import galleryStyles from "./couplesGallery.module.css";
-import useInspirationPhotoWarmup from "./useInspirationPhotoWarmup";
+import useInspirationPhotoWarmup, { warmInspirationPhoto } from "./useInspirationPhotoWarmup";
 
 type Prompt = {
   number: number;
@@ -101,7 +101,7 @@ export default function CouplesPosingGuideClient({
     if (galleryCategory === "All") return images;
     return images.filter((image) => image.categories.includes(galleryCategory));
   }, [galleryCategory, images]);
-  useInspirationPhotoWarmup(filteredImages);
+  useInspirationPhotoWarmup(filteredImages, activeImage);
 
   const moveLightbox = useCallback((direction: number) => {
     setActiveImage((current) => {
@@ -321,15 +321,18 @@ export default function CouplesPosingGuideClient({
                 type="button"
                 className={galleryStyles.galleryItem}
                 onClick={() => setActiveImage(index)}
+                onPointerEnter={() => warmInspirationPhoto(image)}
+                onFocus={() => warmInspirationPhoto(image)}
                 aria-label={`Open ${image.title}`}
               >
+                {/* Tiles sit below the prompt library, so they load as the
+                    visitor scrolls near them (next/image's default). */}
                 <Image
                   src={image.image_url}
                   alt={image.alt_text || image.title}
                   width={image.width || 1200}
                   height={image.height || 1500}
                   sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                  loading="eager"
                 />
                 <span>{image.title}</span>
               </button>

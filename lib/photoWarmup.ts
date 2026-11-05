@@ -50,19 +50,3 @@ export function warmPhoto(request: PhotoRequest): Promise<void> {
   drainWarmups();
   return ready;
 }
-
-export function schedulePhotoWarmup(callback: () => void) {
-  let cancel = () => {};
-  const schedule = () => {
-    if ("requestIdleCallback" in window) {
-      const id = window.requestIdleCallback(callback, { timeout: 2000 });
-      cancel = () => window.cancelIdleCallback(id);
-    } else {
-      const id = setTimeout(callback, 0);
-      cancel = () => clearTimeout(id);
-    }
-  };
-  if (document.readyState === "complete") schedule();
-  else window.addEventListener("load", schedule, { once: true });
-  return () => { window.removeEventListener("load", schedule); cancel(); };
-}

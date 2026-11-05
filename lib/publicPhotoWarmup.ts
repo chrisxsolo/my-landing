@@ -9,6 +9,10 @@ const PUBLIC_PHOTO_PATHS = [
 ];
 const PAGE_CACHE_MS = 5 * 60 * 1000;
 const MAX_CACHED_PAGES = 32;
+// Photos near the top of the destination are the ones a visitor sees on
+// arrival; the rest load lazily there as usual. Decoding every photo on a
+// gallery page cost megabytes per hovered link.
+export const MAX_PAGE_PHOTOS = 6;
 const pageWarmups = new Map<string, { started: number; ready: Promise<void> }>();
 
 export function getPublicPhotoHref(href: string, currentHref: string): string | null {
@@ -29,7 +33,7 @@ export function readPagePhotos(html: string, pageUrl: string): PhotoRequest[] {
   // page is never inserted into the live document.
   const template = document.createElement("template");
   template.innerHTML = html;
-  return Array.from(template.content.querySelectorAll<HTMLImageElement>("main img"))
+  return limitPagePhotos(Array.from(template.content.querySelectorAll<HTMLImageElement>("main img"))
     .flatMap((image) => {
       const src = image.getAttribute("src");
       if (!src || src.startsWith("data:") || src.startsWith("blob:")) return [];
@@ -37,7 +41,12 @@ export function readPagePhotos(html: string, pageUrl: string): PhotoRequest[] {
       if (url.protocol !== "https:" && url.protocol !== "http:") return [];
       return [{ src: url.href, srcSet: image.getAttribute("srcset") ?? undefined,
         sizes: image.getAttribute("sizes") ?? undefined }];
-    });
+    }));
+}
+
+/** Keeps the first photos in document order: the ones shown on arrival. */
+export function limitPagePhotos(photos: PhotoRequest[]): PhotoRequest[] {
+  return photos.slice(0, MAX_PAGE_PHOTOS);
 }
 
 async function fetchPagePhotos(href: string) {
