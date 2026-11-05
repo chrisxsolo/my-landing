@@ -1,7 +1,14 @@
+"use client";
+
 import { getImageProps } from "next/image";
 import type { CSSProperties } from "react";
 import supabaseImageLoader from "@/lib/supabaseImageLoader";
 
+// Client component on purpose: lib/supabaseImageLoader.ts is a client module
+// (Next's documented loaderFile shape), and a server component may not call
+// it directly. Server pages render <LcpPhoto> with plain string props; it
+// still server-renders its HTML and preload links.
+//
 // The one photo a page paints first (hero or cover). Phones get a lighter
 // encode of the same photo; larger screens keep the full-quality one. On the
 // homepage hero that is 52 KB instead of 123 KB at the 750px phone width,
