@@ -27,9 +27,9 @@ const palace = sfOffCampusSpot("palace-of-fine-arts");
 const legion = sfOffCampusSpot("legion-of-honor");
 
 export const spotsGuide: SchoolSpotsGuide = {
-  metaTitle: "Best USF Graduation Photo Locations",
+  metaTitle: "Best University of San Francisco Graduation Photo Locations",
   metaDescription:
-    "Discover the best USF graduation photo spots, including Gleeson Library, St. Ignatius Church, and Lone Mountain, with lighting and photography tips.",
+    "The best University of San Francisco (USF) graduation photo spots: Gleeson Library, St. Ignatius Church, and Lone Mountain, with lighting and timing tips.",
   keywords: [
     "USF graduation photographer",
     "University of San Francisco graduation photos",
@@ -43,7 +43,7 @@ export const spotsGuide: SchoolSpotsGuide = {
     "USF graduation photoshoot",
     "USF graduation photo guide",
   ],
-  h1: "Best USF Graduation Photo Locations",
+  h1: "Best University of San Francisco (USF) Graduation Photo Locations",
   intro: [
     "The University of San Francisco has some beautiful locations for graduation photography, from the historic architecture of St. Ignatius Church to the modern glass hallway and iconic palm trees at Lone Mountain.",
     "One of my favorite things about photographing USF graduates is the variety of backgrounds we can capture in a single session. We can begin with elegant architectural portraits around the church and library, move into something more modern at the glass hallway, and finish with beautiful sunset photos at Lone Mountain.",

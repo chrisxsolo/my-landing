@@ -44,6 +44,7 @@ export interface SchoolSpot {
 export interface SchoolLandingData {
   school: string;                // "UC Berkeley"
   schoolShort: string;           // "Berkeley"
+  schoolAliases?: string[];      // other names people search, e.g. ["USF", "USFCA"]; shown under the H1
   slug: keyof typeof PRICING_CATALOG.graduation.travelFees;
   city: string;                  // "Berkeley, CA"
   metaTitle: string;
@@ -155,6 +156,7 @@ export default async function SchoolLandingTemplate({ data }: { data: SchoolLand
            visitors see the work before the planning details. */}
       <SchoolHero
         school={data.school}
+        aliases={data.schoolAliases}
         tagline={data.heroTagline}
         contactHref={`/contact?${contactParams}`}
         photo={heroPhoto}

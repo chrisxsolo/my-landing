@@ -15,8 +15,20 @@ import { PhotoThumb, type EditorProps } from "./editorsSimple";
 import { PendingGuideLinksNote } from "./editorsLocationGuide";
 import { JournalPhotoTile, MissingPhotoTile, photoDisplayName } from "./journalPhotoTile";
 import { input, label } from "./ui";
+import { metadataWarnings } from "@/lib/seo/metadataChecks";
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
+
+// Search-snippet advice only; never blocks a save or publish.
+function MetadataWarnings({ title, description }: { title: string; description: string }) {
+  const warnings = metadataWarnings({ title, description });
+  if (warnings.length === 0) return null;
+  return (
+    <ul style={{ margin: "6px 0 0", paddingLeft: 16, color: T.amber, fontSize: 12 }}>
+      {warnings.map((warning) => <li key={warning}>{warning}</li>)}
+    </ul>
+  );
+}
 const arr = (v: unknown) => (Array.isArray(v) ? (v as string[]) : []);
 
 export function JournalEditor(props: EditorProps) {
@@ -80,6 +92,7 @@ export function JournalEditor(props: EditorProps) {
           <span style={label}>Meta description</span>
           <textarea style={{ ...input, minHeight: 48 }} value={str(payload.meta_description)} disabled={disabled}
             onChange={(e) => onEdit({ ...payload, meta_description: e.target.value })} />
+          <MetadataWarnings title={str(payload.title)} description={str(payload.meta_description)} />
         </div>
         <div>
           <span style={label}>Meta keywords (deterministic; editable)</span>

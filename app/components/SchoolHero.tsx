@@ -28,18 +28,24 @@ const HERO_CSS = `
 
 type Props = {
   school: string;
+  aliases?: string[];
   tagline: string;
   contactHref: string;
   photo: PagePhoto | null;
 };
 
-export default function SchoolHero({ school, tagline, contactHref, photo }: Props) {
+export default function SchoolHero({ school, aliases, tagline, contactHref, photo }: Props) {
+  // The full name leads the H1; an acronym that is ambiguous on its own
+  // ("USF" is also South Florida) follows as a secondary cue.
+  const kicker = aliases?.length
+    ? `Bay Area graduation photography · ${aliases.join(" · ")}`
+    : "Bay Area graduation photography";
   return (
     <section className={`school-hero${photo ? " school-hero--photo" : ""}`}>
       <style>{HERO_CSS}</style>
       <div className="school-shell school-hero-grid">
         <div>
-          <p className="school-kicker">Bay Area graduation photography</p>
+          <p className="school-kicker">{kicker}</p>
           <h1 className="school-hero-title">{school} Graduation Photographer</h1>
           <p className="school-hero-sub">{tagline}</p>
           <div className="school-hero-actions">

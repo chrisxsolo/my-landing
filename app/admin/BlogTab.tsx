@@ -4,6 +4,7 @@ import { C } from "@/lib/colors";
 import { uploadImage } from "@/lib/uploadImage";
 import { GRAD_SCHOOL_OPTIONS, GRAD_LOCATION_OPTIONS, GRAD_SESSION_OPTIONS } from "@/lib/portfolioSeoDescription";
 import BlogPostImages from "@/app/admin/BlogPostImages";
+import { metadataWarnings } from "@/lib/seo/metadataChecks";
 
 type BlogCategory = "journal" | "professional";
 type BlogPost = { id: number; title: string; body: string; published_at: string; slug: string; cover_image_url: string | null; extra_image_urls: string[]; category?: BlogCategory | string | null; sites?: string[] | null; meta_description?: string | null; meta_keywords?: string | null; cover_image_alt?: string | null; extra_image_alts?: string[] | null };
@@ -401,6 +402,10 @@ export default function BlogTab({ showToast }: Props) {
                   <span className="text-xs font-bold" style={{ color: postForm.meta_description.length > META_DESCRIPTION_MAX ? "#be123c" : C.p1 }}>{postForm.meta_description.length}/{META_DESCRIPTION_MAX}</span>
                 </div>
                 <textarea className={ta} rows={2} placeholder="One or two sentences that show under the title in Google. If blank, the post body is used." value={postForm.meta_description} onChange={e => setPostForm(f => ({ ...f, meta_description: e.target.value }))} />
+                {/* Search-snippet advice only; long copy still saves. */}
+                {metadataWarnings({ title: postForm.title, description: postForm.meta_description }).map(warning => (
+                  <p key={warning} className="text-xs mt-1.5" style={{ color: C.p2 }}>{warning}</p>
+                ))}
               </div>
               <div>
                 <span className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1.5">Tags / keywords</span>

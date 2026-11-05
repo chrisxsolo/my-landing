@@ -11,19 +11,24 @@ import { spotsGuide } from "./spotsGuide";
 //
 // Not stated on purpose: walking times, parking, interior church or library
 // photography, which building holds the glass hallway, and sun angles.
+// "USF" alone is geographically ambiguous (University of South Florida ranks
+// for it), so the full university name leads the title, H1, and opening copy;
+// USF and USFCA follow as secondary cues. schoolShort stays "USF" because
+// testimonial matching, photo tags, and inquiry detection key on it.
 export const data: SchoolLandingData = {
-  school: "USF",
+  school: "University of San Francisco",
   schoolShort: "USF",
+  schoolAliases: ["USF", "USFCA"],
   slug: "usf",
   city: "San Francisco, CA",
-  metaTitle: "USF Graduation Photographer | University of San Francisco",
+  metaTitle: "University of San Francisco Graduation Photographer",
   metaDescription:
-    "USF graduation portraits by Chris Solorzano at St. Ignatius Church, Gleeson Library and its wolf sculpture, and Lone Mountain at sunset in San Francisco.",
+    "University of San Francisco (USF) graduation portraits by Chris Solorzano at St. Ignatius Church, Gleeson Library and its wolf sculpture, and Lone Mountain at sunset.",
   canonicalPath: "/grads/usf",
   heroTagline:
-    "Graduation portraits at the University of San Francisco, from St. Ignatius Church and Gleeson Library to a sunset finish under the Lone Mountain palm trees.",
+    "Graduation portraits at the University of San Francisco (USF), from St. Ignatius Church and Gleeson Library to a sunset finish under the Lone Mountain palm trees.",
   bodyIntro:
-    "USF gives us a lot of variety in one session: elegant architecture around St. Ignatius Church, Gleeson Library with the Los Lobos de Loyola wolf sculpture right outside it, a modern glass hallway, and the stairs and palm trees of Lone Mountain. I like to start on the main campus and finish at Lone Mountain around sunset.",
+    "The University of San Francisco (USF) gives us a lot of variety in one session: elegant architecture around St. Ignatius Church, Gleeson Library with the Los Lobos de Loyola wolf sculpture right outside it, a modern glass hallway, and the stairs and palm trees of Lone Mountain. I like to start on the main campus and finish at Lone Mountain around sunset.",
   spots: [
     {
       key: "st-ignatius-church",

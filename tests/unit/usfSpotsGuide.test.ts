@@ -163,7 +163,9 @@ describe("USF location guide content", () => {
 
   it("uses the requested title and description on the existing /spots URL", () => {
     const meta = buildSpotsMetadata(usf);
-    expect(meta.title).toBe("Best USF Graduation Photo Locations");
+    // The full university name leads: bare "USF" is also the University of South Florida.
+    expect(meta.title).toBe("Best University of San Francisco Graduation Photo Locations");
+    expect(usf.spotsGuide?.h1).toMatch(/^Best University of San Francisco \(USF\)/);
     expect(meta.alternates?.canonical).toBe("/grads/usf/spots");
     expect(String(meta.description).length).toBeLessThanOrEqual(160);
     expect(meta.description).toMatch(/Gleeson Library, St. Ignatius Church, and Lone Mountain/);
