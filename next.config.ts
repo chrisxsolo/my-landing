@@ -48,12 +48,18 @@ export const CSP_HEADER_NAME = CSP_MODE === "enforce" ? "Content-Security-Policy
 
 // Response headers for every route. Hardening rather than ranking: browsers
 // stop sniffing content types, the site cannot be framed by other origins,
-// referrers shrink to the origin off-site, and unused device APIs are off.
+// referrers shrink to the origin off-site, and device APIs are off on the
+// public site. `microphone=()` disables the microphone for the page itself,
+// not just embedded frames (Chrome fires `not-allowed` with no prompt), so the
+// admin — Content Engine dictation, the email composer's voice input — gets
+// `microphone=(self)`: its own origin only, still no third-party frames.
+const PUBLIC_PERMISSIONS_POLICY = "camera=(), microphone=(), geolocation=()";
+export const ADMIN_PERMISSIONS_POLICY = "camera=(), microphone=(self), geolocation=()";
 export const SECURITY_HEADERS = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "X-Frame-Options", value: "SAMEORIGIN" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+  { key: "Permissions-Policy", value: PUBLIC_PERMISSIONS_POLICY },
   { key: CSP_HEADER_NAME, value: buildContentSecurityPolicy({ dev: process.env.NODE_ENV === "development" }) },
 ];
 
@@ -81,7 +87,11 @@ const nextConfig: NextConfig = {
     ],
   },
   async headers() {
-    return [{ source: "/(.*)", headers: SECURITY_HEADERS }];
+    return [
+      { source: "/(.*)", headers: SECURITY_HEADERS },
+      // Later rules override earlier ones for the same header key on a matching path.
+      { source: "/admin/:path*", headers: [{ key: "Permissions-Policy", value: ADMIN_PERMISSIONS_POLICY }] },
+    ];
   },
   async redirects() {
     return [

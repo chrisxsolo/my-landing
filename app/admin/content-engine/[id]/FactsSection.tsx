@@ -208,13 +208,13 @@ export default function FactsSection({ session, sessionId, onSaved, onRegisterFl
           </>
         )}
       </div>
-      <div style={{ marginTop: 10 }}>
-        <span style={label}>Public session summary (may be sent to AI)</span>
-        <DictationTextarea value={form.public_session_summary}
+      <div style={{ marginTop: 10, display: "grid", gap: 8 }}>
+        <DictationTextarea label="Public session summary (may be sent to AI)"
+          value={form.public_session_summary}
           placeholder={svc.summaryPlaceholder}
           onValueChange={(v) => setForm((f) => ({ ...f, public_session_summary: v }))} />
-        <span style={label}>Internal notes (never sent to AI, never published)</span>
-        <DictationTextarea value={form.internal_notes}
+        <DictationTextarea label="Internal notes (never sent to AI, never published)"
+          value={form.internal_notes}
           onValueChange={(v) => setForm((f) => ({ ...f, internal_notes: v }))} />
       </div>
       <div style={{ marginTop: 10, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>

@@ -10,12 +10,25 @@ const directive = (policy: string, name: string) =>
 describe("security headers", () => {
   it("apply to every path", async () => {
     const rules = await nextConfig.headers!();
-    expect(rules).toHaveLength(1);
     expect(rules[0].source).toBe("/(.*)");
     const keys = rules[0].headers.map((header) => header.key);
     expect(keys).toEqual(["X-Content-Type-Options", "X-Frame-Options", "Referrer-Policy", "Permissions-Policy", CSP_HEADER_NAME]);
     expect(SECURITY_HEADERS.find((header) => header.key === "X-Content-Type-Options")?.value).toBe("nosniff");
     expect(["Content-Security-Policy", "Content-Security-Policy-Report-Only"]).toContain(CSP_HEADER_NAME);
+  });
+
+  // Dictation (Content Engine facts) and the email composer's voice input need
+  // the page's own microphone; `microphone=()` disables it even for the page
+  // itself (Chrome fires `not-allowed` with no prompt). The admin keeps every
+  // other device API off and public pages keep the microphone off too.
+  it("allow the microphone only for the admin's own origin", async () => {
+    const rules = await nextConfig.headers!();
+    expect(rules).toHaveLength(2);
+    const policy = (rule: (typeof rules)[number]) => rule.headers.find((header) => header.key === "Permissions-Policy")?.value ?? "";
+    expect(policy(rules[0])).toBe("camera=(), microphone=(), geolocation=()");
+    expect(rules[1].source).toBe("/admin/:path*");
+    expect(rules[1].headers).toHaveLength(1);
+    expect(policy(rules[1])).toBe("camera=(), microphone=(self), geolocation=()");
   });
 
   it("the policy allows what the site loads and nothing broader", () => {

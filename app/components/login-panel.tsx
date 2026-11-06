@@ -229,7 +229,10 @@ export default function LoginPanel() {
             <Link href="/dashboard" className="gp-btn">Go to dashboard</Link>
 
             {isAdmin && (
-              <Link href="/admin/sessions" className="gp-ghost">Open Portal Sessions</Link>
+              // A full load, not a client transition: the admin's response
+              // headers (Permissions-Policy allows the microphone there) only
+              // apply to a document served from /admin.
+              <a href="/admin/sessions" className="gp-ghost">Open Portal Sessions</a>
             )}
 
             <button type="button" onClick={signOut} className="gp-ghost">Sign out</button>
