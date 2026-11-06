@@ -154,6 +154,7 @@ export default function EngineDashboard() {
         <div className="flex flex-wrap items-center gap-2">
           <Link href="/admin/content-engine/locations" style={{ ...btn(false), textDecoration: "none" }}>📍 Locations</Link>
           <Link href="/admin/content-engine/photos" style={{ ...btn(false), textDecoration: "none" }}>🏷 Photo tagging</Link>
+          <Link href="/admin/content-engine/schedule" style={{ ...btn(false), textDecoration: "none" }}>🗓 Publishing queue</Link>
           <button onClick={() => void openPicker()} style={btn(true)}>
             + New from client session
           </button>

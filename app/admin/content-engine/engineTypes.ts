@@ -3,6 +3,9 @@ import type { SessionEngineState } from "@/lib/contentEngine/state";
 import type { ExtractionOutcome, FreshnessOutcome } from "@/lib/contentEngine/emailFacts/run";
 import type { PhotoStatusRow } from "@/lib/contentEngine/jobProgress";
 import type { GenerationProgressEntry } from "@/lib/contentEngine/generationProgress";
+import type { PublicationScheduleDto } from "@/lib/contentPublishing/types";
+
+export type { PublicationScheduleDto };
 
 export type { SessionEngineState, PhotoStatusRow };
 export type { LocationSummaryDto, PlaceDto } from "@/lib/contentEngine/locationSummary";
@@ -108,6 +111,8 @@ export interface WorkspaceData {
   activePackage: EnginePackage | null;
   items: EngineItem[];
   published: EngineItem[];
+  /** Active publication schedules of the items above (lib/contentPublishing). */
+  schedules: PublicationScheduleDto[];
   state: SessionEngineState;
   photoCount: number;
   itemCounts: Record<string, number>;
@@ -173,12 +178,5 @@ export interface ReconcileReport {
 // worker reads the same order, so the two can't drift.
 export { GENERATION_ORDER } from "@/lib/contentEngine/generationProgress";
 
-export const CONTENT_TYPE_LABELS: Record<string, string> = {
-  journal_post: "Journal post",
-  portfolio_pick: "Portfolio pick",
-  school_page_photo: "School page photo",
-  guide_photo: "Guide photo",
-  testimonial_feature: "Testimonial",
-  internal_link_suggestion: "Internal links",
-  location_guide: "New location guide",
-};
+// Canonical home is lib/contentEngine/contentTypeLabels.ts (shared with the publishing queue).
+export { CONTENT_TYPE_LABELS } from "@/lib/contentEngine/contentTypeLabels";

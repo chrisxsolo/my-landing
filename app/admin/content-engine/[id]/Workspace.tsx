@@ -119,6 +119,10 @@ export default function Workspace({ sessionId }: { sessionId: string }) {
               Inquiry ↗
             </Link>
           )}
+          <Link href="/admin/content-engine/schedule" title="Upcoming scheduled publications"
+            style={{ ...chip(T.inkSoft, T.inset), textDecoration: "none", minHeight: 32, display: "inline-flex", alignItems: "center" }}>
+            Queue{(data.schedules?.length ?? 0) > 0 ? ` (${data.schedules!.length})` : ""}
+          </Link>
           <span style={chip(badge.color, badge.bg)}>{badge.label}</span>
         </div>
       </header>
@@ -143,10 +147,11 @@ export default function Workspace({ sessionId }: { sessionId: string }) {
       <GenerationSection sessionId={sessionId} session={session} activePackage={data.activePackage}
         items={data.items} aiAllowed={session.ai_processing_allowed as boolean}
         photos={photos} clockOffsetMs={clockOffsetMs} onChanged={refresh} onPoll={refreshWorkspace} />
-      <ItemsSection items={data.items} photos={photos} onChanged={refresh}
+      <ItemsSection items={data.items} photos={photos} schedules={data.schedules ?? []}
+        marketingPermission={session.marketing_permission as boolean} onChanged={refresh}
         serviceType={typeof session.service_type === "string" ? session.service_type : undefined} />
       <PublicationHistory published={data.published} onChanged={refresh} viewCounts={analytics?.perItem ?? {}} />
-      <ActionBar items={data.items}
+      <ActionBar items={data.items} schedules={data.schedules ?? []}
         marketingPermission={session.marketing_permission as boolean} onChanged={refresh} />
     </main>
     </EngineShell>

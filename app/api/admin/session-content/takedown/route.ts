@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { revalidatePath, revalidateTag } from "next/cache";
 import { requireAdmin } from "@/lib/requireAdmin";
-import { PUBLIC_CONTENT_CACHE_TAG } from "@/lib/publicContentCache";
+import { revalidateOnePath } from "@/lib/contentPublishing/refresh";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
 import { takedownPublishedItem, TakedownError } from "@/lib/contentEngine/takedown";
 import { isUuid } from "@/lib/contentEngine/uploadConfig";
@@ -26,12 +25,7 @@ export async function POST(req: NextRequest) {
     const result = await takedownPublishedItem({
       client: createSupabaseAdminClient(),
       itemId,
-      revalidate: (path) => {
-        // Bust cached blog reads so the regenerated page drops the taken-down
-        // post immediately instead of after the hourly window.
-        revalidateTag(PUBLIC_CONTENT_CACHE_TAG, { expire: 0 });
-        revalidatePath(path);
-      },
+      revalidate: revalidateOnePath,
     });
     return NextResponse.json(result);
   } catch (err) {

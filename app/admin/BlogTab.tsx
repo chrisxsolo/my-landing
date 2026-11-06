@@ -3,11 +3,16 @@ import { useState, useEffect, useRef } from "react";
 import { C } from "@/lib/colors";
 import { uploadImage } from "@/lib/uploadImage";
 import { GRAD_SCHOOL_OPTIONS, GRAD_LOCATION_OPTIONS, GRAD_SESSION_OPTIONS } from "@/lib/portfolioSeoDescription";
-import BlogPostImages from "@/app/admin/BlogPostImages";
 import { metadataWarnings } from "@/lib/seo/metadataChecks";
-
-type BlogCategory = "journal" | "professional";
-type BlogPost = { id: number; title: string; body: string; published_at: string; slug: string; cover_image_url: string | null; extra_image_urls: string[]; category?: BlogCategory | string | null; sites?: string[] | null; meta_description?: string | null; meta_keywords?: string | null; cover_image_alt?: string | null; extra_image_alts?: string[] | null };
+import { uploadToSignedTarget } from "@/lib/adminSignedUpload";
+import type { BlogPostDraftDto } from "@/lib/contentPublishing/types";
+import { publishingApi } from "@/app/admin/publishing/publishingApi";
+import ScheduleControl, { emptyScheduleDraft, type ScheduleDraft } from "@/app/admin/publishing/ScheduleControl";
+import { useBlogDraftActions } from "@/app/admin/blog/useBlogDraftActions";
+import BlogDraftsPanel, { prepareDraftForEditing } from "@/app/admin/blog/BlogDraftsPanel";
+import BlogPostList, { type BlogCategory, type BlogPost } from "@/app/admin/blog/BlogPostList";
+import AiPhotoDropZone from "@/app/admin/blog/AiPhotoDropZone";
+import { compressForAI, parseJournalEntry, slugify } from "@/app/admin/blog/blogFormHelpers";
 
 // Clickable keyword chips for blog SEO — same vocabulary as the photo SEO tagger.
 const BLOG_KEYWORD_OPTIONS: readonly string[] = [...GRAD_SCHOOL_OPTIONS, ...GRAD_LOCATION_OPTIONS, ...GRAD_SESSION_OPTIONS];
@@ -17,64 +22,6 @@ type Props = { showToast: (msg: string, ok?: boolean) => void };
 const card = "bg-white rounded-2xl border border-slate-100 overflow-hidden";
 const inp = "w-full px-3 py-2.5 rounded-xl text-sm font-medium text-slate-800 outline-none border border-slate-200 focus:border-violet-300 bg-white transition-colors";
 const ta = `${inp} resize-none`;
-
-function slugify(s: string) { return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""); }
-
-function parseJournalEntry(raw: string) {
-  const lines = raw.split("\n");
-  const title = lines.find(l => l.trim())?.trim() ?? "";
-
-  const dateRe = /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{2,4}/i;
-  const numericDateRe = /\b\d{1,2}\/\d{1,2}\/\d{2,4}\b/;
-  const timeRe = /\b(\d{1,2}:\d{2}\s*(?:am|pm)?)/i;
-
-  let dateStr = "", timeStr = "", dateLine = -1;
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const dMatch = line.match(dateRe) || line.match(numericDateRe);
-    if (dMatch) {
-      dateStr = dMatch[0];
-      const tMatch = line.match(timeRe);
-      if (tMatch) timeStr = tMatch[1];
-      dateLine = i;
-      break;
-    }
-  }
-
-  let published_at = new Date().toISOString().slice(0, 16);
-  if (dateStr) {
-    try {
-      const d = new Date(`${dateStr}${timeStr ? " " + timeStr : ""}`);
-      if (!isNaN(d.getTime())) published_at = d.toISOString().slice(0, 16);
-    } catch { /* ignore parse failures */ }
-  }
-
-  const skipLines = new Set([0]);
-  if (dateLine >= 0) skipLines.add(dateLine);
-  const body = lines.filter((_, i) => !skipLines.has(i)).join("\n").replace(/^\n+/, "").trim();
-  return { title, slug: slugify(title), published_at, body };
-}
-
-async function compressForAI(file: File, maxPx = 900, quality = 0.75): Promise<Blob> {
-  return new Promise(resolve => {
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      let { width, height } = img;
-      if (width > maxPx || height > maxPx) {
-        if (width > height) { height = Math.round(height * (maxPx / width)); width = maxPx; }
-        else { width = Math.round(width * (maxPx / height)); height = maxPx; }
-      }
-      const canvas = document.createElement("canvas");
-      canvas.width = width; canvas.height = height;
-      canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
-      canvas.toBlob(blob => resolve(blob ?? file), "image/jpeg", quality);
-    };
-    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
-    img.src = url;
-  });
-}
 
 export default function BlogTab({ showToast }: Props) {
   const EMPTY_POST = { title: "", body: "", slug: "", category: "professional" as BlogCategory, sites: ["professional"] as string[], published_at: new Date().toISOString().slice(0, 16), meta_description: "", meta_keywords: "" };
@@ -100,9 +47,27 @@ export default function BlogTab({ showToast }: Props) {
   const [extraDragging, setExtraDragging] = useState(false);
   const coverFileRef = useRef<HTMLInputElement>(null);
   const extraFileRef = useRef<HTMLInputElement>(null);
-  const aiDropRef = useRef<HTMLInputElement>(null);
+  // Drafts & scheduling: the form edits either a live post, a private draft, or nothing yet.
+  const [editingDraft, setEditingDraft] = useState<BlogPostDraftDto | null>(null);
+  const [draftsRefresh, setDraftsRefresh] = useState(0);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [scheduleWhen, setScheduleWhen] = useState<ScheduleDraft>(() => emptyScheduleDraft());
 
   useEffect(() => { fetchPosts(); }, []);
+
+  // The queue page links here with ?draft=<id> to open that draft for editing
+  // — through the same confirm-and-cancel a scheduled draft gets in the panel.
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("draft");
+    if (!id) return;
+    publishingApi.getDraft(id)
+      .then(async ({ draft }) => {
+        const ready = await prepareDraftForEditing(draft, showToast);
+        if (ready) { startEditDraft(ready); setDraftsRefresh(n => n + 1); }
+      })
+      .catch(() => showToast("That draft could not be loaded", false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-time deep link on mount
+  }, []);
 
   async function fetchPosts(): Promise<BlogPost[]> {
     setPostsLoading(true);
@@ -122,6 +87,8 @@ export default function BlogTab({ showToast }: Props) {
   }
 
   function startEditPost(post: BlogPost) {
+    setEditingDraft(null);
+    setScheduleOpen(false);
     setEditingPost(post);
     setPostForm({ title: post.title, body: post.body, slug: post.slug, category: "professional", sites: ["professional"], published_at: post.published_at.slice(0, 16), meta_description: post.meta_description ?? "", meta_keywords: post.meta_keywords ?? "" });
     setCoverImg(null); setCoverImgPreview(post.cover_image_url || null);
@@ -129,8 +96,21 @@ export default function BlogTab({ showToast }: Props) {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  // A draft opens in the same form; its images show through signed previews.
+  function startEditDraft(draft: BlogPostDraftDto) {
+    setEditingPost(null);
+    setEditingDraft(draft);
+    setPostForm({ title: draft.title, body: draft.body, slug: draft.slug, category: "professional", sites: ["professional"], published_at: EMPTY_POST.published_at, meta_description: draft.meta_description ?? "", meta_keywords: draft.meta_keywords ?? "" });
+    setCoverImg(null); setCoverImgPreview(draft.previewUrls[0] ?? null);
+    setExtraImgs([]); setExtraPreviews(draft.previewUrls.slice(1).filter((u): u is string => !!u));
+    setScheduleOpen(false);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   function cancelEditPost() {
     setEditingPost(null);
+    setEditingDraft(null);
+    setScheduleOpen(false);
     setPostForm({ ...EMPTY_POST });
     setCoverImg(null); setCoverImgPreview(null);
     setExtraImgs([]); setExtraPreviews([]);
@@ -174,7 +154,39 @@ export default function BlogTab({ showToast }: Props) {
     }).catch(err => console.error("[blog] image library sync error:", err));
   }
 
-  async function generateBlogFromPhotos() {
+  // Generate draft: the copy lands on a PRIVATE draft and the photos go to the
+  // private draft bucket; nothing is public until the admin schedules or
+  // publishes it. The legacy publish-at-once path is unchanged below.
+  async function generateDraftFromPhotos(compressedForAi: Blob[], compressedForStorage: Blob[]) {
+    const { draft } = await publishingApi.createDraft({ title: "", body: "", slug: "" }, "ai_photos");
+    const fd = new FormData();
+    compressedForAi.forEach((blob, i) => {
+      fd.append("images", new File([blob], aiDropFiles[i].name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" }));
+    });
+    fd.append("sites", "professional");
+    fd.append("draftId", draft.id);
+    const [res, uploads] = await Promise.all([
+      fetch("/api/ai-blog-from-photos", { method: "POST", body: fd }),
+      Promise.all(compressedForStorage.map((blob, i) =>
+        uploadToSignedTarget("blog-draft", draft.id, new File([blob], `draft-${i}.jpg`, { type: "image/jpeg" })).then(r => r.path).catch(() => null))),
+    ]);
+    const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    if (!res.ok) {
+      // Nothing to review: the empty draft (and its private uploads) go too.
+      await publishingApi.deleteDraft(draft.id).catch(() => undefined);
+      throw new Error((json.error as string) || `AI generation failed (${res.status})`);
+    }
+    const indices = Array.isArray(json.selectedIndices) ? (json.selectedIndices as number[]) : [];
+    const ordered = [...indices.filter(i => uploads[i]), ...uploads.map((_, i) => i).filter(i => !indices.includes(i) && uploads[i])];
+    const images = ordered.map(i => ({ path: uploads[i] as string, alt: "" }));
+    const saved = await publishingApi.updateDraft(draft.id, json.revision as number, { images });
+    showToast(`Draft ready: "${saved.draft.title}" — review it, then schedule or publish`);
+    setAiDropFiles([]); setAiDropPreviews([]);
+    setDraftsRefresh(n => n + 1);
+    startEditDraft(saved.draft);
+  }
+
+  async function generateBlogFromPhotos(mode: "publish" | "draft" = "publish") {
     if (aiDropFiles.length < 1) { showToast("Drop at least 1 photo", false); return; }
     setAiGenerating(true);
     try {
@@ -183,6 +195,7 @@ export default function BlogTab({ showToast }: Props) {
         Promise.all(aiDropFiles.map(f => compressForAI(f, 900, 0.75))),
         Promise.all(aiDropFiles.map(f => compressForAI(f, 2000, 0.90))),
       ]);
+      if (mode === "draft") { await generateDraftFromPhotos(compressedForAi, compressedForStorage); return; }
       const fd = new FormData();
       compressedForAi.forEach((blob, i) => {
         fd.append("images", new File([blob], aiDropFiles[i].name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" }));
@@ -213,7 +226,7 @@ export default function BlogTab({ showToast }: Props) {
       setAiDropFiles([]); setAiDropPreviews([]); fetchPosts(); revalidatePublicSite();
     } catch (err) {
       console.error("[ai-blog]", err);
-      showToast("AI generation failed", false);
+      showToast(err instanceof Error ? err.message : "AI generation failed", false);
     } finally { setAiGenerating(false); }
   }
 
@@ -230,8 +243,15 @@ export default function BlogTab({ showToast }: Props) {
       });
   }
 
+  const { saveDraftAndClose, scheduleDraft, publishDraftNow } = useBlogDraftActions({
+    form: postForm, editingDraft, scheduleWhen, showToast, setSaving: setPostSaving,
+    images: () => ({ coverFile: coverImg, coverPreview: coverImgPreview, extraFiles: extraImgs, extraPreviews }),
+    draftsChanged: () => setDraftsRefresh(n => n + 1), close: cancelEditPost, reopen: startEditDraft, postsChanged: () => { fetchPosts(); },
+  });
+
   async function savePost() {
     if (!postForm.title || !postForm.body) { showToast("Title and body required", false); return; }
+    if (editingDraft) { await publishDraftNow(); return; }
     setPostSaving(true);
     const slug = postForm.slug || slugify(postForm.title);
     let cover_image_url = coverImgPreview ?? (editingPost?.cover_image_url ?? null);
@@ -302,57 +322,15 @@ export default function BlogTab({ showToast }: Props) {
         <div className="h-[3px]" style={{ background: C.grad }} />
         <div className="p-6">
           <div className="flex items-center justify-between mb-5">
-            <h2 className="text-base font-black text-slate-900">{editingPost ? `Editing: ${editingPost.title}` : "New Blog Post"}</h2>
-            {editingPost && <button onClick={cancelEditPost} className="text-xs font-bold text-slate-400 px-3 py-1.5 rounded-lg bg-slate-100">Cancel edit</button>}
+            <h2 className="text-base font-black text-slate-900">{editingPost ? `Editing: ${editingPost.title}` : editingDraft ? `Editing draft: ${editingDraft.title || "Untitled"}` : "New Blog Post"}</h2>
+            {(editingPost || editingDraft) && <button onClick={cancelEditPost} className="text-xs font-bold text-slate-400 px-3 py-1.5 rounded-lg bg-slate-100 min-h-[44px]">Cancel edit</button>}
           </div>
           {editingPost && <div className="mb-4 px-3 py-2 rounded-xl text-xs font-bold" style={{ background: C.p1_08, color: C.p1, border: `1px solid ${C.p1_20}` }}>✏️ Editing existing post.</div>}
+          {editingDraft && <div className="mb-4 px-3 py-2 rounded-xl text-xs font-bold" style={{ background: C.p1_08, color: C.p1, border: `1px solid ${C.p1_20}` }}>📝 Editing a private draft — nothing is public until you schedule or publish it.</div>}
 
-          {/* AI Photo Drop */}
-          <div className="mb-5 rounded-xl p-4" style={{ background: "rgba(111,194,150,0.08)", border: "1.5px dashed rgba(111,194,150,0.45)" }}>
-            <div className="flex items-center gap-2 mb-1.5">
-              <span className="text-base">✨</span>
-              <label className="block text-xs font-bold uppercase tracking-widest" style={{ color: "#6fc296" }}>AI: Drop Photos → Auto-Post</label>
-            </div>
-            <p className="text-xs text-slate-400 mb-3">Drop 10–30 photos. Claude picks the best 10, writes the post, and publishes it instantly.</p>
-            <div className="w-full rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-2 cursor-pointer transition-all"
-              style={{ minHeight: "100px", borderColor: aiDropDragging ? "#6fc296" : "rgba(111,194,150,0.35)", background: aiDropDragging ? "rgba(111,194,150,0.16)" : "rgba(111,194,150,0.06)" }}
-              onClick={() => aiDropRef.current?.click()}
-              onDragOver={e => { e.preventDefault(); setAiDropDragging(true); }}
-              onDragLeave={() => setAiDropDragging(false)}
-              onDrop={e => { e.preventDefault(); setAiDropDragging(false); onAiDropFiles(Array.from(e.dataTransfer.files)); }}>
-              {aiDropFiles.length === 0 ? (
-                <>
-                  <span className="text-2xl">📷</span>
-                  <span className="text-xs font-bold" style={{ color: "#6fc296" }}>Drop photos here or tap to select</span>
-                  <span className="text-xs text-slate-400">Up to 30 photos · JPG, PNG, HEIC</span>
-                </>
-              ) : (
-                <div className="w-full p-2">
-                  <div className="grid grid-cols-5 gap-1.5 mb-2">
-                    {aiDropPreviews.map((url, i) => (
-                      <div key={i} className="relative aspect-square rounded-lg overflow-hidden">
-                        <img src={url} className="w-full h-full object-cover" />
-                        <button onClick={e => { e.stopPropagation(); removeAiDropFile(i); }} className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-black/60 text-white text-[9px] font-bold flex items-center justify-center">✕</button>
-                      </div>
-                    ))}
-                    <div className="aspect-square rounded-lg border border-dashed flex items-center justify-center" style={{ borderColor: "#86efac", background: "#dcfce7" }}>
-                      <span className="text-lg text-green-400">+</span>
-                    </div>
-                  </div>
-                  <p className="text-xs font-bold text-center" style={{ color: "#16a34a" }}>{aiDropFiles.length} photo{aiDropFiles.length !== 1 ? "s" : ""} selected — Claude picks the best 10</p>
-                </div>
-              )}
-            </div>
-            <input ref={aiDropRef} type="file" accept="image/*" multiple className="hidden" onChange={e => onAiDropFiles(Array.from(e.target.files ?? []))} />
-            {aiDropFiles.length > 0 && (
-              <div className="flex gap-2 mt-3">
-                <button onClick={generateBlogFromPhotos} disabled={aiGenerating} className="flex-1 py-2.5 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90 active:scale-95" style={{ background: aiGenerating ? "#86efac" : "#16a34a", opacity: aiGenerating ? 0.8 : 1 }}>
-                  {aiGenerating ? "✨ Analyzing & Publishing…" : "✨ Generate & Publish with AI"}
-                </button>
-                <button onClick={() => { setAiDropFiles([]); setAiDropPreviews([]); }} disabled={aiGenerating} className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-400 bg-slate-100 hover:bg-slate-200 transition-colors">Clear</button>
-              </div>
-            )}
-          </div>
+          <AiPhotoDropZone files={aiDropFiles} previews={aiDropPreviews} dragging={aiDropDragging} setDragging={setAiDropDragging}
+            onFiles={onAiDropFiles} onRemove={removeAiDropFile} onClear={() => { setAiDropFiles([]); setAiDropPreviews([]); }}
+            generating={aiGenerating} onGenerate={mode => { void generateBlogFromPhotos(mode); }} />
 
           {/* Journal paste */}
           <div className="mb-4 rounded-xl p-4" style={{ background: C.p1_04, border: `1.5px dashed ${C.p1_20}` }}>
@@ -386,7 +364,13 @@ export default function BlogTab({ showToast }: Props) {
           <div className="space-y-3">
             <div><label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1.5">Title</label><input className={inp} placeholder="e.g. Golden Hour at SJSU — Mia's Grad Shoot" value={postForm.title} onChange={e => setPostForm(f => ({ ...f, title: e.target.value, slug: slugify(e.target.value) }))} /></div>
             <div><label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1.5">Slug (URL)</label><input className={inp} placeholder="auto-generated from title" value={postForm.slug} onChange={e => setPostForm(f => ({ ...f, slug: slugify(e.target.value) }))} /></div>
-            <div><label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1.5">Date &amp; Time</label><input className={inp} type="datetime-local" value={postForm.published_at} onChange={e => setPostForm(f => ({ ...f, published_at: e.target.value }))} /></div>
+            {!editingDraft && (
+              <div>
+                <label htmlFor="blog-published-at" className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1.5">{editingPost ? "Published date & time" : "Shown publication date"}</label>
+                <input id="blog-published-at" className={inp} type="datetime-local" value={postForm.published_at} onChange={e => setPostForm(f => ({ ...f, published_at: e.target.value }))} />
+                <p className="text-xs text-slate-400 mt-1">The date shown on the post. A future date hides it until then (and up to an hour late) — to publish at an exact time, use Schedule below.</p>
+              </div>
+            )}
             <div>
               <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-1.5">Body</label>
               <textarea className={ta} rows={8} placeholder={"Write your shoot story here...\n\nUse blank lines between paragraphs — each one becomes its own paragraph on the post page."} value={postForm.body} onChange={e => setPostForm(f => ({ ...f, body: e.target.value }))} />
@@ -449,60 +433,44 @@ export default function BlogTab({ showToast }: Props) {
               <p className="text-xs text-slate-400">Drag &amp; drop photos here, or tap + to pick. Hit ✕ on any photo to remove it.</p>
             </div>
 
-            <button onClick={savePost} disabled={postSaving} className="w-full py-3 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90 active:scale-95 mt-2" style={{ background: C.grad, opacity: postSaving ? 0.7 : 1 }}>
-              {postSaving ? "Publishing…" : editingPost ? "Update Post ✓" : "Publish Post →"}
-            </button>
+            {editingPost ? (
+              <button onClick={savePost} disabled={postSaving} className="w-full py-3 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90 active:scale-95 mt-2" style={{ background: C.grad, opacity: postSaving ? 0.7 : 1 }}>
+                {postSaving ? "Saving…" : "Update Post ✓"}
+              </button>
+            ) : (
+              <div className="space-y-3 mt-2">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <button onClick={saveDraftAndClose} disabled={postSaving} className="py-3 rounded-xl font-bold text-sm min-h-[44px] transition-all hover:opacity-90 active:scale-95" style={{ background: C.p1_08, color: C.p1, opacity: postSaving ? 0.7 : 1 }}>
+                    {postSaving ? "Saving…" : "Save draft"}
+                  </button>
+                  <button onClick={async () => { if (scheduleOpen) { await scheduleDraft(); } else { setScheduleWhen(emptyScheduleDraft()); setScheduleOpen(true); } }} disabled={postSaving} aria-expanded={scheduleOpen} className="py-3 rounded-xl font-bold text-sm min-h-[44px] transition-all hover:opacity-90 active:scale-95" style={{ background: C.p2_08, color: C.p2, opacity: postSaving ? 0.7 : 1 }}>
+                    {scheduleOpen ? "Confirm schedule" : "Schedule…"}
+                  </button>
+                  <button onClick={savePost} disabled={postSaving} className="py-3 rounded-xl font-bold text-sm text-white min-h-[44px] transition-all hover:opacity-90 active:scale-95" style={{ background: C.grad, opacity: postSaving ? 0.7 : 1 }}>
+                    {postSaving ? "Publishing…" : "Publish now →"}
+                  </button>
+                </div>
+                {scheduleOpen && (
+                  <div className="rounded-xl p-4" style={{ background: C.p2_06, border: `1.5px dashed ${C.p2_18}` }}>
+                    <ScheduleControl value={scheduleWhen} onChange={setScheduleWhen} theme="dark" />
+                    <button onClick={() => setScheduleOpen(false)} className="mt-2 text-xs font-bold text-slate-400 underline min-h-[44px] px-2">Close without scheduling</button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Post list */}
-      <div>
-        <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
-          <div className="flex items-center gap-2">
-            <p className="text-xs font-black uppercase tracking-widest" style={{ color: C.p1 }}>Professional Blog Posts</p>
-            <span className="text-xs font-bold text-slate-400">({posts.length})</span>
-          </div>
-        </div>
-        {postsLoading ? [...Array(2)].map((_, i) => <div key={i} className="rounded-2xl animate-pulse h-20 mb-3" style={{ background: `linear-gradient(135deg,${C.p1_08},${C.p2_06})` }} />) : (
-          posts.length === 0 ? <p className="text-sm text-slate-400 font-medium">No posts yet — write your first one above.</p> : (
-            <div className="space-y-3">
-              {posts.map(post => (
-                <div key={post.id} className={card} style={editingPost?.id === post.id ? { outline: `2px solid ${C.p1}` } : {}}>
-                  <div className="flex">
-                    {post.cover_image_url ? <div className="w-20 h-20 flex-shrink-0 overflow-hidden"><img src={post.cover_image_url} className="w-full h-full object-cover" /></div> : <div className="w-20 h-20 flex-shrink-0 flex items-center justify-center text-2xl" style={{ background: C.p1_06 }}>✍️</div>}
-                    <div className="flex-1 p-4 min-w-0">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="text-sm font-black text-slate-900 truncate mb-0.5">{post.title}</p>
-                          <p className="text-xs text-slate-400">{(post.sites && post.sites.length > 0 ? post.sites : [post.category === "professional" ? "professional" : "journal"]).map(s => s === "professional" ? "Professional" : "Journal").join(" + ")} · {new Date(post.published_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} · {(post.extra_image_urls?.length ?? 0) + 1} photo{(post.extra_image_urls?.length ?? 0) > 0 ? "s" : ""}</p>
-                        </div>
-                        <div className="flex gap-2 flex-shrink-0 flex-wrap">
-                          {(post.sites && post.sites.length > 0 ? post.sites : [post.category === "professional" ? "professional" : "journal"]).includes("professional") && (
-                            <a href={`/blog/${post.slug}`} target="_blank" className="text-xs font-bold px-3 py-1.5 rounded-lg" style={{ background: C.p1_08, color: C.p1 }}>Blog →</a>
-                          )}
-                          <button onClick={() => setImagesOpenId(imagesOpenId === post.id ? null : post.id)} title="Every image the live page renders, with remove / replace and revision history" className="text-xs font-bold px-3 py-1.5 rounded-lg" style={{ background: imagesOpenId === post.id ? C.p1 : C.p1_08, color: imagesOpenId === post.id ? C.white : C.p1 }}>{imagesOpenId === post.id ? "Hide photos" : "Live photos"}</button>
-                          <button onClick={() => generateSeoForPost(post)} disabled={seoGeneratingId === post.id} title="Analyze photos + text and write SEO metadata" className="text-xs font-bold px-3 py-1.5 rounded-lg" style={{ background: C.p3_10, color: C.ink, opacity: seoGeneratingId === post.id ? 0.6 : 1 }}>{seoGeneratingId === post.id ? "✨ Generating…" : "✨ SEO"}</button>
-                          {editingPost?.id !== post.id && <button onClick={() => startEditPost(post)} className="text-xs font-bold px-3 py-1.5 rounded-lg" style={{ background: C.p2_08, color: C.p2 }}>Edit</button>}
-                          {postDeleteConfirm === post.id ? (
-                            <div className="flex gap-1.5">
-                              <button onClick={() => deletePost(post.id)} className="text-xs font-bold text-white px-2.5 py-1.5 rounded-lg" style={{ background: "#be123c" }}>Delete</button>
-                              <button onClick={() => setPostDeleteConfirm(null)} className="text-xs font-bold text-slate-500 px-2.5 py-1.5 rounded-lg bg-slate-100">✕</button>
-                            </div>
-                          ) : <button onClick={() => setPostDeleteConfirm(post.id)} className="text-xs font-bold text-slate-300 hover:text-red-400 transition-colors px-1">🗑</button>}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  {imagesOpenId === post.id && (
-                    <BlogPostImages postId={post.id} showToast={showToast} onChanged={() => { void onLiveImagesChanged(post.id); }} />
-                  )}
-                </div>
-              ))}
-            </div>
-          )
-        )}
-      </div>
+      <BlogDraftsPanel showToast={showToast} onEdit={startEditDraft} editingDraftId={editingDraft?.id ?? null} refreshKey={draftsRefresh}
+        onPublished={id => { if (editingDraft?.id === id) cancelEditPost(); fetchPosts(); }}
+        onDeleted={id => { if (editingDraft?.id === id) cancelEditPost(); }} />
+
+      <BlogPostList posts={posts} loading={postsLoading} editingPostId={editingPost?.id ?? null} imagesOpenId={imagesOpenId}
+        seoGeneratingId={seoGeneratingId} deleteConfirmId={postDeleteConfirm} showToast={showToast}
+        onToggleImages={id => setImagesOpenId(imagesOpenId === id ? null : id)} onSeo={generateSeoForPost}
+        onEdit={startEditPost} onAskDelete={setPostDeleteConfirm} onDelete={deletePost}
+        onLiveImagesChanged={id => { void onLiveImagesChanged(id); }} />
     </div>
   );
 }

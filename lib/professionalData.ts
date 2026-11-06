@@ -314,6 +314,13 @@ export const getSiteSettings = cachePublicContent(async (): Promise<Record<strin
   }
 }, ["site-settings"]);
 
+// Only posts whose publication time has arrived are public. The server client
+// uses the service role (no RLS), so this filter is what keeps a row with a
+// future published_at — the legacy BlogTab allowed setting one — off every
+// list, detail, category and sitemap read. Scheduled drafts never reach
+// blog_posts at all (lib/contentPublishing).
+const livePostCutoff = () => new Date().toISOString();
+
 // Lists posts for a category without the heavy `body` column — for the listing
 // grid and sitemap, which only need metadata + cover images. /blog/[slug] uses
 // getBlogPostBySlug, which still selects the full row including body.
@@ -325,6 +332,7 @@ export const getBlogPostSummaries = cachePublicContent(async (category: "profess
       .from("blog_posts")
       .select(BLOG_SUMMARY_COLUMNS)
       .contains("sites", [category])
+      .lte("published_at", livePostCutoff())
       .order("published_at", { ascending: false });
 
     if (error) {
@@ -333,6 +341,7 @@ export const getBlogPostSummaries = cachePublicContent(async (category: "profess
         .from("blog_posts")
         .select(BLOG_SUMMARY_COLUMNS)
         .eq("category", category)
+        .lte("published_at", livePostCutoff())
         .order("published_at", { ascending: false });
       if (fallback.error && !isMissingColumnError(fallback.error)) {
         console.error(`Failed to load ${category} post summaries`, fallback.error);
@@ -358,6 +367,7 @@ export const getBlogPostSummariesForCategory = cachePublicContent(async (categor
       .from("blog_posts")
       .select(BLOG_SUMMARY_COLUMNS)
       .contains("sites", [category])
+      .lte("published_at", livePostCutoff())
       .order("published_at", { ascending: false });
 
     if (error) {
@@ -365,6 +375,7 @@ export const getBlogPostSummariesForCategory = cachePublicContent(async (categor
         .from("blog_posts")
         .select(BLOG_SUMMARY_COLUMNS)
         .eq("category", category)
+        .lte("published_at", livePostCutoff())
         .order("published_at", { ascending: false });
       if (fallback.error && !isMissingColumnError(fallback.error)) {
         console.error(`Failed to load ${category} post summaries`, fallback.error);
@@ -390,6 +401,7 @@ export const getBlogPostBySlug = cachePublicContent(async (category: "profession
       .select("*")
       .eq("slug", slug)
       .contains("sites", [category])
+      .lte("published_at", livePostCutoff())
       .single();
 
     if (error) {
@@ -399,6 +411,7 @@ export const getBlogPostBySlug = cachePublicContent(async (category: "profession
         .select("*")
         .eq("slug", slug)
         .eq("category", category)
+        .lte("published_at", livePostCutoff())
         .single();
       if (fallback.error && !isMissingColumnError(fallback.error)) {
         console.error(`Failed to load ${category} post ${slug}`, fallback.error);

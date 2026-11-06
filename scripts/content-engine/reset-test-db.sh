@@ -77,7 +77,15 @@ echo "Resetting local test DB schema..."
 # Drop and recreate the public schema (avoids replaying historical migrations
 # that ALTER pre-existing tables and would fail against an empty DB).
 # Storage schema lives in a separate schema and survives this reset.
+# The scheduled-publishing migration registers a pg_cron job that calls
+# public.tick_publication_worker() every minute; unschedule it first so a tick
+# cannot race the DROP SCHEMA (the migration replay re-creates the job).
 run_psql <<'SQL'
+DO $$ BEGIN
+  IF to_regclass('cron.job') IS NOT NULL THEN
+    PERFORM cron.unschedule(jobid) FROM cron.job WHERE jobname = 'publication-worker-tick';
+  END IF;
+END $$;
 DROP SCHEMA IF EXISTS public CASCADE;
 CREATE SCHEMA public;
 GRANT ALL ON SCHEMA public TO postgres;

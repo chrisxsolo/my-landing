@@ -2,24 +2,34 @@
 // Sticky bottom bar (spec §7.4): "n of m handled · k failed · j approved
 // awaiting publish", Approve all remaining (confirmation summary), and
 // Publish approved (sequenced one POST per item; per-item failures surface).
+// Scheduled items are left to their schedule: bulk publish skips them and
+// says how many it skipped; publishing one early is its own Publish now.
 import { useState } from "react";
 import { T } from "@/app/admin/adminTheme";
 import { engineApi, EngineApiError } from "@/app/admin/content-engine/engineApi";
-import { CONTENT_TYPE_LABELS, type EngineItem } from "@/app/admin/content-engine/engineTypes";
+import { CONTENT_TYPE_LABELS, type EngineItem, type PublicationScheduleDto } from "@/app/admin/content-engine/engineTypes";
 import { btn } from "./ui";
 
 interface Props {
   items: EngineItem[];
+  schedules?: PublicationScheduleDto[];
   marketingPermission: boolean;
   onChanged: () => void;
 }
 
-export default function ActionBar({ items, marketingPermission, onChanged }: Props) {
+/** Approved items the bulk action publishes: those WITHOUT an active schedule. Pure; tested. */
+export function publishableNow(items: EngineItem[], schedules: PublicationScheduleDto[]): { now: EngineItem[]; scheduled: EngineItem[] } {
+  const active = new Set(schedules.filter((s) => s.state !== "cancelled" && s.state !== "published").map((s) => s.content_item_id));
+  const approved = items.filter((i) => i.status === "approved");
+  return { now: approved.filter((i) => !active.has(i.id)), scheduled: approved.filter((i) => active.has(i.id)) };
+}
+
+export default function ActionBar({ items, schedules = [], marketingPermission, onChanged }: Props) {
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   const drafts = items.filter((i) => i.status === "draft");
-  const approved = items.filter((i) => i.status === "approved");
+  const { now: approved, scheduled } = publishableNow(items, schedules);
   const failed = items.filter((i) => i.status === "failed");
   const handled = items.length - drafts.length;
   const publishBlocked = !marketingPermission;
@@ -49,7 +59,8 @@ export default function ActionBar({ items, marketingPermission, onChanged }: Pro
   };
 
   const publishApproved = async () => {
-    if (!confirm(`Publish ${approved.length} approved item(s)? Live tables and public storage will be written.`)) return;
+    const skipped = scheduled.length ? ` ${scheduled.length} scheduled item(s) are left to their schedule.` : "";
+    if (!confirm(`Publish ${approved.length} approved item(s) now? Live tables and public storage will be written.${skipped}`)) return;
     setBusy("publish");
     setNotice(null);
     const problems: string[] = [];
@@ -79,6 +90,7 @@ export default function ActionBar({ items, marketingPermission, onChanged }: Pro
     }}>
       <span style={{ fontSize: 13, color: T.inkSoft }}>
         {handled} of {items.length} handled · {failed.length} failed · {approved.length} approved awaiting publish
+        {scheduled.length > 0 && ` · ${scheduled.length} scheduled`}
         {approved.length > 0 && publishBlocked && (
           <span style={{ color: T.amber }}> — enable Marketing permission above to publish</span>
         )}

@@ -5,8 +5,10 @@
 import { useState } from "react";
 import { T } from "@/app/admin/adminTheme";
 import { engineApi } from "@/app/admin/content-engine/engineApi";
-import { CONTENT_TYPE_LABELS, type EngineItem, type EnginePhoto } from "@/app/admin/content-engine/engineTypes";
+import { CONTENT_TYPE_LABELS, type EngineItem, type EnginePhoto, type PublicationScheduleDto } from "@/app/admin/content-engine/engineTypes";
 import { CONTENT_STATUS } from "@/lib/contentStatus";
+import { publishingApi } from "@/app/admin/publishing/publishingApi";
+import ItemScheduleControls from "./ItemScheduleControls";
 import { useAutosave } from "./useAutosave";
 import { JournalEditor } from "./editorsJournal";
 import { LocationGuideEditor } from "./editorsLocationGuide";
@@ -35,15 +37,29 @@ const ITEM_STATUS: Record<EngineItem["status"], { label: string; color: string }
   publishing: { label: "Publishing…", color: T.blue },
 };
 
-function ItemCard({ item, photos, onChanged, serviceType }: {
-  item: EngineItem; photos: EnginePhoto[]; onChanged: () => void; serviceType?: string;
+function ItemCard({ item, photos, schedule, marketingPermission, onChanged, serviceType }: {
+  item: EngineItem; photos: EnginePhoto[]; schedule: PublicationScheduleDto | null;
+  marketingPermission: boolean; onChanged: () => void; serviceType?: string;
 }) {
   const { state, payload, edit, saveNow, resolveConflict } = useAutosave(
     item.id, item.payload, item.payload_revision, onChanged,
   );
   const [notice, setNotice] = useState<string | null>(null);
   const Editor = EDITORS[item.content_type];
-  const locked = item.status === "published" || item.status === "publishing" || item.status === "rejected";
+  // A scheduled item is bound to the revision that was reviewed: editing it
+  // is an explicit act that cancels the schedule first (never a silent one).
+  const scheduled = schedule !== null && schedule.state !== "cancelled" && schedule.state !== "published";
+  const locked = item.status === "published" || item.status === "publishing" || item.status === "rejected" || scheduled;
+
+  const unscheduleToEdit = async () => {
+    if (!schedule || !confirm("Editing cancels this item's schedule. It stays approved; schedule it again when you are done. Continue?")) return;
+    try {
+      await publishingApi.cancel(schedule.id, schedule.schedule_version);
+      onChanged();
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : "could not cancel the schedule");
+    }
+  };
 
   const act = async (action: "approve" | "reject" | "unreject") => {
     setNotice(null);
@@ -88,6 +104,13 @@ function ItemCard({ item, photos, onChanged, serviceType }: {
         <p style={{ color: T.red, fontSize: 12 }}>{item.error}</p>
       )}
       {notice && <p style={{ color: T.red, fontSize: 12 }}>{notice}</p>}
+      <ItemScheduleControls item={item} schedule={schedule} marketingPermission={marketingPermission} onChanged={onChanged} />
+      {scheduled && (
+        <p style={{ fontSize: 12, color: T.inkSoft, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          Locked while scheduled — the reviewed text is what will publish.
+          <button style={{ ...btn(false), padding: "4px 10px" }} onClick={() => void unscheduleToEdit()}>Cancel schedule to edit</button>
+        </p>
+      )}
 
       {state.status === "conflict" && state.conflict && (
         <div style={{ border: `1px solid ${T.red}`, borderRadius: 8, padding: 10, marginBottom: 8, fontSize: 13 }}>
@@ -110,9 +133,11 @@ function ItemCard({ item, photos, onChanged, serviceType }: {
   );
 }
 
-export default function ItemsSection({ items, photos, onChanged, serviceType }: {
-  items: EngineItem[]; photos: EnginePhoto[]; onChanged: () => void; serviceType?: string;
+export default function ItemsSection({ items, photos, schedules, marketingPermission, onChanged, serviceType }: {
+  items: EngineItem[]; photos: EnginePhoto[]; schedules: PublicationScheduleDto[];
+  marketingPermission: boolean; onChanged: () => void; serviceType?: string;
 }) {
+  const scheduleOf = new Map(schedules.map((s) => [s.content_item_id, s]));
   return (
     <section style={card}>
       <h2 style={sectionTitle}>Review drafts ({items.length})</h2>
@@ -126,7 +151,8 @@ export default function ItemsSection({ items, photos, onChanged, serviceType }: 
           // focus after each autosave and discard in-flight keystrokes. Own saves
           // adopt the new revision via the reducer; external edits surface as the
           // 409 conflict prompt by design.
-          <ItemCard key={item.id} item={item} photos={photos} onChanged={onChanged} serviceType={serviceType} />
+          <ItemCard key={item.id} item={item} photos={photos} schedule={scheduleOf.get(item.id) ?? null}
+            marketingPermission={marketingPermission} onChanged={onChanged} serviceType={serviceType} />
         ))
       )}
     </section>

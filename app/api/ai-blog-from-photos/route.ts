@@ -4,6 +4,12 @@
 // Accepts multipart form data:
 //   - images: File[] (10–30 photos)
 //   - sites: comma-separated string e.g. "journal,professional"
+//   - draftId: optional uuid of a blog_post_drafts row. With it, the copy is
+//     written INTO that private draft and nothing goes live: no blog_posts
+//     row, no public upload, no image_library sync. The browser then saves
+//     the (privately uploaded) photos onto the draft in the AI's order and the
+//     admin reviews, schedules or publishes it. Without it, the legacy
+//     generate-and-publish flow below runs unchanged.
 //
 // Flow:
 //   1. Encode all images as base64
@@ -20,6 +26,9 @@ import Anthropic from "@anthropic-ai/sdk";
 import { requireAdmin } from "@/lib/requireAdmin";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { buildJournalImageLibraryRows } from "@/lib/imageLibraryShared";
+import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
+import { isUuid } from "@/lib/contentEngine/uploadConfig";
+import { updateDraft, loadDraft, DraftError } from "@/lib/contentPublishing/blogDrafts";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -49,6 +58,30 @@ function mediaType(file: File): "image/jpeg" | "image/png" | "image/webp" | "ima
   return "image/jpeg";
 }
 
+// Draft mode: the generated copy lands on the draft row only. The photos are
+// the browser's job (they are already uploading to the private bucket), so
+// the response carries the AI's order for the client to save.
+async function writeCopyIntoDraft(
+  draftId: string, copy: { title: string; body: string; meta_description: string }, selectedIndices: number[],
+): Promise<NextResponse> {
+  try {
+    const client = createSupabaseAdminClient();
+    const draft = await loadDraft(client, draftId);
+    if (!draft) return NextResponse.json({ error: "draft not found" }, { status: 404 });
+    const result = await updateDraft(client, draftId, {
+      title: copy.title, body: copy.body, slug: slugify(copy.title), meta_description: copy.meta_description,
+    }, draft.revision);
+    if (result.outcome !== "saved") {
+      return NextResponse.json({ error: `could not write the draft (${result.outcome})` }, { status: 409 });
+    }
+    return NextResponse.json({ draftId, title: copy.title, slug: result.draft.slug, revision: result.draft.revision, selectedIndices, mode: "draft" });
+  } catch (err) {
+    if (err instanceof DraftError) return NextResponse.json({ error: err.message }, { status: err.status });
+    console.error("[ai-blog] draft write failed", err);
+    return NextResponse.json({ error: "could not write the draft" }, { status: 500 });
+  }
+}
+
 export async function POST(req: NextRequest) {
   const deny = requireAdmin(req);
   if (deny) return deny;
@@ -68,6 +101,12 @@ export async function POST(req: NextRequest) {
   const files = formData.getAll("images") as File[];
   if (!files.length) {
     return NextResponse.json({ error: "No images provided" }, { status: 400 });
+  }
+
+  const draftIdRaw = formData.get("draftId");
+  const draftId = typeof draftIdRaw === "string" && isUuid(draftIdRaw) ? draftIdRaw.toLowerCase() : null;
+  if (typeof draftIdRaw === "string" && draftIdRaw && !draftId) {
+    return NextResponse.json({ error: "draftId must be a uuid" }, { status: 400 });
   }
 
   const sitesRaw = (formData.get("sites") as string | null) ?? "journal";
@@ -215,6 +254,9 @@ Output ONLY the JSON object — no markdown, no preamble.`,
   if (!copy.title || !copy.body) {
     return NextResponse.json({ error: "Claude returned incomplete blog copy" }, { status: 500 });
   }
+
+  // ── Draft mode: write the copy into the private draft and stop ───────────
+  if (draftId) return writeCopyIntoDraft(draftId, copy, selectedIndices);
 
   // ── Step 3: Resolve image URLs ────────────────────────────────────────────
   const supabase = createSupabaseServerClient();

@@ -1641,7 +1641,7 @@ function AdminDashboard() {
       />
       {/* Safelight strip — the darkroom signature */}
       <div className="fixed top-0 left-0 right-0 h-[2px] z-50 pointer-events-none" style={{background:`linear-gradient(90deg, transparent, ${T.action}, transparent)`,animation:"adm-safelight 5s ease-in-out infinite"}} aria-hidden="true"/>
-      {toast&&<div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 rounded-full text-sm font-bold adm-pop" style={{background:T.panelSolid,color:T.ink,border:`1px solid ${toast.ok?T.greenBorder:T.redBorder}`,boxShadow:T.shadowHover}}>
+      {toast&&<div role="status" aria-live="polite" className="fixed top-5 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 rounded-full text-sm font-bold adm-pop" style={{background:T.panelSolid,color:T.ink,border:`1px solid ${toast.ok?T.greenBorder:T.redBorder}`,boxShadow:T.shadowHover}}>
         <span style={{color:toast.ok?T.green:T.red}}>{toast.ok?"● ":"● "}</span>{toast.msg}
       </div>}
 

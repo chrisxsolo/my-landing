@@ -48,7 +48,7 @@ describe("publishApprovedItem (spec §9.1 A→B→C)", () => {
     expect(outcome.status).toBe("published");
     if (outcome.status !== "published") throw new Error("unreachable");
     expect(outcome.targetType).toBe("blog_post");
-    expect(tracker.calls).toEqual(["/blog", `/blog/${slug}`]);
+    expect(tracker.calls).toEqual(["/blog", `/blog/${slug}`, "/blog/category/[category]", "/sitemap.xml"]);
     expect(outcome.revalidationFailures).toEqual([]);
 
     const { data: post } = await service.from("blog_posts")

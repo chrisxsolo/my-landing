@@ -4,7 +4,9 @@
 export function pathsForPublishedItem(contentType: string, payload: Record<string, unknown>): string[] {
   switch (contentType) {
     case "journal_post":
-      return ["/blog", `/blog/${payload.slug as string}`];
+      // The index, the post, every category archive (dynamic segment: callers
+      // must revalidate the pattern as a page) and the sitemap.
+      return ["/blog", `/blog/${payload.slug as string}`, "/blog/category/[category]", "/sitemap.xml"];
     case "portfolio_pick":
       return payload.featured === true ? ["/portfolio", "/"] : ["/portfolio"];
     case "school_page_photo":

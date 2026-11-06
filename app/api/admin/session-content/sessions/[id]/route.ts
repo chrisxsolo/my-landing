@@ -8,6 +8,7 @@ import { NO_INHERITANCE_CHANGES, syncSessionLocationInheritanceSummary } from "@
 import { syncSessionInBackground } from "@/lib/locationLibrary/autoSync";
 import { syncCampusSpotPhotosInBackground } from "@/lib/campusSpotFill/autoSync";
 import { isUuid } from "@/lib/contentEngine/uploadConfig";
+import { activeSchedulesForItems } from "@/lib/contentPublishing/scheduleService";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -48,11 +49,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         .order("published_at", { ascending: false })
     : { data: [] };
 
+  const schedules = await activeSchedulesForItems(admin, (items ?? []).map((i) => i.id as string));
+
   return NextResponse.json({
     session,
     activePackage: activePackage ?? null,
     items: items ?? [],
     published: published ?? [],
+    schedules,
     ...states.get(sessionId),
     // Generation leases are judged against this, not the browser clock.
     serverNow: Date.now(),

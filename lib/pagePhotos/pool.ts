@@ -307,7 +307,8 @@ export async function loadPhotoPool(client: SupabaseClient): Promise<PhotoPool> 
     settle("verified_locations", errors, [...KNOWN_PLACES] as KnownPlace[], () => loadKnownPlaces(client)),
     settle("location_guides", errors, [] as DbGuideRef[], () => loadPublishedDbGuides(client)),
     settle(BLOG_POSTS_TABLE, errors, [] as Rows, () => rows(client.from(BLOG_POSTS_TABLE)
-      .select(BLOG_POST_COLUMNS).contains("sites", [PROFESSIONAL_SITE]))),
+      .select(BLOG_POST_COLUMNS).contains("sites", [PROFESSIONAL_SITE])
+      .lte("published_at", new Date().toISOString()))), // a future-dated post is not live yet
     settle(SCHOOL_SPOT_PHOTOS_TABLE, errors, [] as Rows, () => spotTagRows(client)),
   ]);
 

@@ -51,6 +51,11 @@ class Query implements PromiseLike<{ data: unknown; error: { message: string } |
   select() { if (this.kind !== "select") this.returning = true; return this; }
   eq(col: string, v: unknown) { this.filters.push((r) => r[col] === v); return this; }
   neq(col: string, v: unknown) { this.filters.push((r) => r[col] !== v); return this; }
+  // Range filters compare like PostgREST does for ISO timestamps and numbers (a null column never matches).
+  lte(col: string, v: unknown) { this.filters.push((r) => r[col] !== null && r[col] !== undefined && compare(r[col], v) <= 0); return this; }
+  gte(col: string, v: unknown) { this.filters.push((r) => r[col] !== null && r[col] !== undefined && compare(r[col], v) >= 0); return this; }
+  lt(col: string, v: unknown) { this.filters.push((r) => r[col] !== null && r[col] !== undefined && compare(r[col], v) < 0); return this; }
+  gt(col: string, v: unknown) { this.filters.push((r) => r[col] !== null && r[col] !== undefined && compare(r[col], v) > 0); return this; }
   in(col: string, vs: unknown[]) { this.filters.push((r) => vs.includes(r[col])); return this; }
   is(col: string, v: unknown) { this.filters.push((r) => (r[col] ?? null) === v); return this; }
   not(col: string, op: string, v: unknown) {

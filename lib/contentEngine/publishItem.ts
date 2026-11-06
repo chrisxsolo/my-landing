@@ -18,12 +18,38 @@ export type PublishOutcome =
   | { status: "blocked"; reason: string }
   | { status: "failed"; error: string };
 
-const GUARD_PATTERN = /not approved|already published|marketing permission|archived package|claimed by another/i;
+const GUARD_PATTERN =
+  /not approved|already published|marketing permission|archived package|claimed by another|schedule not found|claim is not current|not due yet|content changed since|not for a content item/i;
+// Preconditions the publisher RPC raises for that an admin has to fix (never a
+// crash): on the scheduled path these block the schedule and leave the item
+// approved, so fixing the cause and pressing Retry is enough.
+const PRECONDITION_PATTERN =
+  /slug conflict|payload incomplete|no public derivative|not found in this session|not found|conflict:|invalid guide|unsupported content type|not kebab-case/i;
+
+/** A claimed publication schedule (lib/contentPublishing): Step B commits through the scheduled RPC. */
+export interface PublishScheduleClaim {
+  id: string;
+  claimToken: string;
+  /** The admin's Publish now: the RPC skips the due-time check. */
+  allowEarly?: boolean;
+}
 
 export interface PublishArgs {
   client: SupabaseClient;
   itemId: string;
   revalidate: (path: string) => void;
+  schedule?: PublishScheduleClaim;
+}
+
+// Step B's RPC: the plain publisher, or — for a scheduled publication — the
+// wrapper that re-checks the claim, the bound revision and the due instant in
+// the same transaction before calling the plain publisher.
+function commitRpc(itemId: string, schedule?: PublishScheduleClaim): { fn: string; args: Record<string, unknown> } {
+  if (!schedule) return { fn: "publish_session_content_item", args: { p_item_id: itemId } };
+  return {
+    fn: "publish_scheduled_content_item",
+    args: { p_schedule_id: schedule.id, p_claim_token: schedule.claimToken, p_allow_early: schedule.allowEarly ?? false },
+  };
 }
 
 // After a location guide goes live, journals waiting on it get the link.
@@ -43,7 +69,7 @@ async function linkWaitingJournals(
 }
 
 export async function publishApprovedItem(args: PublishArgs): Promise<PublishOutcome> {
-  const { client, itemId, revalidate } = args;
+  const { client, itemId, revalidate, schedule } = args;
 
   // Preflight — location guards the RPC cannot evaluate (item left untouched)
   const { data: pre, error: preError } = await client.from("session_content_items")
@@ -69,15 +95,20 @@ export async function publishApprovedItem(args: PublishArgs): Promise<PublishOut
   }
 
   // Step B — transactional live write via the RPC
-  const { data, error } = await client.rpc("publish_session_content_item", { p_item_id: itemId });
+  const rpc = commitRpc(itemId, schedule);
+  const { data, error } = await client.rpc(rpc.fn, rpc.args);
   if (error) {
-    if (GUARD_PATTERN.test(error.message)) {
+    if (GUARD_PATTERN.test(error.message) || (schedule && PRECONDITION_PATTERN.test(error.message))) {
       return { status: "blocked", reason: error.message };
     }
-    // genuine publish failure: record failed, preserve the draft (spec §9.1)
-    await client.from("session_content_items")
-      .update({ status: "failed", error: error.message.slice(0, 2000) })
-      .eq("id", itemId).eq("status", "approved");
+    // genuine publish failure: record failed, preserve the draft (spec §9.1).
+    // A scheduled publication records it on the schedule row instead and keeps
+    // the item approved, so the worker's bounded retry can run as is.
+    if (!schedule) {
+      await client.from("session_content_items")
+        .update({ status: "failed", error: error.message.slice(0, 2000) })
+        .eq("id", itemId).eq("status", "approved");
+    }
     return { status: "failed", error: error.message };
   }
   const result = data as { item_id: string; target_type: string; target_id: string | null };

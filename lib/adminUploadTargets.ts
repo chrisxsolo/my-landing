@@ -8,6 +8,7 @@ import { COUPLES_PHOTOS_BUCKET, isValidCouplesLocationSlug } from "@/lib/couples
 import { FAMILY_PHOTOS_BUCKET, isValidFamilyLocationSlug } from "@/lib/familyPhotosAdmin";
 import { PORTRAIT_PHOTOS_BUCKET, isValidPortraitLocationSlug } from "@/lib/portraitPhotosAdmin";
 import { ABOUT_PHOTOS_BUCKET, isValidAboutFactSlug } from "@/lib/aboutFacts";
+import { BLOG_DRAFTS_BUCKET } from "@/lib/contentPublishing/constants";
 
 export const GRAD_PHOTOS_BUCKET = "grad-photos";
 
@@ -28,12 +29,17 @@ export type AdminUploadTarget = {
   isValidPrefix: (prefix: string) => boolean;
 };
 
+const UUID_PREFIX_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const TARGETS: Record<string, AdminUploadTarget> = {
   "couples-photos": { bucket: COUPLES_PHOTOS_BUCKET, isValidPrefix: isValidCouplesLocationSlug },
   "family-photos": { bucket: FAMILY_PHOTOS_BUCKET, isValidPrefix: isValidFamilyLocationSlug },
   "portrait-photos": { bucket: PORTRAIT_PHOTOS_BUCKET, isValidPrefix: isValidPortraitLocationSlug },
   "about-photos": { bucket: ABOUT_PHOTOS_BUCKET, isValidPrefix: isValidAboutFactSlug },
   "grad-image": { bucket: GRAD_PHOTOS_BUCKET, isValidPrefix: (prefix) => GRAD_UPLOAD_FOLDERS.has(prefix) },
+  // A standalone blog draft's images stay PRIVATE until it publishes; the
+  // prefix is the draft's id, so an upload can only ever belong to one draft.
+  "blog-draft": { bucket: BLOG_DRAFTS_BUCKET, isValidPrefix: (prefix) => UUID_PREFIX_RE.test(prefix) },
 };
 
 export function getAdminUploadTarget(key: unknown): AdminUploadTarget | null {

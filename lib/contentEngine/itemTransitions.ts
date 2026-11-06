@@ -6,6 +6,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { validatePayload } from "@/lib/contentEngine/payloads";
 import { removePendingGuideLinks } from "@/lib/contentEngine/pendingGuideLinks";
+import { cancelActiveSchedulesForItem } from "@/lib/contentPublishing/scheduleService";
 import { isLocationGuideType } from "@/lib/locations/guideCoverage";
 
 const EDITABLE_STATUSES = ["draft", "approved", "failed"] as const;
@@ -25,7 +26,7 @@ interface AutosaveServerCopy {
 }
 
 export type AutosaveResult =
-  | { outcome: "saved"; payloadRevision: number; statusReset: boolean }
+  | { outcome: "saved"; payloadRevision: number; statusReset: boolean; scheduleCancelled: boolean }
   | { outcome: "conflict"; server: AutosaveServerCopy }
   | { outcome: "invalid"; message: string }
   | { outcome: "not_found" }
@@ -63,7 +64,11 @@ export async function applyAutosave(args: AutosaveArgs): Promise<AutosaveResult>
       .select("payload,payload_revision,status").eq("id", itemId).single();
     return { outcome: "conflict", server: server as AutosaveServerCopy };
   }
-  return { outcome: "saved", payloadRevision: updated[0].payload_revision as number, statusReset };
+  // A schedule is bound to the revision that was reviewed; the content just
+  // changed, so it is cancelled here (and the commit RPC would refuse the new
+  // revision regardless). The admin re-approves and reschedules.
+  const cancelled = await cancelActiveSchedulesForItem(client, itemId, "cancelled: the item was edited after it was scheduled");
+  return { outcome: "saved", payloadRevision: updated[0].payload_revision as number, statusReset, scheduleCancelled: cancelled > 0 };
 }
 
 export type StatusAction = "approve" | "reject" | "unreject";
@@ -111,6 +116,9 @@ export async function applyStatusAction(args: StatusActionArgs): Promise<StatusA
   const { error } = await client.from("session_content_items")
     .update(patch).eq("id", itemId).eq("status", item.status);
   if (error) throw new Error(`status action failed: ${error.message}`);
+  if (action === "reject") {
+    await cancelActiveSchedulesForItem(client, itemId, "cancelled: the item was rejected");
+  }
   if (action === "reject" && item.content_type === "location_guide") {
     await dropDependentLinks(client, item.payload as Record<string, unknown>);
   }

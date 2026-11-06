@@ -4,7 +4,7 @@ import { pathsForPublishedItem } from "@/lib/contentEngine/publishRevalidation";
 describe("pathsForPublishedItem (spec §9.1 Step C map)", () => {
   it("journal → blog index + post page", () => {
     expect(pathsForPublishedItem("journal_post", { slug: "golden-hour-sjsu" }))
-      .toEqual(["/blog", "/blog/golden-hour-sjsu"]);
+      .toEqual(["/blog", "/blog/golden-hour-sjsu", "/blog/category/[category]", "/sitemap.xml"]);
   });
   it("portfolio → /portfolio, plus / when featured", () => {
     expect(pathsForPublishedItem("portfolio_pick", { featured: false })).toEqual(["/portfolio"]);

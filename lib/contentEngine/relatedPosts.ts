@@ -21,6 +21,7 @@ export async function loadRelatedPosts(
 ): Promise<RelatedPost[]> {
   const { data, error } = await client.from(BLOG_POSTS_TABLE)
     .select("slug,title")
+    .lte("published_at", new Date().toISOString()) // never link to a post that is not live yet
     .order("published_at", { ascending: false })
     .limit(RECENT_WINDOW);
   if (error) {
