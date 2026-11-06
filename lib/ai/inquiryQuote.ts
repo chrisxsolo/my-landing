@@ -15,6 +15,7 @@ import { buildThreadDigest, type ThreadMessage } from "./threadDigest";
 import { parseQuotedPrices, staleQuotedPrices, type QuoteInput } from "./quotePricing";
 import { resolveTravel, schoolImpliesLocationFor, type TravelResolution } from "@/lib/travelResolution";
 import { detectGraduationDurationMinutes } from "@/lib/pricing";
+import { buildSportsTeamPortraitFacts, type ResolvedSportsTeamPortraitOffer } from "./sportsTeamPortraitPricing";
 
 /** The inquiry fields a quote depends on: the row's columns, or the form's. */
 export type QuoteSubject = {
@@ -41,6 +42,13 @@ export type InquiryQuoteOptions = {
   confirmedPrices?: readonly number[];
   /** A travel resolution the caller already settled, used instead of resolving one. */
   travel?: TravelResolution;
+  /**
+   * A special pricing profile the caller has ALREADY resolved and verified
+   * (lib/ai/sportsTeamPortraitPricing). When present it replaces the
+   * classifier's playbook and facts, so one resolution feeds every surface
+   * instead of each one re-running its own eligibility logic.
+   */
+  profile?: ResolvedSportsTeamPortraitOffer | null;
 };
 
 /**
@@ -58,8 +66,13 @@ export function resolveInquiryTravel(subject: QuoteSubject, playbook: string | n
 
 export function buildQuoteInputForInquiry(subject: QuoteSubject, options: InquiryQuoteOptions = {}): InquiryQuote {
   const message = subject.message ?? "";
-  const playbook = classifySession(subject.sessionType, message).key;
-  const facts = buildPricingFacts({ sessionType: subject.sessionType, message, people: subject.people });
+  const profile = options.profile ?? null;
+  const playbook: string | null = profile ? profile.playbook : classifySession(subject.sessionType, message).key;
+  const facts = profile
+    ? buildSportsTeamPortraitFacts(profile)
+    : buildPricingFacts({ sessionType: subject.sessionType, message, people: subject.people });
+  // The special profile is not a graduation, so the school never stands in for
+  // the shoot location (schoolImpliesLocationFor), exactly as for any other service.
   const travel = options.travel ?? resolveInquiryTravel(subject, playbook);
   const messages = options.messages ?? [];
   const confirmedPrices = [...(options.confirmedPrices ?? [])];
@@ -69,6 +82,7 @@ export function buildQuoteInputForInquiry(subject: QuoteSubject, options: Inquir
     people: subject.people != null ? String(subject.people) : null,
     basePrices: facts.basePrices,
     addOnPrices: facts.addOnPrices,
+    informationalPrices: facts.informationalPrices ?? [],
     travel,
     confirmedPrices,
     // The length they asked for, if they named one, so the quote is one

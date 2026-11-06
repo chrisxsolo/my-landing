@@ -247,6 +247,8 @@ export default function ConversationPage() {
     if (localDraft)    setDraft(localDraft);
     if (localAi)       setLastAiDraft(localAi);
     if (localOriginal) setOriginalAiDraft(localOriginal);
+    // Warnings belong to one inquiry's draft; none carry over to the next.
+    setContextWarnings([]);
 
     // Drafts sync through /api/admin/drafts (service role) — no browser access
     // to site_settings. The call is made even when localStorage has every
@@ -258,6 +260,17 @@ export default function ConversationPage() {
       .then((data) => {
         if (!data) return;
         if (data.quote) setDraftQuote((prev) => prev ?? data.quote);
+        // A stored pricing profile that no longer matches its draft is a
+        // review item, not a silent fallback: PricingCheck renders nothing
+        // unusual on the generic quote, so the warning has to be visible here.
+        if (Array.isArray(data.warnings) && data.warnings.length) {
+          // Deduped by code: this effect can run twice in development, and a
+          // repeated warning is noise rather than a second problem.
+          setContextWarnings((prev) => [
+            ...prev,
+            ...(data.warnings as ContextWarning[]).filter((w) => !prev.some((p) => p.code === w.code)),
+          ]);
+        }
         // Functional updates: the user may have started typing/dictating
         // before this resolves — never clobber in-progress text with the
         // older cloud copy. The persist effects below handle localStorage.
@@ -485,21 +498,11 @@ export default function ConversationPage() {
         if (isRefine && json.unchanged) {
           showToast("Refine left the draft as it was. Try saying what you want the result to be.", false);
         }
-        const draftPayload: { inquiryId: number | string; draft: string; ai_draft: string; original_ai_draft?: string } = {
-          inquiryId,
-          draft: json.draft,
-          ai_draft: json.draft,
-        };
-        if (!isRefine && !originalAiDraft) {
-          setOriginalAiDraft(json.draft);
-          draftPayload.original_ai_draft = json.draft;
-        }
-        // Persist server-side (service role) so draft is accessible on any device
-        await fetch("/api/admin/drafts", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(draftPayload),
-        }).catch(() => {});
+        // Persistence is the server's: /api/draft-reply saved draft, ai_draft
+        // and the pricing profile that produced them in one statement, and
+        // set original_ai_draft when this generation started the cycle. The
+        // browser only mirrors that first-cycle baseline into its own state.
+        if (!isRefine && !originalAiDraft) setOriginalAiDraft(json.draft);
       }
       else showToast(json.error ?? "Draft failed", false);
     } catch {

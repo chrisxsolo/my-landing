@@ -108,6 +108,8 @@ export function isValidSettingValue(value: unknown): value is string | null {
   return true;
 }
 
+export const SITE_SETTINGS_TABLE = "site_settings";
+
 // ── Per-inquiry draft sync keys (conversation page) ──────────────────────────
 // e.g. draft_42, ai_draft_42, original_ai_draft_42. inquiryId is a bigint id.
 export const DRAFT_KEY_PREFIXES = ["draft", "ai_draft", "original_ai_draft"] as const;

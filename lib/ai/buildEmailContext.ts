@@ -14,12 +14,14 @@ import { classifySession } from "./sessionClassifier";
 import { TRAVEL_RATE_LABEL } from "@/lib/travelFee";
 import { renderTravelFact, buildPolicyFacts, buildContactFacts, type PricingFacts } from "./businessFacts";
 import type { TravelResolution } from "@/lib/travelResolution";
-import { buildQuoteInputForInquiry } from "./inquiryQuote";
+import { buildQuoteInputForInquiry, resolveInquiryTravel } from "./inquiryQuote";
 import { buildGoldenHourWindow, goldenHourCaveat, type GoldenHourWindow } from "./goldenHour";
 import { buildThreadDigest, renderThreadDigest, type ThreadDigest, type ThreadMessage } from "./threadDigest";
 import { selectExamples, type ApprovedExample, type ExampleScenario } from "./approvedExamples";
 import { detectStage, stageShape, type ConversationStage, type StageShape } from "./conversationStage";
 import { buildAdminStatus, renderAdminStatus, type AdminStatus, type InquiryAdminRow } from "./adminStatus";
+import { resolveSportsTeamPortraitFromThread, sportsTeamProfileWarnings } from "./sportsTeamPortraitContext";
+import { SPORTS_TEAM_PORTRAIT_PLAYBOOK } from "./sportsTeamPortraitPricing";
 
 export type AvailabilityEntry = {
   date: string;
@@ -59,7 +61,10 @@ export type ContextWarning = {
     | "session_type_ambiguous"
     | "requested_date_unavailable"
     | "booking_state_uncertain"
-    | "thread_not_loaded";
+    | "thread_not_loaded"
+    | "prior_quote_ambiguous"           // an outbound amount whose role cannot be read blocks the standardized offer
+    | "prior_quote_kept"                // Chris already priced this client, so the standardized offer was withheld
+    | "pricing_profile_restore_invalid"; // a stored profile snapshot did not match its saved AI baseline
   severity: "high" | "medium" | "low";
   message: string;
 };
@@ -99,6 +104,7 @@ export type EmailContext = {
     stalePrices: number[];
     /** Prices the admin confirmed as agreed for this client. */
     confirmedPrices: number[];
+    requiresCompleteSpecialQuote: boolean; // a special offer's FIRST quote: every approved fact must reach the client
   };
   policy: string[];
   /** Phone number and signature behaviour, so no draft dangles a reference. */
@@ -202,17 +208,30 @@ export function buildEmailContext(input: BuildEmailContextInput): EmailContext {
   const now = input.now ?? new Date();
   const warnings: ContextWarning[] = [];
 
+  // Falls back to the newest message that is theirs, so stage detection still
+  // works for callers that pass a thread without naming the latest message.
+  const newestClientMessage = [...messages].reverse().find((m) => !m.fromMe)?.body ?? null;
+  const latestClientMessage = input.latestClientMessage ?? newestClientMessage;
+
   // The message is consulted too: the form's "Other" option hides real
   // proposals, graduations, and engagements.
   const classification = classifySession(inquiry.sessionType, inquiry.message);
-  const playbook = classification.key;
-  if (!playbook) {
+  // The one exception to classifying from the stored inquiry (lib/ai/sportsTeamPortraitContext).
+  const specialTravel = resolveInquiryTravel(inquiry, SPORTS_TEAM_PORTRAIT_PLAYBOOK);
+  const special = resolveSportsTeamPortraitFromThread({
+    inquiry, messages, threadLoaded, latestClientMessage, confirmedPrices: input.confirmedPrices ?? [], travel: specialTravel,
+  });
+  const profile = special.status === "resolved" ? special.offer : null;
+  const playbook: string | null = profile ? profile.playbook : classification.key;
+  warnings.push(...sportsTeamProfileWarnings(special, inquiry.school, specialTravel));
+  // A resolved profile IS the classification; the generic warnings below do not apply.
+  if (!profile && !playbook) {
     warnings.push({
       code: "session_type_unknown",
       severity: "medium",
       message: "Session type could not be identified, so no rate card applies. Check the price before sending.",
     });
-  } else if (classification.ambiguous) {
+  } else if (!profile && classification.ambiguous) {
     // Two unrelated kinds of session asked for in one message. Picking one
     // silently is how a wrong rate gets quoted confidently.
     warnings.push({
@@ -269,7 +288,7 @@ export function buildEmailContext(input: BuildEmailContextInput): EmailContext {
   // The same inputs a restored draft and the contract check against
   // (lib/ai/inquiryQuote.ts), so no surface prices from its own copy.
   const confirmedPrices = input.confirmedPrices ?? [];
-  const quote = buildQuoteInputForInquiry(inquiry, { messages, confirmedPrices });
+  const quote = buildQuoteInputForInquiry(inquiry, { messages, confirmedPrices, profile });
   const { facts: pricingFacts, travel, stalePrices } = quote;
   if (!pricingFacts.verified) {
     warnings.push({
@@ -318,14 +337,10 @@ export function buildEmailContext(input: BuildEmailContextInput): EmailContext {
     });
   }
 
-  // Falls back to the newest message that is theirs, so stage detection still
-  // works for callers that pass a thread without naming the latest message.
-  const newestClientMessage = [...messages].reverse().find((m) => !m.fromMe)?.body ?? null;
-
   const stage = detectStage({
     digest,
     admin,
-    latestClientMessage: input.latestClientMessage ?? newestClientMessage,
+    latestClientMessage,
     inquiryMessage: inquiry.message,
     hasSessionDate: Boolean(admin.sessionDate),
   });
@@ -362,7 +377,7 @@ export function buildEmailContext(input: BuildEmailContextInput): EmailContext {
       timeVerified: false,
       requestedDateStatus,
     },
-    pricing: { ...pricingFacts, travelFact, travel, stalePrices, confirmedPrices },
+    pricing: { ...pricingFacts, travelFact, travel, stalePrices, confirmedPrices, requiresCompleteSpecialQuote: profile?.firstQuote ?? false },
     policy: buildPolicyFacts(),
     contact: buildContactFacts(),
     goldenHour: {

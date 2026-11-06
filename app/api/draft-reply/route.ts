@@ -33,6 +33,9 @@ import type { ThreadMessage } from "@/lib/ai/threadDigest";
 import type { InquiryInput } from "@/lib/ai/buildEmailContext";
 import { quoteInputOf } from "@/lib/ai/validateEmailDraft";
 import { fetchInquiryAdminRow } from "@/lib/ai/aiEmailStore";
+import { createSupabaseServerClient } from "@/lib/supabaseServer";
+import { persistDraftCycle } from "@/lib/ai/draftCycleStore";
+import { profileOfContext } from "@/lib/ai/draftPricingProfileSnapshot";
 
 export const dynamic = "force-dynamic";
 
@@ -231,6 +234,32 @@ export async function POST(req: NextRequest) {
     // Awaited so a serverless function cannot be frozen mid-insert and lose the
     // row, which would quietly under-report spend.
     await recordUsage(result.usage);
+
+    // The draft, the AI baseline and the pricing profile that produced it are
+    // saved here, as one unit, for every operation that yields a new AI
+    // baseline. The browser no longer writes them: it cannot know the profile,
+    // and a text row saved without it would restore against the wrong quote.
+    const inquiryId = Number(body.inquiry_id);
+    if (Number.isFinite(inquiryId) && inquiryId > 0) {
+      try {
+        await persistDraftCycle(createSupabaseServerClient(), {
+          inquiryId,
+          draft: result.draft,
+          profile: profileOfContext(result.context),
+          // A generation may start a cycle; the store only writes the first AI
+          // draft when none is saved, so a regeneration never overwrites it.
+          startsCycle: mode === "generate",
+        });
+      } catch (err) {
+        console.error(`[draft-reply] ${mode} generated but could not be saved:`, err);
+        // No draft field: a draft the browser kept and later PUT by itself
+        // would restore without the profile that priced it.
+        return NextResponse.json(
+          { error: "The draft was generated but could not be saved. Try again.", code: "draft_save_failed" },
+          { status: 500 },
+        );
+      }
+    }
 
     return NextResponse.json({
       draft: result.draft,

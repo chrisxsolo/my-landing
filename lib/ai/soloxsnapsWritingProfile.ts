@@ -167,6 +167,15 @@ Acknowledge the ceremony location and what they asked to have covered, without r
   headshot_event: `This is a group booking for a club, class, or company, and it gets priced by hand every time. Find out how many people, how long you have, and the venue. Do not quote a per-person or per-hour rate from the session card. Say you'll send a quote for the group once you know the headcount and the time window, and ask whether the headcount could move.`,
 
   commercial: `Brand, editorial, and commercial work is quoted per project, so ask what the deliverables are: where the images run, how many are needed, and whether there is a usage or licensing requirement. Find out the date and location. Do not quote a portrait or headshot rate. Say you'll put a proper quote together once you know the scope.`,
+
+  // Reached only when lib/ai/sportsTeamPortraitPricing resolves the exact
+  // eight-person profile; the classifier never produces this key on its own.
+  sports_team_portrait: `This is the standardized sports senior/team portrait setup for exactly eight participants, and the verified pricing facts carry the whole offer. Answer their pricing question directly, in the first sentence or two.
+Give both options with the session total AND the per-person figure for each: 30 minutes and 60 minutes, as stated in the verified facts. State the exact deliverables: the edited images each participant receives, split into headshots and full-body portraits, and the group total.
+Strongly recommend 60 minutes, for practical reasons: eight people need individual posing and both headshot and full-body coverage, and 30 minutes means a streamlined setup that will feel rushed.
+Say plainly that this is a custom standardized sports-team portrait rate, separate from the regular graduation group pricing. Do not mention per-graduate rates, a group minimum, or any other package.
+If a travel fee is verified, add it once to each option and give both all-in figures; if travel is unverified, say it still needs confirming and give no all-in total.
+Plain text, short paragraphs, no list. End with the natural next step: which option they'd like, and the invoice and contract once that is settled.`,
 } as const;
 
 /**
@@ -181,10 +190,21 @@ export type { PlaybookKey, Classification } from "./sessionClassifier";
 
 import { resolvePlaybookKey as resolveKey } from "./sessionClassifier";
 
+/**
+ * The playbook for a session.
+ *
+ * An already-canonical key ("graduation", "sports_team_portrait") is looked up
+ * directly: the prompt builder passes the resolved key, and a key the
+ * classifier cannot produce (the sports-team profile) would otherwise be lost
+ * to the fallback. Anything else is classified from the dropdown and message.
+ */
 export function getPlaybook(
   sessionType: string | null | undefined,
   message?: string | null,
 ): string | null {
+  if (sessionType && Object.prototype.hasOwnProperty.call(SESSION_PLAYBOOKS, sessionType)) {
+    return SESSION_PLAYBOOKS[sessionType];
+  }
   const key = resolveKey(sessionType, message);
   return key ? SESSION_PLAYBOOKS[key] ?? null : null;
 }

@@ -13,10 +13,12 @@
 
 import { BANNED_PHRASES } from "./soloxsnapsWritingProfile";
 import type { EmailContext } from "./buildEmailContext";
-import { checkDraftQuote, type QuoteInput } from "./quotePricing";
+import { checkDraftQuote, PER_HEAD_FIGURE, type QuoteInput } from "./quotePricing";
 import { detectGraduationDurationMinutes } from "@/lib/pricing";
 import { PRICING_CATALOG } from "@/lib/pricingCatalog";
 import { formatFee } from "@/lib/pricingCatalog";
+import { SPORTS_TEAM_PORTRAIT_PLAYBOOK, sportsTeamOfferOptions } from "./sportsTeamPortraitPricing";
+import { sportsTeamCompletenessGaps } from "./sportsTeamPortraitChecks";
 
 export type IssueType =
   | "em_dash"
@@ -29,6 +31,8 @@ export type IssueType =
   | "missing_greeting"
   | "unsupported_price"
   | "pricing_mismatch"
+  /** A special-profile quote that leaves out one of its approved facts. */
+  | "incomplete_special_quote"
   | "unsupported_date"
   | "unsupported_turnaround"
   | "fabricated_booking_state"
@@ -317,11 +321,16 @@ function auxiliaryPrices(context: EmailContext): number[] {
  * outfit" is a coincidence, not a quote — which is how a discount slips past a
  * looser check.
  */
-function isSupportedPrice(price: number, context: EmailContext): boolean {
+function isSupportedPrice(price: number, context: EmailContext, asPerPerson = false): boolean {
   const { basePrices, addOnPrices } = context.pricing;
+  const informational = context.pricing.informationalPrices ?? [];
 
+  // A figure stated PER PERSON is a session rate or a package breakdown. An
+  // add-on price is neither, so "$100 per person" in an ordinary graduation
+  // draft does not pass because a second location happens to cost $100.
   const exact = new Set<number>([
-    ...basePrices, ...addOnPrices, ...auxiliaryPrices(context), ...context.pricing.confirmedPrices,
+    ...basePrices, ...informational, ...(asPerPerson ? [] : addOnPrices),
+    ...auxiliaryPrices(context), ...context.pricing.confirmedPrices,
   ]);
   // A thread price counts as already quoted unless only a superseded travel
   // fee explains it; those never outrank the current approved fee.
@@ -331,9 +340,10 @@ function isSupportedPrice(price: number, context: EmailContext): boolean {
     if (Number.isFinite(value) && !stale.has(value)) exact.add(value);
   }
   if (exact.has(price)) return true;
-  if (!basePrices.length) return false;
+  if (!basePrices.length || asPerPerson) return false;
 
-  // Subset sum over the add-ons, which number at most a handful.
+  // Subset sum over the add-ons, which number at most a handful. Informational
+  // figures are deliberately absent: a per-person breakdown is never an addend.
   const extras = [...addOnPrices, ...auxiliaryPrices(context)];
   let reachable = new Set<number>(basePrices);
   for (const extra of extras) {
@@ -351,6 +361,7 @@ export function quoteInputOf(context: EmailContext): QuoteInput {
     people: context.request.people,
     basePrices: context.pricing.basePrices,
     addOnPrices: context.pricing.addOnPrices,
+    informationalPrices: context.pricing.informationalPrices ?? [],
     travel: context.pricing.travel,
     confirmedPrices: context.pricing.confirmedPrices,
     durationMinutes: context.client.playbook === "graduation"
@@ -359,19 +370,51 @@ export function quoteInputOf(context: EmailContext): QuoteInput {
   };
 }
 
-/** A stated travel fee or total that disagrees with the rate card. */
+function describeTravelMismatch(stated: number, expected: number): string {
+  return expected > 0
+    ? `States a ${formatFee(stated)} travel fee; the verified fee is ${formatFee(expected)}.`
+    : `States a ${formatFee(stated)} travel fee, but no travel amount is verified for this location.`;
+}
+
+function describePerPersonMismatch(stated: number, expected: number): string {
+  const options = sportsTeamOfferOptions();
+  if (expected > 0) {
+    const option = options.find((o) => o.perPerson === expected);
+    return `States ${formatFee(stated)} per person; the ${option?.durationMinutes}-minute option is ${formatFee(expected)} per person.`;
+  }
+  return `States ${formatFee(stated)} per person, which matches neither option (${options.map((o) => `${formatFee(o.perPerson)} for ${o.durationMinutes} minutes`).join(", ")}).`;
+}
+
+/** A stated travel fee, total or per-person figure that disagrees with the rate card. */
 function checkQuote(draft: string, context: EmailContext): ValidationIssue[] {
   return checkDraftQuote(draft, quoteInputOf(context)).mismatches.map((m) => ({
     type: "pricing_mismatch" as const,
     category: "factual" as const,
     severity: "high" as const,
     description: m.kind === "travel"
-      ? m.expected > 0
-        ? `States a ${formatFee(m.stated)} travel fee; the verified fee is ${formatFee(m.expected)}.`
-        : `States a ${formatFee(m.stated)} travel fee, but no travel amount is verified for this location.`
-      : `States a ${formatFee(m.stated)} total; the rate card gives ${formatFee(m.expected)}.`,
+      ? describeTravelMismatch(m.stated, m.expected)
+      : m.kind === "per_person"
+        ? describePerPersonMismatch(m.stated, m.expected)
+        : `States a ${formatFee(m.stated)} total; the rate card gives ${formatFee(m.expected)}.`,
     excerpt: m.excerpt,
   }));
+}
+
+/**
+ * The approved special offer must reach the client whole. A reply that
+ * drops one option, one image component, the recommendation or the
+ * distinction from graduation pricing is reported, not patched.
+ */
+function checkSpecialQuoteCompleteness(draft: string, context: EmailContext): ValidationIssue[] {
+  // Only the first quote must be whole. Once Chris has quoted the offer, a
+  // confirmation or logistics reply is not asked to restate it.
+  if (context.client.playbook !== SPORTS_TEAM_PORTRAIT_PLAYBOOK || !context.pricing.requiresCompleteSpecialQuote) return [];
+  const gaps = sportsTeamCompletenessGaps(draft);
+  if (!gaps.length) return [];
+  return [{
+    type: "incomplete_special_quote", category: "factual", severity: "high",
+    description: `The sports-team quote is missing: ${gaps.join("; ")}.`,
+  }];
 }
 
 /** Words that make a number-plus-unit a delivery promise rather than a session length. */
@@ -409,11 +452,20 @@ function checkTurnaround(draft: string): ValidationIssue[] {
 }
 
 function checkFacts(draft: string, context: EmailContext): ValidationIssue[] {
-  const issues: ValidationIssue[] = [...checkQuote(draft, context), ...checkTurnaround(draft)];
+  const issues: ValidationIssue[] = [
+    ...checkQuote(draft, context), ...checkSpecialQuoteCompleteness(draft, context), ...checkTurnaround(draft),
+  ];
 
   // ── Prices ────────────────────────────────────────────────────────────────
+  // Per-head wording is a session-rate claim only where the rate card prices
+  // by head (graduation groups, the sports-team offer). Elsewhere "$75 each"
+  // is how an add-on is described, and stays an add-on.
+  const perHeadPlaybook = context.client.playbook === "graduation" || context.client.playbook === SPORTS_TEAM_PORTRAIT_PLAYBOOK;
+  const perPerson = new Set(
+    perHeadPlaybook ? [...draft.matchAll(PER_HEAD_FIGURE)].map((m) => Number(m[1].replace(/,/g, ""))) : [],
+  );
   for (const price of extractPrices(draft)) {
-    if (isSupportedPrice(price, context)) continue;
+    if (isSupportedPrice(price, context, perPerson.has(price))) continue;
     issues.push({
       type: "unsupported_price", category: "factual", severity: "high",
       description: "States a price that is not in the rate card and was not quoted earlier in this thread.",

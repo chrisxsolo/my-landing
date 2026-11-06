@@ -9,8 +9,9 @@
 import { useMemo } from "react";
 import { T, Icon, MonoLabel } from "../ui";
 import {
-  checkDraftQuote, correctDraftPricing, type PricingEnforcement, type QuoteInput,
+  checkDraftQuote, correctDraftPricing, type PricingEnforcement, type QuoteInput, type QuoteMismatch,
 } from "@/lib/ai/quotePricing";
+import { SPORTS_TEAM_PORTRAIT_PLAYBOOK, sportsTeamOfferOptions } from "@/lib/ai/sportsTeamPortraitPricing";
 
 export type DraftQuote = { input: QuoteInput; stalePrices: number[] };
 
@@ -25,6 +26,23 @@ type Props = {
 };
 
 const money = (n: number) => (Number.isInteger(n) ? `$${n.toLocaleString("en-US")}` : `$${n.toFixed(2)}`);
+
+/** How a mismatch reads to Chris, by the role the figure plays. */
+function describeMismatch(m: QuoteMismatch): string {
+  if (m.kind === "travel") {
+    return m.expected > 0
+      ? `Draft says ${money(m.stated)} travel; should be ${money(m.expected)}.`
+      : `Draft says ${money(m.stated)} travel; no travel amount is verified for this location.`;
+  }
+  if (m.kind === "per_person") {
+    const options = sportsTeamOfferOptions();
+    const expected = options.find((o) => o.perPerson === m.expected);
+    return expected
+      ? `Draft says ${money(m.stated)} per person; the ${expected.durationMinutes}-minute package is ${money(m.expected)} per person.`
+      : `Draft says ${money(m.stated)} per person, which matches neither the ${options.map((o) => `${o.durationMinutes}-minute`).join(" nor the ")} package. Check which one it describes.`;
+  }
+  return `Draft says ${money(m.stated)} total; should be ${money(m.expected)}.`;
+}
 
 /** What the server changed before the draft arrived, with the model's text on request. */
 function ServerCorrections({ fix }: { fix: PricingEnforcement }) {
@@ -49,9 +67,14 @@ export default function PricingCheck({ draft, quote, onDraft, onConfirmEarlier, 
   if (!quote || !check?.quotesPrice) return null;
   const { breakdown, mismatches } = check;
   const stale = quote.stalePrices;
+  // Two alternative packages are both valid; the table shows the one the
+  // draft names, or the recommended 60-minute option, never their sum.
+  const twoOptions = quote.input.playbook === SPORTS_TEAM_PORTRAIT_PLAYBOOK;
 
   return (
-    <div className="px-3 py-2 rounded-xl text-xs space-y-2"
+    // Polite live region on the always-mounted card, so a mismatch that appears
+    // or changes while Chris types is announced once without interrupting him.
+    <div className="px-3 py-2 rounded-xl text-xs space-y-2" aria-live="polite"
       style={{ background: T.inset, border: `1px solid ${mismatches.length ? T.redBorder : T.border}` }}>
       <MonoLabel>Pricing from the rate card</MonoLabel>
       {pricingFix && pricingFix.corrections.length > 0 && <ServerCorrections fix={pricingFix} />}
@@ -81,10 +104,9 @@ export default function PricingCheck({ draft, quote, onDraft, onConfirmEarlier, 
       )}
       {mismatches.length > 0 && (
         <div className="space-y-1" style={{ color: T.red }}>
-          {mismatches.map((m) => (
-            <p key={`${m.kind}-${m.excerpt}`} className="leading-snug">
-              Draft says {money(m.stated)} {m.kind === "travel" ? "travel" : "total"}
-              {m.expected > 0 ? `; should be ${money(m.expected)}.` : "; no travel amount is verified for this location."}
+          {mismatches.map((m, i) => (
+            <p key={`${m.kind}-${m.stated}-${i}`} className="leading-snug">
+              {i === 0 && <strong>Price mismatch: </strong>}{describeMismatch(m)}
             </p>
           ))}
           {mismatches.some((m) => m.expected > 0) && (
@@ -95,6 +117,11 @@ export default function PricingCheck({ draft, quote, onDraft, onConfirmEarlier, 
             </button>
           )}
         </div>
+      )}
+      {twoOptions && breakdown && (
+        <p className="leading-snug" style={{ color: T.inkSoft }}>
+          Two package options are available for this setup. The table shows one; the other is an alternative, not an add-on.
+        </p>
       )}
       {stale.length > 0 && (
         <div className="space-y-1" style={{ color: T.inkFaint }}>

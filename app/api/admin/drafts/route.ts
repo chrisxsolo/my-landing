@@ -6,7 +6,7 @@
 // Kept separate from /api/admin/site-settings so that endpoint's allowlist stays
 // strictly the non-secret public image/cover keys.
 //
-//   GET    ?inquiryId=42                  → { draft, ai_draft, original_ai_draft, quote }
+//   GET    ?inquiryId=42                  → { draft, ai_draft, original_ai_draft, quote, warnings }
 //   PUT    { inquiryId, draft?, ai_draft?, original_ai_draft? } → upsert provided
 //   DELETE { inquiryId, kinds? }          → delete (default: draft + ai_draft)
 //
@@ -14,6 +14,12 @@
 // computed from the inquiry row with no model call. A restored draft used to
 // come back without one, so the pricing check never ran on it: a stored draft
 // quoting the old $70 SJSU travel fee restored silently.
+//
+// The row alone cannot see the Gmail context that resolves a special pricing
+// profile, so /api/draft-reply stores a server-owned profile snapshot beside
+// the draft (lib/ai/draftPricingProfileSnapshot). GET honours it only when it
+// still matches the stored AI baseline; PUT never accepts one from the
+// browser; DELETE clears it with the cycle.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { type NextRequest, NextResponse } from "next/server";
@@ -22,8 +28,12 @@ import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { requireAdmin } from "@/lib/requireAdmin";
 import { buildQuoteInputForInquiry, type QuoteSubject } from "@/lib/ai/inquiryQuote";
 import type { QuoteInput } from "@/lib/ai/quotePricing";
+import type { ContextWarning } from "@/lib/ai/buildEmailContext";
+import { draftPricingProfileKey, readDraftPricingProfileSnapshot, type DraftPricingProfile } from "@/lib/ai/draftPricingProfileSnapshot";
+import { resolvedSportsTeamPortraitOffer, SPORTS_TEAM_PORTRAIT_PLAYBOOK } from "@/lib/ai/sportsTeamPortraitPricing";
 import {
   DRAFT_KEY_PREFIXES,
+  SITE_SETTINGS_TABLE,
   type DraftKind,
   draftKey,
   isValidInquiryId,
@@ -41,8 +51,14 @@ type RestoredQuote = { input: QuoteInput; stalePrices: number[] };
  * The pricing inputs for the inquiry, or null when the row cannot be read.
  * Without the Gmail thread there are no earlier quoted prices to call stale;
  * the draft's own figures are still checked against the rate card.
+ *
+ * A verified profile rebuilds the special quote from the profile's current
+ * source plus the row's own location and travel fields. Nothing numeric is
+ * ever read back from storage.
  */
-async function fetchInquiryQuote(supabase: SupabaseClient, inquiryId: string): Promise<RestoredQuote | null> {
+async function fetchInquiryQuote(
+  supabase: SupabaseClient, inquiryId: string, profile: DraftPricingProfile | null,
+): Promise<RestoredQuote | null> {
   try {
     const { data, error } = await supabase
       .from(INQUIRIES_TABLE).select(QUOTE_COLUMNS).eq("id", inquiryId).maybeSingle();
@@ -52,13 +68,20 @@ async function fetchInquiryQuote(supabase: SupabaseClient, inquiryId: string): P
     const subject: QuoteSubject = {
       sessionType: row.session_type, message: row.message, school: row.school, location: row.location, people: row.people,
     };
-    const { input, stalePrices } = buildQuoteInputForInquiry(subject);
+    const special = profile === SPORTS_TEAM_PORTRAIT_PLAYBOOK ? resolvedSportsTeamPortraitOffer() : null;
+    const { input, stalePrices } = buildQuoteInputForInquiry(subject, { profile: special });
     return { input, stalePrices };
   } catch (err) {
     console.error("[admin/drafts] quote inputs unavailable:", err);
     return null;
   }
 }
+
+const RESTORE_INVALID: ContextWarning = {
+  code: "pricing_profile_restore_invalid",
+  severity: "high",
+  message: "The saved draft's pricing profile did not match the saved AI draft, so the restored pricing check uses the ordinary rate card. Check the prices before sending, or regenerate.",
+};
 
 export async function GET(req: NextRequest) {
   const deny = requireAdmin(req);
@@ -70,20 +93,28 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const keys = DRAFT_KEY_PREFIXES.map((k) => draftKey(k, inquiryId!));
+    const profileKey = draftPricingProfileKey(inquiryId!);
+    const keys = [...DRAFT_KEY_PREFIXES.map((k) => draftKey(k, inquiryId!)), profileKey];
     const supabase = createSupabaseServerClient();
-    const [{ data, error }, quote] = await Promise.all([
-      supabase.from("site_settings").select("key,value").in("key", keys),
-      fetchInquiryQuote(supabase, inquiryId!),
-    ]);
+    // Draft rows and the snapshot in one query: the digest check below needs
+    // the ai_draft the snapshot was written with, read at the same moment.
+    const { data, error } = await supabase.from(SITE_SETTINGS_TABLE).select("key,value").in("key", keys);
     if (error) throw error;
 
     const byKey = new Map((data ?? []).map((r) => [r.key, r.value]));
+    const aiDraft = (byKey.get(draftKey("ai_draft", inquiryId!)) as string | undefined) ?? null;
+    const snapshot = readDraftPricingProfileSnapshot(byKey.get(profileKey) as string | undefined, aiDraft);
+    const profile = snapshot.status === "valid" ? snapshot.profile : null;
+    const warnings: ContextWarning[] = snapshot.status === "invalid" ? [RESTORE_INVALID] : [];
+    if (snapshot.status === "invalid") console.error(`[admin/drafts] pricing profile snapshot rejected (${snapshot.reason}) for inquiry ${inquiryId}`);
+
+    const quote = await fetchInquiryQuote(supabase, inquiryId!, profile);
     return NextResponse.json({
       draft: byKey.get(draftKey("draft", inquiryId!)) ?? null,
-      ai_draft: byKey.get(draftKey("ai_draft", inquiryId!)) ?? null,
+      ai_draft: aiDraft,
       original_ai_draft: byKey.get(draftKey("original_ai_draft", inquiryId!)) ?? null,
       quote,
+      warnings,
     });
   } catch (err) {
     console.error("[admin/drafts] GET failed:", err);
@@ -123,8 +154,11 @@ export async function PUT(req: NextRequest) {
   }
 
   try {
+    // Only DRAFT_KEY_PREFIXES rows reach this upsert. The pricing-profile
+    // snapshot is not one of them, so no browser payload can create, replace
+    // or clear it; /api/draft-reply is its only writer.
     const supabase = createSupabaseServerClient();
-    const { error } = await supabase.from("site_settings").upsert(rows, { onConflict: "key" });
+    const { error } = await supabase.from(SITE_SETTINGS_TABLE).upsert(rows, { onConflict: "key" });
     if (error) throw error;
     return NextResponse.json({ ok: true });
   } catch (err) {
@@ -157,9 +191,16 @@ export async function DELETE(req: NextRequest) {
   }
 
   try {
-    const keys = requested.map((k) => draftKey(k, inquiryId as number | string));
+    // The snapshot describes the draft cycle, so it goes whenever the cycle's
+    // text rows go, even when the browser names only those kinds. Clearing the
+    // first-draft baseline alone leaves the live draft and its snapshot intact.
+    const clearsCycle = requested.some((k) => k === "draft" || k === "ai_draft");
+    const keys = [
+      ...requested.map((k) => draftKey(k, inquiryId as number | string)),
+      ...(clearsCycle ? [draftPricingProfileKey(inquiryId as number | string)] : []),
+    ];
     const supabase = createSupabaseServerClient();
-    const { error } = await supabase.from("site_settings").delete().in("key", keys);
+    const { error } = await supabase.from(SITE_SETTINGS_TABLE).delete().in("key", keys);
     if (error) throw error;
     return NextResponse.json({ ok: true });
   } catch (err) {

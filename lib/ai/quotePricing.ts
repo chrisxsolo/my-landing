@@ -19,6 +19,8 @@ import { GRAD_PACKAGES, graduationSessionLabel, graduationSessionPrice, included
 import { supersededTravelFees, type VerifiedRouteKey } from "@/lib/travelFee";
 import type { TravelResolution } from "@/lib/travelResolution";
 import type { ThreadMessage } from "./threadDigest";
+import { EIGHT_PERSON_SPORTS_SENIOR_OFFER, SPORTS_TEAM_PORTRAIT_PLAYBOOK, sportsTeamOfferOptions } from "./sportsTeamPortraitPricing";
+import { sportsTeamPerPersonForClause } from "./sportsTeamPortraitChecks";
 
 export interface QuoteLine {
   kind: "session" | "travel";
@@ -32,8 +34,14 @@ export interface QuoteBreakdown {
 }
 
 export interface QuoteMismatch {
-  kind: "travel" | "total";
+  /**
+   * `per_person` is a package's per-head breakdown stated wrongly: the total
+   * can be right while the figure beside it is not, so it is checked as its
+   * own semantic role rather than as a price in its own right.
+   */
+  kind: "travel" | "total" | "per_person";
   stated: number;
+  /** For `per_person`, 0 when neither option's figure can be assigned with certainty. */
   expected: number;
   /** The exact text that carries the wrong figure, for highlighting and correction. */
   excerpt: string;
@@ -62,6 +70,11 @@ export interface QuoteInput {
   people: string | null;
   basePrices: number[];
   addOnPrices: number[];
+  /**
+   * Per-person breakdowns of a package total (lib/ai/businessFacts). Valid as
+   * stated, and never part of the arithmetic that reaches a package total.
+   */
+  informationalPrices?: number[];
   travel: TravelResolution;
   /** Prices the admin confirmed as agreed for this client; never flagged. */
   confirmedPrices?: number[];
@@ -82,10 +95,21 @@ const TOTAL_FIGURE = new RegExp(
   String.raw`${MONEY}\s*(?:total|in total|all in|all-in)\b|\btotal\b[^$\n.!?]{0,30}?${MONEY}`, "gi",
 );
 
-function figures(text: string, pattern: RegExp): { amount: number; excerpt: string }[] {
+const PER_HEAD_NOUN = String.raw`(?:per|a|for each)\s+(?:person|player|athlete|senior|participant|head|student|graduate|grad)`;
+
+/** "$100 per person", "$150 a head", "$250 each". A bare "$800 a session" is not one. */
+export const PER_PERSON_FIGURE = new RegExp(String.raw`${MONEY}\s*(?:${PER_HEAD_NOUN}|each|apiece)\b`, "gi");
+
+/** The same with the person named: "$75 each" alone may describe an add-on, "$75 per person" claims a rate. */
+export const PER_HEAD_FIGURE = new RegExp(String.raw`${MONEY}\s*${PER_HEAD_NOUN}\b`, "gi");
+
+function figures(text: string, pattern: RegExp): { amount: number; excerpt: string; moneyIndex: number }[] {
   return [...text.matchAll(pattern)].map((m) => ({
     amount: toNumber(m[1] ?? m[2]),
     excerpt: m[0],
+    // Where the dollar sign itself sits, so two patterns that caught the same
+    // figure in different roles can be told apart.
+    moneyIndex: (m.index ?? 0) + m[0].indexOf("$"),
   })).filter((f) => Number.isFinite(f.amount) && f.amount > 0);
 }
 
@@ -112,6 +136,15 @@ function travelLabel(travel: TravelResolution): string {
  * Nine or more graduates have no rate-card line at all.
  */
 function sessionCandidates(input: QuoteInput, draftPrices: number[]): QuoteLine[] {
+  // Two alternative packages for one fixed headcount, both always valid, read
+  // from the offer's own source so this file never carries its figures.
+  if (input.playbook === SPORTS_TEAM_PORTRAIT_PLAYBOOK) {
+    return sportsTeamOfferOptions().map((option) => ({
+      kind: "session" as const,
+      label: `Sports-team portraits, ${option.durationMinutes} min (${EIGHT_PERSON_SPORTS_SENIOR_OFFER.headcount} people)`,
+      amount: option.total,
+    }));
+  }
   if (input.playbook === "graduation") {
     const people = peopleCount(input.people);
     const lengths = input.durationMinutes !== undefined
@@ -200,6 +233,36 @@ function statedPrices(draft: string): number[] {
   return [...draft.matchAll(new RegExp(MONEY, "g"))].map((m) => toNumber(m[1]));
 }
 
+/** The sentence a figure sits in, so a duration named beside it can be read. */
+function sentenceAround(draft: string, excerpt: string): string {
+  return draft.split(/(?<=[.!?])\s+|\n+/).find((sentence) => sentence.includes(excerpt)) ?? excerpt;
+}
+
+/**
+ * Per-person figures against the sports-team offer.
+ *
+ * $100 belongs to 30 minutes and $150 to 60 minutes. A figure beside a
+ * duration (or beside that option's total) is checked against that option
+ * and corrected with certainty; one with no duration nearby is accepted if it
+ * is either option's figure and flagged, uncorrected, otherwise. No other
+ * playbook has a per-person semantics the rate card can stand behind here.
+ */
+function perPersonMismatches(draft: string, input: QuoteInput, confirmed: Set<number>): QuoteMismatch[] {
+  if (input.playbook !== SPORTS_TEAM_PORTRAIT_PLAYBOOK) return [];
+  const informational = new Set(input.informationalPrices ?? []);
+  const mismatches: QuoteMismatch[] = [];
+  for (const f of figures(draft, PER_PERSON_FIGURE)) {
+    if (confirmed.has(f.amount)) continue;
+    const linked = sportsTeamPerPersonForClause(sentenceAround(draft, f.excerpt));
+    if (linked !== null) {
+      if (f.amount !== linked) mismatches.push({ kind: "per_person", stated: f.amount, expected: linked, excerpt: f.excerpt, certain: true });
+    } else if (!informational.has(f.amount)) {
+      mismatches.push({ kind: "per_person", stated: f.amount, expected: 0, excerpt: f.excerpt, certain: false });
+    }
+  }
+  return mismatches;
+}
+
 export function checkDraftQuote(draft: string, input: QuoteInput): DraftQuoteCheck {
   const prices = statedPrices(draft);
   if (prices.length === 0) return { breakdown: null, mismatches: [], quotesPrice: false };
@@ -208,7 +271,11 @@ export function checkDraftQuote(draft: string, input: QuoteInput): DraftQuoteChe
   const mismatches: QuoteMismatch[] = [];
 
   const expectedTravel = input.travel.kind === "verified" ? input.travel.fee : null;
+  // "$150 per person before travel" is a per-person figure, whatever the word
+  // "travel" nearby suggests; it is never read as a travel fee.
+  const perPersonAt = new Set(figures(draft, PER_PERSON_FIGURE).map((f) => f.moneyIndex));
   for (const f of figures(draft, TRAVEL_FIGURE)) {
+    if (perPersonAt.has(f.moneyIndex)) continue;
     if (confirmed.has(f.amount) || f.amount === expectedTravel) continue;
     // Included or unknown travel has no amount the draft may state.
     mismatches.push({
@@ -229,6 +296,7 @@ export function checkDraftQuote(draft: string, input: QuoteInput): DraftQuoteChe
       mismatches.push({ kind: "total", stated: f.amount, expected: certain ? rebased : breakdown.total, excerpt: f.excerpt, certain });
     }
   }
+  mismatches.push(...perPersonMismatches(draft, input, confirmed));
   return { breakdown, mismatches, quotesPrice: true };
 }
 

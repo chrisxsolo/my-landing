@@ -33,6 +33,12 @@ export type PricingFacts = {
   basePrices: number[];
   /** Add-on prices, only valid on top of a base. */
   addOnPrices: number[];
+  /**
+   * Figures that explain a package without being one: a per-person breakdown
+   * of a group total. Quotable as stated, never summed with a base or an
+   * add-on. Absent for every service that has none.
+   */
+  informationalPrices?: number[];
   /** Set when the client's situation needs Chris to price it by hand. */
   needsManualQuote: string | null;
 };
