@@ -3,9 +3,10 @@
 // the rate card has no fee for, a quoted figure that might or might not be the
 // total, or a session with no catalog price all come back as "review".
 
+import { resolveRushPreview, type RushPreviewCharge } from "../extension/rushPreview";
 import { BOOKING_POLICY, PRICING_CATALOG, formatFee } from "../pricingCatalog";
-import { resolveSession, type BaseOption } from "./session";
-import { isPlaceName, resolveInvoiceLocation } from "./travel";
+import { resolveSession, type BaseOption, type ResolvedSession } from "./session";
+import { isPlaceName, resolveInvoiceLocation, type InvoiceLocation } from "./travel";
 import {
   invoiceDraftSchema, NO_FACTS, type InvoiceDraft, type InvoiceInquiry, type InvoiceTravel, type SessionFacts,
 } from "./types";
@@ -45,26 +46,38 @@ function supersededCampusQuote(agreedCents: number, baseCents: number, travel: I
  * Whether a figure from the thread may replace the rate card. Only an amount
  * the thread plainly called the total, consistent with where the shoot is,
  * is accepted on its own; anything else is a review item.
+ *
+ * `shiftCents` is an add-on the client chose after the figure was written:
+ * the figure is compared with the rate card as figure + add-on, while the
+ * reviewer still reads the figure the thread actually wrote. A figure the
+ * thread said already includes an add-on is never read as a stale campus
+ * quote (`staleCampusQuote: false`): "$900 with rush preview and the extra
+ * outfit" is a negotiated total, not $825 plus SJSU travel.
  */
-function applyAgreedTotal(baseCents: number, travel: InvoiceTravel, facts: SessionFacts): Totals {
-  const agreedCents = facts.total_fee === null ? null : Math.round(facts.total_fee * 100);
+interface AgreedTotalOptions { shiftCents?: number; staleCampusQuote?: boolean }
+
+function applyAgreedTotal(baseCents: number, travel: InvoiceTravel, facts: SessionFacts, options: AgreedTotalOptions = {}): Totals {
+  const shiftCents = options.shiftCents ?? 0;
+  const threadCents = facts.total_fee === null ? null : Math.round(facts.total_fee * 100);
   const travelCents = travel.amountCents ?? 0;
   const catalogTotal = travel.kind === "unknown" ? null : baseCents + travelCents;
-  if (agreedCents === null) return { baseCents, agreedTotalCents: null, totalCents: catalogTotal, problems: [], notes: [] };
+  if (threadCents === null) return { baseCents, agreedTotalCents: null, totalCents: catalogTotal, problems: [], notes: [] };
 
+  const agreedCents = threadCents + shiftCents;
+  const stated = shiftCents ? `${money(threadCents / 100)} + ${money(shiftCents / 100)} Rush preview` : money(threadCents / 100);
   const place = travel.place ?? "the shoot location";
-  if (agreedCents === catalogTotal) return { baseCents, agreedTotalCents: agreedCents, totalCents: catalogTotal, problems: [], notes: [] };
-  if (supersededCampusQuote(agreedCents, baseCents, travel)) {
+  if (agreedCents === catalogTotal) return { baseCents, agreedTotalCents: threadCents, totalCents: catalogTotal, problems: [], notes: [] };
+  if (options.staleCampusQuote !== false && supersededCampusQuote(agreedCents, baseCents, travel)) {
     return {
       baseCents, agreedTotalCents: null, totalCents: catalogTotal, problems: [],
-      notes: [`The thread's ${money(facts.total_fee!)} quote included a ${money((agreedCents - baseCents) / 100)} campus travel fee. The shoot is at ${place}, where travel is included, so the invoice uses ${money(catalogTotal! / 100)}.`],
+      notes: [`The thread's ${stated} quote included a ${money((agreedCents - baseCents) / 100)} campus travel fee. The shoot is at ${place}, where travel is included, so the invoice uses ${money(catalogTotal! / 100)}.`],
     };
   }
 
   if (travel.kind === "verified" && agreedCents === baseCents && facts.includes_travel !== true) {
     return {
-      baseCents, agreedTotalCents: agreedCents, totalCents: null,
-      problems: [`The thread mentions ${money(facts.total_fee!)}, which matches the session price alone. Confirm whether the ${money(travelCents / 100)} travel fee for ${place} is included.`],
+      baseCents, agreedTotalCents: threadCents, totalCents: null,
+      problems: [`The thread mentions ${stated}, which matches the session price alone. Confirm whether the ${money(travelCents / 100)} travel fee for ${place} is included.`],
       notes: [],
     };
   }
@@ -73,14 +86,42 @@ function applyAgreedTotal(baseCents: number, travel: InvoiceTravel, facts: Sessi
   // fee for somewhere else; it is never taken as-is.
   const consistent = travelDue(travel) ? facts.includes_travel === true : facts.includes_travel !== true;
   if (clearlyTotal && consistent && travel.kind !== "unknown" && agreedCents > travelCents) {
-    return { baseCents: agreedCents - travelCents, agreedTotalCents: agreedCents, totalCents: agreedCents, problems: [], notes: [] };
+    return { baseCents: agreedCents - travelCents, agreedTotalCents: threadCents, totalCents: agreedCents, problems: [], notes: [] };
   }
   const kind = facts.total_kind === "agreed_total" ? "an agreed total" : facts.total_kind === "quote" ? "a quote" : "an amount";
   return {
-    baseCents, agreedTotalCents: agreedCents, totalCents: null,
-    problems: [`The thread states ${money(facts.total_fee!)} as ${kind}, which differs from the rate card (${catalogTotal === null ? "travel to " + place + " is unpriced" : money(catalogTotal / 100)}). Confirm the total before filling.`],
+    baseCents, agreedTotalCents: threadCents, totalCents: null,
+    problems: [`The thread states ${stated} as ${kind}, which differs from the rate card (${catalogTotal === null ? "travel to " + place + " is unpriced" : money(catalogTotal / 100)}). Confirm the total before filling.`],
     notes: [],
   };
+}
+
+const EMPTY_TOTALS: Totals = { baseCents: 0, agreedTotalCents: null, totalCents: null, problems: [], notes: [] };
+
+/** The reviewer's line for an add-on that is inside the session price. */
+function rushPreviewNote(rush: RushPreviewCharge, facts: SessionFacts): string {
+  if (rush.kind === "included") return rush.note ?? "";
+  const chosen = facts.rush_preview.source === "inquiry" ? "selected on the inquiry form" : "asked for in email";
+  return `Includes the ${money((rush.amountCents ?? 0) / 100)} ${rush.label} add-on the client ${chosen}.`;
+}
+
+/**
+ * The session's money, with the Rush preview add-on resolved first. An
+ * add-on the thread settled joins the nontravel base (the description names
+ * it); a figure written before the add-on is compared with the rate card as
+ * figure + add-on, so $750 then Rush preview lands on $825 and is never read
+ * as a stale $75 campus fee. Unresolved add-on evidence blanks the total.
+ */
+function priceSession(session: ResolvedSession, travel: InvoiceTravel, facts: SessionFacts): { totals: Totals; rush: RushPreviewCharge } {
+  const rush = resolveRushPreview(facts, { serviceKey: session.serviceKey, baseCents: session.baseCents, travelCents: travel.amountCents ?? 0 });
+  const addOnCents = rush.kind === "add" || rush.kind === "included" ? rush.amountCents ?? 0 : 0;
+  const options = { shiftCents: rush.kind === "add" ? addOnCents : 0, staleCampusQuote: rush.kind !== "included" };
+  let totals = session.baseCents !== null
+    ? applyAgreedTotal(session.baseCents + addOnCents, travel, facts, options)
+    : session.baseOptions.length > 1 ? chooseAmongPackages(session.baseOptions, travel, facts) : EMPTY_TOTALS;
+  if (rush.kind === "review") totals = { ...totals, totalCents: null, problems: [...totals.problems, rush.note ?? ""] };
+  else if (addOnCents) totals = { ...totals, notes: [...totals.notes, rushPreviewNote(rush, facts)] };
+  return { totals, rush };
 }
 
 /**
@@ -129,29 +170,31 @@ function clientProblems(inquiry: InvoiceInquiry): string[] {
   return problems;
 }
 
+/** Everything about the client, the thread and the place that must be checked before a fill. */
+function contextProblems(inquiry: InvoiceInquiry, facts: SessionFacts, session: ResolvedSession, where: InvoiceLocation): string[] {
+  const reasons = [...clientProblems(inquiry), ...session.problems];
+  if (facts.email_status === "unavailable") {
+    reasons.push("Gmail is not connected, so the email thread was not read. Location, date and price come from the inquiry form only; reconnect Gmail in the admin or confirm them by hand.");
+  }
+  const storedNote = (inquiry.location ?? "").trim();
+  if (storedNote && !facts.location && !isPlaceName(storedNote)) {
+    reasons.push(`The inquiry's location field is a note, not a place: "${storedNote.slice(0, 120)}". Confirm the shoot location before filling.`);
+  }
+  if (where.travel.kind === "unknown") {
+    reasons.push(`${where.travel.place} is outside San Francisco and has no approved travel fee. Confirm the travel fee before filling.`);
+  }
+  return reasons;
+}
+
 export function buildInvoiceDraft(inquiry: InvoiceInquiry, facts: SessionFacts = NO_FACTS): InvoiceDraft {
   const session = resolveSession(inquiry, facts.session_type);
   const where = resolveInvoiceLocation({
     school: inquiry.school, location: inquiry.location, message: inquiry.message,
     emailLocation: facts.location, serviceKey: session.serviceKey,
   });
-  const reviewReasons = [...clientProblems(inquiry), ...session.problems];
-  if (facts.email_status === "unavailable") {
-    reviewReasons.push("Gmail is not connected, so the email thread was not read. Location, date and price come from the inquiry form only; reconnect Gmail in the admin or confirm them by hand.");
-  }
-  const storedNote = (inquiry.location ?? "").trim();
-  if (storedNote && !facts.location && !isPlaceName(storedNote)) {
-    reviewReasons.push(`The inquiry's location field is a note, not a place: "${storedNote.slice(0, 120)}". Confirm the shoot location before filling.`);
-  }
-  if (where.travel.kind === "unknown") {
-    reviewReasons.push(`${where.travel.place} is outside San Francisco and has no approved travel fee. Confirm the travel fee before filling.`);
-  }
-  const totals = session.baseCents !== null
-    ? applyAgreedTotal(session.baseCents, where.travel, facts)
-    : session.baseOptions.length > 1
-      ? chooseAmongPackages(session.baseOptions, where.travel, facts)
-      : { baseCents: 0, agreedTotalCents: null, totalCents: null, problems: [], notes: [] };
-  reviewReasons.push(...totals.problems);
+  const { totals, rush } = priceSession(session, where.travel, facts);
+  const reviewReasons = [...contextProblems(inquiry, facts, session, where), ...totals.problems];
+  const description = rush.kind === "add" || rush.kind === "included" ? `${session.description} + ${rush.label}` : session.description;
 
   const when = dateFacts(inquiry, facts);
   const status = reviewReasons.length ? "review" : "ready";
@@ -163,7 +206,7 @@ export function buildInvoiceDraft(inquiry: InvoiceInquiry, facts: SessionFacts =
     session: {
       serviceKey: session.serviceKey ?? "unknown",
       itemName: session.itemName,
-      description: session.description,
+      description,
       quantity: 1,
       people: session.people,
       school: inquiry.school?.trim() || null,

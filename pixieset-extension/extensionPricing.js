@@ -256,10 +256,52 @@ function groupGradPrice(inquiry, people) {
 const PACKAGE_REVIEW_HINT = "No package chosen: the inquiry does not say whether this is the 30-minute mini ($325) or the 1-hour session ($425). Enter the total once it is agreed.";
 const MANUAL_QUOTE_HINT = `Nine or more graduates are quoted by hand; the rate card stops at ${GROUP_MAX_PEOPLE}. Enter the agreed total.`;
 
+// ── RUSH PREVIEW ─────────────────────────────────────────────────────────────
+// The add-on is resolved by /api/extension/detect-date from the site's
+// catalog and the labelled email thread; the browser carries no price of its
+// own and only applies the charge the server returns.
+const RUSH_PREVIEW_CHARGE_KINDS = ["none", "add", "included", "review"];
+const MAX_CHARGE_CENTS = 10000000;
+const MAX_NOTE_CHARS = 300;
+const MAX_SERVICE_CHARS = 40;
+
+// The server's charge, checked before it can touch a price. Anything odd
+// (a missing kind, a non-integer or absurd amount) is ignored, so a
+// malformed payload never invents a figure.
+function normalizeRushPreviewCharge(raw) {
+  if (!raw || typeof raw !== "object" || !RUSH_PREVIEW_CHARGE_KINDS.includes(raw.kind)) return null;
+  const priced = raw.kind === "add" || raw.kind === "included";
+  const cents = raw.amountCents;
+  if (priced && !(Number.isInteger(cents) && cents > 0 && cents <= MAX_CHARGE_CENTS)) return null;
+  const text = (v, max) => (typeof v === "string" ? v.slice(0, max) : "");
+  return {
+    kind: raw.kind,
+    service: text(raw.service, MAX_SERVICE_CHARS) || null,
+    amountCents: priced ? cents : 0,
+    label: text(raw.label, MAX_NOTE_CHARS) || "Rush preview",
+    note: text(raw.note, MAX_NOTE_CHARS),
+  };
+}
+
+// The server's Rush preview decision on top of the baseline (the thread's
+// agreed total, else the rate card). "review" and a charge priced for a
+// different service than this preview detected both blank the total with a
+// reason, rather than charging blindly.
+function applyRushPreview(price, rush, service) {
+  if (!rush || rush.kind === "none") return price;
+  if (rush.service && rush.service !== service) {
+    return { ...price, sessionBase: null, reviewHint: `The Rush preview charge was priced for a ${rush.service} session, but this contract looks like ${service}. Confirm the total before filling.` };
+  }
+  if (rush.kind === "review") return { ...price, sessionBase: null, reviewHint: rush.note || "Rush preview needs review: confirm the total before filling." };
+  const withNote = note => ({ ...price, priceNote: [price.priceNote, note].filter(Boolean).join(" ") });
+  if (rush.kind === "included") return withNote(rush.note || `${rush.label} is included in the total.`);
+  return { ...withNote(rush.note || `${rush.label}: +${fmt(rush.amountCents / 100)}`), addOn: rush.amountCents / 100 };
+}
+
 function calcPrice(inquiry) {
   const service = detectServiceType(inquiry);
   const people = parseInt(inquiry.people || "1") || 1;
-  let sessionBase, travelFee = null, schoolKey = null, reviewHint = null;
+  let sessionBase, travelFee = null, schoolKey = null, reviewHint = null, priceNote = null;
 
   if (SERVICE_FLAT_RATES[service] != null) {
     sessionBase = SERVICE_FLAT_RATES[service];
@@ -278,16 +320,20 @@ function calcPrice(inquiry) {
     if (schoolKey != null && TRAVEL_FEES[schoolKey] != null) travelFee = TRAVEL_FEES[schoolKey];
   }
 
-  // A price quoted/agreed in the email thread overrides the calculator
-  const agreed = Number.isFinite(inquiry._agreedTotal) ? inquiry._agreedTotal : null;
+  // A price quoted or agreed in the email thread is the baseline; a figure
+  // the thread left unclear (a deposit, a balance) is only noted.
+  const thread = Number.isFinite(inquiry._agreedTotal) ? inquiry._agreedTotal : null;
+  const agreed = thread != null && inquiry._totalKind !== "unclear" ? thread : null;
   if (agreed != null) { sessionBase = agreed; travelFee = null; reviewHint = null; }
-  const subtotal = sessionBase == null ? null : sessionBase + (travelFee ?? 0);
+  else if (thread != null) priceNote = `The thread mentions ${fmt(thread)}, which may be a deposit or balance rather than the total; the rate card price is shown.`;
+  const priced = applyRushPreview({ sessionBase, travelFee, reviewHint, priceNote, addOn: 0 }, normalizeRushPreviewCharge(inquiry._rushPreview), service);
+  const subtotal = priced.sessionBase == null ? null : priced.sessionBase + (priced.travelFee ?? 0) + priced.addOn;
   const deposit  = subtotal == null ? null : subtotal / 2;
 
   return {
-    sessionBase, travelFee,
+    sessionBase: priced.sessionBase, travelFee: priced.travelFee, addOn: priced.addOn,
     subtotal, deposit, remaining: subtotal == null ? null : subtotal - deposit,
-    people, schoolKey, service, priceFromEmail: agreed != null, reviewHint,
+    people, schoolKey, service, priceFromEmail: agreed != null, reviewHint: priced.reviewHint, priceNote: priced.priceNote,
   };
 }
 

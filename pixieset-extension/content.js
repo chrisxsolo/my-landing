@@ -248,32 +248,17 @@ async function renderDetail(inq) {
     return;
   }
 
-  // Skip Gmail scan on create pages — we only need the client name there
-  let sessionDate     = formatSessionDate(inq.date_in_mind) || inq.date_in_mind || "TBD";
-  let sessionTime     = "TBD";
-  // The shoot location from the thread stays separate from the school.
-  let sessionLocation = "";
-  let serviceType     = null;
-  let agreedTotal     = null;
-
+  // The create page skipped the Gmail scan; here the thread's facts enrich the inquiry.
+  let enriched = enrichInquiryFromFacts(inq);
   try {
     const d = await apiFetch("/api/extension/detect-date", { method: "POST", body: JSON.stringify({ inquiry_id: inq.id }) });
-    if (d.readable)     sessionDate     = formatSessionDate(d.readable) || d.readable;
-    if (d.time)         sessionTime     = d.time;
-    if (d.location)     sessionLocation = d.location;
-    if (d.session_type) serviceType     = d.session_type;
-    if (d.total_fee != null && Number.isFinite(Number(d.total_fee))) agreedTotal = Number(d.total_fee);
-    const confidence = d.confidence === "high" ? "✓ Confirmed in email" : d.confidence === "medium" ? "~ Likely from email" : "~ From inquiry form";
-    const bits = [confidence];
-    if (serviceType)         bits.push(SERVICE_LABELS[serviceType] || serviceType);
-    if (agreedTotal != null) bits.push(`$${agreedTotal} agreed in email`);
-    document.getElementById("sxs-date-status").textContent = bits.join(" · ");
+    enriched = enrichInquiryFromFacts(inq, d);
+    document.getElementById("sxs-date-status").textContent = detectedStatusLine(d);
   } catch (err) {
     console.error("SoloXSnaps detect-date failed", err);
-    document.getElementById("sxs-date-status").textContent = `Could not reach Gmail (${err.message}) — using inquiry date`;
+    document.getElementById("sxs-date-status").textContent = `Could not reach Gmail (${err.message}) — using the inquiry date; add-ons were not checked`;
   }
 
-  const enriched      = { ...inq, _sessionDate: sessionDate, _sessionTime: sessionTime, _location: sessionLocation, _serviceType: serviceType, _agreedTotal: agreedTotal };
   const enrichedPrice = calcPrice(enriched); // recalc with the detected location for the travel fee
   document.getElementById("sxs-preview-rows").innerHTML = buildContractPreview(enriched, enrichedPrice);
   wireContractPreview();
@@ -281,6 +266,39 @@ async function renderDetail(inq) {
   const fillBtn = detail.querySelector("#sxs-fill");
   fillBtn.disabled = false;
   fillBtn.addEventListener("click", () => fillContract(enriched, enrichedPrice));
+}
+
+function detectedTotal(d) {
+  return d.total_fee != null && Number.isFinite(Number(d.total_fee)) ? Number(d.total_fee) : null;
+}
+
+// The inquiry plus what /api/extension/detect-date settled. Every field the
+// payload lacks keeps the inquiry's own value, so an older API response (no
+// Rush preview charge, no total kind) prices exactly as before. The shoot
+// location from the thread stays separate from the school.
+function enrichInquiryFromFacts(inq, d = {}) {
+  return {
+    ...inq,
+    _sessionDate: (d.readable && (formatSessionDate(d.readable) || d.readable)) || formatSessionDate(inq.date_in_mind) || inq.date_in_mind || "TBD",
+    _sessionTime: d.time || "TBD",
+    _location: d.location || "",
+    _serviceType: d.session_type || null,
+    _agreedTotal: detectedTotal(d),
+    _totalKind: typeof d.total_kind === "string" ? d.total_kind : null,
+    _rushPreview: normalizeRushPreviewCharge(d.rush_preview_charge),
+  };
+}
+
+// One line under the title: how sure the thread is, the service, the figure it wrote and any add-on.
+function detectedStatusLine(d) {
+  const confidence = d.confidence === "high" ? "✓ Confirmed in email" : d.confidence === "medium" ? "~ Likely from email" : "~ From inquiry form";
+  const bits = [confidence];
+  if (d.session_type) bits.push(SERVICE_LABELS[d.session_type] || d.session_type);
+  const total = detectedTotal(d);
+  if (total != null) bits.push(`$${total} ${d.total_kind === "agreed_total" ? "agreed" : "quoted"} in email`);
+  const rush = normalizeRushPreviewCharge(d.rush_preview_charge);
+  if (rush && rush.kind === "add") bits.push(`${rush.label} +${fmt(rush.amountCents / 100)}`);
+  return bits.join(" · ");
 }
 
 // Type each character one at a time — this is what React's synthetic event system responds to

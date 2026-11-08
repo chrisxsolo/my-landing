@@ -174,8 +174,8 @@ test("leaves the price placeholders alone for nine or more graduates, and keeps 
   assert.equal(legacyMini.text(), "Total: $350.00; Retainer: $175.00; Remaining: $175.00.");
 });
 
-test("this release of the extension is the one that prices packages", () => {
-  assert.equal(manifest.version, "1.1.2");
+test("this release of the extension is the one that prices Rush preview", () => {
+  assert.equal(manifest.version, "1.1.3");
 });
 
 test("fills the session type when inline formatting splits it across text nodes", () => {
@@ -217,4 +217,125 @@ test("leaves unrelated mentions of graduation untouched", () => {
   const fixture = loadAutofill(["Graduation photos from a previous session. portrait session of Graduation (the “Portrait Session”)."]);
   fill(fixture, { session_type: "family" });
   assert.match(fixture.text(), /^Graduation photos from a previous session\. portrait session of Family/);
+});
+
+// ── Rush preview (server-resolved add-on; the extension carries no $75 of its own) ──
+const PROPOSAL = { session_type: "Couples Session", message: "— Session request —\nPackage: Proposal Session", _serviceType: "proposal" };
+const RUSH_ADD = { kind: "add", service: "proposal", amountCents: 7500, label: "Rush preview", note: "Rush preview: +$75 — requested by the client in email." };
+const RUSH_INCLUDED = { kind: "included", service: "proposal", amountCents: 7500, label: "Rush preview", note: "The $825 total from the thread already includes the $75 Rush preview." };
+const RUSH_REVIEW = { kind: "review", service: "proposal", amountCents: null, label: "Rush preview", note: "The thread mentions Rush preview but whether it was added is unclear. Confirm the total before filling." };
+
+test("adds the server-resolved Rush preview to a proposal: $825, $412.50 and $412.50", () => {
+  const fixture = loadAutofill(PRICE_LINE);
+  fill(fixture, { ...PROPOSAL, _rushPreview: RUSH_ADD });
+  assert.equal(fixture.text(), "Total: $825.00; Retainer: $412.50; Remaining: $412.50.");
+  fixture.context.inquiry = { ...PROPOSAL, _rushPreview: RUSH_ADD };
+  const preview = vm.runInContext("buildContractPreview(inquiry, calcPrice(inquiry))", fixture.context);
+  assert.match(preview, /data-key="TOTAL_FEE" value="\$825.00"/);
+  assert.match(preview, /class="sxs-field-row sxs-price-hint sxs-price-note">Rush preview: \+\$75/);
+  assert.doesNotMatch(preview, /sxs-warning[^>]*>Rush preview/);
+});
+
+test("adds Rush preview on top of the $750 the thread quoted, not on top of today's catalog", () => {
+  const fixture = loadAutofill(PRICE_LINE);
+  fill(fixture, { ...PROPOSAL, _agreedTotal: 750, _rushPreview: RUSH_ADD });
+  assert.equal(fixture.text(), "Total: $825.00; Retainer: $412.50; Remaining: $412.50.");
+  const negotiated = loadAutofill(PRICE_LINE);
+  fill(negotiated, { ...PROPOSAL, _agreedTotal: 700, _rushPreview: RUSH_ADD });
+  assert.equal(negotiated.text(), "Total: $775.00; Retainer: $387.50; Remaining: $387.50.");
+});
+
+test("never adds Rush preview on top of a total that already includes it", () => {
+  const fixture = loadAutofill(PRICE_LINE);
+  fill(fixture, { ...PROPOSAL, _agreedTotal: 825, _rushPreview: RUSH_INCLUDED });
+  assert.equal(fixture.text(), "Total: $825.00; Retainer: $412.50; Remaining: $412.50.");
+  fixture.context.inquiry = { ...PROPOSAL, _agreedTotal: 825, _rushPreview: RUSH_INCLUDED };
+  const preview = vm.runInContext("buildContractPreview(inquiry, calcPrice(inquiry))", fixture.context);
+  assert.match(preview, /already includes the \$75 Rush preview/);
+});
+
+test("leaves the price placeholders alone and shows why when Rush preview needs review", () => {
+  const fixture = loadAutofill(PRICE_LINE);
+  const inquiry = { ...PROPOSAL, _agreedTotal: 750, _rushPreview: RUSH_REVIEW };
+  fill(fixture, inquiry);
+  assert.equal(fixture.text(), "Total: [TOTAL_FEE]; Retainer: [RETAINER]; Remaining: [REMAINING].");
+  fixture.context.inquiry = inquiry;
+  const preview = vm.runInContext("buildContractPreview(inquiry, calcPrice(inquiry))", fixture.context);
+  assert.match(preview, /data-key="TOTAL_FEE" value=""/);
+  assert.match(preview, /sxs-warning sxs-price-hint">The thread mentions Rush preview/);
+});
+
+test("ignores a malformed Rush preview payload instead of inventing a charge", () => {
+  for (const bad of [
+    { kind: "add", amountCents: "7500" }, { kind: "add", amountCents: -7500 }, { kind: "add", amountCents: Number.NaN },
+    { kind: "add", amountCents: 75.5 }, { kind: "bogus", amountCents: 7500 }, "add", null, 7500, { kind: "add", amountCents: 999999999999 },
+  ]) {
+    const fixture = loadAutofill(PRICE_LINE);
+    fill(fixture, { ...PROPOSAL, _rushPreview: bad });
+    assert.equal(fixture.text(), "Total: $750.00; Retainer: $375.00; Remaining: $375.00.", JSON.stringify(bad));
+  }
+});
+
+test("a manually edited total and retainer still win over the Rush preview figures", () => {
+  const fixture = loadAutofill(PRICE_LINE, { TOTAL_FEE: "$900", RETAINER: "500", REMAINING: "400" });
+  fill(fixture, { ...PROPOSAL, _rushPreview: RUSH_ADD });
+  assert.equal(fixture.text(), "Total: $900.00; Retainer: $500.00; Remaining: $400.00.");
+});
+
+test("escapes server text before it reaches the preview", () => {
+  const fixture = loadAutofill([]);
+  fixture.context.inquiry = { ...PROPOSAL, _rushPreview: { ...RUSH_ADD, note: 'Rush <b>"x"</b> & co' } };
+  const preview = vm.runInContext("buildContractPreview(inquiry, calcPrice(inquiry))", fixture.context);
+  assert.match(preview, /Rush &lt;b&gt;&quot;x&quot;&lt;\/b&gt; &amp; co/);
+  assert.doesNotMatch(preview, /<b>/);
+});
+
+test("maps the detect-date payload onto the inquiry, keeping the Rush preview charge and the total's kind", () => {
+  const fixture = loadAutofill([]);
+  fixture.context.inq = { id: 913, name: "Example Client", email: "client@example.test", date_in_mind: "November 20", ...PROPOSAL };
+  fixture.context.d = {
+    readable: "November 20th, 2026", time: "5:30 PM", location: "Palace of Fine Arts", session_type: "proposal",
+    total_fee: 750, total_kind: "quote", confidence: "high", rush_preview_charge: RUSH_ADD,
+  };
+  const enriched = vm.runInContext("enrichInquiryFromFacts(inq, d)", fixture.context);
+  assert.equal(enriched._sessionDate, "November 20th, 2026");
+  assert.equal(enriched._sessionTime, "5:30 PM");
+  assert.equal(enriched._location, "Palace of Fine Arts");
+  assert.equal(enriched._serviceType, "proposal");
+  assert.equal(enriched._agreedTotal, 750);
+  assert.equal(enriched._totalKind, "quote");
+  assert.equal(enriched._rushPreview.kind, "add");
+  assert.equal(vm.runInContext("detectedStatusLine(d)", fixture.context), "✓ Confirmed in email · Proposal Session · $750 quoted in email · Rush preview +$75.00");
+  fixture.context.d = { readable: null, time: null, location: null, session_type: null, total_fee: 825, total_kind: "agreed_total", confidence: "low" };
+  const old = vm.runInContext("enrichInquiryFromFacts(inq, d)", fixture.context);
+  assert.equal(old._rushPreview, null, "an older API payload without the field changes nothing");
+  assert.equal(old._sessionDate, "November 20th, 2026");
+  assert.equal(old._sessionTime, "TBD");
+  assert.equal(vm.runInContext("detectedStatusLine(d)", fixture.context), "~ From inquiry form · $825 agreed in email");
+});
+
+test("refuses a Rush preview charge the server priced for a different service", () => {
+  const fixture = loadAutofill(PRICE_LINE);
+  const inquiry = { session_type: "graduation", school: "SF State", people: "2", _rushPreview: RUSH_ADD };
+  fill(fixture, inquiry);
+  assert.equal(fixture.text(), "Total: [TOTAL_FEE]; Retainer: [RETAINER]; Remaining: [REMAINING].");
+  fixture.context.inquiry = inquiry;
+  const preview = vm.runInContext("buildContractPreview(inquiry, calcPrice(inquiry))", fixture.context);
+  assert.match(preview, /sxs-warning sxs-price-hint">.*proposal.*graduation/i);
+});
+
+test("does not promote an unclear thread figure (a deposit, say) to the agreed total", () => {
+  const fixture = loadAutofill(PRICE_LINE);
+  const inquiry = { ...PROPOSAL, _agreedTotal: 375, _totalKind: "unclear" };
+  fill(fixture, inquiry);
+  assert.equal(fixture.text(), "Total: $750.00; Retainer: $375.00; Remaining: $375.00.");
+  fixture.context.inquiry = inquiry;
+  const preview = vm.runInContext("buildContractPreview(inquiry, calcPrice(inquiry))", fixture.context);
+  assert.match(preview, /sxs-price-note">The thread mentions \$375.00/);
+  const quoted = loadAutofill(PRICE_LINE);
+  fill(quoted, { ...PROPOSAL, _agreedTotal: 700, _totalKind: "quote" });
+  assert.equal(quoted.text(), "Total: $700.00; Retainer: $350.00; Remaining: $350.00.");
+  const legacy = loadAutofill(PRICE_LINE);
+  fill(legacy, { ...PROPOSAL, _agreedTotal: 700 });
+  assert.equal(legacy.text(), "Total: $700.00; Retainer: $350.00; Remaining: $350.00.", "an older payload without total_kind behaves as before");
 });

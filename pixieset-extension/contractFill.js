@@ -16,7 +16,11 @@ function buildContractPreview(inq, price) {
   const hint = price.reviewHint
     ? `<div class="sxs-field-row sxs-warning sxs-price-hint">${esc(price.reviewHint)}</div>`
     : "";
-  return hint + rows.map(([k, v]) => `
+  // How the total was reached (an add-on the thread settled): information, not a warning.
+  const note = price.priceNote
+    ? `<div class="sxs-field-row sxs-price-hint sxs-price-note">${esc(price.priceNote)}</div>`
+    : "";
+  return hint + note + rows.map(([k, v]) => `
     <div class="sxs-field-row">
       <span class="sxs-field-label">[${k}]</span>
       <input class="sxs-field-input" data-key="${k}" value="${esc(v)}" spellcheck="false" />

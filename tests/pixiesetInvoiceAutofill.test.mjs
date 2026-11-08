@@ -319,5 +319,51 @@ test("the manifest loads every invoice module and was bumped", () => {
   for (const file of ["invoiceSelection.js", "invoicePreview.js", "invoiceFill.js", "domHelpers.js", "content.js"]) {
     assert.ok(scripts.includes(file), `${file} is loaded`);
   }
-  assert.equal(manifest.version, "1.1.2");
+  assert.equal(manifest.version, "1.1.3");
+});
+
+// ── Rush preview: one line item whose price already carries the add-on ───────
+
+const proposalRushDraft = {
+  status: "ready", reviewReasons: [], warnings: ["Includes the $75 Rush preview add-on the client asked for in email."],
+  client: { inquiryId: 913, name: "Example Client", email: "client@example.test" },
+  session: {
+    serviceKey: "proposal", itemName: "Proposal Session", description: "Proposal coverage and portraits + Rush preview", quantity: 1, people: 2,
+    school: null, location: "Palace of Fine Arts", locationSource: "email", date: "2026-11-20", dateConfidence: "confirmed", time: "5:30 PM",
+  },
+  pricing: { currency: "USD", baseCents: 82500, travel: { kind: "included", amountCents: 0, place: "Palace of Fine Arts" }, agreedTotalCents: 75000, totalCents: 82500 },
+  note: "Thank you for booking, Example! A 50% non-refundable retainer reserves your session, and the remaining balance is due on or before the session date.",
+  dueDate: "2026-11-20",
+};
+
+test("a proposal with Rush preview previews at $825 with the add-on explained, and fills 825.00 on one line", async () => {
+  const doc = buildInvoicePage();
+  const fixture = loadExtension(doc);
+  fixture.context.draft = proposalRushDraft;
+  const html = vm.runInContext("buildInvoicePreview(draft)", fixture.context);
+  assert.match(html, /data-invoice-key="baseCents" value="\$825.00"/);
+  assert.match(html, /id="sxs-invoice-total">\$825.00</);
+  assert.match(html, /Includes the \$75 Rush preview add-on/);
+  assert.match(html, /\+ Rush preview/);
+  assert.doesNotMatch(html, /\$900/);
+  const result = await fill(fixture, proposalRushDraft);
+  const [name, description, , price] = inputs(doc);
+  assert.equal(name.value, "Proposal Session");
+  assert.equal(description.value, "Proposal coverage and portraits + Rush preview");
+  assert.equal(price.value, "825.00");
+  assert.equal(doc.querySelectorAll("tr").length, 1, "the add-on is inside the session line, not a second row");
+  assert.equal(result.filled, 6);
+});
+
+test("the $825 survives a preview round-trip without doubling or losing the add-on, and an edited base still wins", () => {
+  const doc = buildInvoicePage();
+  const fixture = loadExtension(doc);
+  fixture.context.draft = proposalRushDraft;
+  const untouched = vm.runInContext("readInvoicePreview(draft, document)", fixture.context);
+  assert.equal(untouched.pricing.baseCents, 82500);
+  assert.equal(untouched.pricing.totalCents, 82500);
+  doc.append("input", { "data-invoice-key": "baseCents", value: "$900" });
+  const edited = vm.runInContext("readInvoicePreview(draft, document)", fixture.context);
+  assert.equal(edited.pricing.baseCents, 90000);
+  assert.equal(edited.pricing.totalCents, 90000);
 });

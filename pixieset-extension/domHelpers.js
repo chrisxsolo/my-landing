@@ -20,6 +20,7 @@ function showFillStatus(count) {
   el.style.color = count > 0 ? "#26a69a" : "#e67e22";
 }
 
+// Safe inside text and inside double-quoted attributes alike.
 function esc(str = "") {
-  return String(str).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  return String(str).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 }

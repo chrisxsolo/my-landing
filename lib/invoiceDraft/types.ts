@@ -39,6 +39,11 @@ export const invoiceDraftSchema = z.object({
   }),
   pricing: z.object({
     currency: z.literal("USD"),
+    /**
+     * Everything on the session line that is not travel: the package plus
+     * any add-on the thread settled (a $750 proposal with Rush preview is
+     * 82500). The description names the add-on; there is no separate line.
+     */
     baseCents: cents,
     travel: z.object({
       kind: z.enum(INVOICE_TRAVEL_KINDS),
@@ -90,6 +95,31 @@ export interface InvoiceInquiry {
 export const TOTAL_KINDS = ["agreed_total", "quote", "unclear"] as const;
 export type TotalKind = (typeof TOTAL_KINDS)[number];
 
+export const RUSH_PREVIEW_SELECTIONS = ["selected", "removed", "unclear", "none"] as const;
+export type RushPreviewSelection = (typeof RUSH_PREVIEW_SELECTIONS)[number];
+
+/**
+ * What the inquiry form and the thread say about the Rush preview add-on.
+ * Message numbers index the labelled transcript the model read (1-based),
+ * so a selection can be placed before or after the figure in total_fee.
+ */
+export interface RushPreviewEvidence {
+  /** The client's standing choice: "removed" is a cancellation after a selection. */
+  selection: RushPreviewSelection;
+  /** Where the standing choice came from; null when nothing was selected. */
+  source: "inquiry" | "email" | null;
+  /** The client's decisive message, when the choice came from email. */
+  source_message: number | null;
+  /** Whether the thread said total_fee includes the add-on (null = not said). */
+  included_in_total: boolean | null;
+  /** The message that wrote total_fee, when known. */
+  total_fee_message: number | null;
+}
+
+export const NO_RUSH_PREVIEW: RushPreviewEvidence = {
+  selection: "none", source: null, source_message: null, included_in_total: null, total_fee_message: null,
+};
+
 /** What the Gmail thread (or, failing that, the inquiry form) said. */
 export interface SessionFacts {
   date: string | null;
@@ -103,6 +133,8 @@ export interface SessionFacts {
   total_kind: TotalKind | null;
   /** Whether the thread said the total includes travel (null = not said). */
   includes_travel: boolean | null;
+  /** The Rush preview add-on, from the form and the thread together. */
+  rush_preview: RushPreviewEvidence;
   confidence: "high" | "medium" | "low";
   source: "email" | "inquiry" | "none";
   /** Whether the Gmail thread was read: "unavailable" means Gmail is not connected. */
@@ -111,8 +143,8 @@ export interface SessionFacts {
 
 export const NO_FACTS: SessionFacts = {
   date: null, readable: null, time: null, location: null, session_type: null,
-  total_fee: null, total_kind: null, includes_travel: null, confidence: "low", source: "none",
-  email_status: "none",
+  total_fee: null, total_kind: null, includes_travel: null, rush_preview: NO_RUSH_PREVIEW,
+  confidence: "low", source: "none", email_status: "none",
 };
 
 export const invoiceDraftRequestSchema = z.object({

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
+import { resolveRushPreview } from "@/lib/extension/rushPreview";
 import { sessionFactsForInquiry } from "@/lib/extension/sessionFacts";
+import { resolveSession } from "@/lib/invoiceDraft/session";
 import { invoiceDraftRequestSchema } from "@/lib/invoiceDraft/types";
 
 const EXTENSION_SECRET = process.env.CRON_SECRET ?? "";
@@ -37,7 +39,13 @@ export async function POST(req: NextRequest) {
   if (!inq) return NextResponse.json({ error: "Not found" }, { status: 404, headers: CORS });
 
   try {
-    return NextResponse.json(await sessionFactsForInquiry(inq), { headers: CORS });
+    const facts = await sessionFactsForInquiry(inq);
+    // The Rush preview add-on is priced here, from the catalog, so the
+    // browser never carries a price of its own. Contract previews for the
+    // couples services carry no travel line, hence travelCents 0.
+    const session = resolveSession(inq, facts.session_type);
+    const rush_preview_charge = resolveRushPreview(facts, { serviceKey: session.serviceKey, baseCents: session.baseCents, travelCents: 0 });
+    return NextResponse.json({ ...facts, rush_preview_charge }, { headers: CORS });
   } catch (err) {
     console.error("Extension detect-date extraction error:", err);
     return NextResponse.json({ error: "Could not read the email thread" }, { status: 502, headers: CORS });
