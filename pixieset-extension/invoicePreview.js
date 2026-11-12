@@ -48,9 +48,54 @@ function previewMessages(draft) {
   return `<ul class="sxs-messages">${reasons}${warnings}</ul>`;
 }
 
+function timeUnresolved(draft) {
+  return draft.session.timeDetail?.status === "unresolved";
+}
+
+// Ticking the box lets the checked fields be filled. It never sets a time:
+// an unresolved session time stays unset, and the label says so.
 function previewConfirmation(draft) {
   if (draft.status !== "review") return "";
-  return `<label class="sxs-confirm-row"><input type="checkbox" id="sxs-review-confirm" /> I've checked the flagged fields</label>`;
+  const text = timeUnresolved(draft)
+    ? "I've checked the flagged fields. The session time stays unset and will not be filled."
+    : "I've checked the flagged fields";
+  return `<label class="sxs-confirm-row"><input type="checkbox" id="sxs-review-confirm" /> ${text}</label>`;
+}
+
+function previewSub(text) {
+  return text ? `<span class="sxs-field-sub">${esc(text)}</span>` : "";
+}
+
+// The session time with where it came from. A calculated golden-hour range
+// is labelled as calculated and shows its sunset; an unresolved one shows why
+// and offers a retry. An older API response has no timeDetail and shows the
+// bare time.
+function previewTimeRows(session) {
+  const detail = session.timeDetail;
+  if (!detail) return previewRow("Session time", previewValue(session.time ?? "—"));
+  if (detail.status === "unresolved") {
+    const body = `Not set${previewSub(detail.sourceLabel)}${previewSub(detail.unresolvedReason)}`
+      + `<button type="button" id="sxs-time-retry" class="sxs-link-btn">Retry the lookup</button>`;
+    return previewRow("Session time", `<span class="sxs-field-val sxs-time-unresolved">${body}</span>`);
+  }
+  const zone = [detail.zoneAbbreviation, detail.timeZone].filter(Boolean).join(" · ");
+  const source = detail.status === "none" ? "" : detail.sourceLabel;
+  const time = previewRow("Session time", `<span class="sxs-field-val">${esc(session.time ?? "—")}${previewSub(zone)}${previewSub(source)}</span>`);
+  if (!detail.sunset) return time;
+  const sunset = `<span class="sxs-field-val">${esc(detail.sunset.local)}${previewSub(detail.sunset.source)}${previewSub(detail.sunset.locality)}</span>`;
+  return time + previewRow("Sunset", sunset);
+}
+
+function previewPackageRow(session) {
+  return session.packageNote ? previewRow("Package source", previewValue(session.packageNote)) : "";
+}
+
+// What the fill did about the session time. Pixieset's invoice editor has no
+// session-time field, so a time is never reported as written.
+function invoiceTimeSummary(draft) {
+  if (timeUnresolved(draft)) return " Session time is still unresolved and was not filled.";
+  if (draft.session.time) return ` Pixieset's invoice has no session-time field, so ${draft.session.time} was not written to it.`;
+  return "";
 }
 
 function buildInvoicePreview(draft) {
@@ -66,6 +111,7 @@ function buildInvoicePreview(draft) {
     previewRow("Description", previewInput("description", session.description)),
     previewRow("Quantity", previewValue(String(session.quantity))),
     previewRow("Base price", previewInput("baseCents", fmtCents(pricing.baseCents))),
+    previewPackageRow(session),
     previewRow("Location", previewInput("location", session.location ?? "")),
     previewRow("Location source", previewValue(LOCATION_SOURCE_LABELS[session.locationSource] ?? session.locationSource)),
     previewRow("School", previewValue(session.school ?? "—")),
@@ -73,7 +119,7 @@ function buildInvoicePreview(draft) {
     previewRow("Travel fee", previewInput("travelCents", previewTravelAmount(pricing.travel), 'placeholder="enter a fee"')),
     previewRow("Total", `<span class="sxs-field-val" id="sxs-invoice-total">${esc(previewTotal(draft))}</span>`),
     previewRow("Session date", previewValue(`${session.date ?? "—"} (${DATE_LABELS[session.dateConfidence]})`)),
-    previewRow("Session time", previewValue(session.time ?? "—")),
+    previewTimeRows(session),
     previewRow("Due date", previewInput("dueDate", draft.dueDate ?? "", 'placeholder="left unchanged"')),
     previewRow("Note", previewTextarea("note", draft.note)),
     previewConfirmation(draft),
@@ -103,6 +149,26 @@ function reviewedTravel(original, travelCents, location) {
   return original;
 }
 
+/**
+ * The session time after the panel's edits. A golden-hour range was worked
+ * out for the original location, so editing the location withdraws it rather
+ * than carrying a time calculated for somewhere else.
+ */
+function reviewedTime(session, location) {
+  const detail = session.timeDetail;
+  if (!detail || detail.status !== "calculated" || (location || null) === (session.location || null)) {
+    return { time: session.time, timeDetail: detail };
+  }
+  return {
+    time: null,
+    timeDetail: {
+      ...detail, status: "unresolved", start: null, end: null, startUtc: null, endUtc: null, sunset: null,
+      sourceLabel: "Golden hour requested — time needs confirmation",
+      unresolvedReason: "the location was edited after the time was calculated. Reload the draft to work it out again.",
+    },
+  };
+}
+
 /** The draft as edited in the panel. */
 function readInvoicePreview(draft, root = document) {
   const text = key => readPreviewField(root, key) ?? "";
@@ -111,7 +177,10 @@ function readInvoicePreview(draft, root = document) {
   const dueDate = /^\d{4}-\d{2}-\d{2}$/.test(text("dueDate")) ? text("dueDate") : null;
   return {
     ...draft,
-    session: { ...draft.session, itemName: text("itemName") || draft.session.itemName, description: text("description"), location: text("location") || null },
+    session: {
+      ...draft.session, itemName: text("itemName") || draft.session.itemName, description: text("description"), location: text("location") || null,
+      ...reviewedTime(draft.session, text("location")),
+    },
     pricing: {
       ...draft.pricing,
       baseCents,

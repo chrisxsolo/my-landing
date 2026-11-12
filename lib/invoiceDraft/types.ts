@@ -12,6 +12,38 @@ const cents = z.number().int().min(0).max(MAX_MONEY_CENTS);
 export const INVOICE_LOCATION_SOURCES = ["email", "inquiry", "school", "unknown"] as const;
 export const INVOICE_DATE_CONFIDENCES = ["confirmed", "tentative", "unknown"] as const;
 export const INVOICE_TRAVEL_KINDS = ["verified", "included", "unknown", "none"] as const;
+/** Where the package on the session line came from; "default" is the 60-minute Graduation Session. */
+export const INVOICE_PACKAGE_SOURCES = ["email", "inquiry", "default", "catalog", "unresolved"] as const;
+/** "calculated" is a golden-hour range worked out from sunset: never "confirmed in email". */
+export const INVOICE_TIME_STATUSES = ["confirmed", "proposed", "calculated", "unresolved", "none"] as const;
+
+const isoInstant = z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/);
+const clock = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
+
+/** The session time with its provenance. `requested` keeps the thread's own words. */
+export const invoiceTimeDetailSchema = z.object({
+  status: z.enum(INVOICE_TIME_STATUSES),
+  requested: z.string().nullable(),
+  /** Local wall-clock start and end, "HH:MM" in `timeZone`. */
+  start: clock.nullable(),
+  end: clock.nullable(),
+  /** True when the end is the start plus the package length, not something the thread said. */
+  endDerived: z.boolean(),
+  startUtc: isoInstant.nullable(),
+  endUtc: isoInstant.nullable(),
+  timeZone: z.string().nullable(),
+  zoneAbbreviation: z.string().nullable(),
+  sourceLabel: z.string(),
+  sunset: z.object({
+    local: z.string().min(1),
+    utc: isoInstant,
+    source: z.string().min(1),
+    locality: z.string().min(1),
+  }).nullable(),
+  /** Why no precise time is offered; set only when status is "unresolved". */
+  unresolvedReason: z.string().nullable(),
+});
+export type InvoiceTimeDetail = z.infer<typeof invoiceTimeDetailSchema>;
 
 export const invoiceDraftSchema = z.object({
   status: z.enum(["ready", "review"]),
@@ -35,7 +67,14 @@ export const invoiceDraftSchema = z.object({
     locationSource: z.enum(INVOICE_LOCATION_SOURCES),
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
     dateConfidence: z.enum(INVOICE_DATE_CONFIDENCES),
+    /** The resolved time as shown ("6:30–7:30 pm"); null while unresolved. Never a bare "golden hour". */
     time: z.string().nullable(),
+    timeDetail: invoiceTimeDetailSchema,
+    /** The booked length in minutes; null when the rate card or the thread leaves it open. */
+    durationMinutes: z.number().int().positive().nullable(),
+    packageSource: z.enum(INVOICE_PACKAGE_SOURCES),
+    /** "Default: 60-minute Graduation Session" and the like; shown beside the price, never filled. */
+    packageNote: z.string().nullable(),
   }),
   pricing: z.object({
     currency: z.literal("USD"),
@@ -61,6 +100,16 @@ export const invoiceDraftSchema = z.object({
     if (draft.reviewReasons.length) ctx.addIssue({ code: "custom", message: "a ready draft has no review reasons" });
     if (pricing.travel.kind === "unknown") ctx.addIssue({ code: "custom", message: "a ready draft has resolved travel" });
     if (pricing.totalCents === null) ctx.addIssue({ code: "custom", message: "a ready draft has a total" });
+  }
+  const { time, timeDetail } = draft.session;
+  if (timeDetail.status === "unresolved" && (time !== null || !timeDetail.unresolvedReason)) {
+    ctx.addIssue({ code: "custom", message: "an unresolved time is null and says why" });
+  }
+  if (timeDetail.status === "unresolved" && draft.status === "ready") {
+    ctx.addIssue({ code: "custom", message: "a ready draft has no unresolved time" });
+  }
+  if (timeDetail.status === "calculated" && !(time && timeDetail.sunset && timeDetail.start && timeDetail.end)) {
+    ctx.addIssue({ code: "custom", message: "a calculated time carries its range and its sunset" });
   }
   if (draft.status === "review" && !draft.reviewReasons.length) {
     ctx.addIssue({ code: "custom", message: "a review draft says why" });
@@ -120,11 +169,37 @@ export const NO_RUSH_PREVIEW: RushPreviewEvidence = {
   selection: "none", source: null, source_message: null, included_in_total: null, total_fee_message: null,
 };
 
+export const PACKAGE_SELECTIONS = ["selected", "conflicting", "unclear", "none"] as const;
+export type PackageSelection = (typeof PACKAGE_SELECTIONS)[number];
+
+/**
+ * The package or length the thread settled for this booking. A price list
+ * naming several packages, a declined package and a bare dollar amount are
+ * all "none"; only "none" lets the invoice fall back to a default.
+ */
+export interface PackageEvidence {
+  status: PackageSelection;
+  /** The agreed length in minutes; set only when status is "selected". */
+  minutes: number | null;
+  /** The message that settled it, when known (1-based, like rush_preview). */
+  source_message: number | null;
+}
+
+export const NO_PACKAGE: PackageEvidence = { status: "none", minutes: null, source_message: null };
+
+export const TIME_STATUSES = ["confirmed", "proposed", "conflicting"] as const;
+export type TimeStatus = (typeof TIME_STATUSES)[number];
+
 /** What the Gmail thread (or, failing that, the inquiry form) said. */
 export interface SessionFacts {
   date: string | null;
   readable: string | null;
+  /** A clock time or range, or the client's own phrase ("golden hour"). */
   time: string | null;
+  /** Whether `time` was agreed, only proposed, or still contested (null = not said). */
+  time_status: TimeStatus | null;
+  /** The package or length the thread settled, separate from any dollar amount. */
+  package: PackageEvidence;
   location: string | null;
   session_type: string | null;
   /** Dollars, as written in the thread. */
@@ -142,7 +217,7 @@ export interface SessionFacts {
 }
 
 export const NO_FACTS: SessionFacts = {
-  date: null, readable: null, time: null, location: null, session_type: null,
+  date: null, readable: null, time: null, time_status: null, package: NO_PACKAGE, location: null, session_type: null,
   total_fee: null, total_kind: null, includes_travel: null, rush_preview: NO_RUSH_PREVIEW,
   confidence: "low", source: "none", email_status: "none",
 };

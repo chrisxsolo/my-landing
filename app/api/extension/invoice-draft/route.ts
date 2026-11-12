@@ -5,6 +5,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { sessionFactsForInquiry } from "@/lib/extension/sessionFacts";
 import { buildInvoiceDraft, validateInvoiceDraft } from "@/lib/invoiceDraft/build";
+import { parseSessionTime } from "@/lib/invoiceDraft/sessionTime";
+import { resolveSunset } from "@/lib/invoiceDraft/sunset";
 import { invoiceDraftRequestSchema, type InvoiceInquiry } from "@/lib/invoiceDraft/types";
 
 const EXTENSION_SECRET = process.env.CRON_SECRET ?? "";
@@ -50,7 +52,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Could not read the email thread" }, { status: 502, headers: CORS });
   }
 
-  const checked = validateInvoiceDraft(buildInvoiceDraft(inq, facts));
+  // Sunset is looked up only when the thread's time needs it, and only by
+  // date: nothing about the client leaves this server. A failed lookup never
+  // fails the draft; the time is left unresolved for the reviewer instead.
+  const timeKind = parseSessionTime(facts.time).kind;
+  const needsSunset = timeKind === "golden_hour" || timeKind === "clock";
+  const sunset = needsSunset ? await resolveSunset(facts.date) : null;
+
+  const checked = validateInvoiceDraft(buildInvoiceDraft(inq, facts, { sunset }));
   if (!checked.ok) {
     console.error("Extension invoice-draft produced an invalid draft:", checked.error);
     return NextResponse.json({ error: `Invoice draft failed validation (${checked.error})` }, { status: 500, headers: CORS });

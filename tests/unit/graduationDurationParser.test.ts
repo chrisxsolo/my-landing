@@ -71,7 +71,8 @@ describe("a conflicting length forces review downstream instead of a first-match
     );
     expect(draft.status).toBe("review");
     expect(draft.pricing.totalCents).toBeNull();
-    expect(draft.reviewReasons.join(" ")).toMatch(/does not say which package.*Graduation Mini \(30 min\) \$325 or Graduation Session \(60 min\) \$425/);
+    expect(draft.reviewReasons.join(" ")).toMatch(/names more than one session length.*Graduation Mini \(30 min\) \$325 or Graduation Session \(60 min\) \$425/);
+    expect(draft.session.packageSource).toBe("unresolved");
   });
 
   it("a 90-minute request is never priced as the mini", () => {

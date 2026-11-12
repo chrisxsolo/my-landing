@@ -149,7 +149,7 @@ function renderDetailShell(title, status, btnLabel, btnDisabled) {
     <div id="sxs-date-status" style="font-size:11px;color:#888;margin-bottom:8px">${status}</div>
     <div id="sxs-preview-rows"></div>
     <button id="sxs-fill" class="sxs-fill-btn" ${btnDisabled ? "disabled" : ""}>${btnLabel}</button>
-    <div id="sxs-fill-status"></div>
+    <div id="sxs-fill-status" role="status" aria-live="polite"></div>
   `;
   detail.querySelector("#sxs-back").addEventListener("click", () => loadInquiries());
   setView("detail");
@@ -212,6 +212,7 @@ function renderInvoiceDraft(draft, restored) {
   const syncButton = () => { fillBtn.disabled = !invoiceFillAllowed(draft); };
   syncButton();
   detail.querySelector("#sxs-review-confirm")?.addEventListener("change", syncButton);
+  detail.querySelector("#sxs-time-retry")?.addEventListener("click", () => loadInvoiceDraft(draft.client.inquiryId));
   fillBtn.addEventListener("click", () => runInvoiceFill(draft));
 }
 
@@ -224,6 +225,7 @@ async function runInvoiceFill(draft) {
   showFillStatus(filled);
   const statusEl = document.getElementById("sxs-fill-status");
   if (statusEl && skipped.length) statusEl.textContent += ` Not found on this page: ${skipped.join(", ")}.`;
+  if (statusEl) statusEl.textContent += invoiceTimeSummary(reviewed);
   if (filled > 0) await clearInvoiceSelection();
 }
 

@@ -237,17 +237,12 @@ function classifyMention(clause: string, mention: DurationMention): MentionKind 
 }
 
 /**
- * The length a client asked for, read off free text ("30 min", "mini",
- * "1.5 hours", "1 hour 30 minutes", "two hours"), or null when they named
- * none — or named two that disagree. Shared by the quote check, payment
- * totals, the contract and the invoice draft so none of them guesses a
- * package the text does not name.
- *
- * Lengths tied to session wording outrank unrelated spans ("delivered within
- * 2 hours"); among the lengths that count, one distinct value is the answer
- * and more than one is a conflict for a person to settle.
+ * Every distinct length a client named in free text ("30 min", "mini",
+ * "1.5 hours", "1 hour 30 minutes", "two hours"). Lengths tied to session
+ * wording outrank neutral ones unless `everyMention` is set; unrelated spans
+ * ("delivered within 2 hours") never count. More than one is a conflict.
  */
-export function detectGraduationDurationMinutes(text: string | null | undefined): number | null {
+export function graduationDurationsNamed(text: string | null | undefined, everyMention = false): number[] {
   const found: { minutes: number; kind: MentionKind }[] = []
   // Sentence breaks scope the context words; a period inside "1.5" is not one.
   for (const clause of (text ?? "").toLowerCase().split(/[!?;\n]+|\.(?!\d)/)) {
@@ -256,9 +251,14 @@ export function detectGraduationDurationMinutes(text: string | null | undefined)
     }
   }
   const tied = found.filter((f) => f.kind === "tied")
-  const counted = tied.length ? tied : found.filter((f) => f.kind === "neutral")
-  const distinct = [...new Set(counted.map((f) => f.minutes))]
-  return distinct.length === 1 ? distinct[0] : null
+  const counted = tied.length && !everyMention ? tied : found.filter((f) => f.kind !== "unrelated")
+  return [...new Set(counted.map((f) => f.minutes))]
+}
+
+/** The one length the text names, or null when it names none or two that disagree. */
+export function detectGraduationDurationMinutes(text: string | null | undefined): number | null {
+  const named = graduationDurationsNamed(text)
+  return named.length === 1 ? named[0] : null
 }
 
 export interface EstimateInput {

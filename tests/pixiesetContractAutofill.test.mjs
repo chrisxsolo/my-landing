@@ -174,8 +174,8 @@ test("leaves the price placeholders alone for nine or more graduates, and keeps 
   assert.equal(legacyMini.text(), "Total: $350.00; Retainer: $175.00; Remaining: $175.00.");
 });
 
-test("this release of the extension is the one that prices Rush preview", () => {
-  assert.equal(manifest.version, "1.1.3");
+test("this release of the extension still prices Rush preview (1.1.3 onward)", () => {
+  assert.equal(manifest.version, "1.1.4");
 });
 
 test("fills the session type when inline formatting splits it across text nodes", () => {

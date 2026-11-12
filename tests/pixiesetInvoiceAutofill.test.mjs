@@ -319,7 +319,7 @@ test("the manifest loads every invoice module and was bumped", () => {
   for (const file of ["invoiceSelection.js", "invoicePreview.js", "invoiceFill.js", "domHelpers.js", "content.js"]) {
     assert.ok(scripts.includes(file), `${file} is loaded`);
   }
-  assert.equal(manifest.version, "1.1.3");
+  assert.equal(manifest.version, "1.1.4");
 });
 
 // ── Rush preview: one line item whose price already carries the add-on ───────
@@ -366,4 +366,145 @@ test("the $825 survives a preview round-trip without doubling or losing the add-
   const edited = vm.runInContext("readInvoicePreview(draft, document)", fixture.context);
   assert.equal(edited.pricing.baseCents, 90000);
   assert.equal(edited.pricing.totalCents, 90000);
+});
+
+// ── default package and golden-hour time (synthetic client) ──────────────────
+
+const goldenDetail = {
+  status: "calculated", requested: "golden hour", start: "18:30", end: "19:30", endDerived: false,
+  startUtc: "2027-04-25T01:30:00.000Z", endUtc: "2027-04-25T02:30:00.000Z", timeZone: "America/Los_Angeles", zoneAbbreviation: "PDT",
+  sourceLabel: "Calculated from sunset",
+  sunset: { local: "7:54 pm", utc: "2027-04-25T02:54:00.000Z", source: "user-supplied test sunset", locality: "San Francisco" },
+  unresolvedReason: null,
+};
+
+const averyDraft = {
+  status: "ready", reviewReasons: [], warnings: [],
+  client: { inquiryId: 9001, name: "Avery Example", email: "avery@example.test" },
+  session: {
+    serviceKey: "graduation", itemName: "Graduation Session", description: "One person, Graduation Session (60 min)", quantity: 1, people: 1,
+    school: "California State University, East Bay", location: "Palace of Fine Arts", locationSource: "email",
+    date: "2027-04-24", dateConfidence: "confirmed", time: "6:30–7:30 pm", timeDetail: goldenDetail,
+    durationMinutes: 60, packageSource: "default", packageNote: "Default: 60-minute Graduation Session",
+  },
+  pricing: { currency: "USD", baseCents: 42500, travel: { kind: "included", amountCents: 0, place: "Palace of Fine Arts" }, agreedTotalCents: null, totalCents: 42500 },
+  note: "Thank you for booking, Avery! A 50% non-refundable retainer reserves your session, and the remaining balance is due on or before the session date.",
+  dueDate: "2027-04-24",
+};
+
+const unresolvedDraft = {
+  ...averyDraft, status: "review",
+  reviewReasons: ["Golden hour requested — time needs confirmation: the session date is not confirmed in email."],
+  session: {
+    ...averyDraft.session, time: null,
+    timeDetail: {
+      ...goldenDetail, status: "unresolved", start: null, end: null, startUtc: null, endUtc: null, timeZone: null, zoneAbbreviation: null, sunset: null,
+      sourceLabel: "Golden hour requested — time needs confirmation", unresolvedReason: "the session date is not confirmed in email.",
+    },
+  },
+};
+
+test("the default package previews ready at $425 with its source, the calculated range, zone and sunset", () => {
+  const fixture = loadExtension(buildInvoicePage());
+  fixture.context.draft = averyDraft;
+  const html = vm.runInContext("buildInvoicePreview(draft)", fixture.context);
+  assert.match(html, /Ready to fill/);
+  assert.doesNotMatch(html, /Needs review|sxs-review-confirm|does not say which package/);
+  assert.match(html, /Package source<\/span><span class="sxs-field-val">Default: 60-minute Graduation Session/);
+  assert.match(html, /value="\$425\.00"/);
+  assert.match(html, /Total<\/span><span class="sxs-field-val" id="sxs-invoice-total">\$425\.00/);
+  assert.match(html, /6:30–7:30 pm<span class="sxs-field-sub">PDT · America\/Los_Angeles<\/span><span class="sxs-field-sub">Calculated from sunset/);
+  assert.match(html, /Sunset<\/span><span class="sxs-field-val">7:54 pm<span class="sxs-field-sub">user-supplied test sunset/);
+  assert.doesNotMatch(html, />golden hour</);
+  assert.match(html, /2027-04-24 \(confirmed in email\)/);
+  assert.match(html, /Included \(San Francisco\) · Palace of Fine Arts/);
+  assert.match(html, /California State University, East Bay/);
+  assert.equal(vm.runInContext("invoiceFillAllowed(draft, document)", fixture.context), true);
+});
+
+test("the default package fills one $425.00 line, no travel row, the due date, and claims no time field", async () => {
+  const doc = buildInvoicePage();
+  const fixture = loadExtension(doc);
+  const { filled, skipped } = await fill(fixture, averyDraft);
+  const [name, description, qty, price, note, due] = inputs(doc);
+  assert.equal(name.value, "Graduation Session");
+  assert.equal(description.value, "One person, Graduation Session (60 min)");
+  assert.equal(qty.value, "1");
+  assert.equal(price.value, "425.00");
+  assert.match(note.value, /^Thank you for booking, Avery!/);
+  assert.doesNotMatch(note.value, /6:30|golden|sunset/i);
+  assert.equal(due.value, "04/24/2027");
+  assert.equal(doc.querySelectorAll('input[placeholder="Item name"]').length, 1);
+  assert.deepEqual(plain(skipped), []);
+  assert.equal(filled, 6);
+  assert.ok(price.events.includes("input") && price.events.includes("change"));
+  assert.equal(doc.descendants().every(el => el.clicks === 0), true);
+  fixture.context.draft = averyDraft;
+  assert.equal(vm.runInContext("invoiceTimeSummary(draft)", fixture.context), " Pixieset's invoice has no session-time field, so 6:30–7:30 pm was not written to it.");
+});
+
+test("an unresolved golden hour shows why, offers a retry, and the acknowledgment never sets a time", () => {
+  const doc = buildInvoicePage();
+  const fixture = loadExtension(doc);
+  fixture.context.draft = unresolvedDraft;
+  const html = vm.runInContext("buildInvoicePreview(draft)", fixture.context);
+  assert.match(html, /Needs review/);
+  assert.match(html, /Not set<span class="sxs-field-sub">Golden hour requested — time needs confirmation<\/span><span class="sxs-field-sub">the session date is not confirmed in email\./);
+  assert.match(html, /<button type="button" id="sxs-time-retry"/);
+  assert.match(html, /The session time stays unset and will not be filled\./);
+  assert.match(html, /id="sxs-invoice-total">\$425\.00/);
+  assert.doesNotMatch(html, /6:30/);
+  assert.equal(vm.runInContext("invoiceFillAllowed(draft, document)", fixture.context), false);
+
+  doc.append("input", { id: "sxs-review-confirm", type: "checkbox" }).checked = true;
+  for (const [key, value] of [["itemName", "Graduation Session"], ["description", "One person, Graduation Session (60 min)"], ["baseCents", "$425.00"], ["travelCents", "$0.00"], ["location", "Palace of Fine Arts"], ["dueDate", ""], ["note", "Thanks"]]) {
+    doc.append("input", { "data-invoice-key": key, value });
+  }
+  assert.equal(vm.runInContext("invoiceFillAllowed(draft, document)", fixture.context), true);
+  const reviewed = vm.runInContext("readInvoicePreview(draft, document)", fixture.context);
+  assert.equal(reviewed.session.time, null);
+  assert.equal(reviewed.session.timeDetail.status, "unresolved");
+  assert.equal(reviewed.status, "review");
+  assert.equal(reviewed.pricing.totalCents, 42500);
+  fixture.context.reviewed = reviewed;
+  assert.equal(vm.runInContext("invoiceTimeSummary(reviewed)", fixture.context), " Session time is still unresolved and was not filled.");
+});
+
+test("reading the preview back keeps a reviewer's price edit and withdraws a time calculated for another location", () => {
+  const doc = buildInvoicePage();
+  const fixture = loadExtension(doc);
+  const fields = { itemName: "Graduation Session", description: "One person", baseCents: "400", travelCents: "", location: "Palace of Fine Arts", dueDate: "2027-04-24", note: "" };
+  const els = Object.fromEntries(Object.entries(fields).map(([key, value]) => [key, doc.append("input", { "data-invoice-key": key, value })]));
+  fixture.context.draft = averyDraft;
+  const kept = vm.runInContext("readInvoicePreview(draft, document)", fixture.context);
+  assert.equal(kept.pricing.baseCents, 40000);
+  assert.equal(kept.pricing.totalCents, 40000);
+  assert.equal(kept.session.time, "6:30–7:30 pm");
+  assert.equal(kept.session.timeDetail.status, "calculated");
+
+  els.location.value = "UC Berkeley";
+  const moved = vm.runInContext("readInvoicePreview(draft, document)", fixture.context);
+  assert.equal(moved.session.time, null);
+  assert.equal(moved.session.timeDetail.status, "unresolved");
+  assert.match(moved.session.timeDetail.unresolvedReason, /location was edited/);
+  assert.equal(moved.pricing.baseCents, 40000);
+});
+
+test("a draft from an older API, with no time detail or package note, still previews and fills", async () => {
+  const doc = buildInvoicePage();
+  const fixture = loadExtension(doc);
+  fixture.context.draft = anthonyDraft;
+  const html = vm.runInContext("buildInvoicePreview(draft)", fixture.context);
+  assert.match(html, /Session time<\/span><span class="sxs-field-val">10:00 AM/);
+  assert.doesNotMatch(html, /Package source|Sunset<|undefined/);
+  assert.equal(vm.runInContext("invoiceTimeSummary(draft)", fixture.context), " Pixieset's invoice has no session-time field, so 10:00 AM was not written to it.");
+  assert.equal((await fill(fixture, anthonyDraft)).filled, 6);
+});
+
+test("thread text in the time fields is escaped before it reaches the panel", () => {
+  const fixture = loadExtension(buildInvoicePage());
+  fixture.context.draft = { ...unresolvedDraft, session: { ...unresolvedDraft.session, packageNote: "<img src=x onerror=1>", timeDetail: { ...unresolvedDraft.session.timeDetail, unresolvedReason: "<script>x</script>" } } };
+  const html = vm.runInContext("buildInvoicePreview(draft)", fixture.context);
+  assert.doesNotMatch(html, /<script>|<img/);
+  assert.match(html, /&lt;script&gt;/);
 });

@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
     // The Rush preview add-on is priced here, from the catalog, so the
     // browser never carries a price of its own. Contract previews for the
     // couples services carry no travel line, hence travelCents 0.
-    const session = resolveSession(inq, facts.session_type);
+    const session = resolveSession(inq, facts.session_type, facts.package);
     const rush_preview_charge = resolveRushPreview(facts, { serviceKey: session.serviceKey, baseCents: session.baseCents, travelCents: 0 });
     return NextResponse.json({ ...facts, rush_preview_charge }, { headers: CORS });
   } catch (err) {

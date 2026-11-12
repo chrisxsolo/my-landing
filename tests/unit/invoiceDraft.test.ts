@@ -177,14 +177,18 @@ describe("agreed totals from the thread", () => {
   });
 });
 
-describe("one graduate: the package comes from the thread or the inquiry, never a guess", () => {
+describe("one graduate: an explicit package wins, and no choice at all is the 60-minute session", () => {
   const solo: InvoiceInquiry = { ...anthony, people: "1", message: "Grad photos for me, graduating from SJSU." };
 
-  it("asks which package when no length was named and nothing was agreed", () => {
+  it("defaults to the 60-minute Graduation Session when no length was named and nothing was agreed", () => {
     const draft = buildInvoiceDraft(solo, email({ location: "SJSU campus" }));
-    expect(draft.status).toBe("review");
-    expect(draft.pricing.totalCents).toBeNull();
-    expect(draft.reviewReasons.join(" ")).toMatch(/does not say which package.*Graduation Mini \(30 min\) \$325 or Graduation Session \(60 min\) \$425/);
+    expect(draft.status).toBe("ready");
+    expect(draft.reviewReasons).toEqual([]);
+    expect(draft.session).toMatchObject({
+      itemName: "Graduation Session", description: "One person, Graduation Session (60 min)", durationMinutes: 60,
+      packageSource: "default", packageNote: "Default: 60-minute Graduation Session",
+    });
+    expect(draft.pricing).toMatchObject({ baseCents: 42500, travel: { kind: "verified", amountCents: 7500 }, totalCents: 50000 });
   });
 
   it("prices the mini when the inquiry asks for it", () => {
@@ -194,10 +198,25 @@ describe("one graduate: the package comes from the thread or the inquiry, never 
     expect(draft.pricing).toMatchObject({ baseCents: 32500, travel: { kind: "verified", amountCents: 7500 }, totalCents: 40000 });
   });
 
-  it("picks the package an agreed total lands on", () => {
-    const mini = buildInvoiceDraft(solo, email({ location: "San Francisco City Hall", total_fee: 325, total_kind: "quote" }));
-    expect(mini.status).toBe("ready");
-    expect(mini.pricing.totalCents).toBe(32500);
+  it("never lets a bare $325 choose the mini: an unsettled figure goes to review, named as the mini price", () => {
+    for (const total_kind of ["quote", "unclear"] as const) {
+      const draft = buildInvoiceDraft(solo, email({ location: "San Francisco City Hall", total_fee: 325, total_kind }));
+      expect(draft.status, total_kind).toBe("review");
+      expect(draft.pricing.totalCents, total_kind).toBeNull();
+      expect(draft.session, total_kind).toMatchObject({ itemName: "Graduation Session", durationMinutes: 60, packageSource: "default" });
+      expect(draft.reviewReasons.join(" "), total_kind).toMatch(/\$325.*differs from the rate card \(\$425\).*also the Graduation Mini price.*never chose the mini/);
+    }
+  });
+
+  it("keeps a clearly agreed $325 total as a negotiated price for the 60-minute session, not the mini", () => {
+    const draft = buildInvoiceDraft(solo, email({ location: "San Francisco City Hall", total_fee: 325, total_kind: "agreed_total" }));
+    expect(draft.status).toBe("ready");
+    expect(draft.pricing).toMatchObject({ baseCents: 32500, agreedTotalCents: 32500, totalCents: 32500 });
+    expect(draft.session).toMatchObject({ itemName: "Graduation Session", durationMinutes: 60, packageSource: "default" });
+    expect(draft.session.packageNote).toBe("Default: 60-minute Graduation Session · negotiated price $325 agreed in email (rate card $425)");
+  });
+
+  it("accepts a quote that lands on the default package plus campus travel", () => {
     const hour = buildInvoiceDraft(solo, email({ location: "SJSU campus", total_fee: 500, total_kind: "quote" }));
     expect(hour.status).toBe("ready");
     expect(hour.pricing).toMatchObject({ baseCents: 42500, totalCents: 50000 });

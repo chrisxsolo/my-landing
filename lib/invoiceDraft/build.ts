@@ -5,7 +5,10 @@
 
 import { resolveRushPreview, type RushPreviewCharge } from "../extension/rushPreview";
 import { BOOKING_POLICY, PRICING_CATALOG, formatFee } from "../pricingCatalog";
+import { isRealDate } from "./localTime";
 import { resolveSession, type BaseOption, type ResolvedSession } from "./session";
+import { resolveSessionTime } from "./sessionTime";
+import type { SunsetResolution } from "./sunset";
 import { isPlaceName, resolveInvoiceLocation, type InvoiceLocation } from "./travel";
 import {
   invoiceDraftSchema, NO_FACTS, type InvoiceDraft, type InvoiceInquiry, type InvoiceTravel, type SessionFacts,
@@ -118,40 +121,65 @@ function priceSession(session: ResolvedSession, travel: InvoiceTravel, facts: Se
   const options = { shiftCents: rush.kind === "add" ? addOnCents : 0, staleCampusQuote: rush.kind !== "included" };
   let totals = session.baseCents !== null
     ? applyAgreedTotal(session.baseCents + addOnCents, travel, facts, options)
-    : session.baseOptions.length > 1 ? chooseAmongPackages(session.baseOptions, travel, facts) : EMPTY_TOTALS;
+    : session.baseOptions.length > 1 ? undecidedPackage(session.baseOptions, facts) : EMPTY_TOTALS;
   if (rush.kind === "review") totals = { ...totals, totalCents: null, problems: [...totals.problems, rush.note ?? ""] };
   else if (addOnCents) totals = { ...totals, notes: [...totals.notes, rushPreviewNote(rush, facts)] };
   return { totals, rush };
 }
 
 /**
- * One graduate, two possible packages, and only the thread can say which.
- * An agreed figure that lands exactly on one package (plus travel where it
- * is due) picks that package; a clearly negotiated total is taken as-is the
- * way applyAgreedTotal takes any; anything else is a review item naming both.
+ * The evidence names more than one package, so none is priced. A figure in
+ * the thread never breaks the tie: $325 could be the mini, a retainer or a
+ * negotiated hour, and only a person can say which.
  */
-function chooseAmongPackages(options: BaseOption[], travel: InvoiceTravel, facts: SessionFacts): Totals {
-  const agreedCents = facts.total_fee === null ? null : Math.round(facts.total_fee * 100);
+function undecidedPackage(options: BaseOption[], facts: SessionFacts): Totals {
   const named = options.map((option) => `${option.label} ${money(option.baseCents / 100)}`).join(" or ");
-  const unresolved = (extra: string[] = []): Totals => ({
-    baseCents: 0, agreedTotalCents: agreedCents, totalCents: null,
-    problems: [`The thread does not say which package was booked: ${named}. Confirm the session length before filling.`, ...extra],
-    notes: [],
-  });
-  if (agreedCents === null) return unresolved();
-  const travelCents = travel.amountCents ?? 0;
-  const matches = options.filter((option) => travel.kind !== "unknown" && agreedCents === option.baseCents + travelCents);
-  if (matches.length === 1) return applyAgreedTotal(matches[0].baseCents, travel, facts);
-  // A negotiated total that is neither package stands on its own merits.
-  const negotiated = applyAgreedTotal(options[options.length - 1].baseCents, travel, facts);
-  return negotiated.totalCents !== null && negotiated.problems.length === 0 ? negotiated : unresolved();
+  return {
+    baseCents: 0, agreedTotalCents: facts.total_fee === null ? null : Math.round(facts.total_fee * 100), totalCents: null,
+    problems: [`The package is one of: ${named}. The total stays blank until it is confirmed.`], notes: [],
+  };
+}
+
+const MINI_CENTS = PRICING_CATALOG.graduation.packages.mini.price * 100;
+
+interface PackageReview { note: string | null; problem: string | null; totals: Totals }
+
+/**
+ * A defaulted package next to money from the thread. The default was not the
+ * client's choice, so a figure that disagrees with it is held to a higher
+ * bar than applyAgreedTotal's: it is named as negotiated only when it could
+ * not be the mini in disguise. Below the mini price, or exactly the mini
+ * plus a campus fee for a shoot now in the city, the total is blanked for a
+ * person. The price alone never makes the booking a mini.
+ */
+function reviewDefaultedPackage(session: ResolvedSession, totals: Totals, travel: InvoiceTravel, addOnCents: number): PackageReview {
+  const untouched = { note: session.packageNote, problem: null, totals };
+  if (session.packageSource !== "default" || session.baseCents === null || totals.agreedTotalCents === null) return untouched;
+  const rateCardBase = session.baseCents + addOnCents;
+  const agreedBase = totals.agreedTotalCents - (travel.amountCents ?? 0);
+  const mini = money(MINI_CENTS / 100);
+  const blanked = { ...totals, baseCents: rateCardBase, totalCents: null };
+  if (totals.totalCents === null) {
+    const problem = agreedBase === MINI_CENTS ? `${mini} is also the Graduation Mini price, but the thread never chose the mini. If the mini was booked, change the item, description and price; otherwise confirm the total.` : null;
+    return { ...untouched, problem };
+  }
+  if (totals.baseCents === rateCardBase) return untouched;
+  const stated = money(totals.agreedTotalCents / 100);
+  if (travel.kind === "included" && CAMPUS_FEE_CENTS.has(agreedBase - MINI_CENTS)) {
+    return { note: session.packageNote, totals: blanked, problem: `The thread's ${stated} equals the ${mini} Graduation Mini plus a ${money((agreedBase - MINI_CENTS) / 100)} campus travel fee, and the shoot is now where travel is included. Confirm the package and the total before filling.` };
+  }
+  if (agreedBase < MINI_CENTS) {
+    return { note: session.packageNote, totals: blanked, problem: `The thread's ${stated} is below every graduation package (${mini} mini), and no package was chosen. Confirm the total before filling.` };
+  }
+  return { ...untouched, note: `${session.packageNote} · negotiated price ${money((totals.baseCents ?? 0) / 100)} agreed in email (rate card ${money(session.baseCents / 100)})` };
 }
 
 function dateFacts(inquiry: InvoiceInquiry, facts: SessionFacts): { date: string | null; dateConfidence: InvoiceDraft["session"]["dateConfidence"]; warning: string | null } {
-  if (facts.date && facts.source === "email" && facts.confidence === "high") {
-    return { date: facts.date, dateConfidence: "confirmed", warning: null };
+  // A date that is not on the calendar (February 30th) is no date at all.
+  const date = isRealDate(facts.date) ? facts.date : null;
+  if (date && facts.source === "email" && facts.confidence === "high") {
+    return { date, dateConfidence: "confirmed", warning: null };
   }
-  const date = facts.date ?? null;
   if (date || inquiry.date_in_mind) {
     return { date, dateConfidence: "tentative", warning: "The session date is not confirmed in email. Pixieset's due date is left unchanged." };
   }
@@ -186,27 +214,38 @@ function contextProblems(inquiry: InvoiceInquiry, facts: SessionFacts, session: 
   return reasons;
 }
 
-export function buildInvoiceDraft(inquiry: InvoiceInquiry, facts: SessionFacts = NO_FACTS): InvoiceDraft {
-  const session = resolveSession(inquiry, facts.session_type);
+export interface InvoiceDraftOptions {
+  /** Sunset for the session date in San Francisco, looked up by the caller. Tests inject a fixture. */
+  sunset?: SunsetResolution | null;
+}
+
+export function buildInvoiceDraft(inquiry: InvoiceInquiry, facts: SessionFacts = NO_FACTS, options: InvoiceDraftOptions = {}): InvoiceDraft {
+  const session = resolveSession(inquiry, facts.session_type, facts.package);
   const where = resolveInvoiceLocation({
     school: inquiry.school, location: inquiry.location, message: inquiry.message,
     emailLocation: facts.location, serviceKey: session.serviceKey,
   });
-  const { totals, rush } = priceSession(session, where.travel, facts);
-  const reviewReasons = [...contextProblems(inquiry, facts, session, where), ...totals.problems];
-  const description = rush.kind === "add" || rush.kind === "included" ? `${session.description} + ${rush.label}` : session.description;
-
+  const priced = priceSession(session, where.travel, facts);
+  const addOn = priced.rush.kind === "add" || priced.rush.kind === "included";
+  const pkg = reviewDefaultedPackage(session, priced.totals, where.travel, addOn ? priced.rush.amountCents ?? 0 : 0);
   const when = dateFacts(inquiry, facts);
-  const status = reviewReasons.length ? "review" : "ready";
+  const time = resolveSessionTime({
+    time: facts.time, timeStatus: facts.time_status, date: when.date, dateConfidence: when.dateConfidence,
+    location: where.location, locationSource: where.locationSource, travelKind: where.travel.kind,
+    durationMinutes: session.durationMinutes, sunset: options.sunset ?? null,
+  });
+  const reviewReasons = [
+    ...contextProblems(inquiry, facts, session, where), ...pkg.totals.problems, ...(pkg.problem ? [pkg.problem] : []), ...time.reviewReasons,
+  ];
   return {
-    status,
+    status: reviewReasons.length ? "review" : "ready",
     reviewReasons,
-    warnings: [...totals.notes, ...(when.warning ? [when.warning] : [])],
+    warnings: [...pkg.totals.notes, ...time.warnings, ...(when.warning ? [when.warning] : [])],
     client: { inquiryId: inquiry.id, name: inquiry.name ?? "", email: inquiry.email ?? "" },
     session: {
       serviceKey: session.serviceKey ?? "unknown",
       itemName: session.itemName,
-      description,
+      description: addOn ? `${session.description} + ${priced.rush.label}` : session.description,
       quantity: 1,
       people: session.people,
       school: inquiry.school?.trim() || null,
@@ -214,14 +253,18 @@ export function buildInvoiceDraft(inquiry: InvoiceInquiry, facts: SessionFacts =
       locationSource: where.locationSource,
       date: when.date,
       dateConfidence: when.dateConfidence,
-      time: facts.time,
+      time: time.time,
+      timeDetail: time.detail,
+      durationMinutes: session.durationMinutes,
+      packageSource: session.packageSource,
+      packageNote: pkg.note,
     },
     pricing: {
       currency: "USD",
-      baseCents: totals.baseCents ?? 0,
+      baseCents: pkg.totals.baseCents ?? 0,
       travel: where.travel,
-      agreedTotalCents: totals.agreedTotalCents,
-      totalCents: totals.totalCents,
+      agreedTotalCents: pkg.totals.agreedTotalCents,
+      totalCents: pkg.totals.totalCents,
     },
     note: buildNote(inquiry.name ?? ""),
     dueDate: when.dateConfidence === "confirmed" ? when.date : null,
