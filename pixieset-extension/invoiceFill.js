@@ -63,7 +63,8 @@ function fillRow(row, { name, description, quantity, priceCents }) {
   if (row.name) { setNativeValue(row.name, name); filled++; }
   if (row.description && description !== null) { setNativeValue(row.description, description); filled++; }
   if (row.quantity) { setNativeValue(row.quantity, String(quantity)); filled++; }
-  if (row.price) { setNativeValue(row.price, dollarsFromCents(priceCents)); filled++; }
+  // No confirmed price (null) leaves Pixieset's price field exactly as it is.
+  if (row.price && priceCents !== null) { setNativeValue(row.price, dollarsFromCents(priceCents)); filled++; }
   return filled;
 }
 
@@ -91,6 +92,7 @@ async function fillInvoiceFromDraft(draft, doc = document) {
     name: draft.session.itemName, description: draft.session.description,
     quantity: draft.session.quantity, priceCents: draft.pricing.baseCents,
   });
+  if (draft.pricing.baseCents === null) skipped.push("price (not confirmed: enter it in the panel, or in Pixieset)");
 
   const travel = draft.pricing.travel;
   if (travel.kind === "verified" && travel.amountCents > 0) {

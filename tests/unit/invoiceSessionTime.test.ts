@@ -23,7 +23,7 @@ const avery: InvoiceInquiry = {
   message: "Hi! I'd love grad photos this spring.", date_in_mind: "April 24",
 };
 
-const email = (facts: Partial<SessionFacts>): SessionFacts => ({ ...NO_FACTS, source: "email", confidence: "high", email_status: "read", ...facts });
+const email = (facts: Partial<SessionFacts>): SessionFacts => ({ ...NO_FACTS, source: "email", date_status: "confirmed", total_status: "confirmed", email_status: "read", ...facts });
 const selected = (minutes: number): PackageEvidence => ({ status: "selected", minutes, source_message: 3 });
 
 function sunsetAt(date: string, clock: string, source = FIXTURE_SOURCE): SunsetResolution {
@@ -252,7 +252,7 @@ describe("golden hour that cannot be resolved stays unresolved, and the price st
   };
 
   it("when the date is only tentative, missing, or not a real date", () => {
-    expect(unresolved({ confidence: "medium" }).reviewReasons.join(" ")).toMatch(/session date is not confirmed in email/);
+    expect(unresolved({ date_status: "proposed" }).reviewReasons.join(" ")).toMatch(/session date is not confirmed in email/);
     expect(unresolved({ date: null }, null, { ...avery, date_in_mind: null }).reviewReasons.join(" ")).toMatch(/no session date is known/);
     const impossible = unresolved({ date: "2027-02-30" }, null, { ...avery, date_in_mind: null });
     expect(impossible.reviewReasons.join(" ")).toMatch(/no session date is known/);

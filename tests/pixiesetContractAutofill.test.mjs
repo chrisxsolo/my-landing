@@ -175,7 +175,7 @@ test("leaves the price placeholders alone for nine or more graduates, and keeps 
 });
 
 test("this release of the extension still prices Rush preview (1.1.3 onward)", () => {
-  assert.equal(manifest.version, "1.1.4");
+  assert.equal(manifest.version, "1.2.0");
 });
 
 test("fills the session type when inline formatting splits it across text nodes", () => {
@@ -292,7 +292,7 @@ test("escapes server text before it reaches the preview", () => {
 
 test("maps the detect-date payload onto the inquiry, keeping the Rush preview charge and the total's kind", () => {
   const fixture = loadAutofill([]);
-  fixture.context.inq = { id: 913, name: "Example Client", email: "client@example.test", date_in_mind: "November 20", ...PROPOSAL };
+  fixture.context.inq = { id: 913, name: "Example Client", email: "client@example.test", date_in_mind: "November 20", created_at: "2026-11-02T17:00:00Z", ...PROPOSAL };
   fixture.context.d = {
     readable: "November 20th, 2026", time: "5:30 PM", location: "Palace of Fine Arts", session_type: "proposal",
     total_fee: 750, total_kind: "quote", confidence: "high", rush_preview_charge: RUSH_ADD,

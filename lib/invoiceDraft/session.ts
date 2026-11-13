@@ -2,6 +2,7 @@
 // Every amount comes from PRICING_CATALOG through lib/pricing.ts.
 
 import { classifySession, type PlaybookKey } from "../ai/sessionClassifier";
+import { EIGHT_PERSON_SPORTS_SENIOR_OFFER, sportsTeamDeliverables, sportsTeamOfferOptions } from "../ai/sportsTeamPortraitPricing";
 import {
   COUPLES_PACKAGES, GRAD_PACKAGES, GROUP_MAX_PEOPLE, MINI_MAX_PEOPLE,
   graduationPackageFor, graduationSessionLabel, graduationSessionPrice, includedMinutesFor, isHeadcountPriced,
@@ -11,10 +12,11 @@ import { SUPPORTED_SOLO_MINUTES, choosePackage } from "./packageEvidence";
 import { NO_PACKAGE, type PackageEvidence } from "./types";
 
 export type InvoiceServiceKey =
-  | "graduation" | "family" | "extended-family" | "couples" | "engagement" | "proposal" | "elopement" | "maternity";
+  | "graduation" | "senior-portraits" | "family" | "extended-family" | "couples" | "engagement" | "proposal" | "elopement" | "maternity";
 
 const ITEM_NAMES: Record<InvoiceServiceKey, string> = {
   graduation: "Graduation Session",
+  "senior-portraits": "Senior Portraits",
   family: "Family Session",
   "extended-family": "Extended Family Session",
   couples: "Couples Session",
@@ -25,6 +27,8 @@ const ITEM_NAMES: Record<InvoiceServiceKey, string> = {
 };
 
 const PRICED_KEYS = new Set<string>(Object.keys(ITEM_NAMES));
+/** Types the thread can name that the rate card does not price: a person quotes them. */
+const UNPRICED_EMAIL_TYPES = new Set(["event", "other"]);
 
 const NUMBER_WORDS = ["Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten"];
 
@@ -48,6 +52,22 @@ export interface ResolvedSession {
   /** How the package was chosen, for the reviewer ("Default: 60-minute Graduation Session"). */
   packageNote: string | null;
   problems: string[];
+  /**
+   * Set when the session is quoted per booking, so a total the thread
+   * settled is the price (totals.ts negotiatedTotals). `reason`, when set,
+   * is shown only if the thread settled no total either.
+   */
+  handQuoted?: { reason: string | null };
+}
+
+/** What the thread adds to the inquiry form about who is being photographed and what was promised. */
+export interface SessionEvidence {
+  /** Headcount the emails state; it replaces the form's when both exist. */
+  people?: number | null;
+  /** In scope for the eight-person sports senior offer (decided in lib/ai/sportsTeamPortraitPricing.ts). */
+  sportsTeamOffer?: boolean;
+  /** What the photographer committed to deliver, in a few words. */
+  deliverables?: string | null;
 }
 
 export interface BaseOption {
@@ -71,8 +91,35 @@ export function parseHeadcount(value: string | number | null | undefined): numbe
   return count > 0 ? count : null;
 }
 
-function serviceKeyFor(inquiry: { session_type: string | null; message: string | null; school: string | null }, fromEmail: string | null): InvoiceServiceKey | null {
+const SENIOR_PORTRAIT_WORDS = /\bsenior(?: year)? (?:photos?|photoshoot|portraits?|pictures?|pics|session|shoot)\b|\b(?:high school|college) senior\b/i;
+const TEAM_WORDS = /\b(?:team|teammates|players|athletes?|roster|varsity|soccer|football|basketball|baseball|softball|volleyball|lacrosse|swim(?:ming)?|tennis|cheer|wrestling|hockey|water polo)\b/i;
+const GRADUATION_WORDS = /\bgraduat|\bgrads?\b|\bcap (?:and|&|n) gown\b|\bcommencement\b/i;
+
+/**
+ * Senior portraits for a team, in the client's own words, with nothing about
+ * graduating. Read from the message only: the form's one portrait option is
+ * "Graduation Portrait", which says nothing about what the client wants.
+ */
+function isTeamSeniorPortraits(message: string | null): boolean {
+  const text = message ?? "";
+  return SENIOR_PORTRAIT_WORDS.test(text) && TEAM_WORDS.test(text) && !GRADUATION_WORDS.test(text);
+}
+
+/**
+ * The service being booked. What the thread says wins over the form, and a
+ * thread that names a type the rate card does not price is never turned into
+ * a graduation because a school is on file. The shared classifier reads
+ * "senior portraits" as graduation; team senior portraits are recognised
+ * before it. Where a graduation reading still stands against the client's
+ * own words (the thread said graduation, or only "senior" was written),
+ * graduationDoubts sends the draft to review rather than letting it be ready.
+ */
+function serviceKeyFor(
+  inquiry: { session_type: string | null; message: string | null; school: string | null }, fromEmail: string | null, sportsTeamOffer: boolean,
+): InvoiceServiceKey | null {
   if (fromEmail && PRICED_KEYS.has(fromEmail)) return fromEmail as InvoiceServiceKey;
+  if (fromEmail && UNPRICED_EMAIL_TYPES.has(fromEmail)) return null;
+  if (sportsTeamOffer || isTeamSeniorPortraits(inquiry.message)) return "senior-portraits";
   const text = `${inquiry.session_type ?? ""} ${inquiry.message ?? ""}`.toLowerCase();
   const key: PlaybookKey | null = classifySession(inquiry.session_type, inquiry.message).key;
   if (key === "family" && /\bextended family\b/.test(text)) return "extended-family";
@@ -115,29 +162,94 @@ function flatPrice(service: InvoiceServiceKey, text: string): { cents: number | 
 
 const UNRESOLVED = { durationMinutes: null, packageSource: "unresolved" as const, packageNote: null };
 
+/**
+ * Reasons a graduation price must be looked at before it is filled. The
+ * rate card is still shown, but never as "ready": the client's own words say
+ * senior or team portraits and nothing about graduating, or the headcount
+ * that sets the price came from the emails rather than the form.
+ */
+function graduationDoubts(message: string | null, fromEmail: string | null, evidence: SessionEvidence, stated: number | null): string[] {
+  const doubts: string[] = [];
+  const text = message ?? "";
+  if (evidence.sportsTeamOffer || isTeamSeniorPortraits(message)) {
+    doubts.push("The thread reads as a graduation session, but the client's own words describe senior portraits for a team. Confirm the session type and price before filling.");
+  } else if (fromEmail !== "graduation" && SENIOR_PORTRAIT_WORDS.test(text) && !GRADUATION_WORDS.test(text)) {
+    doubts.push("The inquiry asks for senior portraits and does not mention graduating. The graduation rate card is shown; confirm the session type and price before filling.");
+  }
+  if (evidence.people != null && evidence.people !== (stated ?? 1)) {
+    const form = stated === null ? "the inquiry form gives no headcount" : `the inquiry form says ${stated}`;
+    doubts.push(`The emails say ${evidence.people} ${evidence.people === 1 ? "person" : "people"}, but ${form}. The price uses ${evidence.people}; confirm the headcount before filling.`);
+  }
+  return doubts;
+}
+
 export function resolveSession(
   inquiry: { session_type: string | null; message: string | null; school: string | null; people: string | number | null },
   sessionTypeFromEmail: string | null,
   packageFromEmail: PackageEvidence = NO_PACKAGE,
+  evidence: SessionEvidence = {},
 ): ResolvedSession {
-  const serviceKey = serviceKeyFor(inquiry, sessionTypeFromEmail);
+  const serviceKey = serviceKeyFor(inquiry, sessionTypeFromEmail, evidence.sportsTeamOffer === true);
   const problems: string[] = [];
   if (!serviceKey) {
     problems.push("The session type has no rate-card price. Enter the item and price by hand.");
-    return { serviceKey: null, itemName: "Photo Session", description: "", people: 1, baseCents: null, baseOptions: [], ...UNRESOLVED, problems };
+    return { serviceKey: null, itemName: "Photo Session", description: "", people: 1, baseCents: null, baseOptions: [], ...UNRESOLVED, problems, handQuoted: { reason: null } };
   }
   const itemName = ITEM_NAMES[serviceKey];
   const text = `${inquiry.session_type ?? ""} ${inquiry.message ?? ""}`.toLowerCase();
-  const people = parseHeadcount(inquiry.people) ?? 1;
+  const stated = parseHeadcount(inquiry.people);
+  const people = evidence.people ?? stated ?? 1;
   if (serviceKey === "graduation") {
-    return people <= MINI_MAX_PEOPLE ? resolveGraduate(text, packageFromEmail) : resolveGraduationGroup(people, text, packageFromEmail);
+    const graduation = people <= MINI_MAX_PEOPLE ? resolveGraduate(text, packageFromEmail) : resolveGraduationGroup(people, text, packageFromEmail);
+    return { ...graduation, problems: [...graduation.problems, ...graduationDoubts(inquiry.message, sessionTypeFromEmail, evidence, stated)] };
   }
+  if (serviceKey === "senior-portraits") return resolveSeniorPortraits(people, packageFromEmail, evidence);
   const flat = flatPrice(serviceKey, text);
   if (flat.problem) problems.push(flat.problem);
   const single = flat.cents === null ? [] : [{ label: flat.description, baseCents: flat.cents }];
   return {
     serviceKey, itemName, description: flat.description, people, baseCents: flat.cents, baseOptions: single,
     durationMinutes: flat.minutes, packageSource: "catalog", packageNote: null, problems,
+  };
+}
+
+const SENIOR_HAND_QUOTED = { reason: "Senior portraits are quoted per booking and the thread has not settled a total. Enter the agreed price by hand." };
+
+const sportsOptionLabel = (minutes: number) => `${minutes}-minute sports senior session`;
+
+/**
+ * Senior portraits have no rate-card price: the total is whatever the thread
+ * settled. The one exception is the approved eight-person sports senior
+ * offer, and only for a booking in that offer's own scope; no other
+ * headcount and no ordinary senior session ever takes its rates.
+ */
+function resolveSeniorPortraits(people: number, packageFromEmail: PackageEvidence, evidence: SessionEvidence): ResolvedSession {
+  const base = { serviceKey: "senior-portraits" as const, itemName: ITEM_NAMES["senior-portraits"], people, problems: [] as string[] };
+  const minutes = packageFromEmail.status === "selected" ? packageFromEmail.minutes : null;
+  const describe = (delivered: string | null) => [headcountDescription(people), minutes ? `${minutes}-minute session` : null, delivered].filter(Boolean).join(", ");
+  const promised = evidence.deliverables?.trim() || null;
+  const inOffer = evidence.sportsTeamOffer === true && people === EIGHT_PERSON_SPORTS_SENIOR_OFFER.headcount;
+  if (!inOffer) {
+    return {
+      ...base, description: describe(promised), baseCents: null, baseOptions: [], durationMinutes: minutes,
+      packageSource: minutes ? "email" : "unresolved", packageNote: null, handQuoted: SENIOR_HAND_QUOTED,
+    };
+  }
+  const offered = sportsTeamDeliverables();
+  const delivered = promised ?? `${offered.perPerson} edited portraits per person (${offered.headshotsPerPerson} headshots, ${offered.fullBodyPerPerson} full-body)`;
+  const options = sportsTeamOfferOptions();
+  const chosen = options.find((option) => option.durationMinutes === minutes);
+  if (!chosen) {
+    // No settled length shows both options and prices neither; a length the offer does not have is quoted by hand.
+    const open = minutes ? [] : options.map((option) => ({ label: sportsOptionLabel(option.durationMinutes), baseCents: option.total * 100 }));
+    return { ...base, description: describe(delivered), baseCents: null, baseOptions: open, ...UNRESOLVED, handQuoted: SENIOR_HAND_QUOTED };
+  }
+  return {
+    ...base, description: describe(delivered), baseCents: chosen.total * 100,
+    baseOptions: [{ label: sportsOptionLabel(chosen.durationMinutes), baseCents: chosen.total * 100 }],
+    durationMinutes: chosen.durationMinutes, packageSource: "email",
+    packageNote: `Selected in email: eight-person sports senior offer, $${chosen.perPerson} per person`,
+    handQuoted: SENIOR_HAND_QUOTED,
   };
 }
 
@@ -195,7 +307,7 @@ function resolveGraduationGroup(people: number, text: string, packageFromEmail: 
   const base = { serviceKey: "graduation" as const, itemName: ITEM_NAMES.graduation, description: headcountDescription(people), people };
   if (!isHeadcountPriced(people)) {
     const problem = `A group of ${people} is larger than the rate card prices (up to ${GROUP_MAX_PEOPLE} graduates). Confirm the headcount and quote it by hand.`;
-    return { ...base, baseCents: null, baseOptions: [], ...UNRESOLVED, problems: [problem] };
+    return { ...base, baseCents: null, baseOptions: [], ...UNRESOLVED, problems: [problem], handQuoted: { reason: null } };
   }
   const included = includedMinutesFor(people);
   const choice = choosePackage(text, packageFromEmail, included);

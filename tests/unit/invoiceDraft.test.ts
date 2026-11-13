@@ -13,7 +13,7 @@ const anthony: InvoiceInquiry = {
   message: "Grad photos for me and my sister, both graduating from SJSU.", date_in_mind: "May 16",
 };
 
-const email = (facts: Partial<SessionFacts>): SessionFacts => ({ ...NO_FACTS, source: "email", confidence: "high", ...facts });
+const email = (facts: Partial<SessionFacts>): SessionFacts => ({ ...NO_FACTS, source: "email", date_status: "confirmed", total_status: "confirmed", ...facts });
 
 describe("Anthony: SJSU graduate shooting at San Francisco City Hall", () => {
   const draft = buildInvoiceDraft(anthony, email({ location: "San Francisco City Hall", date: "2027-05-16" }));
@@ -253,7 +253,7 @@ describe("when the thread cannot be read", () => {
 
 describe("due date safety", () => {
   it("leaves the due date alone and warns when the date is only tentative", () => {
-    const draft = buildInvoiceDraft(anthony, email({ location: "San Francisco City Hall", date: "2027-05-16", confidence: "medium" }));
+    const draft = buildInvoiceDraft(anthony, email({ location: "San Francisco City Hall", date: "2027-05-16", date_status: "proposed" }));
     expect(draft.status).toBe("ready");
     expect(draft.dueDate).toBeNull();
     expect(draft.session.dateConfidence).toBe("tentative");

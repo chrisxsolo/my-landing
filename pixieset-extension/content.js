@@ -4,7 +4,8 @@
 //
 // Invoices are priced by /api/extension/invoice-draft (the site's own pricing
 // catalog and travel resolver); the browser only shows that draft for review
-// and writes it into Pixieset. Contract previews still use extensionPricing.js.
+// and writes it into Pixieset. Contract previews read the same server draft
+// (contractResolved.js); extensionPricing.js prices one only for an older API.
 
 const API_BASE   = "https://www.soloxsnaps.com";
 const API_SECRET = "898b46208d6a8e27b1f65f052f7a4d82a47dc9294eed1a7d037b0d8c3abc7032";
@@ -79,13 +80,21 @@ async function apiFetch(path, options = {}) {
   return body;
 }
 
+// Every screen the panel opens takes a new number. A request that answers
+// after the user has opened something else is dropped, so a slow Gmail read
+// for one client can never repaint, or arm the Fill button of, another.
+let currentView = 0;
+function beginView() { return ++currentView; }
+function isCurrentView(view) { return view === currentView; }
+
 async function loadInquiries() {
+  const view = beginView();
   setView("loading");
   try {
     const [rows, totals] = await Promise.all([apiFetch("/api/extension/inquiries"), loadDraftTotals()]);
-    renderList(rows, totals);
+    if (isCurrentView(view)) renderList(rows, totals);
   } catch (err) {
-    showError(`Failed to load: ${err.message}`);
+    if (isCurrentView(view)) showError(`Failed to load: ${err.message}`);
   }
 }
 
@@ -173,9 +182,11 @@ async function selectPixiesetClient(inq) {
     || document.querySelector('input[type="text"]');
   if (!input) { showFillStatus(0); return; }
 
+  const view = currentView;
   await saveInvoiceSelection(inq.id, inq.email);
   await typeIntoInput(input, inq.email);
   await new Promise(r => setTimeout(r, 700));
+  if (!isCurrentView(view)) return; // another client was opened meanwhile: nothing is clicked for this one
 
   const candidates = [...document.querySelectorAll('[role="option"], li, [class*="option" i], [class*="suggestion" i], [class*="result" i]')]
     .map(el => ({ el, text: el.textContent || "" }));
@@ -191,14 +202,15 @@ async function selectPixiesetClient(inq) {
 }
 
 async function loadInvoiceDraft(inquiryId, { restored = false } = {}) {
+  const view = beginView();
   setView("loading");
   document.getElementById("sxs-loading").textContent = "🔍 Pricing the invoice from the inquiry and Gmail…";
   try {
     const { draft } = await apiFetch("/api/extension/invoice-draft", { method: "POST", body: JSON.stringify({ inquiry_id: inquiryId }) });
     await rememberDraftTotal(inquiryId, draft);
-    renderInvoiceDraft(draft, restored);
+    if (isCurrentView(view)) renderInvoiceDraft(draft, restored);
   } catch (err) {
-    showError(`Could not build the invoice draft: ${err.message}`);
+    if (isCurrentView(view)) showError(`Could not build the invoice draft: ${err.message}`);
   } finally {
     document.getElementById("sxs-loading").textContent = "Loading inquiries…";
   }
@@ -213,6 +225,8 @@ function renderInvoiceDraft(draft, restored) {
   syncButton();
   detail.querySelector("#sxs-review-confirm")?.addEventListener("change", syncButton);
   detail.querySelector("#sxs-time-retry")?.addEventListener("click", () => loadInvoiceDraft(draft.client.inquiryId));
+  // Manual acceptance: the reviewer, not the thread, says the client agreed to the requested date.
+  detail.querySelector("#sxs-accept-date")?.addEventListener("click", () => acceptSessionDateAsDue(draft, detail));
   fillBtn.addEventListener("click", () => runInvoiceFill(draft));
 }
 
@@ -221,19 +235,20 @@ async function runInvoiceFill(draft) {
   const reviewed = readInvoicePreview(draft);
   const total = document.getElementById("sxs-invoice-total");
   if (total) total.textContent = reviewed.pricing.totalCents === null ? "—" : fmtCents(reviewed.pricing.totalCents);
+  const view = currentView;
   const { filled, skipped } = await fillInvoiceFromDraft(reviewed);
+  if (filled > 0) await clearInvoiceSelection();
+  if (!isCurrentView(view)) return; // the panel shows something else now: its status line is not this fill's
   showFillStatus(filled);
   const statusEl = document.getElementById("sxs-fill-status");
-  if (statusEl && skipped.length) statusEl.textContent += ` Not found on this page: ${skipped.join(", ")}.`;
+  if (statusEl && skipped.length) statusEl.textContent += ` Not filled: ${skipped.join(", ")}.`;
   if (statusEl) statusEl.textContent += invoiceTimeSummary(reviewed);
-  if (filled > 0) await clearInvoiceSelection();
 }
 
 // ── CONTRACTS ────────────────────────────────────────────────────────────────
 
 async function renderDetail(inq) {
   const pageType = getPageType();
-  const price = calcPrice(inq);
   const isCreatePage = pageType === "contract-create";
   const btnLabel = isCreatePage ? `Fill client name → Next` : `Fill ${pageType} fields`;
   const detail = renderDetailShell(
@@ -251,56 +266,37 @@ async function renderDetail(inq) {
   }
 
   // The create page skipped the Gmail scan; here the thread's facts enrich the inquiry.
-  let enriched = enrichInquiryFromFacts(inq);
-  try {
-    const d = await apiFetch("/api/extension/detect-date", { method: "POST", body: JSON.stringify({ inquiry_id: inq.id }) });
-    enriched = enrichInquiryFromFacts(inq, d);
-    document.getElementById("sxs-date-status").textContent = detectedStatusLine(d);
-  } catch (err) {
-    console.error("SoloXSnaps detect-date failed", err);
-    document.getElementById("sxs-date-status").textContent = `Could not reach Gmail (${err.message}) — using the inquiry date; add-ons were not checked`;
-  }
-
-  const enrichedPrice = calcPrice(enriched); // recalc with the detected location for the travel fee
-  document.getElementById("sxs-preview-rows").innerHTML = buildContractPreview(enriched, enrichedPrice);
+  const view = beginView();
+  const contract = await resolveContractView(inq);
+  if (!isCurrentView(view)) return; // the user moved on: a late answer never repaints another client's preview
+  document.getElementById("sxs-date-status").textContent = contract.status;
+  document.getElementById("sxs-preview-rows").innerHTML = buildContractPreview(contract.inquiry, contract.price);
   wireContractPreview();
 
+  // Flagged items are ticked off before a fill, as on the invoice.
   const fillBtn = detail.querySelector("#sxs-fill");
-  fillBtn.disabled = false;
-  fillBtn.addEventListener("click", () => fillContract(enriched, enrichedPrice));
+  const confirm = detail.querySelector("#sxs-contract-confirm");
+  const syncButton = () => { fillBtn.disabled = Boolean(confirm && !confirm.checked); };
+  syncButton();
+  confirm?.addEventListener("change", syncButton);
+  fillBtn.addEventListener("click", () => { if (!fillBtn.disabled) fillContract(contract.inquiry, contract.price); });
 }
 
-function detectedTotal(d) {
-  return d.total_fee != null && Number.isFinite(Number(d.total_fee)) ? Number(d.total_fee) : null;
-}
-
-// The inquiry plus what /api/extension/detect-date settled. Every field the
-// payload lacks keeps the inquiry's own value, so an older API response (no
-// Rush preview charge, no total kind) prices exactly as before. The shoot
-// location from the thread stays separate from the school.
-function enrichInquiryFromFacts(inq, d = {}) {
-  return {
-    ...inq,
-    _sessionDate: (d.readable && (formatSessionDate(d.readable) || d.readable)) || formatSessionDate(inq.date_in_mind) || inq.date_in_mind || "TBD",
-    _sessionTime: d.time || "TBD",
-    _location: d.location || "",
-    _serviceType: d.session_type || null,
-    _agreedTotal: detectedTotal(d),
-    _totalKind: typeof d.total_kind === "string" ? d.total_kind : null,
-    _rushPreview: normalizeRushPreviewCharge(d.rush_preview_charge),
-  };
-}
-
-// One line under the title: how sure the thread is, the service, the figure it wrote and any add-on.
-function detectedStatusLine(d) {
-  const confidence = d.confidence === "high" ? "✓ Confirmed in email" : d.confidence === "medium" ? "~ Likely from email" : "~ From inquiry form";
-  const bits = [confidence];
-  if (d.session_type) bits.push(SERVICE_LABELS[d.session_type] || d.session_type);
-  const total = detectedTotal(d);
-  if (total != null) bits.push(`$${total} ${d.total_kind === "agreed_total" ? "agreed" : "quoted"} in email`);
-  const rush = normalizeRushPreviewCharge(d.rush_preview_charge);
-  if (rush && rush.kind === "add") bits.push(`${rush.label} +${fmt(rush.amountCents / 100)}`);
-  return bits.join(" · ");
+// What the contract preview shows for an inquiry: the server's resolution
+// when the API sends one, the browser's own pricing for an older API that
+// does not, and no price at all when the thread could not be checked.
+async function resolveContractView(inq) {
+  try {
+    const d = await apiFetch("/api/extension/detect-date", { method: "POST", body: JSON.stringify({ inquiry_id: inq.id }) });
+    const resolved = normalizeResolved(d.resolved);
+    if (resolved) return { inquiry: enrichInquiryFromResolved(inq, d, resolved), price: priceFromResolved(resolved), status: resolvedStatusLine(resolved) };
+    const inquiry = enrichInquiryFromFacts(inq, d);
+    return { inquiry, price: calcPrice(inquiry), status: detectedStatusLine(d) };
+  } catch (err) {
+    console.error("SoloXSnaps detect-date failed", err);
+    const inquiry = { ...enrichInquiryFromFacts(inq), _dateStatus: "inquiry" };
+    return { inquiry, price: unpricedContract(inquiry), status: `Could not check the email thread (${err.message}). Nothing from Gmail is shown and no total is filled in.` };
+  }
 }
 
 // Type each character one at a time — this is what React's synthetic event system responds to
@@ -326,12 +322,14 @@ async function fillClientInput(inq) {
   if (!input) { showFillStatus(0); return; }
 
   const statusEl = document.getElementById("sxs-fill-status");
+  const view = currentView;
   await typeIntoInput(input, inq.email);
+  if (!isCurrentView(view)) return;
   if (statusEl) statusEl.textContent = `✓ Typed — now click Next in PixiSet`;
 
   setTimeout(() => {
     const nextBtn = [...document.querySelectorAll("button")].find(b => /^next$/i.test(b.textContent.trim()));
-    if (nextBtn && !nextBtn.disabled) {
+    if (isCurrentView(view) && nextBtn && !nextBtn.disabled) {
       nextBtn.click();
       if (statusEl) statusEl.textContent = "✓ Clicked Next — open Autofill again on the contract page";
     }
@@ -369,9 +367,18 @@ setTimeout(injectTriggerButton, 1500);
 
 // Also re-inject on SPA navigation (PixiSet uses client-side routing)
 let lastUrl = location.href;
+let lastPath = location.pathname;
 new MutationObserver(() => {
   if (location.href !== lastUrl) {
     lastUrl = location.href;
+    // A different page is a different screen: whatever was loaded or armed
+    // for the last one is dropped, and the panel reopens from the start. A
+    // change to the query or hash alone is the same page and keeps its edits.
+    if (location.pathname !== lastPath) {
+      lastPath = location.pathname;
+      beginView();
+      if (panel) panel.style.display = "none";
+    }
     setTimeout(injectTriggerButton, 1500);
   }
 }).observe(document.body, { childList: true, subtree: true });

@@ -295,7 +295,7 @@ test("the list shows no browser-calculated travel total before the server has pr
   const fixture = loadExtension(buildInvoicePage());
   const describe = cached => { fixture.context.cached = cached; return vm.runInContext("describeListPrice(cached)", fixture.context); };
   assert.equal(describe(undefined), "Open to confirm pricing");
-  assert.equal(describe({ status: "ready", totalCents: 60000 }), "$600.00 confirmed");
+  assert.equal(describe({ status: "ready", totalCents: 60000 }), "$600.00 in the last draft");
   assert.equal(describe({ status: "review", totalCents: null }), "Pricing needs review");
 });
 
@@ -319,7 +319,7 @@ test("the manifest loads every invoice module and was bumped", () => {
   for (const file of ["invoiceSelection.js", "invoicePreview.js", "invoiceFill.js", "domHelpers.js", "content.js"]) {
     assert.ok(scripts.includes(file), `${file} is loaded`);
   }
-  assert.equal(manifest.version, "1.1.4");
+  assert.equal(manifest.version, "1.2.0");
 });
 
 // ── Rush preview: one line item whose price already carries the add-on ───────
@@ -416,7 +416,7 @@ test("the default package previews ready at $425 with its source, the calculated
   assert.match(html, /6:30–7:30 pm<span class="sxs-field-sub">PDT · America\/Los_Angeles<\/span><span class="sxs-field-sub">Calculated from sunset/);
   assert.match(html, /Sunset<\/span><span class="sxs-field-val">7:54 pm<span class="sxs-field-sub">user-supplied test sunset/);
   assert.doesNotMatch(html, />golden hour</);
-  assert.match(html, /2027-04-24 \(confirmed in email\)/);
+  assert.match(html, /April 24th, 2027<span class="sxs-field-sub">confirmed in email/);
   assert.match(html, /Included \(San Francisco\) · Palace of Fine Arts/);
   assert.match(html, /California State University, East Bay/);
   assert.equal(vm.runInContext("invoiceFillAllowed(draft, document)", fixture.context), true);
@@ -507,4 +507,79 @@ test("thread text in the time fields is escaped before it reaches the panel", ()
   const html = vm.runInContext("buildInvoicePreview(draft)", fixture.context);
   assert.doesNotMatch(html, /<script>|<img/);
   assert.match(html, /&lt;script&gt;/);
+});
+
+// ── unconfirmed price, and a requested session date ──────────────────────────
+
+const seniorDraft = {
+  status: "review", reviewReasons: ["The thread states $1,200 as a quote, which differs from the rate card ($2,000). Confirm the total before filling."], warnings: [],
+  client: { inquiryId: 9101, name: "Jordan Example", email: "jordan@example.test" },
+  session: {
+    serviceKey: "graduation", itemName: "Graduation Session", description: "Eight people", quantity: 1, people: 8,
+    school: null, location: "Golden Gate Park", locationSource: "email", date: "2026-11-29", dateConfidence: "tentative", dateStatus: "proposed", time: "3:00–4:00 pm",
+  },
+  pricing: { currency: "USD", baseCents: 200000, travel: { kind: "included", amountCents: 0, place: "Golden Gate Park" }, agreedTotalCents: 120000, totalCents: null, baseConfirmed: false },
+  note: "Thank you for booking, Jordan!", dueDate: null,
+};
+
+const panelWith = values => ({ querySelector: selector => {
+  const key = /data-invoice-key="(\w+)"/.exec(selector)?.[1];
+  return key && key in values ? { value: values[key] } : null;
+} });
+
+test("a price the server would not confirm is shown for reference only and is never filled", async () => {
+  const doc = buildInvoicePage();
+  const price = doc.querySelector('input[placeholder*="0.00"]');
+  price.value = "0.00";
+  const fixture = loadExtension(doc);
+  fixture.context.draft = seniorDraft;
+  const html = vm.runInContext("buildInvoicePreview(draft)", fixture.context);
+  assert.match(html, /data-invoice-key="baseCents" value="" spellcheck="false" placeholder="enter the agreed price"/);
+  assert.match(html, /Not confirmed: nothing is filled until you enter it/);
+  assert.match(html, /Rate card: \$2000\.00/);
+  assert.match(html, /Mentioned in email: \$1200\.00/);
+
+  // Ticking the review box and filling with the field still empty must not write $2,000.
+  fixture.context.root = panelWith({ itemName: "Senior Portraits", description: "Eight people", baseCents: "", location: "Golden Gate Park", travelCents: "$0.00", dueDate: "", note: "" });
+  const untouched = plain(vm.runInContext("readInvoicePreview(draft, root)", fixture.context));
+  assert.equal(untouched.pricing.baseCents, null);
+  assert.equal(untouched.pricing.totalCents, null);
+  const result = await fill(fixture, untouched);
+  assert.equal(price.value, "0.00");
+  assert.deepEqual(price.events, []);
+  assert.match(result.skipped.join(" "), /price \(not confirmed/);
+});
+
+test("a price typed into the panel is what gets filled", async () => {
+  const doc = buildInvoicePage();
+  const fixture = loadExtension(doc);
+  fixture.context.draft = seniorDraft;
+  fixture.context.root = panelWith({ itemName: "Senior Portraits", description: "Eight people", baseCents: "$1,200", location: "Golden Gate Park", travelCents: "$0.00", dueDate: "", note: "" });
+  const typed = plain(vm.runInContext("readInvoicePreview(draft, root)", fixture.context));
+  assert.equal(typed.pricing.baseCents, 120000);
+  assert.equal(typed.pricing.totalCents, 120000);
+  await fill(fixture, typed);
+  assert.equal(doc.querySelector('input[placeholder*="0.00"]').value, "1200.00");
+  assert.equal(doc.querySelector('input[placeholder*="Item name"]').value, "Senior Portraits");
+});
+
+test("a requested session date is shown with its standing and can be accepted by hand as the due date", () => {
+  const fixture = loadExtension(buildInvoicePage());
+  fixture.context.draft = seniorDraft;
+  const html = vm.runInContext("buildInvoicePreview(draft)", fixture.context);
+  assert.match(html, /November 29th, 2026<span class="sxs-field-sub">requested in email, not yet confirmed/);
+  assert.match(html, /id="sxs-accept-date"/);
+  assert.match(html, /data-invoice-key="dueDate" value=""/);
+
+  const due = { value: "" };
+  const button = { textContent: "", disabled: false };
+  fixture.context.root = { querySelector: selector => (selector.includes("dueDate") ? due : selector === "#sxs-accept-date" ? button : null) };
+  vm.runInContext("acceptSessionDateAsDue(draft, root)", fixture.context);
+  assert.equal(due.value, "2026-11-29");
+  assert.equal(button.disabled, true);
+
+  fixture.context.draft = { ...seniorDraft, dueDate: "2026-11-29", session: { ...seniorDraft.session, dateStatus: "confirmed", dateConfidence: "confirmed" } };
+  const confirmed = vm.runInContext("buildInvoicePreview(draft)", fixture.context);
+  assert.match(confirmed, /November 29th, 2026<span class="sxs-field-sub">confirmed in email/);
+  assert.doesNotMatch(confirmed, /sxs-accept-date/);
 });

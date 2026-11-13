@@ -30,54 +30,6 @@ function expandSchoolName(schoolText = "") {
   return key ? SCHOOL_FULL_NAMES[key] ?? schoolText : schoolText;
 }
 
-// ── DATE FORMATTING ──────────────────────────────────────────────────────────
-const MONTH_NAMES = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
-];
-
-function ordinal(n) {
-  const s = ["th", "st", "nd", "rd"];
-  const v = n % 100;
-  return `${n}${s[(v - 20) % 10] || s[v] || s[0]}`;
-}
-
-// "July 24th" / "7/24" / "2026-07-24" → "July 24th, 2026".
-// Missing year resolves to the next occurrence of that month+day.
-// Returns null when the text isn't a parseable date (e.g. "sometime this week").
-function formatSessionDate(raw) {
-  if (!raw) return null;
-  const text = String(raw).trim();
-  let year = null, month = null, day = null;
-
-  const iso   = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(text);
-  const slash = /^(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/.exec(text);
-  const named = /([A-Za-z]{3,9})\.?\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s*(\d{4}))?/.exec(text);
-
-  if (iso) {
-    year = +iso[1]; month = +iso[2]; day = +iso[3];
-  } else if (slash) {
-    month = +slash[1]; day = +slash[2];
-    year = slash[3] ? (+slash[3] < 100 ? 2000 + +slash[3] : +slash[3]) : null;
-  } else if (named) {
-    const idx = MONTH_NAMES.findIndex(m => m.toLowerCase().startsWith(named[1].toLowerCase()));
-    if (idx >= 0) {
-      month = idx + 1; day = +named[2];
-      year = named[3] ? +named[3] : null;
-    }
-  }
-
-  if (!month || !day || month < 1 || month > 12 || day < 1 || day > 31) return null;
-
-  if (year == null) {
-    const now = new Date();
-    year = now.getFullYear();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    if (new Date(year, month - 1, day) < today) year += 1;
-  }
-  return `${MONTH_NAMES[month - 1]} ${ordinal(day)}, ${year}`;
-}
-
 // ── PRICING (mirrors lib/pricingCatalog.ts) ──────────────────────────────────
 // Graduation is two individual packages, not an hourly rate: the 30-minute
 // mini and the 60-minute session. The contract preview fills the package the
@@ -126,12 +78,28 @@ const SERVICE_LABELS = {
   "elopement":       "Elopement & Courthouse Ceremony",
   "maternity":       "Maternity Session",
   "graduation":      "Graduation Session",
+  "senior-portraits": "Senior Portraits",
 };
 
+// Services with no rate-card price: the total is whatever the thread settled.
+const HAND_QUOTED_SERVICES = ["senior-portraits", "other"];
+const HAND_QUOTE_HINT = "This session is quoted per booking and has no rate-card price. Enter the agreed total.";
+const TEAM_SENIOR_RE = /\bsenior(?: year)? (?:photos?|photoshoot|portraits?|pictures?|pics|session|shoot)\b|\b(?:high school|college) senior\b/;
+const TEAM_RE = /\b(?:team|teammates|players|athletes?|roster|varsity|soccer|football|basketball|baseball|softball|volleyball|lacrosse|swim(?:ming)?|tennis|cheer|wrestling|hockey|water polo)\b/;
+const GRADUATION_RE = /\bgrad(?:uat\w*|s)?\b|\bcap (?:and|&|n) gown\b|\bcommencement\b/;
+
 function detectServiceType(inq) {
-  // Email-detected type wins if it's one we price
+  // The type the thread names wins: one the rate card prices, senior
+  // portraits, or a type nobody prices ("event", "other", the server's
+  // "unknown"), which is never turned into a graduation.
   const fromEmail = String(inq._serviceType || "").toLowerCase();
-  if (SERVICE_FLAT_RATES[fromEmail] != null || fromEmail === "graduation") return fromEmail;
+  if (SERVICE_FLAT_RATES[fromEmail] != null || fromEmail === "graduation" || fromEmail === "senior-portraits") return fromEmail;
+  if (fromEmail === "event" || fromEmail === "other" || fromEmail === "unknown") return "other";
+
+  // The client's own words decide before the form's dropdown, whose only
+  // portrait option is "Graduation Portrait".
+  const message = String(inq.message || "").toLowerCase();
+  if (TEAM_SENIOR_RE.test(message) && TEAM_RE.test(message) && !GRADUATION_RE.test(message)) return "senior-portraits";
 
   const t = `${inq.session_type || ""} ${inq.message || ""}`.toLowerCase().replace(/-/g, " ");
   if (t.includes("elope") || t.includes("courthouse")) return "elopement";
@@ -142,7 +110,9 @@ function detectServiceType(inq) {
   if (t.includes("couple") || t.includes("anniversary")) return "couples";
   if (t.includes("extended family")) return "extended-family";
   if (t.includes("family"))          return "family";
-  return "graduation";
+  // Graduation needs a sign of one: a school on file or graduation wording.
+  // Anything else is an unknown session, shown unpriced for a person.
+  return inq.school || GRADUATION_RE.test(t) ? "graduation" : "other";
 }
 
 // ── DURATION PARSER (mirrors lib/pricing.ts detectGraduationDurationMinutes) ──
@@ -305,6 +275,9 @@ function calcPrice(inquiry) {
 
   if (SERVICE_FLAT_RATES[service] != null) {
     sessionBase = SERVICE_FLAT_RATES[service];
+  } else if (HAND_QUOTED_SERVICES.includes(service)) {
+    sessionBase = null;
+    reviewHint = HAND_QUOTE_HINT;
   } else {
     if (people <= 1) {
       sessionBase = individualGradPrice(inquiry);

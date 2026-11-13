@@ -98,6 +98,45 @@ function invoiceTimeSummary(draft) {
   return "";
 }
 
+// A price the server would not confirm is not offered for filling. The field
+// starts empty and the rate-card and thread figures sit beside it for
+// reference, so a fill can only write a price the reviewer typed. An older
+// API sends no baseConfirmed and keeps the filled-in base.
+function basePriceUnconfirmed(pricing) {
+  return pricing.baseConfirmed === false;
+}
+
+function previewBaseRow(pricing) {
+  if (!basePriceUnconfirmed(pricing)) return previewRow("Base price", previewInput("baseCents", fmtCents(pricing.baseCents)));
+  const rateCard = pricing.baseCents > 0 ? previewSub(`Rate card: ${fmtCents(pricing.baseCents)}`) : "";
+  const thread = Number.isInteger(pricing.agreedTotalCents) ? previewSub(`Mentioned in email: ${fmtCents(pricing.agreedTotalCents)}`) : "";
+  const input = previewInput("baseCents", "", 'placeholder="enter the agreed price" aria-label="Base price, not confirmed"');
+  return previewRow("Base price", `<span class="sxs-field-val">${input}${previewSub("Not confirmed: nothing is filled until you enter it")}${rateCard}${thread}</span>`);
+}
+
+// The session date with how it stands. A date the client asked for is shown,
+// not hidden, and can be accepted by hand as the due date; the label never
+// calls a request confirmed. An older API sends no dateStatus.
+function previewDateRow(session, dueDate) {
+  const label = DATE_STATUS_LABELS[session.dateStatus] ?? DATE_LABELS[session.dateConfidence] ?? "status not known";
+  const shown = session.date ? `${formatSessionDate(session.date) || session.date}` : "—";
+  const canAccept = session.date && session.dateStatus && session.dateStatus !== "confirmed" && !dueDate;
+  const accept = canAccept
+    ? `<button type="button" id="sxs-accept-date" class="sxs-link-btn">The client agreed to this date: use it as the due date</button>`
+    : "";
+  return previewRow("Session date", `<span class="sxs-field-val">${esc(shown)}${previewSub(label)}${accept}</span>`);
+}
+
+// Manual acceptance of a requested date: the reviewer puts it in the due-date
+// field, which stays editable. Nothing is sent anywhere.
+function acceptSessionDateAsDue(draft, root = document) {
+  const input = root.querySelector('[data-invoice-key="dueDate"]');
+  if (!input || !draft.session.date) return;
+  input.value = draft.session.date;
+  const button = root.querySelector("#sxs-accept-date");
+  if (button) { button.textContent = "Due date set from the session date (accepted by you)"; button.disabled = true; }
+}
+
 function buildInvoicePreview(draft) {
   const { client, session, pricing } = draft;
   const statusText = draft.status === "ready" ? "✓ Ready to fill" : "⚠ Needs review";
@@ -110,7 +149,7 @@ function buildInvoicePreview(draft) {
     previewRow("Item", previewInput("itemName", session.itemName)),
     previewRow("Description", previewInput("description", session.description)),
     previewRow("Quantity", previewValue(String(session.quantity))),
-    previewRow("Base price", previewInput("baseCents", fmtCents(pricing.baseCents))),
+    previewBaseRow(pricing),
     previewPackageRow(session),
     previewRow("Location", previewInput("location", session.location ?? "")),
     previewRow("Location source", previewValue(LOCATION_SOURCE_LABELS[session.locationSource] ?? session.locationSource)),
@@ -118,7 +157,7 @@ function buildInvoicePreview(draft) {
     previewRow("Travel", previewValue(travelSource)),
     previewRow("Travel fee", previewInput("travelCents", previewTravelAmount(pricing.travel), 'placeholder="enter a fee"')),
     previewRow("Total", `<span class="sxs-field-val" id="sxs-invoice-total">${esc(previewTotal(draft))}</span>`),
-    previewRow("Session date", previewValue(`${session.date ?? "—"} (${DATE_LABELS[session.dateConfidence]})`)),
+    previewDateRow(session, draft.dueDate),
     previewTimeRows(session),
     previewRow("Due date", previewInput("dueDate", draft.dueDate ?? "", 'placeholder="left unchanged"')),
     previewRow("Note", previewTextarea("note", draft.note)),
@@ -172,7 +211,9 @@ function reviewedTime(session, location) {
 /** The draft as edited in the panel. */
 function readInvoicePreview(draft, root = document) {
   const text = key => readPreviewField(root, key) ?? "";
-  const baseCents = parseCents(text("baseCents")) ?? draft.pricing.baseCents;
+  // A typed price always wins. With none typed, a confirmed base stands; an
+  // unconfirmed one is no price at all (null), and the fill leaves it alone.
+  const baseCents = parseCents(text("baseCents")) ?? (basePriceUnconfirmed(draft.pricing) ? null : draft.pricing.baseCents);
   const travel = reviewedTravel(draft.pricing.travel, parseCents(text("travelCents")), text("location"));
   const dueDate = /^\d{4}-\d{2}-\d{2}$/.test(text("dueDate")) ? text("dueDate") : null;
   return {
@@ -185,7 +226,7 @@ function readInvoicePreview(draft, root = document) {
       ...draft.pricing,
       baseCents,
       travel,
-      totalCents: travel.kind === "unknown" ? null : baseCents + (travel.amountCents ?? 0),
+      totalCents: baseCents === null || travel.kind === "unknown" ? null : baseCents + (travel.amountCents ?? 0),
     },
     note: text("note") || draft.note,
     dueDate,

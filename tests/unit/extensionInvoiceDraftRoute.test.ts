@@ -42,7 +42,7 @@ const post = (body: unknown, secret: string | null = SECRET) => route.POST(new N
 }));
 
 const facts = (over: Partial<SessionFacts>): SessionFacts => ({
-  ...NO_FACTS, source: "email", confidence: "high", email_status: "read",
+  ...NO_FACTS, source: "email", date_status: "confirmed", total_status: "confirmed", email_status: "read",
   date: "2027-04-24", location: "Palace of Fine Arts", time: "golden hour", time_status: "proposed", ...over,
 });
 
@@ -110,7 +110,7 @@ describe("invoice-draft", () => {
   });
 
   it("leaves the time unresolved, with the price intact, when the date is only tentative", async () => {
-    mocks.facts = facts({ confidence: "medium" });
+    mocks.facts = facts({ date_status: "proposed" });
     const { draft } = await (await post({ inquiry_id: 9001 })).json();
     expect(draft.status).toBe("review");
     expect(draft.session.time).toBeNull();

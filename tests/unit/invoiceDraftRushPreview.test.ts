@@ -14,7 +14,7 @@ const anthony: InvoiceInquiry = {
   message: "Grad photos for me and my sister, both graduating from SJSU.", date_in_mind: "May 16",
 };
 
-const email = (facts: Partial<SessionFacts>): SessionFacts => ({ ...NO_FACTS, source: "email", confidence: "high", ...facts });
+const email = (facts: Partial<SessionFacts>): SessionFacts => ({ ...NO_FACTS, source: "email", date_status: "confirmed", total_status: "confirmed", ...facts });
 describe("Rush preview on a proposal (synthetic client)", () => {
   const client: InvoiceInquiry = {
     id: 913, name: "Example Client", email: "client@example.test",

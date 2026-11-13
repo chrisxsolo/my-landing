@@ -205,7 +205,7 @@ const EIGHT = String.raw`(?:8|eight)`;
 const PERSON_NOUN = String.raw`(?:people|persons|seniors|senior athletes|athletes|players|students|participants|graduates|grads|guys|girls|kids|of us|of them|team members|teammates)`;
 
 /** Phrases that tie sports or athlete context to the portrait session. */
-const SPORTS_CONTEXT = [
+export const SPORTS_CONTEXT = [
   /\bsports?[- ](?:senior|team)[- ](?:portrait|portraits|photo|photos|picture|pictures|shoot|session|sessions)\b/i,
   /\bsenior[- ]athletes?\b/i,
   /\bathletes?[- ](?:portrait|portraits|photo|photos|picture|pictures|shoot|session)\b/i,
@@ -226,7 +226,7 @@ const PRICING_INTENT = /\b(?:price|prices|pricing|cost|costs|rate|rates|how much
  * carry: anything that mentions graduating keeps the graduation rate card, and
  * a headshot event for a club, class, team or company stays a manual quote.
  */
-const VETO = [
+export const VETO = [
   /\bgraduat(?:e|es|ed|ing|ion)\b/i,
   /\bgrad (?:photo|photos|photoshoot|shoot|session|portraits|pictures|pics)\b/i,
   /\bcap and gown\b/i,
@@ -274,7 +274,7 @@ function headcountsIn(text: string): number[] {
  * "8+", ranges, approximations, dates, grades, jersey numbers and "8x10" are
  * not headcounts and never resolve.
  */
-function exactEight(people: string | number | null | undefined, texts: string[]): boolean {
+export function exactEight(people: string | number | null | undefined, texts: string[]): boolean {
   const joined = texts.join("\n");
   if (NOT_EXACT_EIGHT.some((pattern) => pattern.test(joined))) return false;
 
@@ -291,7 +291,7 @@ function exactEight(people: string | number | null | undefined, texts: string[])
  * Absent counts are fine (the profile supplies them); a different count, or
  * open-ended coverage, is not something to answer with a fixed offer.
  */
-function contradictsDeliverables(text: string): boolean {
+export function contradictsDeliverables(text: string): boolean {
   const approved = sportsTeamDeliverables();
   const perPerson = text.match(/\b(\d{1,3})\s+(?:edited\s+)?(?:images|photos|pictures|portraits)\s+(?:per|for each|each|a)\s+(?:person|player|athlete|senior|student|head|participant)\b/i)
     ?? text.match(/\b(?:everyone|everybody|each (?:person|athlete|player|senior|student|one)|every (?:person|athlete|player|senior|student)|per person)\s+(?:gets?|receives?|needs?|wants?|should get)\s+(\d{1,3})\s+(?:edited\s+)?(?:images|photos|pictures|portraits)\b/i);
@@ -310,7 +310,7 @@ function contradictsDeliverables(text: string): boolean {
  * or without the verified travel fee, or either per-person figure), so
  * nothing would be replaced by applying it again.
  */
-function matchesOffer(amounts: number[], verifiedTravelFee: number | null): boolean {
+export function matchesOffer(amounts: number[], verifiedTravelFee: number | null): boolean {
   const known = new Set<number>(sportsTeamOfferOptions().flatMap((o) => [
     o.total, o.perPerson, ...(verifiedTravelFee ? [o.total + verifiedTravelFee] : []),
   ]));

@@ -14,7 +14,7 @@ const avery: InvoiceInquiry = {
   message: "Hi! I'd love grad photos this spring.", date_in_mind: "April 24",
 };
 
-const email = (facts: Partial<SessionFacts>): SessionFacts => ({ ...NO_FACTS, source: "email", confidence: "high", email_status: "read", ...facts });
+const email = (facts: Partial<SessionFacts>): SessionFacts => ({ ...NO_FACTS, source: "email", date_status: "confirmed", total_status: "confirmed", email_status: "read", ...facts });
 const selected = (minutes: number): PackageEvidence => ({ status: "selected", minutes, source_message: 3 });
 const inSf = { location: "Palace of Fine Arts", date: "2027-04-24" };
 

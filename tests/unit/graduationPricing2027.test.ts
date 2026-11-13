@@ -184,7 +184,7 @@ describe("existing commitments keep their price", () => {
   it("14. an explicitly agreed legacy amount wins on the contract, the invoice, the confirmation and the balance", () => {
     // Quoted at the old $350 hour plus $75 travel.
     expect(resolveContractPricing(sjsuGrad, { ...NO_PRICE, agreedTotal: 425, includesTravel: true })).toMatchObject({ status: "ok", total: 425 });
-    const facts: SessionFacts = { ...NO_FACTS, source: "email", confidence: "high", location: "SJSU campus", total_fee: 425, total_kind: "agreed_total", includes_travel: true };
+    const facts: SessionFacts = { ...NO_FACTS, source: "email", total_status: "confirmed", location: "SJSU campus", total_fee: 425, total_kind: "agreed_total", includes_travel: true };
     const legacyInquiry: InvoiceInquiry = { id: 7, name: "Legacy Grad", email: "legacy@example.com", school: "SJSU", location: null, people: "1", session_type: "Graduation", message: "", date_in_mind: null };
     const invoice = buildInvoiceDraft(legacyInquiry, facts);
     expect(invoice.status).toBe("ready");

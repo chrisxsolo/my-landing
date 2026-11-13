@@ -11,6 +11,12 @@ const cents = z.number().int().min(0).max(MAX_MONEY_CENTS);
 
 export const INVOICE_LOCATION_SOURCES = ["email", "inquiry", "school", "unknown"] as const;
 export const INVOICE_DATE_CONFIDENCES = ["confirmed", "tentative", "unknown"] as const;
+/**
+ * Where the session date stands. "proposed" is a date one side asked for and
+ * the other has not accepted; "inquiry" is the form's date with nothing in
+ * the thread. Only "confirmed" may set a due date.
+ */
+export const INVOICE_DATE_STATUSES = ["confirmed", "proposed", "conflicting", "inquiry", "unknown"] as const;
 export const INVOICE_TRAVEL_KINDS = ["verified", "included", "unknown", "none"] as const;
 /** Where the package on the session line came from; "default" is the 60-minute Graduation Session. */
 export const INVOICE_PACKAGE_SOURCES = ["email", "inquiry", "default", "catalog", "unresolved"] as const;
@@ -53,8 +59,10 @@ export const invoiceDraftSchema = z.object({
   warnings: z.array(z.string().min(1)),
   client: z.object({
     inquiryId: z.number().int().positive(),
-    name: z.string().min(1),
-    email: z.string().email(),
+    // A blank name or an unusable address is a review reason (build.ts
+    // clientProblems), never a failed response: the reviewer has to see it.
+    name: z.string(),
+    email: z.string(),
   }),
   session: z.object({
     serviceKey: z.string().min(1),
@@ -67,6 +75,7 @@ export const invoiceDraftSchema = z.object({
     locationSource: z.enum(INVOICE_LOCATION_SOURCES),
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
     dateConfidence: z.enum(INVOICE_DATE_CONFIDENCES),
+    dateStatus: z.enum(INVOICE_DATE_STATUSES),
     /** The resolved time as shown ("6:30–7:30 pm"); null while unresolved. Never a bare "golden hour". */
     time: z.string().nullable(),
     timeDetail: invoiceTimeDetailSchema,
@@ -91,6 +100,13 @@ export const invoiceDraftSchema = z.object({
     }),
     agreedTotalCents: cents.nullable(),
     totalCents: cents.nullable(),
+    /**
+     * False when the price itself is unsettled (no rate-card price, an
+     * undecided package, a thread figure that disagrees with the rate card).
+     * The panel then leaves the price empty: baseCents is a reference
+     * figure for the reviewer, never something to fill.
+     */
+    baseConfirmed: z.boolean(),
   }),
   note: z.string(),
   dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
@@ -123,6 +139,12 @@ export const invoiceDraftSchema = z.object({
   if (pricing.totalCents !== null && pricing.totalCents !== pricing.baseCents + (pricing.travel.amountCents ?? 0)) {
     ctx.addIssue({ code: "custom", message: "total equals base plus travel" });
   }
+  if (pricing.totalCents !== null && !pricing.baseConfirmed) {
+    ctx.addIssue({ code: "custom", message: "a total is only given for a confirmed base" });
+  }
+  if (draft.dueDate !== null && draft.session.dateStatus !== "confirmed") {
+    ctx.addIssue({ code: "custom", message: "a due date needs a confirmed session date" });
+  }
 });
 
 export type InvoiceDraft = z.infer<typeof invoiceDraftSchema>;
@@ -139,6 +161,8 @@ export interface InvoiceInquiry {
   session_type: string | null;
   message: string | null;
   date_in_mind: string | null;
+  /** When the form was submitted; the reference for a yearless date and the start of the booking's thread. */
+  created_at?: string | null;
 }
 
 export const TOTAL_KINDS = ["agreed_total", "quote", "unclear"] as const;
@@ -190,10 +214,40 @@ export const NO_PACKAGE: PackageEvidence = { status: "none", minutes: null, sour
 export const TIME_STATUSES = ["confirmed", "proposed", "conflicting"] as const;
 export type TimeStatus = (typeof TIME_STATUSES)[number];
 
+/**
+ * Where one fact stands in the thread, judged on its own evidence:
+ * "confirmed" was settled, "proposed" was asked for or offered and not yet
+ * accepted, "conflicting" still has more than one candidate on the table.
+ * A tentative date never makes a settled fee tentative, or the reverse.
+ */
+export const FACT_STATUSES = TIME_STATUSES;
+export type FactStatus = TimeStatus;
+
+/**
+ * How much of the booking's thread the facts rest on. "partial" means some
+ * messages could not be fetched; "unparsed" means the thread was read but the
+ * model's answer was unusable, so the facts are the inquiry form's.
+ */
+export type EmailStatus = "read" | "partial" | "unparsed" | "none" | "unavailable";
+
+/** Counts only: nothing here identifies a message or quotes one. */
+export interface EmailCoverage {
+  /** Messages in the transcript the model read. */
+  messages: number;
+  /** Messages Gmail listed that could not be fetched. */
+  failed: number;
+  /** Older messages left out because the transcript is bounded. */
+  omitted: number;
+  /** Messages whose body was cut at the length limit. */
+  truncated: number;
+}
+
 /** What the Gmail thread (or, failing that, the inquiry form) said. */
 export interface SessionFacts {
   date: string | null;
   readable: string | null;
+  /** Whether `date` was agreed, only asked for, or still contested (null = no date from the thread). */
+  date_status: FactStatus | null;
   /** A clock time or range, or the client's own phrase ("golden hour"). */
   time: string | null;
   /** Whether `time` was agreed, only proposed, or still contested (null = not said). */
@@ -206,20 +260,41 @@ export interface SessionFacts {
   total_fee: number | null;
   /** Whether total_fee was called the total / all-in price, a quote, or something unclear. */
   total_kind: TotalKind | null;
+  /** Whether total_fee was settled as the price, only quoted or asked about, or contested (null = no figure). */
+  total_status: FactStatus | null;
   /** Whether the thread said the total includes travel (null = not said). */
   includes_travel: boolean | null;
+  /** How many people are being photographed, when the emails say (null = not said). */
+  people: number | null;
+  /** What the photographer committed to deliver, in a few words (null = not said). */
+  deliverables: string | null;
+  /**
+   * Whether the booking is in scope for the eight-person sports senior
+   * offer. Decided in code from the client's own words
+   * (lib/ai/sportsTeamPortraitPricing.ts), never by the model.
+   */
+  sports_team_offer: boolean;
   /** The Rush preview add-on, from the form and the thread together. */
   rush_preview: RushPreviewEvidence;
+  /**
+   * The model's overall impression. Shown by older extension builds only:
+   * no decision reads it, because one tentative field must not discount
+   * another that was settled. See date_status, time_status, total_status.
+   */
   confidence: "high" | "medium" | "low";
   source: "email" | "inquiry" | "none";
   /** Whether the Gmail thread was read: "unavailable" means Gmail is not connected. */
-  email_status: "read" | "none" | "unavailable";
+  email_status: EmailStatus;
+  email_coverage: EmailCoverage | null;
+  /** Fingerprint of the evidence these facts came from; changes when a message arrives. */
+  revision: string | null;
 }
 
 export const NO_FACTS: SessionFacts = {
-  date: null, readable: null, time: null, time_status: null, package: NO_PACKAGE, location: null, session_type: null,
-  total_fee: null, total_kind: null, includes_travel: null, rush_preview: NO_RUSH_PREVIEW,
-  confidence: "low", source: "none", email_status: "none",
+  date: null, readable: null, date_status: null, time: null, time_status: null, package: NO_PACKAGE, location: null, session_type: null,
+  total_fee: null, total_kind: null, total_status: null, includes_travel: null, people: null, deliverables: null,
+  sports_team_offer: false, rush_preview: NO_RUSH_PREVIEW,
+  confidence: "low", source: "none", email_status: "none", email_coverage: null, revision: null,
 };
 
 export const invoiceDraftRequestSchema = z.object({

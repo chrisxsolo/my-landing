@@ -67,7 +67,7 @@ beforeEach(() => {
   mocks.claudeUserContent = "";
   mocks.tokens = { access_token: "tok", refresh_token: null, expiry_date: 0, email: "studio@example.test" };
   mocks.inquiry = {
-    name: "Example Client", email: "client@example.test", date_in_mind: "November 20",
+    id: 7001, name: "Example Client", email: "client@example.test", date_in_mind: "November 20",
     message: "— Session request —\nPackage: Proposal Session\nLocation: San Francisco", session_type: "Couples Session", school: null, people: "2",
   };
   mocks.gmailMessages = [
@@ -76,7 +76,7 @@ beforeEach(() => {
     { id: "m3", from: CLIENT, date: "2026-11-05T17:00:00Z", body: "Please add the Rush Preview to my booking.\n\nOn Nov 2, 2026 Studio wrote:\n> The proposal session is $750 QUOTED_OLD_LINE" },
   ];
   mocks.claudeText = JSON.stringify({
-    date: "2026-11-20", readable: "November 20th, 2026", time: null, location: "San Francisco", session_type: "proposal",
+    date: "2026-11-20", date_status: "confirmed", readable: "November 20th, 2026", time: null, location: "San Francisco", session_type: "proposal",
     total_fee: 750, total_kind: "quote", includes_travel: null, total_fee_message: 2,
     rush_preview: { status: "selected", source_message: 3, evidence: "Please add the Rush Preview", in_total: false },
     confidence: "high",

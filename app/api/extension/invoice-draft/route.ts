@@ -3,10 +3,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
-import { sessionFactsForInquiry } from "@/lib/extension/sessionFacts";
-import { buildInvoiceDraft, validateInvoiceDraft } from "@/lib/invoiceDraft/build";
-import { parseSessionTime } from "@/lib/invoiceDraft/sessionTime";
-import { resolveSunset } from "@/lib/invoiceDraft/sunset";
+import { BOOKING_INQUIRY_COLUMNS, INQUIRIES_TABLE, resolveBooking } from "@/lib/extension/bookingResolution";
 import { invoiceDraftRequestSchema, type InvoiceInquiry } from "@/lib/invoiceDraft/types";
 
 const EXTENSION_SECRET = process.env.CRON_SECRET ?? "";
@@ -15,8 +12,6 @@ const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "x-extension-secret, content-type",
 };
-
-const INQUIRY_COLUMNS = "id, name, email, school, location, people, session_type, message, date_in_mind";
 
 export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: { ...CORS, "Access-Control-Allow-Methods": "POST, OPTIONS" } });
@@ -33,8 +28,8 @@ export async function POST(req: NextRequest) {
 
   const supabase = createSupabaseServerClient();
   const { data: inq, error } = await supabase
-    .from("inquiries")
-    .select(INQUIRY_COLUMNS)
+    .from(INQUIRIES_TABLE)
+    .select(BOOKING_INQUIRY_COLUMNS)
     .eq("id", body.data.inquiry_id)
     .maybeSingle<InvoiceInquiry>();
 
@@ -44,25 +39,16 @@ export async function POST(req: NextRequest) {
   }
   if (!inq) return NextResponse.json({ error: "Inquiry not found" }, { status: 404, headers: CORS });
 
-  let facts;
+  let resolved;
   try {
-    facts = await sessionFactsForInquiry(inq);
+    resolved = await resolveBooking(supabase, inq);
   } catch (err) {
     console.error("Extension invoice-draft extraction error:", err);
     return NextResponse.json({ error: "Could not read the email thread" }, { status: 502, headers: CORS });
   }
-
-  // Sunset is looked up only when the thread's time needs it, and only by
-  // date: nothing about the client leaves this server. A failed lookup never
-  // fails the draft; the time is left unresolved for the reviewer instead.
-  const timeKind = parseSessionTime(facts.time).kind;
-  const needsSunset = timeKind === "golden_hour" || timeKind === "clock";
-  const sunset = needsSunset ? await resolveSunset(facts.date) : null;
-
-  const checked = validateInvoiceDraft(buildInvoiceDraft(inq, facts, { sunset }));
-  if (!checked.ok) {
-    console.error("Extension invoice-draft produced an invalid draft:", checked.error);
-    return NextResponse.json({ error: `Invoice draft failed validation (${checked.error})` }, { status: 500, headers: CORS });
+  if (!resolved.ok) {
+    console.error("Extension invoice-draft produced an invalid draft:", resolved.error);
+    return NextResponse.json({ error: `Invoice draft failed validation (${resolved.error})` }, { status: 500, headers: CORS });
   }
-  return NextResponse.json({ draft: checked.draft, facts }, { headers: CORS });
+  return NextResponse.json({ draft: resolved.draft, facts: resolved.facts }, { headers: CORS });
 }

@@ -20,12 +20,18 @@ function buildContractPreview(inq, price) {
   const note = price.priceNote
     ? `<div class="sxs-field-row sxs-price-hint sxs-price-note">${esc(price.priceNote)}</div>`
     : "";
-  return hint + note + rows.map(([k, v]) => `
+  // A date that is requested, undecided or only on the form is filled in for review and says so.
+  const dateText = contractDateNote(inq);
+  const dateNote = dateText ? `<div class="sxs-field-row sxs-warning sxs-date-note">${esc(dateText)}</div>` : "";
+  const confirm = contractNeedsConfirmation(inq, price)
+    ? `<label class="sxs-confirm-row"><input type="checkbox" id="sxs-contract-confirm" /> I've checked the flagged items</label>`
+    : "";
+  return hint + note + dateNote + rows.map(([k, v]) => `
     <div class="sxs-field-row">
       <span class="sxs-field-label">[${k}]</span>
       <input class="sxs-field-input" data-key="${k}" value="${esc(v)}" spellcheck="false" />
     </div>
-  `).join("");
+  `).join("") + confirm;
 }
 
 function parseMoney(v) {
@@ -62,8 +68,19 @@ function readContractPreview() {
   return vals;
 }
 
-function fillContract(inq, price) {
-  // Prefer values from the (possibly user-edited) preview inputs
+const CONTRACT_TOKEN_RE = /\[(?:SESSION_(?:TYPE|DATE|TIME|LOCATION)|TOTAL_FEE|RETAINER|REMAINING|FINAL_DATE)\]|portrait\s+session\s+of\s/i;
+
+// The contract body, not whichever editable box comes first: the one that
+// holds the placeholders (or the "portrait session of …" line), outside this
+// panel. With no such box the first editable area is used, as before.
+function findContractEditor() {
+  const candidates = [...document.querySelectorAll('[contenteditable="true"]')]
+    .filter(el => typeof el.textContent === "string" && !(el.closest && el.closest("#sxs-panel")));
+  return candidates.find(el => CONTRACT_TOKEN_RE.test(el.textContent)) || candidates[0] || document.querySelector('[contenteditable="true"]');
+}
+
+// What each placeholder becomes: the (possibly edited) preview value first.
+function contractReplacements(inq, price) {
   const edited = readContractPreview();
   // An edited figure, else the calculated one, else the placeholder stays
   // put (a group the rate card does not price has no calculated figure).
@@ -88,8 +105,12 @@ function fillContract(inq, price) {
     { pattern: /\[REMAINING\]/g,        value: money(edited.REMAINING, price.remaining, "[REMAINING]") },
     { pattern: /\[FINAL_DATE\]/g,       value: edited.FINAL_DATE || sessionDate },
   ];
+  return { replacements, sessionType };
+}
 
-  const editableArea = document.querySelector('[contenteditable="true"]');
+function fillContract(inq, price) {
+  const { replacements, sessionType } = contractReplacements(inq, price);
+  const editableArea = findContractEditor();
   if (!editableArea) { showFillStatus(0); return; }
 
   let filled = 0;

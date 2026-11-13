@@ -47,7 +47,7 @@ function clearInvoiceSelection() {
   return storageSet(SELECTION_KEY, null);
 }
 
-/** Totals the server has confirmed, by inquiry id: { status, totalCents }. */
+/** The server's last draft total per inquiry id: { status, totalCents }. A list hint only, never the sent invoice's amount. */
 async function loadDraftTotals() {
   const totals = await storageGet(DRAFT_TOTALS_KEY);
   return totals && typeof totals === "object" ? totals : {};
@@ -63,7 +63,8 @@ async function rememberDraftTotal(inquiryId, draft) {
 /** What an inquiry row says about price before and after the server has priced it. */
 function describeListPrice(cached) {
   if (!cached) return "Open to confirm pricing";
-  if (cached.status === "ready" && Number.isInteger(cached.totalCents)) return `${fmtCents(cached.totalCents)} confirmed`;
+  // The server's last draft, not what was edited or sent: a reminder, never the invoice's amount.
+  if (cached.status === "ready" && Number.isInteger(cached.totalCents)) return `${fmtCents(cached.totalCents)} in the last draft`;
   return "Pricing needs review";
 }
 
