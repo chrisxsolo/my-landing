@@ -66,9 +66,12 @@ jobs:
       - name: Install psql (used by the test-DB reset script)
         run: sudo apt-get update && sudo apt-get install -y postgresql-client
 
+      # Pinned to the CLI used locally. `latest` moved to 3.x, which rejects the
+      # [inbucket] section of supabase/config.toml, while 2.x rejects its 3.x
+      # replacement ([local_smtp]). Upgrade both together, config included.
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.105.0
 
       - name: Start Supabase (bare — schema is rebuilt manually below)
         run: |
