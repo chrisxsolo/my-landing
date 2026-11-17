@@ -1,6 +1,20 @@
 // SoloXSnaps → PixiSet Autofill: DOM helpers shared by the contract and
 // invoice fillers.
 
+const ORPHANED_NOTE = "The extension was reloaded or updated, and this tab is still running the old copy. Refresh this page, then open Autofill again.";
+
+// True when this tab's scripts have outlived their extension: after a reload
+// or an update the browser keeps the old scripts running, cut off from it.
+function extensionOrphaned() {
+  return typeof chrome !== "undefined" && Boolean(chrome.runtime) && !chrome.runtime.id;
+}
+
+// The version of the scripts actually running in this tab, or "" when unknown.
+function runningVersion() {
+  try { return extensionOrphaned() || typeof chrome === "undefined" || !chrome.runtime ? "" : `v${chrome.runtime.getManifest().version}`; }
+  catch { return ""; }
+}
+
 function setNativeValue(el, value) {
   const nativeSetter = Object.getOwnPropertyDescriptor(
     el.tagName === "INPUT" ? window.HTMLInputElement.prototype : window.HTMLTextAreaElement.prototype,

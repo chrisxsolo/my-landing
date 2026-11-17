@@ -19,7 +19,7 @@ const PROPOSAL_TEXT = "Proposal photography session. Minimum of 50 edited images
 
 const INQUIRIES = [
   { id: 1, name: "Alex Example", email: "alex@example.test", created_at: "2026-11-01T10:00:00Z", session_type: "Couples Session", people: "2", message: "" },
-  { id: 2, name: "Blake Example", email: "blake@example.test", created_at: "2026-11-02T10:00:00Z", session_type: "Couples Session", people: "2", message: "" },
+  { id: 2, name: "Blake Example", email: "blake@example.test", created_at: "2026-11-02T10:00:00Z", session_type: "Graduation Portrait", school: "USF", people: "1", message: "What packages do you offer?" },
 ];
 
 const resolved = (serviceKey = "proposal") => ({
@@ -33,10 +33,10 @@ const services = (over: Record<string, unknown> = {}) => ({
 
 type Reply = Record<string, unknown> | Error | Promise<Record<string, unknown>>;
 
-function openPage(editorHtml: string, replies: Record<number, Reply>) {
+function openPage(editorHtml: string, replies: Record<number, Reply>, chromeExtras: Record<string, unknown> = {}) {
   const dom = new JSDOM(`<body>${editorHtml}</body>`, { url: "https://studio.pixieset.com/contracts/123", runScripts: "outside-only" });
   const win = dom.window as unknown as Record<string, unknown> & { document: Document };
-  win.chrome = { storage: { local: { get: (key: string, cb: (items: object) => void) => cb({}), set: (_: object, cb?: () => void) => cb?.() } } };
+  win.chrome = { ...chromeExtras, storage: { local: { get: (key: string, cb: (items: object) => void) => cb({}), set: (_: object, cb?: () => void) => cb?.() } } };
   win.fetch = async (url: string, options: { body?: string } = {}) => {
     const json = (body: unknown, ok = true, status = 200) => ({ ok, status, json: async () => body });
     if (String(url).endsWith("/api/extension/inquiries")) return json(INQUIRIES);
@@ -58,6 +58,7 @@ function openPage(editorHtml: string, replies: Record<number, Reply>) {
     confirm: () => $("#sxs-services-confirm") as unknown as HTMLInputElement,
     notes: () => $("#sxs-services-notes")?.textContent ?? "",
     status: () => $("#sxs-fill-status")?.textContent ?? "",
+    show() { vm.runInContext("showPanel()", context); },
     async start() { vm.runInContext("showPanel()", context); await settle(() => doc.querySelectorAll(".sxs-inq-row").length === INQUIRIES.length); },
     click(id: number) { (doc.querySelector(`.sxs-inq-row[data-id="${id}"]`) as HTMLElement).click(); },
     async choose(id: number) { page.click(id); await settle(() => page.box()); },
@@ -134,6 +135,56 @@ describe("old responses and failed lookups", () => {
     await page.choose(2);
     expect(page.box().value).toBe("");
     expect(page.notes()).toMatch(/No description of services was suggested/);
+  });
+
+  it("treats a resolved draft it cannot read as an incompatibility, never as a reason to price in the browser", async () => {
+    const page = openPage(TEMPLATE, { 2: { resolved: { session: "nope" }, package: { status: "selected", minutes: 60 }, total_fee: 425, total_kind: "quote", date: "2026-12-19", time: "2:00 PM" } });
+    await page.start();
+    await page.choose(2);
+    expect(page.$<HTMLInputElement>('input[data-key="TOTAL_FEE"]')!.value).toBe("");
+    expect(page.$("#sxs-date-status")!.textContent).toMatch(/could not be read by this version/);
+    expect(page.$("#sxs-preview-rows")!.textContent).toMatch(/Reload the extension/);
+    expect(page.$("#sxs-preview-rows")!.textContent).not.toMatch(/No package chosen/);
+    expect(page.fillButton().disabled).toBe(true);
+    page.tick(page.$<HTMLInputElement>("#sxs-contract-confirm")!);
+    page.fill();
+    expect(page.$("#contract p")!.textContent).toContain("[TOTAL_FEE]");
+  });
+
+  it("treats a null resolved as an older server, and stops a tab orphaned mid-session at its next request", async () => {
+    const extras: Record<string, unknown> = { runtime: { id: "abc", getManifest: () => ({ version: "1.0.0" }) } };
+    const page = openPage(TEMPLATE, { 2: { resolved: null, package: { status: "selected", minutes: 30 }, session_type: "graduation" } }, extras);
+    await page.start();
+    await page.choose(2);
+    expect(page.$<HTMLInputElement>('input[data-key="TOTAL_FEE"]')!.value).toBe("$325.00");
+    (extras.runtime as Record<string, unknown>).id = undefined;
+    (page.$("#sxs-back") as HTMLElement).click();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(page.$("#sxs-error")!.textContent).toMatch(/Refresh this page/);
+  });
+
+  it("prices an older server's answer from the package the email chose", async () => {
+    const page = openPage(TEMPLATE, { 2: { package: { status: "selected", minutes: 60 }, source: "email", email_status: "read", confidence: "high", date: "2026-12-19", time: "2:00 PM", session_type: "graduation" } });
+    await page.start();
+    await page.choose(2);
+    expect(page.$<HTMLInputElement>('input[data-key="TOTAL_FEE"]')!.value).toBe("$425.00");
+    expect(page.$<HTMLInputElement>('input[data-key="RETAINER"]')!.value).toBe("$212.50");
+    expect(page.$<HTMLInputElement>('input[data-key="SESSION_TIME"]')!.value).toBe("2:00 PM");
+    expect(page.$("#sxs-preview-rows")!.textContent).not.toMatch(/No package chosen/);
+  });
+
+  it("tells a tab still running a replaced copy of the extension to refresh, and loads nothing", async () => {
+    const page = openPage(TEMPLATE, {}, { runtime: {} });
+    page.show();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(page.$("#sxs-error")!.textContent).toMatch(/Refresh this page/);
+    expect(page.doc.querySelectorAll(".sxs-inq-row")).toHaveLength(0);
+  });
+
+  it("shows which version of the scripts this tab is running", async () => {
+    const page = openPage(TEMPLATE, {}, { runtime: { id: "abc", getManifest: () => ({ version: "9.9.9" }) } });
+    await page.start();
+    expect(page.$("#sxs-header")!.textContent).toContain("v9.9.9");
   });
 
   it("says the thread could not be checked and fills no total", async () => {

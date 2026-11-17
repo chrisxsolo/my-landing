@@ -29,7 +29,7 @@ function createPanel() {
   panel.id = "sxs-panel";
   panel.innerHTML = `
     <div id="sxs-header">
-      <span>⚡ SoloXSnaps Autofill</span>
+      <span>⚡ SoloXSnaps Autofill <small id="sxs-version"></small></span>
       <button id="sxs-close">✕</button>
     </div>
     <div id="sxs-body">
@@ -44,9 +44,8 @@ function createPanel() {
   `;
   document.body.appendChild(panel);
 
-  document.getElementById("sxs-close").addEventListener("click", () => {
-    panel.style.display = "none";
-  });
+  document.getElementById("sxs-version").textContent = runningVersion();
+  document.getElementById("sxs-close").addEventListener("click", () => { panel.style.display = "none"; });
 
   openPanelFlow();
 }
@@ -59,6 +58,7 @@ function showPanel() {
 
 /** On the invoice editor, a client chosen on the previous page is restored; everywhere else, the list. */
 async function openPanelFlow() {
+  if (extensionOrphaned()) { beginView(); showError(ORPHANED_NOTE); return; }
   if (getPageType() === "invoice") {
     const selection = await loadInvoiceSelection();
     if (selection) { loadInvoiceDraft(selection.inquiryId, { restored: true }); return; }
@@ -67,6 +67,7 @@ async function openPanelFlow() {
 }
 
 async function apiFetch(path, options = {}) {
+  if (extensionOrphaned()) throw new Error(ORPHANED_NOTE);
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
     headers: {
@@ -292,6 +293,8 @@ async function resolveContractView(inq) {
     const resolved = normalizeResolved(d.resolved);
     const services = normalizeServices(d.services);
     if (resolved) return { inquiry: enrichInquiryFromResolved(inq, d, resolved), price: priceFromResolved(resolved), status: resolvedStatusLine(resolved), services };
+    // A draft that is present but unreadable is not an older API: nothing is priced behind it.
+    if (d.resolved != null) return { ...incompatibleContractView(inq, d), services };
     const inquiry = enrichInquiryFromFacts(inq, d);
     return { inquiry, price: calcPrice(inquiry), status: detectedStatusLine(d), services };
   } catch (err) {

@@ -177,7 +177,7 @@ test("leaves the price placeholders alone for nine or more graduates, and keeps 
 });
 
 test("this release of the extension still prices Rush preview (1.1.3 onward)", () => {
-  assert.equal(manifest.version, "1.3.0");
+  assert.equal(manifest.version, "1.3.1");
 });
 
 test("fills the session type when inline formatting splits it across text nodes", () => {
@@ -340,4 +340,96 @@ test("does not promote an unclear thread figure (a deposit, say) to the agreed t
   const legacy = loadAutofill(PRICE_LINE);
   fill(legacy, { ...PROPOSAL, _agreedTotal: 700 });
   assert.equal(legacy.text(), "Total: $700.00; Retainer: $350.00; Remaining: $350.00.", "an older payload without total_kind behaves as before");
+});
+
+// An older API sends flat facts and no resolved draft. The package the client
+// chose by email still has to reach the browser's pricing, and the preview
+// must not say "no package chosen" about a thread that chose one or that
+// could not be read.
+function legacyView(payload, inquiry = { id: 1, session_type: "graduation", school: "USF", people: "1", message: "What packages do you offer?" }) {
+  const fixture = loadAutofill(PRICE_LINE);
+  fixture.context.inquiry = inquiry;
+  fixture.context.payload = payload;
+  vm.runInContext("var enriched = enrichInquiryFromFacts(inquiry, payload); var price = calcPrice(enriched);", fixture.context);
+  return { fixture, price: fixture.context.price, hint: fixture.context.price.reviewHint, status: () => vm.runInContext("detectedStatusLine(payload)", fixture.context) };
+}
+
+test("a legacy response's email-selected package prices the contract: hour $425, mini $325", () => {
+  const hour = legacyView({ package: { status: "selected", minutes: 60 }, source: "email", email_status: "read" });
+  assert.equal(hour.price.subtotal, 425);
+  assert.equal(hour.hint, null);
+  vm.runInContext("fillContract(enriched, price)", hour.fixture.context);
+  assert.equal(hour.fixture.text(), "Total: $425.00; Retainer: $212.50; Remaining: $212.50.");
+  assert.equal(legacyView({ package: { status: "selected", minutes: 30 } }).price.subtotal, 325);
+});
+
+test("the email's choice wins over an older length on the inquiry form", () => {
+  const view = legacyView({ package: { status: "selected", minutes: 30 } }, { id: 1, session_type: "graduation", school: "USF", people: "1", message: "the 1 hour session" });
+  assert.equal(view.price.subtotal, 325);
+});
+
+test("a negotiated total quoted in email still wins over the selected package's rate", () => {
+  const view = legacyView({ package: { status: "selected", minutes: 60 }, total_fee: 410, total_kind: "agreed_total" });
+  assert.equal(view.price.subtotal, 410);
+  assert.equal(view.price.deposit, 205);
+});
+
+test("a thread that has not settled the package is not overridden by the form, and says so", () => {
+  for (const status of ["conflicting", "unclear"]) {
+    const view = legacyView({ package: { status } }, { id: 1, session_type: "graduation", school: "USF", people: "1", message: "the 1 hour session" });
+    assert.equal(view.price.subtotal, null);
+    assert.match(view.hint, /email thread has not settled/);
+  }
+});
+
+test("a selection with no usable length is an open choice, and anything else is not evidence", () => {
+  for (const pkg of [{ status: "selected" }, { status: "selected", minutes: "60" }, { status: "selected", minutes: 6000 }]) {
+    const view = legacyView({ package: pkg });
+    assert.equal(view.price.subtotal, null);
+    assert.match(view.hint, /email thread has not settled/);
+  }
+  for (const pkg of [{ status: "yes", minutes: 60 }, "60", null, { status: "none" }]) {
+    const view = legacyView({ package: pkg });
+    assert.equal(view.price.subtotal, null);
+    assert.match(view.hint, /No package chosen/);
+  }
+});
+
+test("an email length the rate card does not sell is never priced: one graduate", () => {
+  for (const minutes of [15, 45, 75, 480]) {
+    const view = legacyView({ package: { status: "selected", minutes } });
+    assert.equal(view.price.subtotal, null);
+    assert.match(view.hint, new RegExp(`${minutes}-minute session, which the rate card does not sell`));
+  }
+  assert.equal(legacyView({ package: { status: "selected", minutes: 90 } }).price.subtotal, 525);
+});
+
+test("a group takes an email length only when the rate card prices it", () => {
+  const group = (pkg, people = "3", message = "2 hour session") => legacyView({ package: pkg }, { id: 1, session_type: "graduation", school: "USF", people, message });
+  assert.equal(group({ status: "selected", minutes: 90 }).price.subtotal, 975);
+  assert.equal(group({ status: "selected", minutes: 120 }).price.subtotal, 1075);
+  assert.equal(group(null).price.subtotal, 1075);
+  for (const pkg of [{ status: "unclear" }, { status: "selected", minutes: 30 }, { status: "selected", minutes: 480 }]) {
+    const view = group(pkg);
+    assert.equal(view.price.subtotal, null);
+    assert.match(view.hint, /does not sell for a group of 3|has not settled the session length/);
+  }
+  assert.equal(group({ status: "selected", minutes: 30 }, "2").price.subtotal, null);
+});
+
+test("a package in the payload changes nothing for a service priced flat, and a null resolved is an older API", () => {
+  const view = legacyView({ package: { status: "selected", minutes: 30 } }, { id: 1, session_type: "proposal", people: "2", message: "" });
+  assert.equal(view.price.subtotal, 750);
+});
+
+test("an unread thread is not reported as the client choosing nothing", () => {
+  for (const email_status of ["unavailable", "partial", "unparsed"]) {
+    const view = legacyView({ email_status });
+    assert.equal(view.price.subtotal, null);
+    assert.doesNotMatch(view.hint, /No package chosen/);
+    assert.match(view.hint, /email thread could not be (fully )?read/);
+    assert.match(view.status(), /Email thread not fully read/);
+  }
+  assert.match(legacyView({ source: "email", email_status: "read", confidence: "low" }).status(), /From email, not confirmed/);
+  assert.match(legacyView({}).status(), /From inquiry form/);
 });

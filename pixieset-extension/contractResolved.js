@@ -64,8 +64,19 @@ const UNCHECKED_THREAD_HINT = "The email thread could not be checked, so no tota
 
 // The contract's money when the thread could not be checked: none. The
 // browser does not fall back to its own pricing behind a failed lookup.
-function unpricedContract(inq) {
-  return { service: detectServiceType(inq), subtotal: null, deposit: null, remaining: null, reviewHint: UNCHECKED_THREAD_HINT, priceNote: null, fromServer: true };
+function unpricedContract(inq, reviewHint = UNCHECKED_THREAD_HINT) {
+  return { service: detectServiceType(inq), subtotal: null, deposit: null, remaining: null, reviewHint, priceNote: null, fromServer: true };
+}
+
+const INCOMPATIBLE_STATUS = "The server's answer could not be read by this version of the extension. Nothing is priced.";
+const INCOMPATIBLE_HINT = "The server resolved this booking, but this copy of the extension cannot read the result, so no total is filled in. Reload the extension on the browser's extensions page, refresh this tab and open the client again; or enter the agreed total by hand.";
+
+// A server that sent a resolved draft this build cannot read. The details it
+// also sent are shown for review, unconfirmed; the browser does not price
+// the contract itself behind an answer it could not check.
+function incompatibleContractView(inq, d) {
+  const inquiry = { ...enrichInquiryFromFacts(inq, d), _dateStatus: "inquiry" };
+  return { inquiry, price: unpricedContract(inquiry, INCOMPATIBLE_HINT), status: INCOMPATIBLE_STATUS };
 }
 
 // Whether the preview has something flagged that must be ticked off before a

@@ -199,7 +199,12 @@ function extraTimeCharge(minutes, includedMinutes) {
   return extraHalfHours * ADDON_EXTRA_30_MIN;
 }
 
+// The session length that stands: the package the client chose by email
+// (contractFacts.js), else the one the inquiry names. A choice still open in
+// email is not settled by what the older form said.
 function namedGradMinutes(inquiry) {
+  const fromEmail = inquiry._emailPackage;
+  if (fromEmail) return fromEmail.status === "selected" ? fromEmail.minutes : null;
   return detectGradDurationMinutes(`${inquiry.session_type || ""} ${inquiry.message || ""}`);
 }
 
@@ -223,7 +228,35 @@ function groupGradPrice(inquiry, people) {
   return GROUP_RATES_PER_PERSON[people] * people + extraTimeCharge(minutes, included);
 }
 
-const PACKAGE_REVIEW_HINT = "No package chosen: the inquiry does not say whether this is the 30-minute mini ($325) or the 1-hour session ($425). Enter the total once it is agreed.";
+const PACKAGE_CHOICE = "the 30-minute mini ($325) or the 1-hour session ($425)";
+const PACKAGE_REVIEW_HINT = `No package chosen: the inquiry does not say whether this is ${PACKAGE_CHOICE}. Enter the total once it is agreed.`;
+
+const SOLO_PACKAGE_MINUTES = [30, 60, 90, 120];
+
+// Whether the rate card sells the length the email chose, for this headcount
+// (lib/invoiceDraft/session.ts): one graduate books 30 to 120 minutes, a
+// group its included time or one or two extra half hours. A choice still
+// open in email is not a length. With no email evidence there is nothing to refuse.
+function emailLengthSold(inquiry, people) {
+  const chosen = inquiry._emailPackage;
+  if (!chosen) return true;
+  if (chosen.status !== "selected") return false;
+  if (people <= 1) return SOLO_PACKAGE_MINUTES.includes(chosen.minutes);
+  const included = includedMinutesFor(people);
+  return [included, included + 30, included + 60].includes(chosen.minutes);
+}
+
+// Why a graduation has no price. "No package chosen" is said only when that
+// is what is known: a length the rate card does not sell, an open choice in
+// email and a thread that could not be read are different things, and each is named.
+function packageReviewHint(inquiry, people) {
+  const chosen = inquiry._emailPackage;
+  if (chosen && chosen.status === "selected") return `The email thread asks for a ${chosen.minutes}-minute session, which the rate card does not sell for ${people <= 1 ? "one graduate" : `a group of ${people}`}. Confirm the length and enter the agreed total.`;
+  if (chosen && people > 1) return "The email thread has not settled the session length. Enter the total once it is agreed.";
+  if (chosen) return `The email thread has not settled whether this is ${PACKAGE_CHOICE}. Enter the total once it is agreed.`;
+  if (inquiry._emailUnread) return `No package is known: the email thread could not be fully read, and the inquiry does not say whether this is ${PACKAGE_CHOICE}. Check the thread, then enter the agreed total.`;
+  return PACKAGE_REVIEW_HINT;
+}
 const MANUAL_QUOTE_HINT = `Nine or more graduates are quoted by hand; the rate card stops at ${GROUP_MAX_PEOPLE}. Enter the agreed total.`;
 
 // ── RUSH PREVIEW ─────────────────────────────────────────────────────────────
@@ -279,11 +312,10 @@ function calcPrice(inquiry) {
     sessionBase = null;
     reviewHint = HAND_QUOTE_HINT;
   } else {
-    if (people <= 1) {
-      sessionBase = individualGradPrice(inquiry);
-      if (sessionBase == null) reviewHint = PACKAGE_REVIEW_HINT;
-    } else if (people <= GROUP_MAX_PEOPLE) {
-      sessionBase = groupGradPrice(inquiry, people);
+    if (people <= GROUP_MAX_PEOPLE) {
+      const priced = people <= 1 ? individualGradPrice(inquiry) : groupGradPrice(inquiry, people);
+      sessionBase = emailLengthSold(inquiry, people) ? priced : null;
+      if (sessionBase == null) reviewHint = packageReviewHint(inquiry, people);
     } else {
       sessionBase = null; // quoted by hand; the preview is left for Chris to fill
       reviewHint = MANUAL_QUOTE_HINT;

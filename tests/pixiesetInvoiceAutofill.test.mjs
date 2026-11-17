@@ -319,7 +319,7 @@ test("the manifest loads every invoice module and was bumped", () => {
   for (const file of ["contractServices.js", "invoiceSelection.js", "invoicePreview.js", "invoiceFill.js", "domHelpers.js", "content.js"]) {
     assert.ok(scripts.includes(file), `${file} is loaded`);
   }
-  assert.equal(manifest.version, "1.3.0");
+  assert.equal(manifest.version, "1.3.1");
 });
 
 // ── Rush preview: one line item whose price already carries the add-on ───────
