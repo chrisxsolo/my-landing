@@ -270,13 +270,14 @@ async function renderDetail(inq) {
   const contract = await resolveContractView(inq);
   if (!isCurrentView(view)) return; // the user moved on: a late answer never repaints another client's preview
   document.getElementById("sxs-date-status").textContent = contract.status;
-  document.getElementById("sxs-preview-rows").innerHTML = buildContractPreview(contract.inquiry, contract.price);
+  document.getElementById("sxs-preview-rows").innerHTML = buildContractPreview(contract.inquiry, contract.price) + buildServicesPreview(inq.id, contract.services);
   wireContractPreview();
 
   // Flagged items are ticked off before a fill, as on the invoice.
   const fillBtn = detail.querySelector("#sxs-fill");
   const confirm = detail.querySelector("#sxs-contract-confirm");
-  const syncButton = () => { fillBtn.disabled = Boolean(confirm && !confirm.checked); };
+  const syncButton = () => { fillBtn.disabled = Boolean(confirm && !confirm.checked) || !servicesFillAllowed(); };
+  wireServicesPreview(syncButton);
   syncButton();
   confirm?.addEventListener("change", syncButton);
   fillBtn.addEventListener("click", () => { if (!fillBtn.disabled) fillContract(contract.inquiry, contract.price); });
@@ -289,13 +290,14 @@ async function resolveContractView(inq) {
   try {
     const d = await apiFetch("/api/extension/detect-date", { method: "POST", body: JSON.stringify({ inquiry_id: inq.id }) });
     const resolved = normalizeResolved(d.resolved);
-    if (resolved) return { inquiry: enrichInquiryFromResolved(inq, d, resolved), price: priceFromResolved(resolved), status: resolvedStatusLine(resolved) };
+    const services = normalizeServices(d.services);
+    if (resolved) return { inquiry: enrichInquiryFromResolved(inq, d, resolved), price: priceFromResolved(resolved), status: resolvedStatusLine(resolved), services };
     const inquiry = enrichInquiryFromFacts(inq, d);
-    return { inquiry, price: calcPrice(inquiry), status: detectedStatusLine(d) };
+    return { inquiry, price: calcPrice(inquiry), status: detectedStatusLine(d), services };
   } catch (err) {
     console.error("SoloXSnaps detect-date failed", err);
     const inquiry = { ...enrichInquiryFromFacts(inq), _dateStatus: "inquiry" };
-    return { inquiry, price: unpricedContract(inquiry), status: `Could not check the email thread (${err.message}). Nothing from Gmail is shown and no total is filled in.` };
+    return { inquiry, price: unpricedContract(inquiry), status: `Could not check the email thread (${err.message}). Nothing from Gmail is shown and no total is filled in.`, services: unresolvedServices(SERVICES_UNCHECKED_NOTE) };
   }
 }
 

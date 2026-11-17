@@ -51,11 +51,17 @@ const money = (cents: number) => formatFee(cents / 100);
  * or at the end of the text.
  */
 export function inquirySelectsRushPreview(message: string | null | undefined): boolean {
+  const line = inquiryAddOnsLine(message);
+  if (line === null) return false;
+  const label = RUSH_PREVIEW_LABEL.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`\\b${label}\\b`, "i").test(line);
+}
+
+/** The text of the estimator's "Add-ons: …" line, or null when the message has none. */
+export function inquiryAddOnsLine(message: string | null | undefined): string | null {
   const text = String(message ?? "");
   const match = /add-?ons?\s*:\s*([\s\S]*?)(?=\s*(?:estimated total|session type|package|location|headcount|session length)\s*(?:\(|:)|\n|$)/i.exec(text);
-  if (!match) return false;
-  const label = RUSH_PREVIEW_LABEL.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`\\b${label}\\b`, "i").test(match[1]);
+  return match ? match[1] : null;
 }
 
 // ─── model output ────────────────────────────────────────────────────────────

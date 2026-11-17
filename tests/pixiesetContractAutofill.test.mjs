@@ -13,11 +13,13 @@ function loadAutofill(parts, edited = {}) {
     parentElement: { dispatchEvent: event => events.push(event.type) },
   }));
   const status = { style: {} };
-  const editor = { querySelectorAll: () => [] };
+  // The contract body: an editable area whose text is the template under test.
+  const editor = { querySelectorAll: () => [], get textContent() { return nodes.map(node => node.nodeValue).join(""); } };
+  const previewInputs = () => Object.entries(edited).map(([key, value]) => ({ dataset: { key }, value }));
   const document = {
     body: {},
     querySelector: () => editor,
-    querySelectorAll: () => Object.entries(edited).map(([key, value]) => ({ dataset: { key }, value })),
+    querySelectorAll: selector => (String(selector).includes("contenteditable") ? [editor] : previewInputs()),
     getElementById: () => status,
     createTreeWalker: () => {
       let index = -1;
@@ -175,7 +177,7 @@ test("leaves the price placeholders alone for nine or more graduates, and keeps 
 });
 
 test("this release of the extension still prices Rush preview (1.1.3 onward)", () => {
-  assert.equal(manifest.version, "1.2.0");
+  assert.equal(manifest.version, "1.3.0");
 });
 
 test("fills the session type when inline formatting splits it across text nodes", () => {

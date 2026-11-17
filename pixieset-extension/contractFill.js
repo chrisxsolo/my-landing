@@ -1,6 +1,7 @@
 // SoloXSnaps → PixiSet Autofill: the contract preview (click-to-edit fields
 // with the retainer re-split) and the [PLACEHOLDER] replacement inside
-// Pixieset's contenteditable contract body.
+// Pixieset's contenteditable contract body. The Description of Services
+// box and its placeholder live in contractServices.js.
 
 function buildContractPreview(inq, price) {
   const rows = [
@@ -68,15 +69,18 @@ function readContractPreview() {
   return vals;
 }
 
-const CONTRACT_TOKEN_RE = /\[(?:SESSION_(?:TYPE|DATE|TIME|LOCATION)|TOTAL_FEE|RETAINER|REMAINING|FINAL_DATE)\]|portrait\s+session\s+of\s/i;
+const CONTRACT_TOKEN_RE = /\[(?:SESSION_(?:TYPE|DATE|TIME|LOCATION)|TOTAL_FEE|RETAINER|REMAINING|FINAL_DATE|DESCRIPTION_OF_SERVICES)\]|portrait\s+session\s+of\s/i;
 
-// The contract body, not whichever editable box comes first: the one that
-// holds the placeholders (or the "portrait session of …" line), outside this
-// panel. With no such box the first editable area is used, as before.
-function findContractEditor() {
-  const candidates = [...document.querySelectorAll('[contenteditable="true"]')]
-    .filter(el => typeof el.textContent === "string" && !(el.closest && el.closest("#sxs-panel")));
-  return candidates.find(el => CONTRACT_TOKEN_RE.test(el.textContent)) || candidates[0] || document.querySelector('[contenteditable="true"]');
+// The contract body: the one editable area outside this panel that holds a
+// placeholder (or the "portrait session of …" line). No such area, or more
+// than one, is reported: an arbitrary editable box is never filled.
+function locateContractEditor() {
+  const holders = [...document.querySelectorAll('[contenteditable="true"]')]
+    .filter(el => typeof el.textContent === "string" && !(el.closest && el.closest("#sxs-panel")) && CONTRACT_TOKEN_RE.test(el.textContent));
+  // An editable area nested in another is one editor, counted at its innermost.
+  const innermost = holders.filter(el => !holders.some(other => other !== el && el.contains(other)));
+  if (innermost.length > 1) return { editor: null, problem: "ambiguous" };
+  return { editor: innermost[0] || null, problem: innermost.length ? null : "none" };
 }
 
 // What each placeholder becomes: the (possibly edited) preview value first.
@@ -110,16 +114,11 @@ function contractReplacements(inq, price) {
 
 function fillContract(inq, price) {
   const { replacements, sessionType } = contractReplacements(inq, price);
-  const editableArea = findContractEditor();
-  if (!editableArea) { showFillStatus(0); return; }
+  const { editor, problem } = locateContractEditor();
+  if (problem === "ambiguous") { showContractFillStatus(0, { state: "ambiguous" }); return; }
 
   let filled = 0;
-
-  // Replace [$XXXX]-style plain text nodes
-  const walker = document.createTreeWalker(editableArea, NodeFilter.SHOW_TEXT);
-  const textNodes = [];
-  while (walker.nextNode()) textNodes.push(walker.currentNode);
-
+  const textNodes = editor ? contractTextNodes(editor) : [];
   for (const node of textNodes) {
     let text = node.nodeValue;
     let changed = false;
@@ -134,5 +133,6 @@ function fillContract(inq, price) {
   }
 
   filled += replaceContractSessionType(textNodes, sessionType);
-  showFillStatus(filled);
+  // Last, so nothing typed into the description is read as another placeholder.
+  showContractFillStatus(filled, fillServicesToken(editor));
 }

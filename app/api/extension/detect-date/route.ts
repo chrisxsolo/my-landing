@@ -1,10 +1,12 @@
 // What the client's thread settled, for the Pixieset contract preview. The
 // flat fields are what every extension build reads; `resolved` is the same
 // draft /api/extension/invoice-draft returns for this booking, so a build
-// that reads it shows the contract and the invoice one decision.
+// that reads it shows the contract and the invoice one decision. `services`
+// is the contract's Description of Services, written from those same facts.
 
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
+import { contractServicesSchema, resolveContractServices, type ContractServices, type ContractServicesInput } from "@/lib/contracts/serviceDescription";
 import { BOOKING_INQUIRY_COLUMNS, INQUIRIES_TABLE, resolveBooking } from "@/lib/extension/bookingResolution";
 import { resolveRushPreview } from "@/lib/extension/rushPreview";
 import { sessionEvidenceFrom } from "@/lib/invoiceDraft/build";
@@ -30,6 +32,22 @@ export async function OPTIONS() {
  */
 function legacyConfidence(facts: SessionFacts): SessionFacts["confidence"] {
   return facts.confidence === "high" && facts.date !== null && facts.date_status !== "confirmed" ? "medium" : facts.confidence;
+}
+
+/**
+ * The Description of Services, or null when it cannot be vouched for. A
+ * fault here never takes the contract's date and price down with it: the
+ * extension shows a null as "write it by hand".
+ */
+function safeContractServices(input: () => ContractServicesInput): ContractServices | null {
+  try {
+    const checked = contractServicesSchema.safeParse(resolveContractServices(input()));
+    if (checked.success) return checked.data;
+    console.error("Extension detect-date produced an invalid services description:", checked.error.issues[0]?.message);
+  } catch (err) {
+    console.error("Extension detect-date services description failed:", err instanceof Error ? err.name : "error");
+  }
+  return null;
 }
 
 export async function POST(req: NextRequest) {
@@ -67,7 +85,12 @@ export async function POST(req: NextRequest) {
     // resolved total already contains the add-on.
     const session = resolveSession(inq, facts.session_type, facts.package, sessionEvidenceFrom(facts));
     const rush_preview_charge = resolveRushPreview(facts, { serviceKey: session.serviceKey, baseCents: session.baseCents, travelCents: 0 });
-    return NextResponse.json({ ...facts, confidence: legacyConfidence(facts), rush_preview_charge, resolved: draft }, { headers: CORS });
+    // The services paragraph reads the add-on as the draft priced it (with the draft's travel), not the legacy charge above.
+    const services = safeContractServices(() => ({
+      session, facts, inquiryText: `${inq.session_type ?? ""} ${inq.message ?? ""}`,
+      rush: resolveRushPreview(facts, { serviceKey: session.serviceKey, baseCents: session.baseCents, travelCents: draft.pricing.travel.amountCents ?? 0 }),
+    }));
+    return NextResponse.json({ ...facts, confidence: legacyConfidence(facts), rush_preview_charge, resolved: draft, services }, { headers: CORS });
   } catch (err) {
     console.error("Extension detect-date extraction error:", err);
     return NextResponse.json({ error: "Could not read the email thread" }, { status: 502, headers: CORS });

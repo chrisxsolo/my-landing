@@ -193,6 +193,27 @@ export const NO_RUSH_PREVIEW: RushPreviewEvidence = {
   selection: "none", source: null, source_message: null, included_in_total: null, total_fee_message: null,
 };
 
+/** The photographer's own image-count promise for this booking. */
+export interface ImageCommitment {
+  count: number;
+  /** True when the count was promised per person, not for the gallery as a whole. */
+  per_person: boolean;
+  /** Whether the count was found in a message the photographer wrote; an unverified count is never written into a contract. */
+  verified: boolean;
+}
+
+/**
+ * Booking-specific terms the contract's Description of Services needs and
+ * the invoice does not price: a promised image count and the 72-hour full
+ * gallery delivery. Nothing here carries a message or a quote.
+ */
+export interface ContractTermsEvidence {
+  images: ImageCommitment | null;
+  expedited_gallery: { selection: RushPreviewSelection; source: "inquiry" | "email" | null };
+}
+
+export const NO_CONTRACT_TERMS: ContractTermsEvidence = { images: null, expedited_gallery: { selection: "none", source: null } };
+
 export const PACKAGE_SELECTIONS = ["selected", "conflicting", "unclear", "none"] as const;
 export type PackageSelection = (typeof PACKAGE_SELECTIONS)[number];
 
@@ -276,6 +297,8 @@ export interface SessionFacts {
   sports_team_offer: boolean;
   /** The Rush preview add-on, from the form and the thread together. */
   rush_preview: RushPreviewEvidence;
+  /** What the contract's services paragraph needs beyond the package: see ContractTermsEvidence. */
+  contract_terms: ContractTermsEvidence;
   /**
    * The model's overall impression. Shown by older extension builds only:
    * no decision reads it, because one tentative field must not discount
@@ -293,7 +316,7 @@ export interface SessionFacts {
 export const NO_FACTS: SessionFacts = {
   date: null, readable: null, date_status: null, time: null, time_status: null, package: NO_PACKAGE, location: null, session_type: null,
   total_fee: null, total_kind: null, total_status: null, includes_travel: null, people: null, deliverables: null,
-  sports_team_offer: false, rush_preview: NO_RUSH_PREVIEW,
+  sports_team_offer: false, rush_preview: NO_RUSH_PREVIEW, contract_terms: NO_CONTRACT_TERMS,
   confidence: "low", source: "none", email_status: "none", email_coverage: null, revision: null,
 };
 

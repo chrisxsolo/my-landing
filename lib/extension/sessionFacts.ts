@@ -15,6 +15,7 @@ import {
   FACT_STATUSES, NO_FACTS, NO_PACKAGE, TOTAL_KINDS,
   type EmailStatus, type FactStatus, type PackageEvidence, type SessionFacts, type TotalKind,
 } from "../invoiceDraft/types";
+import { CONTRACT_TERMS_JSON, CONTRACT_TERMS_PROMPT, contractTermsFromInquiry, normalizeContractTerms, verifyContractTerms } from "./contractTerms";
 import { OPEN_WINDOW, fetchEmailContext, type BookingWindow } from "./emailThread";
 import { inquirySelectsRushPreview, mergeRushPreviewEvidence, normalizeRushPreviewEvidence } from "./rushPreview";
 import { businessDate, formatReadable, parseLooseDate } from "./sessionDates";
@@ -28,7 +29,7 @@ const MIN_PACKAGE_MINUTES = 15;
 const MAX_PACKAGE_MINUTES = 480;
 const EXTRACTION_MODEL = "claude-haiku-4-5";
 /** Part of the cache key: bump when the prompt or the normalizer changes what a thread yields. */
-const EXTRACTION_VERSION = "2026-11-13";
+const EXTRACTION_VERSION = "2026-11-17";
 
 const SESSION_TYPES = new Set([
   "graduation", "senior-portraits", "family", "extended-family", "couples", "engagement", "proposal", "elopement", "maternity", "event", "other",
@@ -83,6 +84,7 @@ Extract:
    source_message: the number of the message that settled it. evidence: an exact short quote from that message.
 11. people: how many people are being photographed, as a whole number, as the emails most recently state it ("eight players" is 8). null when the emails never say.
 12. deliverables: what the photographer committed to deliver for the chosen option, in at most 20 words and in the photographer's own terms (e.g. "5 edited portraits per player (2 headshots, 3 full-body) plus 2 group photos"). null when the emails do not say.
+${CONTRACT_TERMS_PROMPT}
 
 Rules:
 - When emails disagree, the most recent one wins — unless it only quotes an older message.
@@ -93,7 +95,7 @@ Rules:
 - Do NOT invent a price — only extract amounts actually written in the emails. Never add, subtract or multiply amounts yourself.
 
 Respond ONLY with valid JSON:
-{"date":"YYYY-MM-DD","date_text":"as written","date_message":6,"date_status":"confirmed|proposed|conflicting","readable":"e.g. July 24th, 2026","time":"e.g. 10:00 AM","time_status":"confirmed|proposed|conflicting","location":"e.g. UC Berkeley","session_type":"family","total_fee":350,"total_kind":"agreed_total","total_status":"confirmed|proposed|conflicting","includes_travel":true,"total_fee_message":2,"rush_preview":{"status":"selected|removed|unclear|none","source_message":3,"evidence":"exact quote","in_total":false},"package":{"status":"selected|conflicting|none","minutes":60,"source_message":4,"evidence":"exact quote"},"people":2,"deliverables":"short summary","confidence":"high|medium|low"}
+{"date":"YYYY-MM-DD","date_text":"as written","date_message":6,"date_status":"confirmed|proposed|conflicting","readable":"e.g. July 24th, 2026","time":"e.g. 10:00 AM","time_status":"confirmed|proposed|conflicting","location":"e.g. UC Berkeley","session_type":"family","total_fee":350,"total_kind":"agreed_total","total_status":"confirmed|proposed|conflicting","includes_travel":true,"total_fee_message":2,"rush_preview":{"status":"selected|removed|unclear|none","source_message":3,"evidence":"exact quote","in_total":false},"package":{"status":"selected|conflicting|none","minutes":60,"source_message":4,"evidence":"exact quote"},"people":2,"deliverables":"short summary",${CONTRACT_TERMS_JSON},"confidence":"high|medium|low"}
 Use null for any field not found.`;
 }
 
@@ -219,6 +221,7 @@ export function normalizeExtractedFacts(raw: unknown, options: NormalizeOptions 
     people,
     deliverables: shortText(r.deliverables, MAX_DELIVERABLES_CHARS),
     rush_preview: mergeRushPreviewEvidence(fromEmail, inquirySelectsRushPreview(options.inquiryMessage)),
+    contract_terms: normalizeContractTerms(r.image_commitment, r.expedited_gallery, options.inquiryMessage),
     confidence,
     source: "email",
     email_status: "read",
@@ -234,7 +237,8 @@ export function normalizeExtractedFacts(raw: unknown, options: NormalizeOptions 
 export function hasUsefulFacts(facts: SessionFacts): boolean {
   return Boolean(
     facts.date || facts.time || facts.location || facts.session_type || facts.total_fee !== null
-    || facts.rush_preview.source === "email" || facts.package.status !== "none",
+    || facts.rush_preview.source === "email" || facts.package.status !== "none"
+    || facts.contract_terms.expedited_gallery.source === "email",
   );
 }
 
@@ -251,6 +255,7 @@ export function factsFromInquiry(inq: FactsInquiry, emailStatus: EmailStatus = "
     session_type: inq.session_type ?? null,
     sports_team_offer: sportsTeamScopeMatches({ inquiryMessage: inq.message, people: inq.people }),
     rush_preview: mergeRushPreviewEvidence(NO_FACTS.rush_preview, inquirySelectsRushPreview(inq.message)),
+    contract_terms: contractTermsFromInquiry(inq.message),
     source: inq.date_in_mind ? "inquiry" : "none",
     email_status: emailStatus,
   };
@@ -337,6 +342,7 @@ function completeFacts(facts: SessionFacts, inq: FactsInquiry, thread: ReadThrea
     sports_team_offer: sportsTeamScopeMatches({
       inquiryMessage: inq.message, people: inq.people, clientMessages: bodies("client"), photographerMessages: bodies("photographer"),
     }),
+    contract_terms: verifyContractTerms(facts.contract_terms, thread.messages),
     email_status: thread.status,
     email_coverage: thread.coverage,
   };

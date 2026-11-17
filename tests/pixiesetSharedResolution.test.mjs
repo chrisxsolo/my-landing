@@ -13,11 +13,13 @@ const manifest = JSON.parse(readFileSync(new URL("manifest.json", extensionRoot)
 
 function loadContract(parts, edited = {}) {
   const nodes = parts.map(nodeValue => ({ nodeValue, parentElement: { dispatchEvent: () => {} } }));
-  const editor = { querySelectorAll: () => [] };
+  // The contract body: an editable area whose text is the template under test.
+  const editor = { querySelectorAll: () => [], get textContent() { return nodes.map(node => node.nodeValue).join(""); } };
+  const previewInputs = () => Object.entries(edited).map(([key, value]) => ({ dataset: { key }, value }));
   const document = {
     body: {},
     querySelector: () => editor,
-    querySelectorAll: () => Object.entries(edited).map(([key, value]) => ({ dataset: { key }, value })),
+    querySelectorAll: selector => (String(selector).includes("contenteditable") ? [editor] : previewInputs()),
     getElementById: () => ({ style: {} }),
     createTreeWalker: () => {
       let index = -1;
@@ -229,14 +231,20 @@ test("a time the server could not resolve is left TBD instead of writing a bare 
   assert.match(view.preview(), /data-key="SESSION_TIME" value="TBD"/);
 });
 
-test("the contract body is the editable box that holds the placeholders, not the first one or the panel's", () => {
+test("the contract body is the editable box that holds the placeholders; with none, nothing is picked", () => {
   const fixture = loadContract([]);
-  const box = (text, inPanel = false) => ({ textContent: text, closest: selector => (inPanel && selector === "#sxs-panel" ? {} : null) });
+  const box = (text, inPanel = false) => ({ textContent: text, closest: selector => (inPanel && selector === "#sxs-panel" ? {} : null), contains: () => false });
   const decoy = box("Internal note"), panel = box("[SESSION_DATE]", true), body = box("Date: [SESSION_DATE]");
   fixture.context.document.querySelectorAll = () => [decoy, panel, body];
   fixture.context.body = body;
-  assert.equal(vm.runInContext("findContractEditor() === body", fixture.context), true);
+  assert.equal(vm.runInContext("locateContractEditor().editor === body", fixture.context), true);
+  // No area holds a placeholder: the first editable box is no longer filled by default.
   fixture.context.document.querySelectorAll = () => [decoy, panel];
-  fixture.context.decoy = decoy;
-  assert.equal(vm.runInContext("findContractEditor() === decoy", fixture.context), true);
+  assert.equal(vm.runInContext("JSON.stringify(locateContractEditor())", fixture.context), '{"editor":null,"problem":"none"}');
+  // Two separate areas hold placeholders: neither is chosen.
+  fixture.context.document.querySelectorAll = () => [body, box("Fee: [TOTAL_FEE]")];
+  assert.equal(vm.runInContext("locateContractEditor().problem", fixture.context), "ambiguous");
+  // A description-only template is still the contract body.
+  fixture.context.document.querySelectorAll = () => [decoy, box("Services: [DESCRIPTION_OF_SERVICES]")];
+  assert.equal(vm.runInContext("locateContractEditor().problem", fixture.context), null);
 });

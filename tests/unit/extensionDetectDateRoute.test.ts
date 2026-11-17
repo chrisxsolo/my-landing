@@ -135,4 +135,29 @@ describe("detect-date", () => {
     expect(body.rush_preview_charge.amountCents).toBeNull();
     expect(body.rush_preview_charge.note).toMatch(/Rush preview/);
   });
+
+  it("returns the description of services written from the same facts, with the Rush Preview the client added", async () => {
+    const body = await (await post({ inquiry_id: 913 })).json();
+    expect(body.services).toMatchObject({ serviceKey: "proposal", packageKey: "proposal", status: "ready", reviewReasons: [] });
+    expect(body.services.text).toBe("Proposal photography session. Minimum of 50 edited images delivered within two weeks through an online gallery.\nRush Preview: 5 edited images delivered within 48 hours.");
+    expect(JSON.stringify(body.services)).not.toMatch(/Please add|QUOTED_OLD_LINE|source_message/);
+  });
+
+  it("writes an image count only when the photographer's own message carries it", async () => {
+    const answer = { session_type: "proposal", confidence: "high", image_commitment: { count: 80, per_person: false } };
+    mocks.claudeText = JSON.stringify(answer);
+    const unbacked = await (await post({ inquiry_id: 913 })).json();
+    expect(unbacked.services.text).toContain("Minimum of 50 edited images");
+    expect(unbacked.services.status).toBe("review");
+    mocks.gmailMessages = [...mocks.gmailMessages, { id: "m4", from: STUDIO, date: "2026-11-06T17:00:00Z", body: "You'll receive a minimum of 80 edited images." }];
+    const backed = await (await post({ inquiry_id: 913 })).json();
+    expect(backed.services.text).toContain("Minimum of 80 edited images");
+  });
+
+  it("sends the description to review when Gmail could not be read", async () => {
+    mocks.tokens = null;
+    const body = await (await post({ inquiry_id: 913 })).json();
+    expect(body.services.status).toBe("review");
+    expect(body.services.reviewReasons.join(" ")).toMatch(/email thread was not read/);
+  });
 });

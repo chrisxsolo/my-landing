@@ -226,3 +226,43 @@
 }
 
 .sxs-fill-btn:disabled { background: #b9ddd9; cursor: not-allowed; }
+
+/* Description of services: a full-width, labelled multiline box under the contract fields. */
+.sxs-services { margin-top: 10px; padding-top: 8px; border-top: 1px solid #f0f0f0; }
+.sxs-services .sxs-field-label { display: block; margin-bottom: 4px; }
+.sxs-services-input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 96px;
+  max-height: 240px;
+  resize: vertical;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  background: #fff;
+  color: #111;
+  font-size: 12px;
+  line-height: 1.45;
+  font-family: inherit;
+  padding: 6px 8px;
+}
+.sxs-services-input:focus { border-color: #1f8a7e; outline: 2px solid #1f8a7e; outline-offset: 1px; }
+.sxs-services-notes { margin-top: 6px; font-size: 11px; line-height: 1.4; }
+.sxs-services-notes:empty { display: none; }
+.sxs-services-notes ul { margin: 0; padding-left: 16px; }
+.sxs-services-notes li + li { margin-top: 3px; }
+.sxs-services-reset {
+  margin-top: 6px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  background: #fafafa;
+  color: #333;
+  font-size: 11px;
+  font-family: inherit;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+.sxs-services-reset:hover { border-color: #1f8a7e; }
+.sxs-services-reset:focus-visible { outline: 2px solid #1f8a7e; outline-offset: 1px; }
+.sxs-services .sxs-confirm-row { padding: 4px 0; }
+.sxs-services [hidden] { display: none; }
