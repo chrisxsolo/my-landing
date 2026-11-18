@@ -1,9 +1,13 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // /api/admin/payment-staging
 //
-// GET  — list pending staged payments (written by /api/sync-payments).
-// POST — { action: "approve" | "reject", ids: number[] }
+// GET  — list pending staged payments (written by /api/sync-payments), plus
+//        `unprojected`: confirmed ledger payments whose booking was never
+//        updated (an approval that only got partway).
+// POST — { action: "approve" | "reject" | "repair", ids: number[] }
 //   reject:  marks staged rows rejected.
+//   repair:  ids are LEDGER payment ids. Re-applies the booking side effects
+//            of active, inquiry-linked payments. Never writes the ledger.
 //   approve: promotes staged rows into `payments` (fingerprint-guarded; rows
 //            whose fingerprint already exists in the ledger are marked
 //            duplicate instead of inserted) and applies the inquiry /
@@ -11,22 +15,28 @@
 //            Rows that look like a transfer already in the ledger under other
 //            evidence (lib/paymentMatching) stay pending and are returned in
 //            `held` unless their id is listed in `confirmIds`.
+//            `incomplete` lists rows whose payment is in the ledger but whose
+//            booking updates failed; `failed` lists rows that could not be
+//            written at all and are still pending.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { type NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/requireAdmin";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
-import { advancePortalSessionForDeposit } from "@/lib/adminPortalSessionUpsert";
-import { buildBookedAvailabilityNote } from "@/lib/clientSessions";
 import { findLedgerMatches } from "@/lib/paymentMatching";
 import { loadNearbyLedger } from "@/lib/paymentLedgerMatches";
+import { projectConfirmedPayment, type ConfirmedPayment, type ProjectionStep } from "@/lib/paymentProjection";
+import {
+  PROJECTION_SELECT, inquiryAwaitsProjection, loadUnprojectedPayments, repairPayments,
+  type LedgerProjectionRow, type UnprojectedPayment,
+} from "@/lib/paymentProjectionRepair";
 
 export const dynamic = "force-dynamic";
 
 const STAGING_TABLE = "payments_staging";
 const PAYMENTS_TABLE = "payments";
-const INQUIRIES_TABLE = "inquiries";
-const AVAILABILITY_TABLE = "availability";
+const UNIQUE_VIOLATION = "23505";
+const ACTIONS = ["approve", "reject", "repair"];
 const MAX_IDS = 50;
 
 const STAGING_SELECT =
@@ -70,7 +80,12 @@ export async function GET(req: NextRequest) {
       .limit(200);
 
     if (error) throw error;
-    return NextResponse.json({ staged: data ?? [] });
+    // A failed repair scan must not take the review queue down with it.
+    const unprojected = await loadUnprojectedPayments(supabase).catch((scanError): UnprojectedPayment[] => {
+      console.error("[payment-staging] unprojected scan failed:", scanError);
+      return [];
+    });
+    return NextResponse.json({ staged: data ?? [], unprojected });
   } catch (err) {
     console.error("[payment-staging] GET failed:", err);
     return NextResponse.json({ error: "Failed to load staged payments." }, { status: 500 });
@@ -89,9 +104,9 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json().catch(() => null) as { action?: string; ids?: unknown; confirmIds?: unknown } | null;
   const ids = parseIds(body?.ids);
-  if (!body || !["approve", "reject"].includes(body.action ?? "") || !ids) {
+  if (!body || !ACTIONS.includes(body.action ?? "") || !ids) {
     return NextResponse.json(
-      { error: `Provide action "approve" or "reject" and 1-${MAX_IDS} staged payment ids.` },
+      { error: `Provide action "approve", "reject" or "repair" and 1-${MAX_IDS} ids.` },
       { status: 400 },
     );
   }
@@ -99,6 +114,9 @@ export async function POST(req: NextRequest) {
   try {
     const supabase = createSupabaseServerClient();
     if (body.action === "reject") return await rejectRows(supabase, ids);
+    if (body.action === "repair") {
+      return NextResponse.json({ ok: true, ...await repairPayments(supabase, ids, new Date().toISOString()) });
+    }
     const confirmIds = new Set(Array.isArray(body.confirmIds)
       ? body.confirmIds.filter((id): id is number => Number.isInteger(id) && id > 0)
       : []);
@@ -120,6 +138,92 @@ async function rejectRows(supabase: SupabaseServerClient, ids: number[]) {
   return NextResponse.json({ ok: true, rejected: count ?? 0 });
 }
 
+type Incomplete = { id: number; paymentId: number | null; failed: (ProjectionStep | "staging")[] };
+
+type ApprovalTally = {
+  approved: number;
+  skippedDuplicates: number;
+  held: { id: number; matches: number[] }[];
+  incomplete: Incomplete[];
+  failed: number[];
+  portalAmbiguous: number[];
+};
+
+/** Marks a staged row reviewed. False when the write failed (the row is still pending). */
+async function markReviewed(supabase: SupabaseServerClient, id: number, status: "approved" | "duplicate", at: string) {
+  const { error } = await supabase.from(STAGING_TABLE).update({ status, reviewed_at: at }).eq("id", id);
+  if (error) console.error(`[payment-staging] could not mark staged row ${id} ${status}:`, error);
+  return !error;
+}
+
+/** Applies a confirmed payment to its booking and records anything that did not land. */
+async function applyToBooking(
+  supabase: SupabaseServerClient, tally: ApprovalTally,
+  ref: { id: number; paymentId: number | null }, payment: ConfirmedPayment, at: string, stagingOk: boolean,
+) {
+  const result = await projectConfirmedPayment(supabase, payment, at);
+  const failed: Incomplete["failed"] = [...(stagingOk ? [] : ["staging" as const]), ...result.failed];
+  if (failed.length) tally.incomplete.push({ ...ref, failed });
+  if (result.portalAmbiguous) tally.portalAmbiguous.push(ref.id);
+}
+
+type LedgerState = {
+  taken: Map<string, LedgerProjectionRow>;
+  nearby: Awaited<ReturnType<typeof loadNearbyLedger>>;
+};
+
+async function loadLedgerState(supabase: SupabaseServerClient, rows: StagedRow[]): Promise<LedgerState> {
+  const { data, error } = await supabase
+    .from(PAYMENTS_TABLE)
+    .select(PROJECTION_SELECT)
+    .in("fingerprint", rows.map(row => row.fingerprint));
+  if (error) throw error;
+  const existing = (data ?? []) as unknown as LedgerProjectionRow[];
+  return { taken: new Map(existing.map(p => [p.fingerprint, p])), nearby: await loadNearbyLedger(supabase, rows) };
+}
+
+/**
+ * The payment is in the ledger already. Normally that is a plain duplicate;
+ * when an earlier approval stopped partway, the booking is still unpaid and
+ * finishing its updates here is what unblocks the row.
+ */
+async function settleExisting(
+  supabase: SupabaseServerClient, tally: ApprovalTally, row: StagedRow, already: LedgerProjectionRow, at: string,
+) {
+  const stagingOk = await markReviewed(supabase, row.id, "duplicate", at);
+  const unfinished = already.status === "active" && !!already.inquiry_id
+    && await inquiryAwaitsProjection(supabase, already.inquiry_id);
+  if (unfinished) {
+    await applyToBooking(supabase, tally, { id: row.id, paymentId: already.id }, already, at, stagingOk);
+  } else if (!stagingOk) {
+    tally.incomplete.push({ id: row.id, paymentId: already.id, failed: ["staging"] });
+  }
+  tally.skippedDuplicates++;
+}
+
+function insertLedgerRow(supabase: SupabaseServerClient, row: StagedRow, at: string) {
+  return supabase.from(PAYMENTS_TABLE).insert({
+    inquiry_id: row.inquiry_id,
+    client_name: row.client_name,
+    client_email: row.client_email,
+    amount: row.amount,
+    amount_cents: row.amount_cents,
+    method: row.method,
+    payment_type: row.payment_type,
+    invoice: row.invoice,
+    note: row.note,
+    source: row.source,
+    status: "active",
+    paid_at: row.paid_at,
+    session_date: row.session_date,
+    fingerprint: row.fingerprint,
+    source_txn_id: row.source_txn_id,
+    imported_at: at,
+    reconciliation_status: "confirmed",
+    reconciled_at: at,
+  }).select("id").single<{ id: number }>();
+}
+
 async function approveRows(supabase: SupabaseServerClient, ids: number[], confirmIds: Set<number>) {
   const { data, error } = await supabase
     .from(STAGING_TABLE)
@@ -129,125 +233,45 @@ async function approveRows(supabase: SupabaseServerClient, ids: number[], confir
 
   if (error) throw error;
   const rows = (data ?? []) as unknown as StagedRow[];
-
-  const fingerprints = rows.map(row => row.fingerprint);
-  const { data: existing, error: existingError } = await supabase
-    .from(PAYMENTS_TABLE)
-    .select("fingerprint")
-    .in("fingerprint", fingerprints);
-
-  if (existingError) throw existingError;
-  const taken = new Set((existing ?? []).map(p => p.fingerprint as string));
-
-  const ledger = await loadNearbyLedger(supabase, rows);
-
-  let approved = 0;
-  let skippedDuplicates = 0;
-  const held: { id: number; matches: number[] }[] = [];
+  const ledger = await loadLedgerState(supabase, rows);
+  const tally: ApprovalTally = { approved: 0, skippedDuplicates: 0, held: [], incomplete: [], failed: [], portalAmbiguous: [] };
   const reviewedAt = new Date().toISOString();
 
   for (const row of rows) {
-    if (taken.has(row.fingerprint)) {
-      await supabase.from(STAGING_TABLE)
-        .update({ status: "duplicate", reviewed_at: reviewedAt })
-        .eq("id", row.id);
-      skippedDuplicates++;
+    const already = ledger.taken.get(row.fingerprint);
+    if (already) {
+      await settleExisting(supabase, tally, row, already, reviewedAt);
       continue;
     }
 
-    const matches = findLedgerMatches({ ...row, id: -row.id }, ledger);
+    const matches = findLedgerMatches({ ...row, id: -row.id }, ledger.nearby);
     if (matches.length && !confirmIds.has(row.id)) {
-      held.push({ id: row.id, matches: matches.map(m => m.id) });
+      tally.held.push({ id: row.id, matches: matches.map(m => m.id) });
       continue;
     }
 
-    const { data: inserted, error: insertError } = await supabase.from(PAYMENTS_TABLE).insert({
-      inquiry_id: row.inquiry_id,
-      client_name: row.client_name,
-      client_email: row.client_email,
-      amount: row.amount,
-      amount_cents: row.amount_cents,
-      method: row.method,
-      payment_type: row.payment_type,
-      invoice: row.invoice,
-      note: row.note,
-      source: row.source,
-      status: "active",
-      paid_at: row.paid_at,
-      session_date: row.session_date,
-      fingerprint: row.fingerprint,
-      source_txn_id: row.source_txn_id,
-      imported_at: reviewedAt,
-      reconciliation_status: "confirmed",
-      reconciled_at: reviewedAt,
-    }).select("id").single<{ id: number }>();
-
+    const { data: inserted, error: insertError } = await insertLedgerRow(supabase, row, reviewedAt);
     if (insertError) {
-      // Unique fingerprint race: treat as duplicate rather than failing the batch.
       console.error("[payment-staging] approve insert failed:", insertError);
-      await supabase.from(STAGING_TABLE)
-        .update({ status: "duplicate", reviewed_at: reviewedAt })
-        .eq("id", row.id);
-      skippedDuplicates++;
+      if (insertError.code === UNIQUE_VIOLATION) {
+        // Unique fingerprint race: another request approved it first.
+        await markReviewed(supabase, row.id, "duplicate", reviewedAt);
+        tally.skippedDuplicates++;
+      } else {
+        // Anything else is a real failure: the row stays pending for a retry.
+        tally.failed.push(row.id);
+      }
       continue;
     }
 
-    taken.add(row.fingerprint);
+    const paymentId = inserted?.id ?? null;
+    ledger.taken.set(row.fingerprint, { ...row, id: paymentId ?? -row.id, status: "active" });
     // Later rows in this batch must also see the payment just inserted.
-    ledger.push({ ...row, id: inserted?.id ?? -row.id });
-    await supabase.from(STAGING_TABLE)
-      .update({ status: "approved", reviewed_at: reviewedAt })
-      .eq("id", row.id);
-    await applySideEffects(supabase, row, reviewedAt);
-    approved++;
+    ledger.nearby.push({ ...row, id: paymentId ?? -row.id });
+    const stagingOk = await markReviewed(supabase, row.id, "approved", reviewedAt);
+    await applyToBooking(supabase, tally, { id: row.id, paymentId }, row, reviewedAt, stagingOk);
+    tally.approved++;
   }
 
-  return NextResponse.json({ ok: true, approved, skippedDuplicates, held });
-}
-
-// Inquiry + availability + portal-session updates that previously ran inside
-// the Gmail sync.
-async function applySideEffects(supabase: SupabaseServerClient, row: StagedRow, now: string) {
-  let inquiry: { session_type: string | null; session_date: string | null; preferred_time: string | null } | null = null;
-
-  if (row.inquiry_id) {
-    const { data } = await supabase
-      .from(INQUIRIES_TABLE)
-      .select("session_type, session_date, preferred_time")
-      .eq("id", row.inquiry_id)
-      .single<{ session_type: string | null; session_date: string | null; preferred_time: string | null }>();
-    inquiry = data;
-
-    await supabase.from(INQUIRIES_TABLE).update({
-      payment_status: "paid",
-      payment_note: `${row.method || "Payment"}: ${row.amount}`,
-      payment_detected_at: now,
-      deposit_paid_at: row.paid_at,
-      booking_confirmed: true,
-    }).eq("id", row.inquiry_id);
-  }
-
-  const sessionDate = row.session_date ?? inquiry?.session_date ?? null;
-  if (sessionDate) {
-    await supabase.from(AVAILABILITY_TABLE).upsert(
-      { date: sessionDate, status: "booked", note: buildBookedAvailabilityNote(row.client_name, inquiry?.preferred_time) },
-      { onConflict: "date" },
-    );
-  }
-
-  // A paid deposit means the client is booked — make sure the portal reflects
-  // it even when the whole booking happened over email.
-  try {
-    const result = await advancePortalSessionForDeposit(supabase, {
-      clientEmail: row.client_email,
-      clientName: row.client_name,
-      sessionType: inquiry?.session_type ?? null,
-      sessionDate,
-    });
-    if (result === "ambiguous") {
-      console.error(`[payment-staging] portal session ambiguous for ${row.client_email} — left untouched`);
-    }
-  } catch (error) {
-    console.error(`[payment-staging] portal session update failed for ${row.client_email}:`, error);
-  }
+  return NextResponse.json({ ok: true, ...tally });
 }

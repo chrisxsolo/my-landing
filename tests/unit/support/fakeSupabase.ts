@@ -17,6 +17,8 @@ export interface FakeOptions {
   serverCap?: number;
   /** Fail a read of this table; `fromRow` limits it to pages starting at or after that row. */
   failRead?: { table: string; fromRow?: number; message?: string };
+  /** Fail writes of this kind to this table. Mutable, so a test can clear it to simulate a retry. */
+  failWrite?: { table: string; kind?: FakeOp["kind"]; message?: string; code?: string } | null;
   rpc?: Record<string, (args: Record<string, unknown>) => unknown>;
 }
 
@@ -35,7 +37,7 @@ function compare(a: unknown, b: unknown): number {
   return a < b ? -1 : 1;
 }
 
-class Query implements PromiseLike<{ data: unknown; error: { message: string } | null; count?: number }> {
+class Query implements PromiseLike<{ data: unknown; error: { message: string; code?: string } | null; count?: number }> {
   private filters: Filter[] = [];
   private orders: { col: string; asc: boolean }[] = [];
   private rangeFrom = 0;
@@ -61,6 +63,13 @@ class Query implements PromiseLike<{ data: unknown; error: { message: string } |
   not(col: string, op: string, v: unknown) {
     if (op !== "is" || v !== null) throw new Error(`fake: unsupported not(${op})`);
     this.filters.push((r) => r[col] !== null && r[col] !== undefined);
+    return this;
+  }
+  // Only the "col.is.null,col.neq.value" form, which is how a nullable column is excluded.
+  or(expr: string) {
+    const m = /^(\w+)\.is\.null,\1\.neq\.(\w+)$/.exec(expr);
+    if (!m) throw new Error(`fake: unsupported or(${expr})`);
+    this.filters.push((r) => (r[m[1]] ?? null) !== m[2]);
     return this;
   }
   contains(col: string, vs: unknown[]) {
@@ -108,6 +117,10 @@ class Query implements PromiseLike<{ data: unknown; error: { message: string } |
   }
 
   private write() {
+    const fail = this.opts.failWrite;
+    if (fail && fail.table === this.table && (!fail.kind || fail.kind === this.kind)) {
+      return { data: null, error: { message: fail.message ?? "write failed", code: fail.code } };
+    }
     const list = Array.isArray(this.payload) ? (this.payload as Row[]) : [this.payload as Row];
     if (this.kind === "insert" || this.kind === "upsert") {
       const next = Math.max(0, ...this.rows().map((r) => (typeof r.id === "number" ? r.id : 0))) + 1;
@@ -125,7 +138,7 @@ class Query implements PromiseLike<{ data: unknown; error: { message: string } |
   }
 
   then<A, B>(
-    ok?: ((v: { data: unknown; error: { message: string } | null }) => A | PromiseLike<A>) | null,
+    ok?: ((v: { data: unknown; error: { message: string; code?: string } | null }) => A | PromiseLike<A>) | null,
     bad?: ((e: unknown) => B | PromiseLike<B>) | null,
   ): PromiseLike<A | B> {
     const result = this.kind === "select" ? this.read() : this.write();

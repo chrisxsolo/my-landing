@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   describePaymentSyncOutcome,
   formatReviewDollars,
+  isOfflinePaymentNotice,
   summarizePendingReview,
 } from "@/lib/paymentSyncShared";
 
@@ -39,5 +40,17 @@ describe("describePaymentSyncOutcome", () => {
   it("appends search warnings", () => {
     const msg = describePaymentSyncOutcome({ total: 0, pendingReview: null, warnings: ["2 of 5 searches failed."] });
     expect(msg).toContain("⚠ 2 of 5 searches failed.");
+  });
+});
+
+describe("isOfflinePaymentNotice", () => {
+  it("recognises a provider's payment-on-the-way notice as a promise, not a receipt", () => {
+    expect(isOfflinePaymentNotice("Payment on the way for Alex Example's invoice #9001. Alex selected Zelle.")).toBe(true);
+  });
+
+  it("leaves real transfer receipts and empty evidence alone", () => {
+    expect(isOfflinePaymentNotice("Alex Example sent you $100.00")).toBe(false);
+    expect(isOfflinePaymentNotice("")).toBe(false);
+    expect(isOfflinePaymentNotice(null)).toBe(false);
   });
 });

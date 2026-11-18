@@ -73,3 +73,15 @@ export function describePaymentSyncOutcome(input: {
   if (input.warnings?.length) parts.push(`⚠ ${input.warnings.join(" ")}`);
   return parts.join(" ");
 }
+
+const OFFLINE_NOTICE = /payment (?:is )?on the way/i;
+
+/**
+ * True when a staged row's evidence is an invoicing provider's "payment on the
+ * way" notice: the client CHOSE an offline method (Zelle, Venmo, cash). That
+ * is a promise to pay, not a receipt — the reviewer has to confirm the money
+ * arrived before approving.
+ */
+export function isOfflinePaymentNotice(evidence: string | null | undefined): boolean {
+  return !!evidence && OFFLINE_NOTICE.test(evidence);
+}

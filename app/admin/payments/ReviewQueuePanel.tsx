@@ -7,7 +7,11 @@ import { useCallback, useEffect, useState } from "react";
 import { findDuplicateSuspects, normalizePaymentMethod, type PaymentRow } from "@/lib/paymentFilters";
 import { findLedgerMatches, suggestDuplicateToVoid } from "@/lib/paymentMatching";
 import { fmtDate, fmtMoney } from "@/lib/revenue/format";
-import { summarizePendingReview, type PendingReviewSummary } from "@/lib/paymentSyncShared";
+import { isOfflinePaymentNotice, summarizePendingReview, type PendingReviewSummary } from "@/lib/paymentSyncShared";
+import { announceTimelineSync } from "@/lib/inquiryRevalidation";
+import { bookingRepairIds, describeReviewOutcome, type ReviewResponse, type UnprojectedPayment } from "./reviewOutcome";
+
+const REPAIR_BATCH = 50; // the API's per-request id limit
 import { GlassPanel } from "./Glass";
 import { METHOD_META, REV } from "./palette";
 
@@ -38,17 +42,28 @@ type Props = {
 
 export default function ReviewQueuePanel({ activeRows, reloadToken, onLedgerChanged, onPendingChange }: Props) {
   const [staged, setStaged] = useState<StagedPayment[]>([]);
+  const [unprojected, setUnprojected] = useState<UnprojectedPayment[]>([]);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [repairing, setRepairing] = useState(false);
+  // Ledger payments from this session's approvals whose calendar / portal /
+  // booking update failed. They are not in `unprojected` once the inquiry
+  // itself reads paid, so they are remembered here until a repair succeeds.
+  const [retryIds, setRetryIds] = useState<number[]>([]);
   const [busyIds, setBusyIds] = useState<Set<number>>(new Set());
   const [error, setError] = useState("");
 
   const loadStaged = useCallback(async () => {
     try {
       const res = await fetch("/api/admin/payment-staging");
-      const json = await res.json() as { staged?: StagedPayment[]; error?: string };
+      const json = await res.json() as { staged?: StagedPayment[]; unprojected?: UnprojectedPayment[]; error?: string };
       if (!res.ok) throw new Error(json.error ?? "Failed to load review queue");
       setStaged(json.staged ?? []);
+      setUnprojected(json.unprojected ?? []);
+      setLoadFailed(false);
     } catch (err) {
+      // Keep whatever was showing: a failed load is "unknown", not "empty".
       console.error("[ReviewQueuePanel] load failed:", err);
+      setLoadFailed(true);
     }
   }, []);
 
@@ -64,13 +79,16 @@ export default function ReviewQueuePanel({ activeRows, reloadToken, onLedgerChan
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action, ids, confirmIds }),
       });
-      const json = await res.json() as { ok?: boolean; error?: string; held?: { id: number; matches: number[] }[] };
-      if (!json.ok) throw new Error(json.error ?? "Review failed");
-      if (json.held?.length) {
-        setError(`${json.held.length} payment${json.held.length === 1 ? "" : "s"} held back: already in the ledger as ${json.held.map(h => h.matches.map(m => `#${m}`).join("/")).join(", ")}. Approve individually only if they are separate transfers.`);
-      }
+      const json = await res.json() as ReviewResponse;
+      if (!res.ok || !json.ok) throw new Error(json.error ?? "Review failed");
+      setError(describeReviewOutcome(json));
+      setRetryIds(prev => [...new Set([...prev, ...bookingRepairIds(json)])]);
       await loadStaged();
-      if (action === "approve") onLedgerChanged();
+      if (action === "approve") {
+        onLedgerChanged();
+        // Open conversations re-read the booking this approval just changed.
+        announceTimelineSync();
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Review failed");
     } finally {
@@ -79,6 +97,32 @@ export default function ReviewQueuePanel({ activeRows, reloadToken, onLedgerChan
         ids.forEach(id => next.delete(id));
         return next;
       });
+    }
+  }
+
+  // Finish booking updates for payments that are in the ledger but never
+  // reached their inquiry. Never writes the ledger, so it is safe to repeat.
+  async function applyToBookings(paymentIds: number[]) {
+    setRepairing(true);
+    setError("");
+    try {
+      const res = await fetch("/api/admin/payment-staging", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "repair", ids: paymentIds }),
+      });
+      const json = await res.json() as ReviewResponse;
+      if (!res.ok || !json.ok) throw new Error(json.error ?? "Booking update failed");
+      setError(describeReviewOutcome(json));
+      const stillFailing = new Set(bookingRepairIds(json));
+      setRetryIds(prev => prev.filter(id => !paymentIds.includes(id) || stillFailing.has(id)));
+      await loadStaged();
+      onLedgerChanged();
+      announceTimelineSync();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Booking update failed");
+    } finally {
+      setRepairing(false);
     }
   }
 
@@ -128,7 +172,19 @@ export default function ReviewQueuePanel({ activeRows, reloadToken, onLedgerChan
     }
   }
 
-  if (!staged.length && !duplicateGroups.length) return null;
+  // Everything the Update booking button would touch, named before it runs.
+  const repairList = [
+    ...unprojected.map(u => ({ paymentId: u.paymentId, label: `#${u.paymentId} ${u.clientName}` })),
+    ...retryIds.filter(id => !unprojected.some(u => u.paymentId === id)).map(id => ({ paymentId: id, label: `#${id}` })),
+  ].slice(0, REPAIR_BATCH);
+
+  function confirmRepair() {
+    const names = repairList.map(r => r.label).join("\n");
+    if (!window.confirm(`Mark these bookings paid and booked from their recorded payments?\n${names}\n\nThe ledger is not changed.`)) return;
+    applyToBookings(repairList.map(r => r.paymentId));
+  }
+
+  if (!staged.length && !duplicateGroups.length && !repairList.length && !loadFailed && !error) return null;
 
   return (
     <GlassPanel className="p-5">
@@ -150,7 +206,28 @@ export default function ReviewQueuePanel({ activeRows, reloadToken, onLedgerChan
           </button>
         )}
       </div>
-      {error && <p className="text-xs font-bold mb-2" style={{ color: REV.red }}>{error}</p>}
+      {loadFailed && (
+        <p role="alert" className="text-xs font-bold mb-2 flex items-center gap-2 flex-wrap" style={{ color: REV.red }}>
+          Couldn&apos;t load the review queue, so this list may be out of date.
+          <button type="button" onClick={loadStaged} className="px-2 py-0.5 rounded-lg" style={{ background: REV.redBg, color: REV.red }}>Retry</button>
+        </p>
+      )}
+      {error && <p role="alert" className="text-xs font-bold mb-2" style={{ color: REV.red }}>{error}</p>}
+
+      {repairList.length > 0 && (
+        <div className="px-3.5 py-3 rounded-xl mb-3 flex items-center justify-between gap-3 flex-wrap"
+          style={{ background: REV.amberBg, border: `1px solid ${REV.panelBorderStrong}` }}>
+          <p className="text-xs font-bold" style={{ color: REV.amber }}>
+            {repairList.length} recorded payment{repairList.length === 1 ? " has" : "s have"} not fully reached the
+            booking (status, calendar or portal): {repairList.map(r => r.label).join(", ")}.
+          </p>
+          <button type="button" onClick={confirmRepair} disabled={repairing}
+            className="text-[10px] font-black px-3 py-2 rounded-lg disabled:opacity-40"
+            style={{ background: REV.accentBg, color: REV.accent }}>
+            {repairing ? "Updating…" : "Update booking" + (repairList.length === 1 ? "" : "s")}
+          </button>
+        </div>
+      )}
 
       <div className="space-y-3">
         {staged.map(s => {
@@ -167,6 +244,12 @@ export default function ReviewQueuePanel({ activeRows, reloadToken, onLedgerChan
                     <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md capitalize" style={{ background: REV.neutralBg, color: REV.textSoft }}>
                       {s.payment_type.replace("_", " ")}
                     </span>
+                    {isOfflinePaymentNotice(s.evidence) && (
+                      <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md" style={{ background: REV.amberBg, color: REV.amber }}
+                        title="The client chose an offline method on the invoice. This is not proof the money arrived.">
+                        not a receipt — confirm it arrived
+                      </span>
+                    )}
                     {!s.inquiry_id && (
                       <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md" style={{ background: REV.orangeBg, color: REV.orange }}>no inquiry</span>
                     )}
