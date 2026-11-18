@@ -1,6 +1,7 @@
 "use client";
 import { T } from "@/app/admin/adminTheme";
 import { updateAdminInquiry } from "@/lib/adminInquiries";
+import { inquiryCountsAsPaid } from "@/lib/clientSessions";
 import { useState } from "react";
 
 export type TimelineInquiry = {
@@ -10,6 +11,7 @@ export type TimelineInquiry = {
   invoice_sent_at: string | null;
   contract_sent_at: string | null;
   deposit_paid_at: string | null;
+  payment_status?: string | null;
   session_date: string | null;
   gallery_delivered_at: string | null;
   booking_confirmed: boolean | null;
@@ -38,7 +40,12 @@ function fmt(val: string | null): string {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
+const DEPOSIT_STEP = "deposit_paid_at";
+
 function isDone(inq: TimelineInquiry, step: Step): boolean {
+  // Same rule as the Clients badge: a confirmed payment counts even when no
+  // deposit date was ever recorded. No date is invented for it.
+  if (step.key === DEPOSIT_STEP) return inquiryCountsAsPaid(inq);
   const val = inq[step.dateField ?? step.key];
   return val !== null && val !== undefined && val !== false;
 }
@@ -67,6 +74,9 @@ export default function ClientTimeline({ inq, onUpdate }: Props) {
       const stepIdx = STEPS.findIndex(s => s.key === step.key);
       STEPS.slice(0, stepIdx + 1).forEach(s => {
         if (!s.dateField || s.key === "created_at" || s.key === "session_date") return;
+        // An already-paid booking keeps its (possibly unrecorded) deposit date:
+        // finishing a later step must not date the deposit today.
+        if (s.key === DEPOSIT_STEP && inquiryCountsAsPaid(inq)) return;
         if (inq[s.dateField] === null) patch[s.dateField as string] = ts;
       });
     }
@@ -111,14 +121,23 @@ export default function ClientTimeline({ inq, onUpdate }: Props) {
           const isLast = i === STEPS.length - 1;
           const isSaving = saving === step.dateField;
           const dateVal = step.dateField ? inq[step.dateField] as string | null : null;
+          // Paid with no recorded date: toggling would either stamp today's
+          // date or do nothing visible, so the step is read-only.
+          // A ledger-confirmed payment is undone by voiding it in Payments, not
+          // by clearing the date here (which would lose the real deposit date).
+          const lockedDeposit = step.key === DEPOSIT_STEP && done && (!dateVal || inq.payment_status === "paid");
+          const hint = isFixed ? fmt(dateVal)
+            : lockedDeposit ? (dateVal ? "Payment confirmed — void it in Payments to undo" : "Paid — no deposit date recorded")
+            : done ? "Mark as not done" : "Mark as done";
 
           return (
             <div key={step.key} className="flex items-start flex-shrink-0">
               <div className="flex flex-col items-center" style={{ minWidth: 64 }}>
                 <button
                   onClick={() => toggleStep(step)}
-                  disabled={isFixed || isSaving}
-                  title={isFixed ? fmt(dateVal) : done ? `Mark as not done` : `Mark as done`}
+                  disabled={isFixed || isSaving || lockedDeposit}
+                  title={hint}
+                  aria-label={`${step.label}: ${hint}`}
                   className="w-9 h-9 rounded-full flex items-center justify-center text-sm transition-all duration-200 border-2 hover:scale-110 active:scale-95 disabled:hover:scale-100"
                   style={
                     done

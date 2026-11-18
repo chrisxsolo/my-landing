@@ -5,6 +5,7 @@
 
 import type { GmailMessage } from "@/app/api/gmail/thread/route";
 import type { AdminInquiry } from "@/lib/adminInquiries";
+import { inquiryCountsAsPaid } from "@/lib/clientSessions";
 import { T, Icon, MonoLabel } from "../ui";
 import { countdownLabel } from "./helpers";
 
@@ -16,7 +17,7 @@ function buildStages(inquiry: AdminInquiry, messages: GmailMessage[]): Stage[] {
     { label: "Inquiry",  done: true },
     { label: "Replied",  done: replied },
     { label: "Date set", done: Boolean(inquiry.session_date) },
-    { label: "Paid",     done: inquiry.payment_status === "paid" },
+    { label: "Deposit",  done: inquiryCountsAsPaid(inquiry) },
   ];
 }
 
@@ -25,7 +26,7 @@ function nextAction(stages: Stage[], inquiry: AdminInquiry): string {
   if (!stages[2].done) return "Lock in the session date";
   if (!stages[3].done) return "Check for payment";
   const date = inquiry.session_date;
-  return date ? `Booked & paid — session ${countdownLabel(date).toLowerCase()}` : "All set";
+  return date ? `Booked, deposit paid — session ${countdownLabel(date).toLowerCase()}` : "All set";
 }
 
 export default function PipelineRail({ inquiry, messages }: {

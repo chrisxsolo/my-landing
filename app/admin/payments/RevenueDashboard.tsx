@@ -42,7 +42,14 @@ function matchesDimensions(p: LedgerRow, f: RevenueFilters): boolean {
   return true;
 }
 
-export default function RevenueDashboard() {
+type Props = {
+  /** Non-zero when the tab was opened to review a detected payment. */
+  focusReviewToken?: number;
+  /** Clears the request in the parent; without it a reload or a later visit would scroll again. */
+  onReviewFocused?: () => void;
+};
+
+export default function RevenueDashboard({ focusReviewToken = 0, onReviewFocused }: Props) {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [payments, setPayments] = useState<PaymentRow[]>([]);
@@ -196,6 +203,14 @@ export default function RevenueDashboard() {
   const scrollTo = useCallback((id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" });
   }, [reduced]);
+
+  // Opened from a booking's "Payment awaiting review": land on the queue once
+  // the sections have rendered.
+  useEffect(() => {
+    if (focusReviewToken === 0 || loading) return;
+    scrollTo("rev-quality");
+    onReviewFocused?.();
+  }, [focusReviewToken, loading, scrollTo, onReviewFocused]);
 
   function drillInsight(insight: Insight) {
     const d = insight.drill;

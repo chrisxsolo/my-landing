@@ -61,6 +61,8 @@ import AnalyticsTab from "@/app/admin/AnalyticsTab";
 import QuickFormatTool from "@/app/admin/QuickFormatTool";
 import PaymentAnalyticsTab from "@/app/admin/PaymentAnalyticsTab";
 import ClientTimeline from "@/app/admin/ClientTimeline";
+import BookingPaymentBadge from "@/app/admin/BookingPaymentBadge";
+import { EMPTY_REVIEW_QUEUE, indexReviewQueue, resolveBookingPaymentState, type ReviewQueueIndex } from "@/lib/bookingPaymentState";
 import InquiryAnalyticsTab from "@/app/admin/InquiryAnalyticsTab";
 import AttributionTab from "@/app/admin/AttributionTab";
 import VaultTab from "@/app/admin/VaultTab";
@@ -107,6 +109,7 @@ import { normalizePortfolioCategorySlug } from "@/lib/photoMetadata";
 import {
   findMatchingClientSession,
   getClientSessionEmailMatches,
+  inquiryCountsAsPaid,
   resolveInquiryPortalStatus,
   CLIENT_SESSION_STATUS_LABELS,
   type AdminClientSessionDTO,
@@ -339,6 +342,15 @@ function AdminDashboard() {
   const [inquiriesLoading,setInquiriesLoading]=useState(false);
   const [ledgerPayments,setLedgerPayments]=useState<AdminPaymentSummaryRow[]>([]);
   const [pendingPaymentReview,setPendingPaymentReview]=useState<PendingReviewSummary>({count:0,cents:0});
+  // Which bookings have a detected payment waiting for approval. A failed
+  // load is tracked separately: "unknown" must never read as "nothing waiting".
+  const [reviewQueue,setReviewQueue]=useState<ReviewQueueIndex>(EMPTY_REVIEW_QUEUE);
+  const [reviewQueueFailed,setReviewQueueFailed]=useState(false);
+  const [paymentReviewFocus,setPaymentReviewFocus]=useState(0);
+  const clearPaymentReviewFocus=useCallback(()=>setPaymentReviewFocus(0),[]);
+  // Overlapping loads (tab switch + Sync All) can answer out of order; only
+  // the newest request may write state.
+  const inquiriesFetchSeq=useRef(0);
   const [finalPaymentIds,setFinalPaymentIds]=useState<Set<number>>(new Set());
   const [deposit1Amounts,setDeposit1Amounts]=useState<Map<number,string>>(new Map());
   const [cardPaymentId,setCardPaymentId]=useState<number|null>(null);
@@ -810,6 +822,8 @@ function AdminDashboard() {
 
   async function fetchInquiries(){
     setInquiriesLoading(true);
+    const seq=++inquiriesFetchSeq.current;
+    const isLatest=()=>seq===inquiriesFetchSeq.current;
     const paymentsReq = fetch("/api/admin/payments")
       .then(res => res.json() as Promise<{ payments?: AdminPaymentSummaryRow[]; error?: string }>)
       .catch(err => {
@@ -819,9 +833,22 @@ function AdminDashboard() {
     // Detected-but-unapproved payments: shown on the Home card so revenue that
     // is waiting in the review queue is never mistaken for missing revenue.
     fetch("/api/admin/payment-staging")
-      .then(res => res.json() as Promise<{ staged?: { amount_cents: number | null }[] }>)
-      .then(json => setPendingPaymentReview(summarizePendingReview(json.staged ?? [])))
-      .catch(err => console.error("[admin] payment review queue load failed", err));
+      .then(async res => {
+        const json = await res.json() as { staged?: { amount_cents: number | null; inquiry_id: number | null }[]; unprojected?: { inquiryId: number }[]; error?: string };
+        if (!res.ok) throw new Error(json.error ?? "Review queue request failed");
+        return json;
+      })
+      .then(json => {
+        if(!isLatest())return;
+        const staged = json.staged ?? [];
+        setPendingPaymentReview(summarizePendingReview(staged));
+        setReviewQueue(indexReviewQueue({ staged, unprojected: json.unprojected }));
+        setReviewQueueFailed(false);
+      })
+      .catch(err => {
+        console.error("[admin] payment review queue load failed", err);
+        if(isLatest())setReviewQueueFailed(true);
+      });
     const [inquiryRows, paymentJson] = await Promise.all([
       loadAdminInquiries().catch(err => {
         console.error("[admin] inquiries load failed",err);
@@ -830,6 +857,7 @@ function AdminDashboard() {
       }),
       paymentsReq,
     ]);
+    if(!isLatest())return;
     const paymentRows = paymentJson.payments ?? [];
     setLedgerPayments(paymentRows);
     const dep2 = paymentRows.filter(p => p.payment_type === "deposit_2" && p.inquiry_id);
@@ -1640,7 +1668,7 @@ function AdminDashboard() {
           [...inquiries].sort((a,b)=>new Date(b.created_at).getTime()-new Date(a.created_at).getTime()).forEach(i=>{
             const k=i.email.toLowerCase();
             if(!seen.has(k))seen.set(k,{id:i.id,name:i.name,email:i.email,sessionType:i.session_type,paid:false});
-            if(i.payment_status==="paid")seen.get(k)!.paid=true;
+            if(inquiryCountsAsPaid(i))seen.get(k)!.paid=true;
           });
           return Array.from(seen.values());
         })()}
@@ -1866,7 +1894,7 @@ function AdminDashboard() {
           const totalClients=new Set(inquiries.map(i=>i.email.toLowerCase())).size;
           const confirmedSessions=inquiries.filter(i=>i.booking_confirmed).length;
           const newThisMonth=inquiries.filter(i=>new Date(i.created_at)>=monthStart).length;
-          const paidSessions=inquiries.filter(i=>i.payment_status==="paid").length;
+          const paidSessions=inquiries.filter(i=>inquiryCountsAsPaid(i)).length;
           const pendingInquiries=inquiries.filter(inquiryNeedsReply).length;
 
           const pad2=(n:number)=>String(n).padStart(2,"0");
@@ -1885,7 +1913,7 @@ function AdminDashboard() {
           const weekEnd=new Date(today);weekEnd.setDate(weekEnd.getDate()+7);
           const weekSessions=inquiries.filter(i=>i.booking_confirmed&&i.session_date&&new Date(i.session_date+"T12:00:00")>=today&&new Date(i.session_date+"T12:00:00")<weekEnd).length;
           const galleryCutoff=(()=>{const d=new Date(today);d.setDate(d.getDate()-60);return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;})();
-          const isGalleryDue=(i:Inquiry)=>i.payment_status==="paid"&&!!i.session_date&&i.session_date<todayStr&&i.session_date>=galleryCutoff&&!i.gallery_delivered_at;
+          const isGalleryDue=(i:Inquiry)=>inquiryCountsAsPaid(i)&&!!i.session_date&&i.session_date<todayStr&&i.session_date>=galleryCutoff&&!i.gallery_delivered_at;
           const galleriesDue=inquiries.filter(isGalleryDue).length;
 
           const pillStyle={background:T.panel,border:`1px solid ${T.border}`,color:T.inkSoft} as const;
@@ -2022,7 +2050,7 @@ function AdminDashboard() {
                 <SessionCalendar
                   sessions={inquiries
                     .filter(i=>i.session_date&&i.booking_confirmed)
-                    .map(i=>({id:i.id,name:i.name,session_type:i.session_type,session_date:i.session_date!,payment_status:i.payment_status,booking_confirmed:i.booking_confirmed,deposit2Received:finalPaymentIds.has(i.id)}))}
+                    .map(i=>({id:i.id,name:i.name,session_type:i.session_type,session_date:i.session_date!,payment_status:inquiryCountsAsPaid(i)?"paid":i.payment_status,booking_confirmed:i.booking_confirmed,deposit2Received:finalPaymentIds.has(i.id)}))}
                   onClientClick={(id)=>router.push(`/admin/conversation/${id}`)}
                   onReschedule={rescheduleSession}
                   onRemindersClick={(id)=>router.push(`/admin/reminders/${id}`)}
@@ -2060,7 +2088,7 @@ function AdminDashboard() {
                                   <p className="text-[10px] truncate" style={{color:T.inkFaint}}>{inq.session_type||"Session"}</p>
                                 </div>
                                 <div className="flex items-center gap-1 flex-shrink-0">
-                                  {inq.payment_status==="paid"&&<span className="text-[9px] font-black px-1.5 py-0.5 rounded-full" style={{background:T.greenBg,color:T.green}}>✓</span>}
+                                  {inquiryCountsAsPaid(inq)&&<span className="text-[9px] font-black px-1.5 py-0.5 rounded-full" style={{background:T.greenBg,color:T.green}}>✓</span>}
                                   <button onClick={()=>router.push(`/admin/reminders/${inq.id}`)}
                                     className="px-1.5 py-0.5 rounded-lg transition-all hover:opacity-80 text-[11px]"
                                     style={{background:T.amberBg,color:T.amber}} title="Send reminder">🔔</button>
@@ -2095,7 +2123,7 @@ function AdminDashboard() {
                       .sort((a,b)=>a.session_date!.localeCompare(b.session_date!));
                     const leadCutoff=Date.now()-90*24*60*60*1000;
                     const leads=inquiries
-                      .filter(i=>i.payment_status!=="paid"&&active(i)&&(i.reply_sent_at||i.status==="responded")&&new Date(i.created_at).getTime()>=leadCutoff)
+                      .filter(i=>!inquiryCountsAsPaid(i)&&active(i)&&(i.reply_sent_at||i.status==="responded")&&new Date(i.created_at).getTime()>=leadCutoff)
                       .sort((a,b)=>new Date(b.created_at).getTime()-new Date(a.created_at).getTime());
                     const avgBooking=averageBookingCents(ledgerPayments);
                     const avgPaid=avgBooking!==null?avgBooking/100:350;
@@ -2947,7 +2975,7 @@ function AdminDashboard() {
         )}
 
         {tab==="payments"&&(
-          <PaymentAnalyticsTab/>
+          <PaymentAnalyticsTab focusReviewToken={paymentReviewFocus} onReviewFocused={clearPaymentReviewFocus}/>
         )}
 
         {tab==="funnel"&&(
@@ -3121,8 +3149,8 @@ function AdminDashboard() {
                   }
                   if(inquirySort==="paid_recently"){
                     // Most recent payment first; unpaid sink to bottom
-                    const aPaid=a.payment_status==="paid";
-                    const bPaid=b.payment_status==="paid";
+                    const aPaid=inquiryCountsAsPaid(a);
+                    const bPaid=inquiryCountsAsPaid(b);
                     if(aPaid!==bPaid)return aPaid?-1:1;
                     const aP=a.deposit_paid_at?new Date(a.deposit_paid_at).getTime():a.payment_detected_at?new Date(a.payment_detected_at).getTime():0;
                     const bP=b.deposit_paid_at?new Date(b.deposit_paid_at).getTime():b.payment_detected_at?new Date(b.payment_detected_at).getTime():0;
@@ -3668,7 +3696,7 @@ function AdminDashboard() {
             return Math.max(inq,reply);
           }));
           const latestDepositDate=(sessions:Inquiry[])=>{
-            const paid=sessions.filter(s=>s.payment_status==="paid");
+            const paid=sessions.filter(s=>inquiryCountsAsPaid(s));
             if(!paid.length)return 0;
             return Math.max(...paid.map(s=>s.deposit_paid_at?new Date(s.deposit_paid_at).getTime():s.payment_detected_at?new Date(s.payment_detected_at).getTime():0));
           };
@@ -3678,8 +3706,8 @@ function AdminDashboard() {
             if(clientSort==="newest_inquiry")return latestInquiryDate(b.sessions)-latestInquiryDate(a.sessions);
             if(clientSort==="oldest_inquiry")return latestInquiryDate(a.sessions)-latestInquiryDate(b.sessions);
             if(clientSort==="paid_recently"){
-              const aPaid=a.sessions.some(s=>s.payment_status==="paid");
-              const bPaid=b.sessions.some(s=>s.payment_status==="paid");
+              const aPaid=a.sessions.some(s=>inquiryCountsAsPaid(s));
+              const bPaid=b.sessions.some(s=>inquiryCountsAsPaid(s));
               if(aPaid!==bPaid)return aPaid?-1:1;
               return latestDepositDate(b.sessions)-latestDepositDate(a.sessions);
             }
@@ -3696,7 +3724,7 @@ function AdminDashboard() {
           const clientDelivered=(c:{sessions:Inquiry[]})=>c.sessions.some(sessionDone)&&!clientInProgress(c);
           const filtered=clients.filter(c=>{
             const matchesSearch=!q||c.name.toLowerCase().includes(q)||c.email.toLowerCase().includes(q);
-            const hasPaid=c.sessions.some(s=>s.payment_status==="paid");
+            const hasPaid=c.sessions.some(s=>inquiryCountsAsPaid(s));
             const matchesFilter=
               clientFilter==="all"||
               (clientFilter==="paid"&&hasPaid)||
@@ -3821,6 +3849,14 @@ function AdminDashboard() {
                 </div>
               </div>
 
+              {reviewQueueFailed&&(
+                <div role="alert" className="rounded-xl px-4 py-3 text-xs font-bold flex items-center justify-between gap-3 flex-wrap"
+                     style={{background:T.redBg,color:T.red,border:`1px solid ${T.redBorder}`}}>
+                  <span>Couldn&apos;t check the payment review queue, so a detected payment may be missing from these badges.</span>
+                  <button type="button" onClick={()=>{fetchInquiries();}} className="px-2.5 py-1 rounded-lg hover:opacity-80" style={{background:T.inset,color:T.ink}}>Retry</button>
+                </div>
+              )}
+
               {/* Add client form */}
               {addClientOpen&&(
                 <div className="adm-rise rounded-2xl overflow-hidden" style={{background:T.panel,border:`1px solid ${T.borderStrong}`,boxShadow:T.shadowHover}}>
@@ -3882,7 +3918,7 @@ function AdminDashboard() {
               ):(
                 <div className="space-y-3">
                   {filtered.map((client,cardIdx)=>{
-                    const paid=client.sessions.some(s=>s.payment_status==="paid");
+                    const paid=client.sessions.some(s=>inquiryCountsAsPaid(s));
                     const initials=(()=>{const parts=client.name.trim().split(/\s+/);return parts.length>=2?(parts[0][0]+parts[parts.length-1][0]).toUpperCase():(client.name[0]??"?").toUpperCase();})();
                     return(
                       <div key={client.email} className="adm-rise rounded-2xl overflow-hidden transition-all duration-200 hover:-translate-y-0.5"
@@ -3981,12 +4017,11 @@ function AdminDashboard() {
                                   </div>
                                   <div className="flex items-center gap-2 flex-shrink-0">
                                     {/* Payment badge */}
-                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-                                          style={s.payment_status==="paid"
-                                            ?{background:T.greenBg,color:T.green}
-                                            :{background:T.neutralBg,color:T.inkFaint}}>
-                                      {s.payment_status==="paid"?"Paid":"Unpaid"}
-                                    </span>
+                                    <BookingPaymentBadge
+                                      state={resolveBookingPaymentState(s,reviewQueue)}
+                                      clientName={s.name}
+                                      onReview={()=>{setPaymentReviewFocus(n=>n+1);setTab("payments");}}
+                                    />
                                     {/* Status picker */}
                                     <div className="relative group">
                                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full cursor-pointer hover:opacity-80 transition-opacity"
