@@ -62,6 +62,7 @@ import QuickFormatTool from "@/app/admin/QuickFormatTool";
 import PaymentAnalyticsTab from "@/app/admin/PaymentAnalyticsTab";
 import ClientTimeline from "@/app/admin/ClientTimeline";
 import BookingPaymentBadge from "@/app/admin/BookingPaymentBadge";
+import { requestPaymentCheck } from "@/lib/checkPaymentClient";
 import { EMPTY_REVIEW_QUEUE, indexReviewQueue, resolveBookingPaymentState, type ReviewQueueIndex } from "@/lib/bookingPaymentState";
 import InquiryAnalyticsTab from "@/app/admin/InquiryAnalyticsTab";
 import AttributionTab from "@/app/admin/AttributionTab";
@@ -348,6 +349,7 @@ function AdminDashboard() {
   const [reviewQueueFailed,setReviewQueueFailed]=useState(false);
   const [paymentReviewFocus,setPaymentReviewFocus]=useState(0);
   const clearPaymentReviewFocus=useCallback(()=>setPaymentReviewFocus(0),[]);
+  const [checkingPaymentId,setCheckingPaymentId]=useState<number|null>(null);
   // Overlapping loads (tab switch + Sync All) can answer out of order; only
   // the newest request may write state.
   const inquiriesFetchSeq=useRef(0);
@@ -388,8 +390,8 @@ function AdminDashboard() {
       const res=await fetch("/api/sync-payments",{method:"POST"});
       const json=await res.json();
       if(!res.ok){setSyncMsg(json.error??"Payment sync failed");return false;}
-      // Sync only stages rows, so report the approval backlog, not just "synced".
-      setSyncMsg(describePaymentSyncOutcome({total:json.total??0,pendingReview:json.pendingReview,warnings:json.warnings}));
+      // Say what was recorded and what is still waiting, not just "synced".
+      setSyncMsg(describePaymentSyncOutcome({total:json.total??0,confirmed:json.confirmed,pendingReview:json.pendingReview,warnings:json.warnings}));
       setSyncResult(json.staged??[]);
       return true;
     }catch{setSyncMsg("Payment sync request failed");return false;}
@@ -408,6 +410,22 @@ function AdminDashboard() {
       note(outcome.message);
       return outcome.status;
     }catch{note("Timeline sync request failed");return "failed";}
+  }
+
+  /** One client's payment check from their card: records it if found, then reloads the booking. */
+  async function checkClientPayment(inq:Inquiry){
+    if(checkingPaymentId!==null)return;
+    setCheckingPaymentId(inq.id);
+    try{
+      const result=await requestPaymentCheck(inq);
+      // This page shows one toast at a time, so the result is one message.
+      showToast(result.toasts.map(t=>t.text).join(" · "),result.toasts.every(t=>t.ok));
+      if(!result.ok)return;
+      await Promise.all([fetchInquiries(),fetchPortalSessions()]);
+      announceTimelineSync();
+    }finally{
+      setCheckingPaymentId(null);
+    }
   }
 
   async function syncAll(){
@@ -4021,6 +4039,9 @@ function AdminDashboard() {
                                       state={resolveBookingPaymentState(s,reviewQueue)}
                                       clientName={s.name}
                                       onReview={()=>{setPaymentReviewFocus(n=>n+1);setTab("payments");}}
+                                      onCheck={()=>checkClientPayment(s)}
+                                      checking={checkingPaymentId===s.id}
+                                      checkDisabled={checkingPaymentId!==null}
                                     />
                                     {/* Status picker */}
                                     <div className="relative group">

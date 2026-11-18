@@ -14,6 +14,7 @@ import {
   updateAdminInquiry,
   type AdminInquiry,
 } from "@/lib/adminInquiries";
+import { requestPaymentCheck } from "@/lib/checkPaymentClient";
 import { T, CONV, STATUS_META, Icon, ConvStyles } from "../ui";
 import { fmtDate, readJsonSafe, stripQuotes, tryParseDate, type ReminderDraft } from "./helpers";
 import { buildInquiryReplySubject, type SubjectSource } from "@/lib/schoolDetection";
@@ -877,44 +878,15 @@ export default function ConversationPage() {
     if (!inquiry) return;
     setPaymentLoading(true);
     try {
-      const res = await fetch("/api/check-payment", {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          inquiry_id:   inquiry.id,
-          email:        inquiry.email,
-          name:         inquiry.name,
-          session_date: sessionDateInput || undefined,
-        }),
-      });
-      const json = await readJsonSafe(res) as {
-        paid?: boolean; note?: string; session_date_booked?: boolean;
-        ledger?: string; warning?: string; error?: string;
-      };
-
-      // A non-ok response means the analysis broke (Gmail, Claude, parsing,
-      // or DB) — never present that as "the client hasn't paid".
-      if (!res.ok) {
-        console.error("[check-payment] analysis failed:", json.error);
-        showToast("Payment analysis failed. No payment status was changed.", false);
-        return;
-      }
-
-      if (json.paid) {
-        showToast(`Payment confirmed — ${json.note}`);
-        if (json.session_date_booked) showToast(`Calendar marked as booked`);
-        if (json.ledger === "staged") showToast("Added to the revenue review queue — approve it in Payments once the money arrives");
-        if (json.warning) showToast(json.warning, false);
-      } else {
-        showToast(json.note || "No payment evidence found", false);
-      }
-
+      const result = await requestPaymentCheck({ ...inquiry, session_date: sessionDateInput });
+      result.toasts.forEach(t => showToast(t.text, t.ok));
+      if (!result.ok) return;
       // Refresh inquiry to pick up new payment fields
       const updated = await loadAdminInquiry(inquiry.id);
       if (updated) { noteLocalEdit(); setInquiry(updated); }
     } catch (error) {
-      console.error("[check-payment] request error:", error);
-      showToast("Payment analysis failed. No payment status was changed.", false);
+      console.error("[conversation] reload after payment check failed:", error);
+      showToast("Payment checked, but this page could not refresh. Reload to see it.", false);
     } finally {
       setPaymentLoading(false);
     }

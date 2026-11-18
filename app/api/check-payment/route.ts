@@ -1,17 +1,20 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/check-payment
 //
-// Scans Gmail for payment evidence for a given client, then uses Claude to
-// decide whether payment has been received.
+// Checks one client's payment. If Sync All already detected a payment for this
+// booking, that payment is recorded immediately (no Gmail or AI round trip).
+// Otherwise it scans Gmail for payment evidence for the client and uses Claude
+// to decide whether payment has been received; a paid result is recorded in
+// the ledger and applied to the booking without a review step.
 //
 // Body: { inquiry_id, email, name, date_in_mind?, session_date? }
 //   session_date: YYYY-MM-DD — if payment found, marks that date as "booked"
 //
 // Response:
 //   200 { paid, amount, method, note, session_date_booked, evidence, ledger?, warning? }
-//       ledger (only when paid): "staged" | "already_recorded" | "no_amount" | "failed"
-//       — a paid result is staged for revenue review so "Paid" never sits
-//       beside a $0 ledger with no trace.
+//       ledger (only when paid): "recorded" | "staged" | "already_recorded" | "no_amount" | "failed"
+//       — "recorded" is in revenue and applied to the booking; "staged" was
+//       held for review because it looks like a payment already on file.
 //   502 { error, code, raw_preview? }  — Gmail or analysis failed; nothing was
 //       written. An analysis failure is an application error, not "unpaid".
 // ─────────────────────────────────────────────────────────────────────────────
@@ -28,7 +31,8 @@ import {
   parsePaymentDetectionResult,
   sanitizeModelPreview,
 } from "@/lib/paymentDetection";
-import { stageDetectedPayment, type LedgerStagingOutcome } from "@/lib/checkPaymentLedger";
+import { confirmDetectedPayment, stageDetectedPayment, type LedgerStagingOutcome } from "@/lib/checkPaymentLedger";
+import { PIXIESET_NOTICE_FROM_QUERY } from "@/lib/providerDocumentEvents";
 
 export const dynamic = "force-dynamic";
 
@@ -112,6 +116,10 @@ function buildPaymentQueries(name: string, email: string): { q: string; max: num
   const firstName = safeFull.split(/\s+/)[0] ?? "";
   const queries: { q: string; max: number }[] = [];
 
+  // 0. The invoicing provider's notice that this client chose an offline
+  //    method — "Payment on the way for Ester Chan's invoice #123".
+  if (safeFull) queries.push({ q: `${PIXIESET_NOTICE_FROM_QUERY} subject:"Payment on the way" "${safeFull}"`, max: PER_QUERY_MAX });
+
   // 1. Provider notifications naming this client — "Ester Chan paid you $200".
   if (safeFull) queries.push({ q: `from:${PROVIDER_FROM} "${safeFull}"`, max: NAME_QUERY_MAX });
   if (firstName && firstName !== safeFull) {
@@ -148,6 +156,8 @@ Payment evidence includes:
 - Venmo/Zelle/PayPal/Cash App/Square/Apple Cash transfer notifications
 - The client saying "I sent it", "I paid", "payment sent", "just paid", "deposit sent"
 - Bank transfer receipts or payment confirmations
+- An invoice "Payment on the way" notice saying this client selected Zelle, Venmo or
+  another offline method for their invoice (Chris counts that as paid; use the invoice amount)
 - Dollar amounts ($) mentioned in a payment context
 
 A generic mention of the word "payment" with no confirmation is NOT evidence.
@@ -202,6 +212,10 @@ export async function POST(req: NextRequest) {
   if (!inquiry_id || !email || !name) {
     return NextResponse.json({ error: "inquiry_id, email, and name are required" }, { status: 400 });
   }
+
+  const supabase = createSupabaseServerClient();
+  const detected = await confirmDetectedPayment(supabase, Number(inquiry_id));
+  if (detected) return NextResponse.json(detected);
 
   const tokens = await getValidTokens();
   if (!tokens) return NextResponse.json({ error: "Gmail not connected" }, { status: 401 });
@@ -289,7 +303,6 @@ export async function POST(req: NextRequest) {
   }
 
   // ── 5. Persist the outcome ─────────────────────────────────────────────────
-  const supabase = createSupabaseServerClient();
   const noteParts = [result.note, result.amount, result.method && `via ${result.method}`];
   if (result.paid && evidence.length) noteParts.push(`Detected: ${evidence.slice(0, 3).join(", ")}`);
   const paymentNote = noteParts.filter(Boolean).join(" · ");
@@ -304,7 +317,6 @@ export async function POST(req: NextRequest) {
       payment_status:      "paid",
       payment_note:        paymentNote,
       payment_detected_at: now,
-      deposit_paid_at:     now,
       booking_confirmed:   true,
       ...(validSessionDate ? { session_date: validSessionDate } : {}),
     }).eq("id", inquiry_id);
@@ -316,6 +328,11 @@ export async function POST(req: NextRequest) {
         { status: 500 }
       );
     }
+    // The detection time stands in for the deposit date only when none is
+    // recorded: a re-check must not move a real, earlier deposit date.
+    const { error: depositError } = await supabase.from(INQUIRIES_TABLE)
+      .update({ deposit_paid_at: now }).eq("id", inquiry_id).is("deposit_paid_at", null);
+    if (depositError) console.error("[check-payment] deposit date update failed:", depositError);
     if (session_date && !validSessionDate) {
       warning = "session_date was not in YYYY-MM-DD format and was not saved.";
     }

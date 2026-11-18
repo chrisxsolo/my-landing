@@ -160,7 +160,15 @@ export default function ReviewQueuePanel({ activeRows, reloadToken, onLedgerChan
 
   const duplicateGroups = findDuplicateSuspects(activeRows);
   const ledgerActive = activeRows.filter(r => r.status === "active");
-  const conflicts = new Map(staged.map(s => [s.id, findLedgerMatches({ ...s, id: -s.id }, ledgerActive)]));
+  // A look-alike transfer nearby in time, or any payment of the same amount
+  // already on this booking: either way approving could count it twice. The
+  // server holds the same rows, so this list and its answer agree.
+  const conflicts = new Map(staged.map(s => {
+    const nearby = findLedgerMatches({ ...s, id: -s.id }, ledgerActive);
+    const sameBooking = s.inquiry_id === null ? []
+      : ledgerActive.filter(r => r.inquiry_id === s.inquiry_id && r.amount_cents === s.amount_cents && !nearby.some(n => n.id === r.id));
+    return [s.id, [...nearby, ...sameBooking]];
+  }));
   const cleanIds = staged.filter(s => !conflicts.get(s.id)?.length).map(s => s.id);
 
   function approveOne(s: StagedPayment) {
@@ -246,8 +254,8 @@ export default function ReviewQueuePanel({ activeRows, reloadToken, onLedgerChan
                     </span>
                     {isOfflinePaymentNotice(s.evidence) && (
                       <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md" style={{ background: REV.amberBg, color: REV.amber }}
-                        title="The client chose an offline method on the invoice. This is not proof the money arrived.">
-                        not a receipt — confirm it arrived
+                        title="The client chose an offline method on the invoice. These are recorded automatically when they match one booking; this one did not.">
+                        offline payment notice
                       </span>
                     )}
                     {!s.inquiry_id && (

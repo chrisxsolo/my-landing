@@ -25,6 +25,14 @@ import {
 const PIXIESET_SHARE_SENDER = "mailer@share.pixiesetmail.com";
 /** Sends account notifications to the photographer. */
 const PIXIESET_NOTICE_SENDER = "no-reply@notifications.pixiesetmail.com";
+/** The address the same notices came from until late 2026. */
+const PIXIESET_LEGACY_NOTICE_SENDER = "notifications@pixiesetmail.com";
+
+/**
+ * Gmail `from:` clause for payment notices. A subject search alone would also
+ * read any stranger's "Payment on the way" mail as income.
+ */
+export const PIXIESET_NOTICE_FROM_QUERY = `from:(${PIXIESET_NOTICE_SENDER} OR ${PIXIESET_LEGACY_NOTICE_SENDER})`;
 
 /** Gmail search for the document mail above. Archived mail is included by default. */
 export const PROVIDER_DISCOVERY_QUERY =

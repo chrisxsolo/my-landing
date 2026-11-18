@@ -219,6 +219,22 @@ describe("approving a staged payment", () => {
     expect(fake.tables.inquiries[0]).toMatchObject({ payment_status: "paid", deposit_paid_at: PAID_AT });
   });
 
+  it("holds a manual approval when the booking already has that amount, until it is confirmed as separate", async () => {
+    setup({
+      payments_staging: [stagedRow()],
+      payments: [{ id: 7, inquiry_id: 10, status: "active", fingerprint: "older", amount_cents: 10000, client_name: "Alex Example",
+        client_email: "alex@example.test", amount: "$100", method: "Zelle", payment_type: "deposit_1", paid_at: "2026-09-01T00:00:00.000Z", session_date: null }],
+      inquiries: [inquiryRow({ payment_status: "paid", deposit_paid_at: "2026-09-01T00:00:00.000Z" })],
+    });
+    const held = await (await post({ action: "approve", ids: [1] })).json();
+    expect(held).toMatchObject({ approved: 0, held: [{ id: 1, matches: [7] }] });
+    expect(fake.tables.payments).toHaveLength(1);
+
+    const confirmed = await (await post({ action: "approve", ids: [1], confirmIds: [1] })).json();
+    expect(confirmed.approved).toBe(1);
+    expect(fake.tables.payments).toHaveLength(2);
+  });
+
   it("rejecting a staged row changes nothing on the booking", async () => {
     setup({ payments_staging: [stagedRow()], inquiries: [inquiryRow()] });
     const json = await (await post({ action: "reject", ids: [1] })).json();

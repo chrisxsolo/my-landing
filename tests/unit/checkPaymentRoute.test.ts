@@ -10,9 +10,13 @@ const mocks = vi.hoisted(() => ({
   claudeUserContent: "",
   searchQueries: [] as string[],
   updates: [] as { table: string; values: Record<string, unknown> }[],
+  conditionalUpdates: [] as { table: string; values: Record<string, unknown> }[],
   upserts: [] as { table: string; values: Record<string, unknown> }[],
   inserts: [] as { table: string; values: Record<string, unknown> }[],
   existingRows: {} as Record<string, { id: number }[]>,
+  autoConfirm: [] as { scope: unknown }[],
+  // What automatic confirmation returns, call by call (default: nothing confirmed).
+  confirmed: [] as { stagingId: number; inquiryId: number; clientName: string; amountCents: number }[][],
 }));
 
 vi.mock("@/lib/requireAdmin", () => ({ requireAdmin: () => null }));
@@ -21,9 +25,13 @@ vi.mock("@/lib/supabaseServer", () => ({
   createSupabaseServerClient: () => ({
     from: (table: string) => ({
       update: (values: Record<string, unknown>) => ({
-        eq: async () => {
-          mocks.updates.push({ table, values });
-          return { error: null };
+        eq: () => {
+          // The "only when missing" deposit-date write is tracked separately.
+          const settle = (list: typeof mocks.updates) => { list.push({ table, values }); return { error: null }; };
+          return {
+            is: async () => settle(mocks.conditionalUpdates),
+            then: (ok: (v: { error: null }) => unknown) => Promise.resolve(settle(mocks.updates)).then(ok),
+          };
         },
       }),
       upsert: async (values: Record<string, unknown>) => {
@@ -43,6 +51,12 @@ vi.mock("@/lib/supabaseServer", () => ({
       },
     }),
   }),
+}));
+vi.mock("@/lib/paymentAutoConfirm", () => ({
+  autoConfirmStaged: async (_client: unknown, scope: unknown) => {
+    mocks.autoConfirm.push({ scope });
+    return { confirmed: mocks.confirmed.shift() ?? [], needsReview: 0, incomplete: [], failed: [], portalAmbiguous: [] };
+  },
 }));
 vi.mock("@anthropic-ai/sdk", () => ({
   default: class MockAnthropic {
@@ -95,9 +109,12 @@ beforeEach(() => {
   mocks.claudeUserContent = "";
   mocks.searchQueries.length = 0;
   mocks.updates.length = 0;
+  mocks.conditionalUpdates.length = 0;
   mocks.upserts.length = 0;
   mocks.inserts.length = 0;
   mocks.existingRows = {};
+  mocks.autoConfirm.length = 0;
+  mocks.confirmed.length = 0;
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
 
@@ -141,6 +158,46 @@ describe("POST /api/check-payment", () => {
     expect(String(mocks.updates[0].values.payment_note)).toContain("$200");
   });
 
+  it("records a payment Sync All already detected without scanning Gmail or asking Claude", async () => {
+    mocks.confirmed.push([{ stagingId: 3, inquiryId: 42, clientName: "Jane Doe", amountCents: 20000 }]);
+    const res = await callRoute();
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json).toMatchObject({ paid: true, amount: "$200", ledger: "recorded" });
+    expect(mocks.autoConfirm[0].scope).toEqual({ inquiryId: 42 });
+    expect(mocks.searchQueries).toHaveLength(0);
+    expect(mocks.claudeUserContent).toBe("");
+  });
+
+  it("records a freshly detected payment in revenue with no review step", async () => {
+    mocks.claudeText = '{"paid": true, "amount": "$200", "method": "Venmo", "note": "Venmo receipt from Jane"}';
+    mocks.confirmed.push([], [{ stagingId: 9, inquiryId: 42, clientName: "Jane Doe", amountCents: 20000 }]);
+    const json = await (await callRoute()).json();
+
+    expect(json.ledger).toBe("recorded");
+    expect(mocks.inserts.some(i => i.table === "payments_staging")).toBe(true);
+  });
+
+  it("searches the invoicing provider's payment-on-the-way notice for this client first", async () => {
+    mocks.claudeText = '{"paid": false, "amount": null, "method": null, "note": "No payment evidence found"}';
+    await callRoute();
+    expect(mocks.searchQueries[0]).toBe('from:(no-reply@notifications.pixiesetmail.com OR notifications@pixiesetmail.com) subject:"Payment on the way" "Jane Doe"');
+  });
+
+  it("never overwrites an existing deposit date on a re-check", async () => {
+    mocks.claudeText = '{"paid": true, "amount": "$200", "method": "Venmo", "note": "Venmo receipt"}';
+    await callRoute();
+    expect(mocks.updates[0].values).not.toHaveProperty("deposit_paid_at");
+    expect(mocks.conditionalUpdates).toEqual([{ table: "inquiries", values: { deposit_paid_at: expect.any(String) } }]);
+  });
+
+  it("says a same-amount detection is waiting in review instead of calling it recorded", async () => {
+    mocks.claudeText = '{"paid": true, "amount": "$200", "method": "Venmo", "note": "Venmo receipt"}';
+    mocks.existingRows = { payments_staging: [{ id: 3 }] };
+    expect((await (await callRoute()).json()).ledger).toBe("staged");
+  });
+
   it("stages a paid result for revenue review so Paid never sits beside a $0 ledger", async () => {
     mocks.claudeText = '{"paid": true, "amount": "$200", "method": "Venmo", "note": "Client confirmed the deposit"}';
     const res = await callRoute();
@@ -180,10 +237,10 @@ describe("POST /api/check-payment", () => {
     // Name-scoped provider searches first, then the client thread — generic
     // provider searches (newest-first, mostly Chris's own purchases) must
     // never crowd these out of the MAX_EMAILS cap.
-    expect(mocks.searchQueries[0]).toContain('"Jane Doe"');
-    expect(mocks.searchQueries[0]).toContain("venmo.com");
-    expect(mocks.searchQueries[1]).toContain('"Jane"');
-    expect(mocks.searchQueries[2]).toContain("jane@example.com");
+    expect(mocks.searchQueries[1]).toContain('"Jane Doe"');
+    expect(mocks.searchQueries[1]).toContain("venmo.com");
+    expect(mocks.searchQueries[2]).toContain('"Jane"');
+    expect(mocks.searchQueries[3]).toContain("jane@example.com");
     const genericVenmoIdx = mocks.searchQueries.findIndex(q => q.startsWith("from:(venmo.com)"));
     expect(genericVenmoIdx).toBeGreaterThan(2);
   });

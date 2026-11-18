@@ -102,13 +102,15 @@ export default function RevenueDashboard({ focusReviewToken = 0, onReviewFocused
         body: JSON.stringify({}),
       });
       const json = await res.json() as {
-        total?: number; pendingReview?: PendingReviewSummary | null; warnings?: string[]; error?: string;
+        total?: number; confirmed?: number; pendingReview?: PendingReviewSummary | null; warnings?: string[]; error?: string;
       };
       if (!res.ok) { setSyncMessage(json.error ?? "Claude payment audit failed."); return; }
       setStagingReloadToken(t => t + 1);
+      if (json.confirmed) load();
+      const needsReview = (json.pendingReview?.count ?? 0) > 0;
       setSyncMessage(`${describePaymentSyncOutcome({
-        total: json.total ?? 0, pendingReview: json.pendingReview, warnings: json.warnings,
-      })} Review them in Data Quality.`);
+        total: json.total ?? 0, confirmed: json.confirmed, pendingReview: json.pendingReview, warnings: json.warnings,
+      })}${needsReview ? " Review them in Data Quality." : ""}`);
     } catch {
       setSyncMessage("Claude payment audit failed.");
     } finally {

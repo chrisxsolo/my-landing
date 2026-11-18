@@ -3,6 +3,7 @@
 // already recorded; only its inquiry / calendar / portal effects are redone.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { inquiryCountsAsPaid } from "@/lib/clientSessions";
+import { CLOSED_INQUIRY_STATUSES } from "@/lib/paymentSyncShared";
 import { projectConfirmedPayment, type ConfirmedPayment, type ProjectionStep } from "@/lib/paymentProjection";
 
 const PAYMENTS_TABLE = "payments";
@@ -20,13 +21,12 @@ export type UnprojectedPayment = { paymentId: number; inquiryId: number; clientN
 // A final installment never books a client, and a closed inquiry is not
 // waiting to be booked — neither is a missing projection.
 const FINAL_INSTALLMENT = "deposit_2";
-const CLOSED_STATUSES = new Set(["not_interested", "archived", "declined", "cancelled", "ghosted"]);
 
 type InquiryPaymentRow = { id: number; status: string | null; payment_status: string | null; deposit_paid_at: string | null };
 
 /** Same rule as the Clients badge: an inquiry already shown as paid needs no repair. */
 function awaitsProjection(inquiry: InquiryPaymentRow): boolean {
-  return !inquiryCountsAsPaid(inquiry) && !CLOSED_STATUSES.has(inquiry.status ?? "");
+  return !inquiryCountsAsPaid(inquiry) && !CLOSED_INQUIRY_STATUSES.has(inquiry.status ?? "");
 }
 
 /** True when this inquiry is still shown unpaid, so a confirmed payment has not reached it. */

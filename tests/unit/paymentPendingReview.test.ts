@@ -28,8 +28,13 @@ describe("describePaymentSyncOutcome", () => {
   it("surfaces the existing backlog even when this run found nothing new", () => {
     const msg = describePaymentSyncOutcome({ total: 0, pendingReview: { count: 2, cents: 97500 } });
     expect(msg).toContain("0 new payments found.");
-    expect(msg).toContain("2 payments ($975) awaiting your approval");
+    expect(msg).toContain("2 payments ($975) need your review (no clear client match, or possibly already recorded)");
     expect(msg).toContain("not counted in revenue");
+  });
+
+  it("reports payments the sync recorded on its own", () => {
+    expect(describePaymentSyncOutcome({ total: 2, confirmed: 2, pendingReview: { count: 0, cents: 0 } }))
+      .toBe("2 new payments found. 2 payments recorded and the bookings updated. Nothing awaiting approval.");
   });
 
   it("says nothing is waiting when the queue is empty", () => {

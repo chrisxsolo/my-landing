@@ -2,10 +2,11 @@
 // POST /api/sync-payments
 //
 // Two-pass payment detection with full Gmail access. Detected payments are
-// written to `payments_staging` (status "pending") — NEVER directly into
-// `payments`. The ledger only changes when staged rows are approved via
-// /api/admin/payment-staging, which also applies inquiry/availability side
-// effects. Dedup is fingerprint-based (see lib/paymentFingerprint.ts).
+// written to `payments_staging` first, then every staged payment that can be
+// tied to exactly one booking is confirmed automatically
+// (lib/paymentAutoConfirm): ledger row, inquiry, calendar and portal session.
+// Unlinked, weakly matched or possibly-duplicate detections stay pending for
+// the review queue. Dedup is fingerprint-based (see lib/paymentFingerprint.ts).
 //
 // Pass 1 — Known payment senders: Searches Pixieset, Venmo, Zelle, PayPal,
 //           Cash App notification emails and extracts client info via Claude.
@@ -15,9 +16,10 @@
 //           for emails to/from that client and asks Claude if any contains
 //           payment evidence. Fingerprint = payer|amount|date|method.
 //
-// Returns: { staged: [...], total, pendingReview: { count, cents }, warnings }
-//   total counts rows staged by THIS run; pendingReview counts every staged
-//   row still awaiting approval (none of it is in revenue yet).
+// Returns: { staged: [...], total, confirmed, pendingReview: { count, cents }, warnings }
+//   total counts rows staged by THIS run; confirmed counts payments recorded
+//   and applied to their booking; pendingReview counts every staged row still
+//   waiting for a person (none of that is in revenue yet).
 // 502 { code: "GMAIL_SEARCH_FAILED" } when every notification search failed —
 //   a Gmail outage must never read as "no payments found".
 // ─────────────────────────────────────────────────────────────────────────────
@@ -27,8 +29,12 @@ import Anthropic from "@anthropic-ai/sdk";
 import { getValidTokens } from "@/lib/gmailTokens";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { requireAdmin } from "@/lib/requireAdmin";
-import { parsePaymentSyncMonth, summarizePendingReview, withGmailMonthFilter } from "@/lib/paymentSyncShared";
+import {
+  CLOSED_INQUIRY_STATUSES, PAYMENT_SOURCE, parsePaymentSyncMonth, summarizePendingReview, withGmailMonthFilter,
+} from "@/lib/paymentSyncShared";
+import { PIXIESET_NOTICE_FROM_QUERY } from "@/lib/providerDocumentEvents";
 import { paymentFingerprint } from "@/lib/paymentFingerprint";
+import { autoConfirmStaged, mergeAutoConfirm, type AutoConfirmOutcome } from "@/lib/paymentAutoConfirm";
 
 export const dynamic = "force-dynamic";
 
@@ -245,8 +251,7 @@ async function syncPayments(req: NextRequest) {
 
   // Never touch inquiries that are closed/rejected — these statuses mean the
   // client didn't book, so any matching payment notification is a false positive.
-  const SKIP_STATUSES = new Set(["not_interested", "archived", "declined", "cancelled", "ghosted"]);
-  const activeInquiries = inquiries.filter(inq => !SKIP_STATUSES.has(inq.status));
+  const activeInquiries = inquiries.filter(inq => !CLOSED_INQUIRY_STATUSES.has(inq.status));
   const unpaid = activeInquiries.filter(inq => inq.payment_status !== "paid");
 
   // Fingerprint dedup set: everything already in the ledger or ever staged.
@@ -290,12 +295,28 @@ async function syncPayments(req: NextRequest) {
     return true;
   }
 
+  // Records every staged payment that can be tied to one booking. A failure
+  // leaves the rows staged, so it is reported rather than failing the sync.
+  const warnings: string[] = [];
+  const confirming: { outcome: AutoConfirmOutcome; failed: boolean } = {
+    outcome: { confirmed: [], incomplete: [], failed: [], portalAmbiguous: [] }, failed: false,
+  };
+  async function confirmDetected() {
+    try {
+      confirming.outcome = mergeAutoConfirm(confirming.outcome, await autoConfirmStaged(supabase));
+    } catch (error) {
+      console.error("[sync-payments] automatic confirmation failed:", error);
+      if (!confirming.failed) warnings.push("Detected payments could not be confirmed automatically; they are waiting in the review queue.");
+      confirming.failed = true;
+    }
+  }
+
   // ═══════════════════════════════════════════════════════════════════════════
   // PASS 1 — Known payment sender notification emails
   // ═══════════════════════════════════════════════════════════════════════════
 
   const pass1Results = await Promise.all([
-    searchMessageIds(withGmailMonthFilter(`subject:"Payment on the way" "invoice"`, syncMonth), auth, 50),
+    searchMessageIds(withGmailMonthFilter(`${PIXIESET_NOTICE_FROM_QUERY} subject:"Payment on the way" "invoice"`, syncMonth), auth, 50),
     searchMessageIds(withGmailMonthFilter(`from:venmo@venmo.com "paid you"`, syncMonth), auth, 50),
     searchMessageIds(withGmailMonthFilter(`from:no-reply@zelle.com "sent you"`, syncMonth), auth, 50),
     searchMessageIds(withGmailMonthFilter(`from:service@paypal.com "sent you"`, syncMonth), auth, 50),
@@ -308,7 +329,6 @@ async function syncPayments(req: NextRequest) {
       { status: 502 },
     );
   }
-  const warnings: string[] = [];
   const failedPass1 = pass1Results.filter(ids => ids === null).length;
   if (failedPass1) {
     warnings.push(`${failedPass1} of ${pass1Results.length} payment-notification searches failed; results may be incomplete.`);
@@ -391,7 +411,7 @@ async function syncPayments(req: NextRequest) {
       payment_type: payment.paymentType,
       invoice: payment.invoice,
       note,
-      source: "pass1",
+      source: PAYMENT_SOURCE.notification,
       source_txn_id: `gmail:${messageId}`,
       paid_at: paidAt,
       session_date: inq?.session_date ?? null,
@@ -409,6 +429,10 @@ async function syncPayments(req: NextRequest) {
       });
     }
   }
+
+  // Confirm what pass 1 found before the slow per-client sweep, so a run cut
+  // short by the platform's time limit has still recorded those payments.
+  await confirmDetected();
 
   // ═══════════════════════════════════════════════════════════════════════════
   // PASS 2 — Per-client full Gmail sweep for remaining unpaid inquiries
@@ -471,7 +495,7 @@ async function syncPayments(req: NextRequest) {
       payment_type: result.paymentType,
       invoice: "",
       note,
-      source: "pass2",
+      source: PAYMENT_SOURCE.clientSweep,
       source_txn_id: "",
       paid_at: paidAt,
       session_date: inq.session_date ?? null,
@@ -493,6 +517,17 @@ async function syncPayments(req: NextRequest) {
     warnings.push(`Gmail search failed for ${failedClientSearches} client${failedClientSearches === 1 ? "" : "s"}; they were not checked.`);
   }
 
+  await confirmDetected();
+  const confirmation = confirming.outcome;
+  if (confirmation.incomplete.length) {
+    const count = confirmation.incomplete.length;
+    warnings.push(`${count} payment${count === 1 ? " was" : "s were"} recorded but the booking update did not finish; finish in Payments → review.`);
+  }
+  if (confirmation.failed.length) {
+    const count = confirmation.failed.length;
+    warnings.push(`${count} payment${count === 1 ? "" : "s"} could not be saved and ${count === 1 ? "is" : "are"} waiting in the review queue.`);
+  }
+
   const { data: pendingRows, error: pendingError } = await supabase
     .from(STAGING_TABLE)
     .select("amount_cents")
@@ -502,6 +537,7 @@ async function syncPayments(req: NextRequest) {
   return NextResponse.json({
     staged,
     total: staged.length,
+    confirmed: confirmation.confirmed.length,
     pendingReview: pendingError ? null : summarizePendingReview(pendingRows ?? []),
     warnings,
   });
