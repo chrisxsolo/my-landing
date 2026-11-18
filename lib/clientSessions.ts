@@ -150,6 +150,28 @@ export function inquiryCountsAsPaid(inquiry: {
   return inquiry.payment_status === "paid" || !!inquiry.deposit_paid_at;
 }
 
+/**
+ * The stage to show for an inquiry. A portal session's stored stage rules when
+ * one exists. Without one, real booking activity on the inquiry — a reply, an
+ * invoice or a contract sent — reads as "booking in progress" instead of
+ * "inquiry received". Display only: no session is created, and nothing short
+ * of payment evidence reads as booked.
+ */
+export function resolveInquiryPortalStatus(
+  storedStatus: ClientSessionStatus | null | undefined,
+  inquiry: {
+    payment_status?: string | null;
+    deposit_paid_at?: string | null;
+    reply_sent_at?: string | null;
+    invoice_sent_at?: string | null;
+    contract_sent_at?: string | null;
+  },
+): ClientSessionStatus {
+  const inProgress = !!(inquiry.reply_sent_at || inquiry.invoice_sent_at || inquiry.contract_sent_at);
+  const base = storedStatus ?? (inProgress ? "booking_in_progress" : "inquiry_received");
+  return resolveEffectiveSessionStatus(base, inquiryCountsAsPaid(inquiry));
+}
+
 export function normalizeClientSessionEmail(value: string | null | undefined) {
   if (typeof value !== "string") return null;
   const trimmed = value.trim().toLowerCase();

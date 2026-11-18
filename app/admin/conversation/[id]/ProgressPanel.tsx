@@ -3,7 +3,7 @@
 // status strip + milestone timeline as the admin Clients tab, scoped to this
 // conversation's client. Owns its own portal-session fetch/save state.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import AdminSessionStatusStrip from "@/app/components/admin-session-status-strip";
 import ClientTimeline from "@/app/admin/ClientTimeline";
@@ -11,8 +11,7 @@ import type { AdminInquiry } from "@/lib/adminInquiries";
 import {
   findMatchingClientSession,
   getClientSessionEmailMatches,
-  inquiryCountsAsPaid,
-  resolveEffectiveSessionStatus,
+  resolveInquiryPortalStatus,
   CLIENT_SESSION_STATUS_LABELS,
   type AdminClientSessionDTO,
   type ClientSessionStatus,
@@ -38,21 +37,27 @@ type Props = {
   inquiry: AdminInquiry;
   onInquiryUpdate: (patch: Partial<AdminInquiry>) => void;
   showToast: (msg: string, ok?: boolean) => void;
+  /** Changes whenever the inquiry was re-read from the server; reloads sessions. */
+  refreshKey?: number;
 };
 
-export default function ProgressPanel({ inquiry, onInquiryUpdate, showToast }: Props) {
+export default function ProgressPanel({ inquiry, onInquiryUpdate, showToast, refreshKey = 0 }: Props) {
   const [sessions, setSessions] = useState<AdminClientSessionDTO[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(true);
   const [savingStatus, setSavingStatus] = useState<ClientSessionStatus | null>(null);
+  // Bumped by every manual stage change, so a session list that was requested
+  // before the change cannot land afterwards and undo it on screen.
+  const stageEditSeq = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
+    const seqAtStart = stageEditSeq.current;
     (async () => {
       try {
         const res = await fetch("/api/admin/sessions", await sessionsHeaders());
         const json = await res.json() as SessionsResponse;
         if (!res.ok) throw new Error(json.error ?? "Failed to load portal sessions");
-        if (!cancelled) setSessions(json.sessions ?? []);
+        if (!cancelled && stageEditSeq.current === seqAtStart) setSessions(json.sessions ?? []);
       } catch (error) {
         console.error("[ProgressPanel] portal sessions load failed:", error);
       } finally {
@@ -60,7 +65,7 @@ export default function ProgressPanel({ inquiry, onInquiryUpdate, showToast }: P
       }
     })();
     return () => { cancelled = true; };
-  }, [inquiry.email]);
+  }, [inquiry.email, refreshKey]);
 
   const portalSession = findMatchingClientSession(sessions, {
     clientEmail: inquiry.email,
@@ -69,12 +74,10 @@ export default function ProgressPanel({ inquiry, onInquiryUpdate, showToast }: P
   }) as AdminClientSessionDTO | null;
   const ambiguous =
     getClientSessionEmailMatches(sessions, inquiry.email).length > 1 && !portalSession;
-  const effectiveStatus = resolveEffectiveSessionStatus(
-    portalSession?.currentStatus ?? "inquiry_received",
-    inquiryCountsAsPaid(inquiry),
-  );
+  const effectiveStatus = resolveInquiryPortalStatus(portalSession?.currentStatus, inquiry);
 
   async function selectStatus(status: ClientSessionStatus) {
+    stageEditSeq.current++;
     setSavingStatus(status);
     try {
       const res = await fetch("/api/admin/sessions", {
@@ -99,6 +102,7 @@ export default function ProgressPanel({ inquiry, onInquiryUpdate, showToast }: P
         return;
       }
       const updated = json.session;
+      stageEditSeq.current++;
       setSessions(prev => {
         const index = prev.findIndex(s => s.id === updated.id);
         if (index === -1) return [updated, ...prev];

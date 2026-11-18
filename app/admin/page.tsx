@@ -101,12 +101,13 @@ import TagStatusBadge from "@/app/admin/photoTagging/TagStatusBadge";
 import { usePhotoTagging } from "@/app/admin/photoTagging/usePhotoTagging";
 import { portfolioPhotoKey } from "@/lib/photoTagging/types";
 import { GRAD_SCHOOLS } from "@/lib/portfolioCategoryContent";
+import { describeSyncResponse, type SyncResponseBody, type SyncStatus } from "@/lib/timelineSync/report";
+import { announceTimelineSync } from "@/lib/inquiryRevalidation";
 import { normalizePortfolioCategorySlug } from "@/lib/photoMetadata";
 import {
   findMatchingClientSession,
   getClientSessionEmailMatches,
-  inquiryCountsAsPaid,
-  resolveEffectiveSessionStatus,
+  resolveInquiryPortalStatus,
   CLIENT_SESSION_STATUS_LABELS,
   type AdminClientSessionDTO,
   type ClientSessionStatus,
@@ -362,7 +363,7 @@ function AdminDashboard() {
   // only ever stages rows for review) and then the timeline / milestone scan,
   // which reads the inquiry rows the first pass may have stamped. Sequential on
   // purpose — two full mailbox sweeps at once just invites rate limiting.
-  const [syncState,setSyncState]=useState<"idle"|"running"|"done"|"failed">("idle");
+  const [syncState,setSyncState]=useState<"idle"|"running"|"done"|"partial"|"failed">("idle");
   const [syncResult,setSyncResult]=useState<{name:string;email:string;amount:string;method:string;paymentType:string;paidAt:string;orphan:boolean;pass:number}[]|null>(null);
   const [syncMsg,setSyncMsg]=useState<string|null>(null);
   // A ref, not state: it has to be read and set within one tick so a double
@@ -382,14 +383,19 @@ function AdminDashboard() {
     }catch{setSyncMsg("Payment sync request failed");return false;}
   }
 
-  /** Timeline / milestone pass. False means it failed. */
-  async function syncTimelinePass():Promise<boolean>{
+  /**
+   * Timeline / milestone pass. Reports what the route says happened — a run
+   * that could not read Gmail or only got partway is not a success, and its
+   * explanation is shown next to the payment result rather than replacing it.
+   */
+  async function syncTimelinePass():Promise<SyncStatus>{
+    const note=(msg:string)=>setSyncMsg(prev=>[prev,msg].filter(Boolean).join(" · "));
     try{
       const res=await fetch("/api/admin/sessions/sync-sent-invoices",{method:"POST"});
-      const json=await res.json();
-      if(!res.ok){setSyncMsg(json.error??"Timeline sync failed");return false;}
-      return true;
-    }catch{setSyncMsg("Timeline sync request failed");return false;}
+      const outcome=describeSyncResponse(res.ok,await res.json() as SyncResponseBody);
+      note(outcome.message);
+      return outcome.status;
+    }catch{note("Timeline sync request failed");return "failed";}
   }
 
   async function syncAll(){
@@ -404,25 +410,27 @@ function AdminDashboard() {
       await Promise.all([fetchInquiries(),fetchPortalSessions()]);
       // Manual sync is explicit intent, so it skips the freshness window.
       await autoRefreshInquiries({force:true});
-      if(payments&&timeline){
+      // Conversations open in other tabs re-read their progress now.
+      announceTimelineSync();
+      if(payments&&timeline==="complete"){
         setSyncState("done");
         showToast("Payments and timeline synced ✓");
         // Let the confirmation sit for a moment, then return to the idle label.
         setTimeout(()=>setSyncState(s=>s==="done"?"idle":s),4000);
         return;
       }
-      setSyncState("failed");
-      showToast(
-        payments?"Payments synced — timeline sync failed"
-        :timeline?"Timeline synced — payment sync failed"
-        :"Sync failed — nothing was updated",
-        false);
+      // A partial timeline run still saved what it found — say "incomplete",
+      // not "failed", and never claim nothing was written (a timed-out request
+      // may have applied changes before it was cut off).
+      const timelineText=timeline==="complete"?"Timeline synced":timeline==="partial"?"Timeline sync incomplete":"Timeline sync failed";
+      setSyncState(payments&&timeline==="partial"?"partial":"failed");
+      showToast(`${payments?"Payments synced":"Payment sync failed"} — ${timelineText.toLowerCase()}. See details below the button.`,false);
     }finally{
       syncInFlight.current=false;
     }
   }
 
-  const SYNC_LABEL={idle:"⟳ Sync All",running:"Syncing…",done:"✓ Synced Successfully",failed:"⚠ Sync Failed — Retry"} as const;
+  const SYNC_LABEL={idle:"⟳ Sync All",running:"Syncing…",done:"✓ Synced Successfully",partial:"⚠ Synced — Incomplete",failed:"⚠ Sync Failed — Retry"} as const;
 
   // ── Gmail ─────────────────────────────────────────────────────────────────
   const [gmailConnected,setGmailConnected]=useState(false);
@@ -1047,7 +1055,7 @@ function AdminDashboard() {
   }
 
   function getEffectivePortalStatus(inquiry:Inquiry,portalSession:AdminClientSessionDTO|null):ClientSessionStatus{
-    return resolveEffectiveSessionStatus(portalSession?.currentStatus??"inquiry_received",inquiryCountsAsPaid(inquiry));
+    return resolveInquiryPortalStatus(portalSession?.currentStatus,inquiry);
   }
 
   async function updatePortalStatusFromInquiry(inquiry:Inquiry,status:ClientSessionStatus){
@@ -2987,6 +2995,8 @@ function AdminDashboard() {
                     className="text-xs font-bold px-3 py-2 rounded-xl transition-all hover:-translate-y-px disabled:opacity-50 flex items-center gap-1.5"
                     style={syncState==="failed"
                       ?{background:T.redBg,color:T.red,border:`1px solid ${T.red}44`}
+                      :syncState==="partial"
+                      ?{background:T.amberBg,color:T.amber,border:`1px solid ${T.amberBorder}`}
                       :{background:T.greenBg,color:T.green,border:`1px solid ${T.greenBorder}`}}>
                     {syncState==="running"&&<span className="animate-spin inline-block">◌</span>}
                     {SYNC_LABEL[syncState]}
@@ -3795,6 +3805,8 @@ function AdminDashboard() {
                         className="text-xs font-bold px-3 py-1.5 rounded-lg transition-all hover:-translate-y-px flex items-center gap-1.5 disabled:opacity-50 flex-shrink-0"
                         style={syncState==="failed"
                           ?{background:T.redBg,color:T.red,border:`1px solid ${T.red}44`}
+                          :syncState==="partial"
+                          ?{background:T.amberBg,color:T.amber,border:`1px solid ${T.amberBorder}`}
                           :{background:T.greenBg,color:T.green,border:`1px solid ${T.greenBorder}`}}>
                         {syncState==="running"&&<span className="animate-spin inline-block">◌</span>}
                         {SYNC_LABEL[syncState]}

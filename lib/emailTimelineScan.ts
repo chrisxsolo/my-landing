@@ -8,6 +8,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import Anthropic from "@anthropic-ai/sdk";
+import { hasExcludedLabel, msgDate } from "@/lib/gmailSyncHelpers";
 import {
   CLIENT_SESSION_STATUS_VALUES,
   normalizeClientSessionStatus,
@@ -17,6 +18,7 @@ import {
 const GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me";
 const MAX_EMAILS_PER_CLIENT = 12;
 const BODY_CHAR_LIMIT = 1200;
+const MODEL_TIMEOUT_MS = 15_000;
 
 export type EmailMilestones = {
   replySentAt: string | null;
@@ -34,8 +36,9 @@ export type EmailMilestones = {
 export type MilestoneScanClient = { email: string; name: string | null };
 
 type MimePart = { mimeType?: string; body?: { data?: string }; parts?: MimePart[] };
-type GmailFullMessage = {
+export type GmailFullMessage = {
   internalDate?: string;
+  labelIds?: string[];
   snippet?: string;
   payload?: MimePart & { headers?: { name: string; value: string }[] };
 };
@@ -77,14 +80,19 @@ function extractJson(raw: string): string {
   return raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
 }
 
-type ThreadEntry = { index: number; iso: string; direction: string; subject: string; body: string };
+export type ThreadEntry = { index: number; iso: string; direction: string; subject: string; body: string };
 
+/**
+ * The client's recent conversation, oldest first. Throws when Gmail could not
+ * be searched or none of the found messages could be read — an unreadable
+ * thread must surface as a failed scan, not as "no milestones".
+ */
 async function fetchClientThread(auth: string, clientEmail: string): Promise<ThreadEntry[]> {
   const searchRes = await fetch(
     `${GMAIL_API}/messages?q=${encodeURIComponent(`from:${clientEmail} OR to:${clientEmail}`)}&maxResults=20`,
     { headers: { Authorization: auth } },
   );
-  if (!searchRes.ok) return [];
+  if (!searchRes.ok) throw new Error(`Gmail thread search failed (${searchRes.status})`);
   const data = await searchRes.json() as { messages?: { id: string }[] };
   const ids = (data.messages ?? []).map(m => m.id).slice(0, MAX_EMAILS_PER_CLIENT);
   if (!ids.length) return [];
@@ -96,10 +104,22 @@ async function fetchClientThread(auth: string, clientEmail: string): Promise<Thr
       return await r.json() as GmailFullMessage;
     } catch { return null; }
   }));
+  if (messages.every(m => m === null)) throw new Error("Gmail thread messages could not be read");
 
+  return toThreadEntries(messages.filter((m): m is GmailFullMessage => m !== null), clientEmail);
+}
+
+/**
+ * Pure: Gmail messages → numbered thread entries. Unsent drafts and trashed or
+ * spam mail are not part of the conversation, and a message without a real
+ * timestamp is dropped rather than dated "now".
+ */
+export function toThreadEntries(messages: GmailFullMessage[], clientEmail: string): ThreadEntry[] {
   const entries: ThreadEntry[] = [];
   for (const msg of messages) {
-    if (!msg) continue;
+    if (hasExcludedLabel(msg)) continue;
+    const iso = msgDate(msg.internalDate);
+    if (!iso) continue;
     const headers = msg.payload?.headers ?? [];
     const header = (name: string) =>
       headers.find(h => h.name.toLowerCase() === name.toLowerCase())?.value ?? "";
@@ -108,7 +128,7 @@ async function fetchClientThread(auth: string, clientEmail: string): Promise<Thr
     if (!body) continue;
     entries.push({
       index: 0, // assigned after sorting
-      iso: msg.internalDate ? new Date(parseInt(msg.internalDate, 10)).toISOString() : new Date().toISOString(),
+      iso,
       direction: from.includes(clientEmail.toLowerCase()) ? "CLIENT → ME" : "ME → CLIENT",
       subject: header("Subject"),
       body,
@@ -148,6 +168,46 @@ Be conservative: only report a milestone when the evidence is clear for THIS cli
 Respond ONLY with valid JSON — no markdown, no code fences, no explanation:
 {"reply_sent":<email number or null>,"invoice_sent":<email number or null>,"contract_sent":<email number or null>,"deposit_paid":<email number or null>,"contract_signed":<email number or null>,"gallery_delivered":<email number or null>,"session_date":<"YYYY-MM-DD" or null>,"session_time":<"HH:MM" or null>}`;
 
+const INDEX_FIELDS = [
+  "reply_sent", "invoice_sent", "contract_sent", "deposit_paid", "contract_signed", "gallery_delivered",
+] as const;
+
+/**
+ * Validates the model's JSON. The reply is untrusted: it must be an object,
+ * and every milestone must be null or a whole email number that exists in the
+ * thread — anything else is discarded, never coerced. Throws on non-JSON.
+ */
+export function parseMilestoneIndices(raw: string, emailCount: number): MilestoneIndices {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(extractJson(raw));
+  } catch {
+    // The parser's own message quotes the model output — keep that out of logs.
+    throw new Error("Milestone response was not valid JSON");
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("Milestone response was not a JSON object");
+  }
+  const record = parsed as Record<string, unknown>;
+  const index = (value: unknown) =>
+    typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= emailCount ? value : null;
+  const text = (value: unknown, pattern: RegExp) =>
+    typeof value === "string" && pattern.test(value) ? value : null;
+
+  const indices = Object.fromEntries(INDEX_FIELDS.map(field => [field, index(record[field])])) as
+    Pick<MilestoneIndices, (typeof INDEX_FIELDS)[number]>;
+  return {
+    ...indices,
+    session_date: text(record.session_date, /^\d{4}-\d{2}-\d{2}$/),
+    session_time: text(record.session_time, /^([01]\d|2[0-3]):[0-5]\d$/),
+  };
+}
+
+/**
+ * Milestones found in one client's thread, or null when the client has no
+ * readable conversation. Throws when Gmail or the model fails, so the caller
+ * can report the client as not scanned.
+ */
 export async function scanClientEmailMilestones(
   auth: string,
   client: MilestoneScanClient,
@@ -159,7 +219,8 @@ export async function scanClientEmailMilestones(
     .map(e => `--- Email ${e.index} | ${e.direction} | ${e.iso.slice(0, 10)} | Subject: ${e.subject} ---\n${e.body}`)
     .join("\n\n");
 
-  const anthropic = new Anthropic();
+  // No retries and a hard timeout: one slow call must not eat the route budget.
+  const anthropic = new Anthropic({ timeout: MODEL_TIMEOUT_MS, maxRetries: 0 });
   const res = await anthropic.messages.create({
     model: "claude-haiku-4-5",
     max_tokens: 200,
@@ -170,17 +231,10 @@ export async function scanClientEmailMilestones(
     }],
   });
 
-  let indices: MilestoneIndices;
-  try {
-    const raw = res.content[0].type === "text" ? res.content[0].text : "{}";
-    indices = JSON.parse(extractJson(raw)) as MilestoneIndices;
-  } catch (error) {
-    console.error(`[emailTimelineScan] bad AI response for ${client.email}:`, error);
-    return null;
-  }
-
+  const first = res.content[0];
+  const indices = parseMilestoneIndices(first?.type === "text" ? first.text : "", entries.length);
   const dateOf = (n: number | null) =>
-    typeof n === "number" ? entries.find(e => e.index === n)?.iso ?? null : null;
+    n === null ? null : entries.find(e => e.index === n)?.iso ?? null;
 
   return {
     replySentAt: dateOf(indices.reply_sent),
@@ -189,37 +243,50 @@ export async function scanClientEmailMilestones(
     depositPaidAt: dateOf(indices.deposit_paid),
     contractSignedAt: dateOf(indices.contract_signed),
     galleryDeliveredAt: dateOf(indices.gallery_delivered),
-    sessionDate: typeof indices.session_date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(indices.session_date)
-      ? indices.session_date
-      : null,
-    sessionTime: typeof indices.session_time === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(indices.session_time)
-      ? indices.session_time
-      : null,
+    sessionDate: indices.session_date,
+    sessionTime: indices.session_time,
   };
 }
 
+export type MilestoneScanOutcome = {
+  results: Map<string, EmailMilestones>;
+  /** Clients whose thread could not be read or analyzed this run. */
+  failed: string[];
+  /** Clients left unscanned because the time budget ran out. */
+  notScanned: string[];
+};
+
 // Scan several clients with bounded concurrency so a full sync stays inside
-// the serverless time limit.
+// the serverless time limit. Once `deadlineAt` passes, no new batch starts:
+// the rest are returned as notScanned instead of being silently dropped.
 export async function scanMilestonesForClients(
   auth: string,
   clients: MilestoneScanClient[],
-  concurrency = 4,
-): Promise<Map<string, EmailMilestones>> {
-  const results = new Map<string, EmailMilestones>();
+  options: { concurrency?: number; deadlineAt?: number } = {},
+): Promise<MilestoneScanOutcome> {
+  const concurrency = options.concurrency ?? 4;
+  const outcome: MilestoneScanOutcome = { results: new Map(), failed: [], notScanned: [] };
   for (let i = 0; i < clients.length; i += concurrency) {
+    if (options.deadlineAt !== undefined && Date.now() >= options.deadlineAt) {
+      outcome.notScanned.push(...clients.slice(i).map(c => c.email.toLowerCase()));
+      break;
+    }
     const batch = clients.slice(i, i + concurrency);
     const scanned = await Promise.all(batch.map(async c => {
-      try { return { email: c.email.toLowerCase(), milestones: await scanClientEmailMilestones(auth, c) }; }
+      const email = c.email.toLowerCase();
+      try { return { email, ok: true as const, milestones: await scanClientEmailMilestones(auth, c) }; }
       catch (error) {
-        console.error(`[emailTimelineScan] scan failed for ${c.email}:`, error);
-        return { email: c.email.toLowerCase(), milestones: null };
+        // Reason only — never the address or any thread content.
+        console.error("[emailTimelineScan] scan failed:", error instanceof Error ? error.message : "unknown error");
+        return { email, ok: false as const, milestones: null };
       }
     }));
     for (const s of scanned) {
-      if (s.milestones) results.set(s.email, s.milestones);
+      if (!s.ok) outcome.failed.push(s.email);
+      else if (s.milestones) outcome.results.set(s.email, s.milestones);
     }
   }
-  return results;
+  return outcome;
 }
 
 // ─── Portal-stage advancement ────────────────────────────────────────────────

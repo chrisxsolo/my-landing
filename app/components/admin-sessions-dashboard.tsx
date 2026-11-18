@@ -23,6 +23,8 @@ import {
   resolveAdminPortalSessionFocus,
 } from "@/lib/adminPortalSessionNavigation";
 import { supabase } from "@/lib/supabase";
+import { describeSyncResponse, syncChangedSessions, type SyncResponseBody } from "@/lib/timelineSync/report";
+import { announceTimelineSync } from "@/lib/inquiryRevalidation";
 
 type AdminSessionsResponse = {
   sessions?: AdminClientSessionDTO[];
@@ -281,13 +283,15 @@ export default function AdminSessionsDashboard() {
         method: "POST",
         headers,
       });
-      const json = await res.json() as { updated?: string[]; message?: string; error?: string };
-      if (!res.ok) {
-        setError(json.error ?? "Scan failed.");
-        return;
-      }
-      setMessage(json.message ?? "Scan complete.");
-      if (json.updated?.length) {
+      const json = await res.json() as SyncResponseBody;
+      const outcome = describeSyncResponse(res.ok, json);
+      // A partial run still saved what it found; its message says what is
+      // incomplete. Only a run that could not look at all is an error.
+      if (outcome.status === "failed") setError(outcome.message);
+      else setMessage(outcome.message);
+      announceTimelineSync();
+      // Reload on failure too: a request that timed out may still have saved changes.
+      if (outcome.status === "failed" || syncChangedSessions(json)) {
         // Reload sessions to reflect the new statuses
         const { data } = await supabase.auth.getSession();
         const token = data.session?.access_token;

@@ -22,6 +22,8 @@ import PipelineRail from "./PipelineRail";
 import ThreadColumn from "./ThreadColumn";
 import ContactCard from "./ContactCard";
 import ProgressPanel from "./ProgressPanel";
+import { useInquiryRevalidation } from "./useInquiryRevalidation";
+import { mergeProgressFields } from "@/lib/inquiryRevalidation";
 import ComposePanel from "./ComposePanel";
 import TrainAiPanel from "./TrainAiPanel";
 import BookingPanel, { SunsetCard } from "./BookingPanel";
@@ -230,6 +232,18 @@ export default function ConversationPage() {
       });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inquiryId]);
+
+  // Sync All usually runs from the dashboard while this conversation stays
+  // open — pick up the milestones it stamped when the tab is looked at again.
+  // Only progress fields are merged; the draft and subject are never touched.
+  const { refreshKey, noteLocalEdit } = useInquiryRevalidation(
+    inquiryId,
+    (fresh) => {
+      // A newly agreed shoot date changes the golden-hour card too.
+      if (fresh.session_date && fresh.session_date !== inquiry?.session_date) fetchSunset(fresh.session_date);
+      setInquiry(prev => (prev ? mergeProgressFields(prev, fresh) : prev));
+    },
+  );
 
   // Deterministic reply subject — recomputed whenever inquiry data changes
   // (load, edits, timeline sync) until the user edits the subject themselves.
@@ -782,7 +796,8 @@ export default function ConversationPage() {
             last_message_at: now,
             last_message_direction: "outbound",
           });
-          setInquiry(updated);
+          noteLocalEdit();
+      setInquiry(updated);
           setStatus("responded");
         } catch (err) {
           // The email went out — never surface this as a send failure, or a
@@ -847,6 +862,7 @@ export default function ConversationPage() {
           ? { needs_reply: false, needs_reply_dismissed_at: new Date().toISOString() }
           : {}),
       });
+      noteLocalEdit();
       setInquiry(updated);
       setStatus(s);
       showToast(`Marked as ${STATUS_META[s]?.label.toLowerCase() ?? s}`);
@@ -895,7 +911,7 @@ export default function ConversationPage() {
 
       // Refresh inquiry to pick up new payment fields
       const updated = await loadAdminInquiry(inquiry.id);
-      if (updated) setInquiry(updated);
+      if (updated) { noteLocalEdit(); setInquiry(updated); }
     } catch (error) {
       console.error("[check-payment] request error:", error);
       showToast("Payment analysis failed. No payment status was changed.", false);
@@ -929,7 +945,7 @@ export default function ConversationPage() {
       }
       showToast(json.already_paid ? "Payment details updated" : "Marked as paid ✓");
       const updated = await loadAdminInquiry(inquiry.id);
-      if (updated) setInquiry(updated);
+      if (updated) { noteLocalEdit(); setInquiry(updated); }
       return true;
     } catch (error) {
       console.error("[mark-paid-manually] request error:", error);
@@ -1032,7 +1048,7 @@ export default function ConversationPage() {
         .eq("client_email", inquiry.email)
         .is("session_date", null);
       const updated = await loadAdminInquiry(inquiry.id);
-      if (updated) setInquiry(updated);
+      if (updated) { noteLocalEdit(); setInquiry(updated); }
       setDetectedDate(null);
       setSessionDateInput("");
       fetchSunset(dateStr);
@@ -1371,8 +1387,12 @@ export default function ConversationPage() {
 
           <ProgressPanel
             inquiry={inquiry}
-            onInquiryUpdate={(patch) => setInquiry(prev => (prev ? { ...prev, ...patch } : prev))}
+            onInquiryUpdate={(patch) => {
+              noteLocalEdit();
+              setInquiry(prev => (prev ? { ...prev, ...patch } : prev));
+            }}
             showToast={showToast}
+            refreshKey={refreshKey}
           />
 
           <ComposePanel
