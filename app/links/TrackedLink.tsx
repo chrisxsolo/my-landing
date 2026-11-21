@@ -1,5 +1,8 @@
 "use client";
 
+import { C } from "@/lib/colors";
+import LinkIcon, { iconForEmoji } from "./LinkIcon";
+
 type TrackedLinkProps = {
   id: number;
   label: string;
@@ -7,9 +10,6 @@ type TrackedLinkProps = {
   emoji: string | null;
   description: string | null;
   animationDelay: string;
-  background: string;
-  borderColor: string;
-  accent?: string;
   eyebrow?: string;
   featured?: boolean;
 };
@@ -60,9 +60,6 @@ export default function TrackedLink({
   emoji,
   description,
   animationDelay,
-  background,
-  borderColor,
-  accent = "#9d6fe8",
   eyebrow,
   featured = false,
 }: TrackedLinkProps) {
@@ -79,69 +76,72 @@ export default function TrackedLink({
     window.open(url, "_blank", "noopener,noreferrer");
   }
 
+  const tile = featured ? 56 : 48;
+  const arrow = featured ? 42 : 34;
+
   return (
     <a
       href={url}
       target="_blank"
       rel="noopener noreferrer"
       onClick={handleClick}
-      className={`link-card flex items-center gap-4 w-full px-5 ${featured ? "rounded-[2rem] py-6" : "rounded-[1.7rem] py-5"}`}
+      className={`link-card flex items-center gap-4 w-full px-5 ${featured ? "rounded-3xl py-6" : "rounded-2xl py-[1.125rem]"}`}
       style={{
         animationDelay,
-        background,
-        border: `1.5px solid ${borderColor}`,
-        boxShadow: featured
-          ? `0 22px 54px ${borderColor}`
-          : undefined,
+        background: featured ? C.pageAlt : C.white,
+        border: `1px solid ${featured ? C.clayBorder : C.warmEdge}`,
+        boxShadow: featured ? C.shadowWarm : undefined,
       }}
     >
       <div
-        className={`flex items-center justify-center flex-shrink-0 ${featured ? "rounded-[1.35rem] text-[1.75rem]" : "rounded-xl text-2xl"}`}
+        className={`flex items-center justify-center flex-shrink-0 ${featured ? "rounded-2xl" : "rounded-xl"}`}
         style={{
-          width: featured ? 60 : 52,
-          height: featured ? 60 : 52,
-          minWidth: featured ? 60 : 52,
-          minHeight: featured ? 60 : 52,
-          background: featured ? "rgba(255,255,255,0.55)" : "rgba(255,255,255,0.42)",
-          boxShadow: featured ? `inset 0 1px 0 rgba(255,255,255,0.7)` : undefined,
+          width: tile,
+          height: tile,
+          background: featured ? C.white : C.pageAlt,
+          border: `1px solid ${C.warmEdge}`,
+          color: C.clay,
         }}
       >
-        {emoji ?? "🔗"}
+        <LinkIcon name={iconForEmoji(emoji)} size={featured ? 26 : 22} />
       </div>
 
       <div className="flex-1 min-w-0">
         {eyebrow ? (
           <p
-            className="mb-1 text-[11px] font-black uppercase tracking-[0.16em]"
-            style={{ color: accent }}
+            className="mb-1 text-[11px] font-bold uppercase tracking-[0.16em]"
+            style={{ color: C.clay }}
           >
             {eyebrow}
           </p>
         ) : null}
-        <p className={`font-black text-slate-900 leading-tight ${featured ? "text-[1.7rem]" : "text-base"}`}>
+        <p
+          className={`font-bold leading-tight tracking-tight ${featured ? "text-[1.6rem]" : "text-base"}`}
+          style={{ color: C.warmInk }}
+        >
           {label}
         </p>
         {description ? (
-          <p className={`font-medium mt-1 leading-tight text-slate-500 ${featured ? "text-[1rem] max-w-[24ch]" : "text-sm truncate"}`}>
+          <p
+            className={`mt-1 leading-tight ${featured ? "text-[1rem] max-w-[24ch]" : "text-sm truncate"}`}
+            style={{ color: C.warmBody }}
+          >
             {description}
           </p>
         ) : null}
       </div>
 
       <div
-        className={`rounded-full flex items-center justify-center flex-shrink-0 ${featured ? "translate-x-0" : ""}`}
+        className="link-arrow rounded-full flex items-center justify-center flex-shrink-0"
         style={{
-          width: featured ? 44 : 34,
-          height: featured ? 44 : 34,
-          minWidth: featured ? 44 : 34,
-          background: "white",
-          boxShadow: featured
-            ? `0 10px 24px ${borderColor}`
-            : `0 2px 8px ${borderColor}`,
-          color: accent,
+          width: arrow,
+          height: arrow,
+          background: featured ? C.clay : "transparent",
+          border: `1px solid ${featured ? C.clay : C.warmEdge}`,
+          color: featured ? C.white : C.clay,
         }}
       >
-        <svg width={featured ? "16" : "13"} height={featured ? "16" : "13"} viewBox="0 0 13 13" fill="none">
+        <svg width={featured ? "15" : "13"} height={featured ? "15" : "13"} viewBox="0 0 13 13" fill="none" aria-hidden="true">
           <path d="M2.5 6.5h8M6.5 2.5l4 4-4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </div>

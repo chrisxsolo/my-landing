@@ -93,6 +93,17 @@ export const C = {
   shadowWarm: `0 18px 42px ${warmShadow}`,
   shadowWarmLg: `0 26px 68px rgba(157,118,86,0.12)`,
 
+  // Warm monotone set (the /links hub): espresso text and one clay accent on
+  // the cream page. Every text color holds at least 4.5:1 on page, pageAlt
+  // and white.
+  warmInk: "#2a211c",
+  warmBody: "#6b5d53",
+  warmMuted: "#7d6e63",
+  clay: "#a4583a",
+  claySoft: "rgba(164,88,58,0.08)",
+  clayBorder: "rgba(164,88,58,0.30)",
+  warmGlow: "radial-gradient(circle, rgba(234,219,203,0.55), transparent 65%)",
+
   // Soft fills (backgrounds, borders)
   p1_04:  `rgba(${r1},0.04)`,
   p1_06:  `rgba(${r1},0.06)`,

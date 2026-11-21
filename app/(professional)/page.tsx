@@ -25,6 +25,7 @@ import styles from "@/app/(professional)/home.module.css";
 import pageStyles from "@/app/(professional)/HomePage.module.css";
 import JsonLd from "@/app/components/JsonLd";
 import { siteGraph } from "@/lib/seo/schema";
+import { ABOUT_PORTRAIT_SRC } from "@/lib/aboutFacts";
 
 export const revalidate = 3600;
 
@@ -36,7 +37,7 @@ const description =
   "Graduation and couples photographer in San Francisco and the Bay Area, plus family and maternity sessions. Guided posing and transparent pricing.";
 // 1200x630 crop for link previews (iMessage, Instagram, Facebook, X).
 const SOCIAL_IMAGE = "/images/about/chris-solorzano-sunset-beach-og.jpg";
-const HOME_ABOUT_PORTRAIT = "/images/about/chris-solorzano-sunset-beach.webp";
+const HOME_ABOUT_PORTRAIT = ABOUT_PORTRAIT_SRC;
 
 export const metadata: Metadata = buildPageMetadata({
   title: PAGE_TITLE,

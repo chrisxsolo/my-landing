@@ -7,6 +7,11 @@
 export const ABOUT_PHOTOS_BUCKET = "about-photos";
 export const ABOUT_PHOTOS_TABLE = "about_photos";
 
+// The portrait of Chris used on /about, the homepage and the /links avatar.
+export const ABOUT_PORTRAIT_SRC = "/images/about/chris-solorzano-sunset-beach.webp";
+export const ABOUT_PORTRAIT_ALT =
+  "Chris Solorzano smiling on a beach at sunset with a camera on his shoulder";
+
 export type AboutFact = {
   slug: string;
   title: string;

@@ -29,6 +29,8 @@ import {
   ABOUT_FACT_CONTENT_KEY,
   ABOUT_FACT_ORDER_KEY,
   ABOUT_PHOTOS_TABLE,
+  ABOUT_PORTRAIT_ALT,
+  ABOUT_PORTRAIT_SRC,
   orderAboutFacts,
   resolveAboutFacts,
   type AboutPhotoMap,
@@ -51,7 +53,7 @@ export const metadata: Metadata = buildPageMetadata({
 
 // ── PORTRAIT PHOTO ────────────────────────────────────────────────────────────
 // To change: drop a new file in public/images/about/ (or paste a Supabase URL).
-const portrait = "/images/about/chris-solorzano-sunset-beach.webp";
+const portrait = ABOUT_PORTRAIT_SRC;
 
 const TURNAROUND_WEEKS = PRICING_CATALOG.standardTurnaroundDays / 7;
 // Package-aware, never one number for every service.
@@ -453,7 +455,7 @@ export default async function ProfessionalAboutPage() {
           <div className="about-portrait-wrap" data-reveal="scale">
             <OptimizedPhoto
               src={portrait}
-              alt="Chris Solorzano smiling on a beach at sunset with a camera on his shoulder"
+              alt={ABOUT_PORTRAIT_ALT}
               sizes="(max-width: 920px) 90vw, 40vw"
               quality={90}
               objectPosition="center 70%"
