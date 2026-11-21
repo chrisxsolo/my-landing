@@ -11,7 +11,7 @@ import {
   callForJson, loadPhotoSummaries, validated, assertKnownPhotos, keepKnownPhotoPlacements, GenerationError,
   type ItemSpec, type TargetContext, type TargetResult,
 } from "@/lib/contentEngine/generationTargetCore";
-import { buildGuidePhotoPrompt } from "@/lib/contentEngine/prompts";
+import { buildGuidePhotoPrompt, MAX_GUIDE_PLACEMENTS } from "@/lib/contentEngine/prompts";
 import { auditGuideClaims, buildLocationGuidePrompt, deterministicGuideFields } from "@/lib/contentEngine/locationGuidePrompt";
 import {
   confirmationMessage, findOpenProposal, guideForSession, loadSessionLocation,
@@ -50,7 +50,8 @@ async function placeOnExistingGuide(
   const parsed = placementsResponseSchema.safeParse(json);
   if (!parsed.success) throw new GenerationError(`malformed placements response: ${parsed.error.message}`);
 
-  const placements = keepKnownPhotoPlacements(parsed.data.placements, known, "guide_photo");
+  const placements = keepKnownPhotoPlacements(parsed.data.placements, known, "guide_photo")
+    .slice(0, MAX_GUIDE_PLACEMENTS);
   const itemSpecs: ItemSpec[] = placements.map((raw) => {
     const payload = validated("guide_photo", raw);
     if (payload.guide !== match.guide || payload.location_key !== match.slug) {

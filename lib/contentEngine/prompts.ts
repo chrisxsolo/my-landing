@@ -201,6 +201,11 @@ export function buildSchoolPagePhotoPrompt(
   };
 }
 
+// A guide page takes the best of a session, not all of it. Uncapped, a
+// 30-photo session produced more placement JSON than the output limit holds
+// and the answer was cut off mid-array (2026-11-21).
+export const MAX_GUIDE_PLACEMENTS = 12;
+
 // The location is decided BEFORE this prompt (deterministic place match), so
 // the model only chooses photos and writes captions for that one guide page —
 // it never picks which location the session belongs to.
@@ -217,6 +222,8 @@ export function buildGuidePhotoPrompt(
       "guide page: one or two warm sentences drawn from this photo's analysis — the " +
       "light, the setting, the moment — useful to someone planning a session at this " +
       "location. Never generic filler. " +
+      `Place at most ${MAX_GUIDE_PLACEMENTS} photos: the strongest (highest quality_score) ` +
+      "and most varied, never near-duplicates. " +
       "If no allowed location matches the session, return {\"placements\":[]}.",
     userText:
       `${factsBlock(facts)}\n\n${locationBlock}\n\nAllowed location keys for the ${guide} guide ` +

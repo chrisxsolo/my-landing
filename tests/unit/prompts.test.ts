@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   PROMPT_VERSION, buildAnalysisPrompt, buildJournalPrompt, buildPortfolioPickPrompt,
-  buildSchoolPagePhotoPrompt, buildGuidePhotoPrompt, buildInternalLinkPrompt,
+  buildSchoolPagePhotoPrompt, buildGuidePhotoPrompt, buildInternalLinkPrompt, MAX_GUIDE_PLACEMENTS,
   buildTopPicksPrompt,
 } from "@/lib/contentEngine/prompts";
 import { internalLinksForService, guideLocationKeys } from "@/lib/contentEngine/taxonomy";
@@ -77,6 +77,13 @@ describe("prompt construction (spec §8.3)", () => {
     );
     expect(p.system).toContain("\"caption\"");
     expect(p.system.toLowerCase()).toContain("guide page");
+  });
+
+  it("guide prompt caps how many photos one session places, so the answer fits the output limit", () => {
+    const p = buildGuidePhotoPrompt(
+      { ...facts, service_type: "couples" }, photoSummaries, "couples", ["lovers-lane"], NO_PLACE,
+    );
+    expect(p.system).toContain(`at most ${MAX_GUIDE_PLACEMENTS} photos`);
   });
 
   it("couples guide prompt carries the couples location keys and couples voice guidance", () => {

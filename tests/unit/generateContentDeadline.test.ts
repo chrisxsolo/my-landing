@@ -113,6 +113,23 @@ describe("generateContentType under a deadline", () => {
     expect(modelCalls).toHaveLength(1); // a timeout is not retried — there is no time left
   });
 
+  it("an answer cut off at the output limit fails with a plain reason, not a JSON syntax error", async () => {
+    const callModel: ModelCaller = async (req) => {
+      modelCalls.push(req);
+      return {
+        text: '{"placements":[{"a":1},{"b":', usage: { input_tokens: 1, output_tokens: 4000 },
+        model: req.model, stopReason: "max_tokens",
+      };
+    };
+    const result = await generateContentType({
+      client: fakeClient(rpcCalls), callModel, packageId: PACKAGE, contentType: "internal_link_suggestion",
+    });
+    expect(result.outcome).toBe("failed");
+    expect(result.error).toMatch(/cut off at the 4000-token output limit/);
+    expect(result.error).not.toMatch(/SyntaxError/);
+    expect(modelCalls).toHaveLength(1);
+  });
+
   it("a transient provider error is retried inside the same deadline, with one terminal record", async () => {
     const start = 9_000_000;
     let now = start;

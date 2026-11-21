@@ -94,6 +94,8 @@ export async function loadPhotoSummaries(client: SupabaseClient, sessionId: stri
   }));
 }
 
+const MAX_TOKENS_STOP = "max_tokens";
+
 const seconds = (ms: number) => Math.round(ms / 1000);
 
 type ModelCallBody = Pick<ModelCallRequest, "model" | "system" | "maxTokens" | "messages">;
@@ -144,6 +146,13 @@ export async function callForJson(
     isRetryable: isTransientModelError,
     delayFor: (err, attempt) => modelRetryDelayMs(err, attempt, GENERATION_RETRY),
   });
+  // A cut-off answer is half a JSON document: say so, rather than let the
+  // parser report a syntax error somewhere in the middle of it.
+  if (response.stopReason === MAX_TOKENS_STOP) {
+    throw new GenerationError(
+      `the model's answer was cut off at the ${maxTokens}-token output limit before it finished`,
+    );
+  }
   return {
     json: extractJsonObject(response.text),
     usage: { model: response.model, ...response.usage },

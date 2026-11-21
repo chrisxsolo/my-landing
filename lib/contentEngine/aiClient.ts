@@ -26,6 +26,8 @@ export interface ModelCallResult {
   text: string;
   usage: ModelUsage;
   model: string;
+  /** Why the model stopped. "max_tokens" means the text was cut off mid-answer. */
+  stopReason?: string | null;
 }
 
 export type ModelCaller = (req: ModelCallRequest) => Promise<ModelCallResult>;
@@ -59,6 +61,7 @@ export function createAnthropicCaller(apiKey: string): ModelCaller {
         output_tokens: response.usage.output_tokens,
       },
       model: response.model,
+      stopReason: response.stop_reason,
     };
   };
 }
