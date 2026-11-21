@@ -1,12 +1,15 @@
 import type { Metadata } from "next";
+import type { CSSProperties } from "react";
 import NextLink from "next/link";
 import { C } from "@/lib/colors";
-import TrackedLink from "./TrackedLink";
+import TrackedLink, { type LinkCardVariant } from "./TrackedLink";
 import LinkIcon from "./LinkIcon";
+import LinksAnalytics from "./LinksAnalytics";
+import LinksFilmstrip from "./LinksFilmstrip";
 import { eyebrowForLink } from "./linkEyebrow";
+import styles from "./links.module.css";
 import OptimizedPhoto from "@/app/components/OptimizedPhoto";
 import { ABOUT_PORTRAIT_ALT, ABOUT_PORTRAIT_SRC } from "@/lib/aboutFacts";
-import LinksAnalytics from "./LinksAnalytics";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 
 export const dynamic = 'force-dynamic'
@@ -26,13 +29,15 @@ export const metadata: Metadata = {
 const PROFILE = {
   name:      "@soloxsnaps",
   bio:       "Chris Solo · Bay Area Portrait Photographer",
-  avatar:    ABOUT_PORTRAIT_SRC, // same portrait as /about
+  photo:     ABOUT_PORTRAIT_SRC, // same portrait as /about
   instagram: "https://www.instagram.com/soloxsnaps",
 };
 
 const HERO = {
   eyebrow: "Bay Area graduation + portrait photos",
-  headline: "Warm, natural photos that still feel like you.",
+  // Rendered as one sentence; the last word is set in the accent style.
+  headlineLead: "Warm, natural photos that still feel like",
+  headlineAccent: "you.",
   subcopy:
     "Start with the link that fits where you're at right now — booking, pricing, availability, or prep.",
   trust: ["Bay Area based", "Calm posing help", "Fast replies"],
@@ -59,12 +64,6 @@ const DRAFT_LINKS: Link[] = [
   { id:4, label:"Graduation Guide",      url:"https://www.soloxsnaps.com/grad-guide",    emoji:"🎓", description:"Poses, outfits, and prep",            active:true, order:5 },
 ];
 
-const MARQUEE_ITEMS = [
-  "Bay Area Photographer","Grad Shoots","Portrait Sessions",
-  "Golden Hour","@soloxsnaps","Book Now","Bay Area Photographer",
-  "Grad Shoots","Portrait Sessions","Golden Hour","@soloxsnaps","Book Now",
-];
-
 async function getLinks() {
   try {
     const supabase = createSupabaseServerClient();
@@ -84,130 +83,108 @@ async function getLinks() {
   return DRAFT_LINKS;
 }
 
-const PAGE_STYLES = `
-  @keyframes fadeUp  { from{opacity:0;transform:translateY(16px);} to{opacity:1;transform:translateY(0);} }
-  @keyframes marquee { from{transform:translateX(0);} to{transform:translateX(-50%);} }
+// lib/colors.ts → CSS custom properties read by links.module.css.
+const LINKS_THEME = {
+  "--page": C.page,
+  "--page-alt": C.pageAlt,
+  "--white": C.white,
+  "--edge": C.warmEdge,
+  "--ink": C.warmInk,
+  "--body": C.warmBody,
+  "--muted": C.warmMuted,
+  "--clay": C.clay,
+  "--clay-deep": C.clayDeep,
+  "--clay-soft": C.claySoft,
+  "--clay-border": C.clayBorder,
+  "--glass": C.white_82,
+  "--sheen": C.white_22,
+  "--glow-warm": C.warmGlow,
+  "--glow-clay": C.clayGlow,
+  "--shadow": C.shadowWarm,
+  "--shadow-lg": C.shadowWarmLg,
+} as CSSProperties;
 
-  .fade-up { animation: fadeUp 0.45s ease both; }
-  .mtrack  { animation: marquee 30s linear infinite; }
+const step = (i: number) => ({ "--i": i }) as CSSProperties;
 
-  .link-card {
-    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
-    animation: fadeUp 0.45s ease both;
-  }
-  .link-card:hover  { transform: translateY(-2px); border-color: ${C.clayBorder} !important; box-shadow: ${C.shadowWarm}; }
-  .link-card:active { transform: scale(0.99); }
-  .link-arrow { transition: transform 0.18s ease; }
-  .link-card:hover .link-arrow { transform: translateX(2px); }
-
-  .ig-button { transition: border-color 0.18s ease, background 0.18s ease; }
-  .ig-button:hover { border-color: ${C.clayBorder} !important; background: ${C.pageAlt} !important; }
-
-  @media (prefers-reduced-motion: reduce) {
-    .fade-up, .link-card, .mtrack { animation: none; }
-    .link-card, .link-arrow { transition: none; }
-  }
-`;
-
-const CARD_SURFACE = {
-  background: C.white,
-  border: `1px solid ${C.warmEdge}`,
-} as const;
-
-function ProfileHeader() {
+function Hero() {
   return (
     <>
-      <div
-        className="fade-up mb-6 inline-flex items-center gap-2 whitespace-nowrap rounded-full px-3.5 py-2 text-[10px] font-bold uppercase tracking-[0.14em]"
-        style={{ ...CARD_SURFACE, color: C.clay }}
-      >
-        <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ background: C.clay }} />
-        {HERO.eyebrow}
-      </div>
-
-      <div className="fade-up mb-6" style={{ animationDelay: "0.04s" }}>
-        <div
-          className="rounded-full p-1.5"
-          style={{ border: `1px solid ${C.warmEdge}`, background: C.white, boxShadow: C.shadowWarm }}
-        >
-          <div
-            className="relative overflow-hidden rounded-full"
-            style={{ width: 112, height: 112, background: C.pageAlt }}
-          >
-            <OptimizedPhoto
-              src={PROFILE.avatar}
-              alt={ABOUT_PORTRAIT_ALT}
-              sizes="112px"
-              priority
-              objectPosition="50% 50%"
-            />
-          </div>
-        </div>
-      </div>
-
-      <div className="fade-up text-center mb-8" style={{ animationDelay: "0.08s" }}>
-        <h1 className="text-2xl font-bold tracking-tight mb-1" style={{ color: C.warmInk }}>{PROFILE.name}</h1>
-        <p className="text-sm font-medium leading-snug" style={{ color: C.warmMuted }}>{PROFILE.bio}</p>
-        <h2 className="mt-5 text-[2rem] font-bold leading-[1.06] tracking-tight" style={{ color: C.warmInk }}>
-          {HERO.headline}
-        </h2>
-        <p className="mx-auto mt-3 max-w-[32ch] text-[0.98rem] leading-relaxed" style={{ color: C.warmBody }}>
-          {HERO.subcopy}
+      <div className={styles.hero}>
+        <OptimizedPhoto
+          src={PROFILE.photo}
+          alt={ABOUT_PORTRAIT_ALT}
+          sizes="(max-width: 448px) 100vw, 448px"
+          priority
+          objectPosition="50% 44%"
+        />
+        <p className={styles.heroPill}>
+          <span className={styles.pulseDot} />
+          {HERO.eyebrow}
         </p>
-        <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
-          {HERO.trust.map((item) => (
-            <span
-              key={item}
-              className="rounded-full px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em]"
-              style={{ ...CARD_SURFACE, color: C.warmBody }}
-            >
-              {item}
-            </span>
-          ))}
+      </div>
+
+      <div className={`${styles.identity} ${styles.rise}`} style={step(1)}>
+        <div className="min-w-0">
+          <h1 className={styles.handle}>{PROFILE.name}</h1>
+          <p className={styles.bio}>{PROFILE.bio}</p>
         </div>
         <a
           href={PROFILE.instagram}
-          target="_blank" rel="noopener noreferrer"
-          className="ig-button inline-flex items-center gap-2 mt-5 px-5 py-2.5 rounded-full text-xs font-bold"
-          style={{ background: C.white, border: `1px solid ${C.warmInk}`, color: C.warmInk }}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Follow on Instagram"
+          className={styles.igIcon}
         >
-          <LinkIcon name="instagram" size={16} />
-          Follow on Instagram
+          <LinkIcon name="instagram" size={20} />
         </a>
       </div>
+
+      <h2 className={styles.headline}>
+        {HERO.headlineLead}{" "}
+        <span className={styles.accent}>
+          {HERO.headlineAccent}
+          <svg className={styles.squiggle} viewBox="0 0 76 10" preserveAspectRatio="none" aria-hidden="true">
+            <path d="M2 6c12-5 24 4 36 0s24-5 36 0" pathLength={1} />
+          </svg>
+        </span>
+      </h2>
+      <p className={`${styles.subcopy} ${styles.rise}`} style={step(4)}>{HERO.subcopy}</p>
+      <ul className={`${styles.trust} ${styles.rise}`} style={step(5)}>
+        {HERO.trust.map((item) => <li key={item}>{item}</li>)}
+      </ul>
     </>
   );
 }
 
-function PageFooter() {
+// First link is the filled primary card; the rest fill a two-column grid, and
+// a leftover odd tile spans the full row.
+function cardVariant(index: number, total: number): LinkCardVariant {
+  if (index === 0) return "primary";
+  const isLast = index === total - 1;
+  const tileCountIsOdd = (total - 1) % 2 === 1;
+  return isLast && tileCountIsOdd ? "tileWide" : "tile";
+}
+
+function Closing() {
   return (
     <>
-      <div className="mt-7 w-full rounded-2xl px-5 py-4" style={{ ...CARD_SURFACE, background: C.pageAlt }}>
-        <p className="text-[11px] font-bold uppercase tracking-[0.18em]" style={{ color: C.clay }}>
-          Quick note
-        </p>
-        <p className="mt-2 text-sm leading-relaxed" style={{ color: C.warmBody }}>
-          If you’re not sure where to begin, start with <span className="font-bold" style={{ color: C.warmInk }}>Book a Photoshoot</span> for the fastest path, or <span className="font-bold" style={{ color: C.warmInk }}>Graduation Guide</span> if you want to feel more prepared first.
+      <div className={styles.note}>
+        <p className={styles.eyebrow}>Quick note</p>
+        <p className={styles.noteText}>
+          If you’re not sure where to begin, start with <strong>Book a Photoshoot</strong> for the fastest path, or <strong>Graduation Guide</strong> if you want to feel more prepared first.
         </p>
       </div>
 
-      <div className="mt-12 w-full overflow-hidden rounded-2xl py-3" style={CARD_SURFACE}>
-        <div className="mtrack flex whitespace-nowrap w-max" style={{ gap: "48px" }}>
-          {MARQUEE_ITEMS.map((item, i) => (
-            <span key={i} className="inline-flex items-center gap-3 text-[11px] font-semibold tracking-[0.13em] uppercase" style={{ color: C.warmMuted }}>
-              {item}
-              <span className="rounded-full inline-block flex-shrink-0" style={{ width: 4, height: 4, background: C.clay }} />
-            </span>
-          ))}
-        </div>
-      </div>
+      <a href={PROFILE.instagram} target="_blank" rel="noopener noreferrer" className={styles.follow}>
+        <LinkIcon name="instagram" size={18} />
+        Follow on Instagram
+      </a>
 
-      <div className="mt-8 text-center">
-        <NextLink href="/" className="text-xs font-semibold" style={{ textDecoration: "none" }}>
-          <span style={{ color: C.warmInk }}>Chris Solorzano</span>
-          <span style={{ color: C.warmMuted }}> · Bay Area Photography</span>
+      <p className={styles.footer}>
+        <NextLink href="/">
+          <strong>Chris Solorzano</strong> · Bay Area Photography
         </NextLink>
-      </div>
+      </p>
     </>
   );
 }
@@ -216,21 +193,15 @@ export default async function LinksPage() {
   const links = await getLinks();
 
   return (
-    <div className="min-h-screen font-sans" style={{ background: C.page }}>
+    <div className={`${styles.root} font-sans`} style={LINKS_THEME}>
       <LinksAnalytics />
-      <style>{PAGE_STYLES}</style>
+      <div className={`${styles.glow} ${styles.glowWarm}`} />
+      <div className={`${styles.glow} ${styles.glowClay}`} />
 
-      <div className="fixed inset-0 overflow-hidden pointer-events-none" style={{ zIndex: 0 }}>
-        <div
-          className="absolute rounded-full"
-          style={{ width: 760, height: 760, top: -420, left: "50%", marginLeft: -380, background: C.warmGlow }}
-        />
-      </div>
+      <div className={styles.column}>
+        <Hero />
 
-      <div className="relative z-10 flex flex-col items-center px-5 pt-10 pb-24 max-w-md mx-auto">
-        <ProfileHeader />
-
-        <div className="w-full space-y-3">
+        <div className={styles.links}>
           {links.map((link, i) => (
             <TrackedLink
               key={link.id}
@@ -239,14 +210,15 @@ export default async function LinksPage() {
               url={link.url}
               emoji={link.emoji}
               description={link.description}
-              animationDelay={`${0.1 + i * 0.06}s`}
               eyebrow={eyebrowForLink(link.url, i)}
-              featured={i === 0}
+              variant={cardVariant(i, links.length)}
+              order={6 + i}
             />
           ))}
         </div>
 
-        <PageFooter />
+        <LinksFilmstrip />
+        <Closing />
       </div>
     </div>
   );

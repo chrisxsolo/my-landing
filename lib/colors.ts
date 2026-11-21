@@ -103,6 +103,8 @@ export const C = {
   claySoft: "rgba(164,88,58,0.08)",
   clayBorder: "rgba(164,88,58,0.30)",
   warmGlow: "radial-gradient(circle, rgba(234,219,203,0.55), transparent 65%)",
+  clayDeep: "#8f4a30",
+  clayGlow: "radial-gradient(circle, rgba(164,88,58,0.12), transparent 65%)",
 
   // Soft fills (backgrounds, borders)
   p1_04:  `rgba(${r1},0.04)`,

@@ -1,0 +1,367 @@
+/* /links — every color arrives as a custom property set from lib/colors.ts on
+   .root (see LINKS_THEME in page.tsx), so no color value lives in this file. */
+
+.root {
+  position: relative;
+  min-height: 100vh;
+  overflow-x: clip;
+  background: var(--page);
+  color: var(--ink);
+}
+
+/* ── Background ─────────────────────────────────────────────── */
+.glow {
+  position: fixed;
+  border-radius: 50%;
+  pointer-events: none;
+}
+.glowWarm {
+  top: -380px;
+  left: 50%;
+  width: 720px;
+  height: 720px;
+  margin-left: -360px;
+  background: var(--glow-warm);
+  animation: drift 22s ease-in-out infinite alternate;
+}
+.glowClay {
+  right: -220px;
+  bottom: -260px;
+  width: 540px;
+  height: 540px;
+  background: var(--glow-clay);
+  animation: drift 28s ease-in-out infinite alternate-reverse;
+}
+
+.column {
+  position: relative;
+  z-index: 1;
+  max-width: 28rem;
+  margin: 0 auto;
+  padding: 1rem 1.25rem 4.5rem;
+}
+
+/* Staggered entrance: set --i on the element for its place in the sequence. */
+.rise {
+  animation: rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: calc(var(--i, 0) * 80ms);
+}
+
+/* ── Hero photo ─────────────────────────────────────────────── */
+.hero {
+  position: relative;
+  aspect-ratio: 3 / 2;
+  overflow: hidden;
+  border: 1px solid var(--edge);
+  border-radius: 28px;
+  background: var(--page-alt);
+  box-shadow: var(--shadow-lg);
+  animation: heroIn 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.hero img {
+  animation: kenBurns 20s ease-in-out infinite alternate;
+}
+.heroPill {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  max-width: calc(100% - 24px);
+  padding: 0.4rem 0.7rem;
+  border-radius: 999px;
+  background: var(--glass);
+  color: var(--ink);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.pulseDot {
+  position: relative;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--clay);
+}
+.pulseDot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--clay);
+  animation: pulse 2.4s ease-out infinite;
+}
+
+/* ── Identity row ───────────────────────────────────────────── */
+.identity {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 0.9rem;
+}
+.handle {
+  font-size: 1.125rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+.bio {
+  margin-top: 0.15rem;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.35;
+}
+.igIcon {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--edge);
+  border-radius: 50%;
+  background: var(--white);
+  color: var(--ink);
+  transition: border-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+.igIcon:hover {
+  border-color: var(--clay-border);
+  color: var(--clay);
+  transform: rotate(-8deg) scale(1.05);
+}
+
+/* ── Headline ───────────────────────────────────────────────── */
+.headline {
+  margin-top: 1.2rem;
+  font-family: var(--font-links-display), Georgia, serif;
+  font-size: 2.5rem;
+  font-weight: 500;
+  letter-spacing: -0.025em;
+  line-height: 1.04;
+  animation: sharpen 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: 0.16s;
+}
+.accent {
+  position: relative;
+  display: inline-block;
+  color: var(--clay);
+  font-style: italic;
+  white-space: nowrap;
+}
+.squiggle {
+  position: absolute;
+  right: 0;
+  bottom: -0.16em;
+  left: 0;
+  width: 100%;
+  height: 0.28em;
+  overflow: visible;
+}
+.squiggle path {
+  fill: none;
+  stroke: var(--clay);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: draw 0.8s ease-out 0.95s forwards;
+}
+.subcopy {
+  max-width: 34ch;
+  margin-top: 0.8rem;
+  color: var(--body);
+  font-size: 1rem;
+  line-height: 1.6;
+}
+.trust {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.55rem;
+  margin-top: 0.85rem;
+  color: var(--muted);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.trust li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+.trust li + li::before {
+  content: "";
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--clay);
+}
+
+/* ── Link cards ─────────────────────────────────────────────── */
+.links {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin-top: 1.4rem;
+}
+.eyebrow {
+  color: var(--eyebrow-color, var(--clay));
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+/* ── Recent work strip ──────────────────────────────────────── */
+.sectionHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-top: 2.5rem;
+}
+.sectionLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--ink);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+.sectionLink:hover {
+  color: var(--clay);
+}
+.strip {
+  overflow: hidden;
+  margin: 0.9rem -1.25rem 0;
+  mask-image: linear-gradient(90deg, transparent, var(--ink) 9%, var(--ink) 91%, transparent);
+  -webkit-mask-image: linear-gradient(90deg, transparent, var(--ink) 9%, var(--ink) 91%, transparent);
+}
+.track {
+  display: flex;
+  gap: 10px;
+  width: max-content;
+  padding: 0.25rem 0 0.75rem;
+  animation: slide 46s linear infinite;
+}
+.strip:hover .track {
+  animation-play-state: paused;
+}
+.frame {
+  position: relative;
+  flex-shrink: 0;
+  width: 132px;
+  aspect-ratio: 3 / 4;
+  overflow: hidden;
+  border: 1px solid var(--edge);
+  border-radius: 16px;
+  background: var(--page-alt);
+}
+
+/* ── Closing blocks ─────────────────────────────────────────── */
+.note {
+  margin-top: 1.75rem;
+  padding: 1.1rem 1.25rem;
+  border: 1px solid var(--edge);
+  border-radius: 20px;
+  background: var(--page-alt);
+}
+.noteText {
+  margin-top: 0.5rem;
+  color: var(--body);
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+.noteText strong {
+  color: var(--ink);
+  font-weight: 700;
+}
+.follow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  margin-top: 0.75rem;
+  padding: 0.9rem 1.25rem;
+  border: 1px solid var(--ink);
+  border-radius: 999px;
+  background: var(--white);
+  color: var(--ink);
+  font-size: 0.875rem;
+  font-weight: 700;
+  text-decoration: none;
+  transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+.follow:hover {
+  background: var(--ink);
+  color: var(--white);
+  transform: translateY(-2px);
+}
+.footer {
+  margin-top: 2rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-align: center;
+}
+.footer a {
+  color: inherit;
+  text-decoration: none;
+}
+.footer strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* ── Keyframes ──────────────────────────────────────────────── */
+@keyframes rise {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes heroIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes kenBurns {
+  from { transform: scale(1.02); }
+  to { transform: scale(1.12) translateY(-1.5%); }
+}
+@keyframes sharpen {
+  from { opacity: 0; filter: blur(8px); transform: translateY(14px); }
+  to { opacity: 1; filter: blur(0); transform: none; }
+}
+@keyframes draw {
+  to { stroke-dashoffset: 0; }
+}
+@keyframes pulse {
+  from { opacity: 0.7; transform: scale(1); }
+  to { opacity: 0; transform: scale(3.4); }
+}
+@keyframes slide {
+  from { transform: translateX(0); }
+  to { transform: translateX(calc(-50% - 5px)); }
+}
+@keyframes drift {
+  from { transform: translate3d(-24px, 0, 0) scale(1); }
+  to { transform: translate3d(24px, 18px, 0) scale(1.08); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise, .hero, .hero img, .headline, .track, .glow, .pulseDot::after {
+    animation: none;
+  }
+  .squiggle path {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+  .igIcon, .follow {
+    transition: none;
+  }
+}

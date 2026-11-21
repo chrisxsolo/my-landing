@@ -1,7 +1,11 @@
 "use client";
 
-import { C } from "@/lib/colors";
+import type { CSSProperties } from "react";
 import LinkIcon, { iconForEmoji } from "./LinkIcon";
+import styles from "./linkCards.module.css";
+import pageStyles from "./links.module.css";
+
+export type LinkCardVariant = "primary" | "tile" | "tileWide";
 
 type TrackedLinkProps = {
   id: number;
@@ -9,9 +13,10 @@ type TrackedLinkProps = {
   url: string;
   emoji: string | null;
   description: string | null;
-  animationDelay: string;
   eyebrow?: string;
-  featured?: boolean;
+  variant: LinkCardVariant;
+  /** Place in the entrance sequence. */
+  order: number;
 };
 
 function getUserId(): string {
@@ -53,15 +58,31 @@ function sendAnalytics(path: string, payload: object) {
   fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body, keepalive: true }).catch(() => {});
 }
 
+function Arrow({ diagonal }: { diagonal: boolean }) {
+  return (
+    <span className={styles.arrow}>
+      <svg width="14" height="14" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+        <path
+          d={diagonal ? "M3.5 9.5l6-6M4.5 3.5h5v5" : "M2.5 6.5h8M6.5 2.5l4 4-4 4"}
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </span>
+  );
+}
+
 export default function TrackedLink({
   id,
   label,
   url,
   emoji,
   description,
-  animationDelay,
   eyebrow,
-  featured = false,
+  variant,
+  order,
 }: TrackedLinkProps) {
   function handleClick(e: React.MouseEvent<HTMLAnchorElement>) {
     e.preventDefault();
@@ -76,8 +97,22 @@ export default function TrackedLink({
     window.open(url, "_blank", "noopener,noreferrer");
   }
 
-  const tile = featured ? 56 : 48;
-  const arrow = featured ? 42 : 34;
+  const isPrimary = variant === "primary";
+  const icon = (
+    <span className={styles.iconBox}>
+      <LinkIcon name={iconForEmoji(emoji)} size={isPrimary ? 26 : 20} />
+    </span>
+  );
+  const text = (
+    <span className="block min-w-0 flex-1">
+      {eyebrow ? <span className={`block ${pageStyles.eyebrow}`}>{eyebrow}</span> : null}
+      <span className={`block ${styles.label}`}>{label}</span>
+      {description ? <span className={`block ${styles.description}`}>{description}</span> : null}
+    </span>
+  );
+  const variantClass = isPrimary
+    ? styles.primary
+    : `${styles.tile} ${variant === "tileWide" ? styles.tileWide : ""}`;
 
   return (
     <a
@@ -85,66 +120,24 @@ export default function TrackedLink({
       target="_blank"
       rel="noopener noreferrer"
       onClick={handleClick}
-      className={`link-card flex items-center gap-4 w-full px-5 ${featured ? "rounded-3xl py-6" : "rounded-2xl py-[1.125rem]"}`}
-      style={{
-        animationDelay,
-        background: featured ? C.pageAlt : C.white,
-        border: `1px solid ${featured ? C.clayBorder : C.warmEdge}`,
-        boxShadow: featured ? C.shadowWarm : undefined,
-      }}
+      className={`${styles.card} ${variantClass}`}
+      style={{ "--i": order } as CSSProperties}
     >
-      <div
-        className={`flex items-center justify-center flex-shrink-0 ${featured ? "rounded-2xl" : "rounded-xl"}`}
-        style={{
-          width: tile,
-          height: tile,
-          background: featured ? C.white : C.pageAlt,
-          border: `1px solid ${C.warmEdge}`,
-          color: C.clay,
-        }}
-      >
-        <LinkIcon name={iconForEmoji(emoji)} size={featured ? 26 : 22} />
-      </div>
-
-      <div className="flex-1 min-w-0">
-        {eyebrow ? (
-          <p
-            className="mb-1 text-[11px] font-bold uppercase tracking-[0.16em]"
-            style={{ color: C.clay }}
-          >
-            {eyebrow}
-          </p>
-        ) : null}
-        <p
-          className={`font-bold leading-tight tracking-tight ${featured ? "text-[1.6rem]" : "text-base"}`}
-          style={{ color: C.warmInk }}
-        >
-          {label}
-        </p>
-        {description ? (
-          <p
-            className={`mt-1 leading-tight ${featured ? "text-[1rem] max-w-[24ch]" : "text-sm truncate"}`}
-            style={{ color: C.warmBody }}
-          >
-            {description}
-          </p>
-        ) : null}
-      </div>
-
-      <div
-        className="link-arrow rounded-full flex items-center justify-center flex-shrink-0"
-        style={{
-          width: arrow,
-          height: arrow,
-          background: featured ? C.clay : "transparent",
-          border: `1px solid ${featured ? C.clay : C.warmEdge}`,
-          color: featured ? C.white : C.clay,
-        }}
-      >
-        <svg width={featured ? "15" : "13"} height={featured ? "15" : "13"} viewBox="0 0 13 13" fill="none" aria-hidden="true">
-          <path d="M2.5 6.5h8M6.5 2.5l4 4-4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </div>
+      {isPrimary ? (
+        <>
+          {icon}
+          {text}
+          <Arrow diagonal={false} />
+        </>
+      ) : (
+        <>
+          <span className={styles.tileTop}>
+            {icon}
+            <Arrow diagonal />
+          </span>
+          {text}
+        </>
+      )}
     </a>
   );
 }

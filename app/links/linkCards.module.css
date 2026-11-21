@@ -1,0 +1,171 @@
+/* /links cards. Colors come from the custom properties set on the page root
+   (LINKS_THEME in page.tsx), so no color value lives in this file. */
+
+.card {
+  position: relative;
+  display: flex;
+  overflow: hidden;
+  border: 1px solid var(--edge);
+  background: var(--white);
+  transition: transform 0.22s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.22s ease,
+    border-color 0.22s ease;
+  animation: rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: calc(var(--i, 0) * 80ms);
+  -webkit-tap-highlight-color: transparent;
+}
+.card:hover {
+  border-color: var(--clay-border);
+  box-shadow: var(--shadow);
+  transform: translateY(-3px);
+}
+.card:active {
+  transform: scale(0.98);
+}
+.label {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+.description {
+  color: var(--body);
+  line-height: 1.35;
+}
+.iconBox {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: var(--clay-soft);
+  color: var(--clay);
+  transition: background 0.22s ease, color 0.22s ease;
+}
+.arrow {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: transform 0.22s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+/* Primary: the one filled card. */
+.primary {
+  grid-column: 1 / -1;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.35rem 1.25rem;
+  border-color: var(--clay);
+  border-radius: 24px;
+  background: var(--clay);
+  color: var(--white);
+  box-shadow: var(--shadow);
+  --eyebrow-color: var(--page-alt);
+}
+.primary:hover {
+  border-color: var(--clay-deep);
+  background: var(--clay-deep);
+  box-shadow: var(--shadow-lg);
+}
+.primary::after {
+  content: "";
+  position: absolute;
+  top: -20%;
+  bottom: -20%;
+  left: -45%;
+  width: 34%;
+  background: linear-gradient(90deg, transparent, var(--sheen), transparent);
+  transform: skewX(-18deg);
+  animation: sheen 6.5s ease-in-out 1.6s infinite;
+}
+.primary .description {
+  color: var(--page-alt);
+}
+.primary .label {
+  font-size: 1.5rem;
+}
+.primary .description {
+  margin-top: 0.3rem;
+  font-size: 0.9375rem;
+}
+.primary .iconBox {
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  background: var(--sheen);
+  color: var(--white);
+}
+.primary .arrow {
+  width: 42px;
+  height: 42px;
+  background: var(--white);
+  color: var(--clay);
+}
+.primary:hover .arrow {
+  transform: translateX(4px);
+}
+
+/* Tiles: the two-column grid below the primary card. */
+.tile {
+  flex-direction: column;
+  min-height: 9.5rem;
+  padding: 0.95rem;
+  border-radius: 20px;
+}
+.tileWide {
+  grid-column: 1 / -1;
+}
+.tileTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: auto;
+  padding-bottom: 0.9rem;
+}
+.tile .iconBox {
+  width: 40px;
+  height: 40px;
+}
+.tile:hover .iconBox {
+  background: var(--clay);
+  color: var(--white);
+}
+.tile .arrow {
+  width: 28px;
+  height: 28px;
+  color: var(--muted);
+}
+.tile:hover .arrow {
+  color: var(--clay);
+  transform: translate(2px, -2px);
+}
+.tile .label {
+  margin-top: 0.25rem;
+  font-size: 0.9375rem;
+}
+.tile .description {
+  display: -webkit-box;
+  overflow: hidden;
+  margin-top: 0.25rem;
+  font-size: 0.8125rem;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes sheen {
+  0%, 72% { left: -45%; }
+  100% { left: 130%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card, .primary::after {
+    animation: none;
+  }
+  .card, .arrow, .iconBox {
+    transition: none;
+  }
+}
